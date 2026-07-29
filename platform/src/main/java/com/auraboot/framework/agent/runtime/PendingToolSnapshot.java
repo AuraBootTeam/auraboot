@@ -1,6 +1,8 @@
 package com.auraboot.framework.agent.runtime;
 
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
+import com.auraboot.framework.agent.identity.ExecutionPrincipal;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelope;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -35,6 +37,12 @@ public class PendingToolSnapshot {
      *  action is SYNC_ACTION, not "bucket unknown"). Enum name as String for
      *  serialization stability; null on pre-F1 rows. */
     private String triageBucket;
+    /**
+     * Immutable execution identity and routing snapshot captured at suspend
+     * time. Null only for snapshots created before context-envelope/v1.
+     */
+    private ExecutionPrincipal executionPrincipal;
+    private ContextEnvelope contextEnvelope;
 
     private String toolId;
     private String toolName;

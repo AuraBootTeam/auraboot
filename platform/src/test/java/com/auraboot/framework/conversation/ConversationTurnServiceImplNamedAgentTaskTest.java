@@ -1,6 +1,11 @@
 package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.port.AgentChatPort;
+import com.auraboot.framework.agent.identity.DelegationGrant;
+import com.auraboot.framework.agent.identity.ExecutionPrincipal;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalResolver;
+import com.auraboot.framework.agent.identity.Initiator;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeFactory;
 import com.auraboot.framework.agent.runtime.TurnExecutionPlanner;
 import com.auraboot.framework.agent.runtime.PendingContinuationService;
 import com.auraboot.framework.agent.runtime.PendingToolStore;
@@ -18,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,6 +49,7 @@ class ConversationTurnServiceImplNamedAgentTaskTest {
     @Mock private TurnSideEffects.EventEmitter eventEmitter;
     @Mock private TurnSideEffects.AuditWriter auditWriter;
     @Mock private TurnSideEffects.MetricsRecorder metricsRecorder;
+    @Mock private ExecutionPrincipalResolver executionPrincipalResolver;
 
     @AfterEach
     void clearMeta() {
@@ -105,7 +112,26 @@ class ConversationTurnServiceImplNamedAgentTaskTest {
                 new TurnExecutionPlanner(),
                 sideEffects,
                 pendingToolStore,
-                new ObjectMapper());
+                new ObjectMapper(),
+                executionPrincipalResolver,
+                new ContextEnvelopeFactory());
+        when(executionPrincipalResolver.resolve(any())).thenReturn(new ExecutionPrincipal(
+                1L,
+                2L,
+                3L,
+                "user-2",
+                "tester",
+                4L,
+                null,
+                Initiator.human(2L, 3L, "web"),
+                DelegationGrant.directUser(),
+                "sales_agent",
+                "agent-release-test",
+                "deployment-test",
+                "release-hash-test",
+                "web",
+                ExecutionPrincipal.Type.HUMAN_DELEGATED,
+                Set.of()));
         ReflectionTestUtils.setField(service, "agentChatPort", agentChatPort);
         ReflectionTestUtils.setField(service, "dynamicDataMapper", dynamicDataMapper);
         return service;

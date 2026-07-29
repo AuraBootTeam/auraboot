@@ -42,4 +42,29 @@ public interface AgentDefinitionMapper extends BaseMapper<AgentDefinition> {
                 .eq(AgentDefinition::getPid, pid)
                 .last("LIMIT 1"));
     }
+
+    /**
+     * Tenant-scoped lookup used at the execution-identity boundary.
+     *
+     * <p>Do not filter by lifecycle status here: principal resolution must be
+     * able to distinguish a missing identity from a suspended/inactive one and
+     * fail with the correct closed decision.
+     */
+    default AgentDefinition findByTenantIdAndAgentCode(Long tenantId, String agentCode) {
+        return selectOne(new LambdaQueryWrapper<AgentDefinition>()
+                // Identity resolution intentionally reads only identity fields.
+                // This keeps the authorization boundary independent from
+                // optional feature columns that may be rolled out later.
+                .select(
+                        AgentDefinition::getId,
+                        AgentDefinition::getPid,
+                        AgentDefinition::getTenantId,
+                        AgentDefinition::getAgentCode,
+                        AgentDefinition::getStatus,
+                        AgentDefinition::getSystemUserId,
+                        AgentDefinition::getEmployeeId)
+                .eq(AgentDefinition::getTenantId, tenantId)
+                .eq(AgentDefinition::getAgentCode, agentCode)
+                .last("LIMIT 1"));
+    }
 }

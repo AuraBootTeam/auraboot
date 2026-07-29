@@ -66,7 +66,7 @@ class ModelCapabilitiesControllerIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setupMvc() {
-        grantPermissionToTestRole(
+        grantCommittedPermissionToTestRole(
                 PERMISSION_CODE,
                 "meta",
                 "model",

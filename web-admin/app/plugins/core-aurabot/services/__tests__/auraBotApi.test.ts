@@ -68,6 +68,52 @@ describe('auraBotApi SSE requests', () => {
       }),
     );
   });
+
+  it('delivers structured retrieval evidence without parsing model text', async () => {
+    const evidence = {
+      evidenceId: 'chunk:chunk-1',
+      kbPid: 'kb-1',
+      documentPid: 'doc-1',
+      documentVersionPid: 'doc-version-1',
+      chunkPid: 'chunk-1',
+      chunkIndex: 2,
+      path: 'hybrid',
+      vectorScore: 0.9,
+      lexicalScore: 0.5,
+      fusedScore: 0.78,
+      rerankScore: 0.82,
+      citationLocator: 'knowledge/kb-1/documents/doc-1#chunk-2',
+      warnings: [],
+    };
+    const response = new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            new TextEncoder().encode(
+              `event: retrieval_evidence\ndata: ${JSON.stringify({ evidence: [evidence] })}\n\n` +
+                'event: done\ndata: {"content":"answer without citation-looking prose"}\n\n',
+            ),
+          );
+          controller.close();
+        },
+      }),
+      { status: 200, statusText: 'OK' },
+    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+    const onRetrievalEvidence = vi.fn();
+
+    await auraBotApi.chatStream(
+      { sessionId: 'session-1', message: 'hello' },
+      {
+        onChunk: vi.fn(),
+        onDone: vi.fn(),
+        onError: vi.fn(),
+        onRetrievalEvidence,
+      },
+    );
+
+    expect(onRetrievalEvidence).toHaveBeenCalledWith([evidence]);
+  });
 });
 
 // =============================================================================

@@ -98,7 +98,7 @@ class AgentChatContextAdapterRagTest {
 
         List<AgentContextBlock> blocks =
                 adapter.assemble(TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
-                        request(List.of("kb-1")), List.of("kb-bound"));
+                        request(List.of("kb-1")), List.of("kb-bound", "kb-1"));
 
         assertThat(hasRagBlock(blocks))
                 .as("a named agent given a knowledge base id must get a retrieved-data block")
@@ -108,6 +108,52 @@ class AgentChatContextAdapterRagTest {
                 .isTrue();
         verify(rag).retrieveContext(TENANT_ID,
                 "how often is ZQ-7731 calibrated?", List.of("kb-1"));
+    }
+
+    @Test
+    void group_turn_without_page_context_still_uses_the_agents_bound_knowledge_base() {
+        RagContextProvider rag = mock(RagContextProvider.class);
+        when(rag.retrieveContext(anyLong(), anyString(), any()))
+                .thenReturn("Group-channel handbook evidence.");
+        var adapter = adapterWith(rag);
+        ChatRequest groupRequest = request(null);
+        groupRequest.setPageContext(null);
+
+        List<AgentContextBlock> blocks =
+                adapter.assemble(
+                        TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
+                        groupRequest,
+                        List.of("kb-group-bound"));
+
+        verify(rag).retrieveContext(
+                TENANT_ID,
+                "how often is ZQ-7731 calibrated?",
+                List.of("kb-group-bound"));
+        assertThat(hasRagBlock(blocks)).isTrue();
+        assertThat(blocks.stream().anyMatch(
+                block -> block.body().contains("Group-channel handbook evidence.")))
+                .isTrue();
+    }
+
+    @Test
+    void request_selection_cannot_expand_the_agents_knowledge_perimeter() {
+        RagContextProvider rag = mock(RagContextProvider.class);
+        var adapter = adapterWith(rag);
+
+        List<AgentContextBlock> blocks =
+                adapter.assemble(TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
+                        request(List.of("kb-not-bound")), List.of("kb-bound"));
+
+        verify(rag, never()).retrieveContext(anyLong(), anyString(), any());
+        assertThat(hasRagBlock(blocks)).isFalse();
+    }
+
+    @Test
+    void request_selection_can_narrow_the_agents_knowledge_perimeter() {
+        assertThat(AgentChatContextAdapter.effectiveKnowledgeBaseIds(
+                List.of("kb-b", "kb-not-bound", "kb-b"),
+                List.of("kb-a", "kb-b")))
+                .containsExactly("kb-b");
     }
 
     @Test
@@ -166,7 +212,7 @@ class AgentChatContextAdapterRagTest {
 
         List<AgentContextBlock> blocks =
                 adapter.assemble(TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
-                        request(List.of("kb-1")), List.of());
+                        request(List.of("kb-1")), List.of("kb-1"));
 
         // Answering without the knowledge base beats not answering; the operator sees a warn.
         assertThat(hasRagBlock(blocks)).isFalse();
@@ -178,7 +224,7 @@ class AgentChatContextAdapterRagTest {
 
         List<AgentContextBlock> blocks =
                 adapter.assemble(TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
-                        request(List.of("kb-1")), List.of());
+                        request(List.of("kb-1")), List.of("kb-1"));
 
         assertThat(hasRagBlock(blocks)).isFalse();
     }
@@ -193,7 +239,7 @@ class AgentChatContextAdapterRagTest {
         req.setMessage("   ");
 
         adapter.assemble(TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
-                req, List.of());
+                req, List.of("kb-1"));
 
         verify(rag, never()).retrieveContext(anyLong(), anyString(), any());
     }

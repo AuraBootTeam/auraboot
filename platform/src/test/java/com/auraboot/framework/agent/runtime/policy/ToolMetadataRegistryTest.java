@@ -29,8 +29,24 @@ class ToolMetadataRegistryTest {
         assertThat(metadata.getToolName()).isEqualTo("nq:crm_customer_stats");
         assertThat(metadata.getEffectType()).isEqualTo(ToolEffectType.INTERNAL_READ);
         assertThat(metadata.getMetadataTrustLevel()).isEqualTo(ToolMetadataTrustLevel.VERIFIED);
+        assertThat(metadata.getPolicyVersion()).isEqualTo(RiskScale.VERSION);
         assertThat(metadata.getApprovalRequirement()).isEqualTo(ApprovalRequirement.NONE);
         assertThat(metadata.getDurabilityRequirement()).isEqualTo(DurabilityRequirement.NONE);
+    }
+
+    @Test
+    @DisplayName("normalizes legacy risk aliases before approval routing")
+    void normalizesLegacyAliases() {
+        ToolDefinition highRisk = ToolDefinition.builder()
+                .toolCode("cmd:delete_account")
+                .toolType("dsl_command")
+                .riskLevel("critical")
+                .build();
+
+        ToolMetadata metadata = registry.from(highRisk, ToolMetadataTrustLevel.VERIFIED);
+
+        assertThat(metadata.getRiskLevel()).isEqualTo("L4");
+        assertThat(metadata.getApprovalRequirement()).isEqualTo(ApprovalRequirement.HUMAN_APPROVAL);
     }
 
     @Test

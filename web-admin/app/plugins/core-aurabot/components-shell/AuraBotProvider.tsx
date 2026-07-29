@@ -21,6 +21,7 @@ import {
   auraBotApi,
   type AuraBotConversationItem,
   type AuraBotConversationMessage,
+  type RetrievalEvidence,
 } from '../services/auraBotApi';
 
 // ============================================================================
@@ -61,6 +62,7 @@ interface SimpleMessage {
   toolInput?: Record<string, any>;
   toolResult?: Record<string, any>;
   resultContract?: import('../types/ResultContract').ResultContract;
+  retrievalEvidence?: RetrievalEvidence[];
   traceId?: string;
   /**
    * Phase B.6: persisted on confirm_card so confirmTool / cancelTool can echo
@@ -130,7 +132,13 @@ type AuraBotAction =
   | { type: 'add_message'; payload: SimpleMessage }
   | {
       type: 'update_message';
-      payload: { id: string; content?: string; type?: SimpleMessage['type']; traceId?: string };
+      payload: {
+        id: string;
+        content?: string;
+        type?: SimpleMessage['type'];
+        traceId?: string;
+        retrievalEvidence?: RetrievalEvidence[];
+      };
     }
   | { type: 'append_message_content'; payload: { id: string; chunk: string } }
   | { type: 'add_tool_message'; payload: SimpleMessage }
@@ -265,6 +273,7 @@ export function toSimpleMessages(message: AuraBotConversationMessage): SimpleMes
     timestamp: baseTimestamp,
     content: message.content || '',
     traceId: message.traceId || undefined,
+    retrievalEvidence: message.retrievalEvidence,
   });
   return out;
 }
@@ -310,6 +319,9 @@ function auraBotReducer(state: AuraBotState, action: AuraBotAction): AuraBotStat
                 ...(action.payload.type !== undefined ? { type: action.payload.type } : {}),
                 ...(action.payload.traceId !== undefined
                   ? { traceId: action.payload.traceId }
+                  : {}),
+                ...(action.payload.retrievalEvidence !== undefined
+                  ? { retrievalEvidence: action.payload.retrievalEvidence }
                   : {}),
               }
             : msg,
@@ -863,6 +875,12 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
                   content: contract.textSummary ?? '',
                   resultContract: contract,
                 },
+              });
+            },
+            onRetrievalEvidence: (evidence) => {
+              dispatch({
+                type: 'update_message',
+                payload: { id: botMsgId, retrievalEvidence: evidence },
               });
             },
             onThinking: (content: string, tokens: number, signature?: string) => {

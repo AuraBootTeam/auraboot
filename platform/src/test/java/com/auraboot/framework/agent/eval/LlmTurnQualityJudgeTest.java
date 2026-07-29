@@ -45,8 +45,8 @@ class LlmTurnQualityJudgeTest {
 
     private void providerReplies(String text) throws Exception {
         LlmProviderFactory.ProviderConfig cfg = new LlmProviderFactory.ProviderConfig();
-        cfg.setProviderCode("qianwen");
-        cfg.setDefaultModel("qwen-plus");
+        cfg.setProviderCode("provider-under-test");
+        cfg.setDefaultModel("model-under-test");
         cfg.setApiKey("test-key-not-real");
         cfg.setBaseUrl("https://example.invalid");
         lenient().when(llmProviderFactory.resolveConfig(any(), any())).thenReturn(cfg);
@@ -125,8 +125,8 @@ class LlmTurnQualityJudgeTest {
     @DisplayName("a provider error means not judged, never healthy")
     void providerErrorFailsClosed() throws Exception {
         LlmProviderFactory.ProviderConfig cfg = new LlmProviderFactory.ProviderConfig();
-        cfg.setProviderCode("qianwen");
-        cfg.setDefaultModel("qwen-plus");
+        cfg.setProviderCode("provider-under-test");
+        cfg.setDefaultModel("model-under-test");
         cfg.setApiKey("test-key-not-real");
         cfg.setBaseUrl("https://example.invalid");
         when(llmProviderFactory.resolveConfig(any(), any())).thenReturn(cfg);

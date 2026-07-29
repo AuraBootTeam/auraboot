@@ -64,6 +64,14 @@
     "dictCode": "acp_ai_model"
   },
   {
+    "code": "visibility",
+    "displayName:zh-CN": "可见范围",
+    "displayName:en": "Visibility",
+    "dataType": "enum",
+    "dictCode": "acp_agent_visibility",
+    "defaultValue": "private"
+  },
+  {
     "code": "system_prompt",
     "displayName:zh-CN": "系统提示词",
     "displayName:en": "System Prompt",
@@ -1632,6 +1640,83 @@
       "multiline": true,
       "placeholder:zh-CN": "JSON 数组:query/create/update/delete/transition",
       "placeholder:en": "JSON array: query/create/update/delete/transition"
+    }
+  },
+  {
+    "code": "proactive_policy",
+    "displayName:zh-CN": "主动履职策略",
+    "displayName:en": "Proactive Policy",
+    "dataType": "json",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "JSON: allowedChannels、quietHours、dailyRunBudget、managerMemberId",
+      "placeholder:en": "JSON: allowedChannels, quiet hours, daily budget and manager scope"
+    }
+  },
+  {
+    "code": "manager_member_id",
+    "displayName:zh-CN": "主管成员 ID",
+    "displayName:en": "Manager Member ID",
+    "dataType": "integer"
+  },
+  {
+    "code": "quiet_hours_start",
+    "displayName:zh-CN": "静默时段开始",
+    "displayName:en": "Quiet Hours Start",
+    "dataType": "string",
+    "extension": {
+      "placeholder:zh-CN": "22:00",
+      "placeholder:en": "22:00"
+    }
+  },
+  {
+    "code": "quiet_hours_end",
+    "displayName:zh-CN": "静默时段结束",
+    "displayName:en": "Quiet Hours End",
+    "dataType": "string",
+    "extension": {
+      "placeholder:zh-CN": "07:00",
+      "placeholder:en": "07:00"
+    }
+  },
+  {
+    "code": "daily_run_budget",
+    "displayName:zh-CN": "每日运行预算",
+    "displayName:en": "Daily Run Budget",
+    "dataType": "integer",
+    "defaultValue": 24
+  },
+  {
+    "code": "concurrency_limit",
+    "displayName:zh-CN": "并发上限",
+    "displayName:en": "Concurrency Limit",
+    "dataType": "integer",
+    "defaultValue": 1
+  },
+  {
+    "code": "missed_run_policy",
+    "displayName:zh-CN": "错过触发策略",
+    "displayName:en": "Missed Run Policy",
+    "dataType": "enum",
+    "dictCode": "acp_missed_run_policy",
+    "defaultValue": "skip"
+  },
+  {
+    "code": "agent_release_pid",
+    "displayName:zh-CN": "固定 Agent Release",
+    "displayName:en": "Pinned Agent Release",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 26
+    }
+  },
+  {
+    "code": "last_block_reason",
+    "displayName:zh-CN": "最近阻断原因",
+    "displayName:en": "Last Block Reason",
+    "dataType": "string",
+    "extension": {
+      "readonly": true
     }
   },
   {

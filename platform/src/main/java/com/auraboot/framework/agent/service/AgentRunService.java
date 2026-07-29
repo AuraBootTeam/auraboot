@@ -1,6 +1,10 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.config.AgentProperties;
+import com.auraboot.framework.agent.identity.ExecutionPrincipal;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalResolver;
+import com.auraboot.framework.agent.identity.Initiator;
 import com.auraboot.framework.agent.dto.AgentPlanStep;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.eval.RunOutcomeEvaluator;
@@ -12,12 +16,18 @@ import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.agent.runtime.AgentExecutionState;
 import com.auraboot.framework.agent.runtime.AgentRuntimeStateFactory;
 import com.auraboot.framework.agent.runtime.LlmRuntimeResolver;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelope;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeFactory;
+import com.auraboot.framework.aurabot.service.RagContextProvider;
 import com.auraboot.framework.agent.memory.SessionEndedEvent;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.SpanContext;
 import com.auraboot.framework.agent.trace.TraceContext;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.conversation.ResponseSink;
+import com.auraboot.framework.conversation.ResponseSinkContext;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
@@ -65,6 +75,17 @@ public class AgentRunService {
     private final AgentSkillService skillService;
     private final ApplicationEventPublisher eventPublisher;
     private final AgentRuntimeStateFactory runtimeStateFactory;
+    private final ExecutionPrincipalResolver executionPrincipalResolver;
+    private final ContextEnvelopeFactory contextEnvelopeFactory;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private RagContextProvider ragContextProvider;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.rag.service.RetrievalEvidenceLedger retrievalEvidenceLedger;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AgentReleaseDeploymentService releaseDeploymentService;
 
     /**
      * User Soul Profile grounding reader (plan §5.5 / PR-77).
@@ -99,22 +120,14 @@ public class AgentRunService {
      */
     @Async
     public void executeTask(Long tenantId, String taskPid, String agentCode) {
-        MetaContext.setSystemTenantContext(tenantId);
-        try {
-            executeTaskSync(tenantId, taskPid, agentCode, null);
-        } finally {
-            MetaContext.clear();
-        }
+        executeTaskWithResolvedPrincipal(
+                tenantId, taskPid, agentCode, null, null, null);
     }
 
     @Async
     public void executeTaskWithResume(Long tenantId, String taskPid, String agentCode, String resumeFromRunPid) {
-        MetaContext.setSystemTenantContext(tenantId);
-        try {
-            executeTaskSync(tenantId, taskPid, agentCode, resumeFromRunPid);
-        } finally {
-            MetaContext.clear();
-        }
+        executeTaskWithResolvedPrincipal(
+                tenantId, taskPid, agentCode, resumeFromRunPid, null, null);
     }
 
     /**
@@ -136,12 +149,224 @@ public class AgentRunService {
     @Async
     public void executeTaskForExistingRun(Long tenantId, String taskPid, String agentCode,
                                           String existingRunPid) {
-        MetaContext.setSystemTenantContext(tenantId);
-        try {
-            executeTaskSync(tenantId, taskPid, agentCode, null, existingRunPid);
-        } finally {
-            MetaContext.clear();
+        executeTaskWithResolvedPrincipal(
+                tenantId, taskPid, agentCode, null, existingRunPid, null);
+    }
+
+    /**
+     * Explicit schedule entry. A schedule has no human actor and therefore can
+     * only run through an enrolled digital employee principal.
+     */
+    @Async
+    public void executeScheduledTask(
+            Long tenantId,
+            String taskPid,
+            String agentCode,
+            String schedulePid) {
+        Initiator initiator = new Initiator(
+                Initiator.Type.SCHEDULE,
+                null,
+                null,
+                "schedule:" + Objects.toString(schedulePid, ""));
+        executeTaskWithResolvedPrincipal(
+                tenantId, taskPid, agentCode, null, null, initiator);
+    }
+
+    /**
+     * Explicit event-trigger entry. The event identifies why work started but
+     * never supplies runtime authority; only an enrolled digital employee can
+     * resolve the resulting principal.
+     */
+    @Async
+    public void executeEventTask(
+            Long tenantId,
+            String taskPid,
+            String agentCode,
+            String eventType) {
+        Initiator initiator = new Initiator(
+                Initiator.Type.EVENT,
+                null,
+                null,
+                "event:" + Objects.toString(eventType, ""));
+        executeTaskWithResolvedPrincipal(
+                tenantId, taskPid, agentCode, null, null, initiator);
+    }
+
+    private void executeTaskWithResolvedPrincipal(
+            Long tenantId,
+            String taskPid,
+            String agentCode,
+            String resumeFromRunPid,
+            String existingRunPid,
+            Initiator explicitInitiator) {
+        MetaContext.Snapshot incoming = MetaContext.snapshot();
+        boolean installedSystemTenant = incoming == null;
+        if (installedSystemTenant) {
+            MetaContext.setSystemTenantContext(tenantId);
         }
+        try {
+            ExecutionPrincipal inherited =
+                    ExecutionPrincipalContext.current().orElse(null);
+            Initiator initiator = explicitInitiator != null
+                    ? explicitInitiator
+                    : inherited != null
+                        ? inherited.initiator()
+                        : systemInitiatorWhenUnauthenticated();
+            Long initiatorUserId = initiator.type() == Initiator.Type.HUMAN
+                    ? initiator.userId()
+                    : null;
+            Long initiatorMemberId = initiator.type() == Initiator.Type.HUMAN
+                    ? initiator.memberId()
+                    : null;
+            ContextEnvelope envelope = resumeFromRunPid == null
+                    ? null
+                    : restoreResumeEnvelope(tenantId, agentCode, resumeFromRunPid);
+            ExecutionPrincipal principal = envelope != null
+                    ? envelope.principal()
+                    : executionPrincipalResolver.resolve(
+                            new ExecutionPrincipalResolver.ResolveRequest(
+                                    tenantId,
+                                    initiatorUserId,
+                                    initiatorMemberId,
+                                    agentCode,
+                                    initiator.channel(),
+                                    initiator.type() == Initiator.Type.HUMAN
+                                            ? null
+                                            : initiator));
+            if (envelope == null) {
+                envelope = contextEnvelopeFactory.compile(
+                        new ContextEnvelopeFactory.CompileRequest(
+                                existingRunPid != null ? existingRunPid : taskPid,
+                                principal,
+                                initiator.channel(),
+                                null,
+                                null,
+                                null,
+                                null,
+                                Set.of(),
+                                List.of(),
+                                Map.of(),
+                                null,
+                                null,
+                                java.time.Instant.now(),
+                                true));
+            }
+            ContextEnvelope executionEnvelope = envelope;
+            ExecutionPrincipalContext.callAs(
+                    principal,
+                    () -> ContextEnvelopeContext.callWith(
+                            executionEnvelope,
+                            () -> executeTaskSync(
+                                    tenantId,
+                                    taskPid,
+                                    agentCode,
+                                    resumeFromRunPid,
+                                    existingRunPid)));
+        } catch (RuntimeException e) {
+            log.error(
+                    "Agent task principal resolution/execution failed: tenant={}, task={}, agent={}, error={}",
+                    tenantId,
+                    taskPid,
+                    agentCode,
+                    e.getMessage(),
+                    e);
+            // Async entry points have no caller that can observe an exception.
+            // Persist a terminal task state so principal-resolution/context
+            // compilation failures are visible and do not leave work in todo
+            // forever. A sub-agent path may have pre-seeded the run row; that
+            // row must also transition terminal or it becomes a permanently
+            // "running" orphan even though its task is blocked.
+            try {
+                String failure = "Execution principal/context setup failed: "
+                        + Objects.toString(e.getMessage(), e.getClass().getSimpleName());
+                if (existingRunPid != null && !existingRunPid.isBlank()) {
+                    runLifecycleService.failRun(
+                            tenantId,
+                            existingRunPid,
+                            taskPid,
+                            LocalDateTime.now(),
+                            failure);
+                } else {
+                    runLifecycleService.failTask(tenantId, taskPid, failure);
+                }
+            } catch (RuntimeException persistenceFailure) {
+                log.error(
+                        "Could not persist agent async setup failure: tenant={}, task={}, error={}",
+                        tenantId,
+                        taskPid,
+                        persistenceFailure.getMessage(),
+                        persistenceFailure);
+            }
+        } finally {
+            if (installedSystemTenant) {
+                MetaContext.clear();
+            }
+        }
+    }
+
+    private ContextEnvelope restoreResumeEnvelope(
+            Long tenantId,
+            String agentCode,
+            String resumeFromRunPid) {
+        String sql = """
+                SELECT context_envelope, context_envelope_hash
+                FROM ab_agent_run
+                WHERE tenant_id = #{params.tenantId}
+                  AND pid = #{params.runPid}
+                  AND agent_id = #{params.agentCode}
+                LIMIT 1
+                """;
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(
+                sql,
+                Map.of(
+                        "tenantId", tenantId,
+                        "runPid", resumeFromRunPid,
+                        "agentCode", agentCode));
+        if (rows.size() != 1) {
+            throw new IllegalStateException(
+                    "Resume source run not found in tenant/agent scope: "
+                            + resumeFromRunPid);
+        }
+        Map<String, Object> row = rows.get(0);
+        Object serialized = row.get("context_envelope");
+        Object persistedHash = row.get("context_envelope_hash");
+        if (serialized == null || String.valueOf(serialized).isBlank()
+                || persistedHash == null || String.valueOf(persistedHash).isBlank()) {
+            throw new IllegalStateException(
+                    "Resume source has no immutable ContextEnvelope: "
+                            + resumeFromRunPid);
+        }
+        try {
+            ContextEnvelope envelope = objectMapper.readValue(
+                    String.valueOf(serialized),
+                    ContextEnvelope.class);
+            if (!String.valueOf(persistedHash).equals(envelope.envelopeHash())
+                    || !contextEnvelopeFactory.verify(envelope)
+                    || envelope.tenantId() != tenantId
+                    || !agentCode.equals(envelope.agentCode())) {
+                throw new IllegalStateException(
+                        "Resume ContextEnvelope verification failed: "
+                                + resumeFromRunPid);
+            }
+            return envelope;
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Resume ContextEnvelope is invalid: " + resumeFromRunPid,
+                    e);
+        }
+    }
+
+    private Initiator systemInitiatorWhenUnauthenticated() {
+        if (MetaContext.exists()) {
+            Long userId = MetaContext.getCurrentUserId();
+            Long memberId = MetaContext.getCurrentMemberId();
+            if (userId != null && userId > 0L && memberId != null && memberId > 0L) {
+                return Initiator.human(userId, memberId, "acp_async");
+            }
+        }
+        return new Initiator(Initiator.Type.SYSTEM, null, null, "acp_async");
     }
 
     /**
@@ -196,7 +421,7 @@ public class AgentRunService {
         try {
             traceCtx = aiTraceService.createTrace(tenantId, runPid,
                     "agent:" + agentCode + " task:" + taskPid,
-                    MetaContext.getCurrentUserId(),
+                    currentInitiatorUserId(),
                     Map.of("agentCode", agentCode, "taskPid", taskPid));
         } catch (Exception e) {
             log.debug("Failed to create trace for run {}: {}", runPid, e.getMessage());
@@ -320,8 +545,32 @@ public class AgentRunService {
                 return new RunOutcome.Failed(runPid, taskMissingMsg);
             }
 
-            String systemPrompt = buildSystemPrompt(agentDef, task, tenantId, agentCode);
             String userMessage = buildUserMessage(task);
+            RagContextProvider.RetrievedContext retrievedKnowledge =
+                    retrieveDurableKnowledge(tenantId, agentDef, task, userMessage);
+            if (retrievalEvidenceLedger != null && !retrievedKnowledge.evidence().isEmpty()) {
+                TraceContext activeTrace = currentTraceCtx.get();
+                retrievalEvidenceLedger.recordDurable(
+                        tenantId,
+                        runPid,
+                        taskPid,
+                        activeTrace != null ? activeTrace.getTraceId() : null,
+                        retrievedKnowledge.evidence());
+            }
+            String systemPrompt = buildSystemPrompt(agentDef, task, tenantId, agentCode);
+            if (!retrievedKnowledge.context().isBlank()) {
+                systemPrompt = systemPrompt + "\n\n" + retrievedKnowledge.context();
+            }
+            ResponseSink responseSink = ResponseSinkContext.get();
+            if (responseSink != null) {
+                if (!retrievedKnowledge.evidence().isEmpty()) {
+                    responseSink.onRetrievalEvidence(retrievedKnowledge.evidence());
+                }
+                if (retrievedKnowledge.diagnostics() != null
+                        && !retrievedKnowledge.diagnostics().warnings().isEmpty()) {
+                    responseSink.onWarnings(retrievedKnowledge.diagnostics().warnings());
+                }
+            }
 
             // Load tools via ToolProviderRegistry
             Integer maxTools = agentDef.get("max_tools") != null
@@ -331,12 +580,15 @@ public class AgentRunService {
             // D1 Grounding: compile user message → BusinessIntentFrame
             com.auraboot.framework.agent.dto.BusinessIntentFrame bif = groundingService.ground(
                     tenantId, userMessage,
-                    GroundingService.GroundingContext.builder().build());
+                    GroundingService.GroundingContext.builder()
+                            .userId(currentInitiatorUserIdText())
+                            .agentCode(agentCode)
+                            .build());
 
             // Build discovery context from BIF
             ToolDiscoveryContext discoveryCtx = ToolDiscoveryContext.builder()
                     .tenantId(tenantId)
-                    .userId(MetaContext.exists() ? MetaContext.getCurrentUserId() : null)
+                    .userId(currentActorUserId())
                     .agentCode(agentCode)
                     .modelHint(bif != null ? bif.getObject() : null)
                     .intentHint(bif != null ? bif.getIntent() : null)
@@ -388,7 +640,7 @@ public class AgentRunService {
             // the plan validator as hallucinated. Only adds declared tools that are missing.
             List<String> declaredCodes = DeclaredAgentToolResolver.parseDeclaredCodes(agentDef, objectMapper);
             if (!declaredCodes.isEmpty()) {
-                Long discoveryUserId = MetaContext.exists() ? MetaContext.getCurrentUserId() : null;
+                Long discoveryUserId = currentActorUserId();
                 List<AgentToolDefinition> declaredTools = toAgentToolDefinitions(
                         declaredAgentToolResolver.resolveDeclaredTools(
                                 tenantId, discoveryUserId, agentCode, declaredCodes));
@@ -556,7 +808,7 @@ public class AgentRunService {
         int maxTokens = config != null && config.getMaxTokens() > 0 ? config.getMaxTokens() : 4096;
         AgentExecutionState runtimeState = runtimeStateFactory.acpRunState(
                 tenantId,
-                MetaContext.exists() ? MetaContext.getCurrentUserId() : null,
+                currentActorUserId(),
                 runPid,
                 taskPid,
                 agentCode,
@@ -790,19 +1042,29 @@ public class AgentRunService {
                     runPid, outcome);
             return;
         }
-        String userId = resolveCurrentUserId();
+        String userId = currentInitiatorUserIdText();
         eventPublisher.publishEvent(new SessionEndedEvent(
                 tenantId, runPid, agentCode, userId, outcome));
     }
 
-    /**
-     * Best-effort current-user resolver for the SessionEndedEvent payload.
-     * Returns null when no user context is bound (system/cron run) — the
-     * promoter handles null userId without fallback.
-     */
-    private String resolveCurrentUserId() {
-        Long uid = MetaContext.getCurrentUserId();
-        return uid == null ? null : uid.toString();
+    private Long currentActorUserId() {
+        return ExecutionPrincipalContext.current()
+                .map(ExecutionPrincipal::actorUserId)
+                .orElse(null);
+    }
+
+    private Long currentInitiatorUserId() {
+        return ExecutionPrincipalContext.current()
+                .map(ExecutionPrincipal::initiator)
+                .filter(Objects::nonNull)
+                .filter(initiator -> initiator.type() == Initiator.Type.HUMAN)
+                .map(Initiator::userId)
+                .orElse(null);
+    }
+
+    private String currentInitiatorUserIdText() {
+        Long userId = currentInitiatorUserId();
+        return userId == null ? null : userId.toString();
     }
 
     /**
@@ -874,6 +1136,9 @@ public class AgentRunService {
     // =========================================================================
 
     private Map<String, Object> loadAgentDefinition(Long tenantId, String agentCode) {
+        if (releaseDeploymentService != null) {
+            return releaseDeploymentService.runtimeDefinition(tenantId, agentCode);
+        }
         String sql = "SELECT * FROM ab_agent_definition WHERE tenant_id = #{params.tenantId} " +
                 "AND agent_code = #{params.agentCode} AND status = 'active' AND deleted_flag = FALSE";
         List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
@@ -950,6 +1215,92 @@ public class AgentRunService {
         return sb.toString();
     }
 
+    /**
+     * ACP/durable retrieval uses the same RAG SPI and KB narrowing rule as
+     * interactive named-agent turns. A task-level selection can only reduce
+     * the deployment binding; it cannot add a KB.
+     */
+    private RagContextProvider.RetrievedContext retrieveDurableKnowledge(
+            Long tenantId,
+            Map<String, Object> agentDef,
+            Map<String, Object> task,
+            String query) {
+        List<String> bound = knowledgeBaseIdsFrom(agentDef.get("knowledge_base_ids"));
+        if (bound.isEmpty()) {
+            return new RagContextProvider.RetrievedContext("", null);
+        }
+        if (ragContextProvider == null) {
+            throw new IllegalStateException(
+                    "CAPABILITY_UNAVAILABLE: durable retrieval runtime is not installed");
+        }
+        List<String> requested = taskRequestedKnowledgeBaseIds(task);
+        List<String> effective =
+                AgentChatContextAdapter.effectiveKnowledgeBaseIds(requested, bound);
+        if (!requested.isEmpty() && effective.isEmpty()) {
+            throw new IllegalStateException(
+                    "No requested knowledge base is inside the agent deployment binding");
+        }
+        try {
+            RagContextProvider.RetrievedContext result =
+                    ragContextProvider.retrieveContextWithDiagnostics(
+                            tenantId,
+                            query,
+                            effective);
+            if (result == null) {
+                return new RagContextProvider.RetrievedContext(
+                        ragContextProvider.retrieveContext(tenantId, query, effective),
+                        null);
+            }
+            return result;
+        } catch (RuntimeException e) {
+            throw new IllegalStateException(
+                    "Durable knowledge retrieval failed: "
+                            + Objects.toString(e.getMessage(), e.getClass().getSimpleName()),
+                    e);
+        }
+    }
+
+    private List<String> taskRequestedKnowledgeBaseIds(Map<String, Object> task) {
+        if (task == null || task.get("input_data") == null) {
+            return List.of();
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode input =
+                    objectMapper.readTree(String.valueOf(task.get("input_data")));
+            if (!input.path("knowledgeBaseIds").isArray()) {
+                return List.of();
+            }
+            List<String> ids = new ArrayList<>();
+            input.path("knowledgeBaseIds").forEach(node -> {
+                if (node.isTextual() && !node.asText().isBlank()) {
+                    ids.add(node.asText());
+                }
+            });
+            return List.copyOf(ids);
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Invalid task input_data knowledgeBaseIds", e);
+        }
+    }
+
+    private List<String> knowledgeBaseIdsFrom(Object value) {
+        String json = com.auraboot.framework.agent.util.JsonbColumns.toJsonText(
+                value,
+                objectMapper);
+        if (json == null) {
+            return List.of();
+        }
+        try {
+            List<String> ids = objectMapper.readValue(
+                    json,
+                    new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+            return AgentChatContextAdapter.effectiveKnowledgeBaseIds(List.of(), ids);
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Invalid agent knowledge_base_ids", e);
+        }
+    }
+
     private String getStringField(Map<String, Object> record, String field) {
         Object val = record.get(field);
         return val instanceof String s && !s.isBlank() ? s : null;
@@ -1006,15 +1357,26 @@ public class AgentRunService {
             // Track memory access for decay system
             memoryService.trackAccess(tenantId, agentCode);
 
-            // PR-77 Phase 3: prepend User Soul Profile section (plan §5.5) BEFORE
-            // the agent-memory block when an ACTIVE profile exists for the current
-            // user. System/cron runs without a user id still get the memory section
-            // unchanged (Reader returns Optional.empty when userId is null).
+            // Resolve the human/user namespace from the immutable execution
+            // principal, never from MetaContext. For a digital employee the actor
+            // is the employee service account while user memory/profile belongs to
+            // the human initiator; schedule/event initiators intentionally have no
+            // user namespace.
+            ExecutionPrincipal currentPrincipal =
+                    ExecutionPrincipalContext.current().orElse(null);
+            String userIdForProfile = currentPrincipal != null
+                    && currentPrincipal.initiator() != null
+                    && currentPrincipal.initiator().type()
+                            == Initiator.Type.HUMAN
+                    && currentPrincipal.initiator().userId() != null
+                        ? currentPrincipal.initiator().userId().toString()
+                        : null;
+
+            // PR-77 Phase 3: prepend User Soul Profile section (plan §5.5)
+            // BEFORE the employee-memory block when an ACTIVE profile exists
+            // for the explicit user namespace.
             String profilePreamble = "";
             if (userSoulProfileReader != null) {
-                Long currentUserIdForProfile = MetaContext.getCurrentUserId();
-                String userIdForProfile = currentUserIdForProfile == null
-                        ? null : currentUserIdForProfile.toString();
                 Optional<UserSoulProfileReader.ProfileSection> section =
                         userSoulProfileReader.loadForGrounding(tenantId, userIdForProfile);
                 if (section.isPresent()) {
@@ -1030,12 +1392,6 @@ public class AgentRunService {
             sb.append(profilePreamble);
             sb.append("## Agent Memory\n");
             sb.append("The following are your accumulated memories and lessons. Use them to inform your work:\n");
-
-            // PR-66: capture the current user id (may be null for system/cron
-            // calls) so each materialised memory can be logged per-user for
-            // the implicit_co_sign extractor.
-            Long currentUserId = MetaContext.getCurrentUserId();
-            String userIdStr = currentUserId == null ? null : currentUserId.toString();
 
             int totalLen = sb.length();
             for (Map<String, Object> mem : memories) {
@@ -1071,8 +1427,8 @@ public class AgentRunService {
                 totalLen += entry.length();
 
                 // PR-66: per-user access log (upsert per day); no-op if userId null.
-                if (pid != null && userIdStr != null) {
-                    memoryService.recordMemoryAccess(pid, userIdStr);
+                if (pid != null && userIdForProfile != null) {
+                    memoryService.recordMemoryAccess(pid, userIdForProfile);
                 }
             }
 

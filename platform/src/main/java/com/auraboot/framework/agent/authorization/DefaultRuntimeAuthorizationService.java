@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.authorization;
 
 import com.auraboot.framework.agent.observability.AgentRuntimeObservabilityService;
+import com.auraboot.framework.agent.runtime.policy.RiskScale;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -208,14 +209,7 @@ public class DefaultRuntimeAuthorizationService implements RuntimeAuthorizationS
     }
 
     private static boolean isHighRisk(String riskLevel) {
-        if (riskLevel == null || riskLevel.isBlank()) {
-            return false;
-        }
-        String normalized = riskLevel.trim().toUpperCase(java.util.Locale.ROOT);
-        return switch (normalized) {
-            case "L3", "L4", "R3", "R4", "HIGH", "CRITICAL", "BLOCKED" -> true;
-            default -> false;
-        };
+        return RiskScale.parseOrDefault(riskLevel, RiskScale.L0).requiresHumanApproval();
     }
 
     /** Effects that change something; a read-only ceiling exists to keep these out. */

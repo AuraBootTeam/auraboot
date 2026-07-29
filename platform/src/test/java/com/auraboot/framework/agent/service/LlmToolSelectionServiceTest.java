@@ -63,8 +63,8 @@ class LlmToolSelectionServiceTest {
 
     private void stubProvider(String replyText) throws Exception {
         LlmProviderFactory.ProviderConfig config = LlmProviderFactory.ProviderConfig.builder()
-                .providerCode("anthropic").apiKey("k").defaultModel("m").build();
-        when(llmProviderFactory.resolveConfig(anyLong(), eq("anthropic"))).thenReturn(config);
+                .providerCode("provider-under-test").apiKey("k").defaultModel("model-under-test").build();
+        when(llmProviderFactory.resolveConfig(anyLong(), eq(null))).thenReturn(config);
         when(llmProviderFactory.getProvider(anyString())).thenReturn(provider);
         when(provider.chat(any(LlmChatRequest.class), anyString(), any()))
                 .thenReturn(LlmChatResponse.builder()
@@ -75,8 +75,7 @@ class LlmToolSelectionServiceTest {
 
     @Test
     void notAvailableWithoutConfiguredProvider() {
-        when(llmProviderFactory.resolveConfig(anyLong(), eq("anthropic"))).thenReturn(null);
-        when(llmProviderFactory.listConfiguredProviders(anyLong())).thenReturn(List.of());
+        when(llmProviderFactory.resolveConfig(anyLong(), eq(null))).thenReturn(null);
 
         assertThat(service.isAvailable(1L)).isFalse();
     }

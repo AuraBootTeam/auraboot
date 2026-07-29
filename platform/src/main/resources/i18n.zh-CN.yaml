@@ -10,6 +10,8 @@ common:
   creator: 创建人
   modifier: 修改人
   loading: 加载中...
+  actionFailed: 操作失败
+  close: 关闭
   yes: 是
   no: 否
 
@@ -23,6 +25,7 @@ common:
 
   print: 打印
   new: 新建
+  add: 添加
   create: 新建
   detail: 详情
   submit: 提交
@@ -710,12 +713,18 @@ ai:
       namePlaceholder: "例如：产品手册"
       description: "描述"
       descPlaceholder: "该知识库包含哪些内容？"
+      visibility: "访问范围"
       provider: "向量模型提供方"
+      providerAuto: "自动选择（使用当前部署已配置的模型）"
       model: "模型"
       chunkSize: "分块大小"
       chunkOverlap: "分块重叠"
       create: "创建"
       update: "保存"
+    visibility:
+      tenant: "租户内所有成员"
+      restricted: "仅显式授权对象"
+      private: "仅创建者"
     toast:
       loadFailed: "加载知识库失败"
       nameRequired: "请填写名称"
@@ -728,6 +737,9 @@ ai:
       toggleFailed: "切换状态失败"
     detail:
       notFound: "未找到该知识库"
+      back: "返回知识库列表"
+      removeGrant: "移除访问授权"
+      deleteDocument: "删除文档“{name}”"
       loading: "加载中..."
       empty: "还没有文档。可上传 PDF、DOCX、PPTX、XLSX、MD、TXT、CSV、HTML，或图表图片。"
       selectDocument: "选择文档"
@@ -735,7 +747,24 @@ ai:
       noChunks: "未找到分块"
       chunk: "分块"
       reindex: "重建索引"
-      reindexing: "重建索引中..."
+      reindexing: "正在构建文本索引..."
+      vectorRebuild: "重建向量索引"
+      vectorRebuilding: "正在重新向量化..."
+      confirmVectorRebuild: "重新向量化全部有效分块并激活新的向量索引发布吗？当前发布仍可用于回滚。"
+      confirmReleaseActivate: "激活索引发布 #{release} 吗？"
+      indexReleases: "索引发布"
+      indexReleasesHint: "文本与向量重建会创建不可变发布；验证成功后再原子切换生效版本。"
+      modelUnconfigured: "模型未配置"
+      releaseType:
+        full: "全量"
+        text: "文本"
+        vector: "向量"
+      releaseState:
+        building: "构建中"
+        ready: "待激活"
+        active: "当前生效"
+        failed: "失败"
+        retired: "历史版本"
       uploadFiles: "上传文件"
       uploading: "上传中..."
       urlPlaceholder: "粘贴网页链接以加入该知识库"
@@ -761,6 +790,22 @@ ai:
         documents: "文档"
         chunks: "分块"
         retrieval: "检索测试"
+        access: "访问控制"
+      accessTitle: "显式访问授权"
+      accessHint: "受限和私有知识库仅允许创建者或以下对象读取；运行时检索还会与数字员工部署绑定的知识范围取交集。"
+      subject:
+        role: "角色"
+        user: "用户"
+        member: "租户成员"
+        employee: "数字员工"
+      subjectId: "授权对象 ID"
+      permission:
+        read: "读取"
+        manage: "管理"
+      expiresAt: "失效时间（可选）"
+      accessEmpty: "暂无显式授权。租户可见知识库仍对租户开放；受限或私有知识库保持仅创建者可见。"
+      expires: "失效时间："
+      openEvidence: "打开来源证据"
       unit:
         documents: "个文档"
         chunks: "个分块"
@@ -786,6 +831,14 @@ ai:
         uploadFailed: "上传失败"
         reindexed: "已重建 {count} 个分块的索引"
         reindexFailed: "重建索引失败"
+        vectorRebuilt: "已为 {count} 个分块构建新的向量索引发布"
+        vectorRebuildFailed: "向量索引重建失败；原发布仍保持生效"
+        releaseActivated: "索引发布已激活"
+        releaseActivateFailed: "无法激活该索引发布"
+        accessLoadFailed: "加载访问授权失败"
+        accessSaved: "访问授权已保存"
+        accessSaveFailed: "无法保存访问授权"
+        accessDeleteFailed: "无法移除访问授权"
         docDeleted: "文档已删除"
         docDeleteFailed: "删除文档失败"
         urlFailed: "无法添加该链接"
@@ -801,6 +854,8 @@ ai:
     badge:
       official: 官方
       fullPower: 满血
+      suspended: 已暂停，不再接收新任务
+      employee: 数字员工
     aurabot:
       desc: 内置 AI 助手，拥有完整数据访问权限
     action:
@@ -808,6 +863,10 @@ ai:
       edit: 编辑
       save: 保存修改
       saving: 保存中...
+      suspend: 暂停
+      resume: 恢复
+      enrollAsEmployee: 纳入组织
+      removeFromOrg: 移出组织
     empty:
       title: 还没有 AI 同事
       description: 创建第一个 AI 同事，自动化任务并提升工作效率。
@@ -818,13 +877,63 @@ ai:
     tab:
       profile: 基本信息
       tools: 工具与技能
+      knowledge: 知识库
       memory: 记忆
+      releases: 发布版本
       runs: 运行历史
       schedules: 定时任务
+    releases:
+      title: 不可变运行版本
+      help: 保存只会更新草稿；发布会生成版本化快照。新任务使用新版本，进行中的任务继续使用已固定的原版本。
+      unpublished: 草稿变更尚未发布
+      current: 当前部署与草稿一致
+      publish: 发布草稿
+      confirmTitle: 发布不可变版本
+      confirmBody: 新对话和新任务将切换到该快照，进行中的任务仍固定在原版本。
+      publishing: 发布中...
+      confirm: 发布并部署
+      deployed: 当前部署
+      historical: 历史版本
+      empty: 尚无发布版本，请先发布草稿再分配任务。
+      loadFailed: 无法加载发布历史，请重试后再发布。
+      publishSuccess: 已发布并部署不可变版本
+      publishFailed: 发布失败，当前部署未发生变化。
+      rollback: 部署此版本
+      rollbackTitle: 回滚当前部署版本
+      rollbackBody: "新任务将使用 v{version}，进行中的任务仍固定在原版本。"
+      rollingBack: 回滚中...
+      rollbackConfirm: 确认回滚部署
+      rollbackSuccess: "当前部署已回滚到 v{version}"
+      rollbackFailed: 回滚失败，当前部署未发生变化。
+    policy:
+      title: 部署调用策略
+      help: 限制该数字员工可运行的渠道和允许发起的主体类型；分组为空时沿用租户兼容访问。
+      channels: 允许渠道
+      initiators: 允许发起者类型
+      allowedUserIds: 用户 ID
+      allowedMemberIds: 组织成员 ID
+      allowedRoleIds: 角色 ID
+      saved: 部署调用策略已保存
+      loadFailed: 无法加载部署策略，当前运行权限未发生变化。
+      saveFailed: 策略保存失败，当前部署未发生变化。
+    suspend:
+      success: AI 同事已暂停，不再接收新任务
+      failed: 无法变更 AI 同事状态
+    resume:
+      success: AI 同事已恢复
     section:
       basicInfo: 基本信息
       soulProfile: 个性设置
       executionLimits: 执行限制
+      visibility: 可见性与共享
+      visibilityDesc: 控制谁可以查看和使用此 AI 同事。
+    visibility:
+      private: 仅自己
+      privateDesc: 只有您可以查看和使用此 AI 同事
+      team: 团队
+      teamDesc: 您所在部门的成员可以查看和使用
+      tenant: 全组织
+      tenantDesc: 组织内所有成员都可以查看和使用
     field:
       name: 名称
       description: 描述
@@ -854,7 +963,24 @@ ai:
     schedules:
       empty: 暂无定时任务
       emptyDesc: 配置定时任务后，将在此显示。
+      error: 定时任务加载失败
+      retry: 重试
       count: "{count} 个定时任务"
+      manage: 管理定时任务
+      name: 名称
+      cron: Cron / 时区
+      status: 状态
+      statusActive: 启用
+      statusPaused: 已暂停
+      statusDisabled: 已停用
+      budget: 预算 / 并发
+      budgetSummary: "每日 {daily} 次 · 并发 {concurrency}"
+      lastRun: 最近运行 / 裁决
+      runNow: 立即运行
+      confirmRunNow: 立即运行计划
+      policyNotice: 本次运行仍会校验预算、并发、数字员工身份和审批策略。
+      triggered: 计划已通过治理运行时启动
+      triggerFailed: 立即运行被阻止或失败，系统未创建重复任务。
     error:
       loadFailed: 加载 AI 同事失败
       notFound: 未找到该智能体
@@ -867,6 +993,9 @@ ai:
       subtitle: 从模板快速开始，或从头构建。
       sectionLabel: 从模板开始
       startFromScratch: 或从头创建 →
+    type:
+      proactive: 主动履职数字员工
+      proactive.desc: 可由受治理的日程或事件唤醒，并受静默时段、预算和主管范围约束。
   template:
     procurement:
       name: 采购审批专家

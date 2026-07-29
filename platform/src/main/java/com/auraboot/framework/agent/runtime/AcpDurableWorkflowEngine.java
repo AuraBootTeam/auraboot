@@ -107,6 +107,23 @@ public class AcpDurableWorkflowEngine implements DurableWorkflowEngine {
         inputData.put("inboundMessageId", ctx.inboundMessageId());
         inputData.put("triageBucket", ctx.triageBucket() != null ? ctx.triageBucket().name() : null);
         inputData.put("userMessage", legacyRequest != null ? legacyRequest.getMessage() : null);
+        inputData.put(
+                "knowledgeBaseIds",
+                legacyRequest != null && legacyRequest.getKnowledgeBaseIds() != null
+                        ? java.util.List.copyOf(legacyRequest.getKnowledgeBaseIds())
+                        : java.util.List.of());
+        if (ctx.executionPrincipal() != null) {
+            inputData.put("actorUserId", ctx.executionPrincipal().actorUserId());
+            inputData.put("actorMemberId", ctx.executionPrincipal().actorMemberId());
+            inputData.put("initiatorUserId", ctx.executionPrincipal().initiator().userId());
+            inputData.put("initiatorMemberId", ctx.executionPrincipal().initiator().memberId());
+            inputData.put("principalType", ctx.executionPrincipal().type().name());
+            inputData.put("agentReleasePid", ctx.executionPrincipal().agentReleasePid());
+            inputData.put("deploymentPid", ctx.executionPrincipal().deploymentPid());
+        }
+        if (ctx.contextEnvelope() != null) {
+            inputData.put("contextEnvelopeHash", ctx.contextEnvelope().envelopeHash());
+        }
         try {
             task.put("input_data", objectMapper.writeValueAsString(inputData));
         } catch (JsonProcessingException ex) {

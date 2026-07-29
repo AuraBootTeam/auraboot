@@ -33,6 +33,7 @@ interface KnowledgeBase {
   status: string;
   embeddingProvider: string;
   embeddingModel: string;
+  activeIndexReleasePid?: string;
   docCount: number;
   chunkCount: number;
 }
@@ -46,6 +47,8 @@ interface KbDocument {
   chunkCount: number;
   /** How many chunks carry a vector. Zero, with chunks present, means semantic search is dead. */
   embeddedChunkCount?: number;
+  activeVersionPid?: string;
+  versionNo?: number;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   errorMessage?: string;
   createdAt: string;
@@ -61,6 +64,10 @@ interface KbChunk {
 }
 
 interface RetrievalResult {
+  kbPid: string;
+  documentPid: string;
+  documentVersionPid: string;
+  indexReleasePid: string;
   chunkPid: string;
   docName: string;
   kbName: string;
@@ -68,6 +75,32 @@ interface RetrievalResult {
   content: string;
   distance: number;
   similarity: number;
+  vectorScore: number;
+  bm25Score: number;
+  hybridScore: number;
+  rerankScore: number;
+  citationLocator?: string;
+}
+
+interface IndexRelease {
+  pid: string;
+  release_no: number;
+  release_type: 'full' | 'text' | 'vector';
+  state: 'building' | 'ready' | 'active' | 'failed' | 'retired';
+  embedding_provider?: string;
+  embedding_model?: string;
+  embedding_dimension?: number;
+  error_message?: string;
+  created_at: string;
+  activated_at?: string;
+}
+
+interface AccessGrant {
+  pid: string;
+  subject_type: 'user' | 'member' | 'role' | 'digital_employee';
+  subject_id: string;
+  permission: 'read' | 'manage';
+  expires_at?: string;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -77,7 +110,7 @@ const STATUS_STYLES: Record<string, string> = {
   failed: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 };
 
-const TABS = ['Documents', 'Chunks', 'Retrieval Test'] as const;
+const TABS = ['Documents', 'Chunks', 'Retrieval Test', 'Access'] as const;
 type Tab = (typeof TABS)[number];
 
 // ---------------------------------------------------------------------------
@@ -98,6 +131,7 @@ export default function KnowledgeBaseDetailPage() {
     Documents: t('ai.knowledge.detail.tab.documents', undefined, 'Documents'),
     Chunks: t('ai.knowledge.detail.tab.chunks', undefined, 'Chunks'),
     'Retrieval Test': t('ai.knowledge.detail.tab.retrieval', undefined, 'Retrieval Test'),
+    Access: t('ai.knowledge.detail.tab.access', undefined, 'Access'),
   };
 
   const fetchKb = useCallback(async () => {
@@ -133,6 +167,8 @@ export default function KnowledgeBaseDetailPage() {
       <div className="flex items-center gap-4 border-b border-gray-200 px-6 py-4 dark:border-gray-700">
         <button
           onClick={() => navigate('/aurabot/knowledge')}
+          aria-label={t('ai.knowledge.detail.back', undefined, 'Back to knowledge bases')}
+          title={t('ai.knowledge.detail.back', undefined, 'Back to knowledge bases')}
           className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
         >
           <ArrowLeftIcon className="h-5 w-5" />
@@ -147,7 +183,8 @@ export default function KnowledgeBaseDetailPage() {
             <span className="text-gray-300 dark:text-gray-600">·</span>
             <span>{kb.chunkCount} {t('ai.knowledge.detail.unit.chunks', undefined, 'chunks')}</span>
             <span className="ml-1 rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-              {kb.embeddingProvider}/{kb.embeddingModel}
+              {kb.embeddingProvider}/
+              {kb.embeddingModel || t('ai.knowledge.detail.modelUnconfigured', undefined, 'Model not configured')}
             </span>
           </div>
         </div>
@@ -175,7 +212,143 @@ export default function KnowledgeBaseDetailPage() {
         {activeTab === 'Documents' && <DocumentsTab kbPid={kbPid!} onUpdate={fetchKb} />}
         {activeTab === 'Chunks' && <ChunksTab kbPid={kbPid!} />}
         {activeTab === 'Retrieval Test' && <RetrievalTestTab kbPid={kbPid!} />}
+        {activeTab === 'Access' && <AccessTab kbPid={kbPid!} />}
       </div>
+    </div>
+  );
+}
+
+function AccessTab({ kbPid }: { kbPid: string }) {
+  const toast = useToastContext();
+  const { t } = useI18n();
+  const [grants, setGrants] = useState<AccessGrant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [subjectType, setSubjectType] = useState<AccessGrant['subject_type']>('role');
+  const [subjectId, setSubjectId] = useState('');
+  const [permission, setPermission] = useState<AccessGrant['permission']>('read');
+  const [expiresAt, setExpiresAt] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const res = await get<AccessGrant[]>(`/api/ai/knowledge/${kbPid}/access-grants`);
+      setGrants(res?.data ?? []);
+    } catch {
+      toast.showErrorToast(t('ai.knowledge.detail.toast.accessLoadFailed', undefined, 'Failed to load access grants'));
+    } finally {
+      setLoading(false);
+    }
+  }, [kbPid, toast, t]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const save = async () => {
+    if (!subjectId.trim()) return;
+    setSaving(true);
+    try {
+      await post(`/api/ai/knowledge/${kbPid}/access-grants`, {
+        subjectType,
+        subjectId: subjectId.trim(),
+        permission,
+        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+      });
+      setSubjectId('');
+      setExpiresAt('');
+      await load();
+      toast.showSuccessToast(t('ai.knowledge.detail.toast.accessSaved', undefined, 'Access grant saved'));
+    } catch {
+      toast.showErrorToast(t('ai.knowledge.detail.toast.accessSaveFailed', undefined, 'Could not save access grant'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (grant: AccessGrant) => {
+    try {
+      await del(`/api/ai/knowledge/${kbPid}/access-grants/${grant.pid}`);
+      await load();
+    } catch {
+      toast.showErrorToast(t('ai.knowledge.detail.toast.accessDeleteFailed', undefined, 'Could not remove access grant'));
+    }
+  };
+
+  return (
+    <div className="max-w-4xl space-y-5">
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          {t('ai.knowledge.detail.accessTitle', undefined, 'Explicit access grants')}
+        </h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {t('ai.knowledge.detail.accessHint', undefined, 'Restricted and private knowledge bases are readable only by their owner or these subjects. Runtime retrieval still intersects this list with the employee deployment binding.')}
+        </p>
+      </div>
+
+      <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5 dark:border-gray-700 dark:bg-gray-800">
+        <select value={subjectType} onChange={(e) => setSubjectType(e.target.value as AccessGrant['subject_type'])} className="rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700">
+          <option value="role">{t('ai.knowledge.detail.subject.role', undefined, 'Role')}</option>
+          <option value="user">{t('ai.knowledge.detail.subject.user', undefined, 'User')}</option>
+          <option value="member">{t('ai.knowledge.detail.subject.member', undefined, 'Member')}</option>
+          <option value="digital_employee">{t('ai.knowledge.detail.subject.employee', undefined, 'Digital employee')}</option>
+        </select>
+        <input value={subjectId} onChange={(e) => setSubjectId(e.target.value)} placeholder={t('ai.knowledge.detail.subjectId', undefined, 'Subject ID')} className="rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700" />
+        <select value={permission} onChange={(e) => setPermission(e.target.value as AccessGrant['permission'])} className="rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-700">
+          <option value="read">{t('ai.knowledge.detail.permission.read', undefined, 'Read')}</option>
+          <option value="manage">{t('ai.knowledge.detail.permission.manage', undefined, 'Manage')}</option>
+        </select>
+        <input
+          type="datetime-local"
+          aria-label={t('ai.knowledge.detail.expiresAt', undefined, 'Optional expiration time')}
+          value={expiresAt}
+          onChange={(e) => setExpiresAt(e.target.value)}
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700"
+        />
+        <button onClick={save} disabled={saving || !subjectId.trim()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+          {saving ? t('common.saving', undefined, 'Saving…') : t('common.add', undefined, 'Add')}
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="py-8 text-center text-gray-400">{t('common.loading', undefined, 'Loading…')}</div>
+      ) : grants.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-gray-300 py-10 text-center text-sm text-gray-500 dark:border-gray-700">
+          {t('ai.knowledge.detail.accessEmpty', undefined, 'No explicit grants. Tenant-visible knowledge remains available tenant-wide; restricted/private knowledge remains owner-only.')}
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+          {grants.map((grant) => (
+            <div key={grant.pid} className="flex items-center justify-between border-b border-gray-100 bg-white px-4 py-3 last:border-b-0 dark:border-gray-700 dark:bg-gray-800">
+              <div>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {t(
+                    `ai.knowledge.detail.subject.${grant.subject_type === 'digital_employee' ? 'employee' : grant.subject_type}`,
+                    undefined,
+                    grant.subject_type,
+                  )}
+                  ：{grant.subject_id}
+                </span>
+                <span className="ml-2 rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                  {t(
+                    `ai.knowledge.detail.permission.${grant.permission}`,
+                    undefined,
+                    grant.permission,
+                  )}
+                </span>
+                {grant.expires_at && <p className="mt-1 text-xs text-gray-500">{t('ai.knowledge.detail.expires', undefined, 'Expires')} {new Date(grant.expires_at).toLocaleString()}</p>}
+              </div>
+              <button
+                onClick={() => remove(grant)}
+                aria-label={t('ai.knowledge.detail.removeGrant', undefined, 'Remove access grant')}
+                title={t('ai.knowledge.detail.removeGrant', undefined, 'Remove access grant')}
+                className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+              >
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -190,6 +363,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
   const [docs, setDocs] = useState<KbDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [releases, setReleases] = useState<IndexRelease[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDocs = useCallback(async () => {
@@ -203,9 +377,19 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
     }
   }, [kbPid, toast]);
 
+  const fetchReleases = useCallback(async () => {
+    try {
+      const res = await get<IndexRelease[]>(`/api/ai/knowledge/${kbPid}/index-releases`);
+      setReleases(res?.data ?? []);
+    } catch {
+      setReleases([]);
+    }
+  }, [kbPid]);
+
   useEffect(() => {
     fetchDocs();
-  }, [fetchDocs]);
+    fetchReleases();
+  }, [fetchDocs, fetchReleases]);
 
   // Poll for processing status
   useEffect(() => {
@@ -250,11 +434,59 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
     setReindexing(true);
     try {
       const res = await post<{ reindexedChunks: number }>(`/api/ai/knowledge/${kbPid}/reindex`, {});
-      toast.showSuccessToast(t('ai.knowledge.detail.toast.reindexed', { count: res?.data?.reindexedChunks ?? 0 }, `Reindexed ${res?.data?.reindexedChunks ?? 0} chunks`));
+      toast.showSuccessToast(t('ai.knowledge.detail.toast.reindexed', { count: res?.data?.reindexedChunks ?? 0 }, `Built a new text index release for ${res?.data?.reindexedChunks ?? 0} chunks`));
+      fetchReleases();
+      onUpdate();
     } catch {
       toast.showErrorToast(t('ai.knowledge.detail.toast.reindexFailed', undefined, 'Reindex failed'));
     } finally {
       setReindexing(false);
+    }
+  };
+
+  const [rebuildingVector, setRebuildingVector] = useState(false);
+  const handleVectorRebuild = async () => {
+    if (!confirm(t(
+      'ai.knowledge.detail.confirmVectorRebuild',
+      undefined,
+      'Re-embed every active chunk and activate a new vector index release? The current release remains available for rollback.',
+    ))) return;
+    setRebuildingVector(true);
+    try {
+      const res = await post<{ indexedChunks: number }>(
+        `/api/ai/knowledge/${kbPid}/rebuild-vector-index`,
+        {},
+      );
+      toast.showSuccessToast(t(
+        'ai.knowledge.detail.toast.vectorRebuilt',
+        { count: res?.data?.indexedChunks ?? 0 },
+        `Built a new vector index release for ${res?.data?.indexedChunks ?? 0} chunks`,
+      ));
+      fetchReleases();
+      onUpdate();
+    } catch {
+      toast.showErrorToast(t('ai.knowledge.detail.toast.vectorRebuildFailed', undefined, 'Vector index rebuild failed; the previous release is still active'));
+    } finally {
+      setRebuildingVector(false);
+    }
+  };
+
+  const activateRelease = async (release: IndexRelease) => {
+    if (!confirm(t(
+      'ai.knowledge.detail.confirmReleaseActivate',
+      { release: release.release_no },
+      `Activate index release #${release.release_no}?`,
+    ))) return;
+    try {
+      await post(
+        `/api/ai/knowledge/${kbPid}/index-releases/${release.pid}/activate`,
+        {},
+      );
+      toast.showSuccessToast(t('ai.knowledge.detail.toast.releaseActivated', undefined, 'Index release activated'));
+      fetchReleases();
+      onUpdate();
+    } catch {
+      toast.showErrorToast(t('ai.knowledge.detail.toast.releaseActivateFailed', undefined, 'Could not activate that release'));
     }
   };
 
@@ -313,6 +545,53 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
 
   return (
     <div>
+      {releases.length > 0 && (
+        <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                {t('ai.knowledge.detail.indexReleases', undefined, 'Index releases')}
+              </h3>
+              <p className="text-xs text-slate-500">
+                {t('ai.knowledge.detail.indexReleasesHint', undefined, 'Text and vector rebuilds create immutable releases; activation is an atomic pointer switch.')}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {releases.slice(0, 6).map((release) => (
+              <button
+                key={release.pid}
+                type="button"
+                disabled={release.state === 'active' || release.state === 'failed'}
+                onClick={() => activateRelease(release)}
+                title={release.error_message || release.pid}
+                className={`rounded-lg border px-3 py-2 text-left text-xs ${
+                  release.state === 'active'
+                    ? 'border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300'
+                    : release.state === 'failed'
+                      ? 'cursor-not-allowed border-red-200 bg-red-50 text-red-600 dark:border-red-900 dark:bg-red-900/20'
+                      : 'border-slate-300 bg-white text-slate-600 hover:border-blue-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                }`}
+              >
+                <span className="font-semibold">
+                  #{release.release_no} · {t(
+                    `ai.knowledge.detail.releaseType.${release.release_type}`,
+                    undefined,
+                    release.release_type,
+                  )}
+                </span>
+                <span className="ml-2">
+                  · {t(
+                    `ai.knowledge.detail.releaseState.${release.state}`,
+                    undefined,
+                    release.state,
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('ai.knowledge.detail.tab.documents', undefined, 'Documents')}</h2>
         <div className="flex items-center gap-2">
@@ -325,7 +604,18 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
             reindexing ? 'cursor-not-allowed text-gray-400' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800'
           }`}
         >
-          {reindexing ? t('ai.knowledge.detail.reindexing', undefined, 'Reindexing...') : t('ai.knowledge.detail.reindex', undefined, 'Reindex')}
+          {reindexing ? t('ai.knowledge.detail.reindexing', undefined, 'Building text index…') : t('ai.knowledge.detail.reindex', undefined, 'Rebuild text index')}
+        </button>
+        <button
+          type="button"
+          data-testid="kb-vector-rebuild-button"
+          onClick={handleVectorRebuild}
+          disabled={rebuildingVector}
+          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+        >
+          {rebuildingVector
+            ? t('ai.knowledge.detail.vectorRebuilding', undefined, 'Re-embedding…')
+            : t('ai.knowledge.detail.vectorRebuild', undefined, 'Rebuild vector index')}
         </button>
         <label
           className={`flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 transition-colors ${
@@ -417,6 +707,11 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
                 >
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
                     {doc.docName}
+                    {doc.activeVersionPid && (
+                      <p className="mt-0.5 font-mono text-[11px] font-normal text-gray-400">
+                        v{doc.versionNo ?? 1} · {doc.activeVersionPid}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-500">{doc.docType}</td>
                   <td className="px-4 py-3 text-right text-gray-500">
@@ -461,6 +756,8 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
                       <button
                         data-testid={`doc-delete-${doc.pid}`}
                         onClick={() => handleDelete(doc)}
+                        aria-label={t('ai.knowledge.detail.deleteDocument', { name: doc.docName }, `Delete ${doc.docName}`)}
+                        title={t('ai.knowledge.detail.deleteDocument', { name: doc.docName }, `Delete ${doc.docName}`)}
                         className="text-gray-400 hover:text-red-500"
                       >
                         <TrashIcon className="h-4 w-4" />
@@ -647,11 +944,14 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<RetrievalResult[]>([]);
   const [path, setPath] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [searching, setSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
     setSearching(true);
+    setHasSearched(true);
     try {
       const res = await post<{ results: RetrievalResult[]; warnings: string[]; path: string }>(
         '/api/ai/knowledge/retrieve',
@@ -663,6 +963,7 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
       );
       setResults(res?.data?.results ?? []);
       setPath(res?.data?.path ?? null);
+      setWarnings(res?.data?.warnings ?? []);
       for (const w of res?.data?.warnings ?? []) {
         toast.showErrorToast(w);
       }
@@ -695,6 +996,14 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
           {searching ? t('ai.knowledge.detail.searching', undefined, 'Searching...') : t('ai.knowledge.detail.search', undefined, 'Search')}
         </button>
       </div>
+
+      {warnings.length > 0 && (
+        <div role="status" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-300">
+          <ul className="list-disc space-y-1 pl-5">
+            {warnings.map((warning) => <li key={warning}>{warning}</li>)}
+          </ul>
+        </div>
+      )}
 
       {results.length > 0 && (
         <div className="space-y-3">
@@ -742,12 +1051,26 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
               <p className="line-clamp-6 text-sm whitespace-pre-wrap text-gray-600 dark:text-gray-400">
                 {r.content}
               </p>
+              <div className="mt-3 grid gap-2 text-[11px] text-gray-500 sm:grid-cols-2">
+                <span className="font-mono">version: {r.documentVersionPid}</span>
+                <span className="font-mono">release: {r.indexReleasePid}</span>
+                <span>vector {r.vectorScore?.toFixed(3)} · keyword {r.bm25Score?.toFixed(3)}</span>
+                <span>hybrid {r.hybridScore?.toFixed(3)} · rerank {r.rerankScore?.toFixed(3)}</span>
+              </div>
+              {r.citationLocator && (
+                <a
+                  href={`/${r.citationLocator}`}
+                  className="mt-2 inline-flex text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  {t('ai.knowledge.detail.openEvidence', undefined, 'Open source evidence')}
+                </a>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {!searching && results.length === 0 && query && (
+      {!searching && hasSearched && results.length === 0 && (
         <div className="py-8 text-center text-gray-400">
           {t('ai.knowledge.detail.noResults', undefined, 'No results. Try a different query or ensure documents are processed.')}
         </div>

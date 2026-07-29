@@ -218,6 +218,23 @@ class PermissionSnapshotCacheTest {
     }
 
     @Test
+    void roleEvictionRefreshesPreviouslyMissingBaselineRole() {
+        when(userRoleMapper.findByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of());
+        Role baseline = new Role();
+        baseline.setId(99L);
+        when(roleMapper.findByTenantIdAndCode(100L, "tenant_member"))
+                .thenReturn(null)
+                .thenReturn(baseline);
+        when(rolePermissionMapper.findPermissionIdsByRole(99L)).thenReturn(Set.of(60L));
+
+        assertThat(cache.getEffectivePermissionIds(100L, 1L, 5L)).isEmpty();
+        cache.evictRole(100L, 99L);
+        assertThat(cache.getEffectivePermissionIds(100L, 1L, 5L)).containsExactly(60L);
+
+        verify(roleMapper, times(2)).findByTenantIdAndCode(100L, "tenant_member");
+    }
+
+    @Test
     void concurrentMissesCollapseIntoSingleDatabaseLoad() throws Exception {
         CountDownLatch loaderEntered = new CountDownLatch(1);
         CountDownLatch releaseLoader = new CountDownLatch(1);

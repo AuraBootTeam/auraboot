@@ -77,9 +77,9 @@ public class AgentTemplateSeeder {
 
         // Default execution_config for skills without special opt-in.
         String defaultExecutionConfig = "{}";
-        // report_analysis is a multi-hop reasoning skill — opt it in to Anthropic
-        // Extended Thinking by default. Read by StepLoopService.resolveThinkingConfig
-        // (mirrors ab_agent_definition.execution_config contract).
+        // report_analysis is a multi-hop reasoning skill — request the generic
+        // thinking capability. The selected adapter decides whether it can
+        // honor or explicitly reject/degrade that request.
         String reportAnalysisExecutionConfig =
                 "{\"thinking_enabled\":true,\"thinking_budget_tokens\":8000}";
 
@@ -326,7 +326,7 @@ public class AgentTemplateSeeder {
                 UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
                 "tpl_aurabot_internal", "AuraBot 全功能助手",
                 "内部全功能AI助手模板，适合管理员和超级用户。掌握所有内置技能，可执行任意操作。",
-                "claude-sonnet-4-6",
+                null,
                 """
                 你是 AuraBot，{{tenantName}} 的智能企业助手。
                 你帮助用户理解业务数据、建议操作方案，并在授权范围内执行操作。
@@ -355,7 +355,7 @@ public class AgentTemplateSeeder {
                 UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
                 "tpl_approval_assistant", "审批助手",
                 "专注审批流程的AI助手模板。严守审批政策边界，适合业务审批场景。",
-                "claude-haiku-4-5-20251001",
+                null,
                 """
                 你是审批助手，专门协助处理 {{tenantName}} 的审批工作。
                 你的职责：
@@ -387,7 +387,7 @@ public class AgentTemplateSeeder {
                 UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
                 "tpl_customer_service", "客服机器人",
                 "对外部署的客服AI助手模板。权限最小化，专注客户问题解决，支持RAG知识库问答。",
-                "claude-haiku-4-5-20251001",
+                null,
                 """
                 你是 {{tenantName}} 的客服助手，负责解答客户咨询和处理常见问题。
                 你的职责：

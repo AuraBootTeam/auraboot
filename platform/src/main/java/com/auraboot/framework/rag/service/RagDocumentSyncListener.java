@@ -153,42 +153,54 @@ public class RagDocumentSyncListener {
         String kbPid = kb.getPid();
         String hash = sha256(content);
 
-        KbDocument existing = findExistingDoc(kbPid, recordId);
+        KbDocument existing = findExistingDoc(tenantId, kbPid, recordId);
         if (existing != null && hash.equals(existing.getContentHash())) {
             return;
         }
 
-        if (existing != null) {
-            jdbcTemplate.update("DELETE FROM ab_kb_chunk WHERE doc_id = ?", existing.getPid());
-            docMapper.deleteById(existing.getId());
+        String docName = (title != null ? title : modelCode + ":" + recordId);
+        String docPid;
+        if (existing == null) {
+            KbDocument doc = KbDocument.builder()
+                    .pid(UniqueIdGenerator.generate()).tenantId(tenantId).kbId(kbPid)
+                    .docName(docName).docType("md")
+                    .fileSize((long) content.length()).charCount(content.length())
+                    .sourceType(SOURCE_TYPE).sourceEntityId(recordId)
+                    .contentHash(hash).status("processing")
+                    .build();
+            docMapper.insert(doc);
+            docPid = doc.getPid();
+        } else {
+            docPid = existing.getPid();
+            jdbcTemplate.update(
+                    "UPDATE ab_kb_document SET doc_name = ?, file_size = ?, "
+                            + "char_count = ?, content_hash = ?, status = 'processing', "
+                            + "error_message = NULL, process_started_at = NOW(), "
+                            + "process_completed_at = NULL "
+                            + "WHERE tenant_id = ? AND kb_id = ? AND pid = ?",
+                    docName, content.length(), content.length(), hash,
+                    tenantId, kbPid, docPid);
         }
 
-        String docPid = UniqueIdGenerator.generate();
-        String docName = (title != null ? title : modelCode + ":" + recordId);
-
-        KbDocument doc = KbDocument.builder()
-                .pid(docPid).tenantId(tenantId).kbId(kbPid)
-                .docName(docName).docType("md")
-                .fileSize((long) content.length()).charCount(content.length())
-                .sourceType(SOURCE_TYPE).sourceEntityId(recordId)
-                .contentHash(hash).status("processing")
-                .build();
-        docMapper.insert(doc);
-
-        var kbEntity = kbService.findKbByPid(kbPid);
-        String provider = kbEntity != null ? kbEntity.getEmbeddingProvider() : "openai";
+        var kbEntity = kbService.findKb(tenantId, kbPid);
+        if (kbEntity == null || kbEntity.getEmbeddingProvider() == null) {
+            throw new IllegalStateException("Knowledge base embedding profile is unavailable");
+        }
+        String provider = kbEntity.getEmbeddingProvider();
         Integer chunkSize = kbEntity != null ? kbEntity.getChunkSize() : null;
         Integer chunkOverlap = kbEntity != null ? kbEntity.getChunkOverlap() : null;
         KbChunkIngestPipeline.IngestOutcome outcome = ingestPipeline.ingestChunks(
                 tenantId, kbPid, docPid, content, chunkSize, chunkOverlap, provider, null);
         if (outcome.chunkCount() == 0) {
-            kbService.updateDocumentAfterProcessing(docPid, "failed", 0, 0, "No chunks");
+            kbService.updateDocumentAfterProcessing(
+                    tenantId, kbPid, docPid, "failed", 0, 0, "No chunks");
             return;
         }
 
-        kbService.updateDocumentAfterProcessing(docPid, "completed", content.length(),
+        kbService.updateDocumentAfterProcessing(
+                tenantId, kbPid, docPid, "completed", content.length(),
                 outcome.chunkCount(), null);
-        kbService.refreshKbCounters(kbPid);
+        kbService.refreshKbCounters(tenantId, kbPid);
         log.info("RAG synced {}:{} — {} chunks, {} embedded",
                 modelCode, recordId, outcome.chunkCount(), outcome.embeddedCount());
     }
@@ -199,12 +211,16 @@ public class RagDocumentSyncListener {
     public void removeFromRag(Long tenantId, String recordId) {
         List<KbDocument> docs = docMapper.selectList(
                 new LambdaQueryWrapper<KbDocument>()
+                        .eq(KbDocument::getTenantId, tenantId)
                         .eq(KbDocument::getSourceType, SOURCE_TYPE)
                         .eq(KbDocument::getSourceEntityId, recordId));
         for (KbDocument doc : docs) {
-            jdbcTemplate.update("DELETE FROM ab_kb_chunk WHERE doc_id = ?", doc.getPid());
+            jdbcTemplate.update(
+                    "DELETE FROM ab_kb_chunk "
+                            + "WHERE tenant_id = ? AND kb_id = ? AND doc_id = ?",
+                    tenantId, doc.getKbId(), doc.getPid());
             docMapper.deleteById(doc.getId());
-            kbService.refreshKbCounters(doc.getKbId());
+            kbService.refreshKbCounters(tenantId, doc.getKbId());
         }
     }
 
@@ -237,9 +253,10 @@ public class RagDocumentSyncListener {
         }
     }
 
-    private KbDocument findExistingDoc(String kbPid, String recordId) {
+    private KbDocument findExistingDoc(Long tenantId, String kbPid, String recordId) {
         return docMapper.selectOne(
                 new LambdaQueryWrapper<KbDocument>()
+                        .eq(KbDocument::getTenantId, tenantId)
                         .eq(KbDocument::getKbId, kbPid)
                         .eq(KbDocument::getSourceType, SOURCE_TYPE)
                         .eq(KbDocument::getSourceEntityId, recordId));
@@ -253,7 +270,7 @@ public class RagDocumentSyncListener {
         CreateKnowledgeBaseRequest req = new CreateKnowledgeBaseRequest();
         req.setName(RAG_KB_NAME);
         req.setDescription("Auto-synced from doc-knowledge plugin");
-        return kbService.createKnowledgeBase(tenantId, 0L, req);
+        return kbService.createKnowledgeBase(tenantId, null, req);
     }
 
     private String getString(Map<String, Object> record, String fieldCode) {

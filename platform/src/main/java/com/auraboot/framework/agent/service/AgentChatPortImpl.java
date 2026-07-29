@@ -25,6 +25,7 @@ import com.auraboot.framework.agent.runtime.policy.DefaultAgentProfileResolver;
 import com.auraboot.framework.agent.util.JsonbColumns;
 import com.auraboot.framework.agent.dto.ChatMessage;
 import com.auraboot.framework.agent.dto.ChatRequest;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
@@ -90,6 +91,9 @@ public class AgentChatPortImpl implements AgentChatPort {
     private final AgentChatToolDiscoveryAdapter toolDiscoveryAdapter;
     private final AgentChatContextAdapter contextAdapter;
     private final AgentChatToolRuntimeAdapterFactory toolRuntimeAdapterFactory;
+
+    @Autowired(required = false)
+    private AgentReleaseDeploymentService releaseDeploymentService;
 
     /**
      * Max tool-call rounds for the named-agent path. Shares the aurabot config key so a
@@ -368,7 +372,12 @@ public class AgentChatPortImpl implements AgentChatPort {
         } else {
             try {
                 toolDefs = toolDiscoveryAdapter.discover(
-                        tenantId, ctx.userId(), agentCode, ctx.channel(), request.getMessage(), agentDef);
+                        tenantId,
+                        ctx.executionUserId(),
+                        agentCode,
+                        ctx.channel(),
+                        request.getMessage(),
+                        agentDef);
             } catch (IllegalStateException e) {
                 String msg = safeExceptionMessage(e);
                 sink.onError(msg, null);
@@ -423,8 +432,12 @@ public class AgentChatPortImpl implements AgentChatPort {
                         toolDefs);
         boolean requireInitialToolCall = profile.evidenceFirst();
         List<String> boundKnowledgeBaseIds = boundKnowledgeBaseIds(agentDef);
-        List<AgentContextBlock> contextBlocks =
+        AgentChatContextAdapter.AssemblyResult contextAssembly =
                 traceContextAssembly(ctx, request, boundKnowledgeBaseIds);
+        List<AgentContextBlock> contextBlocks = contextAssembly.blocks();
+        if (!contextAssembly.retrievalEvidence().isEmpty()) {
+            sink.onRetrievalEvidence(contextAssembly.retrievalEvidence());
+        }
 
         log.info("Agent chat: agentCode={}, provider={}, model={}, tools={}, overrides={}",
                 agentCode, providerCode, model, tools.size(), overrides != null);
@@ -451,9 +464,10 @@ public class AgentChatPortImpl implements AgentChatPort {
      * <p>Tracing must never change the turn: if no tracer is wired, or starting the span
      * throws, the assembly still happens and its result is returned.
      */
-    private List<AgentContextBlock> traceContextAssembly(TurnContext ctx,
-                                                         ChatRequest request,
-                                                         List<String> boundKnowledgeBaseIds) {
+    private AgentChatContextAdapter.AssemblyResult traceContextAssembly(
+            TurnContext ctx,
+            ChatRequest request,
+            List<String> boundKnowledgeBaseIds) {
         if (turnEvalTelemetryRegistry != null && ctx != null) {
             turnEvalTelemetryRegistry.recordInput(
                     ctx.turnId(), request != null ? request.getMessage() : null);
@@ -469,7 +483,8 @@ public class AgentChatPortImpl implements AgentChatPort {
                         ctx != null ? ctx.userId() : null,
                         java.util.Map.of("path", "named_agent",
                                 "agentCode", java.util.Objects.toString(
-                                        ctx != null ? ctx.agentCode() : null, "")));
+                                        ctx != null ? ctx.agentCode() : null, "")),
+                        MetaContext.getOtelTraceId());
                 span = aiTraceService.startSpan(trace, null, "span", "render_prompt", null);
                 if (turnEvalTelemetryRegistry != null && ctx != null && trace != null) {
                     turnEvalTelemetryRegistry.recordTrace(ctx.turnId(), trace.getTraceId());
@@ -497,7 +512,7 @@ public class AgentChatPortImpl implements AgentChatPort {
                 log.warn("Could not end the named-agent prompt span: {}", e.getMessage());
             }
         }
-        return blocks;
+        return assembly;
     }
 
     /**
@@ -751,7 +766,7 @@ public class AgentChatPortImpl implements AgentChatPort {
         if (userPermissionService == null || ctx == null || toolDefs == null || toolDefs.isEmpty()) {
             return null;
         }
-        Long userId = ctx.userId();
+        Long userId = ctx.executionUserId();
         if (userId == null) {
             return null;
         }
@@ -870,6 +885,9 @@ public class AgentChatPortImpl implements AgentChatPort {
     }
 
     private Map<String, Object> loadAgentDefinition(Long tenantId, String agentCode) {
+        if (releaseDeploymentService != null) {
+            return releaseDeploymentService.runtimeDefinition(tenantId, agentCode);
+        }
         try {
             String sql = "SELECT * FROM ab_agent_definition WHERE tenant_id = #{params.tenantId} " +
                     "AND agent_code = #{params.agentCode} AND status = 'active' AND deleted_flag = FALSE";

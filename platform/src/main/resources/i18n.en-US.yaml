@@ -531,9 +531,45 @@ ai:
     tab:
       profile: Profile
       tools: Tools & Skills
+      knowledge: Knowledge
       memory: Memory
+      releases: Releases
       runs: Run History
       schedules: Schedules
+    releases:
+      title: Immutable runtime releases
+      help: Saving updates the draft only. Publishing creates a versioned snapshot; new work uses it while in-flight work keeps its pinned release.
+      unpublished: Draft changes are not deployed
+      current: Deployment matches the draft
+      publish: Publish draft
+      confirmTitle: Publish immutable release
+      confirmBody: New conversations and tasks will move to this snapshot. In-flight work stays pinned to its original release.
+      publishing: Publishing...
+      confirm: Publish and deploy
+      deployed: Deployed
+      historical: Historical
+      empty: No published releases yet. Publish the draft before assigning work.
+      loadFailed: Release history could not be loaded. Retry before publishing.
+      publishSuccess: Immutable release published and deployed
+      publishFailed: Publish failed. The current deployment was not changed.
+      rollback: Deploy this version
+      rollbackTitle: Roll back deployed release
+      rollbackBody: "New work will use v{version}. In-flight work stays pinned to its original release."
+      rollingBack: Rolling back...
+      rollbackConfirm: Confirm deployment rollback
+      rollbackSuccess: "Deployment rolled back to v{version}"
+      rollbackFailed: Rollback failed. The current deployment was not changed.
+    policy:
+      title: Deployment invocation policy
+      help: Restrict where this colleague can run and which initiators may invoke it. Empty groups keep tenant-compatible access.
+      channels: Allowed channels
+      initiators: Allowed initiator types
+      allowedUserIds: User IDs
+      allowedMemberIds: Organization member IDs
+      allowedRoleIds: Role IDs
+      saved: Deployment invocation policy saved
+      loadFailed: Deployment policy could not be loaded. Runtime access remains unchanged.
+      saveFailed: Policy save failed. The active deployment was not changed.
     section:
       basicInfo: Basic Information
       soulProfile: Soul Profile
@@ -567,7 +603,24 @@ ai:
     schedules:
       empty: No schedules
       emptyDesc: Scheduled tasks will appear here once configured.
+      error: Schedules could not be loaded
+      retry: Try again
       count: "{count} schedules"
+      manage: Manage schedules
+      name: Name
+      cron: Cron / timezone
+      status: Status
+      statusActive: Active
+      statusPaused: Paused
+      statusDisabled: Disabled
+      budget: Budget / concurrency
+      budgetSummary: "{daily} per day · {concurrency} concurrent"
+      lastRun: Last run / decision
+      runNow: Run now
+      confirmRunNow: Run schedule now
+      policyNotice: Budget, concurrency, employee identity and approval policy will be enforced.
+      triggered: Schedule started through the governed runtime
+      triggerFailed: Run now was blocked or failed. No duplicate task was created.
     error:
       loadFailed: Failed to load AI colleagues
       notFound: Agent not found
@@ -580,6 +633,9 @@ ai:
       subtitle: Start from a template or build from scratch.
       sectionLabel: Start from a template
       startFromScratch: Or start from scratch →
+    type:
+      proactive: Proactive digital employee
+      proactive.desc: Can wake from governed schedules or events, with quiet hours, budgets and manager scope.
   template:
     procurement:
       name: Procurement Approver

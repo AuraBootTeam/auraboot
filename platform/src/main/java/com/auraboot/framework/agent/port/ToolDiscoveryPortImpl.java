@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.port;
 
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
 import com.auraboot.framework.agent.observability.AgentRuntimeObservabilityService;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
@@ -33,7 +34,7 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
     public List<ToolDef> discoverAlwaysOnTools(Long tenantId, String channel) {
         ToolDiscoveryContext ctx = ToolDiscoveryContext.builder()
                 .tenantId(tenantId)
-                .userId(MetaContext.exists() ? MetaContext.getCurrentUserId() : null)
+                .userId(currentActorUserId())
                 .channel(channel)
                 .maxResults(0) // always-on is never limited by a budget; see discoverAlwaysOn
                 .build();
@@ -54,7 +55,7 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
         // maxTools cut can never be what drops them.
         ToolDiscoveryContext alwaysOnCtx = ToolDiscoveryContext.builder()
                 .tenantId(tenantId)
-                .userId(MetaContext.exists() ? MetaContext.getCurrentUserId() : null)
+                .userId(currentActorUserId())
                 .modelHint(modelHint)
                 .intentHint(intentHint)
                 .channel(channel)
@@ -101,7 +102,7 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
         // Phase 2: Fallback to ToolProviderRegistry discovery, filtered by intent
         ToolDiscoveryContext ctx = ToolDiscoveryContext.builder()
                 .tenantId(tenantId)
-                .userId(MetaContext.exists() ? MetaContext.getCurrentUserId() : null)
+                .userId(currentActorUserId())
                 .modelHint(modelHint)
                 .intentHint(intentHint)
                 .channel(channel)
@@ -226,5 +227,13 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
         if (observabilityService != null) {
             observabilityService.recordToolDiscovery(source, queryOnly, returnedCount);
         }
+    }
+
+    private Long currentActorUserId() {
+        return ExecutionPrincipalContext.current()
+                .map(principal -> principal.actorUserId())
+                .orElseGet(() -> MetaContext.exists()
+                        ? MetaContext.getCurrentUserId()
+                        : null);
     }
 }

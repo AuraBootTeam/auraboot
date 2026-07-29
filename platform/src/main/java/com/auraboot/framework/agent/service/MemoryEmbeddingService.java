@@ -53,8 +53,6 @@ import java.util.Map;
 @Service
 public class MemoryEmbeddingService {
 
-    private static final String DEFAULT_PROVIDER = "openai";
-
     /** Must match the {@code vector(N)} column width in schema.sql. */
     static final int EXPECTED_DIM = 1536;
 
@@ -106,17 +104,17 @@ public class MemoryEmbeddingService {
             return false;
         }
 
-        float[] vector = embeddingService.embed(tenantId, normalised, DEFAULT_PROVIDER);
+        float[] vector = embeddingService.embed(tenantId, normalised, null);
         if (vector == null || vector.length == 0) {
             log.warn("MemoryEmbeddingService: embedding provider returned null/empty vector for tenant {} memory {} — leaving null",
                     tenantId, memoryPid);
-            recordDimMismatch(tenantId, DEFAULT_PROVIDER, vector == null ? 0 : vector.length);
+            recordDimMismatch(tenantId, "auto", vector == null ? 0 : vector.length);
             return false;
         }
         if (vector.length != EXPECTED_DIM) {
             log.warn("MemoryEmbeddingService: embedding dim mismatch tenant={} memory={} provider={} returnedDim={} expectedDim={} — dropping",
-                    tenantId, memoryPid, DEFAULT_PROVIDER, vector.length, EXPECTED_DIM);
-            recordDimMismatch(tenantId, DEFAULT_PROVIDER, vector.length);
+                    tenantId, memoryPid, "auto", vector.length, EXPECTED_DIM);
+            recordDimMismatch(tenantId, "auto", vector.length);
             return false;
         }
 

@@ -1,5 +1,7 @@
 package com.auraboot.framework.conversation;
 
+import com.auraboot.framework.agent.identity.ExecutionPrincipal;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelope;
 import com.auraboot.framework.agent.triage.TriageBucket;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 
@@ -46,8 +48,53 @@ public record TurnContext(
         Set<String> allowedReadOnlyTools,     // populated for read-only CONTEXTUAL_ANSWER triage
         String traceId,
         String taskPid,                      // DC.3c Fix 3: ab_agent_task.pid for this turn (chokepoint creates)
-        Instant beginAt
+        Instant beginAt,
+        ExecutionPrincipal executionPrincipal,
+        ContextEnvelope contextEnvelope
 ) {
+
+    public TurnContext(String turnId,
+                       long tenantId,
+                       long userId,
+                       Long humanMemberId,
+                       Long agentId,
+                       String agentCode,
+                       String channel,
+                       String profileId,
+                       String channelSessionId,
+                       Long conversationId,
+                       Long inboundMessageId,
+                       TriageBucket triageBucket,
+                       Set<String> allowedReadOnlyTools,
+                       String traceId,
+                       String taskPid,
+                       Instant beginAt,
+                       ExecutionPrincipal executionPrincipal) {
+        this(turnId, tenantId, userId, humanMemberId, agentId, agentCode, channel,
+                profileId, channelSessionId, conversationId, inboundMessageId, triageBucket,
+                allowedReadOnlyTools, traceId, taskPid, beginAt, executionPrincipal, null);
+    }
+
+    public TurnContext(String turnId,
+                       long tenantId,
+                       long userId,
+                       Long humanMemberId,
+                       Long agentId,
+                       String agentCode,
+                       String channel,
+                       String profileId,
+                       String channelSessionId,
+                       Long conversationId,
+                       Long inboundMessageId,
+                       TriageBucket triageBucket,
+                       Set<String> allowedReadOnlyTools,
+                       String traceId,
+                       String taskPid,
+                       Instant beginAt) {
+        this(turnId, tenantId, userId, humanMemberId, agentId, agentCode, channel,
+                profileId, channelSessionId, conversationId, inboundMessageId, triageBucket,
+                allowedReadOnlyTools, traceId, taskPid, beginAt, null, null);
+    }
 
     public TurnContext(String turnId,
                        long tenantId,
@@ -65,7 +112,7 @@ public record TurnContext(
                        Instant beginAt) {
         this(turnId, tenantId, userId, humanMemberId, agentId, agentCode, null,
                 null, channelSessionId, conversationId, inboundMessageId, triageBucket,
-                allowedReadOnlyTools, traceId, taskPid, beginAt);
+                allowedReadOnlyTools, traceId, taskPid, beginAt, null);
     }
 
     public TurnContext(String turnId,
@@ -85,7 +132,7 @@ public record TurnContext(
                        Instant beginAt) {
         this(turnId, tenantId, userId, humanMemberId, agentId, agentCode, channel,
                 null, channelSessionId, conversationId, inboundMessageId, triageBucket,
-                allowedReadOnlyTools, traceId, taskPid, beginAt);
+                allowedReadOnlyTools, traceId, taskPid, beginAt, null);
     }
 
     /**
@@ -111,7 +158,9 @@ public record TurnContext(
                 Set.of(),                        // allowedReadOnlyTools
                 null,                            // traceId
                 null,                            // taskPid (DC.3c)
-                Instant.now());
+                Instant.now(),
+                null,                            // executionPrincipal
+                null);                           // contextEnvelope
     }
 
     /**
@@ -123,7 +172,7 @@ public record TurnContext(
     public TurnContext withTaskPid(String newTaskPid) {
         return new TurnContext(turnId, tenantId, userId, humanMemberId, agentId, agentCode,
                 channel, profileId, channelSessionId, conversationId, inboundMessageId, triageBucket,
-                allowedReadOnlyTools, traceId, newTaskPid, beginAt);
+                allowedReadOnlyTools, traceId, newTaskPid, beginAt, executionPrincipal, contextEnvelope);
     }
 
     public TurnContext {
@@ -140,5 +189,21 @@ public record TurnContext(
     public boolean readOnlyContextualTurn() {
         return triageBucket == com.auraboot.framework.agent.triage.TriageBucket.CONTEXTUAL_ANSWER
                 && !allowedReadOnlyTools.isEmpty();
+    }
+
+    /**
+     * Runtime authority user. {@link #userId} remains the initiating human so
+     * conversation ownership and user memory do not silently move to the
+     * employee service account.
+     */
+    public Long executionUserId() {
+        return executionPrincipal != null ? executionPrincipal.actorUserId() : userId;
+    }
+
+    /** Runtime authority member used by role and data-scope evaluation. */
+    public Long executionMemberId() {
+        return executionPrincipal != null
+                ? executionPrincipal.actorMemberId()
+                : humanMemberId;
     }
 }

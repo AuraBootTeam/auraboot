@@ -70,6 +70,7 @@ public final class ImConstants {
     public static final String WS_AI_TURN_COMPLETED = "ai_turn_completed";
     public static final String WS_AI_TURN_FAILED = "ai_turn_failed";
     public static final String WS_AI_TURN_CANCELLED = "ai_turn_cancelled";
+    public static final String WS_AI_RETRIEVAL_EVIDENCE = "ai_retrieval_evidence";
 
     // AI turn error codes (G1)
     public static final String AI_ERR_SAFETY_REFUSAL = "SAFETY_REFUSAL";

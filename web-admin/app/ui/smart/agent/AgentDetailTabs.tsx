@@ -1,7 +1,7 @@
 /**
  * AI Colleague Detail — Tabbed Configuration Page
  *
- * 6 tabs: Profile, Tools & Skills, Knowledge, Memory, Run History, Schedules.
+ * 7 tabs: Profile, Tools & Skills, Knowledge, Memory, Releases, Run History, Schedules.
  * AuraBot (aurabot) renders in read-only mode.
  */
 
@@ -25,6 +25,7 @@ import {
   BuildingOfficeIcon,
   PauseCircleIcon,
   PlayCircleIcon,
+  RocketLaunchIcon,
   XMarkIcon,
   ChevronDownIcon,
 } from '@heroicons/react/24/outline';
@@ -32,6 +33,8 @@ import { get, post, put, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -130,15 +133,38 @@ interface RunRecord {
   task_title: string | null;
 }
 
+interface AgentReleaseItem {
+  pid: string;
+  release_no: number;
+  release_hash: string;
+  status: 'published' | 'deprecated';
+  source_updated_at: string | null;
+  published_at: string;
+  deployed: boolean;
+}
+
+interface AgentDeploymentPolicy {
+  deploymentPid: string;
+  channelPolicy: {
+    version?: string;
+    allowedChannels?: string[];
+    allowedInitiatorTypes?: string[];
+    allowedUserIds?: number[];
+    allowedMemberIds?: number[];
+    allowedRoleIds?: number[];
+  };
+  policySnapshot: Record<string, unknown>;
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const AURABOT_CODE = 'aurabot';
 
-type TabKey = 'profile' | 'tools' | 'knowledge' | 'memory' | 'runs' | 'schedules';
+type TabKey = 'profile' | 'tools' | 'knowledge' | 'memory' | 'releases' | 'runs' | 'schedules';
 
-const AGENT_TYPES = ['reactive', 'copilot', 'autonomous', 'workflow'];
+const AGENT_TYPES = ['reactive', 'copilot', 'autonomous', 'proactive', 'workflow'];
 const COMM_STYLES = ['professional', 'friendly', 'concise', 'detailed'];
 
 // ---------------------------------------------------------------------------
@@ -166,6 +192,11 @@ function useTabs(t: (key: string, params?: Record<string, any>, fallback?: strin
       key: 'memory' as TabKey,
       label: t('ai.colleagues.tab.memory', undefined, 'Memory'),
       icon: BookOpenIcon,
+    },
+    {
+      key: 'releases' as TabKey,
+      label: t('ai.colleagues.tab.releases', undefined, 'Releases'),
+      icon: RocketLaunchIcon,
     },
     {
       key: 'runs' as TabKey,
@@ -217,19 +248,19 @@ function ProfileTab({
   };
 
   const fieldClass = readOnly
-    ? 'bg-gray-50 dark:bg-gray-800 cursor-not-allowed'
-    : 'bg-white dark:bg-gray-900';
+    ? 'bg-subtle dark:bg-subtle cursor-not-allowed'
+    : 'bg-panel dark:bg-subtle';
 
   return (
     <div className="max-w-2xl space-y-6">
       {/* Basic Info */}
       <section>
-        <h3 className="mb-3 text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white">
+        <h3 className="text-text mb-3 text-sm font-semibold tracking-wide uppercase dark:text-white">
           {t('ai.colleagues.section.basicInfo', undefined, 'Basic Information')}
         </h3>
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-text-2 dark:text-text-3 mb-1 block text-sm font-medium">
               {t('ai.colleagues.field.name', undefined, 'Name')} *
             </label>
             <input
@@ -237,13 +268,13 @@ function ProfileTab({
               value={form.name}
               onChange={(e) => handleChange('name', e.target.value)}
               disabled={readOnly}
-              className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 dark:border-gray-600 dark:text-white ${fieldClass} transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500`}
+              className={`border-border-strong text-text dark:border-border-strong w-full rounded-lg border px-3 py-2 dark:text-white ${fieldClass} focus:border-accent0 focus:ring-accent0 transition-colors focus:ring-2`}
               data-testid="agent-name-input"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-text-2 dark:text-text-3 mb-1 block text-sm font-medium">
               {t('ai.colleagues.field.description', undefined, 'Description')}
             </label>
             <textarea
@@ -251,21 +282,21 @@ function ProfileTab({
               value={form.description}
               onChange={(e) => handleChange('description', e.target.value)}
               disabled={readOnly}
-              className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 dark:border-gray-600 dark:text-white ${fieldClass} transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500`}
+              className={`border-border-strong text-text dark:border-border-strong w-full rounded-lg border px-3 py-2 dark:text-white ${fieldClass} focus:border-accent0 focus:ring-accent0 transition-colors focus:ring-2`}
               data-testid="agent-description-input"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="text-text-2 dark:text-text-3 mb-1 block text-sm font-medium">
                 {t('ai.colleagues.field.agentType', undefined, 'Agent Type')}
               </label>
               <select
                 value={form.agent_type}
                 onChange={(e) => handleChange('agent_type', e.target.value)}
                 disabled={readOnly}
-                className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 dark:border-gray-600 dark:text-white ${fieldClass} transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500`}
+                className={`border-border-strong text-text dark:border-border-strong w-full rounded-lg border px-3 py-2 dark:text-white ${fieldClass} focus:border-accent0 focus:ring-accent0 transition-colors focus:ring-2`}
               >
                 {AGENT_TYPES.map((type) => (
                   <option key={type} value={type}>
@@ -275,7 +306,7 @@ function ProfileTab({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="text-text-2 dark:text-text-3 mb-1 block text-sm font-medium">
                 {t('ai.colleagues.field.model', undefined, 'Model')}
               </label>
               <input
@@ -283,7 +314,7 @@ function ProfileTab({
                 value={form.model}
                 onChange={(e) => handleChange('model', e.target.value)}
                 disabled={readOnly}
-                className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 dark:border-gray-600 dark:text-white ${fieldClass} transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500`}
+                className={`border-border-strong text-text dark:border-border-strong w-full rounded-lg border px-3 py-2 dark:text-white ${fieldClass} focus:border-accent0 focus:ring-accent0 transition-colors focus:ring-2`}
               />
             </div>
           </div>
@@ -292,12 +323,12 @@ function ProfileTab({
 
       {/* Soul Profile */}
       <section>
-        <h3 className="mb-3 text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white">
+        <h3 className="text-text mb-3 text-sm font-semibold tracking-wide uppercase dark:text-white">
           {t('ai.colleagues.section.soulProfile', undefined, 'Soul Profile')}
         </h3>
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-text-2 dark:text-text-3 mb-1 block text-sm font-medium">
               {t('ai.colleagues.field.personality', undefined, 'Personality')}
             </label>
             <textarea
@@ -305,12 +336,12 @@ function ProfileTab({
               value={form.personality}
               onChange={(e) => handleChange('personality', e.target.value)}
               disabled={readOnly}
-              className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 dark:border-gray-600 dark:text-white ${fieldClass} transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500`}
+              className={`border-border-strong text-text dark:border-border-strong w-full rounded-lg border px-3 py-2 dark:text-white ${fieldClass} focus:border-accent0 focus:ring-accent0 transition-colors focus:ring-2`}
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-text-2 dark:text-text-3 mb-1 block text-sm font-medium">
               {t('ai.colleagues.field.expertise', undefined, 'Expertise')}
             </label>
             <textarea
@@ -318,19 +349,19 @@ function ProfileTab({
               value={form.expertise}
               onChange={(e) => handleChange('expertise', e.target.value)}
               disabled={readOnly}
-              className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 dark:border-gray-600 dark:text-white ${fieldClass} transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500`}
+              className={`border-border-strong text-text dark:border-border-strong w-full rounded-lg border px-3 py-2 dark:text-white ${fieldClass} focus:border-accent0 focus:ring-accent0 transition-colors focus:ring-2`}
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-text-2 dark:text-text-3 mb-1 block text-sm font-medium">
               {t('ai.colleagues.field.communicationStyle', undefined, 'Communication Style')}
             </label>
             <select
               value={form.communication_style}
               onChange={(e) => handleChange('communication_style', e.target.value)}
               disabled={readOnly}
-              className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 dark:border-gray-600 dark:text-white ${fieldClass} transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500`}
+              className={`border-border-strong text-text dark:border-border-strong w-full rounded-lg border px-3 py-2 dark:text-white ${fieldClass} focus:border-accent0 focus:ring-accent0 transition-colors focus:ring-2`}
             >
               <option value="">
                 {t('ai.colleagues.field.selectStyle', undefined, 'Select style...')}
@@ -344,7 +375,7 @@ function ProfileTab({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-text-2 dark:text-text-3 mb-1 block text-sm font-medium">
               {t('ai.colleagues.field.boundaries', undefined, 'Boundaries')}
             </label>
             <textarea
@@ -352,12 +383,12 @@ function ProfileTab({
               value={form.boundaries}
               onChange={(e) => handleChange('boundaries', e.target.value)}
               disabled={readOnly}
-              className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 dark:border-gray-600 dark:text-white ${fieldClass} transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500`}
+              className={`border-border-strong text-text dark:border-border-strong w-full rounded-lg border px-3 py-2 dark:text-white ${fieldClass} focus:border-accent0 focus:ring-accent0 transition-colors focus:ring-2`}
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-text-2 dark:text-text-3 mb-1 block text-sm font-medium">
               {t('ai.colleagues.field.systemPrompt', undefined, 'System Prompt')}
             </label>
             <textarea
@@ -365,7 +396,7 @@ function ProfileTab({
               value={form.system_prompt}
               onChange={(e) => handleChange('system_prompt', e.target.value)}
               disabled={readOnly}
-              className={`w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm text-gray-900 dark:border-gray-600 dark:text-white ${fieldClass} transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500`}
+              className={`border-border-strong text-text dark:border-border-strong w-full rounded-lg border px-3 py-2 font-mono text-sm dark:text-white ${fieldClass} focus:border-accent0 focus:ring-accent0 transition-colors focus:ring-2`}
             />
           </div>
         </div>
@@ -373,12 +404,12 @@ function ProfileTab({
 
       {/* Execution Limits */}
       <section>
-        <h3 className="mb-3 text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white">
+        <h3 className="text-text mb-3 text-sm font-semibold tracking-wide uppercase dark:text-white">
           {t('ai.colleagues.section.executionLimits', undefined, 'Execution Limits')}
         </h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-text-2 dark:text-text-3 mb-1 block text-sm font-medium">
               {t('ai.colleagues.field.maxConcurrentRuns', undefined, 'Max Concurrent Runs')}
             </label>
             <input
@@ -388,11 +419,11 @@ function ProfileTab({
               value={form.max_concurrent_runs}
               onChange={(e) => handleChange('max_concurrent_runs', parseInt(e.target.value) || 1)}
               disabled={readOnly}
-              className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 dark:border-gray-600 dark:text-white ${fieldClass} transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500`}
+              className={`border-border-strong text-text dark:border-border-strong w-full rounded-lg border px-3 py-2 dark:text-white ${fieldClass} focus:border-accent0 focus:ring-accent0 transition-colors focus:ring-2`}
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-text-2 dark:text-text-3 mb-1 block text-sm font-medium">
               {t('ai.colleagues.field.timeout', undefined, 'Timeout (seconds)')}
             </label>
             <input
@@ -404,7 +435,7 @@ function ProfileTab({
                 handleChange('execution_timeout_seconds', parseInt(e.target.value) || 300)
               }
               disabled={readOnly}
-              className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 dark:border-gray-600 dark:text-white ${fieldClass} transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500`}
+              className={`border-border-strong text-text dark:border-border-strong w-full rounded-lg border px-3 py-2 dark:text-white ${fieldClass} focus:border-accent0 focus:ring-accent0 transition-colors focus:ring-2`}
             />
           </div>
         </div>
@@ -412,10 +443,10 @@ function ProfileTab({
 
       {/* Visibility / Sharing */}
       <section>
-        <h3 className="mb-1 text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white">
+        <h3 className="text-text mb-1 text-sm font-semibold tracking-wide uppercase dark:text-white">
           {t('ai.colleagues.section.visibility', undefined, 'Visibility & Sharing')}
         </h3>
-        <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-text-3 dark:text-text-3 mb-3 text-sm">
           {t(
             'ai.colleagues.section.visibilityDesc',
             undefined,
@@ -423,9 +454,9 @@ function ProfileTab({
           )}
         </p>
         {readOnly ? (
-          <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 dark:border-blue-800 dark:bg-blue-900/10">
-            <GlobeAltIcon className="h-4 w-4 flex-shrink-0 text-blue-500" />
-            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+          <div className="border-accent bg-accent-weak dark:border-accent dark:bg-accent-weak/10 flex items-center gap-2 rounded-lg border px-3 py-2">
+            <GlobeAltIcon className="text-accent0 h-4 w-4 flex-shrink-0" />
+            <span className="text-accent dark:text-accent text-sm font-medium">
               {t(
                 'ai.colleagues.visibility.tenant',
                 undefined,
@@ -446,10 +477,10 @@ function ProfileTab({
                     undefined,
                     'Only you can see and use this agent',
                   ),
-                  color: 'border-gray-200 dark:border-gray-700',
+                  color: 'border-border dark:border-border',
                   activeColor:
-                    'border-gray-400 bg-gray-50 dark:border-gray-500 dark:bg-gray-800/50',
-                  iconColor: 'text-gray-500',
+                    'border-border-strong bg-subtle dark:border-border0 dark:bg-subtle/50',
+                  iconColor: 'text-text-3',
                 },
                 {
                   value: 'team',
@@ -460,10 +491,10 @@ function ProfileTab({
                     undefined,
                     'Members of your department can see and use',
                   ),
-                  color: 'border-gray-200 dark:border-gray-700',
+                  color: 'border-border dark:border-border',
                   activeColor:
-                    'border-purple-300 bg-purple-50 dark:border-purple-700 dark:bg-purple-900/10',
-                  iconColor: 'text-purple-500',
+                    'border-accent bg-accent-weak dark:border-accent dark:bg-accent-weak/10',
+                  iconColor: 'text-accent0',
                 },
                 {
                   value: 'tenant',
@@ -474,10 +505,10 @@ function ProfileTab({
                     undefined,
                     'Everyone in the organization can see and use',
                   ),
-                  color: 'border-gray-200 dark:border-gray-700',
+                  color: 'border-border dark:border-border',
                   activeColor:
-                    'border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/10',
-                  iconColor: 'text-blue-500',
+                    'border-accent bg-accent-weak dark:border-accent dark:bg-accent-weak/10',
+                  iconColor: 'text-accent0',
                 },
               ] as const
             ).map(({ value, Icon, label, desc, color, activeColor, iconColor }) => {
@@ -485,7 +516,7 @@ function ProfileTab({
               return (
                 <label
                   key={value}
-                  className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${selected ? activeColor : color} hover:border-blue-200 dark:hover:border-blue-700`}
+                  className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${selected ? activeColor : color} hover:border-accent dark:hover:border-accent`}
                   data-testid={`visibility-option-${value}`}
                 >
                   <input
@@ -494,14 +525,12 @@ function ProfileTab({
                     value={value}
                     checked={selected}
                     onChange={() => handleChange('visibility', value)}
-                    className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="border-border-strong text-accent focus:ring-accent0 h-4 w-4"
                   />
                   <Icon className={`h-4 w-4 flex-shrink-0 ${iconColor}`} />
                   <div>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {label}
-                    </span>
-                    <span className="block text-xs text-gray-500 dark:text-gray-400">{desc}</span>
+                    <span className="text-text text-sm font-medium dark:text-white">{label}</span>
+                    <span className="text-text-3 dark:text-text-3 block text-xs">{desc}</span>
                   </div>
                 </label>
               );
@@ -512,11 +541,11 @@ function ProfileTab({
 
       {/* Save button */}
       {!readOnly && (
-        <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+        <div className="border-border dark:border-border border-t pt-4">
           <button
             onClick={() => onSave(form)}
             disabled={saving}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+            className="bg-accent hover:bg-accent-hover inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-medium text-white transition-colors disabled:opacity-50"
             data-testid="agent-save-btn"
           >
             <CheckIcon className="h-4 w-4" />
@@ -769,7 +798,7 @@ function ToolsSkillsTab({
   const skeleton = (
     <div className="space-y-2">
       {[1, 2, 3].map((i) => (
-        <div key={i} className="h-10 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+        <div key={i} className="bg-subtle dark:bg-subtle h-10 animate-pulse rounded" />
       ))}
     </div>
   );
@@ -781,15 +810,15 @@ function ToolsSkillsTab({
       {/* AuraBot full-access banner */}
       {isAuraBot && (
         <div
-          className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20"
+          className="border-accent bg-accent-weak dark:border-accent dark:bg-accent-weak/20 flex items-start gap-3 rounded-lg border p-4"
           data-testid="aurabot-full-access-banner"
         >
-          <ShieldCheckIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+          <ShieldCheckIcon className="text-accent dark:text-accent mt-0.5 h-5 w-5 flex-shrink-0" />
           <div>
-            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+            <p className="text-accent dark:text-accent text-sm font-medium">
               {t('ai.colleagues.scope.fullAccess', undefined, 'Full Access Agent')}
             </p>
-            <p className="mt-0.5 text-sm text-blue-600 dark:text-blue-300">
+            <p className="text-accent dark:text-accent mt-0.5 text-sm">
               {t(
                 'ai.colleagues.scope.fullAccessDesc',
                 undefined,
@@ -802,10 +831,10 @@ function ToolsSkillsTab({
 
       {/* Section 1: Data Model Access */}
       <section>
-        <h3 className="mb-1 text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white">
+        <h3 className="text-text mb-1 text-sm font-semibold tracking-wide uppercase dark:text-white">
           {t('ai.colleagues.scope.modelAccess', undefined, 'Data Model Access')}
         </h3>
-        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-text-3 dark:text-text-3 mb-4 text-sm">
           {t(
             'ai.colleagues.scope.modelAccessDesc',
             undefined,
@@ -817,9 +846,9 @@ function ToolsSkillsTab({
         <label
           className={`mb-4 flex items-center gap-3 rounded-lg border p-3 transition-colors ${
             allAccess
-              ? 'border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/20'
-              : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900'
-          } ${readOnly ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:border-blue-300 dark:hover:border-blue-700'}`}
+              ? 'border-accent bg-accent-weak dark:border-accent dark:bg-accent-weak/20'
+              : 'border-border bg-panel dark:border-border dark:bg-subtle'
+          } ${readOnly ? 'cursor-not-allowed opacity-70' : 'hover:border-accent dark:hover:border-accent cursor-pointer'}`}
           data-testid="all-models-toggle"
         >
           <input
@@ -827,13 +856,13 @@ function ToolsSkillsTab({
             checked={allAccess}
             onChange={toggleAllAccess}
             disabled={readOnly}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="border-border-strong text-accent focus:ring-accent0 h-4 w-4 rounded disabled:cursor-not-allowed disabled:opacity-50"
           />
           <div>
-            <span className="text-sm font-medium text-gray-900 dark:text-white">
+            <span className="text-text text-sm font-medium dark:text-white">
               {t('ai.colleagues.scope.allModels', undefined, 'Access all models')}
             </span>
-            <span className="block text-xs text-gray-500 dark:text-gray-400">
+            <span className="text-text-3 dark:text-text-3 block text-xs">
               {t(
                 'ai.colleagues.scope.allModelsHint',
                 undefined,
@@ -854,11 +883,11 @@ function ToolsSkillsTab({
                   return (
                     <div
                       key={group}
-                      className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700"
+                      className="border-border dark:border-border overflow-hidden rounded-lg border"
                     >
                       {/* Group header */}
                       <label
-                        className={`flex items-center gap-3 bg-gray-50 px-4 py-2.5 dark:bg-gray-800/50 ${readOnly ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                        className={`bg-subtle dark:bg-subtle/50 flex items-center gap-3 px-4 py-2.5 ${readOnly ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                         data-testid={`model-group-${group}`}
                       >
                         <input
@@ -869,12 +898,12 @@ function ToolsSkillsTab({
                           }}
                           onChange={() => toggleGroupAll(models)}
                           disabled={readOnly}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="border-border-strong text-accent focus:ring-accent0 h-4 w-4 rounded disabled:cursor-not-allowed disabled:opacity-50"
                         />
-                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        <span className="text-text-2 dark:text-text-3 text-sm font-semibold">
                           {group}
                         </span>
-                        <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">
+                        <span className="text-text-3 dark:text-text-3 ml-auto text-xs">
                           {models.filter((m) => selectedModels.has(m.code)).length} /{' '}
                           {models.length}
                         </span>
@@ -894,10 +923,10 @@ function ToolsSkillsTab({
                                 checked={selectedModels.has(m.code)}
                                 onChange={() => toggleModel(m.code)}
                                 disabled={readOnly}
-                                className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="border-border-strong text-accent focus:ring-accent0 h-3.5 w-3.5 rounded disabled:cursor-not-allowed disabled:opacity-50"
                               />
                               <span
-                                className="truncate text-sm text-gray-700 dark:text-gray-300"
+                                className="text-text-2 dark:text-text-3 truncate text-sm"
                                 title={m.displayName ?? m.code}
                               >
                                 {m.code}
@@ -913,7 +942,7 @@ function ToolsSkillsTab({
 
         {/* When allAccess is true and not loading, show summary */}
         {!loadingModels && allAccess && !isAuraBot && (
-          <div className="flex items-center gap-2 px-1 text-sm text-gray-500 dark:text-gray-400">
+          <div className="text-text-3 dark:text-text-3 flex items-center gap-2 px-1 text-sm">
             <InformationCircleIcon className="h-4 w-4 flex-shrink-0" />
             <span>
               {t(
@@ -928,10 +957,10 @@ function ToolsSkillsTab({
 
       {/* Section 2: Operation Permissions */}
       <section>
-        <h3 className="mb-1 text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white">
+        <h3 className="text-text mb-1 text-sm font-semibold tracking-wide uppercase dark:text-white">
           {t('ai.colleagues.scope.operations', undefined, 'Operation Permissions')}
         </h3>
-        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-text-3 dark:text-text-3 mb-4 text-sm">
           {t(
             'ai.colleagues.scope.operationsDesc',
             undefined,
@@ -948,9 +977,9 @@ function ToolsSkillsTab({
                 key={op}
                 className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
                   checked
-                    ? 'border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-900/10'
-                    : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900'
-                } ${readOnly ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:border-blue-200 dark:hover:border-blue-700'}`}
+                    ? 'border-accent bg-accent-weak/50 dark:border-accent dark:bg-accent-weak/10'
+                    : 'border-border bg-panel dark:border-border dark:bg-subtle'
+                } ${readOnly ? 'cursor-not-allowed opacity-70' : 'hover:border-accent dark:hover:border-accent cursor-pointer'}`}
                 data-testid={`op-toggle-${op}`}
               >
                 <input
@@ -958,13 +987,13 @@ function ToolsSkillsTab({
                   checked={checked}
                   onChange={() => toggleOp(op)}
                   disabled={readOnly}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="border-border-strong text-accent focus:ring-accent0 h-4 w-4 rounded disabled:cursor-not-allowed disabled:opacity-50"
                 />
                 <div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  <span className="text-text text-sm font-medium dark:text-white">
                     {meta.label}
                   </span>
-                  <span className="block text-xs text-gray-500 dark:text-gray-400">
+                  <span className="text-text-3 dark:text-text-3 block text-xs">
                     {meta.description}
                   </span>
                 </div>
@@ -976,11 +1005,11 @@ function ToolsSkillsTab({
 
       {/* Save button for scope */}
       {!readOnly && dirty && (
-        <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+        <div className="border-border dark:border-border border-t pt-4">
           <button
             onClick={handleSaveScope}
             disabled={saving}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+            className="bg-accent hover:bg-accent-hover inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-medium text-white transition-colors disabled:opacity-50"
             data-testid="scope-save-btn"
           >
             <CheckIcon className="h-4 w-4" />
@@ -993,14 +1022,14 @@ function ToolsSkillsTab({
 
       {/* Section 3: Platform Tools (existing) */}
       <section>
-        <h3 className="mb-3 text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white">
+        <h3 className="text-text mb-3 text-sm font-semibold tracking-wide uppercase dark:text-white">
           {t('ai.colleagues.tools.available', undefined, 'Available Tools')}
         </h3>
         {loadingTools ? (
           skeleton
         ) : tools.length === 0 ? (
-          <div className="py-8 text-center text-gray-400 dark:text-gray-500">
-            <WrenchScrewdriverIcon className="mx-auto mb-2 h-10 w-10 text-gray-300 dark:text-gray-600" />
+          <div className="text-text-3 dark:text-text-3 py-8 text-center">
+            <WrenchScrewdriverIcon className="text-text-3 dark:text-text-2 mx-auto mb-2 h-10 w-10" />
             <p className="text-sm">
               {t('ai.colleagues.tools.noTools', undefined, 'No tools configured')}
             </p>
@@ -1008,30 +1037,24 @@ function ToolsSkillsTab({
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-gray-500 dark:text-gray-400">
-                <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">
-                  Code
-                </th>
-                <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">
-                  Name
-                </th>
-                <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">
-                  Type
-                </th>
+              <tr className="text-text-3 dark:text-text-3 text-left">
+                <th className="border-border dark:border-border border-b p-2 font-medium">Code</th>
+                <th className="border-border dark:border-border border-b p-2 font-medium">Name</th>
+                <th className="border-border dark:border-border border-b p-2 font-medium">Type</th>
               </tr>
             </thead>
             <tbody>
               {tools.map((row) => (
                 <tr
                   key={row.pid}
-                  className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
+                  className="border-border hover:bg-subtle dark:border-border dark:hover:bg-subtle/50 border-b"
                 >
-                  <td className="p-2 font-mono text-xs text-gray-700 dark:text-gray-300">
+                  <td className="text-text-2 dark:text-text-3 p-2 font-mono text-xs">
                     {row.tool_code}
                   </td>
-                  <td className="p-2 text-gray-900 dark:text-white">{row.tool_name}</td>
+                  <td className="text-text p-2 dark:text-white">{row.tool_name}</td>
                   <td className="p-2">
-                    <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                    <span className="bg-subtle text-text-2 dark:bg-subtle dark:text-text-3 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium">
                       {row.tool_type}
                     </span>
                   </td>
@@ -1044,14 +1067,14 @@ function ToolsSkillsTab({
 
       {/* Skills */}
       <section>
-        <h3 className="mb-3 text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white">
+        <h3 className="text-text mb-3 text-sm font-semibold tracking-wide uppercase dark:text-white">
           {t('ai.colleagues.tools.skills', undefined, 'Skills')}
         </h3>
         {loadingSkills ? (
           skeleton
         ) : skills.length === 0 ? (
-          <div className="py-8 text-center text-gray-400 dark:text-gray-500">
-            <SparklesIcon className="mx-auto mb-2 h-10 w-10 text-gray-300 dark:text-gray-600" />
+          <div className="text-text-3 dark:text-text-3 py-8 text-center">
+            <SparklesIcon className="text-text-3 dark:text-text-2 mx-auto mb-2 h-10 w-10" />
             <p className="text-sm">
               {t('ai.colleagues.tools.noSkills', undefined, 'No skills configured')}
             </p>
@@ -1059,17 +1082,13 @@ function ToolsSkillsTab({
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-gray-500 dark:text-gray-400">
-                <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">
-                  Code
-                </th>
-                <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">
-                  Name
-                </th>
-                <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">
+              <tr className="text-text-3 dark:text-text-3 text-left">
+                <th className="border-border dark:border-border border-b p-2 font-medium">Code</th>
+                <th className="border-border dark:border-border border-b p-2 font-medium">Name</th>
+                <th className="border-border dark:border-border border-b p-2 font-medium">
                   Category
                 </th>
-                <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">
+                <th className="border-border dark:border-border border-b p-2 font-medium">
                   Execution Mode
                 </th>
               </tr>
@@ -1078,17 +1097,15 @@ function ToolsSkillsTab({
               {skills.map((row) => (
                 <tr
                   key={row.pid}
-                  className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
+                  className="border-border hover:bg-subtle dark:border-border dark:hover:bg-subtle/50 border-b"
                 >
-                  <td className="p-2 font-mono text-xs text-gray-700 dark:text-gray-300">
+                  <td className="text-text-2 dark:text-text-3 p-2 font-mono text-xs">
                     {row.skill_code}
                   </td>
-                  <td className="p-2 text-gray-900 dark:text-white">{row.skill_name}</td>
-                  <td className="p-2 text-gray-600 dark:text-gray-400">
-                    {row.skill_category ?? '-'}
-                  </td>
+                  <td className="text-text p-2 dark:text-white">{row.skill_name}</td>
+                  <td className="text-text-2 dark:text-text-3 p-2">{row.skill_category ?? '-'}</td>
                   <td className="p-2">
-                    <span className="inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    <span className="bg-accent-weak text-accent dark:bg-accent-weak/30 dark:text-accent inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium">
                       {row.execution_mode ?? '-'}
                     </span>
                   </td>
@@ -1139,7 +1156,7 @@ function RunHistoryTab({ agentCode }: { agentCode: string }) {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-12 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+          <div key={i} className="bg-subtle dark:bg-subtle h-12 animate-pulse rounded-lg" />
         ))}
       </div>
     );
@@ -1148,11 +1165,11 @@ function RunHistoryTab({ agentCode }: { agentCode: string }) {
   if (runs.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <ClockIcon className="mb-3 h-12 w-12 text-gray-300 dark:text-gray-600" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+        <ClockIcon className="text-text-3 dark:text-text-2 mb-3 h-12 w-12" />
+        <h3 className="text-text text-lg font-medium dark:text-white">
           {t('ai.colleagues.runs.empty', undefined, 'No runs yet')}
         </h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-text-3 dark:text-text-3 mt-1 text-sm">
           {t(
             'ai.colleagues.runs.emptyDesc',
             undefined,
@@ -1166,13 +1183,13 @@ function RunHistoryTab({ agentCode }: { agentCode: string }) {
   const statusColor = (s: string) => {
     switch (s?.toLowerCase()) {
       case 'completed':
-        return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+        return 'bg-status-green-bg text-status-green dark:bg-status-green-bg/30 dark:text-status-green';
       case 'running':
-        return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
+        return 'bg-accent-weak text-accent dark:bg-accent-weak/30 dark:text-accent';
       case 'failed':
-        return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
+        return 'bg-status-red-bg text-status-red dark:bg-status-red-bg/30 dark:text-status-red';
       default:
-        return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400';
+        return 'bg-subtle text-text-2 dark:bg-subtle dark:text-text-3';
     }
   };
 
@@ -1184,35 +1201,27 @@ function RunHistoryTab({ agentCode }: { agentCode: string }) {
 
   return (
     <div className="max-w-4xl">
-      <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+      <p className="text-text-3 dark:text-text-3 mb-4 text-sm">
         {t('ai.colleagues.runs.count', { count: runs.length }, `${runs.length} recent runs`)}
       </p>
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-gray-500 dark:text-gray-400">
-            <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">Task</th>
-            <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">
-              Status
-            </th>
-            <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">Model</th>
-            <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">
-              Duration
-            </th>
-            <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">
-              Tokens
-            </th>
-            <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">
-              Started
-            </th>
+          <tr className="text-text-3 dark:text-text-3 text-left">
+            <th className="border-border dark:border-border border-b p-2 font-medium">Task</th>
+            <th className="border-border dark:border-border border-b p-2 font-medium">Status</th>
+            <th className="border-border dark:border-border border-b p-2 font-medium">Model</th>
+            <th className="border-border dark:border-border border-b p-2 font-medium">Duration</th>
+            <th className="border-border dark:border-border border-b p-2 font-medium">Tokens</th>
+            <th className="border-border dark:border-border border-b p-2 font-medium">Started</th>
           </tr>
         </thead>
         <tbody>
           {runs.map((run) => (
             <tr
               key={run.pid}
-              className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
+              className="border-border hover:bg-subtle dark:border-border dark:hover:bg-subtle/50 border-b"
             >
-              <td className="max-w-[200px] truncate p-2 text-gray-900 dark:text-white">
+              <td className="text-text max-w-[200px] truncate p-2 dark:text-white">
                 {run.task_title ?? '-'}
               </td>
               <td className="p-2">
@@ -1222,18 +1231,18 @@ function RunHistoryTab({ agentCode }: { agentCode: string }) {
                   {run.run_status}
                 </span>
               </td>
-              <td className="p-2 font-mono text-xs text-gray-600 dark:text-gray-400">
+              <td className="text-text-2 dark:text-text-3 p-2 font-mono text-xs">
                 {run.model ?? '-'}
               </td>
-              <td className="p-2 text-gray-600 dark:text-gray-400">
+              <td className="text-text-2 dark:text-text-3 p-2">
                 {formatDuration(run.duration_ms)}
               </td>
-              <td className="p-2 text-gray-600 dark:text-gray-400">
+              <td className="text-text-2 dark:text-text-3 p-2">
                 {run.input_tokens || run.output_tokens
                   ? `${run.input_tokens ?? 0} / ${run.output_tokens ?? 0}`
                   : '-'}
               </td>
-              <td className="p-2 text-xs text-gray-500 dark:text-gray-400">
+              <td className="text-text-3 dark:text-text-3 p-2 text-xs">
                 {run.started_at ? new Date(run.started_at).toLocaleString() : '-'}
               </td>
             </tr>
@@ -1250,46 +1259,116 @@ function RunHistoryTab({ agentCode }: { agentCode: string }) {
 
 interface ScheduleRecord {
   pid: string;
-  schedule_name: string;
+  title: string;
   cron_expression: string | null;
   schedule_status: string;
   next_run_at: string | null;
   last_run_at: string | null;
+  timezone: string | null;
+  daily_run_budget: number | null;
+  concurrency_limit: number | null;
+  last_block_reason: string | null;
 }
 
-function SchedulesTab({ agentCode }: { agentCode: string }) {
+export function SchedulesTab({ agentCode }: { agentCode: string }) {
   const { t } = useI18n();
+  const { timezone, formats } = useTimezone();
+  const toast = useToastContext();
   const [schedules, setSchedules] = useState<ScheduleRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [confirmTrigger, setConfirmTrigger] = useState<ScheduleRecord | null>(null);
+  const [triggeringPid, setTriggeringPid] = useState<string | null>(null);
+
+  const loadSchedules = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const filters = JSON.stringify([
+        { fieldName: 'agent_code', operator: 'eq', value: agentCode },
+      ]);
+      const res = await get<{ records: ScheduleRecord[] }>('/api/dynamic/agent-schedule/list', {
+        pageNum: 1,
+        pageSize: 20,
+        filters,
+      });
+      if (!ResultHelper.isSuccess(res) || !res.data?.records) {
+        throw new Error('Schedule list request failed');
+      }
+      setSchedules(res.data.records);
+    } catch {
+      setSchedules([]);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [agentCode]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const filters = JSON.stringify([
-          { fieldName: 'agent_code', operator: 'eq', value: agentCode },
-        ]);
-        const res = await get<{ records: ScheduleRecord[] }>('/api/dynamic/agent-schedule/list', {
-          pageNum: 1,
-          pageSize: 20,
-          filters,
-        });
-        if (ResultHelper.isSuccess(res) && res.data?.records) {
-          setSchedules(res.data.records);
-        }
-      } catch {
-        // silent
-      } finally {
-        setLoading(false);
+    void loadSchedules();
+  }, [loadSchedules]);
+
+  const triggerNow = async () => {
+    if (!confirmTrigger) return;
+    setTriggeringPid(confirmTrigger.pid);
+    try {
+      const response = await post<{ taskPid: string; schedulePid: string }>(
+        `/api/agent/schedule/${confirmTrigger.pid}/trigger`,
+        {},
+      );
+      if (!ResultHelper.isSuccess(response) || !response.data?.taskPid) {
+        throw new Error('schedule trigger failed');
       }
-    })();
-  }, [agentCode]);
+      toast.showSuccessToast(
+        t(
+          'ai.colleagues.schedules.triggered',
+          undefined,
+          'Schedule started through the governed runtime',
+        ),
+      );
+      setConfirmTrigger(null);
+      await loadSchedules();
+    } catch {
+      toast.showErrorToast(
+        t(
+          'ai.colleagues.schedules.triggerFailed',
+          undefined,
+          'Run now was blocked or failed. No duplicate task was created.',
+        ),
+      );
+    } finally {
+      setTriggeringPid(null);
+    }
+  };
 
   if (loading) {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-12 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+          <div key={i} className="bg-subtle dark:bg-subtle h-12 animate-pulse rounded-lg" />
         ))}
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div
+        className="border-status-red bg-status-red-bg dark:border-status-red/60 dark:bg-status-red-bg/20 flex flex-col items-center justify-center rounded-xl border px-6 py-12 text-center"
+        data-testid="agent-schedules-error"
+      >
+        <CalendarDaysIcon className="text-status-red mb-3 h-10 w-10" />
+        <h3 className="text-status-red dark:text-status-red text-base font-medium">
+          {t('ai.colleagues.schedules.error', undefined, 'Schedules could not be loaded')}
+        </h3>
+        <button
+          type="button"
+          onClick={() => void loadSchedules()}
+          className="border-status-red bg-panel text-status-red hover:bg-status-red-bg dark:border-status-red dark:bg-status-red-bg dark:text-status-red mt-4 rounded-lg border px-4 py-2 text-sm font-medium"
+          data-testid="retry-agent-schedules"
+        >
+          {t('ai.colleagues.schedules.retry', undefined, 'Try again')}
+        </button>
       </div>
     );
   }
@@ -1297,17 +1376,29 @@ function SchedulesTab({ agentCode }: { agentCode: string }) {
   if (schedules.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <CalendarDaysIcon className="mb-3 h-12 w-12 text-gray-300 dark:text-gray-600" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+        <CalendarDaysIcon className="text-text-3 dark:text-text-2 mb-3 h-12 w-12" />
+        <h3 className="text-text text-lg font-medium dark:text-white">
           {t('ai.colleagues.schedules.empty', undefined, 'No schedules')}
         </h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-text-3 dark:text-text-3 mt-1 text-sm">
           {t(
             'ai.colleagues.schedules.emptyDesc',
             undefined,
             'Scheduled tasks will appear here once configured.',
           )}
         </p>
+        <button
+          type="button"
+          onClick={() =>
+            window.location.assign(
+              `/dynamic/agent-schedule?agentCode=${encodeURIComponent(agentCode)}`,
+            )
+          }
+          className="bg-accent hover:bg-accent-hover mt-4 rounded-lg px-4 py-2 text-sm font-medium text-white"
+          data-testid="manage-agent-schedules"
+        >
+          {t('ai.colleagues.schedules.manage', undefined, 'Manage schedules')}
+        </button>
       </div>
     );
   }
@@ -1315,68 +1406,160 @@ function SchedulesTab({ agentCode }: { agentCode: string }) {
   const statusColor = (s: string) => {
     switch (s?.toLowerCase()) {
       case 'active':
-        return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+        return 'bg-status-green-bg text-status-green dark:bg-status-green-bg/30 dark:text-status-green';
       case 'paused':
-        return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
+        return 'bg-status-amber-bg text-status-amber dark:bg-status-amber-bg/30 dark:text-status-amber';
       case 'disabled':
-        return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400';
+        return 'bg-subtle text-text-2 dark:bg-subtle dark:text-text-3';
       default:
-        return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400';
+        return 'bg-subtle text-text-2 dark:bg-subtle dark:text-text-3';
     }
   };
 
   return (
     <div className="max-w-4xl">
-      <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-        {t(
-          'ai.colleagues.schedules.count',
-          { count: schedules.length },
-          `${schedules.length} schedules`,
-        )}
-      </p>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-gray-500 dark:text-gray-400">
-            <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">Name</th>
-            <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">Cron</th>
-            <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">
-              Status
-            </th>
-            <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">
-              Next Run
-            </th>
-            <th className="border-b border-gray-200 p-2 font-medium dark:border-gray-700">
-              Last Run
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {schedules.map((row) => (
-            <tr
-              key={row.pid}
-              className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="text-text-3 dark:text-text-3 text-sm">
+          {t(
+            'ai.colleagues.schedules.count',
+            { count: schedules.length },
+            `${schedules.length} schedules`,
+          )}
+        </p>
+        <button
+          type="button"
+          onClick={() =>
+            window.location.assign(
+              `/dynamic/agent-schedule?agentCode=${encodeURIComponent(agentCode)}`,
+            )
+          }
+          className="bg-accent hover:bg-accent-hover rounded-lg px-3 py-2 text-sm font-medium text-white"
+          data-testid="manage-agent-schedules"
+        >
+          {t('ai.colleagues.schedules.manage', undefined, 'Manage schedules')}
+        </button>
+      </div>
+      {confirmTrigger && (
+        <div
+          className="border-status-amber bg-status-amber-bg dark:border-status-amber dark:bg-status-amber-bg/30 mb-4 rounded-xl border p-4"
+          role="dialog"
+          aria-label={t('ai.colleagues.schedules.confirmRunNow', undefined, 'Run schedule now')}
+        >
+          <p className="text-text font-medium dark:text-white">
+            {t('ai.colleagues.schedules.confirmRunNow', undefined, 'Run schedule now')}
+          </p>
+          <p className="text-text-2 dark:text-text-3 mt-1 text-sm">
+            {confirmTrigger.title} ·{' '}
+            {t(
+              'ai.colleagues.schedules.policyNotice',
+              undefined,
+              'Budget, concurrency, employee identity and approval policy will be enforced.',
+            )}
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => void triggerNow()}
+              disabled={triggeringPid === confirmTrigger.pid}
+              className="bg-status-amber rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              data-testid="confirm-run-schedule-now"
             >
-              <td className="p-2 text-gray-900 dark:text-white">{row.schedule_name}</td>
-              <td className="p-2 font-mono text-xs text-gray-600 dark:text-gray-400">
-                {row.cron_expression ?? '-'}
-              </td>
-              <td className="p-2">
-                <span
-                  className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${statusColor(row.schedule_status)}`}
-                >
-                  {row.schedule_status}
-                </span>
-              </td>
-              <td className="p-2 text-xs text-gray-500 dark:text-gray-400">
-                {row.next_run_at ? new Date(row.next_run_at).toLocaleString() : '-'}
-              </td>
-              <td className="p-2 text-xs text-gray-500 dark:text-gray-400">
-                {row.last_run_at ? new Date(row.last_run_at).toLocaleString() : '-'}
-              </td>
+              {triggeringPid === confirmTrigger.pid
+                ? t('common.running', undefined, 'Running...')
+                : t('ai.colleagues.schedules.runNow', undefined, 'Run now')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmTrigger(null)}
+              disabled={triggeringPid === confirmTrigger.pid}
+              className="border-border-strong rounded-lg border px-3 py-2 text-sm"
+            >
+              {t('common.cancel', undefined, 'Cancel')}
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[860px] text-sm">
+          <thead>
+            <tr className="text-text-3 dark:text-text-3 text-left">
+              <th className="border-border dark:border-border border-b p-2 font-medium">
+                {t('ai.colleagues.schedules.name', undefined, 'Name')}
+              </th>
+              <th className="border-border dark:border-border border-b p-2 font-medium">
+                {t('ai.colleagues.schedules.cron', undefined, 'Cron / timezone')}
+              </th>
+              <th className="border-border dark:border-border border-b p-2 font-medium">
+                {t('ai.colleagues.schedules.status', undefined, 'Status')}
+              </th>
+              <th className="border-border dark:border-border border-b p-2 font-medium">
+                {t('ai.colleagues.schedules.budget', undefined, 'Budget / concurrency')}
+              </th>
+              <th className="border-border dark:border-border border-b p-2 font-medium">
+                {t('ai.colleagues.schedules.lastRun', undefined, 'Last run / decision')}
+              </th>
+              <th className="border-border dark:border-border border-b p-2 font-medium">
+                {t('common.actions', undefined, 'Actions')}
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {schedules.map((row) => (
+              <tr
+                key={row.pid}
+                className="border-border hover:bg-subtle dark:border-border dark:hover:bg-subtle/50 border-b"
+              >
+                <td className="text-text p-2 dark:text-white">{row.title}</td>
+                <td className="text-text-2 dark:text-text-3 p-2 font-mono text-xs">
+                  {row.cron_expression ?? '-'} · {row.timezone ?? 'UTC'}
+                </td>
+                <td className="p-2">
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${statusColor(row.schedule_status)}`}
+                  >
+                    {t(
+                      `ai.colleagues.schedules.status${row.schedule_status
+                        .charAt(0)
+                        .toUpperCase()}${row.schedule_status.slice(1).toLowerCase()}`,
+                      undefined,
+                      row.schedule_status,
+                    )}
+                  </span>
+                </td>
+                <td className="text-text-3 dark:text-text-3 p-2 text-xs">
+                  {t(
+                    'ai.colleagues.schedules.budgetSummary',
+                    {
+                      daily: row.daily_run_budget ?? 24,
+                      concurrency: row.concurrency_limit ?? 1,
+                    },
+                    `${row.daily_run_budget ?? 24} per day · ${
+                      row.concurrency_limit ?? 1
+                    } concurrent`,
+                  )}
+                </td>
+                <td className="text-text-3 dark:text-text-3 p-2 text-xs">
+                  {row.last_run_at
+                    ? formatInTimezone(row.last_run_at, formats.datetime, timezone)
+                    : '-'}
+                  {row.last_block_reason ? ` · ${row.last_block_reason}` : ''}
+                </td>
+                <td className="p-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmTrigger(row)}
+                    disabled={row.schedule_status !== 'active' || triggeringPid !== null}
+                    className="border-accent text-accent hover:bg-accent-weak dark:border-accent dark:text-accent rounded-lg border px-2.5 py-1.5 text-xs font-medium whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+                    data-testid={`run-schedule-now-${row.pid}`}
+                  >
+                    {t('ai.colleagues.schedules.runNow', undefined, 'Run now')}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -1471,20 +1654,20 @@ function KnowledgeBasesTab({
   if (readOnly) {
     return (
       <div
-        className="max-w-2xl rounded-xl border border-blue-200 bg-blue-50 p-5 dark:border-blue-900 dark:bg-blue-950/30"
+        className="border-accent bg-accent-weak dark:border-accent dark:bg-accent-weak/30 max-w-2xl rounded-xl border p-5"
         data-testid="aurabot-knowledge-policy"
       >
         <div className="flex gap-3">
-          <InformationCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
+          <InformationCircleIcon className="text-accent dark:text-accent mt-0.5 h-5 w-5 shrink-0" />
           <div>
-            <h3 className="font-semibold text-blue-950 dark:text-blue-100">
+            <h3 className="text-accent dark:text-accent font-semibold">
               {t(
                 'ai.colleagues.knowledge.aurabotTitle',
                 undefined,
                 'AuraBot uses tenant knowledge',
               )}
             </h3>
-            <p className="mt-1 text-sm leading-6 text-blue-800 dark:text-blue-200">
+            <p className="text-accent dark:text-accent mt-1 text-sm leading-6">
               {t(
                 'ai.colleagues.knowledge.aurabotDescription',
                 undefined,
@@ -1494,7 +1677,7 @@ function KnowledgeBasesTab({
             <button
               type="button"
               onClick={onManageKnowledge}
-              className="mt-3 text-sm font-medium text-blue-700 hover:underline dark:text-blue-300"
+              className="text-accent dark:text-accent mt-3 text-sm font-medium hover:underline"
               data-testid="manage-knowledge-bases-link"
             >
               {t('ai.colleagues.knowledge.manage', undefined, 'Manage knowledge bases')}
@@ -1508,10 +1691,10 @@ function KnowledgeBasesTab({
   return (
     <div className="max-w-3xl space-y-5" data-testid="agent-knowledge-tab-panel">
       <div>
-        <h3 className="text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white">
+        <h3 className="text-text text-sm font-semibold tracking-wide uppercase dark:text-white">
           {t('ai.colleagues.knowledge.title', undefined, 'Assigned knowledge bases')}
         </h3>
-        <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">
+        <p className="text-text-3 dark:text-text-3 mt-2 text-sm leading-6">
           {t(
             'ai.colleagues.knowledge.description',
             undefined,
@@ -1523,20 +1706,17 @@ function KnowledgeBasesTab({
       {loading && (
         <div className="space-y-3" data-testid="agent-knowledge-loading">
           {[0, 1].map((item) => (
-            <div
-              key={item}
-              className="h-20 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800"
-            />
+            <div key={item} className="bg-subtle dark:bg-subtle h-20 animate-pulse rounded-xl" />
           ))}
         </div>
       )}
 
       {!loading && loadError && (
         <div
-          className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30"
+          className="border-status-red bg-status-red-bg dark:border-status-red dark:bg-status-red-bg/30 rounded-xl border p-4"
           data-testid="agent-knowledge-error"
         >
-          <p className="text-sm text-red-700 dark:text-red-300">
+          <p className="text-status-red dark:text-status-red text-sm">
             {t(
               'ai.colleagues.knowledge.loadFailed',
               undefined,
@@ -1546,7 +1726,7 @@ function KnowledgeBasesTab({
           <button
             type="button"
             onClick={() => void fetchKnowledgeBases()}
-            className="mt-2 text-sm font-medium text-red-700 hover:underline dark:text-red-300"
+            className="text-status-red dark:text-status-red mt-2 text-sm font-medium hover:underline"
             data-testid="agent-knowledge-retry"
           >
             {t('common.retry', undefined, 'Retry')}
@@ -1556,17 +1736,17 @@ function KnowledgeBasesTab({
 
       {!loading && !loadError && knowledgeBases.length === 0 && (
         <div
-          className="rounded-xl border border-dashed border-gray-300 p-8 text-center dark:border-gray-700"
+          className="border-border-strong dark:border-border rounded-xl border border-dashed p-8 text-center"
           data-testid="agent-knowledge-empty"
         >
-          <CircleStackIcon className="mx-auto h-10 w-10 text-gray-300 dark:text-gray-600" />
-          <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-200">
+          <CircleStackIcon className="text-text-3 dark:text-text-2 mx-auto h-10 w-10" />
+          <p className="text-text-2 dark:text-text-3 mt-3 text-sm font-medium">
             {t('ai.colleagues.knowledge.empty', undefined, 'No knowledge bases yet')}
           </p>
           <button
             type="button"
             onClick={onManageKnowledge}
-            className="mt-2 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+            className="text-accent dark:text-accent mt-2 text-sm font-medium hover:underline"
             data-testid="agent-knowledge-create-link"
           >
             {t('ai.colleagues.knowledge.create', undefined, 'Create a knowledge base')}
@@ -1589,16 +1769,16 @@ function KnowledgeBasesTab({
                 aria-pressed={selected}
                 className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-colors ${
                   selected
-                    ? 'border-blue-500 bg-blue-50 dark:border-blue-500 dark:bg-blue-950/30'
-                    : 'border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900'
+                    ? 'border-accent0 bg-accent-weak dark:border-accent0 dark:bg-accent-weak/30'
+                    : 'border-border bg-panel hover:border-border-strong dark:border-border dark:bg-subtle'
                 } ${disabled ? 'cursor-not-allowed opacity-55' : ''}`}
                 data-testid={`agent-knowledge-option-${knowledgeBase.pid}`}
               >
                 <span
                   className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
                     selected
-                      ? 'border-blue-600 bg-blue-600 text-white'
-                      : 'border-gray-300 dark:border-gray-600'
+                      ? 'border-accent bg-accent text-white'
+                      : 'border-border-strong dark:border-border-strong'
                   }`}
                   aria-hidden="true"
                 >
@@ -1606,21 +1786,21 @@ function KnowledgeBasesTab({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-gray-900 dark:text-white">
+                    <span className="text-text font-medium dark:text-white">
                       {knowledgeBase.name}
                     </span>
                     {unavailable && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                      <span className="bg-status-amber-bg text-status-amber dark:bg-status-amber-bg/40 dark:text-status-amber rounded-full px-2 py-0.5 text-xs font-medium">
                         {t('ai.colleagues.knowledge.disabled', undefined, 'Disabled')}
                       </span>
                     )}
                   </span>
                   {knowledgeBase.description && (
-                    <span className="mt-1 block text-sm text-gray-500 dark:text-gray-400">
+                    <span className="text-text-3 dark:text-text-3 mt-1 block text-sm">
                       {knowledgeBase.description}
                     </span>
                   )}
-                  <span className="mt-2 block text-xs text-gray-400 dark:text-gray-500">
+                  <span className="text-text-3 dark:text-text-3 mt-2 block text-xs">
                     {t(
                       'ai.colleagues.knowledge.counts',
                       { documents: knowledgeBase.docCount, chunks: knowledgeBase.chunkCount },
@@ -1634,9 +1814,9 @@ function KnowledgeBasesTab({
         </div>
       )}
 
-      <div className="flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-700">
+      <div className="border-border dark:border-border flex items-center justify-between border-t pt-4">
         <p
-          className="text-xs text-gray-500 dark:text-gray-400"
+          className="text-text-3 dark:text-text-3 text-xs"
           data-testid="agent-knowledge-selection-count"
         >
           {t(
@@ -1649,7 +1829,7 @@ function KnowledgeBasesTab({
           type="button"
           onClick={() => onSave({ knowledge_base_ids: selectedIds })}
           disabled={saving || loading || loadError}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="bg-accent hover:bg-accent-hover inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
           data-testid="agent-knowledge-save"
         >
           <CheckIcon className="h-4 w-4" />
@@ -1696,7 +1876,7 @@ function MemoryTab({ agentPid }: { agentPid: string }) {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-20 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+          <div key={i} className="bg-subtle dark:bg-subtle h-20 animate-pulse rounded-lg" />
         ))}
       </div>
     );
@@ -1705,11 +1885,11 @@ function MemoryTab({ agentPid }: { agentPid: string }) {
   if (memories.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <BookOpenIcon className="mb-3 h-12 w-12 text-gray-300 dark:text-gray-600" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+        <BookOpenIcon className="text-text-3 dark:text-text-2 mb-3 h-12 w-12" />
+        <h3 className="text-text text-lg font-medium dark:text-white">
           {t('ai.colleagues.memory.empty', undefined, 'No memories yet')}
         </h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-text-3 dark:text-text-3 mt-1 text-sm">
           {t(
             'ai.colleagues.memory.emptyDesc',
             undefined,
@@ -1722,33 +1902,33 @@ function MemoryTab({ agentPid }: { agentPid: string }) {
 
   return (
     <div className="max-w-3xl space-y-3">
-      <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+      <p className="text-text-3 dark:text-text-3 mb-4 text-sm">
         {t('ai.colleagues.memory.count', { count: memories.length }, `${memories.length} memories`)}
       </p>
       {memories.map((mem) => (
         <div
           key={mem.pid}
-          className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900"
+          className="border-border bg-panel dark:border-border dark:bg-subtle rounded-lg border p-4"
         >
           <div className="mb-2 flex items-center gap-2">
-            <span className="inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+            <span className="bg-accent-weak text-accent dark:bg-accent-weak/30 dark:text-accent inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium">
               {mem.memory_type}
             </span>
             {mem.category && (
-              <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+              <span className="bg-subtle text-text-2 dark:bg-subtle dark:text-text-3 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium">
                 {mem.category}
               </span>
             )}
-            <span className="ml-auto text-xs text-gray-400">
+            <span className="text-text-3 ml-auto text-xs">
               {new Date(mem.created_at).toLocaleDateString()}
             </span>
           </div>
           {mem.memory_title && (
-            <h4 className="mb-1 text-sm font-medium text-gray-900 dark:text-white">
+            <h4 className="text-text mb-1 text-sm font-medium dark:text-white">
               {mem.memory_title}
             </h4>
           )}
-          <p className="line-clamp-4 text-sm whitespace-pre-wrap text-gray-600 dark:text-gray-300">
+          <p className="text-text-2 dark:text-text-3 line-clamp-4 text-sm whitespace-pre-wrap">
             {mem.memory_content}
           </p>
         </div>
@@ -1874,7 +2054,7 @@ function EnrollEmployeeDialog({
   };
 
   const selectClass =
-    'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 appearance-none dark:border-gray-600 dark:bg-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50';
+    'w-full rounded-lg border border-border-strong bg-panel px-3 py-2 text-sm text-text appearance-none dark:border-border-strong dark:bg-subtle dark:text-white focus:border-accent0 focus:ring-2 focus:ring-accent0 transition-colors disabled:opacity-50';
 
   return (
     <div
@@ -1882,20 +2062,20 @@ function EnrollEmployeeDialog({
       data-testid="enroll-dialog-overlay"
     >
       <div
-        className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900"
+        className="bg-panel dark:bg-subtle relative w-full max-w-md rounded-2xl p-6 shadow-2xl"
         data-testid="enroll-dialog"
       >
         {/* Header */}
         <div className="mb-5 flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/40">
-              <BuildingOfficeIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <div className="bg-accent-weak dark:bg-accent-weak/40 flex h-10 w-10 items-center justify-center rounded-xl">
+              <BuildingOfficeIcon className="text-accent dark:text-accent h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-text text-base font-semibold dark:text-white">
                 {t('ai.colleagues.enroll.title', undefined, 'Enroll as Employee')}
               </h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-text-3 dark:text-text-3 text-xs">
                 {t(
                   'ai.colleagues.enroll.subtitle',
                   { name: agentName },
@@ -1906,7 +2086,7 @@ function EnrollEmployeeDialog({
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+            className="text-text-3 hover:bg-subtle hover:text-text-2 dark:hover:bg-subtle rounded-lg p-1.5"
           >
             <XMarkIcon className="h-5 w-5" />
           </button>
@@ -1914,17 +2094,17 @@ function EnrollEmployeeDialog({
 
         {/* Department */}
         <div className="mb-4">
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="text-text-2 dark:text-text-3 mb-1.5 block text-sm font-medium">
             {t('ai.colleagues.enroll.field.department', undefined, 'Department')} *
           </label>
           {loadingDepts ? (
-            <div className="h-9 w-full animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+            <div className="bg-subtle dark:bg-subtle h-9 w-full animate-pulse rounded-lg" />
           ) : departments.length === 0 ? (
             /* A required field with nothing selectable is a dead end: the only
                feedback used to be "Please select a department" on submit, for a
                list that had none to offer. Say what is missing and where to fix it. */
             <div
-              className="rounded-lg border border-dashed border-gray-300 px-3 py-2.5 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400"
+              className="border-border-strong text-text-3 dark:border-border-strong dark:text-text-3 rounded-lg border border-dashed px-3 py-2.5 text-sm"
               data-testid="enroll-dept-empty"
             >
               {t(
@@ -1959,16 +2139,16 @@ function EnrollEmployeeDialog({
                   </option>
                 ))}
               </select>
-              <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <ChevronDownIcon className="text-text-3 pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2" />
             </div>
           )}
         </div>
 
         {/* Position */}
         <div className="mb-6">
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="text-text-2 dark:text-text-3 mb-1.5 block text-sm font-medium">
             {t('ai.colleagues.enroll.field.position', undefined, 'Position')} *
-            <span className="ml-1 text-xs text-gray-400">
+            <span className="text-text-3 ml-1 text-xs">
               {t('ai.colleagues.enroll.optional', undefined, '(optional)')}
             </span>
           </label>
@@ -1995,10 +2175,10 @@ function EnrollEmployeeDialog({
                 </option>
               ))}
             </select>
-            <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <ChevronDownIcon className="text-text-3 pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2" />
           </div>
           {!selectedDeptPid && (
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="text-text-3 mt-1 text-xs">
               {t(
                 'ai.colleagues.enroll.hint.selectDeptFirst',
                 undefined,
@@ -2008,7 +2188,7 @@ function EnrollEmployeeDialog({
           )}
           {selectedDeptPid && !loadingPos && positions.length === 0 && (
             <p
-              className="mt-1 text-xs text-amber-600 dark:text-amber-500"
+              className="text-status-amber dark:text-status-amber0 mt-1 text-xs"
               data-testid="enroll-position-empty"
             >
               {t(
@@ -2025,14 +2205,14 @@ function EnrollEmployeeDialog({
           <button
             onClick={onClose}
             disabled={submitting}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            className="border-border-strong text-text-2 hover:bg-subtle dark:border-border-strong dark:text-text-3 dark:hover:bg-subtle rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             {t('common.cancel', undefined, 'Cancel')}
           </button>
           <button
             onClick={handleSubmit}
             disabled={submitting || !selectedDeptPid || !selectedPosPid}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="bg-accent hover:bg-accent-hover rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             data-testid="enroll-confirm-btn"
           >
             {submitting
@@ -2097,13 +2277,13 @@ function RemoveFromOrgDialog({
       data-testid="remove-org-dialog-overlay"
     >
       <div
-        className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900"
+        className="bg-panel dark:bg-subtle relative w-full max-w-sm rounded-2xl p-6 shadow-2xl"
         data-testid="remove-org-dialog"
       >
-        <h2 className="mb-2 text-base font-semibold text-gray-900 dark:text-white">
+        <h2 className="text-text mb-2 text-base font-semibold dark:text-white">
           {t('ai.colleagues.removeOrg.title', undefined, 'Remove from Org Chart')}
         </h2>
-        <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-text-3 dark:text-text-3 mb-6 text-sm">
           {t(
             'ai.colleagues.removeOrg.confirm',
             { name: agentName },
@@ -2114,14 +2294,14 @@ function RemoveFromOrgDialog({
           <button
             onClick={onClose}
             disabled={submitting}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            className="border-border-strong text-text-2 hover:bg-subtle dark:border-border-strong dark:text-text-3 dark:hover:bg-subtle rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             {t('common.cancel', undefined, 'Cancel')}
           </button>
           <button
             onClick={handleConfirm}
             disabled={submitting}
-            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            className="bg-status-red hover:bg-status-red rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             data-testid="remove-org-confirm-btn"
           >
             {submitting
@@ -2130,6 +2310,581 @@ function RemoveFromOrgDialog({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+export function ReleasesTab({
+  agentPid,
+  agentUpdatedAt,
+  readOnly,
+}: {
+  agentPid: string;
+  agentUpdatedAt: string;
+  readOnly: boolean;
+}) {
+  const { t } = useI18n();
+  const toast = useToastContext();
+  const [releases, setReleases] = useState<AgentReleaseItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [rollbackTarget, setRollbackTarget] = useState<AgentReleaseItem | null>(null);
+  const [rollingBack, setRollingBack] = useState(false);
+  const [deploymentPolicy, setDeploymentPolicy] = useState<AgentDeploymentPolicy | null>(null);
+  const [policyLoading, setPolicyLoading] = useState(true);
+  const [policyError, setPolicyError] = useState<string | null>(null);
+  const [policySaving, setPolicySaving] = useState(false);
+
+  const fetchReleases = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await get<AgentReleaseItem[]>(`/api/agent/definitions/${agentPid}/releases`);
+      if (!ResultHelper.isSuccess(response)) {
+        throw new Error('release history request failed');
+      }
+      setReleases(Array.isArray(response.data) ? response.data : []);
+    } catch {
+      setError(
+        t(
+          'ai.colleagues.releases.loadFailed',
+          undefined,
+          'Release history could not be loaded. Retry before publishing.',
+        ),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [agentPid, t]);
+
+  useEffect(() => {
+    void fetchReleases();
+  }, [fetchReleases]);
+
+  const fetchDeploymentPolicy = useCallback(async () => {
+    setPolicyLoading(true);
+    setPolicyError(null);
+    try {
+      const response = await get<AgentDeploymentPolicy>(
+        `/api/agent/definitions/${agentPid}/deployment-policy`,
+      );
+      if (!ResultHelper.isSuccess(response) || !response.data?.deploymentPid) {
+        throw new Error('deployment policy request failed');
+      }
+      setDeploymentPolicy({
+        ...response.data,
+        channelPolicy: response.data.channelPolicy ?? {},
+        policySnapshot: response.data.policySnapshot ?? {},
+      });
+    } catch {
+      setDeploymentPolicy(null);
+      setPolicyError(
+        t(
+          'ai.colleagues.policy.loadFailed',
+          undefined,
+          'Deployment policy could not be loaded. Runtime access remains unchanged.',
+        ),
+      );
+    } finally {
+      setPolicyLoading(false);
+    }
+  }, [agentPid, t]);
+
+  useEffect(() => {
+    void fetchDeploymentPolicy();
+  }, [fetchDeploymentPolicy]);
+
+  const updatePolicyArray = (
+    field: keyof AgentDeploymentPolicy['channelPolicy'],
+    value: string | number,
+    checked: boolean,
+  ) => {
+    setDeploymentPolicy((current) => {
+      if (!current) return current;
+      const existing = (current.channelPolicy[field] as Array<string | number> | undefined) ?? [];
+      const next = checked
+        ? Array.from(new Set([...existing, value]))
+        : existing.filter((item) => item !== value);
+      return {
+        ...current,
+        channelPolicy: {
+          ...current.channelPolicy,
+          [field]: next,
+        },
+      };
+    });
+  };
+
+  const parseIds = (value: string) =>
+    Array.from(
+      new Set(
+        value
+          .split(',')
+          .map((item) => Number(item.trim()))
+          .filter((item) => Number.isSafeInteger(item) && item > 0),
+      ),
+    );
+
+  const saveDeploymentPolicy = async () => {
+    if (!deploymentPolicy) return;
+    setPolicySaving(true);
+    try {
+      const response = await put<AgentDeploymentPolicy>(
+        `/api/agent/definitions/${agentPid}/deployment-policy`,
+        deploymentPolicy.channelPolicy,
+      );
+      if (!ResultHelper.isSuccess(response) || !response.data?.deploymentPid) {
+        throw new Error('deployment policy update failed');
+      }
+      setDeploymentPolicy(response.data);
+      toast.showSuccessToast(
+        t('ai.colleagues.policy.saved', undefined, 'Deployment invocation policy saved'),
+      );
+    } catch {
+      toast.showErrorToast(
+        t(
+          'ai.colleagues.policy.saveFailed',
+          undefined,
+          'Policy save failed. The active deployment was not changed.',
+        ),
+      );
+    } finally {
+      setPolicySaving(false);
+    }
+  };
+
+  const publish = async () => {
+    setPublishing(true);
+    try {
+      const response = await post(`/api/agent/definitions/${agentPid}/publish`, {});
+      if (!ResultHelper.isSuccess(response)) {
+        throw new Error('publish failed');
+      }
+      toast.showSuccessToast(
+        t(
+          'ai.colleagues.releases.publishSuccess',
+          undefined,
+          'Immutable release published and deployed',
+        ),
+      );
+      setConfirming(false);
+      await fetchReleases();
+    } catch {
+      toast.showErrorToast(
+        t(
+          'ai.colleagues.releases.publishFailed',
+          undefined,
+          'Publish failed. The current deployment was not changed.',
+        ),
+      );
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const rollback = async () => {
+    if (!rollbackTarget) return;
+    setRollingBack(true);
+    try {
+      const response = await post(
+        `/api/agent/definitions/${agentPid}/releases/${rollbackTarget.pid}/deploy`,
+        {},
+      );
+      if (!ResultHelper.isSuccess(response)) {
+        throw new Error('rollback failed');
+      }
+      toast.showSuccessToast(
+        t(
+          'ai.colleagues.releases.rollbackSuccess',
+          { version: rollbackTarget.release_no },
+          `Deployment rolled back to v${rollbackTarget.release_no}`,
+        ),
+      );
+      setRollbackTarget(null);
+      await fetchReleases();
+    } catch {
+      toast.showErrorToast(
+        t(
+          'ai.colleagues.releases.rollbackFailed',
+          undefined,
+          'Rollback failed. The current deployment was not changed.',
+        ),
+      );
+    } finally {
+      setRollingBack(false);
+    }
+  };
+
+  const deployed = releases.find((release) => release.deployed);
+  const unpublishedChanges =
+    !deployed?.source_updated_at ||
+    new Date(agentUpdatedAt).getTime() > new Date(deployed.source_updated_at).getTime();
+
+  if (loading) {
+    return (
+      <div className="space-y-3" data-testid="agent-releases-loading">
+        <div className="bg-subtle dark:bg-subtle h-20 animate-pulse rounded-xl" />
+        <div className="bg-subtle dark:bg-subtle h-20 animate-pulse rounded-xl" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        className="border-status-red bg-status-red-bg dark:border-status-red dark:bg-status-red-bg/30 rounded-xl border p-5"
+        role="alert"
+      >
+        <p className="text-status-red dark:text-status-red text-sm">{error}</p>
+        <button
+          type="button"
+          onClick={() => void fetchReleases()}
+          className="border-status-red text-status-red hover:bg-status-red-bg dark:border-status-red dark:text-status-red mt-3 rounded-lg border px-3 py-1.5 text-sm font-medium"
+        >
+          {t('common.retry', undefined, 'Retry')}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="border-border bg-panel dark:border-border dark:bg-subtle flex flex-wrap items-start justify-between gap-4 rounded-xl border p-5">
+        <div className="max-w-2xl">
+          <h2 className="text-text font-semibold dark:text-white">
+            {t('ai.colleagues.releases.title', undefined, 'Immutable runtime releases')}
+          </h2>
+          <p className="text-text-3 dark:text-text-3 mt-1 text-sm">
+            {t(
+              'ai.colleagues.releases.help',
+              undefined,
+              'Saving edits updates the draft only. Publishing creates a versioned snapshot; new turns use it while in-flight work keeps its pinned release.',
+            )}
+          </p>
+          <p
+            className={`mt-3 text-sm font-medium ${
+              unpublishedChanges
+                ? 'text-status-amber dark:text-status-amber'
+                : 'text-status-green dark:text-status-green'
+            }`}
+            data-testid="agent-release-draft-state"
+          >
+            {unpublishedChanges
+              ? t('ai.colleagues.releases.unpublished', undefined, 'Draft changes are not deployed')
+              : t('ai.colleagues.releases.current', undefined, 'Deployment matches the draft')}
+          </p>
+        </div>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            disabled={publishing}
+            className="bg-accent hover:bg-accent-hover inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            data-testid="publish-agent-release"
+          >
+            <RocketLaunchIcon className="h-4 w-4" />
+            {t('ai.colleagues.releases.publish', undefined, 'Publish draft')}
+          </button>
+        )}
+      </div>
+
+      <section
+        className="border-border bg-panel dark:border-border dark:bg-subtle rounded-xl border p-5"
+        data-testid="agent-deployment-policy"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-text font-semibold dark:text-white">
+              {t('ai.colleagues.policy.title', undefined, 'Deployment invocation policy')}
+            </h2>
+            <p className="text-text-3 dark:text-text-3 mt-1 text-sm">
+              {t(
+                'ai.colleagues.policy.help',
+                undefined,
+                'Restrict where this colleague can run and which initiators may invoke it. Empty groups keep tenant-compatible access.',
+              )}
+            </p>
+          </div>
+          {deploymentPolicy?.channelPolicy.version && (
+            <span className="bg-subtle text-text-2 dark:bg-subtle dark:text-text-3 rounded-full px-2.5 py-1 font-mono text-xs">
+              {deploymentPolicy.channelPolicy.version}
+            </span>
+          )}
+        </div>
+
+        {policyLoading ? (
+          <div
+            className="bg-subtle dark:bg-subtle mt-4 h-24 animate-pulse rounded-lg"
+            data-testid="agent-deployment-policy-loading"
+          />
+        ) : policyError ? (
+          <div
+            className="border-status-red bg-status-red-bg mt-4 rounded-lg border p-4"
+            role="alert"
+          >
+            <p className="text-status-red text-sm">{policyError}</p>
+            <button
+              type="button"
+              onClick={() => void fetchDeploymentPolicy()}
+              className="border-status-red text-status-red mt-2 rounded border px-3 py-1.5 text-sm"
+              data-testid="retry-agent-deployment-policy"
+            >
+              {t('common.retry', undefined, 'Retry')}
+            </button>
+          </div>
+        ) : deploymentPolicy ? (
+          <div className="mt-5 space-y-5">
+            <fieldset>
+              <legend className="text-text dark:text-text-3 text-sm font-medium">
+                {t('ai.colleagues.policy.channels', undefined, 'Allowed channels')}
+              </legend>
+              <div className="mt-2 flex flex-wrap gap-3">
+                {['web', 'im_group', 'schedule', 'event', 'webhook', 'api'].map((channel) => (
+                  <label key={channel} className="inline-flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={(deploymentPolicy.channelPolicy.allowedChannels ?? []).includes(
+                        channel,
+                      )}
+                      disabled={readOnly || policySaving}
+                      onChange={(event) =>
+                        updatePolicyArray('allowedChannels', channel, event.target.checked)
+                      }
+                      data-testid={`deployment-channel-${channel}`}
+                    />
+                    {channel}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend className="text-text dark:text-text-3 text-sm font-medium">
+                {t('ai.colleagues.policy.initiators', undefined, 'Allowed initiator types')}
+              </legend>
+              <div className="mt-2 flex flex-wrap gap-3">
+                {['human', 'system', 'schedule', 'event', 'agent_handoff'].map((kind) => (
+                  <label key={kind} className="inline-flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={(
+                        deploymentPolicy.channelPolicy.allowedInitiatorTypes ?? []
+                      ).includes(kind)}
+                      disabled={readOnly || policySaving}
+                      onChange={(event) =>
+                        updatePolicyArray('allowedInitiatorTypes', kind, event.target.checked)
+                      }
+                      data-testid={`deployment-initiator-${kind}`}
+                    />
+                    {kind}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              {[
+                ['allowedUserIds', t('ai.colleagues.policy.allowedUserIds', undefined, 'User IDs')],
+                [
+                  'allowedMemberIds',
+                  t('ai.colleagues.policy.allowedMemberIds', undefined, 'Member IDs'),
+                ],
+                ['allowedRoleIds', t('ai.colleagues.policy.allowedRoleIds', undefined, 'Role IDs')],
+              ].map(([field, label]) => (
+                <label key={field} className="text-text-2 dark:text-text-3 text-sm">
+                  {label}
+                  <input
+                    type="text"
+                    value={
+                      (
+                        deploymentPolicy.channelPolicy[
+                          field as keyof AgentDeploymentPolicy['channelPolicy']
+                        ] as number[] | undefined
+                      )?.join(', ') ?? ''
+                    }
+                    disabled={readOnly || policySaving}
+                    onChange={(event) =>
+                      setDeploymentPolicy((current) =>
+                        current
+                          ? {
+                              ...current,
+                              channelPolicy: {
+                                ...current.channelPolicy,
+                                [field]: parseIds(event.target.value),
+                              },
+                            }
+                          : current,
+                      )
+                    }
+                    placeholder="101, 102"
+                    className="border-border-strong dark:border-border dark:bg-subtle mt-1 w-full rounded-lg border px-3 py-2"
+                    data-testid={`deployment-policy-${field}`}
+                  />
+                </label>
+              ))}
+            </div>
+
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={() => void saveDeploymentPolicy()}
+                disabled={policySaving}
+                className="bg-accent hover:bg-accent-hover rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                data-testid="save-agent-deployment-policy"
+              >
+                {policySaving
+                  ? t('common.saving', undefined, 'Saving...')
+                  : t('common.save', undefined, 'Save policy')}
+              </button>
+            )}
+          </div>
+        ) : null}
+      </section>
+
+      {confirming && (
+        <div
+          className="border-accent bg-accent-weak dark:border-accent dark:bg-accent-weak/30 rounded-xl border p-5"
+          role="dialog"
+          aria-label={t(
+            'ai.colleagues.releases.confirmTitle',
+            undefined,
+            'Publish immutable release',
+          )}
+        >
+          <p className="text-text font-medium dark:text-white">
+            {t('ai.colleagues.releases.confirmTitle', undefined, 'Publish immutable release')}
+          </p>
+          <p className="text-text-2 dark:text-text-3 mt-1 text-sm">
+            {t(
+              'ai.colleagues.releases.confirmBody',
+              undefined,
+              'New turns and runs will move to this snapshot. Existing work remains pinned to its original release.',
+            )}
+          </p>
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              onClick={() => void publish()}
+              disabled={publishing}
+              className="bg-accent rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              data-testid="confirm-publish-agent-release"
+            >
+              {publishing
+                ? t('ai.colleagues.releases.publishing', undefined, 'Publishing...')
+                : t('ai.colleagues.releases.confirm', undefined, 'Publish and deploy')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={publishing}
+              className="border-border-strong text-text-2 dark:border-border dark:text-text-3 rounded-lg border px-3 py-2 text-sm font-medium"
+            >
+              {t('common.cancel', undefined, 'Cancel')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {rollbackTarget && (
+        <div
+          className="border-status-amber bg-status-amber-bg dark:border-status-amber dark:bg-status-amber-bg/30 rounded-xl border p-5"
+          role="dialog"
+          aria-label={t(
+            'ai.colleagues.releases.rollbackTitle',
+            undefined,
+            'Roll back deployed release',
+          )}
+        >
+          <p className="text-text font-medium dark:text-white">
+            {t('ai.colleagues.releases.rollbackTitle', undefined, 'Roll back deployed release')}
+          </p>
+          <p className="text-text-2 dark:text-text-3 mt-1 text-sm">
+            {t(
+              'ai.colleagues.releases.rollbackBody',
+              { version: rollbackTarget.release_no },
+              `New work will use v${rollbackTarget.release_no}. In-flight work remains pinned to its original release.`,
+            )}
+          </p>
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              onClick={() => void rollback()}
+              disabled={rollingBack}
+              className="bg-status-amber rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              data-testid="confirm-rollback-agent-release"
+            >
+              {rollingBack
+                ? t('ai.colleagues.releases.rollingBack', undefined, 'Rolling back...')
+                : t('ai.colleagues.releases.rollbackConfirm', undefined, 'Roll back deployment')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setRollbackTarget(null)}
+              disabled={rollingBack}
+              className="border-border-strong text-text-2 dark:border-border dark:text-text-3 rounded-lg border px-3 py-2 text-sm font-medium"
+            >
+              {t('common.cancel', undefined, 'Cancel')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {releases.length === 0 ? (
+        <div className="border-border-strong text-text-3 dark:border-border dark:text-text-3 rounded-xl border border-dashed p-8 text-center text-sm">
+          {t(
+            'ai.colleagues.releases.empty',
+            undefined,
+            'No release exists yet. Publish the draft before assigning work.',
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3" data-testid="agent-release-history">
+          {releases.map((release) => (
+            <div
+              key={release.pid}
+              data-testid={`agent-release-${release.release_no}`}
+              className="border-border bg-panel dark:border-border dark:bg-subtle flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"
+            >
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-text font-semibold dark:text-white">
+                    v{release.release_no}
+                  </span>
+                  {release.deployed && (
+                    <span className="bg-status-green-bg text-status-green dark:bg-status-green-bg/40 dark:text-status-green rounded-full px-2 py-0.5 text-xs font-medium">
+                      {t('ai.colleagues.releases.deployed', undefined, 'Deployed')}
+                    </span>
+                  )}
+                  {!release.deployed && (
+                    <span className="bg-subtle text-text-2 dark:bg-subtle dark:text-text-3 rounded-full px-2 py-0.5 text-xs">
+                      {t('ai.colleagues.releases.historical', undefined, 'Historical')}
+                    </span>
+                  )}
+                </div>
+                <p className="text-text-3 dark:text-text-3 mt-1 font-mono text-xs">
+                  {release.release_hash.slice(0, 12)} · {release.pid}
+                </p>
+              </div>
+              <time className="text-text-3 dark:text-text-3 text-sm">
+                {new Date(release.published_at).toLocaleString()}
+              </time>
+              {!readOnly && !release.deployed && (
+                <button
+                  type="button"
+                  onClick={() => setRollbackTarget(release)}
+                  disabled={rollingBack}
+                  className="border-status-amber text-status-amber hover:bg-status-amber-bg dark:border-status-amber dark:text-status-amber dark:hover:bg-status-amber-bg/30 rounded-lg border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                  data-testid={`rollback-agent-release-${release.release_no}`}
+                >
+                  {t('ai.colleagues.releases.rollback', undefined, 'Deploy this version')}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -2264,9 +3019,9 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
     return (
       <div className="mx-auto w-full max-w-5xl p-6">
         <div className="animate-pulse space-y-6">
-          <div className="h-8 w-48 rounded bg-gray-200 dark:bg-gray-700" />
-          <div className="h-10 w-full rounded bg-gray-200 dark:bg-gray-700" />
-          <div className="h-64 w-full rounded bg-gray-200 dark:bg-gray-700" />
+          <div className="bg-border dark:bg-subtle h-8 w-48 rounded" />
+          <div className="bg-border dark:bg-subtle h-10 w-full rounded" />
+          <div className="bg-border dark:bg-subtle h-64 w-full rounded" />
         </div>
       </div>
     );
@@ -2306,23 +3061,23 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
       <div className="mb-6 flex items-center gap-3">
         <button
           onClick={() => navigate('/p/c/ai_colleagues')}
-          className="rounded-lg p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="hover:bg-subtle dark:hover:bg-subtle rounded-lg p-2 transition-colors"
           data-testid="back-to-colleagues"
         >
-          <ArrowLeftIcon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+          <ArrowLeftIcon className="text-text-2 dark:text-text-3 h-5 w-5" />
         </button>
         <div className="flex-1">
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">{agent.name}</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <h1 className="text-text text-xl font-semibold dark:text-white">{agent.name}</h1>
+          <p className="text-text-3 dark:text-text-3 text-sm">
             {agent.agent_code}
             {isAuraBot && (
-              <span className="ml-2 inline-flex items-center rounded-full bg-blue-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+              <span className="bg-accent ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold text-white">
                 {t('ai.colleagues.badge.official', undefined, 'Official')}
               </span>
             )}
             {isSuspended && (
               <span
-                className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                className="bg-status-amber-bg text-status-amber dark:bg-status-amber-bg/40 dark:text-status-amber ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
                 data-testid="agent-suspended-badge"
               >
                 <PauseCircleIcon className="h-3 w-3" />
@@ -2331,7 +3086,7 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
             )}
             {isEnrolled && (
               <span
-                className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                className="bg-status-green-bg text-status-green dark:bg-status-green-bg/40 dark:text-status-green ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
                 data-testid="digital-employee-badge"
               >
                 <BuildingOfficeIcon className="h-3 w-3" />
@@ -2355,8 +3110,8 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
               disabled={lifecycleBusy}
               className={
                 isSuspended
-                  ? 'inline-flex items-center gap-2 rounded-lg border border-green-200 bg-white px-3 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50 disabled:opacity-50 dark:border-green-800 dark:bg-gray-900 dark:text-green-400'
-                  : 'inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:bg-gray-900 dark:text-amber-400'
+                  ? 'border-status-green bg-panel text-status-green hover:bg-status-green-bg dark:border-status-green dark:bg-subtle dark:text-status-green inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50'
+                  : 'border-status-amber bg-panel text-status-amber hover:bg-status-amber-bg dark:border-status-amber dark:bg-subtle dark:text-status-amber inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50'
               }
               data-testid={isSuspended ? 'agent-resume-btn' : 'agent-suspend-btn'}
             >
@@ -2381,7 +3136,7 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
             {isEnrolled ? (
               <button
                 onClick={() => setShowRemoveOrgDialog(true)}
-                className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-800 dark:bg-gray-900 dark:text-red-400 dark:hover:bg-red-950/30"
+                className="border-status-red bg-panel text-status-red hover:bg-status-red-bg dark:border-status-red dark:bg-subtle dark:text-status-red dark:hover:bg-status-red-bg/30 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors"
                 data-testid="remove-from-org-btn"
               >
                 <BuildingOfficeIcon className="h-4 w-4" />
@@ -2390,7 +3145,7 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
             ) : (
               <button
                 onClick={() => setShowEnrollDialog(true)}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                className="bg-accent hover:bg-accent-hover inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white transition-colors"
                 data-testid="enroll-as-employee-btn"
               >
                 <BuildingOfficeIcon className="h-4 w-4" />
@@ -2402,7 +3157,7 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
+      <div className="border-border dark:border-border mb-6 border-b">
         <nav className="flex gap-6" aria-label="Tabs">
           {tabs.map((tab) => {
             const active = activeTab === tab.key;
@@ -2413,8 +3168,8 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
                 onClick={() => setActiveTab(tab.key)}
                 className={`inline-flex items-center gap-1.5 border-b-2 pb-3 text-sm font-medium transition-colors ${
                   active
-                    ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                    ? 'border-accent text-accent dark:border-accent dark:text-accent'
+                    : 'text-text-3 hover:text-text-2 dark:text-text-3 dark:hover:text-text-3 border-transparent'
                 }`}
                 data-testid={`tab-${tab.key}`}
               >
@@ -2444,6 +3199,9 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
           />
         )}
         {activeTab === 'memory' && agentPid && <MemoryTab agentPid={agentPid} />}
+        {activeTab === 'releases' && agentPid && (
+          <ReleasesTab agentPid={agentPid} agentUpdatedAt={agent.updated_at} readOnly={readOnly} />
+        )}
         {activeTab === 'runs' && agent && <RunHistoryTab agentCode={agent.agent_code} />}
         {activeTab === 'schedules' && agent && <SchedulesTab agentCode={agent.agent_code} />}
       </div>

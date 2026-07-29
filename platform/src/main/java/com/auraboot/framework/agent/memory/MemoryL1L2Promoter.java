@@ -1,9 +1,7 @@
 package com.auraboot.framework.agent.memory;
 
-import com.auraboot.framework.agent.dto.AnthropicRequest;
-import com.auraboot.framework.agent.dto.BatchRequest;
 import com.auraboot.framework.agent.metrics.MemoryL1L2PromotionMetrics;
-import com.auraboot.framework.agent.provider.AnthropicBatchService;
+import com.auraboot.framework.agent.provider.LlmBatchGateway;
 import com.auraboot.framework.agent.service.MemoryEmbeddingService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -91,7 +89,7 @@ public class MemoryL1L2Promoter {
 
     /**
      * P0-4 — when {@code true}, large promotion candidate sets get a parallel
-     * second-pass evaluation via the Anthropic Batch API (half-price, 24h SLA).
+     * second-pass evaluation via an available asynchronous batch adapter.
      * The synchronous promotion still runs; the batch result is recorded for
      * later auditing / re-scoring and does not block the write path. Default
      * {@code false} so existing behaviour is unchanged.
@@ -109,7 +107,7 @@ public class MemoryL1L2Promoter {
      * synchronous promotion path never depends on this.
      */
     @Autowired(required = false)
-    private AnthropicBatchService batchService;
+    private LlmBatchGateway batchGateway;
 
     public MemoryL1L2Promoter(JdbcTemplate jdbc,
                               MemoryTierEvaluator evaluator,
@@ -207,7 +205,7 @@ public class MemoryL1L2Promoter {
         // Synchronous results above are unaffected; batch is purely additive
         // (audit + future re-scoring). Failure to submit must NOT roll back
         // the synchronous transaction — wrap in a try/catch.
-        if (useBatch && batchService != null && candidates.size() >= batchMinCandidates) {
+        if (useBatch && batchGateway != null && candidates.size() >= batchMinCandidates) {
             try {
                 submitMemoryPromotionBatch(tenantId, runId, candidates);
             } catch (RuntimeException e) {
@@ -221,38 +219,30 @@ public class MemoryL1L2Promoter {
     }
 
     /**
-     * Build one Anthropic batch request per candidate and submit. The prompt
+     * Build one provider-neutral batch item per candidate and submit. The prompt
      * asks the model to score the memory's promotion-worthiness on the same
      * factors {@link MemoryTierEvaluator} uses, but at LLM quality. Result
      * consumption happens later in {@code BatchJobPoller}; this method only
      * fires the submission and stores the {@code batch_id} in
-     * {@code ab_agent_batch_job} (handled by {@link AnthropicBatchService}).
+     * {@code ab_agent_batch_job} through the selected batch adapter.
      */
     private void submitMemoryPromotionBatch(Long tenantId, String runId,
                                             List<Map<String, Object>> candidates) {
-        List<BatchRequest> requests = new ArrayList<>(candidates.size());
+        List<LlmBatchGateway.Item> requests = new ArrayList<>(candidates.size());
         for (Map<String, Object> row : candidates) {
             String pid = (String) row.get("pid");
             String content = (String) row.get("memory_content");
             if (pid == null || content == null) continue;
 
-            AnthropicRequest req = AnthropicRequest.builder()
-                    .model("claude-haiku-4")  // cheapest tier — batch already halves the price
-                    .max_tokens(256)
-                    .system("You are a memory-promotion scorer. Reply with a single JSON "
-                            + "object: {\"score\": 0.0-1.0, \"reason\": \"...\"}.")
-                    .messages(List.of(AnthropicRequest.Message.builder()
-                            .role("user")
-                            .content("Score this memory for L2 promotion:\n\n" + content)
-                            .build()))
-                    .build();
-            requests.add(BatchRequest.builder()
-                    .customId(pid)
-                    .params(req)
-                    .build());
+            requests.add(new LlmBatchGateway.Item(
+                    pid,
+                    "You are a memory-promotion scorer. Reply with a single JSON "
+                            + "object: {\"score\": 0.0-1.0, \"reason\": \"...\"}.",
+                    "Score this memory for L2 promotion:\n\n" + content,
+                    256));
         }
         if (requests.isEmpty()) return;
-        String batchId = batchService.submitBatch(requests, "memory_promotion_scoring");
+        String batchId = batchGateway.submit(requests, "memory_promotion_scoring");
         log.info("L1->L2 batch second-pass submitted: tenant={} run={} batch_id={} candidates={}",
                 tenantId, runId, batchId, requests.size());
     }

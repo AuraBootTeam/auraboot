@@ -204,7 +204,12 @@ class DocumentReconcileServiceIntegrationTest extends BaseIntegrationTest {
 
     private int chunkCount(String docPid) {
         Integer n = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ab_kb_chunk WHERE doc_id = ?", Integer.class, docPid);
+                "SELECT COUNT(*) FROM ab_kb_chunk c "
+                        + "JOIN ab_kb_document d ON d.pid = c.doc_id "
+                        + "WHERE d.pid = ? "
+                        + "AND c.document_version_pid = d.active_version_pid",
+                Integer.class,
+                docPid);
         return n == null ? 0 : n;
     }
 }

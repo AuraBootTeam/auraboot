@@ -405,10 +405,10 @@ class NlModelingManifestPostProcessingTest {
 
     @Test
     void buildManifest_conformsPageFieldAliasRequiredAndDictionaryProjection() throws Exception {
-        // Two live providers exposed different halves of the same deterministic gap:
-        // qwen emitted inspector_name for the bound inspector field, while deepseek
-        // omitted required=true from an editable required form field. The manifest
-        // builder must project the declared model contract into both pages.
+        // Two live adapters exposed different halves of the same deterministic
+        // gap: one emitted inspector_name for the bound field, while another
+        // omitted required=true. The manifest builder must project the declared
+        // model contract into both pages.
         NlModelingResponse.Resources res = NlModelingResponse.Resources.builder()
                 .models(List.of(mutable("code", "equipment_inspection", "modelType", "entity")))
                 .fields(List.of(

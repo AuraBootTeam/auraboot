@@ -73,20 +73,15 @@ class P1VirtualModelSmokeTest extends BaseIntegrationTest {
         // DynamicController enforces @RequirePermission("model.{pageKey}.read") and ".create"
         // — we grant both so the security layer lets the request reach the service layer
         // where the virtual-model guard (T10) runs for the write assertion.
-        // Permission rows must commit so the PermissionInterceptor (which runs on a
-        // fresh request thread / possibly different connection) can see them.
-        // BaseIntegrationTest uses @Transactional(rollback=true), so we escape via
-        // TransactionTemplate with NOT_SUPPORTED to auto-commit the grants.
-        TransactionTemplate tt = new TransactionTemplate(txManager);
-        tt.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
-        tt.executeWithoutResult(status -> {
-            grantPermissionToTestRole("meta.model.read",
-                    "meta", "model", "read", "Meta Model Read");
-            grantPermissionToTestRole("model." + modelCode + ".read",
-                    "model", modelCode, "read", "Model " + modelCode + " Read");
-            grantPermissionToTestRole("model." + modelCode + ".create",
-                    "model", modelCode, "create", "Model " + modelCode + " Create");
-        });
+        // Permission rows commit outside the test transaction so the real
+        // PermissionInterceptor can observe them; BaseIntegrationTest removes
+        // the role grants after this test to preserve DENY-path isolation.
+        grantCommittedPermissionToTestRole("meta.model.read",
+                "meta", "model", "read", "Meta Model Read");
+        grantCommittedPermissionToTestRole("model." + modelCode + ".read",
+                "model", modelCode, "read", "Model " + modelCode + " Read");
+        grantCommittedPermissionToTestRole("model." + modelCode + ".create",
+                "model", modelCode, "create", "Model " + modelCode + " Create");
         userPermissionService.evictUserPermissions(getTestUser().getId());
 
         Filter contextFilter = (request, response, chain) -> {

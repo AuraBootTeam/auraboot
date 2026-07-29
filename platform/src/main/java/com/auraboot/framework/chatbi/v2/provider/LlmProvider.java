@@ -21,6 +21,15 @@ import com.auraboot.framework.semantic.dto.SemanticMetaResponse;
 public interface LlmProvider {
 
     /**
+     * Stable, non-secret routing identifier used by audit and circuit-breaker
+     * records. Implementations own this value; the router must not know
+     * concrete provider names.
+     */
+    default String routingKey() {
+        return getClass().getSimpleName();
+    }
+
+    /**
      * Translate a natural-language query into a Token sequence, given the
      * full semantic catalog as grounding and (optionally) recent conversation
      * context for follow-ups.

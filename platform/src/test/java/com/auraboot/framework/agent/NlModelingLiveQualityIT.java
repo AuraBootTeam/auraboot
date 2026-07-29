@@ -49,16 +49,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
-        "agent.anthropic.api-key=",
         "agent.llm.stub-mode=false",
 })
 class NlModelingLiveQualityIT extends BaseIntegrationTest {
 
     /**
-     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * Resolved from the environment (the explicit provider-neutral live profile) rather than
      * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider and its
      * model name in every live IT is what silently broke this whole layer when
-     * DeepSeek retired {@code deepseek-chat}.
+     * an upstream provider retired a model identifier.
      */
     private LiveLlmSeeder.LiveProvider liveProvider;
 

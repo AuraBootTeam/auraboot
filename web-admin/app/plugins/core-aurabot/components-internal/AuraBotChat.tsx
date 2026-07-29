@@ -277,7 +277,10 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
         } `}
       >
         {!isUser ? (
-          <BotMessageContent content={message.content} />
+          <BotMessageContent
+            content={message.content}
+            evidence={message.retrievalEvidence}
+          />
         ) : (
           <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
         )}
@@ -288,68 +291,85 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
 }
 
 // ============================================================================
-// Bot Message Content — parses RAG citation markers [Source: docName, Chunk N]
+// Bot Message Content — renders trusted retrieval evidence from the SSE event.
 // ============================================================================
 
-const CITATION_REGEX = /\[Source:\s*([^,\]]+),\s*Chunk\s*(\d+)\]/g;
-
-function BotMessageContent({ content }: { content: string }) {
-  const parts: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  let key = 0;
-
-  // Reset regex state
-  CITATION_REGEX.lastIndex = 0;
-
-  while ((match = CITATION_REGEX.exec(content)) !== null) {
-    // Text before the citation
-    if (match.index > lastIndex) {
-      parts.push(
-        <span key={key++} className="break-words whitespace-pre-wrap">
-          {content.slice(lastIndex, match.index)}
-        </span>,
-      );
-    }
-    // Citation badge
-    const docName = match[1].trim();
-    const chunkIndex = match[2];
-    parts.push(<CitationBadge key={key++} docName={docName} chunkIndex={chunkIndex} />);
-    lastIndex = match.index + match[0].length;
-  }
-
-  // Remaining text
-  if (lastIndex < content.length) {
-    parts.push(
-      <span key={key++} className="break-words whitespace-pre-wrap">
-        {content.slice(lastIndex)}
-      </span>,
-    );
-  }
-
-  // No citations found — render plain text
-  if (parts.length === 0) {
-    return <p className="text-sm break-words whitespace-pre-wrap">{content}</p>;
-  }
-
-  return <div className="text-sm">{parts}</div>;
+function BotMessageContent({
+  content,
+  evidence,
+}: {
+  content: string;
+  evidence?: import('../services/auraBotApi').RetrievalEvidence[];
+}) {
+  return (
+    <div className="space-y-2 text-sm">
+      <p className="break-words whitespace-pre-wrap">{content}</p>
+      {evidence && evidence.length > 0 ? <EvidencePanel evidence={evidence} /> : null}
+    </div>
+  );
 }
 
-function CitationBadge({ docName, chunkIndex }: { docName: string; chunkIndex: string }) {
+function EvidencePanel({
+  evidence,
+}: {
+  evidence: import('../services/auraBotApi').RetrievalEvidence[];
+}) {
   const [expanded, setExpanded] = React.useState(false);
+  const warningCount = new Set(evidence.flatMap((item) => item.warnings || [])).size;
 
   return (
-    <button
-      onClick={() => setExpanded(!expanded)}
-      className="mx-0.5 inline-flex cursor-pointer items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-      title={`${docName} — Chunk ${chunkIndex}`}
+    <div
+      className="rounded-lg border border-blue-200 bg-blue-50/70 p-2 text-xs text-blue-950"
+      data-testid="retrieval-evidence"
     >
-      <svg className="h-3 w-3" viewBox="0 0 16 16" fill="currentColor">
-        <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 000 2.5v11a.5.5 0 00.707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 00.78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0016 13.5v-11a.5.5 0 00-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783z" />
-      </svg>
-      {docName.length > 20 ? docName.slice(0, 20) + '...' : docName}
-      <span className="opacity-60">#{chunkIndex}</span>
-    </button>
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="flex w-full items-center justify-between gap-2 text-left font-medium"
+        aria-expanded={expanded}
+      >
+        <span>{evidence.length} 条知识来源</span>
+        <span>{warningCount > 0 ? `⚠ ${warningCount}` : expanded ? '收起' : '查看'}</span>
+      </button>
+      {expanded ? (
+        <div className="mt-2 space-y-2">
+          {evidence.map((item) => {
+            const score = item.rerankScore || item.fusedScore || item.vectorScore || 0;
+            const body = (
+              <>
+                <span className="font-medium">
+                  {item.documentName || item.documentPid || '知识文档'}
+                </span>
+                <span className="text-blue-700">
+                  {' '}
+                  · 片段 {item.chunkIndex} · {item.path} · {score.toFixed(3)}
+                </span>
+              </>
+            );
+            return (
+              <div key={item.evidenceId} className="rounded border border-blue-100 bg-white p-2">
+                {item.citationLocator ? (
+                  <a
+                    href={`/${item.citationLocator.replace(/^\//, '')}`}
+                    className="hover:underline"
+                    title={`索引版本 ${item.indexReleasePid || '未版本化'}`}
+                  >
+                    {body}
+                  </a>
+                ) : (
+                  <div>{body}</div>
+                )}
+                {item.warnings?.map((warning) => (
+                  <div key={warning} className="mt-1 text-amber-700">
+                    {warning}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

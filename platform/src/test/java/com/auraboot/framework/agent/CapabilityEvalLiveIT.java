@@ -49,19 +49,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><strong>Opt-in.</strong> Gated on a live LLM credential resolved by
  * {@link LiveLlmSeeder} ({@link Assumptions#assumeTrue}) and tagged
  * {@code agent-eval-live}, so a plain {@code ./gradlew :testAgent} skips it.
- * Any OpenAI-compatible provider works; qwen is preferred, DeepSeek is the fallback.
+ * Any OpenAI-compatible provider works; the runner supplies one explicit provider-neutral profile.
  *
  * <pre>{@code
- * cd platform && DASHSCOPE_API_KEY=... \
+ * cd platform && AURA_LIVE_LLM_PROVIDER=provider AURA_LIVE_LLM_MODEL=model AURA_LIVE_LLM_API_KEY_ENV=LIVE_KEY \
  *   ./gradlew :testAgent --tests '*CapabilityEvalLiveIT*' -PincludeLiveEvals
  * }</pre>
- *
- * <p><strong>Why blank {@code agent.anthropic.api-key}.</strong> The
- * integration-test profile sets it to the stub sentinel, and
- * {@link LlmToolSelectionService} resolves the {@code anthropic} provider
- * <em>first</em>; without blanking it the run would route to the stub instead of
- * the seeded live provider. With it blank, the seeded tenant-level live
- * config becomes the first (and only) configured provider.
  *
  * <p>The seeded {@code ab_cloud_config} row is tenant-scoped and removed in
  * {@link #cleanup()} (and pre-cleaned on each re-seed) so a real API
@@ -73,16 +66,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
-        "agent.anthropic.api-key=",
         "agent.llm.stub-mode=false",
 })
 class CapabilityEvalLiveIT extends BaseIntegrationTest {
 
     /**
-     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * Resolved from the environment (the explicit provider-neutral live profile) rather than
      * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider *and its
      * model name* in every live IT is what silently broke this whole layer when
-     * DeepSeek retired {@code deepseek-chat}.
+     * an upstream provider retired a model identifier.
      */
     private LiveLlmSeeder.LiveProvider liveProvider;
 
@@ -108,7 +100,8 @@ class CapabilityEvalLiveIT extends BaseIntegrationTest {
         // MetaContext (tenant/user) is already set by BaseIntegrationTest#setUp,
         // so saveConfig stamps the correct tenant_id / created_by. seed() clears
         // any prior row first, so the per-test re-seed stays idempotent.
-        LiveLlmSeeder.seed(liveProvider, tenantId, cloudConfigService, jdbcTemplate);
+        liveProvider = LiveLlmSeeder.seed(
+                liveProvider, tenantId, cloudConfigService, jdbcTemplate);
     }
 
     @AfterAll

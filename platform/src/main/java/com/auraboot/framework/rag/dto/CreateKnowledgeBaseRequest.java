@@ -9,6 +9,7 @@ import lombok.Data;
 public class CreateKnowledgeBaseRequest {
     private String name;
     private String description;
+    private String visibility;
     private String embeddingProvider;
     private String embeddingModel;
     private Integer embeddingDimension;

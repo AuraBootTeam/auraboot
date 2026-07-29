@@ -5,6 +5,9 @@ import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.StubLlmProvider;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelope;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
@@ -66,12 +69,35 @@ public class RunLifecycleService {
         run.put("input_tokens", 0);
         run.put("output_tokens", 0);
         run.put("total_cost", 0);
+        ExecutionPrincipalContext.current().ifPresent(principal -> {
+            run.put("actor_user_id", principal.actorUserId());
+            run.put("actor_member_id", principal.actorMemberId());
+            run.put("initiator_user_id", principal.initiator().userId());
+            run.put("initiator_member_id", principal.initiator().memberId());
+            run.put("principal_type", principal.type().name().toLowerCase(Locale.ROOT));
+            run.put("agent_release_pid", principal.agentReleasePid());
+            run.put("deployment_pid", principal.deploymentPid());
+        });
+        ContextEnvelopeContext.current().ifPresent(envelope -> {
+            run.put("context_envelope_hash", envelope.envelopeHash());
+            run.put("context_envelope", serializeContextEnvelope(envelope));
+        });
         run.put("created_at", startedAt);
         run.put("updated_at", startedAt);
         dynamicDataMapper.insert("ab_agent_run", run);
 
         Map<String, Object> taskUpdate = Map.of("task_status", "in_progress", "started_at", startedAt, "updated_at", LocalDateTime.now());
         dynamicDataMapper.update("ab_agent_task", taskUpdate, Map.of("pid", taskPid));
+    }
+
+    private String serializeContextEnvelope(ContextEnvelope envelope) {
+        try {
+            return objectMapper.writeValueAsString(envelope);
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "ContextEnvelope could not be serialized for durable execution",
+                    e);
+        }
     }
 
     /**

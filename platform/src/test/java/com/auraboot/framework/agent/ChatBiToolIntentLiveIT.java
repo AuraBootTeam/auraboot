@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the same property at the new layer, so deleting the v1 parser does not drop coverage.
  *
  * <p>Opt-in: {@code @Tag("agent-eval-live")} + a live credential resolved from the environment by
- * {@link LiveLlmSeeder} (qwen preferred, DeepSeek fallback); skips without one.
+ * {@link LiveLlmSeeder} (the explicit provider-neutral live profile); skips without one.
  */
 @Slf4j
 @Tag("agent-eval-live")
@@ -50,16 +50,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
-        "agent.anthropic.api-key=",
         "agent.llm.stub-mode=false",
 })
 class ChatBiToolIntentLiveIT extends BaseIntegrationTest {
 
     /**
-     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * Resolved from the environment (the explicit provider-neutral live profile) rather than
      * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider and its
      * model name in every live IT is what silently broke this whole layer when
-     * DeepSeek retired {@code deepseek-chat}.
+     * an upstream provider retired a model identifier.
      */
     private LiveLlmSeeder.LiveProvider liveProvider;
 

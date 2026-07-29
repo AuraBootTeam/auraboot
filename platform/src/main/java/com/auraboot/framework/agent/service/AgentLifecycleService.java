@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
@@ -35,6 +36,7 @@ public class AgentLifecycleService {
     public static final String STATUS_ACTIVE = "active";
 
     private final AgentDefinitionMapper agentDefinitionMapper;
+    private final AgentReleaseDeploymentService releaseDeploymentService;
 
     /** Outcome of a lifecycle transition, for the caller to report back. */
     public record Transition(String agentPid, String agentCode, String previousStatus, String status,
@@ -46,11 +48,13 @@ public class AgentLifecycleService {
      * every entry at once. Runs already in flight are not killed here — use the
      * interrupt path for those; this closes the door rather than emptying the room.
      */
+    @Transactional
     public Transition suspend(String agentPid, Long actorUserId, String reason) {
         return transition(agentPid, STATUS_SUSPENDED, actorUserId, reason);
     }
 
     /** Let a suspended agent run again. */
+    @Transactional
     public Transition resume(String agentPid, Long actorUserId) {
         return transition(agentPid, STATUS_ACTIVE, actorUserId, null);
     }
@@ -75,6 +79,12 @@ public class AgentLifecycleService {
         if (updated == 0) {
             throw new IllegalStateException("Agent lifecycle update matched no row: " + agentPid);
         }
+        releaseDeploymentService.setDeploymentStatus(
+                agent.getTenantId(),
+                agent.getAgentCode(),
+                STATUS_ACTIVE.equals(target) ? STATUS_SUSPENDED : STATUS_ACTIVE,
+                target,
+                actorUserId);
         log.warn("Agent lifecycle: agent={} ({}) {} -> {} by user={} reason={}",
                 agent.getAgentCode(), agentPid, previous, target, actorUserId,
                 reason == null || reason.isBlank() ? "(none given)" : reason);

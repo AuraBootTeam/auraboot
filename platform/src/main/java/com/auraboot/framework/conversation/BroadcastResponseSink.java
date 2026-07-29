@@ -192,6 +192,23 @@ public class BroadcastResponseSink implements ResponseSink {
     }
 
     @Override
+    public void onRetrievalEvidence(
+            List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence> evidence) {
+        if (evidence == null || evidence.isEmpty()) {
+            return;
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("turnId", turnId);
+        data.put("agentId", agentId);
+        data.put("conversationId", conversationId);
+        data.put("evidence", List.copyOf(evidence));
+        broadcaster.publish(targetUserIds, WsFrame.builder()
+                .type(ImConstants.WS_AI_RETRIEVAL_EVIDENCE)
+                .data(data)
+                .build());
+    }
+
+    @Override
     public void onError(String message, String traceId) {
         String errorCode = StreamErrorClassifier.classify(message, traceId);
 

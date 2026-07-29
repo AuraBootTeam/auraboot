@@ -19,6 +19,8 @@ public class KnowledgeBaseDTO {
     private String name;
     private String description;
     private String status;
+    private String visibility;
+    private String activeIndexReleasePid;
     private String embeddingProvider;
     private String embeddingModel;
     private Integer embeddingDimension;

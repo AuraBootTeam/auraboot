@@ -61,6 +61,249 @@ CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 COMMENT ON EXTENSION vector IS 'vector data type and ivfflat and hnsw access methods';
 
 
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: ab_agent_definition; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_agent_definition (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    agent_code character varying(100) NOT NULL,
+    name character varying(200) NOT NULL,
+    description text,
+    avatar_url character varying(500),
+    agent_type character varying(20) DEFAULT 'reactive'::character varying NOT NULL,
+    model character varying(50),
+    system_prompt text,
+    tools text,
+    skills text,
+    guardrails text,
+    soul_profile jsonb,
+    personality text,
+    expertise text,
+    communication_style character varying(50),
+    boundaries text,
+    soul_goals text,
+    system_user_id bigint,
+    service_account_id bigint,
+    allowed_models jsonb,
+    allowed_operations jsonb DEFAULT '["query", "create", "update", "delete", "transition"]'::jsonb,
+    max_tools integer DEFAULT 20,
+    max_concurrent_runs integer DEFAULT 3 NOT NULL,
+    execution_timeout_seconds integer DEFAULT 300,
+    event_triggers jsonb,
+    execution_config jsonb DEFAULT '{}'::jsonb,
+    employee_id bigint,
+    auto_reply_mode character varying(20) DEFAULT 'mention'::character varying,
+    status character varying(20) DEFAULT 'active'::character varying,
+    stats text,
+    visibility character varying(20) DEFAULT 'private'::character varying,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    created_by bigint,
+    updated_by bigint,
+    deleted_flag boolean DEFAULT false,
+    knowledge_base_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    proactive_policy jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT chk_agent_definition_knowledge_base_ids_array CHECK ((jsonb_typeof(knowledge_base_ids) = 'array'::text))
+);
+
+
+--
+-- Name: TABLE ab_agent_definition; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_agent_definition IS 'AI Agent definitions with model, tools, skills, guardrails, and soul profile';
+
+
+--
+-- Name: COLUMN ab_agent_definition.model; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_definition.model IS 'Optional deployment-selected model override; NULL resolves through the provider-neutral runtime profile';
+
+
+--
+-- Name: COLUMN ab_agent_definition.execution_config; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_definition.execution_config IS 'JSONB execution-time config (thinking_enabled, thinking_budget_tokens, ...). Read by StepLoopService.resolveThinkingConfig.';
+
+
+--
+-- Name: COLUMN ab_agent_definition.visibility; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_definition.visibility IS 'Who can see this agent: private (creator only), team (same dept), tenant (all users)';
+
+
+--
+-- Name: COLUMN ab_agent_definition.knowledge_base_ids; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_definition.knowledge_base_ids IS 'Explicit public knowledge-base PIDs used as named-agent fallback when a chat request supplies no knowledgeBaseIds';
+
+
+--
+-- Name: COLUMN ab_agent_definition.proactive_policy; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_definition.proactive_policy IS 'Release-governed event trigger policy: timezone, quiet hours, daily budget, manager scope and allowed channels';
+
+
+--
+-- Name: ab_agent_release_spec(public.ab_agent_definition); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_agent_release_spec(source public.ab_agent_definition) RETURNS jsonb
+    LANGUAGE sql IMMUTABLE
+    AS $$
+    SELECT jsonb_strip_nulls(jsonb_build_object(
+        'agent_definition_pid', source.pid,
+        'agent_code', source.agent_code,
+        'name', source.name,
+        'description', source.description,
+        'avatar_url', source.avatar_url,
+        'agent_type', source.agent_type,
+        'model', source.model,
+        'system_prompt', source.system_prompt,
+        'tools', source.tools,
+        'skills', source.skills,
+        'guardrails', source.guardrails,
+        'soul_profile', source.soul_profile,
+        'personality', source.personality,
+        'expertise', source.expertise,
+        'communication_style', source.communication_style,
+        'boundaries', source.boundaries,
+        'soul_goals', source.soul_goals,
+        'allowed_models', source.allowed_models,
+        'allowed_operations', source.allowed_operations,
+        'knowledge_base_ids', source.knowledge_base_ids,
+        'max_tools', source.max_tools,
+        'max_concurrent_runs', source.max_concurrent_runs,
+        'execution_timeout_seconds', source.execution_timeout_seconds,
+        'event_triggers', source.event_triggers,
+        'execution_config', source.execution_config,
+        'auto_reply_mode', source.auto_reply_mode,
+        'visibility', source.visibility,
+        'proactive_policy', source.proactive_policy
+    ))
+$$;
+
+
+--
+-- Name: ab_guard_immutable_agent_release(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_guard_immutable_agent_release() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'Agent releases are immutable and cannot be deleted';
+    END IF;
+    IF OLD.pid IS DISTINCT FROM NEW.pid
+       OR OLD.tenant_id IS DISTINCT FROM NEW.tenant_id
+       OR OLD.agent_definition_pid IS DISTINCT FROM NEW.agent_definition_pid
+       OR OLD.agent_code IS DISTINCT FROM NEW.agent_code
+       OR OLD.release_no IS DISTINCT FROM NEW.release_no
+       OR OLD.release_hash IS DISTINCT FROM NEW.release_hash
+       OR OLD.release_spec IS DISTINCT FROM NEW.release_spec
+       OR OLD.capability_requirements IS DISTINCT FROM NEW.capability_requirements
+       OR OLD.source_updated_at IS DISTINCT FROM NEW.source_updated_at
+       OR OLD.published_at IS DISTINCT FROM NEW.published_at
+       OR OLD.created_at IS DISTINCT FROM NEW.created_at
+       OR OLD.created_by IS DISTINCT FROM NEW.created_by THEN
+        RAISE EXCEPTION 'Agent release content is immutable; publish a new release';
+    END IF;
+    RETURN NEW;
+END
+$$;
+
+
+--
+-- Name: ab_publish_initial_agent_release(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_publish_initial_agent_release() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    spec JSONB;
+    release_pid VARCHAR(26);
+    deployment_pid VARCHAR(26);
+    computed_hash VARCHAR(64);
+BEGIN
+    IF NEW.deleted_flag IS TRUE OR NEW.status <> 'active' THEN
+        RETURN NEW;
+    END IF;
+
+    spec := ab_agent_release_spec(NEW);
+    computed_hash := encode(digest(spec::text, 'sha256'), 'hex');
+    release_pid := 'arl_' || substr(
+        encode(digest(NEW.tenant_id::text || ':' || NEW.pid, 'sha256'), 'hex'),
+        1,
+        22);
+    deployment_pid := 'adp_' || substr(
+        encode(digest(NEW.tenant_id::text || ':' || NEW.agent_code, 'sha256'), 'hex'),
+        1,
+        22);
+
+    INSERT INTO ab_agent_release (
+        pid, tenant_id, agent_definition_pid, agent_code, release_no,
+        release_hash, release_spec, capability_requirements, status,
+        source_updated_at, published_at, created_by)
+    VALUES (
+        release_pid, NEW.tenant_id, NEW.pid, NEW.agent_code, 1,
+        computed_hash, spec,
+        jsonb_build_object(
+            'toolCalling', COALESCE(NEW.tools, '') <> '',
+            'retrieval', jsonb_array_length(COALESCE(NEW.knowledge_base_ids, '[]'::jsonb)) > 0,
+            'thinking', lower(COALESCE(
+                NEW.execution_config ->> 'thinking_enabled',
+                'false')) = 'true'
+        ),
+        'published', NEW.updated_at, CURRENT_TIMESTAMP, NEW.created_by)
+    ON CONFLICT (tenant_id, agent_code, release_hash) DO NOTHING;
+
+    SELECT pid INTO release_pid
+    FROM ab_agent_release
+    WHERE tenant_id = NEW.tenant_id
+      AND agent_code = NEW.agent_code
+      AND ab_agent_release.release_hash = computed_hash
+    ORDER BY release_no DESC
+    LIMIT 1;
+
+    INSERT INTO ab_agent_deployment (
+        pid, tenant_id, agent_code, employee_id, agent_release_pid, status,
+        tool_grants, skill_grants, knowledge_base_ids, memory_policy,
+        channel_policy, policy_snapshot, created_by)
+    VALUES (
+        deployment_pid, NEW.tenant_id, NEW.agent_code, NEW.employee_id,
+        release_pid, 'active',
+        COALESCE(
+            to_jsonb(string_to_array(NULLIF(NEW.tools, ''), ',')),
+            '[]'::jsonb),
+        COALESCE(
+            to_jsonb(string_to_array(NULLIF(NEW.skills, ''), ',')),
+            '[]'::jsonb),
+        COALESCE(NEW.knowledge_base_ids, '[]'::jsonb),
+        '{}'::jsonb, '{}'::jsonb,
+        jsonb_build_object('source', 'initial-release', 'version', 1),
+        NEW.created_by)
+    ON CONFLICT (tenant_id, agent_code) WHERE status = 'active'
+    DO NOTHING;
+
+    RETURN NEW;
+END
+$$;
+
+
 --
 -- Name: check_group_logic_type_consistency(); Type: FUNCTION; Schema: public; Owner: -
 --
@@ -133,10 +376,6 @@ BEGIN
 END;
 $$;
 
-
-SET default_tablespace = '';
-
-SET default_table_access_method = heap;
 
 --
 -- Name: ab_activity; Type: TABLE; Schema: public; Owner: -
@@ -408,6 +647,14 @@ CREATE TABLE public.ab_agent_action (
     target_record_pid character varying(64),
     target_record_pids jsonb,
     on_behalf_of_user_id bigint,
+    actor_user_id bigint,
+    actor_member_id bigint,
+    initiator_user_id bigint,
+    initiator_member_id bigint,
+    principal_type character varying(40),
+    delegation_grant_id character varying(26),
+    agent_release_pid character varying(26),
+    deployment_pid character varying(26),
     CONSTRAINT ab_agent_action_actual_effects_check CHECK (((actual_effects IS NULL) OR public.valid_effect_class_array(actual_effects)))
 );
 
@@ -430,7 +677,49 @@ COMMENT ON COLUMN public.ab_agent_action.actor_id IS 'The agent that performed t
 -- Name: COLUMN ab_agent_action.on_behalf_of_user_id; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.ab_agent_action.on_behalf_of_user_id IS 'The user whose permissions and data scope this agent action executed under; NULL for system-initiated runs';
+COMMENT ON COLUMN public.ab_agent_action.on_behalf_of_user_id IS 'Compatibility projection of initiator_user_id; use actor_user_id for runtime authority';
+
+
+--
+-- Name: COLUMN ab_agent_action.actor_user_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_action.actor_user_id IS 'IAM user whose permissions and data scope executed this action';
+
+
+--
+-- Name: COLUMN ab_agent_action.actor_member_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_action.actor_member_id IS 'Tenant member whose roles and organizational scope executed this action';
+
+
+--
+-- Name: COLUMN ab_agent_action.initiator_user_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_action.initiator_user_id IS 'Human/system user that caused the execution; attribution, not runtime authority';
+
+
+--
+-- Name: COLUMN ab_agent_action.initiator_member_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_action.initiator_member_id IS 'Tenant member that caused the execution; attribution, not runtime authority';
+
+
+--
+-- Name: COLUMN ab_agent_action.principal_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_action.principal_type IS 'digital_employee | human_delegated | system | sandbox';
+
+
+--
+-- Name: COLUMN ab_agent_action.delegation_grant_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_action.delegation_grant_id IS 'Explicit delegation grant when one exists';
 
 
 --
@@ -871,82 +1160,6 @@ ALTER SEQUENCE public.ab_agent_channel_session_state_id_seq OWNED BY public.ab_a
 
 
 --
--- Name: ab_agent_definition; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.ab_agent_definition (
-    id bigint NOT NULL,
-    pid character varying(26) NOT NULL,
-    tenant_id bigint NOT NULL,
-    agent_code character varying(100) NOT NULL,
-    name character varying(200) NOT NULL,
-    description text,
-    avatar_url character varying(500),
-    agent_type character varying(20) DEFAULT 'reactive'::character varying NOT NULL,
-    model character varying(50) DEFAULT 'claude-sonnet-4-6'::character varying,
-    system_prompt text,
-    tools text,
-    skills text,
-    guardrails text,
-    soul_profile jsonb,
-    personality text,
-    expertise text,
-    communication_style character varying(50),
-    boundaries text,
-    soul_goals text,
-    system_user_id bigint,
-    service_account_id bigint,
-    allowed_models jsonb,
-    allowed_operations jsonb DEFAULT '["query", "create", "update", "delete", "transition"]'::jsonb,
-    max_tools integer DEFAULT 20,
-    max_concurrent_runs integer DEFAULT 3 NOT NULL,
-    execution_timeout_seconds integer DEFAULT 300,
-    event_triggers jsonb,
-    execution_config jsonb DEFAULT '{}'::jsonb,
-    employee_id bigint,
-    auto_reply_mode character varying(20) DEFAULT 'mention'::character varying,
-    status character varying(20) DEFAULT 'active'::character varying,
-    stats text,
-    visibility character varying(20) DEFAULT 'private'::character varying,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    created_by bigint,
-    updated_by bigint,
-    deleted_flag boolean DEFAULT false,
-    knowledge_base_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
-    CONSTRAINT chk_agent_definition_knowledge_base_ids_array CHECK ((jsonb_typeof(knowledge_base_ids) = 'array'::text))
-);
-
-
---
--- Name: TABLE ab_agent_definition; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.ab_agent_definition IS 'AI Agent definitions with model, tools, skills, guardrails, and soul profile';
-
-
---
--- Name: COLUMN ab_agent_definition.execution_config; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.ab_agent_definition.execution_config IS 'JSONB execution-time config (thinking_enabled, thinking_budget_tokens, ...). Read by StepLoopService.resolveThinkingConfig.';
-
-
---
--- Name: COLUMN ab_agent_definition.visibility; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.ab_agent_definition.visibility IS 'Who can see this agent: private (creator only), team (same dept), tenant (all users)';
-
-
---
--- Name: COLUMN ab_agent_definition.knowledge_base_ids; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.ab_agent_definition.knowledge_base_ids IS 'Explicit public knowledge-base PIDs used as named-agent fallback when a chat request supplies no knowledgeBaseIds';
-
-
---
 -- Name: ab_agent_definition_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -963,6 +1176,58 @@ CREATE SEQUENCE public.ab_agent_definition_id_seq
 --
 
 ALTER SEQUENCE public.ab_agent_definition_id_seq OWNED BY public.ab_agent_definition.id;
+
+
+--
+-- Name: ab_agent_deployment; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_agent_deployment (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    agent_code character varying(100) NOT NULL,
+    employee_id bigint,
+    agent_release_pid character varying(26) NOT NULL,
+    status character varying(20) DEFAULT 'active'::character varying NOT NULL,
+    tool_grants jsonb DEFAULT '[]'::jsonb NOT NULL,
+    skill_grants jsonb DEFAULT '[]'::jsonb NOT NULL,
+    knowledge_base_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    memory_policy jsonb DEFAULT '{}'::jsonb NOT NULL,
+    channel_policy jsonb DEFAULT '{}'::jsonb NOT NULL,
+    policy_snapshot jsonb DEFAULT '{}'::jsonb NOT NULL,
+    deployed_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_by bigint,
+    updated_by bigint,
+    CONSTRAINT chk_agent_deployment_status CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'suspended'::character varying, 'revoked'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_agent_deployment; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_agent_deployment IS 'Tenant binding from a stable digital-employee/assistant identity to one immutable Agent release';
+
+
+--
+-- Name: ab_agent_deployment_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_agent_deployment_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_agent_deployment_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_agent_deployment_id_seq OWNED BY public.ab_agent_deployment.id;
 
 
 --
@@ -1492,6 +1757,172 @@ ALTER SEQUENCE public.ab_agent_observation_id_seq OWNED BY public.ab_agent_obser
 
 
 --
+-- Name: ab_agent_proactive_usage; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_agent_proactive_usage (
+    id bigint NOT NULL,
+    tenant_id bigint NOT NULL,
+    agent_code character varying(64) NOT NULL,
+    usage_date date NOT NULL,
+    run_count integer DEFAULT 0 NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_agent_proactive_usage_count CHECK ((run_count >= 0))
+);
+
+
+--
+-- Name: TABLE ab_agent_proactive_usage; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_agent_proactive_usage IS 'Atomic per-employee daily proactive run budget shared by schedule and event triggers';
+
+
+--
+-- Name: ab_agent_proactive_usage_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_agent_proactive_usage_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_agent_proactive_usage_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_agent_proactive_usage_id_seq OWNED BY public.ab_agent_proactive_usage.id;
+
+
+--
+-- Name: ab_agent_release; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_agent_release (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    agent_definition_pid character varying(26) NOT NULL,
+    agent_code character varying(100) NOT NULL,
+    release_no integer NOT NULL,
+    release_hash character varying(64) NOT NULL,
+    release_spec jsonb NOT NULL,
+    capability_requirements jsonb DEFAULT '{}'::jsonb NOT NULL,
+    status character varying(20) DEFAULT 'published'::character varying NOT NULL,
+    source_updated_at timestamp with time zone,
+    published_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_by bigint,
+    CONSTRAINT chk_agent_release_number CHECK ((release_no > 0)),
+    CONSTRAINT chk_agent_release_status CHECK (((status)::text = ANY ((ARRAY['published'::character varying, 'deprecated'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_agent_release; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_agent_release IS 'Immutable published runtime snapshot of an editable Agent definition';
+
+
+--
+-- Name: COLUMN ab_agent_release.release_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_release.release_hash IS 'SHA-256 over the canonical JSONB runtime snapshot';
+
+
+--
+-- Name: COLUMN ab_agent_release.release_spec; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_release.release_spec IS 'Provider-neutral prompt, tool, skill, knowledge, memory and runtime policy snapshot';
+
+
+--
+-- Name: ab_agent_release_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_agent_release_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_agent_release_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_agent_release_id_seq OWNED BY public.ab_agent_release.id;
+
+
+--
+-- Name: ab_agent_retrieval_evidence; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_agent_retrieval_evidence (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    turn_pid character varying(26),
+    task_pid character varying(26),
+    conversation_id bigint,
+    trace_id character varying(64),
+    actor_user_id bigint,
+    actor_member_id bigint,
+    initiator_user_id bigint,
+    context_envelope_hash character varying(64),
+    evidence_id character varying(100) NOT NULL,
+    query_text text,
+    kb_pid character varying(26) NOT NULL,
+    index_release_pid character varying(26),
+    document_pid character varying(26) NOT NULL,
+    document_version_pid character varying(26),
+    chunk_pid character varying(26) NOT NULL,
+    chunk_index integer NOT NULL,
+    retrieval_path character varying(20) NOT NULL,
+    vector_score double precision,
+    lexical_score double precision,
+    fused_score double precision,
+    rerank_score double precision,
+    citation_locator text,
+    warnings jsonb,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: TABLE ab_agent_retrieval_evidence; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_agent_retrieval_evidence IS 'Immutable structured evidence actually supplied to an agent turn or durable task';
+
+
+--
+-- Name: ab_agent_retrieval_evidence_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_agent_retrieval_evidence_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_agent_retrieval_evidence_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_agent_retrieval_evidence_id_seq OWNED BY public.ab_agent_retrieval_evidence.id;
+
+
+--
 -- Name: ab_agent_run; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1528,6 +1959,15 @@ CREATE TABLE public.ab_agent_run (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     updated_by bigint,
+    actor_user_id bigint,
+    actor_member_id bigint,
+    initiator_user_id bigint,
+    initiator_member_id bigint,
+    principal_type character varying(40),
+    agent_release_pid character varying(26),
+    context_envelope_hash character varying(64),
+    deployment_pid character varying(26),
+    context_envelope text,
     CONSTRAINT chk_agent_run_subtask_origin CHECK (((subtask_origin IS NULL) OR ((subtask_origin)::text = ANY ((ARRAY['interrupt_subtask'::character varying, 'delegate_task'::character varying, 'scheduled_split'::character varying])::text[]))))
 );
 
@@ -1537,6 +1977,20 @@ CREATE TABLE public.ab_agent_run (
 --
 
 COMMENT ON TABLE public.ab_agent_run IS 'Agent execution session records (audit log, never deleted)';
+
+
+--
+-- Name: COLUMN ab_agent_run.context_envelope_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_run.context_envelope_hash IS 'SHA-256 of the immutable context-envelope/v2 identity, capability, knowledge and budget snapshot';
+
+
+--
+-- Name: COLUMN ab_agent_run.context_envelope; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_run.context_envelope IS 'Secret-free context-envelope/v2 JSON; its SHA-256 is stored in context_envelope_hash';
 
 
 --
@@ -1628,7 +2082,19 @@ CREATE TABLE public.ab_agent_schedule (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false,
+    agent_code character varying(64),
+    manager_member_id bigint,
+    quiet_hours_start time without time zone,
+    quiet_hours_end time without time zone,
+    daily_run_budget integer DEFAULT 24 NOT NULL,
+    concurrency_limit integer DEFAULT 1 NOT NULL,
+    missed_run_policy character varying(20) DEFAULT 'skip'::character varying NOT NULL,
+    agent_release_pid character varying(26),
+    last_block_reason character varying(100),
+    CONSTRAINT chk_agent_schedule_concurrency_limit CHECK ((concurrency_limit > 0)),
+    CONSTRAINT chk_agent_schedule_daily_run_budget CHECK ((daily_run_budget > 0)),
+    CONSTRAINT chk_agent_schedule_missed_run_policy CHECK (((missed_run_policy)::text = ANY ((ARRAY['skip'::character varying, 'catch_up_once'::character varying])::text[])))
 );
 
 
@@ -1637,6 +2103,27 @@ CREATE TABLE public.ab_agent_schedule (
 --
 
 COMMENT ON TABLE public.ab_agent_schedule IS 'Scheduled triggers for automated agent task creation';
+
+
+--
+-- Name: COLUMN ab_agent_schedule.agent_code; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_schedule.agent_code IS 'Explicit proactive digital employee; task_template is input only and never an identity source';
+
+
+--
+-- Name: COLUMN ab_agent_schedule.manager_member_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_schedule.manager_member_id IS 'Human manager scope used for proactive result/approval routing';
+
+
+--
+-- Name: COLUMN ab_agent_schedule.agent_release_pid; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_schedule.agent_release_pid IS 'Optional fixed immutable Agent Release; null follows the current deployment';
 
 
 --
@@ -8482,6 +8969,52 @@ ALTER TABLE public.ab_jdbc_connector ALTER COLUMN id ADD GENERATED BY DEFAULT AS
 
 
 --
+-- Name: ab_kb_access_grant; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_kb_access_grant (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    kb_pid character varying(26) NOT NULL,
+    subject_type character varying(30) NOT NULL,
+    subject_id character varying(100) NOT NULL,
+    permission character varying(20) DEFAULT 'read'::character varying NOT NULL,
+    expires_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_by bigint,
+    CONSTRAINT chk_kb_access_permission CHECK (((permission)::text = ANY ((ARRAY['read'::character varying, 'manage'::character varying])::text[]))),
+    CONSTRAINT chk_kb_access_subject_type CHECK (((subject_type)::text = ANY ((ARRAY['user'::character varying, 'member'::character varying, 'role'::character varying, 'digital_employee'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_kb_access_grant; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_kb_access_grant IS 'Explicit resource grants for restricted/private knowledge bases';
+
+
+--
+-- Name: ab_kb_access_grant_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_kb_access_grant_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_kb_access_grant_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_kb_access_grant_id_seq OWNED BY public.ab_kb_access_grant.id;
+
+
+--
 -- Name: ab_kb_chunk; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -8502,6 +9035,8 @@ CREATE TABLE public.ab_kb_chunk (
     embedding_retry_count integer DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    document_version_pid character varying(26),
+    index_release_pid character varying(26),
     CONSTRAINT chk_chunk_emb_status CHECK (((embedding_status)::text = ANY ((ARRAY['pending'::character varying, 'completed'::character varying, 'failed'::character varying, 'failed_permanent'::character varying])::text[])))
 );
 
@@ -8558,6 +9093,8 @@ CREATE TABLE public.ab_kb_document (
     created_by bigint,
     deleted_flag boolean DEFAULT false,
     process_retry_count integer DEFAULT 0 NOT NULL,
+    active_version_pid character varying(26),
+    version_no integer DEFAULT 1 NOT NULL,
     CONSTRAINT chk_doc_source CHECK (((source_type)::text = ANY ((ARRAY['file'::character varying, 'entity'::character varying, 'internal_doc'::character varying, 'conversation'::character varying])::text[]))),
     CONSTRAINT chk_doc_status CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'processing'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
     CONSTRAINT chk_doc_type CHECK (((doc_type)::text = ANY ((ARRAY['pdf'::character varying, 'docx'::character varying, 'md'::character varying, 'txt'::character varying, 'csv'::character varying, 'html'::character varying, 'pptx'::character varying, 'xlsx'::character varying, 'image'::character varying, 'ppt'::character varying, 'xls'::character varying])::text[])))
@@ -8598,6 +9135,108 @@ ALTER SEQUENCE public.ab_kb_document_id_seq OWNED BY public.ab_kb_document.id;
 
 
 --
+-- Name: ab_kb_document_version; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_kb_document_version (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    kb_pid character varying(26) NOT NULL,
+    document_pid character varying(26) NOT NULL,
+    version_no integer NOT NULL,
+    content_hash character varying(64),
+    file_pid character varying(26),
+    source_type character varying(20),
+    source_entity_id character varying(500),
+    state character varying(20) DEFAULT 'processing'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_by bigint,
+    CONSTRAINT chk_kb_document_version_state CHECK (((state)::text = ANY ((ARRAY['processing'::character varying, 'active'::character varying, 'failed'::character varying, 'superseded'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_kb_document_version; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_kb_document_version IS 'Immutable source/content lineage for each indexed document version';
+
+
+--
+-- Name: ab_kb_document_version_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_kb_document_version_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_kb_document_version_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_kb_document_version_id_seq OWNED BY public.ab_kb_document_version.id;
+
+
+--
+-- Name: ab_kb_index_release; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_kb_index_release (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    kb_pid character varying(26) NOT NULL,
+    release_no integer NOT NULL,
+    release_type character varying(20) NOT NULL,
+    state character varying(20) NOT NULL,
+    parent_release_pid character varying(26),
+    embedding_provider character varying(50),
+    embedding_model character varying(100),
+    embedding_dimension integer,
+    chunk_strategy character varying(30),
+    chunk_size integer,
+    chunk_overlap integer,
+    error_message text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    activated_at timestamp with time zone,
+    created_by bigint,
+    CONSTRAINT chk_kb_index_release_state CHECK (((state)::text = ANY ((ARRAY['building'::character varying, 'ready'::character varying, 'active'::character varying, 'failed'::character varying, 'retired'::character varying])::text[]))),
+    CONSTRAINT chk_kb_index_release_type CHECK (((release_type)::text = ANY ((ARRAY['full'::character varying, 'text'::character varying, 'vector'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_kb_index_release; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_kb_index_release IS 'Versioned KB index profile and atomic active-release pointer';
+
+
+--
+-- Name: ab_kb_index_release_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_kb_index_release_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_kb_index_release_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_kb_index_release_id_seq OWNED BY public.ab_kb_index_release.id;
+
+
+--
 -- Name: ab_knowledge_base; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -8621,7 +9260,10 @@ CREATE TABLE public.ab_knowledge_base (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_by bigint,
     deleted_flag boolean DEFAULT false,
-    CONSTRAINT chk_kb_status CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'disabled'::character varying])::text[])))
+    visibility character varying(20) DEFAULT 'tenant'::character varying NOT NULL,
+    active_index_release_pid character varying(26),
+    CONSTRAINT chk_kb_status CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'disabled'::character varying])::text[]))),
+    CONSTRAINT chk_kb_visibility CHECK (((visibility)::text = ANY ((ARRAY['tenant'::character varying, 'restricted'::character varying, 'private'::character varying])::text[])))
 );
 
 
@@ -15186,6 +15828,13 @@ ALTER TABLE ONLY public.ab_agent_definition ALTER COLUMN id SET DEFAULT nextval(
 
 
 --
+-- Name: ab_agent_deployment id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_deployment ALTER COLUMN id SET DEFAULT nextval('public.ab_agent_deployment_id_seq'::regclass);
+
+
+--
 -- Name: ab_agent_dry_run_support id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -15253,6 +15902,27 @@ ALTER TABLE ONLY public.ab_agent_memory_tier_event ALTER COLUMN id SET DEFAULT n
 --
 
 ALTER TABLE ONLY public.ab_agent_observation ALTER COLUMN id SET DEFAULT nextval('public.ab_agent_observation_id_seq'::regclass);
+
+
+--
+-- Name: ab_agent_proactive_usage id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_proactive_usage ALTER COLUMN id SET DEFAULT nextval('public.ab_agent_proactive_usage_id_seq'::regclass);
+
+
+--
+-- Name: ab_agent_release id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_release ALTER COLUMN id SET DEFAULT nextval('public.ab_agent_release_id_seq'::regclass);
+
+
+--
+-- Name: ab_agent_retrieval_evidence id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_retrieval_evidence ALTER COLUMN id SET DEFAULT nextval('public.ab_agent_retrieval_evidence_id_seq'::regclass);
 
 
 --
@@ -15592,6 +16262,13 @@ ALTER TABLE ONLY public.ab_i18n_resource ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
+-- Name: ab_kb_access_grant id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_kb_access_grant ALTER COLUMN id SET DEFAULT nextval('public.ab_kb_access_grant_id_seq'::regclass);
+
+
+--
 -- Name: ab_kb_chunk id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -15603,6 +16280,20 @@ ALTER TABLE ONLY public.ab_kb_chunk ALTER COLUMN id SET DEFAULT nextval('public.
 --
 
 ALTER TABLE ONLY public.ab_kb_document ALTER COLUMN id SET DEFAULT nextval('public.ab_kb_document_id_seq'::regclass);
+
+
+--
+-- Name: ab_kb_document_version id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_kb_document_version ALTER COLUMN id SET DEFAULT nextval('public.ab_kb_document_version_id_seq'::regclass);
+
+
+--
+-- Name: ab_kb_index_release id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_kb_index_release ALTER COLUMN id SET DEFAULT nextval('public.ab_kb_index_release_id_seq'::regclass);
 
 
 --
@@ -16004,6 +16695,22 @@ ALTER TABLE ONLY public.ab_agent_definition
 
 
 --
+-- Name: ab_agent_deployment ab_agent_deployment_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_deployment
+    ADD CONSTRAINT ab_agent_deployment_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_agent_deployment ab_agent_deployment_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_deployment
+    ADD CONSTRAINT ab_agent_deployment_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: ab_agent_dry_run_support ab_agent_dry_run_support_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -16169,6 +16876,46 @@ ALTER TABLE ONLY public.ab_agent_observation
 
 ALTER TABLE ONLY public.ab_agent_observation
     ADD CONSTRAINT ab_agent_observation_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_agent_proactive_usage ab_agent_proactive_usage_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_proactive_usage
+    ADD CONSTRAINT ab_agent_proactive_usage_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_agent_release ab_agent_release_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_release
+    ADD CONSTRAINT ab_agent_release_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_agent_release ab_agent_release_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_release
+    ADD CONSTRAINT ab_agent_release_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_agent_retrieval_evidence ab_agent_retrieval_evidence_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_retrieval_evidence
+    ADD CONSTRAINT ab_agent_retrieval_evidence_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_agent_retrieval_evidence ab_agent_retrieval_evidence_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_retrieval_evidence
+    ADD CONSTRAINT ab_agent_retrieval_evidence_pkey PRIMARY KEY (id);
 
 
 --
@@ -17956,6 +18703,22 @@ ALTER TABLE ONLY public.ab_jdbc_connector
 
 
 --
+-- Name: ab_kb_access_grant ab_kb_access_grant_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_kb_access_grant
+    ADD CONSTRAINT ab_kb_access_grant_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_kb_access_grant ab_kb_access_grant_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_kb_access_grant
+    ADD CONSTRAINT ab_kb_access_grant_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: ab_kb_chunk ab_kb_chunk_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -17985,6 +18748,38 @@ ALTER TABLE ONLY public.ab_kb_document
 
 ALTER TABLE ONLY public.ab_kb_document
     ADD CONSTRAINT ab_kb_document_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_kb_document_version ab_kb_document_version_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_kb_document_version
+    ADD CONSTRAINT ab_kb_document_version_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_kb_document_version ab_kb_document_version_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_kb_document_version
+    ADD CONSTRAINT ab_kb_document_version_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_kb_index_release ab_kb_index_release_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_kb_index_release
+    ADD CONSTRAINT ab_kb_index_release_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_kb_index_release ab_kb_index_release_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_kb_index_release
+    ADD CONSTRAINT ab_kb_index_release_pkey PRIMARY KEY (id);
 
 
 --
@@ -19940,6 +20735,30 @@ ALTER TABLE ONLY public.ab_agent_user_profile
 
 
 --
+-- Name: ab_agent_proactive_usage uq_agent_proactive_usage; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_proactive_usage
+    ADD CONSTRAINT uq_agent_proactive_usage UNIQUE (tenant_id, agent_code, usage_date);
+
+
+--
+-- Name: ab_agent_release uq_agent_release_hash; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_release
+    ADD CONSTRAINT uq_agent_release_hash UNIQUE (tenant_id, agent_code, release_hash);
+
+
+--
+-- Name: ab_agent_release uq_agent_release_version; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_release
+    ADD CONSTRAINT uq_agent_release_version UNIQUE (tenant_id, agent_code, release_no);
+
+
+--
 -- Name: ab_async_task uq_async_task_code; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -20153,6 +20972,30 @@ ALTER TABLE ONLY public.ab_inbound_channel_stats
 
 ALTER TABLE ONLY public.ab_inbound_form
     ADD CONSTRAINT uq_inbound_form_pid UNIQUE (pid);
+
+
+--
+-- Name: ab_kb_access_grant uq_kb_access_grant; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_kb_access_grant
+    ADD CONSTRAINT uq_kb_access_grant UNIQUE (tenant_id, kb_pid, subject_type, subject_id, permission);
+
+
+--
+-- Name: ab_kb_document_version uq_kb_document_version_no; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_kb_document_version
+    ADD CONSTRAINT uq_kb_document_version_no UNIQUE (tenant_id, document_pid, version_no);
+
+
+--
+-- Name: ab_kb_index_release uq_kb_index_release_no; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_kb_index_release
+    ADD CONSTRAINT uq_kb_index_release_no UNIQUE (tenant_id, kb_pid, release_no);
 
 
 --
@@ -21403,6 +22246,27 @@ CREATE INDEX idx_agent_action_actor_on_behalf ON public.ab_agent_action USING bt
 
 
 --
+-- Name: idx_agent_action_deployment; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_action_deployment ON public.ab_agent_action USING btree (tenant_id, deployment_pid, executed_at DESC);
+
+
+--
+-- Name: idx_agent_action_execution_principal; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_action_execution_principal ON public.ab_agent_action USING btree (tenant_id, actor_user_id, actor_member_id, executed_at DESC);
+
+
+--
+-- Name: idx_agent_action_initiator; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_action_initiator ON public.ab_agent_action USING btree (tenant_id, initiator_user_id, executed_at DESC);
+
+
+--
 -- Name: idx_agent_approval_grant_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -21463,6 +22327,20 @@ CREATE INDEX idx_agent_def_event_triggers ON public.ab_agent_definition USING bt
 --
 
 CREATE INDEX idx_agent_def_tenant ON public.ab_agent_definition USING btree (tenant_id);
+
+
+--
+-- Name: idx_agent_deployment_employee; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_deployment_employee ON public.ab_agent_deployment USING btree (tenant_id, employee_id) WHERE ((employee_id IS NOT NULL) AND ((status)::text = 'active'::text));
+
+
+--
+-- Name: idx_agent_deployment_release; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_deployment_release ON public.ab_agent_deployment USING btree (tenant_id, agent_release_pid);
 
 
 --
@@ -21557,6 +22435,41 @@ CREATE INDEX idx_agent_observation_type ON public.ab_agent_observation USING btr
 
 
 --
+-- Name: idx_agent_release_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_release_active ON public.ab_agent_release USING btree (tenant_id, agent_code, release_no DESC) WHERE ((status)::text = 'published'::text);
+
+
+--
+-- Name: idx_agent_release_definition; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_release_definition ON public.ab_agent_release USING btree (tenant_id, agent_definition_pid, release_no DESC);
+
+
+--
+-- Name: idx_agent_retrieval_evidence_source; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_retrieval_evidence_source ON public.ab_agent_retrieval_evidence USING btree (tenant_id, kb_pid, document_version_pid, index_release_pid);
+
+
+--
+-- Name: idx_agent_retrieval_evidence_trace; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_retrieval_evidence_trace ON public.ab_agent_retrieval_evidence USING btree (tenant_id, trace_id, created_at);
+
+
+--
+-- Name: idx_agent_retrieval_evidence_turn; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_retrieval_evidence_turn ON public.ab_agent_retrieval_evidence USING btree (tenant_id, turn_pid, created_at);
+
+
+--
 -- Name: idx_agent_run_agent; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -21575,6 +22488,20 @@ CREATE INDEX idx_agent_run_checkpoint_run ON public.ab_agent_run_checkpoint USIN
 --
 
 CREATE INDEX idx_agent_run_checkpoint_type ON public.ab_agent_run_checkpoint USING btree (tenant_id, checkpoint_type, created_at);
+
+
+--
+-- Name: idx_agent_run_deployment; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_run_deployment ON public.ab_agent_run USING btree (tenant_id, deployment_pid, started_at DESC);
+
+
+--
+-- Name: idx_agent_run_execution_principal; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_run_execution_principal ON public.ab_agent_run USING btree (tenant_id, actor_user_id, actor_member_id, started_at DESC);
 
 
 --
@@ -21603,6 +22530,13 @@ CREATE INDEX idx_agent_run_task ON public.ab_agent_run USING btree (task_id);
 --
 
 CREATE INDEX idx_agent_run_tenant ON public.ab_agent_run USING btree (tenant_id);
+
+
+--
+-- Name: idx_agent_schedule_agent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_schedule_agent ON public.ab_agent_schedule USING btree (tenant_id, agent_code) WHERE (deleted_flag = false);
 
 
 --
@@ -23601,10 +24535,24 @@ CREATE INDEX idx_invariant_log_tenant_code ON public.ab_invariant_evaluation_log
 
 
 --
+-- Name: idx_kb_access_grant_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_kb_access_grant_lookup ON public.ab_kb_access_grant USING btree (tenant_id, kb_pid, subject_type, subject_id);
+
+
+--
 -- Name: idx_kb_chunk_doc; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_kb_chunk_doc ON public.ab_kb_chunk USING btree (doc_id);
+
+
+--
+-- Name: idx_kb_chunk_document_version; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_kb_chunk_document_version ON public.ab_kb_chunk USING btree (tenant_id, document_version_pid);
 
 
 --
@@ -23619,6 +24567,13 @@ CREATE INDEX idx_kb_chunk_embedding ON public.ab_kb_chunk USING hnsw (embedding 
 --
 
 CREATE INDEX idx_kb_chunk_kb ON public.ab_kb_chunk USING btree (kb_id);
+
+
+--
+-- Name: idx_kb_chunk_release; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_kb_chunk_release ON public.ab_kb_chunk USING btree (tenant_id, kb_id, index_release_pid);
 
 
 --
@@ -23647,6 +24602,20 @@ CREATE INDEX idx_kb_doc_status ON public.ab_kb_document USING btree (kb_id, stat
 --
 
 CREATE INDEX idx_kb_doc_tenant ON public.ab_kb_document USING btree (tenant_id) WHERE (deleted_flag = false);
+
+
+--
+-- Name: idx_kb_document_version_document; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_kb_document_version_document ON public.ab_kb_document_version USING btree (tenant_id, kb_pid, document_pid, version_no DESC);
+
+
+--
+-- Name: idx_kb_index_release_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_kb_index_release_active ON public.ab_kb_index_release USING btree (tenant_id, kb_pid, state, release_no DESC);
 
 
 --
@@ -25638,6 +26607,13 @@ CREATE UNIQUE INDEX uq_agent_def_tenant_code ON public.ab_agent_definition USING
 
 
 --
+-- Name: uq_agent_deployment_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_agent_deployment_active ON public.ab_agent_deployment USING btree (tenant_id, agent_code) WHERE ((status)::text = 'active'::text);
+
+
+--
 -- Name: uq_agent_eval_case; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -25883,6 +26859,20 @@ CREATE UNIQUE INDEX ux_meta_model_current ON public.ab_meta_model USING btree (t
 
 
 --
+-- Name: ab_agent_definition trg_agent_definition_initial_release; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_agent_definition_initial_release AFTER INSERT ON public.ab_agent_definition FOR EACH ROW EXECUTE FUNCTION public.ab_publish_initial_agent_release();
+
+
+--
+-- Name: ab_agent_release trg_agent_release_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_agent_release_immutable BEFORE DELETE OR UPDATE ON public.ab_agent_release FOR EACH ROW EXECUTE FUNCTION public.ab_guard_immutable_agent_release();
+
+
+--
 -- Name: ab_subject_permission trg_check_group_logic_type_consistency; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -26103,6 +27093,14 @@ ALTER TABLE ONLY public.ab_user_data_domain
 
 ALTER TABLE ONLY public.ab_category_attribute_schema
     ADD CONSTRAINT fk_ab_category_attribute_schema_category FOREIGN KEY (category_id) REFERENCES public.ab_category(id);
+
+
+--
+-- Name: ab_agent_deployment fk_agent_deployment_release; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_agent_deployment
+    ADD CONSTRAINT fk_agent_deployment_release FOREIGN KEY (agent_release_pid) REFERENCES public.ab_agent_release(pid);
 
 
 --

@@ -2,6 +2,9 @@ package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.identity.ChannelSessionResolver;
+import com.auraboot.framework.agent.identity.ExecutionPrincipal;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalResolver;
 import com.auraboot.framework.agent.runtime.ChatMessageTapeStore;
 import com.auraboot.framework.agent.runtime.ContextConflictPolicy;
 import com.auraboot.framework.agent.runtime.PendingContinuationService;
@@ -9,8 +12,12 @@ import com.auraboot.framework.agent.runtime.PendingContextFreshnessDecision;
 import com.auraboot.framework.agent.runtime.PendingContextFreshnessValidator;
 import com.auraboot.framework.agent.runtime.PendingToolSnapshot;
 import com.auraboot.framework.agent.runtime.PendingToolStore;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelope;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeFactory;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -20,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
@@ -27,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -73,6 +82,15 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
 
     @Autowired
     private ChannelSessionResolver channelSessionResolver;
+
+    @Autowired
+    private ExecutionPrincipalResolver executionPrincipalResolver;
+
+    @Autowired
+    private ContextEnvelopeFactory contextEnvelopeFactory;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private ResponseSink sink;
 
@@ -133,6 +151,80 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
 
         assertThat(outcome).isSameAs(expected);
         verify(pendingContinuationService, times(1)).resumeApprovedChatTool(any(), same(pending), any());
+    }
+
+    @Test
+    @DisplayName("APPROVED resume preserves and binds the exact suspended execution context")
+    void approvedResumePreservesAndBindsPinnedExecutionContext() {
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
+        Long memberId = getTestTenantMember().getId();
+        String pendingTurnId = "01HW3KPINNEDCTX";
+        ExecutionPrincipal principal = executionPrincipalResolver.resolve(
+                new ExecutionPrincipalResolver.ResolveRequest(
+                        tenantId,
+                        userId,
+                        memberId,
+                        "aurabot",
+                        "web"));
+        ContextEnvelope envelope = contextEnvelopeFactory.compile(
+                new ContextEnvelopeFactory.CompileRequest(
+                        pendingTurnId,
+                        principal,
+                        "web",
+                        null,
+                        null,
+                        1L,
+                        "SYNC_ACTION",
+                        Set.of(),
+                        List.of("KB_PINNED"),
+                        Map.of("requiresApproval", true),
+                        "zh-CN",
+                        "Asia/Shanghai",
+                        java.time.Instant.parse("2026-07-29T10:00:00Z")));
+        PendingToolSnapshot pending = PendingToolSnapshot.builder()
+                .turnId(pendingTurnId)
+                .tenantId(tenantId)
+                .userId(userId)
+                .humanMemberId(memberId)
+                .conversationId(1L)
+                .agentCode("aurabot")
+                .channel("web")
+                .triageBucket("SYNC_ACTION")
+                .executionPrincipal(principal)
+                .contextEnvelope(envelope)
+                .toolId("tool-pinned")
+                .toolName("cmd_test")
+                .input(Map.of())
+                .description("pinned context")
+                .build();
+        when(pendingToolStore.consumePendingForOwner(
+                eq(pendingTurnId), eq(tenantId), eq(userId)))
+                .thenReturn(pending);
+        when(pendingContinuationService.resumeApprovedChatTool(
+                any(), same(pending), any()))
+                .thenAnswer(invocation -> {
+                    TurnContext ctx = invocation.getArgument(0);
+                    assertThat(ctx.executionPrincipal()).isEqualTo(principal);
+                    assertThat(ctx.contextEnvelope()).isEqualTo(envelope);
+                    assertThat(ExecutionPrincipalContext.current())
+                            .contains(principal);
+                    assertThat(ContextEnvelopeContext.current())
+                            .contains(envelope);
+                    assertThat(MetaContext.getCurrentUserId())
+                            .isEqualTo(principal.actorUserId());
+                    return new TurnOutcome.Success("ok", Map.of());
+                });
+
+        TurnOutcome outcome = turnService.resumeTurn(
+                pendingTurnId,
+                ConversationTurnService.ConfirmDecision.APPROVED,
+                sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
+        assertThat(ExecutionPrincipalContext.current()).isEmpty();
+        assertThat(ContextEnvelopeContext.current()).isEmpty();
+        assertThat(MetaContext.getCurrentUserId()).isEqualTo(userId);
     }
 
     @Test
@@ -462,13 +554,27 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
         Long tenantId = getTestTenant().getId();
         Long userId = getTestUser().getId();
         String pendingTurnId = "01HW3KTASKPID";
+        String agentCode = "pcba_procurement_comparison_agent";
+        jdbc.update(
+                """
+                INSERT INTO ab_agent_definition
+                    (pid, tenant_id, agent_code, name, agent_type, status,
+                     deleted_flag, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'reactive', 'active', FALSE,
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT DO NOTHING
+                """,
+                UniqueIdGenerator.generate(),
+                tenantId,
+                agentCode,
+                "Resume context fixture");
         PendingToolSnapshot pending = PendingToolSnapshot.builder()
                 .turnId(pendingTurnId)
                 .tenantId(tenantId)
                 .userId(userId)
                 .humanMemberId(getTestTenantMember().getId())
                 .conversationId(1L)
-                .agentCode("pcba_procurement_comparison_agent")
+                .agentCode(agentCode)
                 .taskPid("task-resume-1")
                 .toolId("tool-taskpid")
                 .toolName("cmd_test")

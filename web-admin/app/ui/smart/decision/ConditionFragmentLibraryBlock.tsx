@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getApiService } from '~/shared/services/ApiService';
-import { group, type ConditionNode, type DataType, type GroupNode, type PathOperand, type Scope } from '~/shared/decision/ast/conditionAst';
+import { useI18n } from '~/contexts/I18nContext';
+import {
+  group,
+  type ConditionNode,
+  type DataType,
+  type GroupNode,
+  type PathOperand,
+  type Scope,
+} from '~/shared/decision/ast/conditionAst';
 import { ConditionBuilder, type FieldOption } from '~/shared/decision/ui/ConditionBuilder';
 import {
   factCatalogToFieldOptions,
@@ -236,7 +244,9 @@ function decisionRefDisplayLabel(code: string): string {
 }
 
 function decisionOptionLabel(option: DecisionDefinitionOption): string {
-  return option.decisionName ? `${option.decisionName} · ${option.decisionCode}` : option.decisionCode;
+  return option.decisionName
+    ? `${option.decisionName} · ${option.decisionCode}`
+    : option.decisionCode;
 }
 
 function scopeLabel(value: unknown): string {
@@ -344,7 +354,10 @@ function latestFragments(rows: ConditionFragment[]): ConditionFragment[] {
   );
 }
 
-function upsertFragmentVersion(rows: ConditionFragment[], fragment: ConditionFragment): ConditionFragment[] {
+function upsertFragmentVersion(
+  rows: ConditionFragment[],
+  fragment: ConditionFragment,
+): ConditionFragment[] {
   const matches = (row: ConditionFragment) => {
     if (fragment.pid && row.pid === fragment.pid) return true;
     return row.fragmentCode === fragment.fragmentCode && row.version === fragment.version;
@@ -383,7 +396,9 @@ function asConditionNode(value: unknown): ConditionNode | null {
   return null;
 }
 
-function conditionSpecParts(spec: unknown): Pick<FragmentDraft, 'conditionRoot' | 'conditionSpecExtra'> {
+function conditionSpecParts(
+  spec: unknown,
+): Pick<FragmentDraft, 'conditionRoot' | 'conditionSpecExtra'> {
   const extra: Record<string, unknown> = {};
   if (!isObject(spec)) {
     return { conditionRoot: group('AND', []), conditionSpecExtra: extra };
@@ -435,9 +450,7 @@ function decisionBindingsFromExtra(extra: Record<string, unknown>): DecisionBind
     .map((binding) => ({
       decisionCode: String(binding.decisionCode ?? ''),
       versionPolicy:
-        typeof binding.versionPolicy === 'string'
-          ? binding.versionPolicy
-          : 'LATEST_PUBLISHED',
+        typeof binding.versionPolicy === 'string' ? binding.versionPolicy : 'LATEST_PUBLISHED',
       enabled: typeof binding.enabled === 'boolean' ? binding.enabled : true,
     }))
     .filter((binding) => binding.decisionCode);
@@ -516,7 +529,9 @@ function editorFieldsFor(
     scopeDefaults(draft.scopeType),
     filterCatalogFields(draft.scopeType, fieldCatalog),
     fieldsFromConditionNode(draft.conditionRoot),
-    (selectedFragment?.fieldRefs ?? []).map(fieldFromRef).filter((field): field is FieldOption => Boolean(field)),
+    (selectedFragment?.fieldRefs ?? [])
+      .map(fieldFromRef)
+      .filter((field): field is FieldOption => Boolean(field)),
   );
 }
 
@@ -585,6 +600,7 @@ function impactSourceUrl(ref: DecisionImpactRef): string | null {
 }
 
 export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibraryBlockProps) {
+  const { t } = useI18n();
   const api = useMemo(() => createApi(), []);
   const defaultScopeType = block?.props?.defaultScopeType;
   const sampleContextJson = block?.props?.sampleContextJson ?? DEFAULT_SAMPLE_CONTEXT;
@@ -642,21 +658,24 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
   const incomingImpactCount = impact?.incomingCount ?? 0;
   const publishRequiresImpactAck = Boolean(
     selectedFragment?.pid &&
-      canPublishVersion(selectedFragment) &&
-      (selectedFragment.version ?? 0) > 1 &&
-      incomingImpactCount > 0,
+    canPublishVersion(selectedFragment) &&
+    (selectedFragment.version ?? 0) > 1 &&
+    incomingImpactCount > 0,
   );
-  const newVersionDisabledReason = selectedFragment && !canCreateNewVersion(selectedFragment)
-    ? '只有已发布、已废弃或已停用版本可以编辑为新版本'
-    : '';
-  const validateDisabledReason = selectedFragment && !canValidateVersion(selectedFragment)
-    ? '不可校验已发布、已废弃或已停用版本'
-    : '';
-  const publishDisabledReason = selectedFragment && !canPublishVersion(selectedFragment)
-    ? '只有已校验版本可以发布'
-    : publishRequiresImpactAck && !impactAcknowledged
-      ? `请先确认 ${incomingImpactCount} 个复用方影响`
+  const newVersionDisabledReason =
+    selectedFragment && !canCreateNewVersion(selectedFragment)
+      ? '只有已发布、已废弃或已停用版本可以编辑为新版本'
       : '';
+  const validateDisabledReason =
+    selectedFragment && !canValidateVersion(selectedFragment)
+      ? '不可校验已发布、已废弃或已停用版本'
+      : '';
+  const publishDisabledReason =
+    selectedFragment && !canPublishVersion(selectedFragment)
+      ? '只有已校验版本可以发布'
+      : publishRequiresImpactAck && !impactAcknowledged
+        ? `请先确认 ${incomingImpactCount} 个复用方影响`
+        : '';
 
   const loadFragments = async (options: LoadFragmentsOptions = {}) => {
     setLoading(true);
@@ -708,7 +727,8 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
 
   useEffect(() => {
     let cancelled = false;
-    api.listDefinitions({ page: 1, size: 200 })
+    api
+      .listDefinitions({ page: 1, size: 200 })
       .then((result) => {
         if (cancelled) return;
         setDecisionDefinitions(asDecisionDefinitionList(result));
@@ -729,16 +749,22 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
       setDecisionBindingCandidate('');
       return;
     }
-    if (decisionBindingCandidate && availableDecisionDefinitions.some(
-      (definition) => definition.decisionCode === decisionBindingCandidate,
-    )) {
+    if (
+      decisionBindingCandidate &&
+      availableDecisionDefinitions.some(
+        (definition) => definition.decisionCode === decisionBindingCandidate,
+      )
+    ) {
       return;
     }
     setDecisionBindingCandidate(availableDecisionDefinitions[0]?.decisionCode ?? '');
   }, [availableDecisionDefinitions, decisionBindingCandidate, editorMode]);
 
   useEffect(() => {
-    if (selectedCode && visibleFragments.some((fragment) => fragment.fragmentCode === selectedCode)) {
+    if (
+      selectedCode &&
+      visibleFragments.some((fragment) => fragment.fragmentCode === selectedCode)
+    ) {
       return;
     }
     if (selectedCode && loading) {
@@ -809,7 +835,10 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
 
   const addDecisionBinding = () => {
     const decisionCode = decisionBindingCandidate || availableDecisionDefinitions[0]?.decisionCode;
-    if (!decisionCode || decisionBindings.some((binding) => binding.decisionCode === decisionCode)) {
+    if (
+      !decisionCode ||
+      decisionBindings.some((binding) => binding.decisionCode === decisionCode)
+    ) {
       return;
     }
     setDecisionBindings([
@@ -819,7 +848,9 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
   };
 
   const removeDecisionBinding = (decisionCode: string) => {
-    setDecisionBindings(decisionBindings.filter((binding) => binding.decisionCode !== decisionCode));
+    setDecisionBindings(
+      decisionBindings.filter((binding) => binding.decisionCode !== decisionCode),
+    );
   };
 
   const openCreate = () => {
@@ -952,13 +983,15 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
       <div className="decisionops-toolbar cfl-toolbar">
         <input
           className="decisionops-search-input"
-          aria-label="condition-fragment-keyword"
-          placeholder="搜索片段编码、名称"
+          aria-label={t('decision.fragments.keywordLabel', undefined, '搜索条件片段编码或名称')}
+          data-testid="condition-fragment-keyword"
+          placeholder={t('decision.fragments.keywordPlaceholder', undefined, '搜索片段编码、名称')}
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
         />
         <select
-          aria-label="condition-fragment-scope-filter"
+          aria-label={t('decision.fragments.scopeFilterLabel', undefined, '按场景筛选条件片段')}
+          data-testid="condition-fragment-scope-filter"
           value={scopeType}
           onChange={(e) => setScopeType(e.target.value)}
         >
@@ -988,20 +1021,23 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
       {editorMode && (
         <div className="decisionops-editor-panel cfl-editor" data-testid="cfl-editor">
           <input
-            aria-label="fragment-code"
-            placeholder="片段编码"
+            aria-label={t('decision.fragments.codeLabel', undefined, '条件片段编码')}
+            data-testid="fragment-code"
+            placeholder={t('decision.fragments.codePlaceholder', undefined, '片段编码')}
             value={draft.fragmentCode}
             disabled={editorMode === 'version'}
             onChange={(e) => updateDraft('fragmentCode', e.target.value)}
           />
           <input
-            aria-label="fragment-name"
-            placeholder="片段名称"
+            aria-label={t('decision.fragments.nameLabel', undefined, '条件片段名称')}
+            data-testid="fragment-name"
+            placeholder={t('decision.fragments.namePlaceholder', undefined, '片段名称')}
             value={draft.fragmentName}
             onChange={(e) => updateDraft('fragmentName', e.target.value)}
           />
           <select
-            aria-label="fragment-scope-type"
+            aria-label={t('decision.fragments.scopeTypeLabel', undefined, '条件片段场景类型')}
+            data-testid="fragment-scope-type"
             value={draft.scopeType}
             onChange={(e) => updateDraft('scopeType', e.target.value)}
           >
@@ -1012,20 +1048,23 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
             ))}
           </select>
           <input
-            aria-label="fragment-scope-ref"
-            placeholder="消费方/场景引用"
+            aria-label={t('decision.fragments.scopeRefLabel', undefined, '消费方或场景引用')}
+            data-testid="fragment-scope-ref"
+            placeholder={t('decision.fragments.scopeRefPlaceholder', undefined, '消费方/场景引用')}
             value={draft.scopeRef}
             onChange={(e) => updateDraft('scopeRef', e.target.value)}
           />
           <input
-            aria-label="fragment-owner-module"
-            placeholder="所属模块"
+            aria-label={t('decision.fragments.ownerModuleLabel', undefined, '所属模块')}
+            data-testid="fragment-owner-module"
+            placeholder={t('decision.fragments.ownerModulePlaceholder', undefined, '所属模块')}
             value={draft.ownerModule}
             onChange={(e) => updateDraft('ownerModule', e.target.value)}
           />
           <textarea
-            aria-label="fragment-description"
-            placeholder="说明"
+            aria-label={t('decision.fragments.descriptionLabel', undefined, '条件片段说明')}
+            data-testid="fragment-description"
+            placeholder={t('decision.fragments.descriptionPlaceholder', undefined, '说明')}
             value={draft.description}
             onChange={(e) => updateDraft('description', e.target.value)}
           />
@@ -1047,7 +1086,12 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
             </div>
             <div className="decisionops-toolbar cfl-binding-toolbar">
               <select
-                aria-label="fragment-decision-binding-select"
+                aria-label={t(
+                  'decision.fragments.bindingSelectLabel',
+                  undefined,
+                  '选择要复用的决策',
+                )}
+                data-testid="fragment-decision-binding-select"
                 value={decisionBindingCandidate}
                 onChange={(e) => setDecisionBindingCandidate(e.target.value)}
                 disabled={availableDecisionDefinitions.length === 0}
@@ -1239,38 +1283,36 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
                   <dd>
                     {(selectedFragment.fieldRefs ?? []).length
                       ? selectedFragment.fieldRefs?.map((fieldRef, index, refs) => (
-                        <span key={fieldRef} title={fieldRef}>
-                          {fieldRefDisplayLabel(fieldRef)}
-                          {index < refs.length - 1 ? ', ' : ''}
-                        </span>
-                      ))
+                          <span key={fieldRef} title={fieldRef}>
+                            {fieldRefDisplayLabel(fieldRef)}
+                            {index < refs.length - 1 ? ', ' : ''}
+                          </span>
+                        ))
                       : '-'}
                   </dd>
                 </div>
                 <div>
                   <dt>决策引用</dt>
                   <dd className="cfl-link-list">
-                    {(selectedFragment.decisionRefs ?? []).length ? (
-                      selectedFragment.decisionRefs?.map((decisionCode) => (
-                        <span key={decisionCode} className="cfl-link-pair">
-                          <a
-                            href={decisionDefinitionUrl(decisionCode)}
-                            title={decisionCode}
-                            data-testid={`cfl-decision-link-${testIdPart(decisionCode)}`}
-                          >
-                            {decisionDisplayLabel(decisionCode)}
-                          </a>
-                          <a
-                            href={decisionLogsUrl(decisionCode)}
-                            data-testid={`cfl-decision-logs-${testIdPart(decisionCode)}`}
-                          >
-                            日志
-                          </a>
-                        </span>
-                      ))
-                    ) : (
-                      '-'
-                    )}
+                    {(selectedFragment.decisionRefs ?? []).length
+                      ? selectedFragment.decisionRefs?.map((decisionCode) => (
+                          <span key={decisionCode} className="cfl-link-pair">
+                            <a
+                              href={decisionDefinitionUrl(decisionCode)}
+                              title={decisionCode}
+                              data-testid={`cfl-decision-link-${testIdPart(decisionCode)}`}
+                            >
+                              {decisionDisplayLabel(decisionCode)}
+                            </a>
+                            <a
+                              href={decisionLogsUrl(decisionCode)}
+                              data-testid={`cfl-decision-logs-${testIdPart(decisionCode)}`}
+                            >
+                              日志
+                            </a>
+                          </span>
+                        ))
+                      : '-'}
                   </dd>
                 </div>
               </dl>
@@ -1285,7 +1327,10 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
                       ref.sourcePid ?? ref.sourceCode ?? idx,
                     )}`;
                     return (
-                      <div key={`${ref.sourceType}:${ref.sourceCode}:${idx}`} className="cfl-impact-row">
+                      <div
+                        key={`${ref.sourceType}:${ref.sourceCode}:${idx}`}
+                        className="cfl-impact-row"
+                      >
                         <span className="decisionops-badge is-neutral">
                           {scopeLabel(ref.sourceType)}
                         </span>
@@ -1314,7 +1359,10 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
               <section className="cfl-panel" data-testid="cfl-versions">
                 <h4>版本</h4>
                 {versions.map((version) => (
-                  <div key={version.pid ?? `${version.fragmentCode}:${version.version}`} className="cfl-version-row">
+                  <div
+                    key={version.pid ?? `${version.fragmentCode}:${version.version}`}
+                    className="cfl-version-row"
+                  >
                     <strong>v{version.version ?? '-'}</strong>
                     <span className={`decisionops-badge ${statusTone(version.status)}`}>
                       {statusLabel(version.status)}
@@ -1326,8 +1374,8 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
                 <section className="cfl-panel" data-testid="cfl-evaluation">
                   <h4>测试结果</h4>
                   <p>
-                    {evaluationResultLabel(evaluation.result)} · {evaluation.matched ? '命中' : '未命中'} · v
-                    {evaluation.version ?? '-'}
+                    {evaluationResultLabel(evaluation.result)} ·{' '}
+                    {evaluation.matched ? '命中' : '未命中'} · v{evaluation.version ?? '-'}
                   </p>
                 </section>
               )}

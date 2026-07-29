@@ -203,7 +203,15 @@ const AGENT_TYPES = [
     labelKey: 'ai.wizard.type.autonomous',
     fallback: 'Autonomous',
     descKey: 'ai.wizard.type.autonomous.desc',
-    descFallback: 'Runs independently on schedules or triggers.',
+    descFallback: 'Runs independently after a person delegates a goal.',
+  },
+  {
+    value: 'proactive',
+    labelKey: 'ai.wizard.type.proactive',
+    fallback: 'Proactive digital employee',
+    descKey: 'ai.wizard.type.proactive.desc',
+    descFallback:
+      'Can wake from governed schedules or events, with quiet hours, budgets and manager scope.',
   },
 ];
 
@@ -244,10 +252,10 @@ function TemplateSelector({
   return (
     <div className="space-y-6" data-testid="wizard-template-selector">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+        <h2 className="text-text text-xl font-semibold dark:text-white">
           {t('ai.wizard.template.title', undefined, 'Create AI Colleague')}
         </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-text-3 dark:text-text-3 mt-1 text-sm">
           {t(
             'ai.wizard.template.subtitle',
             undefined,
@@ -258,7 +266,7 @@ function TemplateSelector({
 
       {/* Template grid */}
       <div>
-        <p className="mb-3 text-xs font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
+        <p className="text-text-3 dark:text-text-3 mb-3 text-xs font-semibold tracking-wider uppercase">
           {t('ai.wizard.template.sectionLabel', undefined, 'Start from a template')}
         </p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="wizard-template-grid">
@@ -267,17 +275,17 @@ function TemplateSelector({
               key={tpl.id}
               type="button"
               onClick={() => onSelect(tpl)}
-              className="group flex flex-col items-start gap-2 rounded-xl border-2 border-gray-200 bg-white p-4 text-left transition-all hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-500 dark:hover:bg-blue-900/10"
+              className="group border-border bg-panel hover:border-accent hover:bg-accent-weak/50 dark:border-border dark:bg-subtle dark:hover:border-accent0 dark:hover:bg-accent-weak/10 flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left transition-all"
               data-testid={`wizard-template-${tpl.id}`}
             >
               <span className="text-2xl leading-none" role="img" aria-hidden="true">
                 {tpl.icon}
               </span>
               <div>
-                <p className="text-sm font-semibold text-gray-900 transition-colors group-hover:text-blue-700 dark:text-white dark:group-hover:text-blue-300">
+                <p className="text-text group-hover:text-accent dark:group-hover:text-accent text-sm font-semibold transition-colors dark:text-white">
                   {t(tpl.nameKey, undefined, tpl.defaults.name)}
                 </p>
-                <p className="mt-0.5 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-text-3 dark:text-text-3 mt-0.5 line-clamp-2 text-xs">
                   {t(tpl.descriptionKey, undefined, tpl.defaults.description)}
                 </p>
               </div>
@@ -288,16 +296,16 @@ function TemplateSelector({
 
       {/* Skip / start from scratch */}
       <div className="flex items-center gap-3 pt-2">
-        <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+        <div className="bg-border dark:bg-subtle h-px flex-1" />
         <button
           type="button"
           onClick={onSkip}
-          className="text-sm font-medium whitespace-nowrap text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          className="text-text-3 hover:text-text-2 dark:text-text-3 dark:hover:text-text-3 text-sm font-medium whitespace-nowrap transition-colors"
           data-testid="wizard-template-skip"
         >
           {t('ai.wizard.template.startFromScratch', undefined, 'Or start from scratch →')}
         </button>
-        <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+        <div className="bg-border dark:bg-subtle h-px flex-1" />
       </div>
     </div>
   );
@@ -332,7 +340,7 @@ function StepIndicator({
             {idx > 0 && (
               <div
                 className={`mx-1 h-0.5 w-12 transition-colors duration-300 ${
-                  isDone ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'
+                  isDone ? 'bg-accent' : 'bg-border dark:bg-subtle'
                 }`}
               />
             )}
@@ -340,10 +348,10 @@ function StepIndicator({
               <div
                 className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-blue-900/40'
+                    ? 'bg-accent text-white shadow-md shadow-blue-200 dark:shadow-blue-900/40'
                     : isDone
-                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400'
-                      : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500'
+                      ? 'bg-accent-weak text-accent dark:bg-accent-weak/40 dark:text-accent'
+                      : 'bg-subtle text-text-3 dark:bg-subtle dark:text-text-3'
                 }`}
               >
                 {isDone ? <CheckIcon className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
@@ -351,10 +359,10 @@ function StepIndicator({
               <span
                 className={`hidden text-sm font-medium transition-colors duration-300 sm:inline ${
                   isActive
-                    ? 'text-gray-900 dark:text-white'
+                    ? 'text-text dark:text-white'
                     : isDone
-                      ? 'text-blue-600 dark:text-blue-400'
-                      : 'text-gray-400 dark:text-gray-500'
+                      ? 'text-accent dark:text-accent'
+                      : 'text-text-3 dark:text-text-3'
                 }`}
               >
                 {stepLabels[idx]}
@@ -385,10 +393,10 @@ function StepIdentity({
   return (
     <div className="space-y-6" data-testid="wizard-step-identity">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+        <h2 className="text-text text-xl font-semibold dark:text-white">
           {t('ai.wizard.identity.title', undefined, 'Define your AI Colleague')}
         </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-text-3 dark:text-text-3 mt-1 text-sm">
           {t(
             'ai.wizard.identity.subtitle',
             undefined,
@@ -399,8 +407,8 @@ function StepIdentity({
 
       {/* Name */}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          {t('ai.wizard.field.name', undefined, 'Name')} <span className="text-red-500">*</span>
+        <label className="text-text-2 dark:text-text-3 mb-1.5 block text-sm font-medium">
+          {t('ai.wizard.field.name', undefined, 'Name')} <span className="text-status-red0">*</span>
         </label>
         <input
           type="text"
@@ -411,16 +419,16 @@ function StepIdentity({
             undefined,
             'e.g. Procurement Assistant',
           )}
-          className={`w-full rounded-lg border bg-white px-3 py-2.5 text-sm dark:bg-gray-900 ${
+          className={`bg-panel dark:bg-subtle w-full rounded-lg border px-3 py-2.5 text-sm ${
             errors.name
-              ? 'border-red-300 focus:border-red-500 focus:ring-red-500 dark:border-red-700'
-              : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600'
+              ? 'border-status-red focus:border-status-red0 focus:ring-status-red0 dark:border-status-red'
+              : 'border-border-strong focus:border-accent0 focus:ring-accent0 dark:border-border-strong'
           } placeholder-gray-400 transition-colors focus:ring-2 focus:outline-none dark:text-white dark:placeholder-gray-500`}
           data-testid="wizard-input-name"
         />
         {errors.name && (
           <p
-            className="mt-1 text-sm text-red-600 dark:text-red-400"
+            className="text-status-red dark:text-status-red mt-1 text-sm"
             data-testid="wizard-error-name"
           >
             {errors.name}
@@ -430,7 +438,7 @@ function StepIdentity({
 
       {/* Description */}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="text-text-2 dark:text-text-3 mb-1.5 block text-sm font-medium">
           {t('ai.wizard.field.description', undefined, 'Description')}
         </label>
         <textarea
@@ -442,14 +450,14 @@ function StepIdentity({
             'What does this colleague do?',
           )}
           rows={3}
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm placeholder-gray-400 transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500"
+          className="border-border-strong bg-panel focus:border-accent0 focus:ring-accent0 dark:border-border-strong dark:bg-subtle w-full rounded-lg border px-3 py-2.5 text-sm placeholder-gray-400 transition-colors focus:ring-2 focus:outline-none dark:text-white dark:placeholder-gray-500"
           data-testid="wizard-input-description"
         />
       </div>
 
       {/* Avatar Icon */}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="text-text-2 dark:text-text-3 mb-1.5 block text-sm font-medium">
           {t('ai.wizard.field.avatar', undefined, 'Avatar')}
         </label>
         <div className="flex items-center gap-3" data-testid="wizard-avatar-picker">
@@ -460,8 +468,8 @@ function StepIdentity({
               onClick={() => onChange({ avatarIcon: data.avatarIcon === value ? '' : value })}
               className={`flex h-11 w-11 items-center justify-center rounded-full border-2 transition-all ${
                 data.avatarIcon === value
-                  ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                  : 'border-gray-200 text-gray-400 hover:border-gray-300 dark:border-gray-700 dark:text-gray-500 dark:hover:border-gray-600'
+                  ? 'border-accent0 bg-accent-weak text-accent dark:bg-accent-weak/30 dark:text-accent'
+                  : 'border-border text-text-3 hover:border-border-strong dark:border-border dark:text-text-3 dark:hover:border-border-strong'
               }`}
               data-testid={`wizard-avatar-${value}`}
             >
@@ -473,7 +481,7 @@ function StepIdentity({
 
       {/* Agent Type */}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="text-text-2 dark:text-text-3 mb-1.5 block text-sm font-medium">
           {t('ai.wizard.field.agentType', undefined, 'Agent Type')}
         </label>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-testid="wizard-agent-type">
@@ -484,21 +492,21 @@ function StepIdentity({
               onClick={() => onChange({ agent_type: at.value })}
               className={`rounded-lg border-2 p-4 text-left transition-all ${
                 data.agent_type === at.value
-                  ? 'border-blue-500 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20'
-                  : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
+                  ? 'border-accent0 bg-accent-weak dark:border-accent dark:bg-accent-weak/20'
+                  : 'border-border hover:border-border-strong dark:border-border dark:hover:border-border-strong'
               }`}
               data-testid={`wizard-type-${at.value}`}
             >
               <span
                 className={`text-sm font-semibold ${
                   data.agent_type === at.value
-                    ? 'text-blue-700 dark:text-blue-300'
-                    : 'text-gray-900 dark:text-white'
+                    ? 'text-accent dark:text-accent'
+                    : 'text-text dark:text-white'
                 }`}
               >
                 {t(at.labelKey, undefined, at.fallback)}
               </span>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-text-3 dark:text-text-3 mt-1 text-xs">
                 {t(at.descKey, undefined, at.descFallback)}
               </p>
             </button>
@@ -527,10 +535,10 @@ function StepPersonality({
   return (
     <div className="space-y-6" data-testid="wizard-step-personality">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+        <h2 className="text-text text-xl font-semibold dark:text-white">
           {t('ai.wizard.personality.title', undefined, 'Shape the personality')}
         </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-text-3 dark:text-text-3 mt-1 text-sm">
           {t(
             'ai.wizard.personality.subtitle',
             undefined,
@@ -541,7 +549,7 @@ function StepPersonality({
 
       {/* Role Description */}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="text-text-2 dark:text-text-3 mb-1.5 block text-sm font-medium">
           {t('ai.wizard.field.personality', undefined, 'Role Description')}
         </label>
         <textarea
@@ -553,14 +561,14 @@ function StepPersonality({
             'You are a procurement specialist who helps find the best suppliers and negotiate contracts...',
           )}
           rows={4}
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm placeholder-gray-400 transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500"
+          className="border-border-strong bg-panel focus:border-accent0 focus:ring-accent0 dark:border-border-strong dark:bg-subtle w-full rounded-lg border px-3 py-2.5 text-sm placeholder-gray-400 transition-colors focus:ring-2 focus:outline-none dark:text-white dark:placeholder-gray-500"
           data-testid="wizard-input-personality"
         />
       </div>
 
       {/* Communication Style */}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="text-text-2 dark:text-text-3 mb-1.5 block text-sm font-medium">
           {t('ai.wizard.field.commStyle', undefined, 'Communication Style')}
         </label>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" data-testid="wizard-comm-style">
@@ -571,8 +579,8 @@ function StepPersonality({
               onClick={() => onChange({ communication_style: cs.value })}
               className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
                 data.communication_style === cs.value
-                  ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-900/20 dark:text-blue-300'
-                  : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600'
+                  ? 'border-accent0 bg-accent-weak text-accent dark:border-accent dark:bg-accent-weak/20 dark:text-accent'
+                  : 'border-border text-text-2 hover:border-border-strong dark:border-border dark:text-text-3 dark:hover:border-border-strong'
               }`}
               data-testid={`wizard-style-${cs.value}`}
             >
@@ -587,7 +595,7 @@ function StepPersonality({
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center gap-1.5 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+          className="text-text-2 hover:text-text dark:text-text-3 dark:hover:text-text-3 flex items-center gap-1.5 text-sm font-medium transition-colors"
           data-testid="wizard-toggle-advanced"
         >
           {showAdvanced ? (
@@ -608,10 +616,10 @@ function StepPersonality({
                 'Override the default system prompt. Leave empty to auto-generate from role description and communication style.',
               )}
               rows={6}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 font-mono text-sm placeholder-gray-400 transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500"
+              className="border-border-strong bg-panel focus:border-accent0 focus:ring-accent0 dark:border-border-strong dark:bg-subtle w-full rounded-lg border px-3 py-2.5 font-mono text-sm placeholder-gray-400 transition-colors focus:ring-2 focus:outline-none dark:text-white dark:placeholder-gray-500"
               data-testid="wizard-input-system-prompt"
             />
-            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+            <p className="text-text-3 dark:text-text-3 mt-1 text-xs">
               {t(
                 'ai.wizard.field.systemPrompt.hint',
                 undefined,
@@ -646,18 +654,18 @@ function StepReview({
   return (
     <div className="space-y-6" data-testid="wizard-step-review">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+        <h2 className="text-text text-xl font-semibold dark:text-white">
           {t('ai.wizard.review.title', undefined, 'Review your AI Colleague')}
         </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-text-3 dark:text-text-3 mt-1 text-sm">
           {t('ai.wizard.review.subtitle', undefined, 'Confirm the details before creating.')}
         </p>
       </div>
 
-      <div className="divide-y divide-gray-200 rounded-xl border border-gray-200 bg-gray-50 dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800/50">
+      <div className="divide-border border-border bg-subtle dark:divide-border dark:border-border dark:bg-subtle/50 divide-y rounded-xl border">
         {/* Identity section */}
         <div className="p-5">
-          <h3 className="mb-3 text-xs font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
+          <h3 className="text-text-3 dark:text-text-3 mb-3 text-xs font-semibold tracking-wider uppercase">
             {t('ai.wizard.step.identity', undefined, 'Identity')}
           </h3>
           <div className="space-y-3">
@@ -681,14 +689,14 @@ function StepReview({
               testId="review-agent-type"
             />
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center">
-              <span className="w-40 shrink-0 text-sm text-gray-500 dark:text-gray-400">
+              <span className="text-text-3 dark:text-text-3 w-40 shrink-0 text-sm">
                 {t('ai.wizard.field.provider', undefined, 'AI service')}
               </span>
               {providers.length > 0 ? (
                 <select
                   value={data.provider}
                   onChange={(e) => onChange({ provider: e.target.value })}
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  className="border-border-strong bg-panel dark:border-border-strong dark:bg-subtle rounded-lg border px-3 py-1.5 text-sm dark:text-white"
                   data-testid="review-provider-select"
                 >
                   {providers.map((p) => (
@@ -698,7 +706,10 @@ function StepReview({
                   ))}
                 </select>
               ) : (
-                <span className="text-sm text-amber-600 dark:text-amber-500" data-testid="review-provider-none">
+                <span
+                  className="text-status-amber dark:text-status-amber0 text-sm"
+                  data-testid="review-provider-none"
+                >
                   {t(
                     'ai.wizard.field.provider.none',
                     undefined,
@@ -712,7 +723,7 @@ function StepReview({
 
         {/* Personality section */}
         <div className="p-5">
-          <h3 className="mb-3 text-xs font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
+          <h3 className="text-text-3 dark:text-text-3 mb-3 text-xs font-semibold tracking-wider uppercase">
             {t('ai.wizard.step.personality', undefined, 'Personality')}
           </h3>
           <div className="space-y-3">
@@ -758,11 +769,11 @@ function ReviewRow({
 }) {
   return (
     <div className="flex flex-col gap-1 sm:flex-row sm:items-start" data-testid={testId}>
-      <span className="shrink-0 text-sm font-medium text-gray-500 sm:w-40 dark:text-gray-400">
+      <span className="text-text-3 dark:text-text-3 shrink-0 text-sm font-medium sm:w-40">
         {label}
       </span>
       <span
-        className={`text-sm break-words text-gray-900 dark:text-white ${mono ? 'rounded border border-gray-200 bg-white p-2 font-mono text-xs whitespace-pre-wrap dark:border-gray-700 dark:bg-gray-900' : ''}`}
+        className={`text-text text-sm break-words dark:text-white ${mono ? 'border-border bg-panel dark:border-border dark:bg-subtle rounded border p-2 font-mono text-xs whitespace-pre-wrap' : ''}`}
       >
         {value}
       </span>
@@ -942,7 +953,7 @@ export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown 
         {/* Back to list */}
         <button
           onClick={() => navigate('/p/c/ai_colleagues')}
-          className="mb-6 inline-flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          className="text-text-3 hover:text-text-2 dark:text-text-3 dark:hover:text-text-3 mb-6 inline-flex items-center gap-1.5 text-sm transition-colors"
           data-testid="wizard-back-to-list"
         >
           <ArrowLeftIcon className="h-4 w-4" />
@@ -951,7 +962,7 @@ export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown 
 
         {/* Template Picker (step 0 of the overall flow) */}
         {showTemplatePicker ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8 dark:border-gray-700 dark:bg-gray-900">
+          <div className="border-border bg-panel dark:border-border dark:bg-subtle rounded-xl border p-6 shadow-sm sm:p-8">
             <TemplateSelector onSelect={handleSelectTemplate} onSkip={handleSkipTemplate} t={t} />
           </div>
         ) : (
@@ -960,7 +971,7 @@ export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown 
             <StepIndicator currentStep={step} t={t} />
 
             {/* Step Content */}
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8 dark:border-gray-700 dark:bg-gray-900">
+            <div className="border-border bg-panel dark:border-border dark:bg-subtle rounded-xl border p-6 shadow-sm sm:p-8">
               {step === 0 && <StepIdentity data={data} onChange={onChange} errors={errors} t={t} />}
               {step === 1 && <StepPersonality data={data} onChange={onChange} t={t} />}
               {step === 2 && (
@@ -968,11 +979,11 @@ export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown 
               )}
 
               {/* Navigation Buttons */}
-              <div className="mt-8 flex items-center justify-between border-t border-gray-200 pt-6 dark:border-gray-700">
+              <div className="border-border dark:border-border mt-8 flex items-center justify-between border-t pt-6">
                 <div>
                   <button
                     onClick={handleBack}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                    className="border-border text-text-2 hover:bg-subtle dark:border-border dark:text-text-3 dark:hover:bg-subtle inline-flex items-center gap-1.5 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors"
                     data-testid="wizard-btn-back"
                   >
                     <ArrowLeftIcon className="h-4 w-4" />
@@ -983,7 +994,7 @@ export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown 
                   {step < 2 ? (
                     <button
                       onClick={handleNext}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+                      className="bg-accent hover:bg-accent-hover inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors"
                       data-testid="wizard-btn-next"
                     >
                       {t('ai.wizard.btn.next', undefined, 'Next')}
@@ -993,7 +1004,7 @@ export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown 
                     <button
                       onClick={handleCreate}
                       disabled={creating}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="bg-accent hover:bg-accent-hover inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       data-testid="wizard-btn-create"
                     >
                       {creating ? (

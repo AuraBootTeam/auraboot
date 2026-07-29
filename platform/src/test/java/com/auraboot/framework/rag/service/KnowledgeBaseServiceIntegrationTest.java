@@ -39,6 +39,8 @@ class KnowledgeBaseServiceIntegrationTest extends BaseIntegrationTest {
         CreateKnowledgeBaseRequest req = new CreateKnowledgeBaseRequest();
         req.setName("Test KB " + System.currentTimeMillis());
         req.setDescription("Integration test knowledge base");
+        // The browser submits an empty string while "Auto" is selected.
+        req.setEmbeddingModel("");
 
         KnowledgeBaseDTO dto = kbService.createKnowledgeBase(
                 getTestTenant().getId(), getTestUser().getId(), req);
@@ -79,7 +81,7 @@ class KnowledgeBaseServiceIntegrationTest extends BaseIntegrationTest {
         req.setEmbeddingProvider(kbService.resolveEmbeddingProvider(
                 getTestTenant().getId(), null).provider());
         req.setEmbeddingModel("custom-model-under-test");
-        req.setEmbeddingDimension(1024);
+        req.setEmbeddingDimension(1536);
         req.setChunkSize(1000);
         req.setChunkOverlap(100);
 
@@ -90,7 +92,7 @@ class KnowledgeBaseServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(dto.getEmbeddingModel())
                 .as("an explicitly requested model must win over the provider's default")
                 .isEqualTo("custom-model-under-test");
-        assertThat(dto.getEmbeddingDimension()).isEqualTo(1024);
+        assertThat(dto.getEmbeddingDimension()).isEqualTo(1536);
         assertThat(dto.getChunkSize()).isEqualTo(1000);
         assertThat(dto.getChunkOverlap()).isEqualTo(100);
     }
@@ -283,7 +285,7 @@ class KnowledgeBaseServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(13)
-    @DisplayName("DOC-03: Delete document removes chunks and updates counters")
+    @DisplayName("DOC-03: Delete document publishes a snapshot without it and updates counters")
     void deleteDocument() {
         KnowledgeBaseDTO kb = createTestKb("Doc Delete Test");
         KbDocument doc = kbService.createDocument(
@@ -293,7 +295,7 @@ class KnowledgeBaseServiceIntegrationTest extends BaseIntegrationTest {
         // Insert some chunks
         insertTestChunk(kb.getPid(), doc.getPid(), 0, "chunk-0 content");
         insertTestChunk(kb.getPid(), doc.getPid(), 1, "chunk-1 content");
-        kbService.refreshKbCounters(kb.getPid());
+        kbService.refreshKbCounters(getTestTenant().getId(), kb.getPid());
 
         // Verify counters before delete
         KnowledgeBaseDTO beforeDelete = kbService.getKnowledgeBase(
@@ -335,7 +337,9 @@ class KnowledgeBaseServiceIntegrationTest extends BaseIntegrationTest {
                 "process-me.txt", "txt", "fp-proc", 1000L, "file", null);
 
         // Simulate processing completion
-        kbService.updateDocumentAfterProcessing(doc.getPid(), "completed", 5000, 10, null);
+        kbService.updateDocumentAfterProcessing(
+                getTestTenant().getId(), kb.getPid(), doc.getPid(),
+                "completed", 5000, 10, null);
 
         // Verify via listing
         List<KbDocumentDTO> docs = kbService.listDocuments(kb.getPid());
@@ -358,7 +362,8 @@ class KnowledgeBaseServiceIntegrationTest extends BaseIntegrationTest {
                 "bad-file.xyz", "txt", "fp-fail", 0L, "file", null);
 
         kbService.updateDocumentAfterProcessing(
-                doc.getPid(), "failed", 0, 0, "Unsupported format");
+                getTestTenant().getId(), kb.getPid(), doc.getPid(),
+                "failed", 0, 0, "Unsupported format");
 
         List<KbDocumentDTO> docs = kbService.listDocuments(kb.getPid());
         KbDocumentDTO failed = docs.stream()
@@ -425,7 +430,7 @@ class KnowledgeBaseServiceIntegrationTest extends BaseIntegrationTest {
         insertTestChunk(kb.getPid(), doc.getPid(), 1, "C1");
         insertTestChunk(kb.getPid(), doc.getPid(), 2, "C2");
 
-        kbService.refreshKbCounters(kb.getPid());
+        kbService.refreshKbCounters(getTestTenant().getId(), kb.getPid());
 
         KnowledgeBaseDTO refreshed = kbService.getKnowledgeBase(
                 getTestTenant().getId(), kb.getPid());
@@ -460,11 +465,34 @@ class KnowledgeBaseServiceIntegrationTest extends BaseIntegrationTest {
 
     private void insertTestChunk(String kbPid, String docPid, int index, String content) {
         String chunkPid = UniqueIdGenerator.generate();
+        String releasePid = jdbcTemplate.queryForObject(
+                "SELECT active_index_release_pid FROM ab_knowledge_base "
+                        + "WHERE tenant_id = ? AND pid = ?",
+                String.class, getTestTenant().getId(), kbPid);
+        String versionPid = jdbcTemplate.queryForObject(
+                "SELECT active_version_pid FROM ab_kb_document "
+                        + "WHERE tenant_id = ? AND kb_id = ? AND pid = ?",
+                String.class, getTestTenant().getId(), kbPid, docPid);
+        if (versionPid == null) {
+            versionPid = UniqueIdGenerator.generate();
+            jdbcTemplate.update(
+                    "INSERT INTO ab_kb_document_version ("
+                            + "pid, tenant_id, kb_pid, document_pid, version_no, state, created_by"
+                            + ") VALUES (?, ?, ?, ?, 1, 'active', ?)",
+                    versionPid, getTestTenant().getId(), kbPid, docPid, getTestUser().getId());
+            jdbcTemplate.update(
+                    "UPDATE ab_kb_document SET active_version_pid = ?, version_no = 1 "
+                            + "WHERE tenant_id = ? AND kb_id = ? AND pid = ?",
+                    versionPid, getTestTenant().getId(), kbPid, docPid);
+        }
         jdbcTemplate.update(
-                "INSERT INTO ab_kb_chunk (pid, tenant_id, kb_id, doc_id, chunk_index, "
+                "INSERT INTO ab_kb_chunk (pid, tenant_id, kb_id, doc_id, "
+                + "document_version_pid, index_release_pid, chunk_index, "
                 + "content, char_count, token_count, tsv, embedding_status, created_at, updated_at) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, to_tsvector('simple', ?), 'pending', NOW(), NOW())",
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, to_tsvector('simple', ?), "
+                + "'pending', NOW(), NOW())",
                 chunkPid, getTestTenant().getId(), kbPid, docPid,
-                index, content, content.length(), content.length() / 4, content);
+                versionPid, releasePid, index, content,
+                content.length(), content.length() / 4, content);
     }
 }

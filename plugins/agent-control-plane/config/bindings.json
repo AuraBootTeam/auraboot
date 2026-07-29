@@ -111,6 +111,15 @@
   },
   {
     "modelCode": "agent_definition",
+    "fieldCode": "visibility",
+    "sequence": 13,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "defaultValue": "private"
+  },
+  {
+    "modelCode": "agent_definition",
     "fieldCode": "personality",
     "sequence": 60,
     "required": false,
@@ -616,6 +625,17 @@
   },
   {
     "modelCode": "agent_schedule",
+    "fieldCode": "agent_code",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "agent_schedule",
     "fieldCode": "title",
     "sequence": 2,
     "required": true,
@@ -727,6 +747,70 @@
     "required": false,
     "visible": false,
     "editable": true
+  },
+  {
+    "modelCode": "agent_schedule",
+    "fieldCode": "manager_member_id",
+    "sequence": 15,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "agent_schedule",
+    "fieldCode": "quiet_hours_start",
+    "sequence": 16,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "agent_schedule",
+    "fieldCode": "quiet_hours_end",
+    "sequence": 17,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "agent_schedule",
+    "fieldCode": "daily_run_budget",
+    "sequence": 18,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "agent_schedule",
+    "fieldCode": "concurrency_limit",
+    "sequence": 19,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "agent_schedule",
+    "fieldCode": "missed_run_policy",
+    "sequence": 20,
+    "required": true,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "agent_schedule",
+    "fieldCode": "agent_release_pid",
+    "sequence": 21,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "agent_schedule",
+    "fieldCode": "last_block_reason",
+    "sequence": 22,
+    "required": false,
+    "visible": true,
+    "editable": false
   },
   {
     "modelCode": "approval_policy",
@@ -1687,6 +1771,14 @@
     "modelCode": "agent_definition",
     "fieldCode": "knowledge_base_ids",
     "sequence": 67,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "agent_definition",
+    "fieldCode": "proactive_policy",
+    "sequence": 68,
     "required": false,
     "visible": true,
     "editable": true

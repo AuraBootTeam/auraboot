@@ -33,6 +33,8 @@ interface KnowledgeBase {
   name: string;
   description: string;
   status: 'active' | 'disabled';
+  visibility: 'tenant' | 'restricted' | 'private';
+  activeIndexReleasePid?: string;
   embeddingProvider: string;
   embeddingModel: string;
   embeddingDimension: number;
@@ -47,20 +49,19 @@ interface KnowledgeBase {
 interface CreateKbForm {
   name: string;
   description: string;
+  visibility: 'tenant' | 'restricted' | 'private';
   embeddingProvider: string;
   embeddingModel: string;
   chunkSize: number;
   chunkOverlap: number;
 }
 
-/**
- * The model each embedding provider is seeded with. These must produce 1536-dimension vectors —
- * that is the width of ab_kb_chunk.embedding, and a vector of any other width cannot be stored.
- */
-const DEFAULT_EMBEDDING_MODELS: Record<string, string> = {
-  openai: 'text-embedding-3-small',
-  qianwen: 'text-embedding-v4',
-};
+interface EmbeddingProfile {
+  providerCode: string;
+  displayName: string;
+  defaultModel: string;
+  dimensions: number;
+}
 
 // Empty provider means "let the backend pick the one this deployment actually has
 // enabled". Defaulting to a literal 'openai' switched OFF the backend's auto-resolve
@@ -70,6 +71,7 @@ const DEFAULT_EMBEDDING_MODELS: Record<string, string> = {
 const DEFAULT_FORM: CreateKbForm = {
   name: '',
   description: '',
+  visibility: 'tenant',
   embeddingProvider: '',
   embeddingModel: '',
   chunkSize: 500,
@@ -88,6 +90,8 @@ export default function KnowledgeBasePage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editingKb, setEditingKb] = useState<KnowledgeBase | null>(null);
   const [form, setForm] = useState<CreateKbForm>(DEFAULT_FORM);
+  const [embeddingProfiles, setEmbeddingProfiles] = useState<EmbeddingProfile[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const fetchKbs = useCallback(async () => {
     try {
@@ -102,6 +106,9 @@ export default function KnowledgeBasePage() {
 
   useEffect(() => {
     fetchKbs();
+    get<EmbeddingProfile[]>('/api/ai/knowledge/embedding-profiles')
+      .then((res) => setEmbeddingProfiles(res?.data ?? []))
+      .catch(() => setEmbeddingProfiles([]));
   }, [fetchKbs]);
 
   const handleCreate = async () => {
@@ -110,6 +117,7 @@ export default function KnowledgeBasePage() {
       return;
     }
     try {
+      setSaving(true);
       await post('/api/ai/knowledge', form);
       toast.showSuccessToast(t('ai.knowledge.toast.created', undefined, 'Knowledge base created'));
       setShowCreate(false);
@@ -117,12 +125,15 @@ export default function KnowledgeBasePage() {
       fetchKbs();
     } catch {
       toast.showErrorToast(t('ai.knowledge.toast.createFailed', undefined, 'Failed to create knowledge base'));
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleUpdate = async () => {
     if (!editingKb) return;
     try {
+      setSaving(true);
       await put(`/api/ai/knowledge/${editingKb.pid}`, form);
       toast.showSuccessToast(t('ai.knowledge.toast.updated', undefined, 'Knowledge base updated'));
       setEditingKb(null);
@@ -130,6 +141,8 @@ export default function KnowledgeBasePage() {
       fetchKbs();
     } catch {
       toast.showErrorToast(t('ai.knowledge.toast.updateFailed', undefined, 'Failed to update knowledge base'));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -157,6 +170,7 @@ export default function KnowledgeBasePage() {
     setForm({
       name: kb.name,
       description: kb.description || '',
+      visibility: kb.visibility || 'tenant',
       embeddingProvider: kb.embeddingProvider,
       embeddingModel: kb.embeddingModel,
       chunkSize: kb.chunkSize,
@@ -251,6 +265,8 @@ export default function KnowledgeBasePage() {
 
             <KbForm
               form={form}
+              embeddingProfiles={embeddingProfiles}
+              saving={saving}
               t={t}
               onChange={setForm}
               onSubmit={editingKb ? handleUpdate : handleCreate}
@@ -338,7 +354,11 @@ function KbCard({
       </div>
 
       <div className="mb-4 inline-flex items-center rounded-md bg-gray-50 px-2 py-1 font-mono text-xs text-gray-400 dark:bg-gray-900/40 dark:text-gray-500">
-        {kb.embeddingProvider} / {kb.embeddingModel}
+        {kb.embeddingProvider} /{' '}
+        {kb.embeddingModel || t('ai.knowledge.detail.modelUnconfigured', undefined, 'Model not configured')}
+      </div>
+      <div className="mb-4 ml-2 inline-flex items-center rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-500 dark:bg-slate-900/40 dark:text-slate-400">
+        {t(`ai.knowledge.visibility.${kb.visibility}`, undefined, kb.visibility)}
       </div>
 
       <div className="flex items-center gap-2 border-t border-gray-100 pt-3 dark:border-gray-700">
@@ -377,12 +397,16 @@ function KbCard({
 
 function KbForm({
   form,
+  embeddingProfiles,
+  saving,
   t,
   onChange,
   onSubmit,
   submitLabel,
 }: {
   form: CreateKbForm;
+  embeddingProfiles: EmbeddingProfile[];
+  saving: boolean;
   t: TFn;
   onChange: (f: CreateKbForm) => void;
   onSubmit: () => void;
@@ -404,6 +428,21 @@ function KbForm({
           className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           placeholder={t('ai.knowledge.form.namePlaceholder', undefined, 'e.g. Product Documentation')}
         />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+          {t('ai.knowledge.form.visibility', undefined, 'Access')}
+        </label>
+        <select
+          value={form.visibility}
+          onChange={(e) => update('visibility', e.target.value)}
+          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+        >
+          <option value="tenant">{t('ai.knowledge.visibility.tenant', undefined, 'Everyone in this tenant')}</option>
+          <option value="restricted">{t('ai.knowledge.visibility.restricted', undefined, 'Explicit grants only')}</option>
+          <option value="private">{t('ai.knowledge.visibility.private', undefined, 'Owner only')}</option>
+        </select>
       </div>
 
       <div>
@@ -439,25 +478,18 @@ function KbForm({
               onChange({
                 ...form,
                 embeddingProvider: provider,
-                embeddingModel: DEFAULT_EMBEDDING_MODELS[provider] ?? form.embeddingModel,
+                embeddingModel:
+                  embeddingProfiles.find((profile) => profile.providerCode === provider)?.defaultModel ?? '',
               });
             }}
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
-            {/*
-              Only providers whose default model produces a 1536-wide vector belong here — that is
-              the width of ab_kb_chunk.embedding, and anything else cannot be stored at all.
-
-              Zhipu is deliberately absent: embedding-3 answers with 2048 dimensions, so a knowledge
-              base created on it would fail to embed every single chunk. An option that is guaranteed
-              to fail is worse than no option — the user only finds out long after the dialog closed,
-              from a knowledge base that quietly returns nothing. The provider stays seeded (disabled,
-              keyless); put it back here once its config pins dimensions=1536 and that has been
-              verified against the live API.
-            */}
             <option value="">{t('ai.knowledge.form.providerAuto', undefined, 'Auto (use what this deployment has configured)')}</option>
-            <option value="openai">OpenAI</option>
-            <option value="qianwen">通义千问 (DashScope)</option>
+            {embeddingProfiles.map((profile) => (
+              <option key={profile.providerCode} value={profile.providerCode}>
+                {profile.displayName} · {profile.dimensions}d
+              </option>
+            ))}
           </select>
         </div>
         <div>
@@ -501,10 +533,20 @@ function KbForm({
       <button
         data-testid="kb-submit-button"
         onClick={onSubmit}
-        className="w-full rounded-lg bg-blue-600 py-2.5 font-medium text-white transition-colors hover:bg-blue-700"
+        disabled={saving || embeddingProfiles.length === 0}
+        className="w-full rounded-lg bg-blue-600 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {submitLabel}
+        {saving ? t('common.saving', undefined, 'Saving…') : submitLabel}
       </button>
+      {embeddingProfiles.length === 0 && (
+        <p role="alert" className="text-sm text-amber-600 dark:text-amber-400">
+          {t(
+            'ai.knowledge.form.noEmbeddingProfile',
+            undefined,
+            'No compatible embedding profile is enabled. Configure one before creating a knowledge base.',
+          )}
+        </p>
+      )}
     </div>
   );
 }

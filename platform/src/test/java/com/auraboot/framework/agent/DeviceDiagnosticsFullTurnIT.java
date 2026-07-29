@@ -58,15 +58,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Uses the platform-registered {@code device_inspection} model (tenant =
  * integration-test-tenant) so no model/table creation is needed.
  *
- * <p>Opt-in: gated by a live LLM credential (see {@link LiveLlmSeeder}), tagged {@code agent-eval-live}.
- * <pre>{@code DASHSCOPE_API_KEY=... ./gradlew :testAgent --tests '*DeviceDiagnosticsFullTurnIT*' -PincludeLiveEvals}</pre>
+ * <p>Opt-in: gated by a live LLM credential (see {@link LiveLlmSeeder}), tagged
+ * {@code agent-eval-live}.
+ * <pre>{@code
+ * AURA_LIVE_LLM_PROVIDER=provider AURA_LIVE_LLM_MODEL=model \
+ * AURA_LIVE_LLM_API_KEY_ENV=LIVE_KEY ./gradlew :testAgent \
+ * --tests '*DeviceDiagnosticsFullTurnIT*' -PincludeLiveEvals
+ * }</pre>
  */
 @Tag("agent-eval-live")
 @DisplayName("R1: device diagnostics full conversational turn — the live model reads seeded rows")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
-        "agent.anthropic.api-key=",
         "agent.llm.stub-mode=false",
 })
 class DeviceDiagnosticsFullTurnIT extends BaseIntegrationTest {
@@ -77,10 +81,10 @@ class DeviceDiagnosticsFullTurnIT extends BaseIntegrationTest {
     private static final String READ_PERMISSION = "model." + MODEL + ".read";
 
     /**
-     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * Resolved from the environment (the explicit provider-neutral live profile) rather than
      * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider and its
      * model name in every live IT is what silently broke this whole layer when
-     * DeepSeek retired {@code deepseek-chat}.
+     * an upstream provider retired a model identifier.
      */
     private LiveLlmSeeder.LiveProvider liveProvider;
 

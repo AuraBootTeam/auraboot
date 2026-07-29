@@ -45,7 +45,8 @@ class KnowledgeBaseProviderResolutionTest {
     private KnowledgeBaseService serviceWith(List<CloudConfig> enabled) {
         CloudConfigService cloud = mock(CloudConfigService.class);
         when(cloud.getEnabledProviders(anyLong(), eq("embedding"))).thenReturn(enabled);
-        KnowledgeBaseService svc = new KnowledgeBaseService(null, null, null, null, cloud, new ObjectMapper());
+        KnowledgeBaseService svc = new KnowledgeBaseService(
+                null, null, null, null, cloud, new ObjectMapper(), null);
         ReflectionTestUtils.setField(svc, "cloudConfigService", cloud);
         return svc;
     }
@@ -108,14 +109,11 @@ class KnowledgeBaseProviderResolutionTest {
     }
 
     @Test
-    void a_malformed_config_blob_does_not_block_creation() {
-        // A provider is enabled; its config JSON is broken. Refusing here would be worse
-        // than proceeding — the embed itself reports the truth either way.
+    void a_malformed_config_blob_is_refused_before_creating_a_dead_knowledge_base() {
         var svc = serviceWith(List.of(provider("qianwen", "{not json")));
 
-        var resolved = svc.resolveEmbeddingProvider(TENANT, "qianwen");
-
-        assertThat(resolved.provider()).isEqualTo("qianwen");
-        assertThat(resolved.model()).isEqualTo("text-embedding-3-small");
+        assertThatThrownBy(() -> svc.resolveEmbeddingProvider(TENANT, "qianwen"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("defaultModel");
     }
 }

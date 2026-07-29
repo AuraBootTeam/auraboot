@@ -7,6 +7,7 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.provider.ModelCapabilityProfile;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
@@ -48,6 +49,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -184,6 +186,15 @@ class AgentChatPortImplToolLoopTest {
                         .defaultModel("test-model")
                         .build());
         when(providerFactory.getProvider("openai")).thenReturn(provider);
+        lenient().when(provider.modelCapabilities("test-model"))
+                .thenReturn(new ModelCapabilityProfile(
+                        true,
+                        true,
+                        true,
+                        true,
+                        true,
+                        false,
+                        false));
     }
 
     private void stubGrounding() {

@@ -15,11 +15,11 @@ interface StatusBadgeProps {
 }
 
 const COLOR_CLASSES = {
-  gray: 'bg-gray-100 text-gray-800 border-gray-200',
-  green: 'bg-green-100 text-green-800 border-green-200',
-  orange: 'bg-orange-100 text-orange-800 border-orange-200',
-  blue: 'bg-blue-100 text-blue-800 border-blue-200',
-  red: 'bg-red-100 text-red-800 border-red-200',
+  gray: 'bg-subtle text-text border-border',
+  green: 'bg-status-green-bg text-status-green border-status-green',
+  orange: 'bg-status-amber-bg text-status-amber border-status-amber',
+  blue: 'bg-accent-weak text-accent border-accent',
+  red: 'bg-status-red-bg text-status-red border-status-red',
 };
 
 const SIZE_CLASSES = {
@@ -99,11 +99,11 @@ interface StatusDotProps {
 }
 
 const DOT_COLOR_CLASSES = {
-  gray: 'bg-gray-500',
-  green: 'bg-green-500',
-  orange: 'bg-orange-500',
-  blue: 'bg-blue-500',
-  red: 'bg-red-500',
+  gray: 'bg-subtle0',
+  green: 'bg-status-green-bg0',
+  orange: 'bg-status-amber-bg0',
+  blue: 'bg-accent',
+  red: 'bg-status-red-bg0',
 };
 
 export function StatusDot({ status, showLabel = true, className = '' }: StatusDotProps) {
@@ -118,7 +118,7 @@ export function StatusDot({ status, showLabel = true, className = '' }: StatusDo
   return (
     <span className={`inline-flex items-center gap-1.5 ${className}`} title={config.description}>
       <span className={`h-2 w-2 rounded-full ${dotColorClass}`} />
-      {showLabel && <span className="text-sm text-gray-700">{config.label}</span>}
+      {showLabel && <span className="text-text-2 text-sm">{config.label}</span>}
     </span>
   );
 }

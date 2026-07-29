@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.runtime.policy.RiskScale;
 import org.springframework.stereotype.Component;
 
 /**
@@ -11,21 +12,20 @@ public class RiskEvaluator {
 
     public String evaluate(String intent, int affectedCount) {
         // Base risk from intent
-        String baseRisk = switch (intent) {
+        RiskScale baseRisk = switch (intent) {
             case "query", "analyze", "summarize", "compare", "explain",
-                 "export", "report", "recommend" -> "L0";
-            case "create", "update", "assign", "notify" -> "L1";
-            case "transition" -> "L1";
-            case "automate" -> "L2";
-            case "delete" -> "L4";
-            default -> "L1";
+                 "export", "report", "recommend" -> RiskScale.L0;
+            case "create", "update", "assign", "notify", "transition" -> RiskScale.L1;
+            case "automate" -> RiskScale.L2;
+            case "delete" -> RiskScale.L4;
+            default -> RiskScale.L1;
         };
 
         // Elevate for batch operations
-        if (affectedCount > 10) baseRisk = maxRisk(baseRisk, "L2");
-        if (affectedCount > 100) baseRisk = maxRisk(baseRisk, "L3");
+        if (affectedCount > 10) baseRisk = RiskScale.max(baseRisk, RiskScale.L2);
+        if (affectedCount > 100) baseRisk = RiskScale.max(baseRisk, RiskScale.L3);
 
-        return baseRisk;
+        return baseRisk.code();
     }
 
     public String deriveActionability(String intent) {
@@ -43,16 +43,12 @@ public class RiskEvaluator {
      * Used by BIF layer when ObjectResolver resolves a commandCode.
      */
     public String deriveFromCommandType(String executionConfigType) {
-        return switch (executionConfigType) {
-            case "create", "update" -> "L1";
-            case "state_transition" -> "L1";
-            case "automate" -> "L2";
-            case "delete" -> "L4";
-            default -> "L1";
+        RiskScale risk = switch (executionConfigType) {
+            case "create", "update", "state_transition" -> RiskScale.L1;
+            case "automate" -> RiskScale.L2;
+            case "delete" -> RiskScale.L4;
+            default -> RiskScale.L1;
         };
-    }
-
-    private String maxRisk(String a, String b) {
-        return a.compareTo(b) > 0 ? a : b;
+        return risk.code();
     }
 }

@@ -525,6 +525,9 @@ public class AuraBotChatService {
         if (!contextWarnings.isEmpty()) {
             sink.onWarnings(contextWarnings);
         }
+        if (!contextAssembly.retrievalEvidence().isEmpty()) {
+            sink.onRetrievalEvidence(contextAssembly.retrievalEvidence());
+        }
         String systemPrompt = buildSystemPrompt(tenantId, request, effectiveResolved, contextBundle);
         if (bif != null) {
             systemPrompt = systemPrompt + buildBifContextHint(bif);
@@ -718,12 +721,21 @@ public class AuraBotChatService {
                         modelSchemaText,
                         retrieved.context(),
                         request != null ? request.getKnowledgeBaseIds() : null));
-        return new ContextAssembly(contextBundle, retrieved.diagnostics());
+        return new ContextAssembly(
+                contextBundle,
+                retrieved.diagnostics(),
+                retrieved.evidence());
     }
 
     private record ContextAssembly(
             AgentContextBundle bundle,
-            RagContextProvider.RetrievalDiagnostics retrievalDiagnostics) {
+            RagContextProvider.RetrievalDiagnostics retrievalDiagnostics,
+            List<RagContextProvider.RetrievalEvidence> retrievalEvidence) {
+        private ContextAssembly {
+            retrievalEvidence = retrievalEvidence == null
+                    ? List.of()
+                    : List.copyOf(retrievalEvidence);
+        }
     }
 
     /**

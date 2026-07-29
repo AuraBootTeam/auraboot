@@ -36,6 +36,12 @@ public class KnowledgeBase {
     @TableField("status")
     private String status;
 
+    @TableField("active_index_release_pid")
+    private String activeIndexReleasePid;
+
+    @TableField("visibility")
+    private String visibility;
+
     @TableField("embedding_provider")
     private String embeddingProvider;
 

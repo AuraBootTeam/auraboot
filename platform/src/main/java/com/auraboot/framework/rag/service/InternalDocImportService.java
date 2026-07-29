@@ -61,7 +61,7 @@ public class InternalDocImportService {
         log.info("Found {} markdown files in {}", mdFiles.size(), docsPath);
 
         // 3. Load existing docs for this KB (for incremental comparison)
-        Map<String, KbDocument> existingDocs = loadExistingDocs(kbPid);
+        Map<String, KbDocument> existingDocs = loadExistingDocs(tenantId, kbPid);
 
         int imported = 0;
         int skipped = 0;
@@ -81,31 +81,39 @@ public class InternalDocImportService {
                     continue;
                 }
 
+                KbDocument doc;
                 if (existing != null) {
-                    // Content changed — delete old chunks and re-import
-                    deleteDocChunks(existing.getPid(), kbPid);
-                    docMapper.deleteById(existing.getId());
+                    // Keep the logical document and create a new immutable
+                    // DocumentVersion during ingest. Old chunks remain tied
+                    // to their previous version/release for rollback.
+                    jdbcTemplate.update(
+                            "UPDATE ab_kb_document SET doc_name = ?, file_size = ?, "
+                                    + "char_count = ?, content_hash = ?, status = 'processing', "
+                                    + "error_message = NULL, process_started_at = NOW(), "
+                                    + "process_completed_at = NULL "
+                                    + "WHERE tenant_id = ? AND kb_id = ? AND pid = ?",
+                            relativePath, content.length(), content.length(), hash,
+                            tenantId, kbPid, existing.getPid());
+                    doc = existing;
                     updated++;
                 } else {
                     imported++;
+                    doc = KbDocument.builder()
+                            .pid(UniqueIdGenerator.generate())
+                            .tenantId(tenantId)
+                            .kbId(kbPid)
+                            .docName(relativePath)
+                            .docType("md")
+                            .fileSize((long) content.length())
+                            .charCount(content.length())
+                            .sourceType(SOURCE_TYPE)
+                            .sourceEntityId(relativePath)
+                            .contentHash(hash)
+                            .status("processing")
+                            .createdBy(userId)
+                            .build();
+                    docMapper.insert(doc);
                 }
-
-                // Create document record
-                KbDocument doc = KbDocument.builder()
-                        .pid(UniqueIdGenerator.generate())
-                        .tenantId(tenantId)
-                        .kbId(kbPid)
-                        .docName(relativePath)
-                        .docType("md")
-                        .fileSize((long) content.length())
-                        .charCount(content.length())
-                        .sourceType(SOURCE_TYPE)
-                        .sourceEntityId(relativePath)
-                        .contentHash(hash)
-                        .status("processing")
-                        .createdBy(userId)
-                        .build();
-                docMapper.insert(doc);
 
                 // Chunk and store
                 processContent(doc, content, kbPid, tenantId);
@@ -117,7 +125,7 @@ public class InternalDocImportService {
         }
 
         // Refresh counters
-        kbService.refreshKbCounters(kbPid);
+        kbService.refreshKbCounters(tenantId, kbPid);
 
         ImportResult result = new ImportResult(kbPid, mdFiles.size(), imported, updated, skipped, failed);
         log.info("Import complete: {}", result);
@@ -128,8 +136,11 @@ public class InternalDocImportService {
      * Process document content: chunk → embed → store chunks.
      */
     private void processContent(KbDocument doc, String content, String kbPid, Long tenantId) {
-        var kb = kbService.findKbByPid(kbPid);
-        String provider = kb != null ? kb.getEmbeddingProvider() : "openai";
+        var kb = kbService.findKb(tenantId, kbPid);
+        if (kb == null || kb.getEmbeddingProvider() == null) {
+            throw new IllegalStateException("Knowledge base embedding profile is unavailable");
+        }
+        String provider = kb.getEmbeddingProvider();
         Integer chunkSize = kb != null ? kb.getChunkSize() : null;
         Integer chunkOverlap = kb != null ? kb.getChunkOverlap() : null;
         String escapedName = doc.getDocName().replace("\"", "\\\"");
@@ -138,11 +149,13 @@ public class InternalDocImportService {
                 tenantId, kbPid, doc.getPid(), content, chunkSize, chunkOverlap, provider,
                 chunk -> String.format("{\"filePath\":\"%s\",\"chunkIndex\":%d}", escapedName, chunk.index()));
         if (outcome.chunkCount() == 0) {
-            kbService.updateDocumentAfterProcessing(doc.getPid(), "failed", 0, 0, "No chunks produced");
+            kbService.updateDocumentAfterProcessing(
+                    tenantId, kbPid, doc.getPid(), "failed", 0, 0, "No chunks produced");
             return;
         }
 
-        kbService.updateDocumentAfterProcessing(doc.getPid(), "completed",
+        kbService.updateDocumentAfterProcessing(
+                tenantId, kbPid, doc.getPid(), "completed",
                 content.length(), outcome.chunkCount(), null);
     }
 
@@ -179,9 +192,10 @@ public class InternalDocImportService {
         return files;
     }
 
-    private Map<String, KbDocument> loadExistingDocs(String kbPid) {
+    private Map<String, KbDocument> loadExistingDocs(Long tenantId, String kbPid) {
         List<KbDocument> docs = docMapper.selectList(
                 new LambdaQueryWrapper<KbDocument>()
+                        .eq(KbDocument::getTenantId, tenantId)
                         .eq(KbDocument::getKbId, kbPid)
                         .eq(KbDocument::getSourceType, SOURCE_TYPE));
         Map<String, KbDocument> map = new HashMap<>();
@@ -192,10 +206,6 @@ public class InternalDocImportService {
             }
         }
         return map;
-    }
-
-    private void deleteDocChunks(String docPid, String kbPid) {
-        jdbcTemplate.update("DELETE FROM ab_kb_chunk WHERE doc_id = ?", docPid);
     }
 
     private String sha256(String content) {

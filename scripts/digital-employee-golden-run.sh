@@ -120,10 +120,17 @@ echo "[de-golden] === digital employee journey golden — name=$NAME slot=$SLOT 
 if [[ "$LIVE" == 1 ]]; then
   # The live tier costs real money and is not deterministic, which is why it is
   # opt-in and belongs to the nightly rotation rather than to every run.
-  [[ -n "${DASHSCOPE_API_KEY:-}${DEEPSEEK_API_KEY:-}" ]] \
-    || die "--live needs a provider key in the environment (DASHSCOPE_API_KEY or DEEPSEEK_API_KEY)"
+  for required_var in AURA_LIVE_LLM_PROVIDER AURA_LIVE_LLM_MODEL AURA_LIVE_LLM_API_KEY_ENV; do
+    [[ -n "${!required_var:-}" ]] \
+      || die "--live requires $required_var"
+  done
+  key_env="$AURA_LIVE_LLM_API_KEY_ENV"
+  [[ "$key_env" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] \
+    || die "AURA_LIVE_LLM_API_KEY_ENV is invalid"
+  [[ -n "${!key_env:-}" ]] \
+    || die "configured credential variable $key_env is UNSET"
   export AGENT_LLM_STUB_MODE=false
-  echo "[de-golden] mode: LIVE — a real model answers; the full suite runs"
+  echo "[de-golden] mode: LIVE — provider=$AURA_LIVE_LLM_PROVIDER model=$AURA_LIVE_LLM_MODEL key=$key_env=SET"
 else
   # The default tier asserts that the plumbing works: that a colleague can be
   # created, enrolled, suspended and hold a turn at all. Whether the model

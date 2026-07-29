@@ -60,6 +60,12 @@ public class KbDocument {
     @TableField("status")
     private String status;
 
+    @TableField("active_version_pid")
+    private String activeVersionPid;
+
+    @TableField("version_no")
+    private Integer versionNo;
+
     @TableField("error_message")
     private String errorMessage;
 

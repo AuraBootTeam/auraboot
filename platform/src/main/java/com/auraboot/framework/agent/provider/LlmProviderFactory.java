@@ -29,7 +29,7 @@ import java.util.*;
 public class LlmProviderFactory {
 
     private final Map<String, LlmProvider> providerMap;
-    private final LlmProvider openAiCompatible;
+    private final Map<String, LlmProvider> adapterByApiFormat;
     private final CloudConfigService cloudConfigService;
     private final AgentProperties agentProperties;
     private final ObjectMapper objectMapper;
@@ -66,14 +66,12 @@ public class LlmProviderFactory {
         this.tracer = tracerProvider.getIfAvailable();
 
         this.providerMap = new HashMap<>();
-        LlmProvider openAiRef = null;
+        this.adapterByApiFormat = new HashMap<>();
         for (LlmProvider p : providers) {
             providerMap.put(p.getProviderCode(), p);
-            if ("openai".equals(p.getProviderCode())) {
-                openAiRef = p;
-            }
+            p.supportedApiFormats().forEach(format ->
+                    adapterByApiFormat.putIfAbsent(format, p));
         }
-        this.openAiCompatible = openAiRef;
     }
 
     /**
@@ -92,7 +90,7 @@ public class LlmProviderFactory {
 
     private LlmProvider resolveRawProvider(String providerCode) {
         if (providerCode == null || providerCode.isBlank()) {
-            providerCode = "anthropic";
+            return null;
         }
 
         // Stub-mode short-circuit: when the operator opts into stub-mode, every
@@ -114,14 +112,14 @@ public class LlmProviderFactory {
 
         // Resolve apiFormat from CloudConfig to pick the right implementation
         String apiFormat = resolveApiFormat(providerCode);
-        if ("messages".equals(apiFormat)) {
-            return providerMap.get("anthropic");
+        if (apiFormat != null) {
+            LlmProvider adapter = adapterByApiFormat.get(apiFormat);
+            if (adapter != null) {
+                return adapter;
+            }
         }
-
-        // Default: chat_completions → OpenAI-compatible
-        if (openAiCompatible != null) return openAiCompatible;
-
-        log.error("No OpenAI-compatible provider bean available for provider: {}", providerCode);
+        log.error("No LLM adapter registered for provider={} apiFormat={}",
+                providerCode, apiFormat);
         return null;
     }
 
@@ -138,7 +136,7 @@ public class LlmProviderFactory {
         // CAP-04: config-driven provider fallback. When the requested provider has no usable
         // config, try the configured fallback chain so a single mis-provisioned provider is
         // not a hard single point of failure. Default chain is empty → returns null as before.
-        String requested = defaultProviderCode(providerCode);
+        String requested = providerCode;
         for (String fallbackCode : providerFallbackChain()) {
             if (fallbackCode.equalsIgnoreCase(requested)) {
                 continue; // the one that already failed
@@ -257,7 +255,13 @@ public class LlmProviderFactory {
     /** Resolve exactly the requested provider (no fallback). Null when its config is unusable. */
     private ProviderResolution resolveProviderExact(Long tenantId, String providerCode) {
         ProviderConfig config = resolveConfig(tenantId, providerCode);
-        if (config == null || config.getApiKey() == null || config.getApiKey().isBlank()) {
+        if (config == null
+                || config.getApiKey() == null
+                || config.getApiKey().isBlank()
+                || config.getBaseUrl() == null
+                || config.getBaseUrl().isBlank()
+                || config.getDefaultModel() == null
+                || config.getDefaultModel().isBlank()) {
             return null;
         }
 
@@ -268,7 +272,9 @@ public class LlmProviderFactory {
         }
 
         return ProviderResolution.builder()
-                .requestedProviderCode(defaultProviderCode(providerCode))
+                .requestedProviderCode(providerCode != null && !providerCode.isBlank()
+                        ? providerCode
+                        : config.getProviderCode())
                 .effectiveProviderCode(effectiveProviderCode)
                 .config(config)
                 .provider(provider)
@@ -294,11 +300,7 @@ public class LlmProviderFactory {
         if (config != null && config.getProviderCode() != null && !config.getProviderCode().isBlank()) {
             return config.getProviderCode();
         }
-        return defaultProviderCode(requestedProviderCode);
-    }
-
-    private static String defaultProviderCode(String providerCode) {
-        return providerCode != null && !providerCode.isBlank() ? providerCode : "anthropic";
+        return requestedProviderCode;
     }
 
     /**
@@ -369,8 +371,8 @@ public class LlmProviderFactory {
                     return ProviderConfig.builder()
                             .providerCode(providerCode)
                             .apiKey(apiKey)
-                            .baseUrl(getConfigString(config, "baseUrl", "https://api.openai.com"))
-                            .defaultModel(getConfigString(config, "defaultModel", "gpt-4o"))
+                            .baseUrl(getConfigString(config, "baseUrl", null))
+                            .defaultModel(getConfigString(config, "defaultModel", null))
                             .maxTokens(resolveMaxTokens(config))
                             .build();
                 }
@@ -425,11 +427,20 @@ public class LlmProviderFactory {
         if (StubLlmProvider.STUB_API_KEY_SENTINEL.equals(key)) {
             return stubProviderConfig();
         }
+        LlmProvider adapter = providerMap.get("anthropic");
+        String baseUrl = anthropic.getBaseUrl();
+        if ((baseUrl == null || baseUrl.isBlank()) && adapter != null) {
+            baseUrl = adapter.getDefaultBaseUrl();
+        }
+        String model = anthropic.getDefaultModel();
+        if ((model == null || model.isBlank()) && adapter != null) {
+            model = adapter.getDefaultModel();
+        }
         return ProviderConfig.builder()
                 .providerCode("anthropic")
                 .apiKey(key)
-                .baseUrl(anthropic.getBaseUrl())
-                .defaultModel(anthropic.getDefaultModel())
+                .baseUrl(baseUrl)
+                .defaultModel(model)
                 .maxTokens(anthropic.getMaxTokens())
                 .build();
     }
@@ -575,15 +586,6 @@ public class LlmProviderFactory {
             }
         } catch (Exception ignored) {}
 
-        // 2. Name-based fallback heuristics
-        if (modelLower.contains("claude")) return "anthropic";
-        if (modelLower.contains("gpt") || modelLower.startsWith("o1-") || modelLower.startsWith("o3-") || modelLower.startsWith("o4-")) return "openai";
-        if (modelLower.contains("deepseek")) return "deepseek";
-        if (modelLower.contains("minimax") || modelLower.contains("abab")) return "minimaxi";
-        if (modelLower.contains("qwen")) return "qianwen";
-        if (modelLower.contains("glm")) return "zhipu";
-        if (modelLower.contains("moonshot")) return "moonshot";
-
         return null;
     }
 
@@ -595,7 +597,9 @@ public class LlmProviderFactory {
      */
     @SuppressWarnings("unchecked")
     public String getDefaultModel(String providerCode) {
-        if (providerCode == null) return "claude-sonnet-4-6";
+        if (providerCode == null || providerCode.isBlank()) {
+            return null;
+        }
 
         try {
             List<CloudConfig> configs = cloudConfigService.getAllByServiceType("llm");
@@ -608,8 +612,7 @@ public class LlmProviderFactory {
             }
         } catch (Exception ignored) {}
 
-        // Hardcoded fallback for the most common provider
-        return "anthropic".equals(providerCode) ? "claude-sonnet-4-6" : "gpt-4o";
+        return null;
     }
 
     // =========================================================================
@@ -633,8 +636,7 @@ public class LlmProviderFactory {
             }
         } catch (Exception ignored) {}
 
-        // Fallback: anthropic uses messages API, everything else uses chat_completions
-        return "anthropic".equals(providerCode) ? "messages" : "chat_completions";
+        return null;
     }
 
     private String getConfigString(Map<String, Object> config, String key, String fallback) {

@@ -34,8 +34,8 @@
 # Determinism: the loop is a state machine, and a previous run leaves candidates approved and
 # published. Reset first, always — otherwise a second run reviews an empty queue and "passes".
 #
-# Requires DEEPSEEK_API_KEY: distillation is a real LLM call. Without it the run stops rather than
-# quietly proving nothing.
+# Requires the provider-neutral AURA_LIVE_LLM_* profile. Without a complete
+# profile the run stops instead of quietly proving nothing.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,7 +55,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [ -n "$SLOT" ] || { echo "FATAL: --slot N is required (pick a free one: ./dev.sh runtime list)" >&2; exit 2; }
-[ -n "${DEEPSEEK_API_KEY:-}" ] || { echo "FATAL: DEEPSEEK_API_KEY is not set — distillation is a real LLM call" >&2; exit 2; }
+for required_var in AURA_LIVE_LLM_PROVIDER AURA_LIVE_LLM_MODEL AURA_LIVE_LLM_API_KEY_ENV; do
+  [ -n "${!required_var:-}" ] \
+    || { echo "FATAL: $required_var is UNSET — distillation requires a real LLM profile" >&2; exit 2; }
+done
+key_env="$AURA_LIVE_LLM_API_KEY_ENV"
+[[ "$key_env" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] \
+  || { echo "FATAL: AURA_LIVE_LLM_API_KEY_ENV is invalid" >&2; exit 2; }
+[ -n "${!key_env:-}" ] \
+  || { echo "FATAL: configured credential variable $key_env is UNSET" >&2; exit 2; }
 
 log() { printf '\033[36m[faq-golden]\033[0m %s\n' "$*"; }
 STACK="$SCRIPT_DIR/oss-golden-stack.sh"
@@ -172,7 +180,7 @@ rc=0
 # ---- 3. distil, from the browser ---------------------------------------------------------
 # Creates the candidates step 4 reviews, and carries the fabrication gate: pointing the distiller
 # at the chit-chat conversation must yield nothing.
-log "3/6 browser: queue → transcript → distil (live DeepSeek) → nothing from chit-chat"
+log "3/6 browser: queue → transcript → distil (live LLM) → nothing from chit-chat"
 npx playwright test -c playwright.gt5.config.ts \
   tests/e2e/faq-loop-conversation-queue.spec.ts --project=chromium --reporter=line || rc=$?
 

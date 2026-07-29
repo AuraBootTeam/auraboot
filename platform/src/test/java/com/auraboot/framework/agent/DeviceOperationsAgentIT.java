@@ -81,7 +81,7 @@ class DeviceOperationsAgentIT extends BaseIntegrationTest {
                 .name("Device Operations Agent")
                 .description("Diagnose read-first, execute device control with confirmation.")
                 .agentType("reactive")
-                .model("deepseek-chat")
+                .model(null)
                 .systemPrompt("Diagnose first; execute control actions only after explicit user confirmation.")
                 .tools(List.of(
                         "list:iot_alarm_event", "list:iot_device", "nq:pe_andon_open_stats",

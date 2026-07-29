@@ -24,12 +24,12 @@ class D7ContextAssemblerTest {
 
         String budgeted = assembler.buildFusedContext(fused, 1500);
 
-        assertThat(budgeted).contains("[Source: doc0, Chunk 0]");
-        assertThat(budgeted).doesNotContain("[Source: doc2, Chunk 2]");
+        assertThat(budgeted).contains("[Evidence chunk:c0] doc0 / Chunk 0");
+        assertThat(budgeted).doesNotContain("[Evidence chunk:c2] doc2 / Chunk 2");
         assertThat(budgeted).contains("omitted for context budget");
 
         String unbounded = assembler.buildFusedContext(fused, 0);
-        assertThat(unbounded).contains("[Source: doc4, Chunk 4]");
+        assertThat(unbounded).contains("[Evidence chunk:c4] doc4 / Chunk 4");
         assertThat(unbounded).doesNotContain("omitted");
     }
 }

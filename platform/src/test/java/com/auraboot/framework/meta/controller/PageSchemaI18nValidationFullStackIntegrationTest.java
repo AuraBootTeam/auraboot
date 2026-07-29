@@ -75,7 +75,7 @@ class PageSchemaI18nValidationFullStackIntegrationTest extends BaseIntegrationTe
 
     @BeforeEach
     void setup() {
-        grantPermissionToTestRole(PERMISSION_CODE, "page", "page", "manage", "Page Manage");
+        grantCommittedPermissionToTestRole(PERMISSION_CODE, "page", "page", "manage", "Page Manage");
         userPermissionService.evictUserPermissions(getTestUser().getId());
 
         Filter contextFilter = (request, response, chain) -> {

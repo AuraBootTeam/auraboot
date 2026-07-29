@@ -91,9 +91,9 @@ class PageSchemaPublishVersionIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setup() {
-        grantPermissionToTestRole(PERMISSION_CODE, "page", "page", "manage", "Page Manage");
+        grantCommittedPermissionToTestRole(PERMISSION_CODE, "page", "page", "manage", "Page Manage");
         // The compare endpoint is gated by PAGE_SCHEMA_READ (page.page.read).
-        grantPermissionToTestRole("page.page.read", "page", "page", "read", "Page Read");
+        grantCommittedPermissionToTestRole("page.page.read", "page", "page", "read", "Page Read");
         userPermissionService.evictUserPermissions(getTestUser().getId());
 
         Filter contextFilter = (request, response, chain) -> {

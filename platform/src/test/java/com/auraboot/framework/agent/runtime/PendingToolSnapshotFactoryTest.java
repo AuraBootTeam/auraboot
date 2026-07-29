@@ -2,11 +2,17 @@ package com.auraboot.framework.agent.runtime;
 
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
+import com.auraboot.framework.agent.identity.DelegationGrant;
+import com.auraboot.framework.agent.identity.ExecutionPrincipal;
+import com.auraboot.framework.agent.identity.Initiator;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.runtime.context.AgentContextAssembler;
 import com.auraboot.framework.agent.runtime.context.AgentContextBundle;
 import com.auraboot.framework.agent.dto.ChatRequest;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelope;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeFactory;
 import com.auraboot.framework.conversation.TurnContext;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -22,6 +28,86 @@ class PendingToolSnapshotFactoryTest {
 
     private final PendingToolSnapshotFactory factory =
             new PendingToolSnapshotFactory(new AgentRuntimeStateFactory());
+
+    @Test
+    @DisplayName("pins the exact execution principal and context envelope across suspension")
+    void pinsExecutionContextAcrossSuspension() throws Exception {
+        Instant createdAt = Instant.parse("2026-07-29T10:00:00Z");
+        ExecutionPrincipal principal = new ExecutionPrincipal(
+                1L,
+                301L,
+                401L,
+                "USR_AGENT",
+                "agent-user",
+                501L,
+                "EMP_AGENT",
+                Initiator.human(100L, 200L, "group"),
+                DelegationGrant.employeeAutonomous(),
+                "agent-a",
+                "RELEASE_1",
+                "DEPLOYMENT_1",
+                "release-hash-1",
+                "group",
+                ExecutionPrincipal.Type.DIGITAL_EMPLOYEE,
+                Set.of(11L));
+        ContextEnvelope envelope = new ContextEnvelopeFactory().compile(
+                new ContextEnvelopeFactory.CompileRequest(
+                        "turn-pinned",
+                        principal,
+                        "group",
+                        "profile-1",
+                        "session-1",
+                        400L,
+                        "SYNC_ACTION",
+                        Set.of(),
+                        List.of("KB_BOUND"),
+                        Map.of("requiresApproval", true),
+                        "zh-CN",
+                        "Asia/Shanghai",
+                        createdAt));
+        TurnContext ctx = new TurnContext(
+                "turn-pinned",
+                1L,
+                100L,
+                200L,
+                300L,
+                "agent-a",
+                "group",
+                "profile-1",
+                "session-1",
+                400L,
+                500L,
+                com.auraboot.framework.agent.triage.TriageBucket.SYNC_ACTION,
+                Set.of(),
+                "trace-1",
+                "task-1",
+                createdAt,
+                principal,
+                envelope);
+
+        PendingToolSnapshot pending = factory.build(
+                PendingToolSnapshotFactory.Snapshot.builder()
+                        .ctx(ctx)
+                        .agentCode("agent-a")
+                        .toolId("tool-1")
+                        .toolName("cmd_update")
+                        .input(Map.of("pid", "P-1"))
+                        .build());
+
+        assertThat(pending.getExecutionPrincipal()).isEqualTo(principal);
+        assertThat(pending.getContextEnvelope()).isEqualTo(envelope);
+        assertThat(pending.getContextEnvelope().envelopeHash())
+                .isEqualTo(envelope.envelopeHash());
+
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+        PendingToolSnapshot restored = mapper.readValue(
+                mapper.writeValueAsBytes(pending),
+                PendingToolSnapshot.class);
+        assertThat(restored.getExecutionPrincipal()).isEqualTo(principal);
+        assertThat(restored.getContextEnvelope()).isEqualTo(envelope);
+        assertThat(new ContextEnvelopeFactory().verify(
+                restored.getContextEnvelope())).isTrue();
+    }
 
     @Test
     @DisplayName("builds chat pending snapshots with identity, tool snapshot and secret-free runtime state")

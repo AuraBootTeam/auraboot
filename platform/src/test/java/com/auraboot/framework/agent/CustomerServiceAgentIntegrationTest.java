@@ -1,6 +1,9 @@
 package com.auraboot.framework.agent;
 
+import com.auraboot.framework.agent.entity.AgentDefinition;
+import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
 import com.auraboot.framework.agent.service.AgentApprovalGateService;
+import com.auraboot.framework.agent.service.AgentOrganizationService;
 import com.auraboot.framework.agent.service.AgentRunService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -8,6 +11,10 @@ import com.auraboot.framework.crm.event.InboundEmailEvent;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.notification.service.EmailSender;
+import com.auraboot.framework.plugin.dto.imports.ImportExecuteResult;
+import com.auraboot.framework.plugin.dto.imports.ImportPreviewResult;
+import com.auraboot.framework.plugin.dto.imports.ImportRequest;
+import com.auraboot.framework.plugin.service.PluginImportService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
@@ -18,6 +25,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -55,6 +64,15 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private AgentRunService agentRunService;
+
+    @Autowired
+    private AgentOrganizationService agentOrganizationService;
+
+    @Autowired
+    private AgentDefinitionMapper agentDefinitionMapper;
+
+    @Autowired
+    private PluginImportService pluginImportService;
 
     @Autowired
     private AgentApprovalGateService approvalGateService;
@@ -523,6 +541,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
                 Map.of("tenantId", tenantId));
         if (!existing.isEmpty()) {
             log.info("cs_agent definition already exists for tenant {}", tenantId);
+            ensureDigitalEmployee(tenantId);
             return;
         }
 
@@ -533,7 +552,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         agentDef.put("name", "Customer Service Agent");
         agentDef.put("description", "Automated customer service agent for processing inbound emails and logging CRM outreach");
         agentDef.put("agent_type", "reactive");
-        agentDef.put("model", "deepseek-chat");
+        agentDef.put("model", null);
         agentDef.put("system_prompt", buildCsAgentSystemPrompt());
         agentDef.put("tools", "[\"get:crm_account\",\"get:crm_contact\",\"list:crm_activity\",\"get:crm_activity\",\"cmd:crm:create_activity\",\"custom:send_customer_reply\"]");
         agentDef.put("max_tools", 20);
@@ -544,7 +563,93 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         agentDef.put("created_at", LocalDateTime.now());
         agentDef.put("updated_at", LocalDateTime.now());
         dynamicDataMapper.insert("ab_agent_definition", agentDef);
+        ensureDigitalEmployee(tenantId);
         log.info("Created cs_agent definition for tenant {}", tenantId);
+    }
+
+    private void ensureDigitalEmployee(Long tenantId) {
+        AgentDefinition definition =
+                agentDefinitionMapper.findByTenantIdAndAgentCode(tenantId, "cs_agent");
+        if (definition == null || definition.getEmployeeId() != null) {
+            return;
+        }
+        ensureOrganizationModel();
+        List<Map<String, Object>> departments = dynamicDataMapper.selectByQuery(
+                "SELECT pid FROM mt_org_department "
+                        + "WHERE tenant_id = #{params.tenantId} "
+                        + "AND deleted_flag = FALSE ORDER BY id LIMIT 1",
+                Map.of("tenantId", tenantId));
+        String departmentPid;
+        if (departments.isEmpty()) {
+            departmentPid = UniqueIdGenerator.generate();
+            dynamicDataMapper.insert(
+                    "mt_org_department",
+                    Map.of(
+                            "pid", departmentPid,
+                            "tenant_id", tenantId,
+                            "org_dept_name", "Customer Service",
+                            "org_dept_code", "cs-test",
+                            "org_dept_status", "active",
+                            "deleted_flag", false));
+        } else {
+            departmentPid = String.valueOf(departments.get(0).get("pid"));
+        }
+        List<Map<String, Object>> positions = dynamicDataMapper.selectByQuery(
+                "SELECT pid FROM mt_org_position "
+                        + "WHERE tenant_id = #{params.tenantId} "
+                        + "AND org_pos_dept_id = #{params.departmentPid} "
+                        + "ORDER BY id LIMIT 1",
+                Map.of("tenantId", tenantId, "departmentPid", departmentPid));
+        String positionPid;
+        if (positions.isEmpty()) {
+            positionPid = UniqueIdGenerator.generate();
+            dynamicDataMapper.insert(
+                    "mt_org_position",
+                    Map.of(
+                            "pid", positionPid,
+                            "tenant_id", tenantId,
+                            "org_pos_name", "Customer Service Specialist",
+                            "org_pos_code", "cs-specialist",
+                            "org_pos_dept_id", departmentPid,
+                            "org_pos_level", "staff",
+                            "org_pos_status", "active"));
+        } else {
+            positionPid = String.valueOf(positions.get(0).get("pid"));
+        }
+        agentOrganizationService.enrollAsEmployee(
+                definition.getId(),
+                departmentPid,
+                positionPid);
+    }
+
+    private void ensureOrganizationModel() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_meta_model "
+                        + "WHERE tenant_id = ? AND code = 'org_employee' "
+                        + "AND is_current = TRUE AND deleted_flag = FALSE",
+                Integer.class,
+                getTestTenant().getId());
+        if (count != null && count > 0) {
+            return;
+        }
+
+        Path pluginDir = Path.of("plugins", "org-management").toAbsolutePath().normalize();
+        if (!Files.isDirectory(pluginDir)) {
+            pluginDir = Path.of("..", "plugins", "org-management").toAbsolutePath().normalize();
+        }
+        assertThat(Files.isDirectory(pluginDir))
+                .as("org-management plugin directory")
+                .isTrue();
+
+        ImportPreviewResult preview = pluginImportService.parseDirectory(pluginDir.toString());
+        assertThat(preview.isValid())
+                .as("org-management import preview: %s", preview.getErrors())
+                .isTrue();
+        ImportExecuteResult result =
+                pluginImportService.execute(preview.getImportId(), new ImportRequest());
+        assertThat(result.isSuccess())
+                .as("org-management import result: %s", result.getErrorMessage())
+                .isTrue();
     }
 
     /**
@@ -564,7 +669,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         agentDef.put("name", "CS Agent Timeout Test");
         agentDef.put("description", "Agent with very short timeout for testing graceful failure");
         agentDef.put("agent_type", "reactive");
-        agentDef.put("model", "deepseek-chat");
+        agentDef.put("model", null);
         agentDef.put("system_prompt", "You are a test agent. Analyze the request thoroughly.");
         agentDef.put("tools", "[\"list:crm_activity\"]");
         agentDef.put("max_tools", 5);

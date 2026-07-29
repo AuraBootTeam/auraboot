@@ -30,6 +30,8 @@ public class ThinkingCapturingResponseSink implements ResponseSink {
 
     private final ResponseSink delegate;
     private final List<String> contents = new ArrayList<>();
+    private final List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence>
+            retrievalEvidence = new ArrayList<>();
     private String lastSignature;
 
     public ThinkingCapturingResponseSink(ResponseSink delegate) {
@@ -51,6 +53,11 @@ public class ThinkingCapturingResponseSink implements ResponseSink {
     /** @return signature from the last thinking block, or null when absent. */
     public String capturedSignature() {
         return lastSignature;
+    }
+
+    public List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence>
+            capturedRetrievalEvidence() {
+        return List.copyOf(retrievalEvidence);
     }
 
     /** @return the wrapped sink, e.g. the SSE adapter. */
@@ -107,6 +114,16 @@ public class ThinkingCapturingResponseSink implements ResponseSink {
     @Override
     public void onResultContract(ResultContract contract) {
         delegate.onResultContract(contract);
+    }
+
+    @Override
+    public void onRetrievalEvidence(
+            List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence> evidence) {
+        if (evidence != null) {
+            retrievalEvidence.clear();
+            retrievalEvidence.addAll(evidence);
+        }
+        delegate.onRetrievalEvidence(evidence);
     }
 
     @Override

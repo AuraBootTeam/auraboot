@@ -5,6 +5,7 @@ import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.dto.LlmChunk;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.provider.ModelCapabilityProfile;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.event.AutomationLlmChunkEvent;
@@ -32,8 +33,8 @@ import java.util.regex.Pattern;
  * under {@code context.<outputVariableName>} (default {@code llmOutput}) so
  * downstream automation steps can consume it.
  *
- * <p>Capability gating: when {@code thinkingEnabled=true} but the chosen model
- * does not support Anthropic Extended Thinking, this executor throws a
+ * <p>Capability gating: when a requested capability is unavailable on the
+ * resolved model profile, this executor throws a
  * {@link BusinessException} (no silent drop). Aligns with the no-fallback red
  * line — we never quietly ignore a configured capability.
  *
@@ -83,30 +84,6 @@ public class LlmCallExecutor implements ActionExecutor {
     private static final Pattern DATA_URI_PATTERN = Pattern.compile(
             "^data:(image/(?:png|jpeg|gif|webp));base64,(.+)$");
 
-    /**
-     * Provider codes that accept vision input. All other providers will be
-     * rejected at executor level with an explicit error so workflow authors
-     * see "this provider does not support vision" rather than a generic
-     * provider-side HTTP 400 / IllegalArgumentException downstream.
-     *
-     * <p>Anthropic supports vision on Claude 3.5+/4.x/5.x. The OpenAI-compat
-     * fall-through path used by DeepSeek/Qwen/Zhipu/etc. explicitly rejects
-     * image content (see {@code OpenAiCompatibleLlmProvider#chat}), so we
-     * pre-filter here to give a workflow-level error message.
-     */
-    private static final Set<String> VISION_CAPABLE_PROVIDERS = Set.of("anthropic");
-
-    /**
-     * Anthropic models that accept the {@code thinking} request field. Mirrors
-     * {@code AnthropicLlmProvider.THINKING_CAPABLE_PATTERNS} but is duplicated
-     * here so we can capability-gate <i>before</i> dispatching to the provider
-     * (the provider silently drops thinking on legacy models, which is the
-     * wrong contract for an explicitly-toggled workflow node — users want a
-     * clear error rather than a silent no-op).
-     */
-    private static final List<String> THINKING_CAPABLE_MODEL_PATTERNS = List.of(
-            "sonnet-4-6", "sonnet-4-7", "opus-4", "haiku-4");
-
     private final LlmProviderFactory llmProviderFactory;
 
     /**
@@ -143,18 +120,6 @@ public class LlmCallExecutor implements ActionExecutor {
         boolean thinkingEnabled = boolOr(config, "thinkingEnabled", false);
         int thinkingBudget = intOr(config, "thinkingBudgetTokens", DEFAULT_THINKING_BUDGET_TOKENS);
         String outputVariable = stringOr(config, "outputVariableName", DEFAULT_OUTPUT_VARIABLE);
-
-        // Capability gate — fail loudly if user opted in to thinking on a model
-        // that cannot honour it. Matches the "no silent fallback" rule from
-        // P0-2 / Vision: a configured capability that the runtime ignores is a
-        // bug surface, not a feature.
-        if (thinkingEnabled && !modelSupportsThinking(model)) {
-            throw new BusinessException(String.format(
-                    "LLM_CALL: model '%s' does not support Extended Thinking. "
-                            + "Disable thinkingEnabled or pick a thinking-capable model "
-                            + "(claude-sonnet-4-6, claude-opus-4, claude-haiku-4).",
-                    model == null ? "<unset>" : model));
-        }
 
         // Interpolate ${var} placeholders against the workflow context. Same
         // simple substitution other action executors use (CallApiExecutor,
@@ -193,19 +158,32 @@ public class LlmCallExecutor implements ActionExecutor {
 
         String resolvedModel = (model != null && !model.isBlank())
                 ? model : providerConfig.getDefaultModel();
+        String effectiveProviderCode =
+                LlmProviderFactory.effectiveProviderCode(providerCode, providerConfig);
+        LlmProvider provider = llmProviderFactory.getProvider(effectiveProviderCode);
+        if (provider == null) {
+            throw new BusinessException("LLM_CALL: provider implementation not found for code "
+                    + effectiveProviderCode);
+        }
+        ModelCapabilityProfile capabilities =
+                provider.modelCapabilities(resolvedModel);
 
-        // E.2 — Vision provider gate. If image vars are configured, refuse
-        // outright on non-vision providers so the workflow author sees a
-        // clear "Provider X does not support vision" message at the executor
-        // boundary, instead of a confusing IllegalArgumentException raised
-        // deep inside OpenAiCompatibleLlmProvider#chat. Matches the explicit-
-        // refusal pattern used in B.1 (no silent drop of capabilities).
+        if (thinkingEnabled
+                && (capabilities == null || !capabilities.thinking())) {
+            throw new BusinessException(String.format(
+                    "LLM_CALL: model '%s' does not satisfy capability=thinking. "
+                            + "Disable thinkingEnabled or select a capable model.",
+                    resolvedModel == null ? "<unset>" : resolvedModel));
+        }
+
+        // E.2 — Vision capability gate. A configured capability must never be
+        // silently stripped from the request.
         if (!imageVariableNames.isEmpty()
-                && !VISION_CAPABLE_PROVIDERS.contains(providerConfig.getProviderCode())) {
+                && (capabilities == null || !capabilities.vision())) {
             throw new IllegalArgumentException(
-                    "Provider " + providerConfig.getProviderCode()
-                            + " does not support vision. Configure an Anthropic-backed "
-                            + "model (Claude 3.5+ / 4.x) or remove imageVariableNames.");
+                    "Model " + resolvedModel
+                            + " does not satisfy capability=vision. "
+                            + "Select a capable model or remove imageVariableNames.");
         }
 
         // Build the user-message content. With no image vars we keep the
@@ -237,13 +215,6 @@ public class LlmCallExecutor implements ActionExecutor {
                                 .build()
                         : null)
                 .build();
-
-        String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(providerCode, providerConfig);
-        LlmProvider provider = llmProviderFactory.getProvider(effectiveProviderCode);
-        if (provider == null) {
-            throw new BusinessException("LLM_CALL: provider implementation not found for code "
-                    + effectiveProviderCode);
-        }
 
         LlmChatResponse response;
         try {
@@ -292,20 +263,6 @@ public class LlmCallExecutor implements ActionExecutor {
     @Override
     public boolean supports(String actionType) {
         return ACTION_TYPE.equals(actionType);
-    }
-
-    /**
-     * Capability gate identical in spirit to
-     * {@code AnthropicLlmProvider.supportsThinking}, kept here so we can fail
-     * fast at action validation time rather than relying on the provider's
-     * silent-drop behaviour.
-     */
-    private boolean modelSupportsThinking(String model) {
-        if (model == null || model.isBlank()) return false;
-        for (String pattern : THINKING_CAPABLE_MODEL_PATTERNS) {
-            if (model.contains(pattern)) return true;
-        }
-        return false;
     }
 
     /**

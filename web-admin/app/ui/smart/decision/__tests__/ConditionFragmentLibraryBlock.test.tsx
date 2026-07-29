@@ -209,10 +209,9 @@ describe('ConditionFragmentLibraryBlock', () => {
       'href',
       '/p/bpm_process_management/edit/bpm-process-pid',
     );
-    expect(screen.getByTestId('cfl-impact-link-PERMISSION_POLICY-role-permission-pid')).toHaveAttribute(
-      'href',
-      '/enterprise/permissions',
-    );
+    expect(
+      screen.getByTestId('cfl-impact-link-PERMISSION_POLICY-role-permission-pid'),
+    ).toHaveAttribute('href', '/enterprise/permissions');
     expect(screen.getByTestId('condition-fragment-library')).toHaveTextContent('当前记录.SLA 节点');
     expect(screen.getByTestId('condition-fragment-library')).not.toHaveTextContent(
       'record.data.targetKey',
@@ -242,19 +241,19 @@ describe('ConditionFragmentLibraryBlock', () => {
     fireEvent.click(screen.getByTestId('cfl-open-create'));
     expect(screen.getByTestId('condition-builder')).toBeInTheDocument();
     expect(screen.queryByLabelText('fragment-condition-spec')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('fragment-code'), {
+    fireEvent.change(screen.getByTestId('fragment-code'), {
       target: { value: 'approval_high_amount' },
     });
-    fireEvent.change(screen.getByLabelText('fragment-name'), {
+    fireEvent.change(screen.getByTestId('fragment-name'), {
       target: { value: '高金额审批条件' },
     });
-    fireEvent.change(screen.getByLabelText('fragment-scope-type'), {
+    fireEvent.change(screen.getByTestId('fragment-scope-type'), {
       target: { value: 'BPM' },
     });
     await waitFor(() =>
       expect(get).toHaveBeenCalledWith('/decision/definitions', { page: 1, size: 200 }),
     );
-    fireEvent.change(screen.getByLabelText('fragment-decision-binding-select'), {
+    fireEvent.change(screen.getByTestId('fragment-decision-binding-select'), {
       target: { value: 'approval_routing' },
     });
     fireEvent.click(screen.getByTestId('cfl-add-decision-binding'));
@@ -323,7 +322,7 @@ describe('ConditionFragmentLibraryBlock', () => {
       expect(get).toHaveBeenCalledWith('/decision/definitions', { page: 1, size: 200 }),
     );
 
-    fireEvent.change(screen.getByLabelText('fragment-decision-binding-select'), {
+    fireEvent.change(screen.getByTestId('fragment-decision-binding-select'), {
       target: { value: 'dynamic_sla_deadline' },
     });
     fireEvent.click(screen.getByTestId('cfl-add-decision-binding'));
@@ -339,9 +338,7 @@ describe('ConditionFragmentLibraryBlock', () => {
   it('loads ConditionBuilder fields from the unified fact catalog before the legacy model field endpoint', async () => {
     render(<ConditionFragmentLibraryBlock />);
 
-    await waitFor(() =>
-      expect(get).toHaveBeenCalledWith('/decision/facts/catalog', undefined),
-    );
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/decision/facts/catalog', undefined));
     expect(get).not.toHaveBeenCalledWith('/decision/model/fields', undefined);
 
     fireEvent.click(await screen.findByTestId('cfl-open-create'));
@@ -429,9 +426,7 @@ describe('ConditionFragmentLibraryBlock', () => {
         undefined,
       ),
     );
-    await waitFor(() =>
-      expect(screen.getByTestId('cfl-publish-selected')).not.toBeDisabled(),
-    );
+    await waitFor(() => expect(screen.getByTestId('cfl-publish-selected')).not.toBeDisabled());
     expect(screen.getByTestId('cfl-message')).toHaveTextContent('已校验');
     expect(screen.queryByTestId('cfl-error')).not.toBeInTheDocument();
   });
@@ -516,9 +511,7 @@ describe('ConditionFragmentLibraryBlock', () => {
         { impactAcknowledged: true },
       ),
     );
-    await waitFor(() =>
-      expect(screen.getByTestId('cfl-versions')).toHaveTextContent('v2已发布'),
-    );
+    await waitFor(() => expect(screen.getByTestId('cfl-versions')).toHaveTextContent('v2已发布'));
     expect(screen.queryByTestId('cfl-impact-ack')).not.toBeInTheDocument();
     expect(screen.getByTestId('cfl-publish-selected')).toBeDisabled();
   });

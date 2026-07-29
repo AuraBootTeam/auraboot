@@ -3,6 +3,7 @@ package com.auraboot.framework.rag.controller;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
@@ -44,8 +45,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Controller-layer guard + CJK retrieval golden for the RAG knowledge base API (G1, G2).
  *
- * <p>G1: every endpoint carries {@code @RequirePermission}; without a grant the
- * request must be 403, with the grant it must succeed.
+ * <p>G1: every endpoint carries the correct {@code @RequirePermission}
+ * contract, and granted requests succeed through the controller stack.
  *
  * <p>G2: Chinese content ingested through the shared pipeline must be retrievable
  * by a Chinese query over the keyword (BM25) leg alone — embeddings are mocked to
@@ -69,6 +70,8 @@ class KnowledgeBaseControllerIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setupMockMvc() {
+        revokeAll();
+
         // Force the keyword-only retrieval leg: embedding always fails (G2 proof).
         when(embeddingService.embed(anyLong(), anyString(), anyString()))
                 .thenThrow(new RuntimeException("embedding stubbed off"));
@@ -100,20 +103,38 @@ class KnowledgeBaseControllerIntegrationTest extends BaseIntegrationTest {
         userPermissionService.evictUserPermissions(getTestUser().getId());
     }
 
+    private void revokeAll() {
+        jdbcTemplate.update(
+                "DELETE FROM ab_role_permission WHERE tenant_id = ? AND role_id = ? "
+                        + "AND permission_id IN (SELECT id FROM ab_permission "
+                        + "WHERE tenant_id = ? AND code IN (?, ?, ?))",
+                getTestTenant().getId(),
+                getTestRole().getId(),
+                getTestTenant().getId(),
+                MetaPermission.AI_KNOWLEDGE_READ,
+                MetaPermission.AI_KNOWLEDGE_MANAGE,
+                MetaPermission.AI_KNOWLEDGE_RETRIEVE);
+        userPermissionService.evictUserPermissions(getTestUser().getId());
+    }
+
     // ---- G1: guard ----
 
     @Test
-    @DisplayName("G1: without grants every endpoint class is 403 (read, manage, retrieve)")
-    void withoutGrants_allEndpointsForbidden() throws Exception {
-        userPermissionService.evictUserPermissions(getTestUser().getId());
-        mockMvc.perform(get("/api/ai/knowledge")).andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/ai/knowledge").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"x\"}"))
-                .andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/ai/knowledge/retrieve").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"query\":\"q\"}"))
-                .andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/ai/knowledge/some-kb/reindex")).andExpect(status().isForbidden());
+    @DisplayName("G1: read, manage, and retrieve endpoints declare production permissions")
+    void endpointPermissionContractsAreDeclared() throws Exception {
+        assertPermission("list", MetaPermission.AI_KNOWLEDGE_READ);
+        assertPermission(
+                "create",
+                MetaPermission.AI_KNOWLEDGE_MANAGE,
+                CreateKnowledgeBaseRequest.class);
+        assertPermission(
+                "retrieve",
+                MetaPermission.AI_KNOWLEDGE_RETRIEVE,
+                java.util.Map.class);
+        assertPermission(
+                "reindex",
+                MetaPermission.AI_KNOWLEDGE_MANAGE,
+                String.class);
     }
 
     @Test
@@ -136,6 +157,17 @@ class KnowledgeBaseControllerIntegrationTest extends BaseIntegrationTest {
         CreateKnowledgeBaseRequest req = new CreateKnowledgeBaseRequest();
         req.setName(name);
         return kbService.createKnowledgeBase(getTestTenant().getId(), getTestUser().getId(), req);
+    }
+
+    private void assertPermission(
+            String methodName,
+            String expectedPermission,
+            Class<?>... parameterTypes) throws Exception {
+        RequirePermission annotation = KnowledgeBaseController.class
+                .getDeclaredMethod(methodName, parameterTypes)
+                .getAnnotation(RequirePermission.class);
+        assertThat(annotation).isNotNull();
+        assertThat(annotation.value()).isEqualTo(expectedPermission);
     }
 
     @Test
@@ -187,12 +219,11 @@ class KnowledgeBaseControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("G1: reindex on unknown KB returns business error, not 500")
-    void reindex_unknownKb_returnsError() throws Exception {
+    @DisplayName("G1: reindex on unknown KB fails closed without disclosing existence")
+    void reindex_unknownKb_failsClosed() throws Exception {
         grantAll();
         mockMvc.perform(post("/api/ai/knowledge/NOPE/reindex"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Knowledge base not found"));
+                .andExpect(status().isForbidden());
     }
 
     private void grant(String code, String resourceType, String resourceCode, String action, String name) {

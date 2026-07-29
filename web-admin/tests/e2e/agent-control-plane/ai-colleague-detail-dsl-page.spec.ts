@@ -173,6 +173,25 @@ test.describe('AI colleague detail — explicit knowledge binding', () => {
       path: `${SCREENSHOT_DIR}/knowledge-binding-reloaded.png`,
     });
 
+    // Saving changes only the mutable draft. Runtime turns are deliberately
+    // pinned to an immutable deployed release, so publish the knowledge
+    // binding before expecting a new conversation to see it.
+    await page.locator('[data-testid="tab-releases"]').click();
+    await expect(page.locator('[data-testid="agent-release-draft-state"]')).toContainText(
+      /Unpublished changes|存在未发布变更|草稿变更尚未发布/,
+    );
+    await page.locator('[data-testid="publish-agent-release"]').click();
+    const publishResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/api/agent/definitions/${agentPid}/publish`) &&
+        response.request().method() === 'POST',
+    );
+    await page.locator('[data-testid="confirm-publish-agent-release"]').click();
+    expect((await publishResponse).status()).toBe(200);
+    await expect(page.locator('[data-testid="agent-release-2"]')).toContainText(
+      /Deployed|已部署|当前部署/,
+    );
+
     await page.locator('[data-testid="back-to-colleagues"]').click();
     await expect(page.locator('[data-testid="agent-colleagues-grid"]')).toBeVisible({
       timeout: 20_000,

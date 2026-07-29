@@ -77,12 +77,15 @@ public class KbTextIngestService {
         if (kbPid == null || kbPid.isBlank() || text == null || text.isBlank()) {
             return null;
         }
-        KnowledgeBase kb = kbService.findKbByPid(kbPid);
-        if (kb == null) {
+        KnowledgeBase kb = kbService.findKb(tenantId, kbPid);
+        if (kb == null || !"active".equals(kb.getStatus())) {
             log.warn("[kb-ingest] unknown kb {} — skip ingest source={}:{}", kbPid, sourceType, sourceId);
             return null;
         }
-        String provider = kb.getEmbeddingProvider() != null ? kb.getEmbeddingProvider() : "openai";
+        String provider = kb.getEmbeddingProvider();
+        if (provider == null || provider.isBlank()) {
+            throw new IllegalStateException("Knowledge base embedding profile is unavailable");
+        }
         String hash = sha256(text);
         String resolvedName = (docName != null && !docName.isBlank())
                 ? docName : sourceType + ":" + sourceId;
@@ -92,30 +95,51 @@ public class KbTextIngestService {
         String dbSourceType = DB_SOURCE_TYPES.contains(sourceType) ? sourceType : "internal_doc";
 
         return tx.execute(status -> {
-            // Idempotent: drop this source's prior document + chunks before re-inserting.
-            deleteBySource(dbSourceType, sourceId);
-
-            String docPid = UniqueIdGenerator.generate();
-            KbDocument doc = KbDocument.builder()
-                    .pid(docPid).tenantId(tenantId).kbId(kbPid)
-                    .docName(resolvedName).docType("html")
-                    .fileSize((long) text.length()).charCount(text.length())
-                    .sourceType(dbSourceType).sourceEntityId(sourceId)
-                    .contentHash(hash).status("processing")
-                    .build();
-            docMapper.insert(doc);
+            List<KbDocument> existing =
+                    findBySource(tenantId, kbPid, dbSourceType, sourceId);
+            KbDocument doc;
+            if (existing.isEmpty()) {
+                doc = KbDocument.builder()
+                        .pid(UniqueIdGenerator.generate()).tenantId(tenantId).kbId(kbPid)
+                        .docName(resolvedName).docType("html")
+                        .fileSize((long) text.length()).charCount(text.length())
+                        .sourceType(dbSourceType).sourceEntityId(sourceId)
+                        .contentHash(hash).status("processing")
+                        .build();
+                docMapper.insert(doc);
+            } else {
+                if (hash.equals(existing.get(0).getContentHash())
+                        && "completed".equals(existing.get(0).getStatus())) {
+                    return existing.get(0).getPid();
+                }
+                // Reuse the logical document. The ingest pipeline creates a
+                // new immutable DocumentVersion and atomically switches
+                // active_version_pid only after its chunks are ready.
+                doc = existing.get(0);
+                jdbcTemplate.update(
+                        "UPDATE ab_kb_document SET doc_name = ?, doc_type = 'html', "
+                                + "file_size = ?, char_count = ?, content_hash = ?, "
+                                + "status = 'processing', error_message = NULL, "
+                                + "process_started_at = NOW(), process_completed_at = NULL "
+                                + "WHERE tenant_id = ? AND kb_id = ? AND pid = ?",
+                        resolvedName, text.length(), text.length(), hash,
+                        tenantId, kbPid, doc.getPid());
+            }
+            String docPid = doc.getPid();
 
             KbChunkIngestPipeline.IngestOutcome outcome = ingestPipeline.ingestChunks(
                     tenantId, kbPid, docPid, text,
                     kb.getChunkSize(), kb.getChunkOverlap(), provider, null);
             if (outcome.chunkCount() == 0) {
-                kbService.updateDocumentAfterProcessing(docPid, "failed", 0, 0, "No chunks");
+                kbService.updateDocumentAfterProcessing(
+                        tenantId, kbPid, docPid, "failed", 0, 0, "No chunks");
                 return docPid;
             }
 
-            kbService.updateDocumentAfterProcessing(docPid, "completed", text.length(),
+            kbService.updateDocumentAfterProcessing(
+                    tenantId, kbPid, docPid, "completed", text.length(),
                     outcome.chunkCount(), null);
-            kbService.refreshKbCounters(kbPid);
+            kbService.refreshKbCounters(tenantId, kbPid);
             log.info("[kb-ingest] ingested {}:{} -> kb {} ({} chunks, {} embedded)",
                     sourceType, sourceId, kbPid, outcome.chunkCount(), outcome.embeddedCount());
             return docPid;
@@ -140,9 +164,9 @@ public class KbTextIngestService {
         }
         String dbSourceType = DB_SOURCE_TYPES.contains(sourceType) ? sourceType : "internal_doc";
         Boolean removed = tx.execute(status -> {
-            int n = deleteBySource(dbSourceType, sourceId);
+            int n = deleteBySource(tenantId, kbPid, dbSourceType, sourceId);
             if (n > 0 && kbPid != null && !kbPid.isBlank()) {
-                kbService.refreshKbCounters(kbPid);
+                kbService.refreshKbCounters(tenantId, kbPid);
             }
             return n > 0;
         });
@@ -154,15 +178,28 @@ public class KbTextIngestService {
      * idempotent re-ingest path and by {@link #remove}, so both drop exactly the same set — an
      * unpublish can never leave behind a chunk a re-publish would have overwritten.
      */
-    private int deleteBySource(String dbSourceType, String sourceId) {
-        List<KbDocument> existing = docMapper.selectList(new LambdaQueryWrapper<KbDocument>()
-                .eq(KbDocument::getSourceType, dbSourceType)
-                .eq(KbDocument::getSourceEntityId, sourceId));
+    private int deleteBySource(long tenantId, String kbPid, String dbSourceType, String sourceId) {
+        List<KbDocument> existing =
+                findBySource(tenantId, kbPid, dbSourceType, sourceId);
         for (KbDocument d : existing) {
-            jdbcTemplate.update("DELETE FROM ab_kb_chunk WHERE doc_id = ?", d.getPid());
+            jdbcTemplate.update(
+                    "DELETE FROM ab_kb_chunk WHERE tenant_id = ? AND kb_id = ? AND doc_id = ?",
+                    tenantId, kbPid, d.getPid());
             docMapper.deleteById(d.getId());
         }
         return existing.size();
+    }
+
+    private List<KbDocument> findBySource(
+            long tenantId,
+            String kbPid,
+            String dbSourceType,
+            String sourceId) {
+        return docMapper.selectList(new LambdaQueryWrapper<KbDocument>()
+                .eq(KbDocument::getTenantId, tenantId)
+                .eq(KbDocument::getKbId, kbPid)
+                .eq(KbDocument::getSourceType, dbSourceType)
+                .eq(KbDocument::getSourceEntityId, sourceId));
     }
 
     private static String sha256(String s) {

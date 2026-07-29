@@ -33,6 +33,8 @@ public class KbDocumentDTO {
      * chunkCount, is exactly that state.
      */
     private Integer embeddedChunkCount;
+    private String activeVersionPid;
+    private Integer versionNo;
     private String sourceType;
     private String status;
     private String errorMessage;

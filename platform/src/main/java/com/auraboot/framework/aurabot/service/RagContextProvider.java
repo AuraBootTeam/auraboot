@@ -21,6 +21,33 @@ public interface RagContextProvider {
     }
 
     /**
+     * Structured, model-independent provenance for one retrieved chunk.
+     * The UI and audit trail consume this record directly; they must not parse
+     * citation-looking prose from the model response.
+     */
+    record RetrievalEvidence(String evidenceId,
+                             String query,
+                             String kbPid,
+                             String kbName,
+                             String indexReleasePid,
+                             String documentPid,
+                             String documentVersionPid,
+                             String documentName,
+                             String chunkPid,
+                             int chunkIndex,
+                             String path,
+                             double vectorScore,
+                             double lexicalScore,
+                             double fusedScore,
+                             double rerankScore,
+                             String citationLocator,
+                             List<String> warnings) {
+        public RetrievalEvidence {
+            warnings = warnings == null ? List.of() : List.copyOf(warnings);
+        }
+    }
+
+    /**
      * Diagnostics for the retrieval that actually served a turn.
      *
      * <p>{@code path=keyword} is not a weaker generation result. It means the vector
@@ -39,9 +66,16 @@ public interface RagContextProvider {
     }
 
     /** Rendered prompt context plus the retrieval evidence used to build it. */
-    record RetrievedContext(String context, RetrievalDiagnostics diagnostics) {
+    record RetrievedContext(String context,
+                            RetrievalDiagnostics diagnostics,
+                            List<RetrievalEvidence> evidence) {
         public RetrievedContext {
             context = context == null ? "" : context;
+            evidence = evidence == null ? List.of() : List.copyOf(evidence);
+        }
+
+        public RetrievedContext(String context, RetrievalDiagnostics diagnostics) {
+            this(context, diagnostics, List.of());
         }
     }
 

@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.service.ActiveMemoryService;
 import com.auraboot.framework.agent.service.AgentMemoryService;
 import com.auraboot.framework.agent.service.AgentRunService;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +45,19 @@ class AgentRunShadowAnnotationIntegrationTest extends BaseIntegrationTest {
         long base = System.nanoTime() % 1_000_000;
         tenantId = 9_800_000L + base;
         MetaContext.setContext(tenantId, testUser.getId(), testUser.getPid(), testUser.getUserName());
+        jdbc.update(
+                """
+                INSERT INTO ab_agent_definition (
+                    pid, tenant_id, agent_code, name, model, system_prompt,
+                    status, visibility, created_by, updated_by, deleted_flag)
+                VALUES (?, ?, ?, 'Memory annotation test agent', 'qwen-plus',
+                        'Test prompt', 'active', 'tenant', ?, ?, FALSE)
+                """,
+                UniqueIdGenerator.generate(),
+                tenantId,
+                agent,
+                testUser.getId(),
+                testUser.getId());
     }
 
     @AfterEach

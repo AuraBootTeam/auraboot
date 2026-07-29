@@ -25,8 +25,8 @@ public class AgentProperties {
     @Data
     public static class Anthropic {
         private String apiKey;
-        private String baseUrl = "https://api.anthropic.com";
-        private String defaultModel = "claude-sonnet-4-6";
+        private String baseUrl;
+        private String defaultModel;
         private int maxTokens = 4096;
     }
 

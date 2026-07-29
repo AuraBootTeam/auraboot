@@ -2311,7 +2311,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         target.setDescription(dto.getDescription());
         target.setAvatarUrl(dto.getAvatarUrl());
         target.setAgentType(defaultString(dto.getAgentType(), "reactive"));
-        target.setModel(defaultString(dto.getModel(), "claude-sonnet-4-6"));
+        target.setModel(dto.getModel());
         target.setSystemPrompt(dto.getSystemPrompt());
         target.setTools(toJsonText(dto.getTools()));
         target.setSkills(toJsonText(dto.getSkills()));
@@ -2347,7 +2347,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         state.put("name", dto.getEffectiveName());
         state.put("description", dto.getDescription());
         state.put("agentType", defaultString(dto.getAgentType(), "reactive"));
-        state.put("model", defaultString(dto.getModel(), "claude-sonnet-4-6"));
+        state.put("model", dto.getModel());
         state.put("systemPrompt", dto.getSystemPrompt());
         state.put("tools", dto.getTools());
         state.put("skills", dto.getSkills());

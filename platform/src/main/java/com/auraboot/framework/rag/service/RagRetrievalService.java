@@ -1,7 +1,5 @@
 package com.auraboot.framework.rag.service;
 
-import com.auraboot.framework.common.constant.ResponseCode;
-import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.rag.config.RagRetrievalProperties;
 import com.auraboot.framework.rag.dto.RetrievalOutcome;
 import com.auraboot.framework.rag.dto.RetrievalResult;
@@ -33,6 +31,7 @@ public class RagRetrievalService {
     private final JdbcTemplate jdbcTemplate;
     private final RagRetrievalMetrics metrics;
     private final RagRetrievalProperties retrievalProperties;
+    private final KnowledgeBaseAccessPolicy accessPolicy;
 
     private static final int DEFAULT_TOP_K = 5;
     private static final double DEFAULT_THRESHOLD = 0.8;
@@ -87,14 +86,14 @@ public class RagRetrievalService {
         // fails the cosine `<=>` operator on dimension mismatch. Previous
         // behavior was zero results or confusing SQL error. Per deep-review
         // P3-1: drop incompatible KBs + log.
-        KnowledgeBase firstKb = kbService.findKbByPid(targetKbs.get(0));
+        KnowledgeBase firstKb = kbService.findKb(tenantId, targetKbs.get(0));
         if (firstKb == null) return new RetrievalOutcome(List.of(), warnings, "none");
         if (targetKbs.size() > 1) {
             String firstProvider = firstKb.getEmbeddingProvider();
             List<String> compatibleKbs = new ArrayList<>();
             List<String> incompatibleKbs = new ArrayList<>();
             for (String pid : targetKbs) {
-                KnowledgeBase kb = kbService.findKbByPid(pid);
+                KnowledgeBase kb = kbService.findKb(tenantId, pid);
                 if (kb == null) continue;
                 if (java.util.Objects.equals(kb.getEmbeddingProvider(), firstProvider)) {
                     compatibleKbs.add(pid);
@@ -136,10 +135,12 @@ public class RagRetrievalService {
         String path;
         if (queryEmbedding != null) {
             path = "hybrid";
-            results = rerankedResults(hybridSearch(queryEmbedding, searchQuery, targetKbs, k, dist), query, k);
+            results = rerankedResults(
+                    hybridSearch(tenantId, queryEmbedding, searchQuery, targetKbs, k, dist),
+                    query, k);
         } else {
             path = "keyword";
-            results = rerankedResults(keywordSearch(searchQuery, targetKbs, k), query, k);
+            results = rerankedResults(keywordSearch(tenantId, searchQuery, targetKbs, k), query, k);
         }
         // G10: drop results below the relevance floor so off-topic queries return empty.
         results = applyRejectionFloor(results, query);
@@ -150,22 +151,27 @@ public class RagRetrievalService {
     /**
      * Hybrid search combining vector distance and BM25 keyword scoring.
      */
-    private List<RetrievalResult> hybridSearch(float[] queryEmbedding, String query,
+    private List<RetrievalResult> hybridSearch(Long tenantId, float[] queryEmbedding, String query,
                                                  List<String> targetKbs, int topK, double threshold) {
         String vectorStr = VectorUtils.toVectorString(queryEmbedding);
         String tsQuery = buildTsQuery(query);
         String placeholders = String.join(",", Collections.nCopies(targetKbs.size(), "?"));
 
         String sql = "WITH candidates AS ("
-                + "SELECT c.pid AS chunk_pid, c.chunk_index, c.content, d.doc_name, kb.name AS kb_name, "
+                + "SELECT c.pid AS chunk_pid, c.kb_id AS kb_pid, d.pid AS document_pid, "
+                + "c.document_version_pid, c.index_release_pid, "
+                + "c.chunk_index, c.content, d.doc_name, kb.name AS kb_name, "
                 + "CASE WHEN c.embedding IS NOT NULL AND c.embedding_status = 'completed' "
                 + "  THEN (c.embedding <=> ?::vector) ELSE 1.0 END AS distance, "
                 + "CASE WHEN c.tsv IS NOT NULL AND ?::tsquery @@ c.tsv "
                 + "  THEN ts_rank_cd(c.tsv, ?::tsquery) ELSE 0.0 END AS bm25_raw "
                 + "FROM ab_kb_chunk c "
-                + "JOIN ab_kb_document d ON c.doc_id = d.pid "
-                + "JOIN ab_knowledge_base kb ON c.kb_id = kb.pid "
-                + "WHERE c.kb_id IN (" + placeholders + ") "
+                + "JOIN ab_kb_document d ON c.tenant_id = d.tenant_id "
+                + "AND c.kb_id = d.kb_id AND c.doc_id = d.pid "
+                + "JOIN ab_knowledge_base kb ON c.tenant_id = kb.tenant_id AND c.kb_id = kb.pid "
+                + "WHERE c.tenant_id = ? AND c.kb_id IN (" + placeholders + ") "
+                + "AND c.index_release_pid = kb.active_index_release_pid "
+                + "AND (d.deleted_flag IS NULL OR d.deleted_flag = FALSE) "
                 + "AND ("
                 + "  (c.embedding IS NOT NULL AND c.embedding_status = 'completed' AND (c.embedding <=> ?::vector) < ?) "
                 + "  OR (c.tsv IS NOT NULL AND ?::tsquery @@ c.tsv)"
@@ -184,6 +190,7 @@ public class RagRetrievalService {
         params.add(vectorStr);
         params.add(tsQuery);
         params.add(tsQuery);
+        params.add(tenantId);
         params.addAll(targetKbs);
         params.add(vectorStr);
         params.add(threshold);
@@ -196,7 +203,7 @@ public class RagRetrievalService {
         } catch (Exception e) {
             log.error("Hybrid search failed, falling back to vector-only: {}", e.getMessage());
             metrics.recordDegraded("hybrid_sql_failed");
-            return vectorOnlySearch(queryEmbedding, targetKbs, topK, threshold);
+            return vectorOnlySearch(tenantId, queryEmbedding, targetKbs, topK, threshold);
         }
     }
 
@@ -214,19 +221,25 @@ public class RagRetrievalService {
      * Bugfix-0 audit docs/backlog/2026-05-27-rag-catch-exception-audit.md
      * cluster 1.
      */
-    private List<RetrievalResult> keywordSearch(String query, List<String> targetKbs, int topK) {
+    private List<RetrievalResult> keywordSearch(
+            Long tenantId, String query, List<String> targetKbs, int topK) {
         String tsQuery = buildTsQuery(query);
         String placeholders = String.join(",", Collections.nCopies(targetKbs.size(), "?"));
 
-        String sql = "SELECT c.pid AS chunk_pid, c.chunk_index, c.content, d.doc_name, kb.name AS kb_name, "
+        String sql = "SELECT c.pid AS chunk_pid, c.kb_id AS kb_pid, d.pid AS document_pid, "
+                + "c.document_version_pid, c.index_release_pid, "
+                + "c.chunk_index, c.content, d.doc_name, kb.name AS kb_name, "
                 + "1.0 AS distance, ts_rank_cd(c.tsv, ?::tsquery) AS bm25_raw, "
                 + "0.0 AS vector_score, "
                 + "ts_rank_cd(c.tsv, ?::tsquery) AS bm25_score, "
                 + "ts_rank_cd(c.tsv, ?::tsquery) AS hybrid_score "
                 + "FROM ab_kb_chunk c "
-                + "JOIN ab_kb_document d ON c.doc_id = d.pid "
-                + "JOIN ab_knowledge_base kb ON c.kb_id = kb.pid "
-                + "WHERE c.kb_id IN (" + placeholders + ") "
+                + "JOIN ab_kb_document d ON c.tenant_id = d.tenant_id "
+                + "AND c.kb_id = d.kb_id AND c.doc_id = d.pid "
+                + "JOIN ab_knowledge_base kb ON c.tenant_id = kb.tenant_id AND c.kb_id = kb.pid "
+                + "WHERE c.tenant_id = ? AND c.kb_id IN (" + placeholders + ") "
+                + "AND c.index_release_pid = kb.active_index_release_pid "
+                + "AND (d.deleted_flag IS NULL OR d.deleted_flag = FALSE) "
                 + "AND c.tsv IS NOT NULL AND ?::tsquery @@ c.tsv "
                 + "ORDER BY hybrid_score DESC LIMIT ?";
 
@@ -234,6 +247,7 @@ public class RagRetrievalService {
         params.add(tsQuery);
         params.add(tsQuery);
         params.add(tsQuery);
+        params.add(tenantId);
         params.addAll(targetKbs);
         params.add(tsQuery);
         params.add(topK);
@@ -259,18 +273,23 @@ public class RagRetrievalService {
      * RAG answer; not a hard failure to propagate. See Bugfix-0 audit
      * docs/backlog/2026-05-27-rag-catch-exception-audit.md cluster 1.
      */
-    private List<RetrievalResult> vectorOnlySearch(float[] queryEmbedding,
+    private List<RetrievalResult> vectorOnlySearch(Long tenantId, float[] queryEmbedding,
                                                      List<String> targetKbs, int topK, double threshold) {
         String vectorStr = VectorUtils.toVectorString(queryEmbedding);
         String placeholders = String.join(",", Collections.nCopies(targetKbs.size(), "?"));
 
-        String sql = "SELECT c.pid AS chunk_pid, c.chunk_index, c.content, "
+        String sql = "SELECT c.pid AS chunk_pid, c.kb_id AS kb_pid, d.pid AS document_pid, "
+                + "c.document_version_pid, c.index_release_pid, "
+                + "c.chunk_index, c.content, "
                 + "(c.embedding <=> ?::vector) AS distance, "
                 + "d.doc_name, kb.name AS kb_name "
                 + "FROM ab_kb_chunk c "
-                + "JOIN ab_kb_document d ON c.doc_id = d.pid "
-                + "JOIN ab_knowledge_base kb ON c.kb_id = kb.pid "
-                + "WHERE c.kb_id IN (" + placeholders + ") "
+                + "JOIN ab_kb_document d ON c.tenant_id = d.tenant_id "
+                + "AND c.kb_id = d.kb_id AND c.doc_id = d.pid "
+                + "JOIN ab_knowledge_base kb ON c.tenant_id = kb.tenant_id AND c.kb_id = kb.pid "
+                + "WHERE c.tenant_id = ? AND c.kb_id IN (" + placeholders + ") "
+                + "AND c.index_release_pid = kb.active_index_release_pid "
+                + "AND (d.deleted_flag IS NULL OR d.deleted_flag = FALSE) "
                 + "AND c.embedding IS NOT NULL "
                 + "AND c.embedding_status = 'completed' "
                 + "AND (c.embedding <=> ?::vector) < ? "
@@ -279,6 +298,7 @@ public class RagRetrievalService {
 
         List<Object> params = new ArrayList<>();
         params.add(vectorStr);
+        params.add(tenantId);
         params.addAll(targetKbs);
         params.add(vectorStr);
         params.add(threshold);
@@ -288,6 +308,10 @@ public class RagRetrievalService {
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, params.toArray());
             return rows.stream().map(row -> RetrievalResult.builder()
+                    .kbPid((String) row.get("kb_pid"))
+                    .documentPid((String) row.get("document_pid"))
+                    .documentVersionPid((String) row.get("document_version_pid"))
+                    .indexReleasePid((String) row.get("index_release_pid"))
                     .chunkPid((String) row.get("chunk_pid"))
                     .chunkIndex(((Number) row.get("chunk_index")).intValue())
                     .content((String) row.get("content"))
@@ -296,6 +320,7 @@ public class RagRetrievalService {
                     .vectorScore(1.0 - ((Number) row.get("distance")).doubleValue())
                     .docName((String) row.get("doc_name"))
                     .kbName((String) row.get("kb_name"))
+                    .citationLocator(citationLocator(row))
                     .build()).toList();
         } catch (Exception e) {
             log.error("Vector-only search failed: {}", e.getMessage());
@@ -370,6 +395,10 @@ public class RagRetrievalService {
         double hybridScore = row.get("hybrid_score") != null ? ((Number) row.get("hybrid_score")).doubleValue() : 0.0;
 
         return RetrievalResult.builder()
+                .kbPid((String) row.get("kb_pid"))
+                .documentPid((String) row.get("document_pid"))
+                .documentVersionPid((String) row.get("document_version_pid"))
+                .indexReleasePid((String) row.get("index_release_pid"))
                 .chunkPid((String) row.get("chunk_pid"))
                 .chunkIndex(((Number) row.get("chunk_index")).intValue())
                 .content((String) row.get("content"))
@@ -380,7 +409,21 @@ public class RagRetrievalService {
                 .hybridScore(hybridScore)
                 .docName((String) row.get("doc_name"))
                 .kbName((String) row.get("kb_name"))
+                .citationLocator(citationLocator(row))
                 .build();
+    }
+
+    private String citationLocator(Map<String, Object> row) {
+        return "knowledge/"
+                + java.util.Objects.toString(row.get("kb_pid"), "")
+                + "/documents/"
+                + java.util.Objects.toString(row.get("document_pid"), "")
+                + "?version="
+                + java.util.Objects.toString(row.get("document_version_pid"), "")
+                + "&release="
+                + java.util.Objects.toString(row.get("index_release_pid"), "")
+                + "#chunk-"
+                + java.util.Objects.toString(row.get("chunk_index"), "0");
     }
 
 
@@ -425,29 +468,6 @@ public class RagRetrievalService {
      * tenant-scoped query — it can only ever return this tenant's KBs.
      */
     private List<String> resolveTargetKbs(Long tenantId, List<String> kbPids) {
-        if (kbPids != null && !kbPids.isEmpty()) {
-            String placeholders = String.join(",", Collections.nCopies(kbPids.size(), "?"));
-            List<Object> params = new ArrayList<>();
-            params.add(tenantId);
-            params.addAll(kbPids);
-            List<String> owned = jdbcTemplate.queryForList(
-                    "SELECT pid FROM ab_knowledge_base "
-                    + "WHERE tenant_id = ? AND pid IN (" + placeholders + ")",
-                    String.class, params.toArray());
-            if (owned.size() != kbPids.size()) {
-                log.warn("Retrieval refused: tenant {} requested {} knowledge base(s), only {} are owned by it",
-                        tenantId, kbPids.size(), owned.size());
-                throw new BusinessException(ResponseCode.FORBIDDEN,
-                        "One or more knowledge bases do not belong to this tenant");
-            }
-            return kbPids;
-        }
-        // Default: all active KBs with chunks for this tenant
-        return jdbcTemplate.queryForList(
-                "SELECT pid FROM ab_knowledge_base "
-                + "WHERE tenant_id = ? AND status = 'active' "
-                + "AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
-                + "AND chunk_count > 0",
-                String.class, tenantId);
+        return accessPolicy.resolveReadable(tenantId, kbPids);
     }
 }

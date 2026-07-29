@@ -56,7 +56,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE",
                 Integer.class,
                 SYSTEM_TENANT_ID);
-        assertThat(count).isEqualTo(7);
+        assertThat(count).isEqualTo(8);
     }
 
     @Test
@@ -66,7 +66,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT * FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE ORDER BY skill_code",
                 SYSTEM_TENANT_ID);
 
-        assertThat(skills).hasSize(7);
+        assertThat(skills).hasSize(8);
         for (Map<String, Object> skill : skills) {
             assertThat(skill.get("skill_code")).isNotNull();
             assertThat(skill.get("skill_name")).isNotNull();
@@ -96,6 +96,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "data_entry_assistant",
                 "report_analysis",
                 "crm_operations",
+                "crm_quarterly_review",
                 "ops_inspector",
                 "dsl.command",
                 "dsl.query"

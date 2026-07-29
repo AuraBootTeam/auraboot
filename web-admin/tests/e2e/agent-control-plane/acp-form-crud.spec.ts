@@ -301,10 +301,14 @@ async function selectFormField(page: Page, fieldCode: string, optionValue: strin
       .first()
       .inputValue()
       .catch(() => '');
-    if (inputValue === optionValue || optionLabels.some((label) => inputValue === label)) return true;
+    if (inputValue === optionValue || optionLabels.some((label) => inputValue === label))
+      return true;
 
     const visibleText = await container.innerText().catch(() => '');
-    if (labelPattern.test(visibleText) || visibleText.toLowerCase().includes(optionValue.toLowerCase())) {
+    if (
+      labelPattern.test(visibleText) ||
+      visibleText.toLowerCase().includes(optionValue.toLowerCase())
+    ) {
       return true;
     }
 
@@ -316,7 +320,10 @@ async function selectFormField(page: Page, fieldCode: string, optionValue: strin
         .locator('xpath=following::*[@role="combobox" or self::button or self::select][1]')
         .first();
       const triggerText = (await trigger.textContent({ timeout: 500 }).catch(() => '')) ?? '';
-      if (labelPattern.test(triggerText) || triggerText.toLowerCase().includes(optionValue.toLowerCase())) {
+      if (
+        labelPattern.test(triggerText) ||
+        triggerText.toLowerCase().includes(optionValue.toLowerCase())
+      ) {
         return true;
       }
     }
@@ -1591,12 +1598,16 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     await clickCreateButton(page);
     await waitForFormReady(page);
 
+    await fillFormField(page, 'agent_code', seededAgentCode);
     await fillFormField(page, 'title', scheduleTitle);
     await fillFormField(page, 'description', `E2E CRUD schedule — ${uid}`);
     await selectFormField(page, 'schedule_type', 'cron').catch(() => null);
     await fillFormField(page, 'cron_expression', '0 */30 * * * *').catch(() => null);
     await fillFormField(page, 'timezone', 'Asia/Shanghai').catch(() => null);
     await fillFormField(page, 'max_runs', '10').catch(() => null);
+    await fillFormField(page, 'daily_run_budget', '8');
+    await fillFormField(page, 'concurrency_limit', '1');
+    await selectFormField(page, 'missed_run_policy', 'skip');
     await fillFormField(page, 'mission_id', seededMissionPid).catch(() => null);
     // task_template is required — fill with valid JSON
     await fillFormField(
@@ -1700,12 +1711,16 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
       seedPage,
       CMD.createSchedule,
       {
+        agent_code: seededAgentCode,
         title: deleteScheduleTitle,
         description: 'Delete target schedule',
         schedule_type: 'cron',
         cron_expression: '0 0 * * * *',
         schedule_status: 'draft',
         timezone: 'utc',
+        daily_run_budget: 8,
+        concurrency_limit: 1,
+        missed_run_policy: 'skip',
         mission_id: seededMissionPid,
         task_template: JSON.stringify({
           title: 'Delete target scheduled task',
@@ -2242,35 +2257,51 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     await expectEmptySubmitBlocked(page, '/dynamic/mission');
   });
 
-  test('CRUD-30: Agent definition form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-30: Agent definition form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/agent-definition');
   });
 
-  test('CRUD-31: Agent task form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-31: Agent task form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/agent-task');
   });
 
-  test('CRUD-32: Agent tool form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-32: Agent tool form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/agent-tool');
   });
 
-  test('CRUD-33: Agent memory form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-33: Agent memory form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/agent-memory');
   });
 
-  test('CRUD-34: Agent skill form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-34: Agent skill form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/agent-skill');
   });
 
-  test('CRUD-35: Agent schedule form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-35: Agent schedule form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/agent-schedule');
   });
 
-  test('CRUD-36: Approval policy form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-36: Approval policy form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/approval-policy');
   });
 
-  test('CRUD-37: Agent artifact form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-37: Agent artifact form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/agent-artifact');
   });
 });

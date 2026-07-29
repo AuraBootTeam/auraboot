@@ -1185,7 +1185,9 @@ describe('DecisionOpsConsole', () => {
         ],
       },
     });
-    const draftContent = (draftRequest as { contentJson: { inputs: Array<Record<string, unknown>> } }).contentJson;
+    const draftContent = (
+      draftRequest as { contentJson: { inputs: Array<Record<string, unknown>> } }
+    ).contentJson;
     const firstInput = draftContent.inputs.find((input) => input.id === 'sla_deadlineMinutes');
     expect(firstInput).toMatchObject({
       id: 'sla_deadlineMinutes',
@@ -1365,7 +1367,9 @@ describe('DecisionOpsConsole', () => {
 
     fireEvent.click(screen.getByTestId('strategy-scenario-AUTOMATION'));
     await waitFor(() =>
-      expect(screen.getByTestId('strategy-consumer-summary')).toHaveTextContent('自动化 / 条件触发'),
+      expect(screen.getByTestId('strategy-consumer-summary')).toHaveTextContent(
+        '自动化 / 条件触发',
+      ),
     );
 
     fireEvent.click(screen.getByTestId('dt-input-field-picker-0'));
@@ -1374,7 +1378,9 @@ describe('DecisionOpsConsole', () => {
     });
 
     expect(screen.getByTestId('dt-input-field-picker-panel-0')).toHaveTextContent('请假类型');
-    expect(screen.getByTestId('dt-input-field-option-0-record-data_wd_req_type')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('dt-input-field-option-0-record-data_wd_req_type'),
+    ).toBeInTheDocument();
   });
 
   it('does not let a late Strategy Studio table restore overwrite local DMN edits', async () => {
@@ -1853,7 +1859,9 @@ describe('DecisionOpsConsole', () => {
     } as unknown as Partial<DecisionApi>);
 
     await waitFor(() =>
-      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('SLA 自动加载旧片段'),
+      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent(
+        'SLA 自动加载旧片段',
+      ),
     );
     fireEvent.click(screen.getByTestId('strategy-save-draft'));
 
@@ -2322,7 +2330,7 @@ describe('DecisionOpsConsole', () => {
     expect(logRow).not.toHaveTextContent('MATCHED');
     expect(logRow).toHaveTextContent('18ms');
 
-    fireEvent.change(screen.getByLabelText('log-keyword'), { target: { value: 'trace-live' } });
+    fireEvent.change(screen.getByTestId('log-keyword'), { target: { value: 'trace-live' } });
     fireEvent.click(screen.getByTestId('elta-apply'));
 
     await waitFor(() =>

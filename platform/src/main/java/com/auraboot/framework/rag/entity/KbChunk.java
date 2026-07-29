@@ -36,6 +36,12 @@ public class KbChunk {
     @TableField("doc_id")
     private String docId;
 
+    @TableField("document_version_pid")
+    private String documentVersionPid;
+
+    @TableField("index_release_pid")
+    private String indexReleasePid;
+
     @TableField("chunk_index")
     private Integer chunkIndex;
 

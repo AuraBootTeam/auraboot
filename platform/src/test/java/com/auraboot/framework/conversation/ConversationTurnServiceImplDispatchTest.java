@@ -1,6 +1,12 @@
 package com.auraboot.framework.conversation;
 
+import com.auraboot.framework.agent.identity.DelegationGrant;
+import com.auraboot.framework.agent.identity.ExecutionPrincipal;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalResolutionException;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalResolver;
+import com.auraboot.framework.agent.identity.Initiator;
 import com.auraboot.framework.agent.port.AgentChatPort;
+import com.auraboot.framework.agent.service.AgentReleaseDeploymentService;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.agent.dto.ChatRequest;
@@ -65,6 +71,17 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
     @MockitoBean
     private AgentChatPort agentChatPort;
 
+    /**
+     * Dispatch tests own the route contract, not IAM/release fixture setup.
+     * Principal resolution has its own real-stack suite, so keep this axis
+     * deterministic and override it only in the rejection test below.
+     */
+    @MockitoBean
+    private ExecutionPrincipalResolver executionPrincipalResolver;
+
+    @MockitoBean
+    private AgentReleaseDeploymentService releaseDeploymentService;
+
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -74,6 +91,37 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
     void setUpSink() {
         sink = mock(ResponseSink.class);
         when(sink.isClientConnected()).thenReturn(true);
+        when(executionPrincipalResolver.resolve(any())).thenAnswer(invocation -> {
+            ExecutionPrincipalResolver.ResolveRequest request = invocation.getArgument(0);
+            if (request == null) {
+                return null;
+            }
+            String agentCode = request.agentCode() == null || request.agentCode().isBlank()
+                    ? "aurabot"
+                    : request.agentCode();
+            return new ExecutionPrincipal(
+                    request.tenantId(),
+                    getTestUser().getId(),
+                    getTestTenantMember().getId(),
+                    getTestUser().getPid(),
+                    getTestUser().getUserName(),
+                    null,
+                    null,
+                    Initiator.human(
+                            getTestUser().getId(),
+                            getTestTenantMember().getId(),
+                            request.channel()),
+                    DelegationGrant.directUser(),
+                    agentCode,
+                    "REL_TEST_1",
+                    "DEP_TEST_1",
+                    "hash-test-1",
+                    request.channel(),
+                    ExecutionPrincipal.Type.HUMAN_DELEGATED,
+                    java.util.Set.of());
+        });
+        when(releaseDeploymentService.runtimeDefinition(anyLong(), anyString()))
+                .thenReturn(java.util.Map.of());
     }
 
     private TurnRequest buildTurnRequest(String agentCode, String message) {
@@ -471,6 +519,35 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
             verify(sink, atLeastOnce()).onError(contains("Agent definition lookup failed"), any());
             verify(agentChatPort, never()).runAgentTurn(any(), any(), any(),
                     org.mockito.ArgumentMatchers.<com.auraboot.framework.agent.port.AgentTurnOverrides>any());
+        });
+    }
+
+    @Test
+    @Order(14)
+    @DisplayName("inactive named agent is explained without leaking its internal code")
+    void inactiveNamedAgent_surfacesSafeActionableMessage() {
+        withTestIdentity(() -> {
+            String agentCode = "test_agent";
+            when(executionPrincipalResolver.resolve(
+                    argThat(request -> agentCode.equals(request.agentCode()))))
+                    .thenThrow(new ExecutionPrincipalResolutionException(
+                            ExecutionPrincipalResolutionException.Reason.AGENT_INACTIVE,
+                            "Agent definition is inactive: agentCode=" + agentCode));
+
+            TurnOutcome outcome =
+                    turnService.runTurn(buildTurnRequest(agentCode, "are you there?"), sink);
+
+            assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+            assertThat(((TurnOutcome.Failed) outcome).errorMessage())
+                    .contains("suspended")
+                    .contains("resume")
+                    .doesNotContain(agentCode);
+            verify(sink).onError(
+                    argThat(message -> message.contains("suspended")
+                            && message.contains("resume")
+                            && !message.contains(agentCode)),
+                    isNull());
+            verifyNoInteractions(agentChatPort);
         });
     }
 }

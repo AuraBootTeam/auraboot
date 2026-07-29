@@ -46,7 +46,7 @@ public class ToolMetadataRegistry {
                 .approvalRequirement(approval)
                 .durabilityRequirement(durability)
                 .metadataTrustLevel(effectiveTrust)
-                .policyVersion("v1")
+                .policyVersion(RiskScale.VERSION)
                 .schemaHash(hash(definition.getParameterSchema()))
                 .build();
     }
@@ -78,7 +78,7 @@ public class ToolMetadataRegistry {
                 .approvalRequirement(approval)
                 .durabilityRequirement(durability)
                 .metadataTrustLevel(effectiveTrust)
-                .policyVersion("v1")
+                .policyVersion(RiskScale.VERSION)
                 .schemaHash(hash(definition.getInputSchema()))
                 .build();
     }
@@ -142,15 +142,11 @@ public class ToolMetadataRegistry {
     }
 
     private boolean highRisk(String riskLevel) {
-        String normalized = normalizeRisk(riskLevel);
-        return "L3".equals(normalized) || "L4".equals(normalized);
+        return RiskScale.parseOrDefault(riskLevel, RiskScale.L0).requiresHumanApproval();
     }
 
     private String normalizeRisk(String riskLevel) {
-        if (riskLevel == null || riskLevel.isBlank()) {
-            return "L0";
-        }
-        return riskLevel.trim().toUpperCase(Locale.ROOT);
+        return RiskScale.parseOrDefault(riskLevel, RiskScale.L0).code();
     }
 
     private boolean startsWithAny(String value, String... prefixes) {

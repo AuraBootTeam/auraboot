@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
 import com.auraboot.framework.agent.service.AgentOrganizationService;
+import com.auraboot.framework.agent.service.AgentReleaseDeploymentService;
 import com.auraboot.framework.agent.service.SystemAgentUserProvisioner;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.StatusConstants;
@@ -59,6 +60,7 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
     private final TenantMemberService tenantMemberService;
     private final UserService userService;
     private final SystemAgentUserProvisioner systemAgentUserProvisioner;
+    private final AgentReleaseDeploymentService releaseDeploymentService;
 
     @Override
     @Transactional
@@ -118,6 +120,11 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
         // 5. Update agent_definition.employee_id
         agent.setEmployeeId(employeeId);
         agentDefinitionMapper.updateById(agent);
+        releaseDeploymentService.bindEmployee(
+                tenantId,
+                agent.getAgentCode(),
+                employeeId,
+                MetaContext.getCurrentUserId());
 
         log.info("Agent enrolled as digital employee: agentId={}, agentName={}, employeePid={}, memberId={}",
                 agentId, agent.getName(), employeePid, serviceMember.getId());
@@ -171,6 +178,11 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
         agentDefinitionMapper.update(null, new LambdaUpdateWrapper<AgentDefinition>()
                 .eq(AgentDefinition::getId, agentId)
                 .set(AgentDefinition::getEmployeeId, null));
+        releaseDeploymentService.bindEmployee(
+                MetaContext.getCurrentTenantId(),
+                agent.getAgentCode(),
+                null,
+                MetaContext.getCurrentUserId());
 
         log.info("Agent removed from org: agentId={}, former employeeId={}", agentId, employeeId);
     }
@@ -218,35 +230,6 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
         }
         Map<String, Object> record = dynamicDataService.getById(modelCode, String.valueOf(pid));
         return record != null ? (String) record.get(nameField) : null;
-    }
-
-    @Override
-    public Long getAgentMemberId(Long agentId, Long triggerUserId) {
-        AgentDefinition agent = agentDefinitionMapper.selectById(agentId);
-        if (agent == null) {
-            throw new BusinessException("Agent not found: " + agentId);
-        }
-
-        if (agent.getEmployeeId() != null) {
-            // Independent mode: agent has its own employee → find linked service member
-            Long tenantId = MetaContext.getCurrentTenantId();
-            Long systemUserId = agent.getSystemUserId();
-            if (systemUserId != null) {
-                TenantMember serviceMember = tenantMemberService.findByTenantIdAndUserId(tenantId, systemUserId);
-                if (serviceMember != null) {
-                    return serviceMember.getId();
-                }
-            }
-            log.warn("Agent {} has employee_id but no service member found, falling back to trigger user", agentId);
-        }
-
-        // Proxy mode: use the triggering user's member ID
-        Long tenantId = MetaContext.getCurrentTenantId();
-        TenantMember triggerMember = tenantMemberService.findByTenantIdAndUserId(tenantId, triggerUserId);
-        if (triggerMember == null) {
-            throw new BusinessException("Trigger user has no tenant member: userId=" + triggerUserId);
-        }
-        return triggerMember.getId();
     }
 
     private Long extractId(Map<String, Object> record) {

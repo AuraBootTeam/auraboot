@@ -95,7 +95,7 @@ VALUES (
     'Customer Service Agent',
     'Automated customer service agent that processes inbound customer emails, sends approved replies, and logs customer outreach in CRM.',
     'reactive',
-    'deepseek-chat',
+    NULL,
     'You are a professional customer service agent. When processing an inbound customer email:
 
 1. IDENTIFY: Use the pre-resolved contact context when present. If a contact pid is provided, look up the customer contact with get:crm_contact. If an account pid is provided or found on the contact, look up the account with get:crm_account.

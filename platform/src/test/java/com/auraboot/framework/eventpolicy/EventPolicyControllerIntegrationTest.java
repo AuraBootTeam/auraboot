@@ -5,11 +5,6 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.decision.entity.DecisionUsageRefEntity;
 import com.auraboot.framework.decision.mapper.DecisionUsageRefMapper;
 import com.auraboot.framework.integration.BaseIntegrationTest;
-import com.auraboot.framework.permission.entity.Permission;
-import com.auraboot.framework.permission.mapper.PermissionMapper;
-import com.auraboot.framework.permission.service.UserPermissionService;
-import com.auraboot.framework.rbac.entity.RolePermission;
-import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.MissingNode;
@@ -26,8 +21,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-import java.time.Instant;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -49,9 +44,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private WebApplicationContext webApplicationContext;
-    @Autowired private PermissionMapper permissionMapper;
-    @Autowired private RolePermissionMapper rolePermissionMapper;
-    @Autowired private UserPermissionService userPermissionService;
     @Autowired private DecisionUsageRefMapper usageRefMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
 
@@ -135,11 +127,14 @@ class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setupAuthAndMockMvc() {
-        grant("decision.policy.read", "decision", "policy", "read", "Event Policy Read");
-        grant("decision.policy.manage", "decision", "policy", "manage", "Event Policy Manage");
-        grant("decision.policy.publish", "decision", "policy", "publish", "Event Policy Publish");
-        grant("decision.policy.run", "decision", "policy", "run", "Event Policy Run");
-        userPermissionService.evictUserPermissions(getTestUser().getId());
+        grantCommittedPermissionToTestRole(
+                "decision.policy.read", "decision", "policy", "read", "Event Policy Read");
+        grantCommittedPermissionToTestRole(
+                "decision.policy.manage", "decision", "policy", "manage", "Event Policy Manage");
+        grantCommittedPermissionToTestRole(
+                "decision.policy.publish", "decision", "policy", "publish", "Event Policy Publish");
+        grantCommittedPermissionToTestRole(
+                "decision.policy.run", "decision", "policy", "run", "Event Policy Run");
 
         Filter contextFilter = (request, response, chain) -> {
             try {
@@ -621,37 +616,6 @@ class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.status").value("NOT_MATCHED"))
                 .andExpect(jsonPath("$.data.matchedRuleCodes").isEmpty())
                 .andExpect(jsonPath("$.data.actionPlans").isEmpty());
-    }
-
-    private void grant(String code, String resourceType, String resourceCode, String action, String name) {
-        Permission permission = permissionMapper.findByCode(code);
-        if (permission == null) {
-            permission = new Permission();
-            permission.setPid(UniqueIdGenerator.generate());
-            permission.setCode(code);
-            permission.setName(name);
-            permission.setResourceType(resourceType);
-            permission.setResourceCode(resourceCode);
-            permission.setAction(action);
-            permission.setSource("manual");
-            permission.setStatus("active");
-            permission.setDeletedFlag(false);
-            permission.setTenantId(getTestTenant().getId());
-            permission.setCreatedAt(Instant.now());
-            permission.setUpdatedAt(Instant.now());
-            permissionMapper.insert(permission);
-        }
-        RolePermission rp = new RolePermission();
-        rp.setPid(UniqueIdGenerator.generate());
-        rp.setRoleId(getTestRole().getId());
-        rp.setPermissionId(permission.getId());
-        rp.setGrantType("grant");
-        rp.setStatus("active");
-        rp.setDeletedFlag(false);
-        rp.setTenantId(getTestTenant().getId());
-        rp.setCreatedAt(Instant.now());
-        rp.setUpdatedAt(Instant.now());
-        rolePermissionMapper.insert(rp);
     }
 
     private boolean containsPolicyCode(JsonNode rows, String policyCode) {

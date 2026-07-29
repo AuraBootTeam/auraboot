@@ -49,6 +49,11 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
     }
 
     @Override
+    public Set<String> supportedApiFormats() {
+        return Set.of("chat_completions");
+    }
+
+    @Override
     public boolean supportsTools() {
         return true;
     }
@@ -507,6 +512,25 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
             if (m.contains(pattern)) return true;
         }
         return false;
+    }
+
+    @Override
+    public ModelCapabilityProfile modelCapabilities(String model) {
+        return new ModelCapabilityProfile(
+                true,
+                true,
+                supportsTools(),
+                true,
+                true,
+                supportsVision(model),
+                supportsThinking(model));
+    }
+
+    private boolean supportsThinking(String model) {
+        if (model == null || model.isBlank()) {
+            return false;
+        }
+        return model.toLowerCase(Locale.ROOT).startsWith("deepseek-v4");
     }
 
     /**

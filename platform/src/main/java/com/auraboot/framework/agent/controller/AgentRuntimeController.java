@@ -211,69 +211,20 @@ public class AgentRuntimeController {
     /** Manually trigger a schedule to run immediately ("Run Now") */
     @PostMapping("/schedule/{schedulePid}/trigger")
     @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
-    @SuppressWarnings("unchecked")
     public ApiResponse<Map<String, String>> triggerSchedule(@PathVariable String schedulePid) {
         if (!agentProperties.isEnabled()) {
             return ApiResponse.error("Agent runtime is disabled");
         }
         Long tenantId = MetaContext.getCurrentTenantId();
-
-        // Load the schedule
-        String sql = "SELECT * FROM ab_agent_schedule WHERE tenant_id = #{params.tenantId} " +
-                "AND pid = #{params.pid} AND deleted_flag = FALSE";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
-                Map.of("tenantId", tenantId, "pid", schedulePid));
-        if (rows.isEmpty()) {
-            return ApiResponse.error("Schedule not found: " + schedulePid);
+        AgentScheduleService.TriggerResult result =
+                scheduleService.triggerNow(tenantId, schedulePid);
+        if (!result.triggered()) {
+            return ApiResponse.error(
+                    "Schedule trigger blocked: " + result.reason());
         }
-
-        Map<String, Object> schedule = rows.get(0);
-        if (!"active".equals(schedule.get("schedule_status"))) {
-            return ApiResponse.error("Schedule is not active, current status: " + schedule.get("schedule_status"));
-        }
-
-        // Parse task template
-        String templateJson = (String) schedule.get("task_template");
-        Map<String, Object> template;
-        try {
-            template = (templateJson != null && !templateJson.isBlank())
-                    ? objectMapper.readValue(templateJson, Map.class)
-                    : Map.of();
-        } catch (Exception e) {
-            return ApiResponse.error("Invalid task_template JSON: " + e.getMessage());
-        }
-
-        // Create a new task from the template
-        String taskPid = UniqueIdGenerator.generate();
-        LocalDateTime now = LocalDateTime.now();
-        Map<String, Object> task = new HashMap<>();
-        task.put("pid", taskPid);
-        task.put("tenant_id", tenantId);
-        task.put("title", template.getOrDefault("title", "Manual trigger: " + schedule.get("title")));
-        task.put("description", template.getOrDefault("description", "Manually triggered from schedule " + schedulePid));
-        task.put("task_status", "todo");
-        task.put("task_priority", template.getOrDefault("task_priority", "medium"));
-        task.put("assignee_type", "agent");
-        task.put("assignee_id", template.getOrDefault("assignee_id", template.getOrDefault("agent_code", "")));
-        task.put("mission_id", schedule.get("mission_id"));
-        task.put("created_at", now);
-        task.put("updated_at", now);
-        dynamicDataMapper.insert("ab_agent_task", task);
-
-        // Update schedule run stats
-        Map<String, Object> scheduleUpdate = new HashMap<>();
-        scheduleUpdate.put("last_run_at", now);
-        scheduleUpdate.put("run_count", ((Number) schedule.getOrDefault("run_count", 0)).intValue() + 1);
-        scheduleUpdate.put("updated_at", now);
-        dynamicDataMapper.update("ab_agent_schedule", scheduleUpdate, Map.of("pid", schedulePid));
-
-        // Dispatch the task
-        String agentCode = (String) task.get("assignee_id");
-        if (agentCode != null && !agentCode.isBlank()) {
-            dispatchHandler.dispatch(tenantId, taskPid, agentCode);
-        }
-
-        return ApiResponse.success(Map.of("taskPid", taskPid, "schedulePid", schedulePid));
+        return ApiResponse.success(Map.of(
+                "taskPid", result.taskPid(),
+                "schedulePid", schedulePid));
     }
 
     /** Retry a failed or timed-out run */

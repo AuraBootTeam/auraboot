@@ -13,6 +13,7 @@ import com.auraboot.framework.agent.runtime.DurableToolExecutionLedger;
 import com.auraboot.framework.agent.runtime.DurableToolExecutionRecord;
 import com.auraboot.framework.agent.runtime.DurableToolExecutionRequest;
 import com.auraboot.framework.agent.runtime.DurableToolExecutionStatus;
+import com.auraboot.framework.agent.runtime.policy.RiskScale;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.SpanContext;
 import com.auraboot.framework.agent.trace.TraceContext;
@@ -939,8 +940,7 @@ public class ToolLoopService {
 
     /** Risk levels L3/L4 (and R3/R4 aliases) trigger mandatory Approval Gate routing. */
     private boolean isHighRisk(String riskLevel) {
-        String normalized = normalizeRiskLevel(riskLevel, "L0");
-        return "L3".equals(normalized) || "L4".equals(normalized);
+        return RiskScale.parseOrDefault(riskLevel, RiskScale.L0).requiresHumanApproval();
     }
 
     /**
@@ -1074,21 +1074,9 @@ public class ToolLoopService {
     }
 
     private String normalizeRiskLevel(String riskLevel, String fallback) {
-        if (riskLevel == null || riskLevel.isBlank()) {
-            return fallback;
-        }
-        String normalized = riskLevel.trim().toUpperCase(Locale.ROOT);
-        if (normalized.startsWith("R") && normalized.length() == 2) {
-            normalized = "L" + normalized.substring(1);
-        }
-        return switch (normalized) {
-            case "L0", "L1", "L2", "L3", "L4" -> normalized;
-            case "LOW" -> "L0";
-            case "MEDIUM" -> "L2";
-            case "HIGH" -> "L3";
-            case "CRITICAL" -> "L4";
-            default -> fallback;
-        };
+        return RiskScale.parseOrDefault(
+                riskLevel,
+                RiskScale.parseOrDefault(fallback, RiskScale.L1)).code();
     }
 
     private String resolveModelCodeForCommand(Long tenantId, String commandCode) {

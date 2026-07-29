@@ -51,9 +51,9 @@ public class ActiveMemoryService {
     private boolean semanticRecallEnabled;
     @Value("${acp.memory.semantic-recall.limit:5}")
     private int semanticLimit = 5;
-    /** Must match the provider that wrote the memory embeddings (MemoryEmbeddingService uses "openai"). */
-    @Value("${acp.memory.semantic-recall.provider:openai}")
-    private String semanticProvider = "openai";
+    /** Blank means the deployment's configured embedding profile. */
+    @Value("${acp.memory.semantic-recall.provider:}")
+    private String semanticProvider;
 
     /** Optional — semantic recall degrades gracefully when no embedding provider is wired. */
     @Autowired(required = false)

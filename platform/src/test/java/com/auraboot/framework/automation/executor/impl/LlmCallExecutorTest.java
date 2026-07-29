@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.provider.ModelCapabilityProfile;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.event.AutomationRunStreamPublisher;
 import com.auraboot.framework.exception.BusinessException;
@@ -28,8 +29,8 @@ import static org.mockito.Mockito.*;
  * Unit tests for {@link LlmCallExecutor} (P1 — workflow LLM action node).
  *
  * <p>Mirrors the existing executor unit test style (Mockito-based) — the SDK
- * itself contains higher-level integration tests at {@code AnthropicLlmProviderIntegrationTest}.
- * Here we mock {@link LlmProviderFactory} + {@link LlmProvider} so we can
+ * Provider adapters have their own higher-level integration tests. Here we
+ * mock {@link LlmProviderFactory} + {@link LlmProvider} so we can
  * assert on the wire request shape and on capability gating without standing
  * up the WebClient.
  */
@@ -65,16 +66,25 @@ class LlmCallExecutorTest {
         // Default happy-path resolution. Individual tests override as needed
         // before calling execute(). Kept lenient so tests that never trigger
         // resolution (validation failures) don't trip "unnecessary stubbing".
-        lenient().when(llmProviderFactory.resolveProviderByModel(anyString())).thenReturn("anthropic");
+        lenient().when(llmProviderFactory.resolveProviderByModel(anyString())).thenReturn("provider-under-test");
         lenient().when(llmProviderFactory.resolveConfig(any(), anyString()))
                 .thenReturn(LlmProviderFactory.ProviderConfig.builder()
-                        .providerCode("anthropic")
+                        .providerCode("provider-under-test")
                         .apiKey("sk-test")
-                        .baseUrl("https://api.anthropic.com")
-                        .defaultModel("claude-sonnet-4-6")
+                        .baseUrl("https://llm.example.test")
+                        .defaultModel("model-capable")
                         .maxTokens(4096)
                         .build());
-        lenient().when(llmProviderFactory.getProvider("anthropic")).thenReturn(llmProvider);
+        lenient().when(llmProviderFactory.getProvider("provider-under-test")).thenReturn(llmProvider);
+        lenient().when(llmProvider.modelCapabilities(anyString()))
+                .thenAnswer(invocation -> new ModelCapabilityProfile(
+                        true,
+                        true,
+                        true,
+                        true,
+                        true,
+                        true,
+                        "model-capable".equals(invocation.getArgument(0))));
     }
 
     // =========================================================
@@ -108,7 +118,7 @@ class LlmCallExecutorTest {
 
     @Test
     void execute_missingUserPromptTemplate_throwsIllegalArgument() {
-        AutomationAction action = buildAction(Map.of("model", "claude-sonnet-4-6"));
+        AutomationAction action = buildAction(Map.of("model", "model-capable"));
 
         assertThatThrownBy(() -> executor.execute(action, new HashMap<>()))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -118,7 +128,7 @@ class LlmCallExecutorTest {
     @Test
     void execute_blankUserPromptTemplate_throwsIllegalArgument() {
         AutomationAction action = buildAction(Map.of(
-                "model", "claude-sonnet-4-6",
+                "model", "model-capable",
                 "userPromptTemplate", "   "));
 
         assertThatThrownBy(() -> executor.execute(action, new HashMap<>()))
@@ -132,11 +142,11 @@ class LlmCallExecutorTest {
 
     @Test
     void executes_basic_template_with_variable_interpolation() throws Exception {
-        when(llmProvider.chat(any(LlmChatRequest.class), eq("sk-test"), eq("https://api.anthropic.com")))
+        when(llmProvider.chat(any(LlmChatRequest.class), eq("sk-test"), eq("https://llm.example.test")))
                 .thenReturn(buildTextResponse("summary"));
 
         AutomationAction action = buildAction(Map.of(
-                "model", "claude-sonnet-4-6",
+                "model", "model-capable",
                 "userPromptTemplate", "Summarise: ${trigger.text}",
                 "maxTokens", 256
         ));
@@ -153,8 +163,8 @@ class LlmCallExecutorTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> resultMap = (Map<String, Object>) result;
         assertThat(resultMap.get("success")).isEqualTo(Boolean.TRUE);
-        assertThat(resultMap.get("model")).isEqualTo("claude-sonnet-4-6");
-        assertThat(resultMap.get("providerCode")).isEqualTo("anthropic");
+        assertThat(resultMap.get("model")).isEqualTo("model-capable");
+        assertThat(resultMap.get("providerCode")).isEqualTo("provider-under-test");
         assertThat(resultMap.get("output")).isEqualTo("summary");
         assertThat(resultMap.get("outputVariable")).isEqualTo("llmOutput");
 
@@ -175,7 +185,7 @@ class LlmCallExecutorTest {
                 .thenReturn(buildTextResponse("classified-as-bug"));
 
         AutomationAction action = buildAction(Map.of(
-                "model", "claude-sonnet-4-6",
+                "model", "model-capable",
                 "userPromptTemplate", "classify",
                 "outputVariableName", "ticketCategory"
         ));
@@ -188,7 +198,7 @@ class LlmCallExecutorTest {
     }
 
     // =========================================================
-    // execute() — Extended Thinking propagation
+    // execute() — thinking propagation
     // =========================================================
 
     @Test
@@ -197,7 +207,7 @@ class LlmCallExecutorTest {
                 .thenReturn(buildTextResponse("ok"));
 
         AutomationAction action = buildAction(Map.of(
-                "model", "claude-sonnet-4-6",
+                "model", "model-capable",
                 "userPromptTemplate", "deep think please",
                 "thinkingEnabled", true,
                 "thinkingBudgetTokens", 5000
@@ -220,17 +230,17 @@ class LlmCallExecutorTest {
 
     @Test
     void unsupported_model_for_thinking_throws() {
-        // claude-3-haiku-20240307 is a legacy model; thinking must NOT be
+        // model-incapable is a legacy model; thinking must NOT be
         // silently dropped — workflow author opted in explicitly.
         AutomationAction action = buildAction(Map.of(
-                "model", "claude-3-haiku-20240307",
+                "model", "model-incapable",
                 "userPromptTemplate", "x",
                 "thinkingEnabled", true
         ));
 
         assertThatThrownBy(() -> executor.execute(action, new HashMap<>()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("does not support Extended Thinking");
+                .hasMessageContaining("capability=thinking");
     }
 
     // =========================================================
@@ -246,7 +256,7 @@ class LlmCallExecutorTest {
                 .thenThrow(new RuntimeException("upstream 503"));
 
         AutomationAction action = buildAction(Map.of(
-                "model", "claude-sonnet-4-6",
+                "model", "model-capable",
                 "userPromptTemplate", "x"
         ));
 
@@ -261,7 +271,7 @@ class LlmCallExecutorTest {
         when(llmProviderFactory.resolveConfig(any(), anyString())).thenReturn(null);
 
         AutomationAction action = buildAction(Map.of(
-                "model", "claude-sonnet-4-6",
+                "model", "model-capable",
                 "userPromptTemplate", "x"
         ));
 

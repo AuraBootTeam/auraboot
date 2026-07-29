@@ -1,6 +1,8 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.agent.identity.ExecutionPrincipal;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
 import com.auraboot.framework.agent.authorization.EffectClass;
 import com.auraboot.framework.agent.dto.ActionRecord;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
@@ -45,13 +47,34 @@ public class ActionRecorder {
     /**
      * Records which agent acted and whose authority it spent.
      *
-     * <p>An agent runs inside the initiating user's MetaContext — its tools carry
-     * that person's permissions and data scope — so the user is not incidental
-     * context, it is the authority the action was taken under. A system-initiated
-     * run has no such user, and leaving the column null says exactly that rather
-     * than inventing an owner.
+     * <p>The immutable execution principal is authoritative: actor fields drive
+     * authorization while initiator fields retain attribution. MetaContext is
+     * consulted only for legacy non-agent entry paths that do not yet establish
+     * a principal.
      */
     private void stampIdentity(Map<String, Object> row) {
+        Optional<ExecutionPrincipal> currentPrincipal = ExecutionPrincipalContext.current();
+        if (currentPrincipal.isPresent()) {
+            ExecutionPrincipal principal = currentPrincipal.get();
+            row.put("actor_id", principal.agentCode());
+            row.put("actor_user_id", principal.actorUserId());
+            row.put("actor_member_id", principal.actorMemberId());
+            row.put("principal_type", principal.type().name().toLowerCase(Locale.ROOT));
+            row.put("agent_release_pid", principal.agentReleasePid());
+            row.put("deployment_pid", principal.deploymentPid());
+            if (principal.initiator().userId() != null) {
+                row.put("initiator_user_id", principal.initiator().userId());
+                // Compatibility projection for existing audit consumers.
+                row.put("on_behalf_of_user_id", principal.initiator().userId());
+            }
+            if (principal.initiator().memberId() != null) {
+                row.put("initiator_member_id", principal.initiator().memberId());
+            }
+            if (principal.delegation().grantPid() != null) {
+                row.put("delegation_grant_id", principal.delegation().grantPid());
+            }
+            return;
+        }
         String agentCode = StepContext.getAgentCode();
         if (agentCode != null && !agentCode.isBlank()) {
             row.put("actor_id", agentCode);

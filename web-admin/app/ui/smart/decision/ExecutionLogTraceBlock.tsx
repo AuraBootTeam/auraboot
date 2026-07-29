@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { getApiService } from '~/shared/services/ApiService';
+import { useI18n } from '~/contexts/I18nContext';
 import {
   createDecisionApi,
   type DecisionApi,
@@ -53,7 +54,16 @@ type FilterState = {
 };
 
 const STATUS_OPTIONS = ['ALL', 'MATCHED', 'NOT_MATCHED', 'ERROR', 'SKIPPED', 'UNKNOWN'];
-const CALLER_OPTIONS = ['ALL', 'API', 'AUTOMATION', 'EVENT_POLICY', 'PERMISSION', 'SLA', 'BPM', 'TEST'];
+const CALLER_OPTIONS = [
+  'ALL',
+  'API',
+  'AUTOMATION',
+  'EVENT_POLICY',
+  'PERMISSION',
+  'SLA',
+  'BPM',
+  'TEST',
+];
 const ROLLOUT_OPTIONS = ['ALL', 'BASELINE', 'CANDIDATE'];
 const CALLER_LABELS: Record<string, string> = {
   ALL: '全部',
@@ -541,7 +551,10 @@ function payloadDisplay(value: unknown, key = '', traceSnapshot?: unknown): stri
   return display(value);
 }
 
-function traceValueLabels(key: string, traceSnapshot?: unknown): Record<string, string> | undefined {
+function traceValueLabels(
+  key: string,
+  traceSnapshot?: unknown,
+): Record<string, string> | undefined {
   if (!key) return undefined;
   const metadataLabels = factValueLabels(key, traceSnapshot);
   if (metadataLabels) return metadataLabels;
@@ -752,7 +765,10 @@ function factValueLabels(key: string, traceSnapshot?: unknown): Record<string, s
   return Object.keys(labels).length ? labels : undefined;
 }
 
-function outputValueLabels(key: string, traceSnapshot?: unknown): Record<string, string> | undefined {
+function outputValueLabels(
+  key: string,
+  traceSnapshot?: unknown,
+): Record<string, string> | undefined {
   const raw = outputMetadataForKey(key, traceSnapshot)?.valueLabels;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
   const labels = Object.fromEntries(
@@ -993,6 +1009,7 @@ function ActionLogCard({
 }
 
 export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBlockProps) {
+  const { t } = useI18n();
   const api = useMemo(() => createApi(), []);
   const location = useLocation();
   const navigate = useNavigate();
@@ -1205,25 +1222,36 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
           <label>
             <span>关键词</span>
             <input
-              aria-label="log-keyword"
+              aria-label={t('decision.executionLog.keywordLabel', undefined, '执行日志关键词')}
+              data-testid="log-keyword"
               value={filters.keyword}
               onChange={(e) => updateFilter('keyword', e.target.value)}
-              placeholder="trace / caller / error"
+              placeholder={t(
+                'decision.executionLog.keywordPlaceholder',
+                undefined,
+                'trace / caller / error',
+              )}
             />
           </label>
           <label>
             <span>决策编码</span>
             <input
-              aria-label="log-decision-code"
+              aria-label={t('decision.executionLog.decisionCodeLabel', undefined, '决策编码')}
+              data-testid="log-decision-code"
               value={filters.decisionCode}
               onChange={(e) => updateFilter('decisionCode', e.target.value)}
-              placeholder="decisionCode"
+              placeholder={t(
+                'decision.executionLog.decisionCodePlaceholder',
+                undefined,
+                'decisionCode',
+              )}
             />
           </label>
           <label>
             <span>状态</span>
             <select
-              aria-label="log-status"
+              aria-label={t('decision.executionLog.statusLabel', undefined, '执行状态')}
+              data-testid="log-status"
               value={filters.status}
               onChange={(e) => updateFilter('status', e.target.value)}
             >
@@ -1237,7 +1265,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
           <label>
             <span>调用方</span>
             <select
-              aria-label="log-caller-type"
+              aria-label={t('decision.executionLog.callerTypeLabel', undefined, '调用方类型')}
+              data-testid="log-caller-type"
               value={filters.callerType}
               onChange={(e) => updateFilter('callerType', e.target.value)}
             >
@@ -1251,7 +1280,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
           <label>
             <span>命中</span>
             <select
-              aria-label="log-matched"
+              aria-label={t('decision.executionLog.matchedLabel', undefined, '是否命中')}
+              data-testid="log-matched"
               value={filters.matched}
               onChange={(e) => updateFilter('matched', e.target.value)}
             >
@@ -1263,7 +1293,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
           <label>
             <span>灰度分支</span>
             <select
-              aria-label="log-rollout-arm"
+              aria-label={t('decision.executionLog.rolloutArmLabel', undefined, '灰度分支')}
+              data-testid="log-rollout-arm"
               value={filters.rolloutArm}
               onChange={(e) => updateFilter('rolloutArm', e.target.value)}
             >
@@ -1277,7 +1308,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
           <label>
             <span>最小耗时</span>
             <input
-              aria-label="log-min-duration"
+              aria-label={t('decision.executionLog.minDurationLabel', undefined, '最小耗时')}
+              data-testid="log-min-duration"
               type="number"
               min="0"
               value={filters.minDurationMs}
@@ -1287,7 +1319,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
           <label>
             <span>最大耗时</span>
             <input
-              aria-label="log-max-duration"
+              aria-label={t('decision.executionLog.maxDurationLabel', undefined, '最大耗时')}
+              data-testid="log-max-duration"
               type="number"
               min="0"
               value={filters.maxDurationMs}
@@ -1435,7 +1468,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             <button
               type="button"
               className="elta-drawer-backdrop"
-              aria-label="关闭执行链路"
+              aria-label={t('decision.executionLog.closeTraceLabel', undefined, '关闭执行链路')}
               data-testid="elta-trace-backdrop"
               onClick={closeTrace}
             />
@@ -1444,7 +1477,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
             ref={traceDrawerRef}
             className="elta-drawer"
             role="dialog"
-            aria-label="执行链路"
+            aria-label={t('decision.executionLog.traceDialogLabel', undefined, '执行链路')}
             aria-modal={mode === 'list' ? true : undefined}
             data-mode={mode}
             data-testid="elta-trace-drawer"
@@ -1485,7 +1518,10 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                 </a>
               ) : null}
               {bpmProcessStatusHref(selectedLog) ? (
-                <a data-testid="elta-open-bpm-process-status" href={bpmProcessStatusHref(selectedLog)}>
+                <a
+                  data-testid="elta-open-bpm-process-status"
+                  href={bpmProcessStatusHref(selectedLog)}
+                >
                   打开流程状态
                 </a>
               ) : null}

@@ -49,14 +49,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Opt-in: gated on a live LLM credential (see {@link LiveLlmSeeder}), tagged
  * {@code agent-eval-live}.
- * <pre>{@code DASHSCOPE_API_KEY=... ./gradlew :testAgent --tests '*CapabilityScorecardLiveIT*' -PincludeLiveEvals}</pre>
+ * <pre>{@code
+ * AURA_LIVE_LLM_PROVIDER=provider AURA_LIVE_LLM_MODEL=model \
+ * AURA_LIVE_LLM_API_KEY_ENV=LIVE_KEY ./gradlew :testAgent \
+ * --tests '*CapabilityScorecardLiveIT*' -PincludeLiveEvals
+ * }</pre>
  */
 @Tag("agent-eval-live")
 @DisplayName("Capability scorecard: aggregate 5-dimension score vs the competency bar")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
-        "agent.anthropic.api-key=",
         "agent.llm.stub-mode=false",
 })
 class CapabilityScorecardLiveIT extends BaseIntegrationTest {

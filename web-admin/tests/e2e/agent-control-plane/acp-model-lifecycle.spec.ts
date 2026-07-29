@@ -115,9 +115,7 @@ async function fetchRecordByPid(
 function waitForListResponse(page: Page, modelCode: string, timeout = 10_000) {
   return page
     .waitForResponse(
-      (r) =>
-        r.url().includes(`/api/dynamic/${modelCode}/list`) &&
-        r.status() === 200,
+      (r) => r.url().includes(`/api/dynamic/${modelCode}/list`) && r.status() === 200,
       { timeout },
     )
     .catch(() => null);
@@ -301,6 +299,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
         page,
         COMMANDS.createSchedule,
         {
+          agent_code: agentCode,
           title: scheduleTitle,
           description: 'Lifecycle test schedule',
           schedule_type: 'cron',
@@ -309,6 +308,9 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
           timezone: 'Asia/Shanghai',
           mission_id: missionPid,
           max_runs: 100,
+          daily_run_budget: 8,
+          concurrency_limit: 1,
+          missed_run_policy: 'skip',
           task_template: JSON.stringify({
             title: 'Auto lifecycle scan',
             assignee_id: agentCode,
@@ -327,9 +329,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
         {
           policy_name: policyName,
           description: 'Lifecycle test approval policy',
-          trigger_rules: JSON.stringify([
-            { type: 'cost_threshold', threshold: 5 },
-          ]),
+          trigger_rules: JSON.stringify([{ type: 'cost_threshold', threshold: 5 }]),
           approver_rules: JSON.stringify([{ role: 'tenant_admin' }]),
           policy_status: 'active',
           timeout_hours: 48,
@@ -407,10 +407,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
 
   // Skip all if ACP not installed
   test.beforeEach(async () => {
-    expect(
-      acpInstalled,
-      'ACP plugin must be installed for lifecycle tests',
-    ).toBe(true);
+    expect(acpInstalled, 'ACP plugin must be installed for lifecycle tests').toBe(true);
   });
 
   // =========================================================================
@@ -423,9 +420,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     await expectAcpUiPage(page, '/dynamic/agent-definition');
 
     // Wait for table to render with data
-    await expect(
-      page.locator('table tbody tr').first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
 
     // Verify Chinese i18n column headers
     const headerRow = page.locator('table thead');
@@ -442,9 +437,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L002: Agent Definition — update Soul Profile fields and verify
   // =========================================================================
-  test('ACP-L002: Agent Definition — update Soul Profile fields', async ({
-    page,
-  }) => {
+  test('ACP-L002: Agent Definition — update Soul Profile fields', async ({ page }) => {
     await executeCommandViaApi(
       page,
       COMMANDS.updateAgentDef,
@@ -460,17 +453,11 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     );
 
     // Verify update persisted
-    const record = await fetchRecordByPid(
-      page,
-      'agent-definition',
-      agentDefPid,
-    );
+    const record = await fetchRecordByPid(page, 'agent-definition', agentDefPid);
     expect(record, 'Agent definition should exist').toBeTruthy();
     expect(record!.personality).toBe('Creative and adaptive');
     expect(record!.communication_style).toBe('detailed');
-    expect(record!.soul_goals).toBe(
-      'Improve code quality across all projects',
-    );
+    expect(record!.soul_goals).toBe('Improve code quality across all projects');
   });
 
   // =========================================================================
@@ -482,9 +469,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     await navigateToAcpMenu(page, '/dynamic/mission');
     await expectAcpUiPage(page, '/dynamic/mission');
 
-    await expect(
-      page.locator('table tbody tr').first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
 
     const headerRow = page.locator('table thead');
     await expect(headerRow.getByText('标题')).toBeVisible({ timeout: 5_000 });
@@ -499,9 +484,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L004: Mission lifecycle — active -> paused -> active -> completed -> archived
   // =========================================================================
-  test('ACP-L004: Mission lifecycle — full state transitions', async ({
-    page,
-  }) => {
+  test('ACP-L004: Mission lifecycle — full state transitions', async ({ page }) => {
     // Create a dedicated mission for lifecycle transitions
     const lcMissionTitle = `MissionLC_${uid}`;
     const createRes = await executeCommandViaApi(
@@ -520,46 +503,22 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     expect(lcMissionPid).toBeTruthy();
 
     // active -> paused
-    await executeCommandViaApi(
-      page,
-      COMMANDS.pauseMission,
-      {},
-      lcMissionPid,
-      'update',
-    );
+    await executeCommandViaApi(page, COMMANDS.pauseMission, {}, lcMissionPid, 'update');
     let record = await fetchRecordByPid(page, 'mission', lcMissionPid);
     expect(record!.mission_status).toBe('paused');
 
     // paused -> active (resume)
-    await executeCommandViaApi(
-      page,
-      COMMANDS.resumeMission,
-      {},
-      lcMissionPid,
-      'update',
-    );
+    await executeCommandViaApi(page, COMMANDS.resumeMission, {}, lcMissionPid, 'update');
     record = await fetchRecordByPid(page, 'mission', lcMissionPid);
     expect(record!.mission_status).toBe('active');
 
     // active -> completed
-    await executeCommandViaApi(
-      page,
-      COMMANDS.completeMission,
-      {},
-      lcMissionPid,
-      'update',
-    );
+    await executeCommandViaApi(page, COMMANDS.completeMission, {}, lcMissionPid, 'update');
     record = await fetchRecordByPid(page, 'mission', lcMissionPid);
     expect(record!.mission_status).toBe('completed');
 
     // completed -> archived
-    await executeCommandViaApi(
-      page,
-      COMMANDS.archiveMission,
-      {},
-      lcMissionPid,
-      'update',
-    );
+    await executeCommandViaApi(page, COMMANDS.archiveMission, {}, lcMissionPid, 'update');
     record = await fetchRecordByPid(page, 'mission', lcMissionPid);
     expect(record!.mission_status).toBe('archived');
   });
@@ -567,15 +526,11 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L005: Task list — navigate and verify i18n headers
   // =========================================================================
-  test('ACP-L005: Task list — navigate via sidebar and verify i18n headers', async ({
-    page,
-  }) => {
+  test('ACP-L005: Task list — navigate via sidebar and verify i18n headers', async ({ page }) => {
     await navigateToAcpMenu(page, '/dynamic/agent-task');
     await expectAcpUiPage(page, '/dynamic/agent-task');
 
-    await expect(
-      page.locator('table tbody tr').first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
 
     const headerRow = page.locator('table thead');
     await expect(headerRow.getByText('标题')).toBeVisible({ timeout: 5_000 });
@@ -593,9 +548,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L006: Task lifecycle — TODO -> in_progress -> BLOCKED -> in_progress -> DONE
   // =========================================================================
-  test('ACP-L006: Task lifecycle — full state transitions including BLOCKED', async ({
-    page,
-  }) => {
+  test('ACP-L006: Task lifecycle — full state transitions including BLOCKED', async ({ page }) => {
     // Create dedicated task for lifecycle
     const lcTaskTitle = `TaskLC_${uid}`;
     const createRes = await executeCommandViaApi(
@@ -617,41 +570,21 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     expect(lcTaskPid).toBeTruthy();
 
     // TODO -> in_progress
-    await executeCommandViaApi(
-      page,
-      COMMANDS.startTask,
-      {},
-      lcTaskPid,
-      'update',
-    );
+    await executeCommandViaApi(page, COMMANDS.startTask, {}, lcTaskPid, 'update');
     let record = await fetchRecordByPid(page, 'agent-task', lcTaskPid);
     expect(record!.task_status).toBe('in_progress');
 
     // in_progress -> BLOCKED
-    await executeCommandViaApi(
-      page,
-      COMMANDS.blockTask,
-      {},
-      lcTaskPid,
-      'update',
-    );
+    await executeCommandViaApi(page, COMMANDS.blockTask, {}, lcTaskPid, 'update');
     record = await fetchRecordByPid(page, 'agent-task', lcTaskPid);
     expect(record!.task_status).toBe('blocked');
 
     // Verify BLOCKED task appears on task list page
     await navigateToAcpMenu(page, '/dynamic/agent-task');
-    await expect(
-      page.locator('table tbody tr').first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
 
     // BLOCKED -> cancel (BLOCKED is not in startTask fromStates, so cancel it)
-    await executeCommandViaApi(
-      page,
-      COMMANDS.cancelTask,
-      {},
-      lcTaskPid,
-      'update',
-    );
+    await executeCommandViaApi(page, COMMANDS.cancelTask, {}, lcTaskPid, 'update');
     record = await fetchRecordByPid(page, 'agent-task', lcTaskPid);
     expect(record!.task_status).toBe('cancelled');
   });
@@ -678,13 +611,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     const cancelPid = createRes.recordId;
     expect(cancelPid).toBeTruthy();
 
-    await executeCommandViaApi(
-      page,
-      COMMANDS.cancelTask,
-      {},
-      cancelPid,
-      'update',
-    );
+    await executeCommandViaApi(page, COMMANDS.cancelTask, {}, cancelPid, 'update');
     const record = await fetchRecordByPid(page, 'agent-task', cancelPid);
     expect(record!.task_status).toBe('cancelled');
   });
@@ -694,13 +621,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   test('ACP-L008: Agent Run — cancel running run', async ({ page }) => {
     // Cancel the run created in beforeAll (running -> cancelled)
-    await executeCommandViaApi(
-      page,
-      COMMANDS.cancelRun,
-      {},
-      runPid,
-      'update',
-    );
+    await executeCommandViaApi(page, COMMANDS.cancelRun, {}, runPid, 'update');
     const record = await fetchRecordByPid(page, 'agent-run', runPid);
     expect(record!.run_status).toBe('cancelled');
   });
@@ -708,16 +629,12 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L009: Agent Run list — navigate and verify i18n headers
   // =========================================================================
-  test('ACP-L009: Agent Run list — navigate via sidebar and verify data', async ({
-    page,
-  }) => {
+  test('ACP-L009: Agent Run list — navigate via sidebar and verify data', async ({ page }) => {
     await navigateToAcpMenu(page, '/dynamic/agent-run');
     await expectAcpUiPage(page, '/dynamic/agent-run');
 
     // Run list should have at least one row from seed data
-    await expect(
-      page.locator('table tbody tr').first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
 
     const headerRow = page.locator('table thead');
     await expect(headerRow.getByText('运行状态')).toBeVisible({
@@ -731,9 +648,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L010: Artifact — update and create CODE type
   // =========================================================================
-  test('ACP-L010: Artifact — update title and create CODE type artifact', async ({
-    page,
-  }) => {
+  test('ACP-L010: Artifact — update title and create CODE type artifact', async ({ page }) => {
     // Update existing artifact
     const updatedTitle = `ArtifactUpd_${uid}`;
     await executeCommandViaApi(
@@ -767,9 +682,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
 
     // Navigate to artifact list and verify data
     await navigateToAcpMenu(page, '/dynamic/agent-artifact');
-    await expect(
-      page.locator('table tbody tr').first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
 
     const headerRow = page.locator('table thead');
     await expect(headerRow.getByText('标题')).toBeVisible({ timeout: 5_000 });
@@ -781,28 +694,14 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L011: Schedule lifecycle — active -> paused -> active
   // =========================================================================
-  test('ACP-L011: Schedule lifecycle — active -> paused -> active', async ({
-    page,
-  }) => {
+  test('ACP-L011: Schedule lifecycle — active -> paused -> active', async ({ page }) => {
     // active -> paused
-    await executeCommandViaApi(
-      page,
-      COMMANDS.pauseSchedule,
-      {},
-      schedulePid,
-      'update',
-    );
+    await executeCommandViaApi(page, COMMANDS.pauseSchedule, {}, schedulePid, 'update');
     let record = await fetchRecordByPid(page, 'agent-schedule', schedulePid);
     expect(record!.schedule_status).toBe('paused');
 
     // paused -> active
-    await executeCommandViaApi(
-      page,
-      COMMANDS.activateSchedule,
-      {},
-      schedulePid,
-      'update',
-    );
+    await executeCommandViaApi(page, COMMANDS.activateSchedule, {}, schedulePid, 'update');
     record = await fetchRecordByPid(page, 'agent-schedule', schedulePid);
     expect(record!.schedule_status).toBe('active');
   });
@@ -810,15 +709,11 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L012: Schedule list — navigate and verify i18n headers
   // =========================================================================
-  test('ACP-L012: Schedule list — navigate via sidebar and verify i18n', async ({
-    page,
-  }) => {
+  test('ACP-L012: Schedule list — navigate via sidebar and verify i18n', async ({ page }) => {
     await navigateToAcpMenu(page, '/dynamic/agent-schedule');
     await expectAcpUiPage(page, '/dynamic/agent-schedule');
 
-    await expect(
-      page.locator('table tbody tr').first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
 
     const headerRow = page.locator('table thead');
     await expect(headerRow.getByText('标题')).toBeVisible({ timeout: 5_000 });
@@ -833,9 +728,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L013: Approval Policy — update and verify
   // =========================================================================
-  test('ACP-L013: Approval Policy — update and verify in list', async ({
-    page,
-  }) => {
+  test('ACP-L013: Approval Policy — update and verify in list', async ({ page }) => {
     const updatedName = `PolicyUpd_${uid}`;
     await executeCommandViaApi(
       page,
@@ -849,20 +742,14 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
       'update',
     );
 
-    const record = await fetchRecordByPid(
-      page,
-      'approval-policy',
-      policyPid,
-    );
+    const record = await fetchRecordByPid(page, 'approval-policy', policyPid);
     expect(record!.policy_name).toBe(updatedName);
     expect(Number(record!.timeout_hours)).toBe(72);
     expect(record!.auto_approve).toBe(true);
 
     // Navigate to policy list page
     await navigateToAcpMenu(page, '/dynamic/approval-policy');
-    await expect(
-      page.locator('table tbody tr').first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
 
     const headerRow = page.locator('table thead');
     await expect(headerRow.getByText('策略名称')).toBeVisible({
@@ -876,9 +763,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L014: Agent Approval — create pending and approve
   // =========================================================================
-  test('ACP-L014: Agent Approval — create pending approval and approve it', async ({
-    page,
-  }) => {
+  test('ACP-L014: Agent Approval — create pending approval and approve it', async ({ page }) => {
     // Create a pending approval record via direct API (no create command, use run's API)
     // agent_approval has no explicit create command in commands.json — use run-based creation
     // Actually it does not have create command — we need to create via the dynamic API
@@ -918,9 +803,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
       'update',
     );
     let record = await fetchRecordByPid(page, 'agent-memory', memoryPid);
-    expect(record!.memory_content).toBe(
-      'Updated lifecycle test memory content',
-    );
+    expect(record!.memory_content).toBe('Updated lifecycle test memory content');
     expect(Number(record!.importance)).toBe(10);
 
     // Create LESSON type memory
@@ -961,15 +844,11 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L016: Memory list — navigate and verify i18n headers
   // =========================================================================
-  test('ACP-L016: Memory list — navigate via sidebar and verify data', async ({
-    page,
-  }) => {
+  test('ACP-L016: Memory list — navigate via sidebar and verify data', async ({ page }) => {
     await navigateToAcpMenu(page, '/dynamic/agent-memory');
     await expectAcpUiPage(page, '/dynamic/agent-memory');
 
-    await expect(
-      page.locator('table tbody tr').first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
 
     const headerRow = page.locator('table thead');
     await expect(headerRow.getByText('标题')).toBeVisible({ timeout: 5_000 });
@@ -984,9 +863,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L017: Observation — create multiple severity levels
   // =========================================================================
-  test('ACP-L017: Observation — create ERROR, ALERT, and METRIC observations', async ({
-    page,
-  }) => {
+  test('ACP-L017: Observation — create ERROR, ALERT, and METRIC observations', async ({ page }) => {
     const observations = [
       {
         observation_type: 'error',
@@ -1025,19 +902,14 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
         undefined,
         'create',
       );
-      expect(
-        res.recordId,
-        `Observation ${obs.observation_type} should be created`,
-      ).toBeTruthy();
+      expect(res.recordId, `Observation ${obs.observation_type} should be created`).toBeTruthy();
     }
 
     // Navigate to observation page and verify data
     await navigateToAcpMenu(page, '/dynamic/agent-observation');
     await expectAcpUiPage(page, '/dynamic/agent-observation');
 
-    await expect(
-      page.locator('table tbody tr').first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
 
     const headerRow = page.locator('table thead');
     await expect(headerRow.getByText('观测类型')).toBeVisible({
@@ -1051,9 +923,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L018: Tool — update and create MCP_SERVER type
   // =========================================================================
-  test('ACP-L018: Tool — update existing and create MCP_SERVER type', async ({
-    page,
-  }) => {
+  test('ACP-L018: Tool — update existing and create MCP_SERVER type', async ({ page }) => {
     // Update existing tool
     await executeCommandViaApi(
       page,
@@ -1067,9 +937,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
       'update',
     );
     let record = await fetchRecordByPid(page, 'agent-tool', toolPid);
-    expect(record!.tool_description).toBe(
-      'Updated lifecycle tool description',
-    );
+    expect(record!.tool_description).toBe('Updated lifecycle tool description');
     expect(record!.risk_level).toBe('medium');
     expect(record!.requires_approval).toBe(true);
 
@@ -1121,15 +989,11 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L019: Tool list — navigate and verify i18n headers
   // =========================================================================
-  test('ACP-L019: Tool list — navigate via sidebar and verify i18n', async ({
-    page,
-  }) => {
+  test('ACP-L019: Tool list — navigate via sidebar and verify i18n', async ({ page }) => {
     await navigateToAcpMenu(page, '/dynamic/agent-tool');
     await expectAcpUiPage(page, '/dynamic/agent-tool');
 
-    await expect(
-      page.locator('table tbody tr').first(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 15_000 });
 
     const headerRow = page.locator('table thead');
     await expect(headerRow.getByText('工具名称')).toBeVisible({
@@ -1208,16 +1072,12 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L021: Skill list — navigate and verify i18n headers
   // =========================================================================
-  test('ACP-L021: Skill list — navigate via sidebar and verify i18n', async ({
-    page,
-  }) => {
+  test('ACP-L021: Skill list — navigate via sidebar and verify i18n', async ({ page }) => {
     await navigateToAcpMenu(page, '/dynamic/agent-skill');
     await expectAcpUiPage(page, '/dynamic/agent-skill');
 
     // Skill list should have data from seeds
-    const table = page
-      .locator('table')
-      .or(page.locator('[data-testid="smart-table"]'));
+    const table = page.locator('table').or(page.locator('[data-testid="smart-table"]'));
     await expect(table.first()).toBeVisible({ timeout: 15_000 });
 
     const headerRow = page.locator('table thead');
@@ -1234,9 +1094,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L022: Cross-model data integrity — task references mission
   // =========================================================================
-  test('ACP-L022: Cross-model integrity — task references valid mission', async ({
-    page,
-  }) => {
+  test('ACP-L022: Cross-model integrity — task references valid mission', async ({ page }) => {
     const task = await fetchRecordByPid(page, 'agent-task', taskPid);
     expect(task, 'Task should exist').toBeTruthy();
     expect(task!.mission_id).toBe(missionPid);
@@ -1250,9 +1108,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L023: Cross-model data integrity — run references task and agent
   // =========================================================================
-  test('ACP-L023: Cross-model integrity — run references task', async ({
-    page,
-  }) => {
+  test('ACP-L023: Cross-model integrity — run references task', async ({ page }) => {
     const run = await fetchRecordByPid(page, 'agent-run', runPid);
     expect(run, 'Run should exist').toBeTruthy();
     expect(run!.task_id).toBe(taskPid);
@@ -1264,9 +1120,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
   // =========================================================================
   // ACP-L024: All 12 model list APIs return valid responses
   // =========================================================================
-  test('ACP-L024: All 12 model list APIs return 200 with valid structure', async ({
-    page,
-  }) => {
+  test('ACP-L024: All 12 model list APIs return 200 with valid structure', async ({ page }) => {
     const models = [
       'agent-definition',
       'mission',
@@ -1283,9 +1137,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     ];
 
     for (const model of models) {
-      const resp = await page.request.get(
-        `/api/dynamic/${model}/list?pageSize=5`,
-      );
+      const resp = await page.request.get(`/api/dynamic/${model}/list?pageSize=5`);
       expect(resp.status(), `${model} list API should return 200`).toBe(200);
       const body = await resp.json();
       // Dynamic API uses code:"0" for success, not success:true
@@ -1293,19 +1145,14 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
         body.success === true || body.code === '0' || body.code === 0,
         `${model} list API should succeed (code=${body.code})`,
       ).toBe(true);
-      expect(
-        Array.isArray(body.data?.records),
-        `${model} should return records array`,
-      ).toBe(true);
+      expect(Array.isArray(body.data?.records), `${model} should return records array`).toBe(true);
     }
   });
 
   // =========================================================================
   // ACP-L025: Seed data record counts — verify minimum records per model
   // =========================================================================
-  test('ACP-L025: Seed data integrity — minimum record counts across models', async ({
-    page,
-  }) => {
+  test('ACP-L025: Seed data integrity — minimum record counts across models', async ({ page }) => {
     // Models that should have at least 1 record from lifecycle seeds
     const expectations: Array<{ model: string; minCount: number }> = [
       { model: 'agent-definition', minCount: 1 },
@@ -1322,9 +1169,7 @@ test.describe('Agent Control Plane — Model Lifecycle', () => {
     ];
 
     for (const { model, minCount } of expectations) {
-      const resp = await page.request.get(
-        `/api/dynamic/${model}/list?pageSize=200`,
-      );
+      const resp = await page.request.get(`/api/dynamic/${model}/list?pageSize=200`);
       const body = await resp.json();
       const count = body.data?.records?.length ?? 0;
       expect(

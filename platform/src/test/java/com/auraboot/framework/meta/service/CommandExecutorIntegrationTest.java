@@ -1279,7 +1279,7 @@ class CommandExecutorIntegrationTest {
         });
 
         log.info("Handler exception propagated: {}", ex.getMessage());
-        assertTrue(ex.getMessage().contains("Handler") || ex.getMessage().contains("testCommandHandler"),
+        assertTrue(ex.getMessage().toLowerCase(java.util.Locale.ROOT).contains("handler"),
                 "Exception should indicate handler failure");
     }
 

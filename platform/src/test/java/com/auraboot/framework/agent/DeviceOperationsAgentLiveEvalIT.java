@@ -47,7 +47,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Opt-in: gated by the presence of a live LLM credential ({@link LiveLlmSeeder}),
  * tagged {@code agent-eval-live}.
- * <pre>{@code DASHSCOPE_API_KEY=sk-... ./gradlew :platform:testAgent --tests '*DeviceOperationsAgentLiveEvalIT*'}</pre>
+ * <pre>{@code
+ * AURA_LIVE_LLM_PROVIDER=provider AURA_LIVE_LLM_MODEL=model \
+ * AURA_LIVE_LLM_API_KEY_ENV=LIVE_KEY ./gradlew :platform:testAgent \
+ * --tests '*DeviceOperationsAgentLiveEvalIT*'
+ * }</pre>
  */
 @Tag("agent-eval-live")
 @DisplayName("Device operations agent: live LLM golden — diagnose-read vs confirmed-action")
@@ -55,16 +59,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
-        "agent.anthropic.api-key=",
         "agent.llm.stub-mode=false",
 })
 class DeviceOperationsAgentLiveEvalIT extends BaseIntegrationTest {
 
     /**
-     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * Resolved from the environment (the explicit provider-neutral live profile) rather than
      * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider and its
      * model name in every live IT is what silently broke this whole layer when
-     * DeepSeek retired {@code deepseek-chat}.
+     * an upstream provider retired a model identifier.
      */
     private LiveLlmSeeder.LiveProvider liveProvider;
 

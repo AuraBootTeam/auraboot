@@ -75,8 +75,7 @@ public class EmbeddingRetryService {
         try {
             List<float[]> embeddings;
             try {
-                embeddings = embeddingService.embedBatch(tenantId, texts,
-                        provider != null ? provider : "openai");
+                embeddings = embeddingService.embedBatch(tenantId, texts, provider);
             } catch (Exception e) {
                 log.warn("Embedding retry batch failed for tenant {} provider {}: {}",
                         tenantId, provider, e.getMessage());
