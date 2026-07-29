@@ -216,8 +216,9 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
         freshYunhanRequestObserved: true,
       });
 
-    // The same UI upload must also have triggered process-fee calculation. The first row proves
-    // the match is content-driven: blank package + description token 0201 -> Excel rule row 3.
+    // The same UI upload must also have triggered process-point calculation. The matching row
+    // proves package normalization + exact package matching -> Excel rule row 3. The backend owns
+    // points only; the exported quote template owns the point-unit-price multiplication.
     let processHits: Record<string, unknown>[] = [];
     await expect
       .poll(
@@ -247,14 +248,14 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
         basis: 'fixed_points',
         unitPoints: 2,
         totalPoints: 6,
-        amount: 0.07,
+        amount: 0,
       });
     expect(processHits).toHaveLength(4);
 
     const resistorHit = processHits.find(
       (row) => String(row.qo_pfrh_quote_line_id) === String(resistorLine?.pid),
     );
-    expect(String(resistorHit?.qo_pfrh_point_formula)).toMatch(/^fixed_points\(2(?:\.0+)?\)$/);
+    expect(String(resistorHit?.qo_pfrh_point_formula)).toBe('3 × 2 = 6');
     expect(resistorHit?.qo_pfrh_point_source).toBe('rule-fixed-points');
     expect(String(resistorHit?.qo_pfrh_trace)).toContain('ruleRow=3');
 
@@ -265,7 +266,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     expect(Number(matchedRules[0]?.qo_pfrl_source_row_no)).toBe(3);
     expect(String(matchedRules[0]?.qo_pfrl_component_type)).toContain('0201');
     expect(Number(matchedRules[0]?.qo_pfrl_point_count)).toBe(2);
-    expect(Number(matchedRules[0]?.qo_pfrl_unit_price)).toBe(0.012);
+    expect(matchedRules[0]?.qo_pfrl_unit_price ?? null).toBeNull();
 
     await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
     await expect(page.getByTestId('metric-strip-qo_bom_price_metrics')).toBeVisible({
@@ -309,13 +310,15 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     await expect(resistorHitRow).toHaveCount(1, { timeout: 20_000 });
     await expect(resistorHitRow).toContainText(/完全匹配|Matched/i);
     await expect(resistorHitRow).toContainText('SMT');
-    await expect(resistorHitRow).toContainText(/数量 3 .*单件点数 2 .*合计点数 6|Qty \/ Points/i);
 
     await resistorHitRow.click();
     const reviewDrawer = page.getByTestId('review-drawer');
     await expect(reviewDrawer).toBeVisible({ timeout: 10_000 });
     await expect(reviewDrawer).toContainText('WMF2400TEE');
-    await expect(reviewDrawer).toContainText(/fixed_points\(2(?:\.0+)?\)/);
+    await expect(reviewDrawer).toContainText(/单套用量\s*3(?:\.00)?/);
+    await expect(reviewDrawer).toContainText(/单件点数\s*2/);
+    await expect(reviewDrawer).toContainText(/单套点数\s*6/);
+    await expect(reviewDrawer).toContainText('fixed_points');
     await expect(reviewDrawer).toContainText(/Excel行 3|Excel Row 3/i);
 
     await testInfo.attach('nonstd-process-fee-0201-match.png', {
