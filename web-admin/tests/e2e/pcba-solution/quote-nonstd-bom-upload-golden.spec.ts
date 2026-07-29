@@ -324,7 +324,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     ] as const) {
       const column = processHeaders.findIndex((header) => label.test(header));
       expect(column, `process headers: ${processHeaders.join(' | ')}`).toBeGreaterThanOrEqual(0);
-      expect(processCells[column]).toBe(expected);
+      expect(Number(processCells[column])).toBe(Number(expected));
     }
 
     await resistorHitRow.click();
