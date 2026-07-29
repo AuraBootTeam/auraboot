@@ -16,7 +16,7 @@ import { post, fetchResult } from '~/shared/services/http-client';
 import { ResultHelper, type User } from '~/utils/type';
 import { getUserInfo } from '~/shared/services/userService';
 import { useI18n } from '~/contexts/I18nContext';
-import { getIcpComplianceConfig } from '~/config/icpCompliance';
+import { useRootLoaderData } from '~/root';
 import IcpComplianceFooter from './IcpComplianceFooter';
 import { getLoginFailureActionData } from './login-errors';
 
@@ -40,11 +40,6 @@ const SOCIAL_I18N_KEYS: Record<string, string> = {
   google: 'auth.social.google',
   apple: 'auth.social.apple',
   oidc: 'auth.social.oidc',
-};
-
-export const meta = () => {
-  const compliance = getIcpComplianceConfig();
-  return compliance.enabled ? [{ title: compliance.siteDisplayName }] : [];
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -310,7 +305,7 @@ interface CapabilityRow {
 }
 
 export default function LoginPage() {
-  const compliance = getIcpComplianceConfig();
+  const compliance = useRootLoaderData()!.icpCompliance;
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
@@ -324,8 +319,8 @@ export default function LoginPage() {
     new Set(rawChannels.map((channel) => String(channel || '').toLowerCase()).filter(Boolean)),
   );
   const actionChannel = typeof (visibleActionData as any)?.channelCode === 'string'
-    ? String((visibleActionData as any).channelCode).toLowerCase()
-    : null;
+      ? String((visibleActionData as any).channelCode).toLowerCase()
+      : null;
 
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -339,8 +334,8 @@ export default function LoginPage() {
   const tabChannels = channels.filter((c: string) => !SOCIAL_CHANNELS.includes(c as any));
   const socialChannels = channels.filter((c: string) => SOCIAL_CHANNELS.includes(c as any));
   const preferredTab = actionChannel && tabChannels.includes(actionChannel)
-    ? actionChannel
-    : tabChannels[0] || 'email_password';
+      ? actionChannel
+      : tabChannels[0] || 'email_password';
   const [activeTab, setActiveTab] = useState<string>(preferredTab);
 
   useEffect(() => {

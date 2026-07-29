@@ -4,6 +4,12 @@ const ENABLED_VALUES = new Set(['1', 'true', 'yes', 'on']);
 
 export const ICP_RECORD_LOOKUP_URL = 'https://beian.miit.gov.cn/';
 
+export interface IcpComplianceEnvironment {
+  ICP_COMPLIANCE_ENABLED?: string;
+  ICP_SITE_TITLE?: string;
+  ICP_RECORD_NUMBER?: string;
+}
+
 export interface IcpComplianceConfig {
   enabled: boolean;
   siteTitle: string;
@@ -16,12 +22,14 @@ function envValue(value: string | undefined, fallback: string): string {
   return normalized || fallback;
 }
 
-export function getIcpComplianceConfig(): IcpComplianceConfig {
+export function resolveIcpComplianceConfig(
+  environment: IcpComplianceEnvironment = {},
+): IcpComplianceConfig {
   const enabled = ENABLED_VALUES.has(
-    (import.meta.env.VITE_ICP_COMPLIANCE_ENABLED || '').trim().toLowerCase(),
+    (environment.ICP_COMPLIANCE_ENABLED || '').trim().toLowerCase(),
   );
-  const siteTitle = envValue(import.meta.env.VITE_ICP_SITE_TITLE, defaults.siteTitle);
-  const recordNumber = envValue(import.meta.env.VITE_ICP_RECORD_NUMBER, defaults.recordNumber);
+  const siteTitle = envValue(environment.ICP_SITE_TITLE, defaults.siteTitle);
+  const recordNumber = envValue(environment.ICP_RECORD_NUMBER, defaults.recordNumber);
 
   return {
     enabled,

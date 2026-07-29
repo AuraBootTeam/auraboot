@@ -13,6 +13,7 @@
 #   SKIP_BUILD=1 ./deploy.sh          # reuse already-built local images
 #   SKIP_SEED=1 ./deploy.sh           # deploy without demo data
 #   STEP=verify ./deploy.sh           # run a single phase (build|ship|up|bootstrap|seed|verify)
+#   STEP=config ./deploy.sh           # update ICP runtime config; do not build or upload images
 #
 # Required env:
 #   HOST=root@1.2.3.4                 # ssh target
@@ -88,9 +89,6 @@ build(){
   else cp "$WEB_ADMIN/Dockerfile" "$fedf"; fi
   docker buildx build --platform "$PLATFORM" --load \
     --build-arg NPM_REGISTRY="$NPM_REGISTRY" \
-    --build-arg VITE_ICP_COMPLIANCE_ENABLED="$ICP_COMPLIANCE_ENABLED" \
-    --build-arg VITE_ICP_SITE_TITLE="$ICP_SITE_TITLE" \
-    --build-arg VITE_ICP_RECORD_NUMBER="$ICP_RECORD_NUMBER" \
     -f "$fedf" -t "$FE_IMG" "$ROOT"
   rm -f "$fedf"
   for i in "$BE_IMG" "$FE_IMG"; do
@@ -98,6 +96,48 @@ build(){
     [ "$a" = "${PLATFORM}" ] || { echo "ERROR: $i is $a, expected $PLATFORM" >&2; exit 1; }
   done
   log "build: OK — both images are $PLATFORM"
+}
+
+set_remote_env(){
+  local key="$1" value_b64
+  value_b64="$(printf '%s' "$2" | base64 | tr -d '\n')"
+  run_remote "python3 - '$REMOTE_DIR/.env' '$key' '$value_b64'" <<'PY'
+import base64
+import os
+import pathlib
+import sys
+import tempfile
+
+path = pathlib.Path(sys.argv[1])
+key = sys.argv[2]
+value = base64.b64decode(sys.argv[3]).decode('utf-8')
+lines = path.read_text(encoding='utf-8').splitlines()
+entry = f'{key}={value}'
+updated = []
+replaced = False
+for line in lines:
+    if line.startswith(f'{key}='):
+        if not replaced:
+            updated.append(entry)
+            replaced = True
+        continue
+    updated.append(line)
+if not replaced:
+    updated.append(entry)
+
+mode = path.stat().st_mode & 0o777
+with tempfile.NamedTemporaryFile('w', encoding='utf-8', dir=path.parent, delete=False) as handle:
+    handle.write('\n'.join(updated) + '\n')
+    temporary = handle.name
+os.chmod(temporary, mode)
+os.replace(temporary, path)
+PY
+}
+
+sync_runtime_config(){
+  set_remote_env ICP_COMPLIANCE_ENABLED "$ICP_COMPLIANCE_ENABLED"
+  set_remote_env ICP_SITE_TITLE "$ICP_SITE_TITLE"
+  set_remote_env ICP_RECORD_NUMBER "$ICP_RECORD_NUMBER"
 }
 
 # --- ship images + config to the host ----------------------------------------
@@ -134,10 +174,14 @@ PUBLIC_URL=$PUBLIC_URL
 EDGE_NETWORK=${EDGE_NETWORK:-}
 LOCAL_ADMIN_PORT=$LOCAL_ADMIN_PORT
 PUBLIC_HTTP_PORT=$PUBLIC_HTTP_PORT
+ICP_COMPLIANCE_ENABLED=$ICP_COMPLIANCE_ENABLED
+ICP_SITE_TITLE=$ICP_SITE_TITLE
+ICP_RECORD_NUMBER=$ICP_RECORD_NUMBER
 EOF
   fi
-  # keep TAG current on re-deploy
-  run_remote "sed -i 's|^TAG=.*|TAG=$TAG|' '$REMOTE_DIR/.env'"
+  # Keep the image tag and user-visible compliance settings current on re-deploy.
+  set_remote_env TAG "$TAG"
+  sync_runtime_config
   log "ship: images ($BE_IMG, $FE_IMG) via save|load — this can take a few minutes"
   docker save "$BE_IMG" | gzip -1 | run_remote "docker load"
   docker save "$FE_IMG" | gzip -1 | run_remote "docker load"
@@ -145,6 +189,19 @@ EOF
 }
 
 compose_cmd(){ echo "cd '$REMOTE_DIR' && docker compose --env-file .env -f docker-compose.remote.yml -f override.$MODE.yml"; }
+
+# --- update runtime-only configuration ---------------------------------------
+config(){
+  run_remote "test -f '$REMOTE_DIR/.env'" || {
+    echo "ERROR: $REMOTE_DIR/.env is missing; run the ship phase once first" >&2
+    exit 1
+  }
+  log "config: update ICP runtime settings without rebuilding or uploading images"
+  sync_runtime_config
+  run_remote "$(compose_cmd) up -d --no-deps --force-recreate frontend"
+  run_remote "docker inspect auraboot-oss-frontend --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^ICP_'"
+  log "config: frontend recreated with the existing image"
+}
 
 # --- bring the stack up ------------------------------------------------------
 up(){
@@ -196,6 +253,11 @@ verify(){
 
 # --- run ---------------------------------------------------------------------
 log "target=$HOST url=$PUBLIC_URL tag=$TAG mode=$MODE step=$STEP"
+if [ "$STEP" = "config" ]; then
+  config
+  verify
+  exit 0
+fi
 want build     && build
 want ship      && ship
 want up        && up

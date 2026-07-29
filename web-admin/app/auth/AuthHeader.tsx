@@ -5,12 +5,12 @@ import { useTheme } from '~/contexts/ThemeContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { useHydrated } from '~/hooks/useHydrated';
 import { useAuth } from '~/contexts/AuthContext';
-import { getIcpComplianceConfig } from '~/config/icpCompliance';
+import { useRootLoaderData } from '~/root';
 
 const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';
 
 export default function AuthHeader() {
-  const compliance = getIcpComplianceConfig();
+  const compliance = useRootLoaderData()!.icpCompliance;
   const { theme, setTheme, isDark } = useTheme();
   const { t, locale, setLocale } = useI18n();
   const isHydrated = useHydrated();

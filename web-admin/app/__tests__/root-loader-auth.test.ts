@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   destroySession: vi.fn(),
@@ -109,6 +109,10 @@ describe('root loader authentication guard', () => {
     mocks.ssrCacheGet.mockReturnValue(undefined);
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('redirects anonymous private routes even when route middleware is bypassed', async () => {
     mocks.getTokenFromRequest.mockResolvedValue(null);
 
@@ -139,9 +143,34 @@ describe('root loader authentication guard', () => {
       i18n: {},
       locale: 'zh-CN',
       runtimeProfile: 'admin',
+      icpCompliance: {
+        enabled: false,
+        siteDisplayName: 'AuraBoot',
+      },
     });
     expect(mocks.getUserInfo).not.toHaveBeenCalled();
     expect(mocks.getUserMenus).not.toHaveBeenCalled();
+  });
+
+  it('injects ICP settings from the BFF runtime environment', async () => {
+    vi.stubEnv('ICP_COMPLIANCE_ENABLED', 'true');
+    vi.stubEnv('ICP_SITE_TITLE', 'Runtime title');
+    vi.stubEnv('ICP_RECORD_NUMBER', 'Runtime ICP record');
+    mocks.getTokenFromRequest.mockResolvedValue(null);
+
+    const { loader } = await import('~/root');
+    const result = await loader({
+      request: new Request('http://localhost/login'),
+    } as any);
+
+    expect(result).toMatchObject({
+      icpCompliance: {
+        enabled: true,
+        siteTitle: 'Runtime title',
+        recordNumber: 'Runtime ICP record',
+        siteDisplayName: 'AuraBoot Runtime title',
+      },
+    });
   });
 
   it('keeps storefront runtime public even when an admin token exists', async () => {

@@ -1,22 +1,45 @@
 import { render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import IcpComplianceFooter from '../IcpComplianceFooter';
 
+const rootLoaderData = vi.hoisted(() => ({
+  value: {
+    icpCompliance: {
+      enabled: false,
+      siteTitle: '个人技术',
+      recordNumber: '浙ICP备2023054087号',
+      siteDisplayName: 'AuraBoot',
+    },
+  },
+}));
+
+vi.mock('~/root', () => ({
+  useRootLoaderData: () => rootLoaderData.value,
+}));
+
 describe('IcpComplianceFooter', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
+  beforeEach(() => {
+    rootLoaderData.value.icpCompliance = {
+      enabled: false,
+      siteTitle: '个人技术',
+      recordNumber: '浙ICP备2023054087号',
+      siteDisplayName: 'AuraBoot',
+    };
   });
 
   it('does not render when the compliance profile is disabled', () => {
-    vi.stubEnv('VITE_ICP_COMPLIANCE_ENABLED', 'false');
-
     render(<IcpComplianceFooter />);
 
     expect(screen.queryByTestId('icp-compliance-footer')).not.toBeInTheDocument();
   });
 
   it('renders the configured filing link when enabled', () => {
-    vi.stubEnv('VITE_ICP_COMPLIANCE_ENABLED', 'true');
+    rootLoaderData.value.icpCompliance = {
+      enabled: true,
+      siteTitle: '个人技术',
+      recordNumber: '浙ICP备2023054087号',
+      siteDisplayName: 'AuraBoot 个人技术',
+    };
 
     render(<IcpComplianceFooter />);
 
