@@ -23,7 +23,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { declaredCommands, referencedCommands } from './check-command-reachability.mjs';
+import {
+  declaredCommands,
+  referencedCommandsInRoots,
+} from './check-command-reachability.mjs';
 
 import { resolveRepoRoot } from './lib/repo-root.mjs';
 
@@ -164,6 +167,25 @@ export function buildPageIndex(specRoots) {
   return index;
 }
 
+export function buildModelRouteIndex(specRoots) {
+  const index = new Map();
+  const add = (key, rel) => {
+    if (!index.has(key)) index.set(key, []);
+    if (!index.get(key).includes(rel)) index.get(key).push(rel);
+  };
+  for (const root of specRoots) {
+    for (const file of walk(root, SPEC_EXTS)) {
+      const text = fs.readFileSync(file, 'utf8').replaceAll('\\/', '/');
+      const rel = path.relative(process.cwd(), file);
+      for (const match of text.matchAll(/\/p\/([a-z][a-z0-9_]+)(?:\/(new|view|edit))?(?=["'`/?#),\s])/gi)) {
+        const kind = match[2] === 'view' ? 'detail' : match[2] ? 'form' : 'list';
+        add(`${match[1]}:${kind}`, rel);
+      }
+    }
+  }
+  return index;
+}
+
 /**
  * Platform-native pages: hand-written React routes declared in a plugin's resources.ts.
  *
@@ -219,21 +241,44 @@ export function buildRouteIndex(specRoots) {
   };
 }
 
+export function resolveConfiguredPath(repoRoot, configured, env = process.env) {
+  const match = /^\$(?:\{([A-Z][A-Z0-9_]*)\}|([A-Z][A-Z0-9_]*))(?:\/(.*))?$/.exec(
+    configured,
+  );
+  if (!match) return path.resolve(repoRoot, configured);
+  const variable = match[1] ?? match[2];
+  const root = env[variable];
+  if (!root) {
+    throw new Error(`coverage spec root requires ${variable}: ${configured}`);
+  }
+  return path.resolve(root, match[3] ?? '');
+}
+
 function gitCommit(root) {
   try {
     return execFileSync('git', ['-C', root, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim();
   } catch { return 'unknown'; }
 }
 
-export function buildManifest({ repoRoot, pluginRoot, only, specRoots, runId, target }) {
-  const absSpecRoots = specRoots.map((r) => path.resolve(repoRoot, r));
+export function buildManifest({
+  repoRoot,
+  pluginRoot,
+  only,
+  specRoots,
+  runId,
+  target,
+  env = process.env,
+}) {
+  const absSpecRoots = specRoots.map((r) => resolveConfiguredPath(repoRoot, r, env));
   const uiIndex = buildUiIndex(absSpecRoots);
   const pageIndex = buildPageIndex(absSpecRoots);
+  const modelRouteIndex = buildModelRouteIndex(absSpecRoots);
   const groups = [];
   let untested = 0;
   let total = 0;
   let pageTotal = 0;
   let pageUntested = 0;
+  const referenced = referencedCommandsInRoots([pluginRoot]);
 
   const plugins = fs.readdirSync(pluginRoot).sort()
     .filter((e) => fs.statSync(path.join(pluginRoot, e)).isDirectory())
@@ -244,8 +289,6 @@ export function buildManifest({ repoRoot, pluginRoot, only, specRoots, runId, ta
     const commands = declaredCommands(pluginDir);
     const pages = declaredPages(pluginDir);
     if (commands.length === 0 && pages.length === 0) continue;
-    const referenced = referencedCommands(pluginDir);
-
     const rows = commands.sort().map((code) => {
       const hits = coverageFor(pluginDir, code, uiIndex);
       total += 1;
@@ -279,19 +322,25 @@ export function buildManifest({ repoRoot, pluginRoot, only, specRoots, runId, ta
 
     const pageRows = pages.map((p) => {
       pageTotal += 1;
-      const evidence = pageIndex.get(p.pageKey) ?? [];
-      if (evidence.length === 0) pageUntested += 1;
+      const evidence = new Set(pageIndex.get(p.pageKey) ?? []);
+      if (p.modelCode && p.pageKey === `${p.modelCode}_${p.kind}`) {
+        for (const file of modelRouteIndex.get(`${p.modelCode}:${p.kind}`) ?? []) {
+          evidence.add(file);
+        }
+      }
+      const evidenceFiles = [...evidence].sort();
+      if (evidenceFiles.length === 0) pageUntested += 1;
       return {
         id: `page:${p.pageKey}`,
         action: p.pageKey,
         surface: 'ui',
         dependencies: 'real-stack',
         driver: 'browser',
-        evidence,
-        assertion: evidence.length > 0
+        evidence: evidenceFiles,
+        assertion: evidenceFiles.length > 0
           ? 'a browser spec reaches this page'
           : 'no browser spec names this page or its route',
-        verdict: evidence.length > 0 ? 'pass' : 'untested',
+        verdict: evidenceFiles.length > 0 ? 'pass' : 'untested',
         note: `kind=${p.kind}${p.modelCode ? ` model=${p.modelCode}` : ''}`,
       };
     });

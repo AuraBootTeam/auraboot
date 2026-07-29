@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { buildPageIndex } from './gen-coverage-manifest.mjs';
+import {
+  buildModelRouteIndex,
+  buildPageIndex,
+  resolveConfiguredPath,
+} from './gen-coverage-manifest.mjs';
 
 // The page index decides which pages count as covered, so both of its failure
 // directions matter and they are not symmetric:
@@ -77,6 +81,40 @@ test('the index records which file the evidence came from', () => {
     assert.equal(files.length, 1);
     assert.ok(files[0].endsWith('g.spec.ts'), `expected g.spec.ts, got ${files[0]}`);
   });
+});
+
+test('an environment-owned spec root resolves in clean and worktree checkouts', () => {
+  assert.equal(
+    resolveConfiguredPath('/repo/quote', '$AURA_CORE_PROJECT_ROOT/web-admin/tests/e2e', {
+      AURA_CORE_PROJECT_ROOT: '/worktrees/oss-current',
+    }),
+    '/worktrees/oss-current/web-admin/tests/e2e',
+  );
+  assert.throws(
+    () => resolveConfiguredPath('/repo/quote', '${AURA_CORE_PROJECT_ROOT}/web-admin', {}),
+    /requires AURA_CORE_PROJECT_ROOT/,
+  );
+});
+
+test('default model routes distinguish list, form, and detail evidence', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'modelroute-'));
+  try {
+    mkdirSync(path.join(dir, 'tests'), { recursive: true });
+    writeFileSync(
+      path.join(dir, 'tests', 'routes.spec.ts'),
+      [
+        `await page.goto('/p/qo_quote_common');`,
+        `await expect(page).toHaveURL(/\\/p\\/qo_quote_common\\/new/);`,
+        `await page.waitForURL('/p/qo_quote_common/view/quote-1');`,
+      ].join('\n'),
+    );
+    const index = buildModelRouteIndex([path.join(dir, 'tests')]);
+    assert.equal(index.get('qo_quote_common:list').length, 1);
+    assert.equal(index.get('qo_quote_common:form').length, 1);
+    assert.equal(index.get('qo_quote_common:detail').length, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // ---------------------------------------------------------------------------

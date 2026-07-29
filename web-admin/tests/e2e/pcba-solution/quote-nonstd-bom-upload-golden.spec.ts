@@ -310,6 +310,20 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     await expect(resistorHitRow).toHaveCount(1, { timeout: 20_000 });
     await expect(resistorHitRow).toContainText(/完全匹配|Matched/i);
     await expect(resistorHitRow).toContainText('SMT');
+    const processTable = resistorHitRow.locator('xpath=ancestor::table[1]');
+    const processHeaders = await tableTexts(
+      processTable.locator('thead th, thead [role="columnheader"]'),
+    );
+    const processCells = await tableTexts(resistorHitRow.locator('td, [role="cell"]'));
+    for (const [label, expected] of [
+      [/^(数量|Qty)$/i, '3'],
+      [/^(单件点数|Unit Points)$/i, '2'],
+      [/^(合计点数|Total Points)$/i, '6'],
+    ] as const) {
+      const column = processHeaders.findIndex((header) => label.test(header));
+      expect(column, `process headers: ${processHeaders.join(' | ')}`).toBeGreaterThanOrEqual(0);
+      expect(processCells[column]).toBe(expected);
+    }
 
     await resistorHitRow.click();
     const reviewDrawer = page.getByTestId('review-drawer');

@@ -25,6 +25,14 @@ function makeRepo({ commands = [], pagesJson = null, pagesDir = null, menusJson 
   return { root: path.join(root, 'plugins'), pluginDir: path.join(root, 'plugins', 'demo') };
 }
 
+function addPlugin(root, name, { commands = [], pagesJson = null } = {}) {
+  const cfg = path.join(root, name, 'config');
+  fs.mkdirSync(cfg, { recursive: true });
+  fs.writeFileSync(path.join(cfg, 'commands.json'),
+    JSON.stringify({ commands: commands.map((code) => ({ code, type: 'custom' })) }, null, 2));
+  if (pagesJson) fs.writeFileSync(path.join(cfg, 'pages.json'), JSON.stringify(pagesJson, null, 2));
+}
+
 const errs = (r) => r.findings.filter((f) => f.level === 'error');
 const kinds = (r) => errs(r).map((f) => f.kind);
 
@@ -61,6 +69,17 @@ test('a menu entry counts as an entry point', () => {
   const { root } = makeRepo({
     commands: ['demo:do_thing'],
     menusJson: [{ code: 'm', command: 'demo:do_thing' }],
+  });
+  assert.deepEqual(auditReachability({ roots: [root], config: {} }).findings, []);
+});
+
+test('a command referenced by another plugin page is reachable', () => {
+  const { root } = makeRepo({
+    commands: ['engine:reprice'],
+    pagesJson: [{ pageKey: 'engine_internal' }],
+  });
+  addPlugin(root, 'workbench', {
+    pagesJson: [{ pageKey: 'quote_detail', blocks: [{ action: { command: 'engine:reprice' } }] }],
   });
   assert.deepEqual(auditReachability({ roots: [root], config: {} }).findings, []);
 });
