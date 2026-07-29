@@ -10,6 +10,7 @@ import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryFieldMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
+import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.meta.service.AggregateQueryService;
 import com.auraboot.framework.meta.service.DataDomainService;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
@@ -300,6 +301,16 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     private String buildNamedQuerySql(AggregateQueryRequest request, NamedQuery query,
                                       Map<String, NamedQueryField> fieldMap, Long tenantId,
                                       List<String> accessClauses, Map<String, Object> params) {
+        // columnExpr values come from the stored NamedQuery definition and are composed into
+        // SELECT / WHERE / GROUP BY. The NamedQuery read path (NamedQueryServiceImpl) already
+        // runs validateSqlFragment on them; apply the same blacklist check here so both SQL
+        // composition paths are aligned (SEC-20260723-10).
+        for (NamedQueryField field : fieldMap.values()) {
+            if (field != null && field.getColumnExpr() != null) {
+                SqlSafetyUtils.validateSqlFragment(field.getColumnExpr());
+            }
+        }
+
         StringBuilder sql = new StringBuilder("SELECT ");
 
         List<String> selectClauses = new ArrayList<>();
