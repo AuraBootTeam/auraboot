@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   BffProxyService,
   isBinaryDownloadPath,
+  isLongRunningProxyPath,
   shouldForwardRequestBody,
 } from '../BffProxyService';
 
@@ -29,6 +30,24 @@ describe('isBinaryDownloadPath', () => {
     expect(isBinaryDownloadPath('/api/downloads/list')).toBe(false);
     expect(isBinaryDownloadPath('/api/file/downloaded')).toBe(false);
     expect(isBinaryDownloadPath('/api/pages/page_1')).toBe(false);
+  });
+});
+
+describe('isLongRunningProxyPath', () => {
+  it('gives bounded BOM format exploration the long-running proxy budget', () => {
+    expect(
+      isLongRunningProxyPath('/api/meta/commands/execute/bom:explore_format'),
+    ).toBe(true);
+    expect(
+      isLongRunningProxyPath('/api/meta/commands/execute/bom:explore_format?taskId=01ABC'),
+    ).toBe(true);
+  });
+
+  it('preserves existing plugin/deploy classification without widening ordinary commands', () => {
+    expect(isLongRunningProxyPath('/api/plugins/import')).toBe(true);
+    expect(isLongRunningProxyPath('/api/plugins/packages/quote-bom/deploy')).toBe(true);
+    expect(isLongRunningProxyPath('/api/meta/commands/execute/bom:apply_parse_plan')).toBe(false);
+    expect(isLongRunningProxyPath('/api/pages/page_1')).toBe(false);
   });
 });
 

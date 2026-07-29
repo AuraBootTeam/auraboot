@@ -65,11 +65,11 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
     @Override
     @SuppressWarnings("unchecked")
     public LlmChatResponse chat(LlmChatRequest request, String apiKey, String baseUrl) throws Exception {
-        // Anthropic Extended Thinking is intentionally NOT mapped here.
-        // OpenAI o1/o3 reasoning_effort lives in a different request shape and
-        // is out of scope for P0-2 — see plan §5. Drop the field with a debug
-        // log so noisy callers can observe the skip without polluting INFO.
-        if (request.getThinking() != null && request.getThinking().isEnabled() && log.isDebugEnabled()) {
+        // DeepSeek V4 exposes an OpenAI-compatible thinking toggle. Other
+        // providers use different request shapes, so their thinking hint is
+        // still intentionally dropped.
+        if (request.getThinking() != null && request.getThinking().isEnabled()
+                && !isDeepSeekV4Model(request.getModel()) && log.isDebugEnabled()) {
             log.debug("OpenAI-compatible provider does not honour LlmChatRequest.thinking; "
                     + "dropping for model={}", request.getModel());
         }
@@ -141,7 +141,8 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                     "model '" + request.getModel() + "' does not accept image input. "
                             + "Use a vision-capable model (e.g. qwen-vl-max, gpt-4o) or Anthropic Claude."));
         }
-        if (request.getThinking() != null && request.getThinking().isEnabled() && log.isDebugEnabled()) {
+        if (request.getThinking() != null && request.getThinking().isEnabled()
+                && !isDeepSeekV4Model(request.getModel()) && log.isDebugEnabled()) {
             log.debug("OpenAI-compatible provider does not honour LlmChatRequest.thinking; "
                     + "dropping for model={}", request.getModel());
         }
@@ -312,6 +313,18 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", request.getModel());
         body.put("max_tokens", request.getMaxTokens());
+        if (request.getTemperature() != null) {
+            body.put("temperature", request.getTemperature());
+        }
+
+        // DeepSeek V4 defaults thinking to enabled. Preserve the provider
+        // default when callers are silent, but honour an explicit toggle so
+        // bounded structured-output tasks can reserve their output budget for
+        // the final JSON answer instead of exhausting it on reasoning tokens.
+        if (isDeepSeekV4Model(request.getModel()) && request.getThinking() != null) {
+            body.put("thinking", Map.of(
+                    "type", request.getThinking().isEnabled() ? "enabled" : "disabled"));
+        }
 
         // Messages: system prompt as first message
         List<Map<String, Object>> messages = new ArrayList<>();
@@ -372,6 +385,14 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
             log.debug("Skipping tool payload for model '{}' because provider compatibility is disabled", request.getModel());
         }
         return body;
+    }
+
+    static boolean isDeepSeekV4Model(String model) {
+        if (model == null) {
+            return false;
+        }
+        String normalized = model.trim().toLowerCase(Locale.ROOT);
+        return normalized.equals("deepseek-v4-flash") || normalized.equals("deepseek-v4-pro");
     }
 
     @Override
