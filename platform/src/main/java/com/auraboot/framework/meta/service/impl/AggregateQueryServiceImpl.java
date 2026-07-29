@@ -883,7 +883,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         Long tenantId = getCurrentTenantId();
         Long userId = getCurrentUserId();
         List<String> clauses = new ArrayList<>();
-        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
         if (permitFilter != null) {
             appendAccessClause(clauses, permitFilter);
             return clauses;
@@ -909,14 +909,14 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     }
 
     private List<String> buildNamedQueryDataAccessClauses(NamedQuery query, Long tenantId, Long userId) {
-        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        String resourceCode = trimToNull(query.getResourceCode());
+        String permitFilter = CommandPermitDataAccess.rowFilter(resourceCode, userId);
         if (permitFilter != null) {
             List<String> clauses = new ArrayList<>();
             appendAccessClause(clauses, permitFilter);
             return clauses;
         }
 
-        String resourceCode = trimToNull(query.getResourceCode());
         String actionCode = trimToNull(query.getActionCode());
         if (resourceCode == null || actionCode == null) {
             return Collections.emptyList();

@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash } from 'crypto';
 import { fileURLToPath } from 'url';
 import type { Browser, BrowserContext, Response } from '@playwright/test';
 import { test, expect, type Page } from '../../fixtures';
@@ -50,21 +51,36 @@ const ENG_USER: QuoteRoleUser = {
 };
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-function findSampleBom(): string | undefined {
-  const rel = 'aura-quote/docs/ref/10款GERBER加坐标';
+const INCIDENT_FIXTURE = 'E1-error (1).xlsx';
+const INCIDENT_SHA256 = '06748c113435afda0409eb0ca119715be141f67fb65808d094211b10f5d52801';
+
+function findIncidentBom(): string | undefined {
   const roots = [
-    process.env.QUOTE_BOM_SAMPLES_DIR,
-    path.resolve(HERE, '../../../../../' + rel),
-    '/Users/ghj/work/auraboot/' + rel,
+    process.env.SOT_BOM_INCIDENT_FIXTURE,
+    process.env.BOM_GOLDEN_VERIFY_DIR
+      ? path.join(process.env.BOM_GOLDEN_VERIFY_DIR, INCIDENT_FIXTURE)
+      : undefined,
+    process.env.AURA_ENTERPRISE_ROOT
+      ? path.join(process.env.AURA_ENTERPRISE_ROOT, 'doa/jiejia_tech/bom-verify', INCIDENT_FIXTURE)
+      : undefined,
+    path.resolve(
+      HERE,
+      '../../../../../../auraboot-enterprise/doa/jiejia_tech/bom-verify',
+      INCIDENT_FIXTURE,
+    ),
+    path.join(
+      '/Users/ghj/work/auraboot/auraboot-enterprise/doa/jiejia_tech/bom-verify',
+      INCIDENT_FIXTURE,
+    ),
   ].filter(Boolean) as string[];
-  for (const root of roots) {
-    const d = path.join(root, 'FUTROBO_MCU', 'BOM');
-    if (fs.existsSync(d)) {
-      const x = fs.readdirSync(d).find((f) => /\.xlsx$/i.test(f));
-      if (x) return path.join(d, x);
-    }
+  for (const candidate of roots) {
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
   }
   return undefined;
+}
+
+function sha256(filePath: string): string {
+  return createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
 
 async function execCommand(page: Page, code: string, payload: Record<string, unknown>) {
@@ -73,6 +89,30 @@ async function execCommand(page: Page, code: string, payload: Record<string, unk
     timeout: 30_000,
   });
   return { status: r.status(), body: (await r.json().catch(() => ({}))) as any };
+}
+
+function commandRecordPid(body: any): string {
+  return String(
+    body?.data?.data?.recordPid ||
+      body?.data?.recordPid ||
+      body?.data?.data?.recordId ||
+      body?.data?.recordId ||
+      '',
+  );
+}
+
+async function selectReference(page: Page, field: string, pid: string, label: string) {
+  const trigger = page.getByTestId(`select-trigger-${field}`);
+  await expect(trigger, `${field} reference trigger`).toBeVisible({ timeout: 15_000 });
+  await expect(trigger, `${field} reference trigger`).toBeEnabled({ timeout: 15_000 });
+  await trigger.click();
+  const exact = page.locator(`[role="option"][data-value="${pid}"]`).first();
+  const option = (await exact.isVisible({ timeout: 10_000 }).catch(() => false))
+    ? exact
+    : page.getByRole('option', { name: label, exact: true }).first();
+  await expect(option, `${field} option ${label}`).toBeVisible({ timeout: 15_000 });
+  await option.click();
+  await expect(trigger).toContainText(label, { timeout: 5_000 });
 }
 
 test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
@@ -133,8 +173,9 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
   });
 
   test('eng sees only own task; admin sees all', async ({ browser }) => {
-    const sample = findSampleBom();
-    expect(sample, 'sample BOM fixture present').toBeTruthy();
+    const incident = findIncidentBom();
+    expect(incident, 'fixed E1 incident fixture present').toBeTruthy();
+    expect(sha256(incident!), 'fixed E1 incident fixture checksum').toBe(INCIDENT_SHA256);
 
     const engContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const engPage = await engContext.newPage();
@@ -153,43 +194,90 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
       await loginViaUI(engPage, ENG_USER.email, ENG_USER.password);
 
       // 1. eng creates its OWN task via the real command pipeline (created_by=eng)
-      step = 'eng create project';
+      step = 'eng create customer/project';
       const uid = `${Date.now()}${Math.random().toString(16).slice(2, 6)}`;
+      const customerName = `SelfScope Customer ${uid}`;
+      const account = await execCommand(engPage, 'crm:create_account', {
+        crm_acc_name: customerName,
+        crm_acc_industry: 'pcba',
+      });
+      const customerId = commandRecordPid(account.body);
+      expect(customerId, 'customer created').toBeTruthy();
+      const projectName = `SelfScope ${uid}`;
       const proj = await execCommand(engPage, 'bom:create_project', {
-        bom_project_name: `SelfScope ${uid}`,
+        bom_project_name: projectName,
         bom_pcba_code: `SS-${uid}`,
+        bom_project_customer_id: customerId,
         bom_project_library_source: 'excel_current_library',
         bom_project_remark: 'self-scope golden',
       });
-      const projId =
-        proj.body?.data?.data?.recordPid || proj.body?.data?.recordPid || proj.body?.data?.recordId;
-      expect(projId, `project created (resp=${JSON.stringify(proj.body?.data).slice(0, 200)})`).toBeTruthy();
+      const projId = commandRecordPid(proj.body);
+      expect(
+        projId,
+        `project created (resp=${JSON.stringify(proj.body?.data).slice(0, 200)})`,
+      ).toBeTruthy();
 
-      step = 'eng upload bom';
-      const up = await engPage.request.post('/api/file/upload', {
-        multipart: {
-          file: {
-            name: 'bom.xlsx',
-            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            buffer: fs.readFileSync(sample!),
-          },
-        },
-        timeout: 30_000,
-      });
-      const fileId = (await up.json())?.data?.fileId;
-      expect(fileId, 'BOM uploaded').toBeTruthy();
+      // Drive the user-visible core action through the real workbench form.
+      step = 'eng open upload form';
+      await engPage.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+      await ensureSidebarExpanded(engPage);
+      const sidebar = engPage.getByTestId('sidebar');
+      await sidebar.locator(`a[href="${WORKBENCH_HREF}"]`).first().click();
+      await waitForDynamicPageLoad(engPage, 20_000);
+      const uploadButton = engPage
+        .getByTestId('toolbar-btn-upload_bom')
+        .or(engPage.getByRole('button', { name: /上传 BOM|Upload BOM/i }))
+        .first();
+      await expect(uploadButton).toBeVisible({ timeout: 15_000 });
+      await uploadButton.click();
 
-      step = 'eng start conversion';
-      const conv = await execCommand(engPage, 'bom:start_conversion', {
-        bom_task_project_id: projId,
-        bom_task_source_package: `self-scope-${uid}`,
-        bom_task_raw_file_id: fileId,
-      });
-      expect(conv.status, 'start_conversion accepted').toBe(200);
+      step = 'eng select customer/project';
+      await selectReference(engPage, 'bom_task_customer_id', customerId, customerName);
+      await selectReference(engPage, 'bom_task_project_id', projId, projectName);
 
-      // poll (as eng) until eng's own task record appears; capture its bom_task_no
-      step = 'eng poll own task';
+      step = 'eng upload incident fixture';
+      const fileField = engPage.getByTestId('form-field-bom_task_raw_file_id');
+      await expect(fileField).toBeVisible({ timeout: 15_000 });
+      const uploadResponsePromise = engPage.waitForResponse(
+        (response) =>
+          response.url().includes('/api/file/upload') && response.request().method() === 'POST',
+        { timeout: 60_000 },
+      );
+      await fileField.locator('input[type="file"]').first().setInputFiles(incident!);
+      const uploadResponse = await uploadResponsePromise;
+      expect(uploadResponse.ok(), `file upload HTTP ${uploadResponse.status()}`).toBe(true);
+      await expect(fileField).toContainText(INCIDENT_FIXTURE, { timeout: 10_000 });
+
+      step = 'eng start conversion from form';
+      const startResponsePromise = engPage.waitForResponse(
+        (response) =>
+          response.url().includes('/api/meta/commands/execute/bom:start_conversion') &&
+          response.request().method() === 'POST',
+        { timeout: 60_000 },
+      );
+      const startButton = engPage
+        .getByTestId('form-btn-start_conversion')
+        .or(engPage.getByRole('button', { name: /开始转换|Start Conversion/i }))
+        .first();
+      await expect(startButton).toBeVisible({ timeout: 15_000 });
+      await startButton.click();
+      const startResponse = await startResponsePromise;
+      const startBody = (await startResponse.json().catch(() => ({}))) as any;
+      expect(
+        startResponse.status(),
+        `start_conversion response: ${JSON.stringify(startBody)}`,
+      ).toBe(200);
+      expect(
+        String(startBody?.code ?? '0'),
+        `start_conversion body: ${JSON.stringify(startBody)}`,
+      ).toBe('0');
+
+      // The previous golden stopped as soon as the record appeared. The incident
+      // happens later inside the async handler, so the release verdict must wait
+      // for the authoritative terminal state.
+      step = 'eng poll own task to completed';
       let engTaskNo = '';
+      let engTask: Record<string, unknown> = {};
       await expect
         .poll(
           async () => {
@@ -197,14 +285,31 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
               { fieldName: 'bom_task_project_id', operator: 'EQ', value: projId },
             ]);
             if (recs.length > 0) {
-              engTaskNo = String(recs[0].bom_task_no ?? '');
-              return engTaskNo.length > 0;
+              engTask = recs[0];
+              engTaskNo = String(engTask.bom_task_no ?? '');
+              const status = String(engTask.bom_task_status ?? '');
+              if (
+                [
+                  'failed',
+                  'format_exploration_required',
+                  'adjustment_required',
+                  'cancelled',
+                ].includes(status)
+              ) {
+                return `${status}: ${String(engTask.bom_task_error_message ?? '')}`;
+              }
+              return status;
             }
-            return false;
+            return '';
           },
-          { timeout: 90_000, intervals: [2000, 3000, 3000, 3000] },
+          { timeout: 240_000, intervals: [2_000, 3_000, 5_000] },
         )
-        .toBe(true);
+        .toBe('completed');
+      expect(engTaskNo, 'completed task has task number').toBeTruthy();
+      expect(
+        JSON.stringify(engTask),
+        'completed incident task has no ambiguity warning',
+      ).not.toContain('系统无法安全判断部分内容');
       // eslint-disable-next-line no-console
       console.log(`[self-scope-golden] eng task=${engTaskNo}`);
 
@@ -234,7 +339,10 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
       await expect(engRow).toContainText(engTaskNo);
       // admin task NOT rendered anywhere in eng's scoped list
       step = 'eng workbench hides admin task';
-      const engMain = await engPage.locator('main').innerText().catch(() => '');
+      const engMain = await engPage
+        .locator('main')
+        .innerText()
+        .catch(() => '');
       expect(
         engMain.includes(adminTaskNo),
         `SELF-SCOPE (UI): eng workbench must not render admin task ${adminTaskNo}`,

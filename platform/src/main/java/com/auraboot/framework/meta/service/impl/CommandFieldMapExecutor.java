@@ -456,7 +456,7 @@ public class CommandFieldMapExecutor {
             return;
         }
         Long userId = MetaContext.getCurrentUserId();
-        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
         if (permitFilter != null) {
             appendScopedFilter(sql, permitFilter);
             return;

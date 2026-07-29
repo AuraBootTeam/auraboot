@@ -39,6 +39,34 @@ class CommandPermitDataAccessTest {
     }
 
     @Test
+    @DisplayName("a targeted SELF plan applies only to its root model")
+    void targetedSelfAppliesOnlyToRootModel() {
+        MetaContext.runWithCommandPermitPlan("SELF", null, "personal_task", "task-1", () -> {
+            assertThat(CommandPermitDataAccess.rowFilter("personal_task", 100L))
+                    .isEqualTo("AND created_by = 100");
+            assertThat(CommandPermitDataAccess.permitsRecord(
+                    "personal_task", Map.of("created_by", 200L), 100L)).isFalse();
+
+            assertThat(CommandPermitDataAccess.rowFilter("shared_config", 100L))
+                    .as("a different model must evaluate its own data permission")
+                    .isNull();
+            assertThat(CommandPermitDataAccess.permitsRecord(
+                    "shared_config", Map.of("created_by", 200L), 100L))
+                    .as("without an applicable plan grade this helper must not manufacture authority")
+                    .isFalse();
+        });
+    }
+
+    @Test
+    @DisplayName("a targeted ALL plan does not widen another model")
+    void targetedAllDoesNotWidenAnotherModel() {
+        MetaContext.runWithCommandPermitPlan("ALL", null, "personal_task", "task-1", () -> {
+            assertThat(CommandPermitDataAccess.rowFilter("personal_task", 100L)).isEmpty();
+            assertThat(CommandPermitDataAccess.rowFilter("private_reference", 100L)).isNull();
+        });
+    }
+
+    @Test
     @DisplayName("missing, unknown, or unusable scope never manufactures authority")
     void unresolvedScopeNeverManufacturesAuthority() {
         assertThat(CommandPermitDataAccess.permitsRecord(Map.of("created_by", 100L), 100L)).isFalse();

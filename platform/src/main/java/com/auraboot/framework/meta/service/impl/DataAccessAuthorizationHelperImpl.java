@@ -27,7 +27,7 @@ public class DataAccessAuthorizationHelperImpl extends BaseMetaService implement
         String resolvedAction = resolveAction(actionCode);
         Long tenantId = getCurrentTenantId();
         Long userId = getCurrentUserId();
-        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        String permitFilter = CommandPermitDataAccess.rowFilter(resourceCode, userId);
         if (permitFilter != null) {
             return new DataAccessAuthorizationContext(
                     tenantId, userId, resourceCode, resolvedAction, normalizeFilterClause(permitFilter));
@@ -50,8 +50,8 @@ public class DataAccessAuthorizationHelperImpl extends BaseMetaService implement
         String resolvedAction = resolveAction(actionCode);
         Long tenantId = getCurrentTenantId();
         Long userId = getCurrentUserId();
-        if (MetaContext.hasCommandPermitScope()) {
-            if (!CommandPermitDataAccess.permitsRecord(record, userId)) {
+        if (MetaContext.hasCommandPermitScopeFor(resourceCode)) {
+            if (!CommandPermitDataAccess.permitsRecord(resourceCode, record, userId)) {
                 throw new MetaServiceException("Access denied for resource: " + resourceCode);
             }
             return true;
