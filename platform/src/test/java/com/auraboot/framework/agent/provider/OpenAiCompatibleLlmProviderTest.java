@@ -199,6 +199,37 @@ class OpenAiCompatibleLlmProviderTest {
     }
 
     @Test
+    void buildRequestBodyDisablesDeepSeekV4ThinkingWhenExplicitlyRequested() throws Exception {
+        OpenAiCompatibleLlmProvider provider = createProvider();
+        LlmChatRequest request = LlmChatRequest.builder()
+                .model("deepseek-v4-flash")
+                .maxTokens(1600)
+                .temperature(0.0d)
+                .thinking(LlmChatRequest.ThinkingConfig.builder().enabled(false).build())
+                .messages(List.of(LlmChatRequest.Message.text("user", "Return JSON.")))
+                .build();
+
+        Map<String, Object> body = provider.buildOpenAiRequestBody(request);
+
+        assertThat(body).containsEntry("thinking", Map.of("type", "disabled"));
+        assertThat(body).containsEntry("temperature", 0.0d);
+    }
+
+    @Test
+    void buildRequestBodyPreservesDeepSeekV4ThinkingDefaultWhenCallerIsSilent() throws Exception {
+        OpenAiCompatibleLlmProvider provider = createProvider();
+        LlmChatRequest request = LlmChatRequest.builder()
+                .model("deepseek-v4-pro")
+                .maxTokens(1600)
+                .messages(List.of(LlmChatRequest.Message.text("user", "Analyze this.")))
+                .build();
+
+        Map<String, Object> body = provider.buildOpenAiRequestBody(request);
+
+        assertThat(body).doesNotContainKey("thinking");
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void buildRequestBodySanitizesCommandCodeToolNames() throws Exception {
         // AuraBoot command tools are named with command codes ("plugin:command"),

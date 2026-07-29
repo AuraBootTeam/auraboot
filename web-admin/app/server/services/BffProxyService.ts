@@ -41,6 +41,24 @@ export function isBinaryDownloadPath(path: string): boolean {
   );
 }
 
+/**
+ * Whether the backend operation is expected to outlive the default 30-second
+ * interactive proxy budget.
+ *
+ * BOM format exploration performs one bounded LLM call before returning a
+ * deterministic patch. Treating it as an ordinary command caused the BFF to
+ * return 502 while the backend was still waiting for a valid model response.
+ */
+export function isLongRunningProxyPath(path: string): boolean {
+  const pathname = path.split('?')[0];
+  return (
+    pathname.includes('/plugins/import') ||
+    pathname.includes('/plugins/packages') ||
+    pathname.includes('/deploy') ||
+    /\/meta\/commands\/execute\/bom:explore_format(?:\/|$)/.test(pathname)
+  );
+}
+
 function hasNonEmptyBody(body: unknown): boolean {
   if (body === undefined || body === null) return false;
   if (Buffer.isBuffer(body)) return body.length > 0;
@@ -240,10 +258,7 @@ export class BffProxyService {
       }
 
       // Longer timeout for plugin import and deploy operations
-      const isLongRunning =
-        originalPath.includes('/plugins/import') ||
-        originalPath.includes('/plugins/packages') ||
-        originalPath.includes('/deploy');
+      const isLongRunning = isLongRunningProxyPath(originalPath);
       const longRunningTimeout = Number.parseInt(
         process.env.BFF_LONG_RUNNING_TIMEOUT_MS || '900000',
         10,

@@ -55,6 +55,13 @@ public class LlmChatRequest {
     private int maxTokens;
 
     /**
+     * Optional sampling temperature. Null preserves the provider default;
+     * callers that require reproducible structured output can explicitly use
+     * zero when the selected model supports it.
+     */
+    private Double temperature;
+
+    /**
      * Optional provider-agnostic structured-output mode. OpenAI-compatible
      * providers currently support {@code json_object}; other providers may
      * ignore it until they expose an equivalent wire contract.
@@ -62,13 +69,10 @@ public class LlmChatRequest {
     private String responseFormat;
 
     /**
-     * Optional Anthropic Extended Thinking configuration. When {@code null} the
-     * provider must NOT add a {@code thinking} field to the wire request — this
-     * keeps existing chat callers byte-identical with the pre-P0-2 behaviour.
-     *
-     * <p>Capability gating happens in the provider: even when this is set with
-     * {@code enabled=true}, providers that cannot handle thinking (legacy
-     * Claude 3, OpenAI/DeepSeek/Qwen, etc.) silently drop it.
+     * Optional provider thinking configuration. When {@code null} the provider
+     * must NOT add a {@code thinking} field to the wire request, preserving its
+     * default behavior. Anthropic and DeepSeek V4 currently honour the explicit
+     * toggle; incompatible OpenAI-format providers silently drop it.
      */
     private ThinkingConfig thinking;
 
@@ -205,8 +209,8 @@ public class LlmChatRequest {
     }
 
     /**
-     * Anthropic Extended Thinking knob. Only honoured by Claude Sonnet 4.6+,
-     * Opus 4.x, and Haiku 4.x — see {@code AnthropicLlmProvider#supportsThinking}.
+     * Provider thinking knob. Anthropic uses {@code budgetTokens}; DeepSeek V4
+     * currently maps only the enabled/disabled toggle.
      *
      * <p>{@code budgetTokens} is the maximum tokens the model may spend in its
      * private thinking block. Anthropic requires

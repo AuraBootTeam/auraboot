@@ -57,7 +57,9 @@ public class LlmProviderAccessorImpl implements AiProviderAccessor {
                     .systemPrompt(request.systemPrompt())
                     .messages(toLlmMessages(request.messages()))
                     .maxTokens(maxTokens)
+                    .temperature(temperature(request.metadata()))
                     .responseFormat(responseFormat(request.metadata()))
+                    .thinking(thinking(request.metadata()))
                     .build();
             LlmChatResponse response = provider.chat(llmRequest, config.getApiKey(), config.getBaseUrl());
             String text = extractText(response);
@@ -111,6 +113,45 @@ public class LlmProviderAccessorImpl implements AiProviderAccessor {
             throw new IllegalArgumentException("Unsupported AI response format: " + value);
         }
         return value;
+    }
+
+    private static Double temperature(Map<String, Object> metadata) {
+        if (metadata == null || !metadata.containsKey("temperature")) {
+            return null;
+        }
+        Object raw = metadata.get("temperature");
+        double value;
+        try {
+            value = raw instanceof Number number
+                    ? number.doubleValue()
+                    : Double.parseDouble(String.valueOf(raw).trim());
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("temperature must be a number", ex);
+        }
+        if (!Double.isFinite(value) || value < 0.0d || value > 2.0d) {
+            throw new IllegalArgumentException("temperature must be between 0 and 2");
+        }
+        return value;
+    }
+
+    private static LlmChatRequest.ThinkingConfig thinking(Map<String, Object> metadata) {
+        if (metadata == null || !metadata.containsKey("thinkingEnabled")) {
+            return null;
+        }
+        Object raw = metadata.get("thinkingEnabled");
+        boolean enabled;
+        if (raw instanceof Boolean value) {
+            enabled = value;
+        } else if ("true".equalsIgnoreCase(String.valueOf(raw).trim())) {
+            enabled = true;
+        } else if ("false".equalsIgnoreCase(String.valueOf(raw).trim())) {
+            enabled = false;
+        } else {
+            throw new IllegalArgumentException("thinkingEnabled must be true or false");
+        }
+        return LlmChatRequest.ThinkingConfig.builder()
+                .enabled(enabled)
+                .build();
     }
 
     private static String extractText(LlmChatResponse response) {
