@@ -136,14 +136,30 @@ function persistDrawerLayout(storageKey: string, layout: DrawerLayoutState): voi
 }
 
 function parseJsonValue(value: unknown): unknown {
-  if (typeof value !== 'string') return value;
-  const trimmed = value.trim();
-  if (!trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) return value;
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    return value;
+  let current = value;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (
+      current &&
+      typeof current === 'object' &&
+      !Array.isArray(current) &&
+      ['json', 'jsonb'].includes(
+        String((current as Record<string, unknown>).type || '').toLowerCase(),
+      ) &&
+      Object.prototype.hasOwnProperty.call(current, 'value')
+    ) {
+      current = (current as Record<string, unknown>).value;
+      continue;
+    }
+    if (typeof current !== 'string') return current;
+    const trimmed = current.trim();
+    if (!trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) return current;
+    try {
+      current = JSON.parse(trimmed);
+    } catch {
+      return current;
+    }
   }
+  return current;
 }
 
 function formatValue(value: unknown, emptyText = '-'): string {
@@ -198,11 +214,11 @@ interface LadderRung {
 }
 
 /**
- * Parses the ladder array off a field value. It arrives as jsonb, so it may already be an array or
- * still be the string form depending on the driver and the projection.
+ * Parses the ladder array off a field value. Depending on the NamedQuery driver it can arrive as
+ * an array, a JSON string, or the platform's typed JSONB envelope.
  */
 export function parseLadderRungs(value: unknown): LadderRung[] | null {
-  const raw = typeof value === 'string' ? parseJsonValue(value) : value;
+  const raw = parseJsonValue(value);
   if (!Array.isArray(raw) || raw.length === 0) return null;
   const rungs = raw.filter(
     (item): item is LadderRung =>
@@ -423,6 +439,125 @@ function sectionLabel(config: any, locale: string, t: (key: string) => string, f
 
 function localized(locale: string, t: (key: string) => string, zh: string, en: string) {
   return getLocalizedText({ 'zh-CN': zh, en }, locale, t);
+}
+
+function priceFactorPercent(value: unknown): number {
+  const normalized = String(value ?? '')
+    .trim()
+    .replace(/%$/, '');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
+}
+
+function formatUnitPrice(value: unknown): string {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return formatValue(value);
+  return parsed.toFixed(4);
+}
+
+function factoredUnitPrice(value: unknown, factor: unknown): string {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return formatValue(value);
+  return ((parsed * priceFactorPercent(factor)) / 100).toFixed(4);
+}
+
+function PriceComparison({
+  original,
+  factored,
+  factor,
+  locale,
+  t,
+}: {
+  original: unknown;
+  factored: unknown;
+  factor: unknown;
+  locale: string;
+  t: (key: string) => string;
+}) {
+  const factorText = `${Number(priceFactorPercent(factor).toFixed(2))}%`;
+  return (
+    <div
+      data-testid="review-drawer-price-comparison"
+      className="rounded-control border-border bg-subtle grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-2 border p-2"
+    >
+      <div className="min-w-0 px-1">
+        <div className="text-text-2 text-[11px]">
+          {localized(locale, t, '原始单价', 'Supplier price')}
+        </div>
+        <div className="text-text mt-1 font-mono text-sm font-medium tabular-nums">
+          {formatUnitPrice(original)}
+        </div>
+      </div>
+      <div className="text-text-2 flex flex-col items-center justify-center gap-1 px-1">
+        <span className="rounded-pill border-border bg-panel border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap">
+          × {factorText}
+        </span>
+        <span aria-hidden="true">→</span>
+      </div>
+      <div className="border-accent bg-accent-weak min-w-0 rounded border px-2 py-1.5">
+        <div className="text-accent text-[11px] font-medium">
+          {localized(locale, t, '系数后单价', 'After factor')}
+        </div>
+        <div className="text-text mt-1 font-mono text-base font-semibold tabular-nums">
+          {formatUnitPrice(factored)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PriceLadder({
+  rowKey,
+  rungs,
+  factor,
+  locale,
+  t,
+}: {
+  rowKey: string;
+  rungs: LadderRung[];
+  factor: unknown;
+  locale: string;
+  t: (key: string) => string;
+}) {
+  const factorText = `${Number(priceFactorPercent(factor).toFixed(2))}%`;
+  return (
+    <div
+      className="border-border bg-subtle rounded-control w-full overflow-hidden border text-xs tabular-nums"
+      data-testid={`review-drawer-candidate-${rowKey}-ladder`}
+    >
+      <div className="text-text-2 border-border grid grid-cols-[minmax(72px,0.75fr)_minmax(92px,1fr)_minmax(112px,1fr)] border-b px-2 py-1.5 text-[11px] font-medium">
+        <span>{localized(locale, t, '数量', 'Qty')}</span>
+        <span className="text-right">{localized(locale, t, '原始单价', 'Original')}</span>
+        <span className="text-right">
+          {localized(locale, t, '系数后', 'After factor')} ({factorText})
+        </span>
+      </div>
+      {rungs.map((rung) => (
+        <div
+          key={String(rung.qty)}
+          data-testid={rung.current ? `review-drawer-ladder-current-${rowKey}` : undefined}
+          className={`border-border grid grid-cols-[minmax(72px,0.75fr)_minmax(92px,1fr)_minmax(112px,1fr)] items-center border-b px-2 py-1.5 last:border-b-0 ${
+            rung.current ? 'bg-accent-weak text-text font-semibold' : 'text-text-2'
+          }`}
+        >
+          <span className="flex items-center gap-1.5 whitespace-nowrap">
+            {String(rung.qty)}+
+            {rung.current && (
+              <span className="rounded-pill bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                {localized(locale, t, '当前', 'Current')}
+              </span>
+            )}
+          </span>
+          <span className="text-right font-mono whitespace-nowrap">
+            {formatUnitPrice(rung.price)}
+          </span>
+          <span className="text-text text-right font-mono whitespace-nowrap">
+            {factoredUnitPrice(rung.price, factor)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function candidateKey(candidate: any, index: number): string {
@@ -1530,38 +1665,29 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                                       className="text-text min-w-0 break-words whitespace-normal"
                                       title={value}
                                     >
-                                      {field.format === 'ladder' && parseLadderRungs(rawValue) ? (
-                                        // A self-contained tier card: quantity and price sit next to
-                                        // each other (an inline-grid so the columns hug their content
-                                        // instead of spanning the whole field), and the tier the line
-                                        // quotes at is a filled row rather than only coloured text.
-                                        <div
-                                          className="border-border bg-subtle rounded-control inline-grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 border p-1.5 text-xs tabular-nums"
-                                          data-testid={`review-drawer-candidate-${rowKey}-ladder`}
-                                        >
-                                          {parseLadderRungs(rawValue)!.map((rung) => (
-                                            <div
-                                              key={String(rung.qty)}
-                                              data-testid={
-                                                rung.current
-                                                  ? `review-drawer-ladder-current-${rowKey}`
-                                                  : undefined
-                                              }
-                                              className={`col-span-2 grid grid-cols-subgrid rounded px-1.5 py-0.5 ${
-                                                rung.current
-                                                  ? 'bg-accent font-semibold text-white'
-                                                  : 'text-text-2'
-                                              }`}
-                                            >
-                                              <span className="whitespace-nowrap">
-                                                {String(rung.qty)}+
-                                              </span>
-                                              <span className="text-right whitespace-nowrap">
-                                                {String(rung.price)}
-                                              </span>
-                                            </div>
-                                          ))}
-                                        </div>
+                                      {field.format === 'price-comparison' ? (
+                                        <PriceComparison
+                                          original={rawValue}
+                                          factored={readFieldValue(candidate, {
+                                            field: field.factoredField,
+                                          })}
+                                          factor={readFieldValue(candidate, {
+                                            field: field.factorField,
+                                          })}
+                                          locale={locale}
+                                          t={t}
+                                        />
+                                      ) : field.format === 'ladder' &&
+                                        parseLadderRungs(rawValue) ? (
+                                        <PriceLadder
+                                          rowKey={rowKey}
+                                          rungs={parseLadderRungs(rawValue)!}
+                                          factor={readFieldValue(candidate, {
+                                            field: field.factorField,
+                                          })}
+                                          locale={locale}
+                                          t={t}
+                                        />
                                       ) : field.format === 'link' && safeExternalUrl(rawValue) ? (
                                         <a
                                           href={safeExternalUrl(rawValue) as string}
