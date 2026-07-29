@@ -115,7 +115,8 @@ ship(){
   rm -f "$SELF_DIR/schema.sql" "$SELF_DIR/quickstart.sh"
   # plugins (builtin config plugins mounted read-only into the backend)
   log "ship: plugins/"
-  tar --exclude='node_modules' --exclude='.git' -C "$ROOT" -czf - plugins \
+  COPYFILE_DISABLE=1 tar --exclude='node_modules' --exclude='.git' \
+    --exclude='._*' --exclude='__MACOSX' -C "$ROOT" -czf - plugins \
     | run_remote "tar xzf - -C '$REMOTE_DIR'"
   # .env (generated once; kept if it already exists so re-deploys are stable)
   if run_remote "test -f '$REMOTE_DIR/.env'"; then
