@@ -279,7 +279,9 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     const priceHeaders = await tableTexts(
       priceTable.locator('thead th, thead [role="columnheader"]'),
     );
-    const yunhanColumn = priceHeaders.indexOf('云汉芯城');
+    const yunhanColumn = priceHeaders.findIndex((header) =>
+      /云汉(?:芯城|\(系数后\))|Yunhan(?: \(After Factor\))?/.test(header),
+    );
     expect(yunhanColumn, `price headers: ${priceHeaders.join(' | ')}`).toBeGreaterThanOrEqual(0);
 
     for (const lineId of lineIds) {

@@ -182,7 +182,9 @@ test.describe('PCBA quote pricing and process-point evidence golden', () => {
     const priceTable = page
       .locator('table')
       .filter({
-        has: page.getByRole('columnheader', { name: /采购分析近期价|Recent Purchase/ }),
+        has: page.getByRole('columnheader', {
+          name: /采购分析近期价|近期价\(系数后\)|Recent Purchase/,
+        }),
       })
       .first();
     await expect(priceTable).toBeVisible({ timeout: 20_000 });
