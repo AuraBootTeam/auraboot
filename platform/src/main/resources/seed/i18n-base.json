@@ -1375,6 +1375,21 @@
     "en-US": "Sign in to continue to your AuraBoot workspace"
   },
   {
+    "key": "auth.compliance.welcomeSub",
+    "zh-CN": "登录以继续使用 AuraBoot",
+    "en-US": "Sign in to continue to AuraBoot"
+  },
+  {
+    "key": "auth.compliance.identifier",
+    "zh-CN": "账号或邮箱",
+    "en-US": "Account or email"
+  },
+  {
+    "key": "auth.compliance.identifierPlaceholder",
+    "zh-CN": "请输入账号或邮箱",
+    "en-US": "Enter account or email"
+  },
+  {
     "key": "auth.badge",
     "zh-CN": "AI 原生 · 企业应用运行时",
     "en-US": "AI-native application runtime"

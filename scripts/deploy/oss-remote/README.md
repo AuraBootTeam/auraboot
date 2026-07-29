@@ -48,6 +48,7 @@ app is behind it (this is exactly how the 2026-07-15 numnan test env was deploye
 ```bash
 HOST=root@110.42.255.233 PUBLIC_URL=https://numnan.com \
 MODE=coexist EDGE_NETWORK=auraboot-bom-acceptance_default \
+ICP_COMPLIANCE_ENABLED=1 \
 STOP_CONTAINERS="auraboot-bom-acceptance-frontend-bff-1 auraboot-bom-acceptance-backend-1 \
   auraboot-bom-acceptance-gateway-1 auraboot-bom-acceptance-postgres-1 \
   auraboot-bom-acceptance-redis-1 auraboot-bom-acceptance-gerber-sidecar-1" \

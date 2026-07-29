@@ -5,10 +5,12 @@ import { useTheme } from '~/contexts/ThemeContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { useHydrated } from '~/hooks/useHydrated';
 import { useAuth } from '~/contexts/AuthContext';
+import { getIcpComplianceConfig } from '~/config/icpCompliance';
 
 const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';
 
 export default function AuthHeader() {
+  const compliance = getIcpComplianceConfig();
   const { theme, setTheme, isDark } = useTheme();
   const { t, locale, setLocale } = useI18n();
   const isHydrated = useHydrated();
@@ -60,7 +62,12 @@ export default function AuthHeader() {
         {/* Left: Logo */}
         <Link to="/" className="flex items-center">
           <img className="h-8 w-8 rounded-lg" src="/android-chrome-192x192.png" alt="AuraBoot" />
-          <span className="ml-3 text-xl font-bold text-gray-900 dark:text-white">AuraBoot</span>
+          <span
+            data-testid="auth-site-title"
+            className="ml-3 text-xl font-bold text-gray-900 dark:text-white"
+          >
+            {compliance.siteDisplayName}
+          </span>
         </Link>
 
         {/* Right: Toolbar */}
