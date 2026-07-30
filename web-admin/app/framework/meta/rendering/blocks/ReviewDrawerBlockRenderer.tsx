@@ -632,6 +632,8 @@ function FieldRows({
         const rendersComparisons = isComparisonList(mappedValue);
         const value = rendersComparisons ? '' : formatConfiguredValue(rawValue, field, locale, t);
         const isMultiline = value.includes('\n') || value.length > 86;
+        const ladder = field.format === 'ladder' ? parseLadderRungs(rawValue) : null;
+        const externalUrl = field.format === 'link' ? safeExternalUrl(rawValue) : null;
         return (
           <div key={key} className="grid grid-cols-[118px_minmax(0,1fr)] gap-3 px-3 py-2.5 text-sm">
             <dt className="text-text-2 text-xs">{label}</dt>
@@ -640,7 +642,33 @@ function FieldRows({
                 isMultiline ? 'whitespace-pre-wrap' : ''
               }`}
             >
-              {rendersComparisons ? (
+              {field.format === 'price-comparison' ? (
+                <PriceComparison
+                  original={rawValue}
+                  factored={readFieldValue(record, { field: field.factoredField })}
+                  factor={readFieldValue(record, { field: field.factorField })}
+                  locale={locale}
+                  t={t}
+                />
+              ) : ladder ? (
+                <PriceLadder
+                  rowKey={String(field.rowKey || key)}
+                  rungs={ladder}
+                  factor={readFieldValue(record, { field: field.factorField })}
+                  locale={locale}
+                  t={t}
+                />
+              ) : externalUrl ? (
+                <a
+                  href={externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent underline underline-offset-2"
+                  data-testid={`review-drawer-field-link-${key}`}
+                >
+                  {getLocalizedText(field.linkLabel || { 'zh-CN': '查看', en: 'Open' }, locale, t)}
+                </a>
+              ) : rendersComparisons ? (
                 <ComparisonList value={mappedValue} locale={locale} t={t} />
               ) : (
                 value
@@ -723,8 +751,10 @@ function DrawerEditForm({
   const [values, setValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<Record<string, any> | null>(null);
 
-  if (fields.length === 0 || !config?.command)
+  const isTwoPhase = Boolean(config?.previewCommand && config?.confirmCommand);
+  if (fields.length === 0 || (!config?.command && !isTwoPhase))
     return <div data-testid="review-drawer-edit-form-empty" />;
   const recordPid = record ? String(record.pid ?? '') : '';
   const disabled = !recordPid;
@@ -732,11 +762,31 @@ function DrawerEditForm({
   function begin() {
     const seed: Record<string, string> = {};
     for (const f of fields) {
-      const raw = readPath(record, f.valueField || f.field);
+      const raw = Object.prototype.hasOwnProperty.call(f, 'defaultValue')
+        ? f.defaultValue
+        : readPath(record, f.valueField || f.field);
       seed[f.field] = raw === undefined || raw === null ? '' : String(raw);
+    }
+    if (isTwoPhase && config.modeField && config.searchField && config.modeValueFields) {
+      let mode =
+        seed[config.modeField] ||
+        String(fields.find((field: any) => field.field === config.modeField)?.defaultValue || '');
+      const exactValue = readPath(record, config.modeValueFields.exact);
+      if (
+        mode === 'exact' &&
+        (exactValue === undefined || exactValue === null || exactValue === '')
+      ) {
+        mode = 'spec';
+      }
+      seed[config.modeField] = mode;
+      const sourceField = config.modeValueFields[mode];
+      const searchValue = sourceField ? readPath(record, sourceField) : '';
+      seed[config.searchField] =
+        searchValue === undefined || searchValue === null ? '' : String(searchValue);
     }
     setValues(seed);
     setError(null);
+    setPreview(null);
     setOpen(true);
   }
 
@@ -756,23 +806,79 @@ function DrawerEditForm({
     }
     setSaving(true);
     setError(null);
-    // Only send fields the user actually filled: the handler leaves a blank field alone, so an
-    // empty box means "keep the current value" rather than "clear it".
     const payload: Record<string, string> = {};
     for (const f of fields) {
       const v = (values[f.field] ?? '').trim();
       if (v !== '') payload[f.field] = v;
     }
     try {
-      await executeSimpleWorkbenchAction(runtime, {
+      const result = await executeSimpleWorkbenchAction(runtime, {
         action: 'command.execute',
         args: {
-          command: config.command,
+          command: isTwoPhase ? config.previewCommand : config.command,
           targetRecordPid: recordPid,
           payload,
+          reload: isTwoPhase ? [] : Array.isArray(config.reload) ? config.reload : [],
+        },
+      });
+      if (isTwoPhase) {
+        if (!result || typeof result !== 'object') {
+          throw new Error(
+            getLocalizedText(
+              { 'zh-CN': '查价未返回可预览结果', en: 'The price search returned no preview' },
+              locale,
+              t,
+            ),
+          );
+        }
+        setPreview(result as Record<string, any>);
+      } else {
+        setOpen(false);
+      }
+    } catch (e: any) {
+      setError(e?.message || String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function confirmPreview() {
+    if (!preview || !isTwoPhase) return;
+    const previewIdField = config.preview?.previewIdField || 'previewId';
+    const previewId = readPath(preview, previewIdField);
+    if (!previewId) {
+      setError(
+        getLocalizedText(
+          { 'zh-CN': '查价预览缺少编号，请重新查价', en: 'Preview id is missing; search again' },
+          locale,
+          t,
+        ),
+      );
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await executeSimpleWorkbenchAction(runtime, {
+        action: 'command.execute',
+        args: {
+          command: config.confirmCommand,
+          targetRecordPid: recordPid,
+          payload: { previewId },
           reload: Array.isArray(config.reload) ? config.reload : [],
         },
       });
+      for (const selection of Array.isArray(config.afterConfirmSelections)
+        ? config.afterConfirmSelections
+        : []) {
+        const resultKey = readPath(result, selection.resultField);
+        const row = readDataSourceRows(runtime, selection.dataSource).find(
+          (candidate: any) =>
+            String(readPath(candidate, selection.keyField || 'pid')) === String(resultKey),
+        );
+        if (row && selection.bind) writeRuntimeState(runtime, selection.bind, row);
+      }
+      setPreview(null);
       setOpen(false);
     } catch (e: any) {
       setError(e?.message || String(e));
@@ -780,6 +886,35 @@ function DrawerEditForm({
       setSaving(false);
     }
   }
+
+  function cancel() {
+    setPreview(null);
+    setError(null);
+    setOpen(false);
+  }
+
+  function updateValue(key: string, value: string) {
+    setValues((previous) => {
+      const next = { ...previous, [key]: value };
+      if (
+        isTwoPhase &&
+        key === config.modeField &&
+        config.searchField &&
+        config.modeValueFields?.[value]
+      ) {
+        const raw = readPath(record, config.modeValueFields[value]);
+        next[config.searchField] = raw === undefined || raw === null ? '' : String(raw);
+      }
+      return next;
+    });
+    if (error) setError(null);
+  }
+
+  const previewConfig = config?.preview || {};
+  const previewFields: any[] = Array.isArray(previewConfig.fields) ? previewConfig.fields : [];
+  const confirmable = preview
+    ? Boolean(readPath(preview, previewConfig.confirmableField || 'confirmable'))
+    : false;
 
   return (
     <div
@@ -800,11 +935,121 @@ function DrawerEditForm({
             t,
           )}
         </button>
+      ) : preview ? (
+        <div data-testid="review-drawer-edit-preview" className="space-y-3">
+          <section className="rounded-control border-border bg-subtle overflow-hidden border">
+            <header className="border-border bg-panel text-text border-b px-3 py-2 text-sm font-semibold">
+              {getLocalizedText(
+                previewConfig.title || { 'zh-CN': '查价预览', en: 'Price Preview' },
+                locale,
+                t,
+              )}
+            </header>
+            {previewConfig.notice && (
+              <div
+                data-testid="review-drawer-edit-preview-notice"
+                className="border-border bg-accent-weak text-text-2 border-b px-3 py-2 text-xs"
+              >
+                {getLocalizedText(previewConfig.notice, locale, t)}
+              </div>
+            )}
+            {previewFields.length > 0 && (
+              <FieldRows fields={previewFields} record={preview} locale={locale} t={t} />
+            )}
+            {readPath(preview, previewConfig.messageField || 'message') && (
+              <div
+                data-testid="review-drawer-edit-preview-message"
+                className="border-border text-text-2 border-t px-3 py-2 text-sm"
+              >
+                {String(readPath(preview, previewConfig.messageField || 'message'))}
+              </div>
+            )}
+          </section>
+          {error && (
+            <div data-testid="review-drawer-edit-error" className="text-status-red text-xs">
+              {error}
+            </div>
+          )}
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              data-testid="review-drawer-edit-cancel"
+              onClick={cancel}
+              className="rounded-control border-border bg-panel text-text hover:bg-hover border px-3 py-1.5 text-sm"
+            >
+              {t('common.cancel') || 'Cancel'}
+            </button>
+            <button
+              type="button"
+              data-testid="review-drawer-edit-back"
+              onClick={() => {
+                setPreview(null);
+                setError(null);
+              }}
+              className="rounded-control border-border bg-panel text-text hover:bg-hover border px-3 py-1.5 text-sm"
+            >
+              {getLocalizedText(
+                config.backLabel || { 'zh-CN': '返回修改', en: 'Edit search' },
+                locale,
+                t,
+              )}
+            </button>
+            {confirmable && (
+              <button
+                type="button"
+                data-testid="review-drawer-edit-confirm"
+                disabled={saving}
+                onClick={() => void confirmPreview()}
+                className="rounded-control bg-accent px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {saving
+                  ? t('common.loading')
+                  : getLocalizedText(
+                      config.confirmLabel || { 'zh-CN': '确认并采用', en: 'Confirm and adopt' },
+                      locale,
+                      t,
+                    )}
+              </button>
+            )}
+          </div>
+        </div>
       ) : (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-3">
             {fields.map((f: any) => {
               const key = String(f.field);
+              const label = getLocalizedText(f.label || key, locale, t);
+              if (f.type === 'radio') {
+                return (
+                  <fieldset
+                    key={key}
+                    data-testid={`review-drawer-edit-field-${key}`}
+                    className="text-text-2 min-w-[220px] text-xs"
+                  >
+                    <legend>
+                      {label}
+                      {f.required && <span className="text-status-red ml-0.5">*</span>}
+                    </legend>
+                    <div className="mt-1 flex flex-wrap gap-3">
+                      {(Array.isArray(f.options) ? f.options : []).map((option: any) => (
+                        <label
+                          key={String(option.value)}
+                          className="text-text flex items-center gap-1.5"
+                        >
+                          <input
+                            type="radio"
+                            name={`review-drawer-edit-${key}`}
+                            value={String(option.value)}
+                            checked={values[key] === String(option.value)}
+                            onChange={(event) => updateValue(key, event.target.value)}
+                          />
+                          <span>{getLocalizedText(option.label || option.value, locale, t)}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                );
+              }
               return (
                 <label
                   key={key}
@@ -812,7 +1057,7 @@ function DrawerEditForm({
                   className="text-text-2 flex min-w-[160px] flex-1 flex-col gap-1 text-xs"
                 >
                   <span>
-                    {getLocalizedText(f.label || key, locale, t)}
+                    {label}
                     {f.required && <span className="text-status-red ml-0.5">*</span>}
                   </span>
                   <input
@@ -822,12 +1067,7 @@ function DrawerEditForm({
                     placeholder={
                       f.placeholder ? getLocalizedText(f.placeholder, locale, t) : undefined
                     }
-                    onChange={(e) => {
-                      setValues((prev) => ({ ...prev, [key]: e.target.value }));
-                      // A validation or command error describes the previous values. Keeping it
-                      // visible after the user corrects a field makes a valid form look broken.
-                      if (error) setError(null);
-                    }}
+                    onChange={(e) => updateValue(key, e.target.value)}
                   />
                 </label>
               );
@@ -841,10 +1081,11 @@ function DrawerEditForm({
           <div className="flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              data-testid="review-drawer-edit-cancel"
+              onClick={cancel}
               className="rounded-control border-border bg-panel text-text hover:bg-hover border px-3 py-1.5 text-sm"
             >
-              {t('common.cancel') || '取消'}
+              {t('common.cancel') || 'Cancel'}
             </button>
             <button
               type="button"

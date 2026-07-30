@@ -409,7 +409,7 @@ const KNOWN_WORKBENCH_ACTIONS = ['state.set', 'dataSource.reload', 'navigate', '
 export async function executeSimpleWorkbenchAction(
   runtime: SchemaRuntime,
   config: any,
-): Promise<void> {
+): Promise<any> {
   if (!config) return;
   if (!KNOWN_WORKBENCH_ACTIONS.includes(config.action)) {
     // An unrecognized action used to fall through every branch below and return
@@ -521,9 +521,8 @@ export async function executeSimpleWorkbenchAction(
         await reloadDataSources(runtime, reloadIds);
       }
       const resultData = unwrapCommandData(result);
-      const { downloadBase64CommandArtifact } = await import(
-        '~/framework/meta/runtime/actions/ActionRegistry'
-      );
+      const { downloadBase64CommandArtifact } =
+        await import('~/framework/meta/runtime/actions/ActionRegistry');
       downloadBase64CommandArtifact(resultData);
       if (isBusinessRejected(resultData)) {
         showCommandFeedback(
@@ -550,6 +549,7 @@ export async function executeSimpleWorkbenchAction(
           openDownloadUrl(downloadUrl);
         }
       }
+      return resultData;
     } catch (error) {
       showCommandFeedback(
         runtime,

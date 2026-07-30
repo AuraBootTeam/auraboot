@@ -22,15 +22,17 @@ import {
 } from './quote-e2e-helpers';
 
 /**
- * Quote full-chain deep golden AS THE SALES ROLE (qo_sales), not admin.
+ * Quote full-chain deep golden led by the SALES ROLE (qo_sales), with admin parity.
  *
  * Drives the sales person's real day: create customer + BOM project (own data, self-scope),
  * create a quote from the UI form (customer/project reference dropdowns + corrected-BOM
  * upload), adopt recent-purchase/Yunhan/manual prices, change sets + price factor, edit a
- * material and reprice it through the local Yunhan mock, then generate and parse the quote
- * Excel after every business state (3 sheets, no broken formulas, no raw field codes).
- * A zero-401/403 collector runs across the owner's whole session, followed by a second sales
- * employee proving that every confidential child record remains hidden ("管理员能用 ≠ 系统能用",
+ * material through a non-mutating Yunhan preview, prove cancel leaves the quote/Excel untouched,
+ * explicitly confirm the preview, then generate and parse the quote Excel after every business
+ * state (3 sheets, no broken formulas, no raw field codes). An administrator repeats the
+ * preview/confirm/export path under ALL scope. A zero-401/403 collector runs across the owner's
+ * whole session, followed by a second sales employee proving that every confidential child
+ * record remains hidden and both reprice commands are denied ("管理员能用 ≠ 系统能用",
  * DDR-2026-06-29 §8).
  *
  * RUN (local host-first stack, business roles reconciled):
@@ -72,20 +74,13 @@ const REPRICE_MPN = 'TEST-REPRICE-0603';
 type ForbiddenHit = { step: string; url: string; status: number };
 
 async function fillDialogField(page: Page, field: string, value: string): Promise<void> {
-  const testId = `form-dialog-field-${field}`;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const input = page.getByTestId(testId);
-    await expect(input).toBeVisible();
-    await input.fill(value);
-    try {
-      await expect(input).toHaveValue(value, { timeout: 2_000 });
-      return;
-    } catch (error) {
-      if (attempt === 2) {
-        throw error;
-      }
-    }
-  }
+  const input = page.getByTestId(`form-dialog-field-${field}`);
+  await expect(input).toBeVisible();
+  // FormDialog number inputs are controlled and coerce on every change. Send the complete value
+  // as one input event: per-character typing can lose the remaining keystrokes when React commits
+  // the first numeric value and re-renders the element.
+  await input.fill(value);
+  await expect(input).toHaveValue(value);
 }
 
 function sheetRows(workbook: XLSX.WorkBook, sheetName: string): unknown[][] {
@@ -266,17 +261,6 @@ async function generateAndValidateWorkbook(
   await download.saveAs(exportPath);
   validateQuoteWorkbook(exportPath, expectedSetCount, expectedLine);
   return exportPath;
-}
-
-function editAndRepriceAudit(commandBody: Record<string, unknown>): Record<string, unknown> {
-  const data = parseJsonObject(commandBody.data);
-  const handlerResults = Array.isArray(data.handlerResults) ? data.handlerResults : [];
-  const first = parseJsonObject(handlerResults[0]);
-  return (
-    [parseJsonObject(data.data), parseJsonObject(first.data), first, data].find((candidate) =>
-      Array.isArray(candidate.externalSourcesRequested),
-    ) ?? {}
-  );
 }
 
 async function pickReferenceOption(
@@ -625,6 +609,9 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         await expect(page.getByTestId('form-dialog')).toBeVisible({ timeout: 15_000 });
         await fillDialogField(page, 'qo_quote_set_count', String(SET_COUNT));
         await fillDialogField(page, 'qo_quote_price_factor', String(PRICE_FACTOR));
+        await expect(page.getByTestId('form-dialog-field-qo_quote_set_count')).toHaveValue(
+          String(SET_COUNT),
+        );
         const recomputeResponsePromise = page.waitForResponse(
           (response) =>
             response
@@ -805,9 +792,11 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       await executeCommand(page, 'qo_quote_common:rollup_cost', {}, quoteId, 'update');
       await generateAndValidateWorkbook(page, quoteId, 'manual', SET_COUNT, testInfo);
 
-      // 7. Edit material facts and reprice. This switches only the local fake service to its
-      // recorded deterministic scenario; the browser still executes the production command.
-      step = 'edit material and reprice through Yunhan mock';
+      // 7. Two-phase material reprice. Preview is deliberately non-mutating: the old material,
+      // accepted decision, evidence and generated Excel remain authoritative until the user
+      // explicitly confirms. The browser calls the protocol-level local Yunhan fake so the gate
+      // never spends live API quota.
+      step = 'preview material reprice through Yunhan mock';
       const scenarioResponse = await page.request.post(
         `${mockControlUrl}/__control/scenario/reprice-v2`,
       );
@@ -819,56 +808,192 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       await page.getByRole('tab', { name: /BOM价格|BOM Price/ }).click();
       await page.getByTestId(`table-row-${lineId}`).click();
       await expect(page.getByTestId('review-drawer')).toBeVisible({ timeout: 20_000 });
+      const lineBeforePreview = await readDynamicRecord(page, 'qo_quote_line_common', lineId);
+      const acceptedBeforePreview = await queryDynamicRecords(
+        page,
+        'qo_quote_line_price_decision_common',
+        [
+          { fieldName: 'qo_qlpd_quote_line_id', operator: 'EQ', value: lineId },
+          { fieldName: 'qo_qlpd_status', operator: 'EQ', value: 'accepted' },
+        ],
+      );
+      const evidenceBeforePreview = await queryDynamicRecords(page, 'qo_price_evidence_common', [
+        { fieldName: 'qo_pe_quote_line_id', operator: 'EQ', value: lineId },
+      ]);
+      expect(acceptedBeforePreview.length, 'one accepted price exists before preview').toBe(1);
+
       await page.getByTestId('review-drawer-edit-open').click();
-      const descriptionInput = page
-        .getByTestId('review-drawer-edit-field-qo_ql_description')
+      const exactMode = page.getByRole('radio', { name: /精确型号|Exact MPN/ });
+      const specMode = page.getByRole('radio', { name: /规格描述|Specification/ });
+      await expect(exactMode).toBeChecked();
+      await expect(specMode).not.toBeChecked();
+      await expect(
+        page.getByTestId('review-drawer-edit-form').locator('input:not([type="radio"])'),
+        'the UI exposes one search text input only',
+      ).toHaveCount(1);
+      const searchInput = page
+        .getByTestId('review-drawer-edit-field-searchText')
         .locator('input')
         .first();
-      const mpnInput = page
-        .getByTestId('review-drawer-edit-field-qo_ql_mpn')
-        .locator('input')
-        .first();
-      await descriptionInput.fill('贴片电容 100nF 50V 0402');
-      await mpnInput.fill(REPRICE_MPN);
-      const repriceResponsePromise = page.waitForResponse(
+      await searchInput.fill(REPRICE_MPN);
+      const previewResponsePromise = page.waitForResponse(
         (response) =>
           response.request().method() === 'POST' &&
           response
             .url()
-            .includes('/api/meta/commands/execute/qo_quote_line_common:edit_and_reprice'),
+            .includes('/api/meta/commands/execute/qo_quote_line_common:preview_reprice'),
         { timeout: 60_000 },
       );
       await page.getByTestId('review-drawer-edit-submit').click();
-      const repriceBody = (await (await repriceResponsePromise).json().catch(() => ({}))) as Record<
+      const previewBody = (await (await previewResponsePromise).json().catch(() => ({}))) as Record<
         string,
         unknown
       >;
-      expect(String(repriceBody.code), JSON.stringify(repriceBody).slice(0, 800)).toBe('0');
-      const repriceAudit = editAndRepriceAudit(repriceBody);
-      expect(
-        repriceAudit.externalSourcesRequested,
-        JSON.stringify(repriceBody).slice(0, 1200),
-      ).toEqual(['yunhan']);
-      expect(repriceAudit.localLookups, JSON.stringify(repriceBody).slice(0, 1200)).toEqual([
-        'purchase_analysis_recent_price',
-      ]);
+      expect(String(previewBody.code), JSON.stringify(previewBody).slice(0, 800)).toBe('0');
+      const previewPanel = page.getByTestId('review-drawer-edit-preview');
+      await expect(previewPanel).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByTestId('review-drawer-edit-preview-notice')).toContainText(
+        '当前报价尚未变更',
+      );
+      await expect(previewPanel).toContainText(REPRICE_MPN);
+      await expect(previewPanel).toContainText('YAGEO');
+      await expect(previewPanel).toContainText('10kΩ ±1% 62.5mW 0402 chip resistor');
+      await expect(previewPanel).toContainText('0.0100');
+      await expect(previewPanel).toContainText('0.0105');
+      await expect(previewPanel).toContainText('当前');
+      await expect(page.getByTestId('review-drawer-edit-confirm')).toBeVisible();
+      await expect(page.getByTestId('review-drawer-field-link-detailUrl')).toHaveAttribute(
+        'href',
+        'https://www.ickey.cn/detail/mock/reprice-new.html',
+      );
+      await previewPanel.scrollIntoViewIfNeeded();
+      await previewPanel.screenshot({
+        path: testInfo.outputPath('ordinary-sales-reprice-preview-before-confirm.png'),
+      });
+      await page.getByTestId('review-drawer-edit-confirm').scrollIntoViewIfNeeded();
+      await page.getByTestId('review-drawer').screenshot({
+        path: testInfo.outputPath('ordinary-sales-reprice-preview-actions.png'),
+      });
+
       const mockRequestsResponse = await page.request.get(`${mockControlUrl}/__control/requests`);
       expect(mockRequestsResponse.ok(), 'Yunhan mock request audit is readable').toBe(true);
       const mockRequestsBody = (await mockRequestsResponse.json()) as {
         requests?: Array<{ path?: string; form?: Record<string, unknown> }>;
       };
-      const singleSearchRequest = [...(mockRequestsBody.requests ?? [])]
-        .reverse()
-        .find((request) => request.path?.endsWith('/get-single-goods-new'));
+      const singleSearchRequests = (mockRequestsBody.requests ?? []).filter((request) =>
+        request.path?.endsWith('/get-single-goods-new'),
+      );
+      expect(
+        singleSearchRequests,
+        'one preview must issue one Yunhan single-goods call',
+      ).toHaveLength(1);
+      const singleSearchRequest = singleSearchRequests[0];
       expect(singleSearchRequest, JSON.stringify(mockRequestsBody).slice(0, 1200)).toBeTruthy();
       expect(singleSearchRequest?.form?.keyword).toEqual([REPRICE_MPN]);
       expect(singleSearchRequest?.form?.is_exact_match).toEqual(['1']);
-      await testInfo.attach('ordinary-sales-edit-and-reprice-response.json', {
-        body: JSON.stringify(repriceBody, null, 2),
+      await testInfo.attach('ordinary-sales-reprice-preview-response.json', {
+        body: JSON.stringify(previewBody, null, 2),
         contentType: 'application/json',
       });
       await testInfo.attach('ordinary-sales-yunhan-mock-requests.json', {
         body: JSON.stringify(mockRequestsBody, null, 2),
+        contentType: 'application/json',
+      });
+
+      const lineDuringPreview = await readDynamicRecord(page, 'qo_quote_line_common', lineId);
+      expect(String(lineDuringPreview.qo_ql_mpn ?? '')).toBe(
+        String(lineBeforePreview.qo_ql_mpn ?? ''),
+      );
+      expect(Number(lineDuringPreview.qo_ql_unit_cost)).toBeCloseTo(
+        Number(lineBeforePreview.qo_ql_unit_cost),
+        6,
+      );
+      const acceptedDuringPreview = await queryDynamicRecords(
+        page,
+        'qo_quote_line_price_decision_common',
+        [
+          { fieldName: 'qo_qlpd_quote_line_id', operator: 'EQ', value: lineId },
+          { fieldName: 'qo_qlpd_status', operator: 'EQ', value: 'accepted' },
+        ],
+      );
+      expect(acceptedDuringPreview.map((row) => String(row.pid))).toEqual(
+        acceptedBeforePreview.map((row) => String(row.pid)),
+      );
+      const evidenceDuringPreview = await queryDynamicRecords(page, 'qo_price_evidence_common', [
+        { fieldName: 'qo_pe_quote_line_id', operator: 'EQ', value: lineId },
+      ]);
+      expect(evidenceDuringPreview).toHaveLength(evidenceBeforePreview.length);
+
+      // Cancel means the preview is discarded from the business flow. The technical preview
+      // audit may remain server-side, but quote facts and the next exported workbook stay intact.
+      await page.getByTestId('review-drawer-edit-cancel').click();
+      await expect(page.getByTestId('review-drawer-edit-preview')).toBeHidden();
+      await expect(page.getByTestId('review-drawer-edit-open')).toBeVisible();
+      const lineAfterCancel = await readDynamicRecord(page, 'qo_quote_line_common', lineId);
+      expect(String(lineAfterCancel.qo_ql_mpn ?? '')).toBe(
+        String(lineBeforePreview.qo_ql_mpn ?? ''),
+      );
+      expect(Number(lineAfterCancel.qo_ql_unit_cost)).toBeCloseTo(
+        Number(lineBeforePreview.qo_ql_unit_cost),
+        6,
+      );
+      await generateAndValidateWorkbook(
+        page,
+        quoteId,
+        'reprice-preview-cancel',
+        SET_COUNT,
+        testInfo,
+        {
+          mpn: String(lineBeforePreview.qo_ql_mpn ?? ''),
+          unitCost: Number(lineBeforePreview.qo_ql_unit_cost),
+        },
+      );
+
+      // Run the same explicit exact-model preview again, then adopt it. The confirmation request
+      // is generated by the shared renderer with previewId only; trusted price/URL/ladder data is
+      // loaded by the server from the preview record.
+      step = 'confirm material reprice preview';
+      await page.getByRole('tab', { name: /BOM价格|BOM Price/ }).click();
+      await page.getByTestId(`table-row-${lineId}`).click();
+      await page.getByTestId('review-drawer-edit-open').click();
+      await page
+        .getByTestId('review-drawer-edit-field-searchText')
+        .locator('input')
+        .fill(REPRICE_MPN);
+      const secondPreviewResponsePromise = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response
+            .url()
+            .includes('/api/meta/commands/execute/qo_quote_line_common:preview_reprice'),
+        { timeout: 60_000 },
+      );
+      await page.getByTestId('review-drawer-edit-submit').click();
+      const secondPreviewBody = (await (await secondPreviewResponsePromise)
+        .json()
+        .catch(() => ({}))) as Record<string, unknown>;
+      expect(String(secondPreviewBody.code), JSON.stringify(secondPreviewBody).slice(0, 800)).toBe(
+        '0',
+      );
+      await expect(page.getByTestId('review-drawer-edit-confirm')).toBeVisible({
+        timeout: 20_000,
+      });
+      const confirmResponsePromise = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response
+            .url()
+            .includes('/api/meta/commands/execute/qo_quote_line_common:confirm_reprice_preview'),
+        { timeout: 60_000 },
+      );
+      await page.getByTestId('review-drawer-edit-confirm').click();
+      const confirmBody = (await (await confirmResponsePromise).json().catch(() => ({}))) as Record<
+        string,
+        unknown
+      >;
+      expect(String(confirmBody.code), JSON.stringify(confirmBody).slice(0, 1000)).toBe('0');
+      await testInfo.attach('ordinary-sales-reprice-confirm-response.json', {
+        body: JSON.stringify(confirmBody, null, 2),
         contentType: 'application/json',
       });
 
@@ -885,7 +1010,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
                 const snapshot = parseJsonObject(row.qo_pe_snapshot);
                 return (
                   String(row.qo_pe_part_no ?? '') === REPRICE_MPN &&
-                  String(row.qo_pe_status ?? '') === 'captured' &&
+                  String(row.qo_pe_status ?? '') === 'confirmed' &&
                   String(snapshot.matchedBy ?? '') !== 'recent_cache'
                 );
               }) ?? {};
@@ -911,13 +1036,11 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       );
       expect(matchedProcessHit, JSON.stringify(processHits).slice(0, 1200)).toBeTruthy();
 
-      const refreshedEvidenceId = String(refreshedYunhan.pid);
-      await adoptEvidence(page, lineId, refreshedEvidenceId, 'yunhan');
       const refreshedLine = await readDynamicRecord(page, 'qo_quote_line_common', lineId);
       expect(String(refreshedLine.qo_ql_mpn ?? '')).toBe(REPRICE_MPN);
+      expect(String(refreshedLine.qo_ql_package ?? '')).toBe('0402');
       const refreshedUnitCost = Number(refreshedLine.qo_ql_unit_cost);
       expect(refreshedUnitCost).toBeCloseTo(0.01 * (PRICE_FACTOR / 100), 6);
-      await executeCommand(page, 'qo_quote_common:rollup_cost', {}, quoteId, 'update');
       await generateAndValidateWorkbook(page, quoteId, 'reprice', SET_COUNT, testInfo, {
         mpn: REPRICE_MPN,
         unitCost: refreshedUnitCost,
@@ -931,11 +1054,17 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
 
       // 8. A second sales employee has the same capability atoms but cannot read any record
       // owned by the first employee. This explicitly covers quote child records involved in
-      // recompute/export/reprice, not just the quote root.
+      // recompute/export/reprice, not just the quote root. Run this before the administrator
+      // path: an ALL-scope export legitimately refreshes derived cost rows as the administrator,
+      // which would no longer be an honest fixture for a SELF-owner isolation assertion.
       step = 'cross-employee SELF isolation';
+      const ownedRepricePreviews = await queryDynamicRecords(page, 'qo_reprice_preview_common', [
+        { fieldName: 'qo_rp_quote_line_id', operator: 'EQ', value: lineId },
+      ]);
       const ownedRecordGroups: Array<{ model: string; records: Record<string, unknown>[] }> = [
         { model: 'qo_quote_common', records: [{ pid: quoteId }] },
         { model: 'qo_quote_line_common', records: [{ pid: lineId }] },
+        { model: 'qo_reprice_preview_common', records: ownedRepricePreviews },
         {
           model: 'qo_quote_line_price_decision_common',
           records: await queryDynamicRecords(page, 'qo_quote_line_price_decision_common', [
@@ -968,6 +1097,26 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
 
       const other = await openQuoteRolePage(browser, SALES_B_USER);
       try {
+        for (const command of [
+          'qo_quote_line_common:preview_reprice',
+          'qo_quote_line_common:confirm_reprice_preview',
+        ]) {
+          const denied = await other.page.request.post(`/api/meta/commands/execute/${command}`, {
+            data: {
+              targetRecordPid: lineId,
+              operationType: 'UPDATE',
+              payload:
+                command === 'qo_quote_line_common:preview_reprice'
+                  ? { searchMode: 'exact', searchText: 'MUST-NOT-QUERY' }
+                  : { previewId: 'FOREIGN-PREVIEW' },
+            },
+          });
+          const deniedBody = (await denied.json().catch(() => ({}))) as Record<string, unknown>;
+          expect(
+            denied.ok() && String(deniedBody.code ?? '') === '0',
+            `${command} must not execute against another employee's line`,
+          ).toBe(false);
+        }
         for (const group of ownedRecordGroups) {
           const pid = String(group.records[0].pid ?? '');
           expect(pid, `${group.model} fixture pid`).toBeTruthy();
@@ -994,7 +1143,78 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         await other.context.close();
       }
 
-      // 9. hard gates
+      // 9. An administrator executes the same preview + confirm path against the sales-owned
+      // quote, proving ALL-scope behavior. The resulting workbook must remain consistent.
+      step = 'admin preview, confirm and export';
+      const adminGoldenContext = await browser.newContext({
+        storageState: { cookies: [], origins: [] },
+      });
+      try {
+        const adminPage = await adminGoldenContext.newPage();
+        await loginViaUI(adminPage, ADMIN_EMAIL, ADMIN_PASSWORD);
+        const adminScenarioResponse = await adminPage.request.post(
+          `${mockControlUrl}/__control/scenario/reprice-v2`,
+        );
+        expect(adminScenarioResponse.ok(), 'admin Yunhan mock scenario switch').toBe(true);
+        await openQuoteDetailFromList(adminPage, created);
+        await adminPage.getByRole('tab', { name: /BOM价格|BOM Price/ }).click();
+        await adminPage.getByTestId(`table-row-${lineId}`).click();
+        await adminPage.getByTestId('review-drawer-edit-open').click();
+        await adminPage
+          .getByTestId('review-drawer-edit-field-searchText')
+          .locator('input')
+          .fill(REPRICE_MPN);
+        await adminPage.getByTestId('review-drawer-edit-submit').click();
+        const adminPreview = adminPage.getByTestId('review-drawer-edit-preview');
+        await expect(adminPreview).toBeVisible({ timeout: 20_000 });
+        await adminPreview.scrollIntoViewIfNeeded();
+        await adminPreview.screenshot({
+          path: testInfo.outputPath('admin-reprice-preview-before-confirm.png'),
+        });
+        await adminPage.getByTestId('review-drawer-edit-confirm').scrollIntoViewIfNeeded();
+        await adminPage.getByTestId('review-drawer').screenshot({
+          path: testInfo.outputPath('admin-reprice-preview-actions.png'),
+        });
+        const adminConfirmResponsePromise = adminPage.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            response
+              .url()
+              .includes('/api/meta/commands/execute/qo_quote_line_common:confirm_reprice_preview'),
+          { timeout: 60_000 },
+        );
+        await adminPage.getByTestId('review-drawer-edit-confirm').click();
+        const adminConfirmBody = (await (await adminConfirmResponsePromise)
+          .json()
+          .catch(() => ({}))) as Record<string, unknown>;
+        expect(String(adminConfirmBody.code), JSON.stringify(adminConfirmBody).slice(0, 1000)).toBe(
+          '0',
+        );
+        const adminLine = await readDynamicRecord(adminPage, 'qo_quote_line_common', lineId);
+        await generateAndValidateWorkbook(
+          adminPage,
+          quoteId,
+          'admin-reprice-confirm',
+          SET_COUNT,
+          testInfo,
+          {
+            mpn: REPRICE_MPN,
+            unitCost: Number(adminLine.qo_ql_unit_cost),
+          },
+        );
+        await adminPage.getByRole('tab', { name: /BOM价格|BOM Price/ }).click();
+        await expect(adminPage.getByTestId(`table-row-${lineId}`)).toBeVisible({
+          timeout: 20_000,
+        });
+        await adminPage.screenshot({
+          path: testInfo.outputPath('admin-reprice-confirm-result.png'),
+          fullPage: true,
+        });
+      } finally {
+        await adminGoldenContext.close();
+      }
+
+      // 10. hard gates
       expect(consoleIssues, `console issues:\n${consoleIssues.join('\n')}`).toEqual([]);
       const hits = forbidden.map((h) => `[${h.step}] ${h.status} ${h.url}`);
       expect(hits, `forbidden API hits as qo_sales:\n${hits.join('\n')}`).toEqual([]);
