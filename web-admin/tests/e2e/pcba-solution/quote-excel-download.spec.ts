@@ -4,11 +4,14 @@ import path from 'node:path';
 import * as XLSX from 'xlsx';
 import { cleanupRows, openQuoteDetailFromList, seedDownloadableQuote } from './quote-e2e-helpers';
 
-function formulasOf(sheet: XLSX.WorkSheet): string[] {
-  return Object.values(sheet)
-    .filter((cell): cell is XLSX.CellObject => Boolean(cell) && typeof cell === 'object' && 'f' in cell)
-    .map((cell) => String(cell.f ?? ''))
-    .filter(Boolean);
+function numericCell(sheet: XLSX.WorkSheet, address: string): number {
+  const value = sheet[address]?.v;
+  expect(typeof value, `${address} must carry a numeric cached value`).toBe('number');
+  return Number(value);
+}
+
+function expectFormula(sheet: XLSX.WorkSheet, address: string, expected: string): void {
+  expect(String(sheet[address]?.f ?? ''), `${address} formula`).toBe(expected);
 }
 
 function assertNoRef(workbook: XLSX.WorkBook): void {
@@ -40,9 +43,36 @@ function validateQuoteWorkbook(filePath: string): void {
   expect(typeof bom['N2']?.v).toBe('number');
   expect(bom['O2']?.f).toBe('G2*N2');
 
-  const processFormulas = formulasOf(workbook.Sheets['加工明细']);
-  expect(processFormulas.some((formula) => formula.includes('BOM明细') && formula.toUpperCase().includes('SUM'))).toBe(true);
-  expect(formulasOf(workbook.Sheets['报价单']).join('\n')).not.toContain('#REF!');
+  const process = workbook.Sheets['加工明细'];
+  for (let row = 3; row <= 11; row += 1) {
+    expectFormula(process, `H${row}`, `F${row}*G${row}`);
+  }
+  expectFormula(process, 'H12', 'SUM(H3:H11)');
+  const processDetailTotal = Array.from({ length: 9 }, (_, index) => numericCell(process, `H${index + 3}`))
+    .reduce((total, value) => total + value, 0);
+  expect(numericCell(process, 'H12')).toBeCloseTo(processDetailTotal, 8);
+
+  const quote = workbook.Sheets['报价单'];
+  expectFormula(quote, 'J15', '(H15+I15)*30%');
+  expectFormula(quote, 'K15', 'ROUND((H15+I15+J15),2)');
+  expectFormula(quote, 'L15', 'G15*K15');
+  expectFormula(quote, 'P15', 'N15+M15+L15');
+  expect(String(quote['K15']?.f ?? '')).not.toContain('L15/G15');
+
+  const materialPerSet = numericCell(quote, 'H15');
+  const processAndPackagingPerSet = numericCell(quote, 'I15');
+  const managementProfit = numericCell(quote, 'J15');
+  const unitPrice = numericCell(quote, 'K15');
+  const setCount = numericCell(quote, 'G15');
+  const recurringTotal = numericCell(quote, 'L15');
+  const stencilFee = numericCell(quote, 'M15');
+  const engineeringFee = numericCell(quote, 'N15');
+  const finalTotal = numericCell(quote, 'P15');
+
+  expect(managementProfit).toBeCloseTo((materialPerSet + processAndPackagingPerSet) * 0.3, 8);
+  expect(unitPrice).toBeCloseTo(Math.round((materialPerSet + processAndPackagingPerSet + managementProfit) * 100) / 100, 8);
+  expect(recurringTotal).toBeCloseTo(setCount * unitPrice, 8);
+  expect(finalTotal).toBeCloseTo(engineeringFee + stencilFee + recurringTotal, 8);
 }
 
 test.describe('PCBA quote Excel download', () => {
