@@ -241,6 +241,10 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
     result.chartType || (columns.length > 0 ? inferChartType(records, effectiveColumns) : 'table');
 
   const showChart = chartType !== 'table' && records.length > 0;
+  const recordLabel =
+    total === 1
+      ? t('aurabot.chatbi.record', undefined, '条记录')
+      : t('aurabot.chatbi.records', undefined, '条记录');
 
   // ── Ad-hoc → persisted bridge: save this chart as a dashboard widget ──
   const { modelCode, dimensions = [], metrics = [] } = result;
@@ -301,12 +305,12 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
             <path d="M7 16l4-8 4 4 4-6" />
           </svg>
           <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
-            Data Query
+            {t('aurabot.chatbi.data_query', undefined, '数据查询')}
           </span>
           {total != null && (
             <span className="ml-auto text-xs text-indigo-400 dark:text-indigo-500">
-              {total} record{total !== 1 ? 's' : ''}
-              {truncated && ' (truncated)'}
+              {total} {recordLabel}
+              {truncated && ` (${t('aurabot.chatbi.truncated', undefined, '已截断')})`}
             </span>
           )}
         </div>

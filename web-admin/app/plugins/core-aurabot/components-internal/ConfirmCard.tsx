@@ -9,6 +9,7 @@
 
 import { AlertTriangle } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
+import { formatToolDisplayName } from './toolDisplayName';
 
 // ============================================================================
 // Types
@@ -27,61 +28,6 @@ interface ConfirmCardProps {
 // ============================================================================
 // Helpers
 // ============================================================================
-
-/** Strip prefix (cmd__, nq__, builtin__) and replace __ with ' › ' */
-/**
- * Turns the LLM-safe tool name into something a person can read.
- *
- * This card is shown at the one moment the product asks a human to authorise an action, so the
- * name on it has to be legible. It was stripping double-underscore prefixes (`cmd__`) while the
- * runtime emits single ones — `cmd_crm_create_account` — so nothing matched and the card asked
- * people to approve a raw command code.
- *
- * The runtime builds these by replacing the namespace colon with an underscore, so the first
- * underscore after the prefix is that separator: `cmd_crm_create_account` is `crm:create_account`.
- */
-function formatToolName(name: string, isZh: boolean): string {
-  const localizeWords = (value: string) => {
-    const words = value.split(/[_\s]+/).filter(Boolean);
-    if (!isZh) {
-      return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-    }
-    const labels: Record<string, string> = {
-      create: '新建',
-      update: '更新',
-      delete: '删除',
-      list: '查询',
-      get: '查看',
-      account: '客户',
-      customer: '客户',
-      lead: '线索',
-      contact: '联系人',
-      opportunity: '商机',
-      record: '记录',
-    };
-    return words.map((word) => labels[word.toLowerCase()] ?? word).join('');
-  };
-
-  // Already carries its namespace separator — that is the form the product uses.
-  if (name.includes(':')) {
-    const normalized = name.replace(/^(cmd|nq|builtin):/, '');
-    const [namespace, ...actionParts] = normalized.split(':');
-    if (actionParts.length > 0) {
-      return `${namespace.toUpperCase()} › ${localizeWords(actionParts.join('_'))}`;
-    }
-    return localizeWords(normalized);
-  }
-  const withoutPrefix = name.replace(/^(cmd__|nq__|builtin__)/, '').replace(/^(cmd_|nq_|builtin_)/, '');
-  if (withoutPrefix.includes('__')) {
-    const [namespace, ...actionParts] = withoutPrefix.split('__');
-    return `${namespace.toUpperCase()} › ${localizeWords(actionParts.join('_'))}`;
-  }
-  const separator = withoutPrefix.indexOf('_');
-  if (separator <= 0 || separator >= withoutPrefix.length - 1) {
-    return localizeWords(withoutPrefix);
-  }
-  return `${withoutPrefix.slice(0, separator).toUpperCase()} › ${localizeWords(withoutPrefix.slice(separator + 1))}`;
-}
 
 function formatParamName(key: string, isZh: boolean): string {
   const words = key.split(/[_\s]+/).filter(Boolean);
@@ -128,7 +74,7 @@ export function ConfirmCard({
 }: ConfirmCardProps) {
   const { t, locale } = useI18n();
   const isZh = locale.toLowerCase().startsWith('zh');
-  const displayName = formatToolName(toolName, isZh);
+  const displayName = formatToolDisplayName(toolName, isZh);
 
   // Filter input params for display
   const visibleParams = Object.entries(input).filter(([key]) => !EXCLUDED_KEYS.has(key));

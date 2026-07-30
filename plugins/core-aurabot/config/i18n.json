@@ -677,5 +677,40 @@
     "zh-CN": "复制",
     "en-US": "Copy",
     "refType": "ui"
+  },
+  {
+    "key": "aurabot.chatbi.data_query",
+    "source": "import",
+    "zh-CN": "数据查询",
+    "en-US": "Data query",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chatbi.records",
+    "source": "import",
+    "zh-CN": "条记录",
+    "en-US": "records",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chatbi.record",
+    "source": "import",
+    "zh-CN": "条记录",
+    "en-US": "record",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chatbi.more_records",
+    "source": "import",
+    "zh-CN": "另有",
+    "en-US": "and",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chatbi.truncated",
+    "source": "import",
+    "zh-CN": "已截断",
+    "en-US": "truncated",
+    "refType": "ui"
   }
 ]
