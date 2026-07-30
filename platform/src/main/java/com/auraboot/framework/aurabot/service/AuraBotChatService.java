@@ -419,6 +419,8 @@ public class AuraBotChatService {
         // --- Trace: create trace ---
         Map<String, Object> traceMetadata = new HashMap<>();
         traceMetadata.put("provider_code", providerCode);
+        traceMetadata.put("turn_id", ctx.turnId());
+        traceMetadata.put("turn_phase", "initial");
         if (request.getPageContext() != null) {
             traceMetadata.put("page_context", Map.of(
                     "kind", Objects.toString(request.getPageContext().getKind(), ""),
