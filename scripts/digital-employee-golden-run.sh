@@ -236,9 +236,14 @@ fi
 
 echo "[de-golden] 4/4 result"
 SHOTS=$(find test-results/digital-employee -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
+# A clean run has no "<n> failed" summary line. With `set -euo pipefail`,
+# grep's expected no-match exit code would otherwise terminate the runner
+# before it writes the PASS banner and receipt.
+set +e
 PASSED_COUNT=$(grep -aoE '[0-9]+ passed' "/tmp/de-golden-run.$$.log" 2>/dev/null | tail -1 | awk '{print $1}')
 SKIPPED_COUNT=$(grep -aoE '[0-9]+ skipped' "/tmp/de-golden-run.$$.log" 2>/dev/null | tail -1 | awk '{print $1}')
 FAILED_COUNT=$(grep -aoE '[0-9]+ failed' "/tmp/de-golden-run.$$.log" 2>/dev/null | tail -1 | awk '{print $1}')
+set -e 2>/dev/null || true
 PASSED_COUNT=${PASSED_COUNT:-0}
 SKIPPED_COUNT=${SKIPPED_COUNT:-0}
 FAILED_COUNT=${FAILED_COUNT:-0}
