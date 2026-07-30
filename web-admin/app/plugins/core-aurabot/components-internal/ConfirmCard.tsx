@@ -8,6 +8,7 @@
  */
 
 import { AlertTriangle } from 'lucide-react';
+import { useI18n } from '~/contexts/I18nContext';
 
 // ============================================================================
 // Types
@@ -39,20 +40,74 @@ interface ConfirmCardProps {
  * The runtime builds these by replacing the namespace colon with an underscore, so the first
  * underscore after the prefix is that separator: `cmd_crm_create_account` is `crm:create_account`.
  */
-function formatToolName(name: string): string {
+function formatToolName(name: string, isZh: boolean): string {
+  const localizeWords = (value: string) => {
+    const words = value.split(/[_\s]+/).filter(Boolean);
+    if (!isZh) {
+      return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    }
+    const labels: Record<string, string> = {
+      create: '新建',
+      update: '更新',
+      delete: '删除',
+      list: '查询',
+      get: '查看',
+      account: '客户',
+      customer: '客户',
+      lead: '线索',
+      contact: '联系人',
+      opportunity: '商机',
+      record: '记录',
+    };
+    return words.map((word) => labels[word.toLowerCase()] ?? word).join('');
+  };
+
   // Already carries its namespace separator — that is the form the product uses.
   if (name.includes(':')) {
-    return name.replace(/^(cmd|nq|builtin):/, '').replace(/_/g, ' ');
+    const normalized = name.replace(/^(cmd|nq|builtin):/, '');
+    const [namespace, ...actionParts] = normalized.split(':');
+    if (actionParts.length > 0) {
+      return `${namespace.toUpperCase()} › ${localizeWords(actionParts.join('_'))}`;
+    }
+    return localizeWords(normalized);
   }
   const withoutPrefix = name.replace(/^(cmd__|nq__|builtin__)/, '').replace(/^(cmd_|nq_|builtin_)/, '');
   if (withoutPrefix.includes('__')) {
-    return withoutPrefix.replace(/__/g, ' › ');
+    const [namespace, ...actionParts] = withoutPrefix.split('__');
+    return `${namespace.toUpperCase()} › ${localizeWords(actionParts.join('_'))}`;
   }
   const separator = withoutPrefix.indexOf('_');
   if (separator <= 0 || separator >= withoutPrefix.length - 1) {
-    return withoutPrefix.replace(/_/g, ' ');
+    return localizeWords(withoutPrefix);
   }
-  return `${withoutPrefix.slice(0, separator)} › ${withoutPrefix.slice(separator + 1).replace(/_/g, ' ')}`;
+  return `${withoutPrefix.slice(0, separator).toUpperCase()} › ${localizeWords(withoutPrefix.slice(separator + 1))}`;
+}
+
+function formatParamName(key: string, isZh: boolean): string {
+  const words = key.split(/[_\s]+/).filter(Boolean);
+  const last = words.at(-1)?.toLowerCase() ?? key;
+  const labels: Record<string, [string, string]> = {
+    name: ['名称', 'Name'],
+    title: ['标题', 'Title'],
+    description: ['描述', 'Description'],
+    industry: ['行业', 'Industry'],
+    rating: ['评级', 'Rating'],
+    status: ['状态', 'Status'],
+    amount: ['金额', 'Amount'],
+    quantity: ['数量', 'Quantity'],
+    email: ['邮箱', 'Email'],
+    phone: ['电话', 'Phone'],
+    code: ['编码', 'Code'],
+  };
+  const known = labels[last];
+  if (known) return isZh ? known[0] : known[1];
+  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
+function hasTechnicalDescription(value: string): boolean {
+  return /\b(?:cmd|nq|builtin)_[a-z0-9_]+\b/i.test(value)
+    || /\b[a-z][a-z0-9]*:[a-z][a-z0-9_]*\b/i.test(value)
+    || /\b[a-z][a-z0-9]*_[a-z][a-z0-9_]*\b/i.test(value);
 }
 
 /** Keys to exclude from the displayed parameters */
@@ -71,10 +126,17 @@ export function ConfirmCard({
   onCancel,
   disabled = false,
 }: ConfirmCardProps) {
-  const displayName = formatToolName(toolName);
+  const { t, locale } = useI18n();
+  const isZh = locale.toLowerCase().startsWith('zh');
+  const displayName = formatToolName(toolName, isZh);
 
   // Filter input params for display
   const visibleParams = Object.entries(input).filter(([key]) => !EXCLUDED_KEYS.has(key));
+  const safeDescription = description && !hasTechnicalDescription(description)
+    ? description
+    : isZh
+      ? `执行前请核对 ${visibleParams.length} 项参数。`
+      : `Review ${visibleParams.length} parameter${visibleParams.length === 1 ? '' : 's'} before execution.`;
 
   return (
     <div className="mb-3 flex justify-start" data-testid="aurabot-confirm-card">
@@ -90,7 +152,7 @@ export function ConfirmCard({
         {/* Body */}
         <div className="space-y-2 px-3 py-2">
           {/* Description */}
-          <p className="text-sm text-amber-700 dark:text-amber-300/80">{description}</p>
+          <p className="text-sm text-amber-700 dark:text-amber-300/80">{safeDescription}</p>
 
           {/* Params */}
           {visibleParams.length > 0 && (
@@ -98,7 +160,7 @@ export function ConfirmCard({
               {visibleParams.map(([key, value]) => (
                 <div key={key} className="flex items-start gap-2 text-xs">
                   <span className="min-w-[60px] font-medium text-amber-600 dark:text-amber-400">
-                    {key}:
+                    {formatParamName(key, isZh)}:
                   </span>
                   <span className="break-all text-amber-700 dark:text-amber-300/70">
                     {typeof value === 'object' ? JSON.stringify(value) : String(value)}
@@ -117,7 +179,7 @@ export function ConfirmCard({
             data-testid="aurabot-confirm-cancel"
             className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
           >
-            Cancel
+            {t('common.cancel', undefined, isZh ? '取消' : 'Cancel')}
           </button>
           <button
             onClick={() => onConfirm(toolId)}
@@ -125,7 +187,7 @@ export function ConfirmCard({
             data-testid="aurabot-confirm-approve"
             className="rounded-lg bg-amber-500 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Confirm
+            {t('common.confirm', undefined, isZh ? '确认' : 'Confirm')}
           </button>
         </div>
       </div>
