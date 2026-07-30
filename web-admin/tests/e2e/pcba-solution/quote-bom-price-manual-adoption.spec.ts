@@ -16,8 +16,9 @@ const MANUAL_SOURCE_NOTE = 'E2E source: business phone quote';
 const MANUAL_REASON = 'E2E business裁决: record and adopt manual price';
 const MANUAL_VALID_UNTIL = '2030-12-31';
 const EXPECTED_LINE_COST = Number((MANUAL_UNIT_PRICE * 10).toFixed(2));
-const PURCHASE_ANALYSIS_RECENT_PRICE_LABEL = '采购分析近期价';
-const YUNHAN_PRICE_LABEL = '云汉芯城';
+const PURCHASE_ANALYSIS_RECENT_PRICE_LABEL = '近期价(系数后)';
+const YUNHAN_PRICE_LABEL = '云汉(系数后)';
+const DEEPSEEK_PRICE_LABEL = 'DeepSeek(系数后)';
 
 async function tableHeaders(table: Locator): Promise<string[]> {
   const headers = table.locator('thead th, [role="columnheader"]');
@@ -133,7 +134,7 @@ test.describe('PCBA quote BOM price manual adoption', () => {
         '总用量',
         PURCHASE_ANALYSIS_RECENT_PRICE_LABEL,
         YUNHAN_PRICE_LABEL,
-        'DeepSeek建议价',
+        DEEPSEEK_PRICE_LABEL,
         '采用价格',
         '采用来源',
         '当前状态',

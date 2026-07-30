@@ -483,6 +483,27 @@ export async function executeCommand(
   return commandData;
 }
 
+export function yunhanMockControlUrl(): string {
+  const controlUrl = String(process.env.YUNHAN_MOCK_CONTROL_URL ?? '').replace(/\/$/, '');
+  expect(
+    controlUrl,
+    'YUNHAN_MOCK_CONTROL_URL is required; release E2E must not consume live Yunhan quota',
+  ).toBeTruthy();
+  return controlUrl;
+}
+
+export async function setYunhanMockScenario(page: Page, scenario: string): Promise<void> {
+  const controlUrl = yunhanMockControlUrl();
+  const response = await page.request.post(
+    `${controlUrl}/__control/scenario/${encodeURIComponent(scenario)}`,
+  );
+  const body = await response.text();
+  expect(
+    response.ok(),
+    `switch Yunhan mock to ${scenario}: HTTP ${response.status()} ${body}`,
+  ).toBe(true);
+}
+
 export async function dynamicCreate(
   page: Page,
   model: string,
@@ -968,15 +989,15 @@ async function seedQuoteScaffold(
  * sanitises such columns before upload; keeping one here is what makes that sanitisation falsifiable
  * (remove it from the client and the Yunhan evidence assertions below go red).
  */
-export function createNonStandardBomWorkbook(filePath: string): string {
+export function createNonStandardBomWorkbook(filePath: string, mpnSuffix = ''): string {
   mkdirSync(path.dirname(filePath), { recursive: true });
   const workbook = XLSXUtils.book_new();
   const worksheet = XLSXUtils.aoa_to_sheet([
     ['', '位号', '规格描述', '封装', '数量', '品牌', '料号'],
-    ['', 'R1,R2,R3', '240Ω ±1% 1/20W 0201', '', 3, '', 'WMF2400TEE'],
-    ['', 'R4,R5', '10kΩ ±1% 贴片电阻', '0603', 2, 'YAGEO', 'RC0603FR-0710KL'],
-    ['', 'C1', '0.1uF 50V X7R 贴片电容', '0603', 1, 'SAMSUNG', 'CL10B104KB8NNNC'],
-    ['', 'D1', '开关二极管', 'SOD-123', 10, 'MDD', '1N4148W'],
+    ['', 'R1,R2,R3', '240Ω ±1% 1/20W 0201', '', 3, '', `WMF2400TEE${mpnSuffix}`],
+    ['', 'R4,R5', '10kΩ ±1% 贴片电阻', '0603', 2, 'YAGEO', `RC0603FR-0710KL${mpnSuffix}`],
+    ['', 'C1', '0.1uF 50V X7R 贴片电容', '0603', 1, 'SAMSUNG', `CL10B104KB8NNNC${mpnSuffix}`],
+    ['', 'D1', '开关二极管', 'SOD-123', 10, 'MDD', `1N4148W${mpnSuffix}`],
   ]);
   XLSXUtils.book_append_sheet(workbook, worksheet, 'BOM');
   const bytes = write(workbook, { bookType: 'xlsx', type: 'buffer' });

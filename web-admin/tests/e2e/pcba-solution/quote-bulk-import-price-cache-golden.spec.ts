@@ -7,6 +7,7 @@ import {
   openQuoteDetailFromList,
   queryDynamicRecords,
   seedQuoteForCorrectedBomUpload,
+  setYunhanMockScenario,
   type CreatedRows,
 } from './quote-e2e-helpers';
 import { utils as XLSXUtils, write as xlsxWrite } from 'xlsx';
@@ -25,9 +26,10 @@ import path from 'node:path';
  *   2. incremental price cache (reuseRecentPrices) — a line whose MPN carries a fresh captured
  *      price is served from cache (snapshot.matchedBy='recent_cache'), not re-sourced.
  *
- * Deterministic by construction: the BOM uses synthetic MPNs that no external price source can
- * match, and the "already priced" state is seeded explicitly. The spec therefore behaves the same
- * whether or not Yunhan credentials are configured on the stack.
+ * Deterministic by construction: the import runs against the managed mock's
+ * not-found scenario, then the "already priced" state is seeded explicitly
+ * before the normal pricing scenario is restored. No live supplier state can
+ * preempt the cache evidence.
  */
 
 // Unique per run: the handler writes reused-evidence rows of its own, and any residue left in the
@@ -67,13 +69,16 @@ test.describe('QuoteOps bulk import + price cache golden', () => {
   test('imports correlated rows in bulk and serves recently-priced MPNs from cache', async ({
     page,
   }, testInfo) => {
+    await setYunhanMockScenario(page, 'reprice-v1');
     const created: CreatedRows = await seedQuoteForCorrectedBomUpload(page);
     const importedLineIds: string[] = [];
     const consoleIssues: string[] = [];
     page.on('console', (message) => {
       const text = message.text();
       if (isTransientViteDynamicImportIssue(text)) return;
-      if (/Expression evaluation failed|Cannot read properties|ReferenceError|TypeError/i.test(text)) {
+      if (
+        /Expression evaluation failed|Cannot read properties|ReferenceError|TypeError/i.test(text)
+      ) {
         consoleIssues.push(`${message.type()}: ${text}`);
       }
     });
@@ -94,7 +99,9 @@ test.describe('QuoteOps bulk import + price cache golden', () => {
 
       const importResponsePromise = page.waitForResponse(
         (response) =>
-          response.url().includes('/api/meta/commands/execute/qo_quote_common:import_corrected_bom') &&
+          response
+            .url()
+            .includes('/api/meta/commands/execute/qo_quote_common:import_corrected_bom') &&
           response.request().method() === 'POST',
         { timeout: 60_000 },
       );
@@ -117,7 +124,9 @@ test.describe('QuoteOps bulk import + price cache golden', () => {
           .poll(
             async () => {
               const r = await page.request.get(`/api/async-tasks/${encodeURIComponent(taskCode)}`);
-              return String(((await r.json().catch(() => ({}))) as any)?.data?.status ?? '').toLowerCase();
+              return String(
+                ((await r.json().catch(() => ({}))) as any)?.data?.status ?? '',
+              ).toLowerCase();
             },
             { timeout: 240_000, intervals: [1000, 2000, 3000] },
           )
@@ -149,9 +158,15 @@ test.describe('QuoteOps bulk import + price cache golden', () => {
       // an off-by-one or reordered batch shows up as a broken/crossed link here.
       for (const importRow of importRows) {
         const lineId = String(importRow.qo_bir_quote_line_id ?? '');
-        expect(lineId, `import row ${importRow.qo_bir_row_no} must link to a quote line`).toBeTruthy();
+        expect(
+          lineId,
+          `import row ${importRow.qo_bir_row_no} must link to a quote line`,
+        ).toBeTruthy();
         const line = lines.find((l) => String(l.pid) === lineId);
-        expect(line, `import row ${importRow.qo_bir_row_no} links to a non-existent line ${lineId}`).toBeTruthy();
+        expect(
+          line,
+          `import row ${importRow.qo_bir_row_no} links to a non-existent line ${lineId}`,
+        ).toBeTruthy();
         expect(
           String(line!.qo_ql_source_ref),
           'the quote line must point back at the import row that produced it',
@@ -189,7 +204,14 @@ test.describe('QuoteOps bulk import + price cache golden', () => {
         );
       }
 
-      await executeCommand(page, 'qo_quote_common:batch_source_prices', {}, created.quoteId, 'execute');
+      await setYunhanMockScenario(page, 'release-default');
+      await executeCommand(
+        page,
+        'qo_quote_common:batch_source_prices',
+        {},
+        created.quoteId,
+        'execute',
+      );
 
       // Every line must be served from the cache — proven by the reuse marker on its evidence.
       for (const line of lines) {
@@ -224,6 +246,19 @@ test.describe('QuoteOps bulk import + price cache golden', () => {
         'the reused evidence must carry the cached unit price, not a re-sourced one',
       ).toBe(true);
 
+      const closeImportResult = page.getByRole('button', { name: /^(关闭|Close)$/i }).last();
+      if (await closeImportResult.isVisible().catch(() => false)) {
+        await closeImportResult.click();
+      }
+      await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
+      for (const line of lines) {
+        const row = page.getByTestId(`table-row-${String(line.pid)}`);
+        await expect(row, `cached line ${String(line.qo_ql_mpn)} remains visible`).toBeVisible({
+          timeout: 20_000,
+        });
+        await expect(row).toContainText(String(line.qo_ql_mpn));
+      }
+
       await testInfo.attach('bulk-cache-golden.png', {
         body: await page.screenshot({ fullPage: true }),
         contentType: 'image/png',
@@ -241,6 +276,7 @@ test.describe('QuoteOps bulk import + price cache golden', () => {
         );
       }
       await cleanupRows(page, created);
+      await setYunhanMockScenario(page, 'release-default');
     }
   });
 });
