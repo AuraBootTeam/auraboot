@@ -83,6 +83,29 @@ async function fillDialogField(page: Page, field: string, value: string): Promis
   await expect(input).toHaveValue(value);
 }
 
+async function expectEditActionInsideDrawer(page: Page, actionTestId: string): Promise<void> {
+  const drawer = page.getByTestId('review-drawer');
+  const actionBar = page.getByTestId('review-drawer-edit-actions');
+  const action = page.getByTestId(actionTestId);
+  await expect(action).toBeVisible();
+  await expect(action).toBeInViewport({ ratio: 1 });
+  const [drawerBox, actionBarBox, actionBox] = await Promise.all([
+    drawer.boundingBox(),
+    actionBar.boundingBox(),
+    action.boundingBox(),
+  ]);
+  expect(drawerBox, 'review drawer geometry is available').not.toBeNull();
+  expect(actionBarBox, 'edit action bar geometry is available').not.toBeNull();
+  expect(actionBox, `${actionTestId} geometry is available`).not.toBeNull();
+  expect(actionBarBox!.y).toBeGreaterThanOrEqual(drawerBox!.y);
+  expect(actionBarBox!.y + actionBarBox!.height).toBeLessThanOrEqual(
+    drawerBox!.y + drawerBox!.height + 1,
+  );
+  expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(
+    drawerBox!.y + drawerBox!.height + 1,
+  );
+}
+
 function sheetRows(workbook: XLSX.WorkBook, sheetName: string): unknown[][] {
   const sheet = workbook.Sheets[sheetName];
   expect(sheet, `sheet ${sheetName} exists`).toBeTruthy();
@@ -836,6 +859,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         .locator('input')
         .first();
       await searchInput.fill(REPRICE_MPN);
+      await expectEditActionInsideDrawer(page, 'review-drawer-edit-submit');
       const previewResponsePromise = page.waitForResponse(
         (response) =>
           response.request().method() === 'POST' &&
@@ -861,16 +885,18 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       await expect(previewPanel).toContainText('0.0100');
       await expect(previewPanel).toContainText('0.0105');
       await expect(previewPanel).toContainText('当前');
-      await expect(page.getByTestId('review-drawer-edit-confirm')).toBeVisible();
+      await expectEditActionInsideDrawer(page, 'review-drawer-edit-confirm');
       await expect(page.getByTestId('review-drawer-field-link-detailUrl')).toHaveAttribute(
         'href',
         'https://www.ickey.cn/detail/mock/reprice-new.html',
       );
-      await previewPanel.scrollIntoViewIfNeeded();
+      await page
+        .getByTestId('review-drawer-edit-scroll')
+        .evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+      await expectEditActionInsideDrawer(page, 'review-drawer-edit-confirm');
       await previewPanel.screenshot({
         path: testInfo.outputPath('ordinary-sales-reprice-preview-before-confirm.png'),
       });
-      await page.getByTestId('review-drawer-edit-confirm').scrollIntoViewIfNeeded();
       await page.getByTestId('review-drawer').screenshot({
         path: testInfo.outputPath('ordinary-sales-reprice-preview-actions.png'),
       });
@@ -1164,14 +1190,17 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
           .getByTestId('review-drawer-edit-field-searchText')
           .locator('input')
           .fill(REPRICE_MPN);
+        await expectEditActionInsideDrawer(adminPage, 'review-drawer-edit-submit');
         await adminPage.getByTestId('review-drawer-edit-submit').click();
         const adminPreview = adminPage.getByTestId('review-drawer-edit-preview');
         await expect(adminPreview).toBeVisible({ timeout: 20_000 });
-        await adminPreview.scrollIntoViewIfNeeded();
+        await adminPage
+          .getByTestId('review-drawer-edit-scroll')
+          .evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+        await expectEditActionInsideDrawer(adminPage, 'review-drawer-edit-confirm');
         await adminPreview.screenshot({
           path: testInfo.outputPath('admin-reprice-preview-before-confirm.png'),
         });
-        await adminPage.getByTestId('review-drawer-edit-confirm').scrollIntoViewIfNeeded();
         await adminPage.getByTestId('review-drawer').screenshot({
           path: testInfo.outputPath('admin-reprice-preview-actions.png'),
         });

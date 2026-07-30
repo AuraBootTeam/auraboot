@@ -614,15 +614,26 @@ function FieldRows({
   fallbackRecord,
   locale,
   t,
+  layout = 'rows',
 }: {
   fields: any[];
   record: any;
   fallbackRecord?: any;
   locale: string;
   t: (key: string) => string;
+  layout?: 'rows' | 'compact-grid';
 }) {
+  const isCompactGrid = layout === 'compact-grid';
+
   return (
-    <div className="divide-border divide-y">
+    <div
+      data-testid={isCompactGrid ? 'review-drawer-preview-field-grid' : undefined}
+      className={
+        isCompactGrid
+          ? 'bg-border grid grid-cols-1 gap-px sm:grid-cols-2 xl:grid-cols-4'
+          : 'divide-border divide-y'
+      }
+    >
       {fields.map((field) => {
         const key = String(field.key || field.field || field.label);
         const label = getLocalizedText(field.label || key, locale, t);
@@ -634,6 +645,65 @@ function FieldRows({
         const isMultiline = value.includes('\n') || value.length > 86;
         const ladder = field.format === 'ladder' ? parseLadderRungs(rawValue) : null;
         const externalUrl = field.format === 'link' ? safeExternalUrl(rawValue) : null;
+        const fieldValue =
+          field.format === 'price-comparison' ? (
+            <PriceComparison
+              original={rawValue}
+              factored={readFieldValue(record, { field: field.factoredField })}
+              factor={readFieldValue(record, { field: field.factorField })}
+              locale={locale}
+              t={t}
+            />
+          ) : ladder ? (
+            <PriceLadder
+              rowKey={String(field.rowKey || key)}
+              rungs={ladder}
+              factor={readFieldValue(record, { field: field.factorField })}
+              locale={locale}
+              t={t}
+            />
+          ) : externalUrl ? (
+            <a
+              href={externalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent underline underline-offset-2"
+              data-testid={`review-drawer-field-link-${key}`}
+            >
+              {getLocalizedText(field.linkLabel || { 'zh-CN': '查看', en: 'Open' }, locale, t)}
+            </a>
+          ) : rendersComparisons ? (
+            <ComparisonList value={mappedValue} locale={locale} t={t} />
+          ) : (
+            value
+          );
+        if (isCompactGrid) {
+          const requestedSpan = Number(field.gridSpan);
+          const spanClass =
+            requestedSpan === 4 || field.format === 'price-comparison' || field.format === 'ladder'
+              ? 'sm:col-span-2 xl:col-span-4'
+              : requestedSpan === 3
+                ? 'sm:col-span-2 xl:col-span-3'
+                : requestedSpan === 2
+                  ? 'sm:col-span-2 xl:col-span-2'
+                  : '';
+          return (
+            <div
+              key={key}
+              data-testid={`review-drawer-preview-field-${key}`}
+              className={`bg-panel min-w-0 px-3 py-2 text-sm ${spanClass}`}
+            >
+              <dt className="text-text-2 mb-1 text-[11px] font-medium">{label}</dt>
+              <dd
+                className={`text-text min-w-0 overflow-x-auto [overflow-wrap:anywhere] break-words ${
+                  isMultiline ? 'whitespace-pre-wrap' : ''
+                }`}
+              >
+                {fieldValue}
+              </dd>
+            </div>
+          );
+        }
         return (
           <div key={key} className="grid grid-cols-[118px_minmax(0,1fr)] gap-3 px-3 py-2.5 text-sm">
             <dt className="text-text-2 text-xs">{label}</dt>
@@ -642,37 +712,7 @@ function FieldRows({
                 isMultiline ? 'whitespace-pre-wrap' : ''
               }`}
             >
-              {field.format === 'price-comparison' ? (
-                <PriceComparison
-                  original={rawValue}
-                  factored={readFieldValue(record, { field: field.factoredField })}
-                  factor={readFieldValue(record, { field: field.factorField })}
-                  locale={locale}
-                  t={t}
-                />
-              ) : ladder ? (
-                <PriceLadder
-                  rowKey={String(field.rowKey || key)}
-                  rungs={ladder}
-                  factor={readFieldValue(record, { field: field.factorField })}
-                  locale={locale}
-                  t={t}
-                />
-              ) : externalUrl ? (
-                <a
-                  href={externalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-accent underline underline-offset-2"
-                  data-testid={`review-drawer-field-link-${key}`}
-                >
-                  {getLocalizedText(field.linkLabel || { 'zh-CN': '查看', en: 'Open' }, locale, t)}
-                </a>
-              ) : rendersComparisons ? (
-                <ComparisonList value={mappedValue} locale={locale} t={t} />
-              ) : (
-                value
-              )}
+              {fieldValue}
             </dd>
           </div>
         );
@@ -739,12 +779,14 @@ function DrawerEditForm({
   runtime,
   locale,
   t,
+  onOpenChange,
 }: {
   config: any;
   record: any;
   runtime: SchemaRuntime;
   locale: string;
   t: (key: string) => string;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const fields: any[] = Array.isArray(config?.fields) ? config.fields : [];
   const [open, setOpen] = useState(false);
@@ -788,6 +830,7 @@ function DrawerEditForm({
     setError(null);
     setPreview(null);
     setOpen(true);
+    onOpenChange?.(true);
   }
 
   async function submit() {
@@ -834,6 +877,7 @@ function DrawerEditForm({
         setPreview(result as Record<string, any>);
       } else {
         setOpen(false);
+        onOpenChange?.(false);
       }
     } catch (e: any) {
       setError(e?.message || String(e));
@@ -880,6 +924,7 @@ function DrawerEditForm({
       }
       setPreview(null);
       setOpen(false);
+      onOpenChange?.(false);
     } catch (e: any) {
       setError(e?.message || String(e));
     } finally {
@@ -891,6 +936,7 @@ function DrawerEditForm({
     setPreview(null);
     setError(null);
     setOpen(false);
+    onOpenChange?.(false);
   }
 
   function updateValue(key: string, value: string) {
@@ -919,7 +965,9 @@ function DrawerEditForm({
   return (
     <div
       data-testid="review-drawer-edit-form"
-      className="border-border bg-panel border-b px-4 py-2"
+      className={`border-border bg-panel min-h-0 border-b ${
+        open ? 'flex h-full flex-col overflow-hidden' : 'px-4 py-2'
+      }`}
     >
       {!open ? (
         <button
@@ -936,41 +984,58 @@ function DrawerEditForm({
           )}
         </button>
       ) : preview ? (
-        <div data-testid="review-drawer-edit-preview" className="space-y-3">
-          <section className="rounded-control border-border bg-subtle overflow-hidden border">
-            <header className="border-border bg-panel text-text border-b px-3 py-2 text-sm font-semibold">
-              {getLocalizedText(
-                previewConfig.title || { 'zh-CN': '查价预览', en: 'Price Preview' },
-                locale,
-                t,
+        <div
+          data-testid="review-drawer-edit-preview"
+          className="flex h-full min-h-0 flex-col overflow-hidden"
+        >
+          <div
+            data-testid="review-drawer-edit-scroll"
+            className="min-h-0 flex-1 overflow-y-auto p-3"
+          >
+            <section className="rounded-control border-border bg-subtle overflow-hidden border">
+              <header className="border-border bg-panel text-text border-b px-3 py-2 text-sm font-semibold">
+                {getLocalizedText(
+                  previewConfig.title || { 'zh-CN': '查价预览', en: 'Price Preview' },
+                  locale,
+                  t,
+                )}
+              </header>
+              {previewConfig.notice && (
+                <div
+                  data-testid="review-drawer-edit-preview-notice"
+                  className="border-border bg-accent-weak text-text-2 border-b px-3 py-2 text-xs"
+                >
+                  {getLocalizedText(previewConfig.notice, locale, t)}
+                </div>
               )}
-            </header>
-            {previewConfig.notice && (
-              <div
-                data-testid="review-drawer-edit-preview-notice"
-                className="border-border bg-accent-weak text-text-2 border-b px-3 py-2 text-xs"
-              >
-                {getLocalizedText(previewConfig.notice, locale, t)}
+              {previewFields.length > 0 && (
+                <FieldRows
+                  fields={previewFields}
+                  record={preview}
+                  locale={locale}
+                  t={t}
+                  layout={previewConfig.layout}
+                />
+              )}
+              {readPath(preview, previewConfig.messageField || 'message') && (
+                <div
+                  data-testid="review-drawer-edit-preview-message"
+                  className="border-border text-text-2 border-t px-3 py-2 text-sm"
+                >
+                  {String(readPath(preview, previewConfig.messageField || 'message'))}
+                </div>
+              )}
+            </section>
+            {error && (
+              <div data-testid="review-drawer-edit-error" className="text-status-red mt-2 text-xs">
+                {error}
               </div>
             )}
-            {previewFields.length > 0 && (
-              <FieldRows fields={previewFields} record={preview} locale={locale} t={t} />
-            )}
-            {readPath(preview, previewConfig.messageField || 'message') && (
-              <div
-                data-testid="review-drawer-edit-preview-message"
-                className="border-border text-text-2 border-t px-3 py-2 text-sm"
-              >
-                {String(readPath(preview, previewConfig.messageField || 'message'))}
-              </div>
-            )}
-          </section>
-          {error && (
-            <div data-testid="review-drawer-edit-error" className="text-status-red text-xs">
-              {error}
-            </div>
-          )}
-          <div className="flex flex-wrap justify-end gap-2">
+          </div>
+          <div
+            data-testid="review-drawer-edit-actions"
+            className="border-border bg-panel flex shrink-0 flex-wrap justify-end gap-2 border-t px-4 py-2.5"
+          >
             <button
               type="button"
               data-testid="review-drawer-edit-cancel"
@@ -1014,71 +1079,79 @@ function DrawerEditForm({
           </div>
         </div>
       ) : (
-        <div className="space-y-2">
-          <div className="flex flex-wrap gap-3">
-            {fields.map((f: any) => {
-              const key = String(f.field);
-              const label = getLocalizedText(f.label || key, locale, t);
-              if (f.type === 'radio') {
+        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+          <div
+            data-testid="review-drawer-edit-scroll"
+            className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
+          >
+            <div className="flex flex-wrap gap-3">
+              {fields.map((f: any) => {
+                const key = String(f.field);
+                const label = getLocalizedText(f.label || key, locale, t);
+                if (f.type === 'radio') {
+                  return (
+                    <fieldset
+                      key={key}
+                      data-testid={`review-drawer-edit-field-${key}`}
+                      className="text-text-2 min-w-[220px] text-xs"
+                    >
+                      <legend>
+                        {label}
+                        {f.required && <span className="text-status-red ml-0.5">*</span>}
+                      </legend>
+                      <div className="mt-1 flex flex-wrap gap-3">
+                        {(Array.isArray(f.options) ? f.options : []).map((option: any) => (
+                          <label
+                            key={String(option.value)}
+                            className="text-text flex items-center gap-1.5"
+                          >
+                            <input
+                              type="radio"
+                              name={`review-drawer-edit-${key}`}
+                              value={String(option.value)}
+                              checked={values[key] === String(option.value)}
+                              onChange={(event) => updateValue(key, event.target.value)}
+                            />
+                            <span>{getLocalizedText(option.label || option.value, locale, t)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  );
+                }
                 return (
-                  <fieldset
+                  <label
                     key={key}
                     data-testid={`review-drawer-edit-field-${key}`}
-                    className="text-text-2 min-w-[220px] text-xs"
+                    className="text-text-2 flex min-w-[160px] flex-1 flex-col gap-1 text-xs"
                   >
-                    <legend>
+                    <span>
                       {label}
                       {f.required && <span className="text-status-red ml-0.5">*</span>}
-                    </legend>
-                    <div className="mt-1 flex flex-wrap gap-3">
-                      {(Array.isArray(f.options) ? f.options : []).map((option: any) => (
-                        <label
-                          key={String(option.value)}
-                          className="text-text flex items-center gap-1.5"
-                        >
-                          <input
-                            type="radio"
-                            name={`review-drawer-edit-${key}`}
-                            value={String(option.value)}
-                            checked={values[key] === String(option.value)}
-                            onChange={(event) => updateValue(key, event.target.value)}
-                          />
-                          <span>{getLocalizedText(option.label || option.value, locale, t)}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
+                    </span>
+                    <input
+                      className="rounded-control border-border bg-panel text-text border px-2 py-1 text-sm"
+                      value={values[key] ?? ''}
+                      inputMode={f.type === 'number' ? 'numeric' : undefined}
+                      placeholder={
+                        f.placeholder ? getLocalizedText(f.placeholder, locale, t) : undefined
+                      }
+                      onChange={(e) => updateValue(key, e.target.value)}
+                    />
+                  </label>
                 );
-              }
-              return (
-                <label
-                  key={key}
-                  data-testid={`review-drawer-edit-field-${key}`}
-                  className="text-text-2 flex min-w-[160px] flex-1 flex-col gap-1 text-xs"
-                >
-                  <span>
-                    {label}
-                    {f.required && <span className="text-status-red ml-0.5">*</span>}
-                  </span>
-                  <input
-                    className="rounded-control border-border bg-panel text-text border px-2 py-1 text-sm"
-                    value={values[key] ?? ''}
-                    inputMode={f.type === 'number' ? 'numeric' : undefined}
-                    placeholder={
-                      f.placeholder ? getLocalizedText(f.placeholder, locale, t) : undefined
-                    }
-                    onChange={(e) => updateValue(key, e.target.value)}
-                  />
-                </label>
-              );
-            })}
-          </div>
-          {error && (
-            <div data-testid="review-drawer-edit-error" className="text-status-red text-xs">
-              {error}
+              })}
             </div>
-          )}
-          <div className="flex justify-end gap-2">
+            {error && (
+              <div data-testid="review-drawer-edit-error" className="text-status-red mt-2 text-xs">
+                {error}
+              </div>
+            )}
+          </div>
+          <div
+            data-testid="review-drawer-edit-actions"
+            className="border-border bg-panel flex shrink-0 justify-end gap-2 border-t px-4 py-2.5"
+          >
             <button
               type="button"
               data-testid="review-drawer-edit-cancel"
@@ -1154,6 +1227,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const [selectedCandidateKey, setSelectedCandidateKey] = useState('');
   const [dismissedRecordKey, setDismissedRecordKey] = useState('');
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [position, setPosition] = useState({
     left: initialLayout.left,
     top: initialLayout.top,
@@ -1417,7 +1491,11 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     <section
       data-testid="review-drawer"
       style={drawerStyle}
-      className="rounded-card bg-panel shadow-pop border-border fixed z-50 grid min-h-[500px] max-w-[calc(100vw-24px)] grid-rows-[auto_auto_auto_minmax(0,1fr)] overflow-hidden border"
+      className={`rounded-card bg-panel shadow-pop border-border fixed z-50 grid min-h-[500px] max-w-[calc(100vw-24px)] overflow-hidden border ${
+        isEditFormOpen
+          ? 'grid-rows-[auto_auto_minmax(0,1fr)]'
+          : 'grid-rows-[auto_auto_auto_minmax(0,1fr)]'
+      }`}
     >
       <div
         className="bg-accent flex min-h-12 cursor-move items-center justify-between gap-3 overflow-hidden px-4 text-white"
@@ -1489,9 +1567,15 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
         runtime={runtime}
         locale={locale}
         t={t}
+        onOpenChange={setIsEditFormOpen}
       />
 
-      <div className="bg-subtle min-h-0 max-w-full overflow-hidden p-4">
+      <div
+        data-testid="review-drawer-content-grid"
+        className={`bg-subtle min-h-0 max-w-full overflow-hidden p-4 ${
+          isEditFormOpen ? 'hidden' : ''
+        }`}
+      >
         <div
           className={`grid h-full min-h-0 min-w-0 gap-3 ${
             hasLeftRail ? 'xl:grid-cols-[minmax(0,1fr)_minmax(380px,440px)]' : 'grid-cols-1'

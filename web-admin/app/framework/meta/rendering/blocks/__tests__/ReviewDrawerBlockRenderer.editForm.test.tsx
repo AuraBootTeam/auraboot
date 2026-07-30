@@ -110,14 +110,16 @@ function twoPhaseBlock(): BlockConfig {
       notice: { 'zh-CN': '确认并采用后才会更新报价' },
       confirmableField: 'confirmable',
       previewIdField: 'previewId',
+      layout: 'compact-grid',
       fields: [
-        { field: 'productModel', label: { 'zh-CN': '返回型号' } },
+        { field: 'productModel', label: { 'zh-CN': '返回型号' }, gridSpan: 2 },
         {
           field: 'unitPrice',
           label: { 'zh-CN': '价格' },
           format: 'price-comparison',
           factoredField: 'factoredUnitPrice',
           factorField: 'priceFactor',
+          gridSpan: 4,
         },
         {
           field: 'priceLadderRows',
@@ -243,6 +245,7 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
     );
 
     fireEvent.click(screen.getByTestId('review-drawer-edit-open'));
+    expect(screen.getByTestId('review-drawer-content-grid').classList.contains('hidden')).toBe(true);
     const exact = screen.getByRole('radio', { name: '精确型号' }) as HTMLInputElement;
     expect(exact.checked).toBe(true);
     const search = screen
@@ -264,9 +267,22 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
       'href',
       'https://www.ickey.cn/detail/new',
     );
+    const scrollRegion = screen.getByTestId('review-drawer-edit-scroll');
+    const actionBar = screen.getByTestId('review-drawer-edit-actions');
+    const confirm = screen.getByTestId('review-drawer-edit-confirm');
+    expect(scrollRegion).not.toContainElement(actionBar);
+    expect(actionBar).toContainElement(confirm);
+    expect(actionBar.className).toContain('shrink-0');
+    expect(screen.getByTestId('review-drawer-preview-field-grid').className).toContain(
+      'xl:grid-cols-4',
+    );
+    expect(screen.getByTestId('review-drawer-preview-field-productModel').className).toContain(
+      'xl:col-span-2',
+    );
 
     fireEvent.click(screen.getByTestId('review-drawer-edit-cancel'));
     expect(screen.queryByTestId('review-drawer-edit-preview')).toBeNull();
+    expect(screen.getByTestId('review-drawer-content-grid').classList.contains('hidden')).toBe(false);
     expect(executeSimpleWorkbenchAction).toHaveBeenCalledTimes(1);
     expect(executeSimpleWorkbenchAction.mock.calls[0][1].args.command).toBe(
       'qo_quote_line_common:preview_reprice',
