@@ -1,6 +1,8 @@
 import { reactRouter } from '@react-router/dev/vite';
 import tailwindcss from '@tailwindcss/vite';
-import { defineConfig, type Plugin } from 'vite';
+import fs from 'node:fs';
+import path from 'node:path';
+import { defineConfig, normalizePath, type Plugin } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import federation from '@originjs/vite-plugin-federation';
 import istanbul from 'vite-plugin-istanbul';
@@ -20,6 +22,93 @@ const viteCacheKey = (
   'local'
 ).replace(/[^a-zA-Z0-9._-]/g, '-');
 const viteCacheDir = process.env.AURA_VITE_CACHE_DIR || `.vite/${viteCacheKey}`;
+const coreWebAdminRoot = path.resolve(
+  process.env.AURA_CORE_WEB_ADMIN_ROOT || process.cwd(),
+);
+const WEB_CONTRIBUTIONS_MODULE = 'virtual:auraboot-web-contributions';
+const RESOLVED_WEB_CONTRIBUTIONS_MODULE = `\0${WEB_CONTRIBUTIONS_MODULE}`;
+const contributionRoots = (process.env.AURA_WEB_CONTRIBUTION_ROOTS || '')
+  .split(path.delimiter)
+  .map((root) => root.trim())
+  .filter(Boolean)
+  .map((root) => path.resolve(root));
+const contributionExtensions = [
+  '',
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.css',
+  '.json',
+  '/index.ts',
+  '/index.tsx',
+  '/index.js',
+  '/index.jsx',
+];
+
+const resolveSourceCandidate = (root: string, relative: string) => {
+  // The codebase uses ESM-style `.js` specifiers from TypeScript sources.
+  // Vite normally maps those to `.ts`/`.tsx`; external source roots need the
+  // same mapping before the tsconfig resolver sees the import.
+  const relativeCandidates = [relative];
+  if (/\.[cm]?jsx?$/.test(relative)) {
+    relativeCandidates.push(relative.replace(/\.[cm]?jsx?$/, ''));
+  }
+  return relativeCandidates
+    .flatMap((candidate) =>
+      contributionExtensions.map((extension) =>
+        path.join(root, `${candidate}${extension}`),
+      ),
+    )
+    .find(
+      (candidate) =>
+        fs.existsSync(candidate) && fs.statSync(candidate).isFile(),
+    );
+};
+
+const webCompositionPlugin: Plugin = {
+  name: 'auraboot-web-composition',
+  resolveId(id) {
+    if (id === WEB_CONTRIBUTIONS_MODULE) {
+      return RESOLVED_WEB_CONTRIBUTIONS_MODULE;
+    }
+    if (!id.startsWith('~/') || contributionRoots.length === 0) return null;
+    const relative = id.slice(2);
+    const coreCandidate = resolveSourceCandidate(
+      path.join(coreWebAdminRoot, 'app'),
+      relative,
+    );
+    // Resolve the core owner explicitly. External contribution files do not
+    // share the composition tsconfig's directory, so delegating to a tsconfig
+    // plugin makes `~/...` resolution depend on the importer's physical path.
+    if (coreCandidate) return normalizePath(coreCandidate);
+    const matches = contributionRoots
+      .map((root) => resolveSourceCandidate(root, relative))
+      .filter((candidate): candidate is string => Boolean(candidate));
+    if (matches.length > 1) {
+      throw new Error(
+        `Enterprise contribution conflict for '${id}': ${matches.join(', ')}`,
+      );
+    }
+    return matches[0] ? normalizePath(matches[0]) : null;
+  },
+  load(id) {
+    if (id !== RESOLVED_WEB_CONTRIBUTIONS_MODULE) return null;
+    const configured = process.env.AURA_WEB_CONTRIBUTION_MANIFEST;
+    if (!configured) {
+      return 'export const ENTERPRISE_PLUGINS = [];';
+    }
+    const manifestPath = path.resolve(configured);
+    if (!fs.existsSync(manifestPath)) {
+      throw new Error(
+        `AURA_WEB_CONTRIBUTION_MANIFEST does not exist: ${manifestPath}`,
+      );
+    }
+    return `export { ENTERPRISE_PLUGINS } from ${JSON.stringify(
+      normalizePath(manifestPath),
+    )};`;
+  },
+};
 
 // @originjs/vite-plugin-federation 1.4.x does not support SSR — its virtual
 // imports (`__federation_fn_satisfy`, etc.) are emitted unconditionally and
@@ -68,6 +157,7 @@ export default defineConfig({
     e2eCoveragePlugin,
     tailwindcss(),
     reactRouter(),
+    webCompositionPlugin,
     tsconfigPaths(),
     clientOnlyFederationPlugin,
   ].filter((plugin): plugin is Plugin => Boolean(plugin)),
@@ -83,7 +173,7 @@ export default defineConfig({
     // without tripping CORS errors on HEAD/GET requests.
     cors: true,
     fs: {
-      allow: ['..'],
+      allow: ['..', coreWebAdminRoot, ...contributionRoots],
     },
     watch: {
       // NOTE: do NOT use bare `**/plugins/**` — that pattern also matches

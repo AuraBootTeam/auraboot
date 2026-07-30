@@ -23,6 +23,7 @@ import { fetchResult } from '~/shared/services/http-client';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
+import { useContributionRegistry } from '~/framework/extensions/use-contribution';
 
 export interface UsePageRuntimeOptions {
   /** Auth token */
@@ -78,6 +79,7 @@ export function usePageRuntime(
   const navigate = useNavigate();
   const location = useLocation();
   const { t, locale } = useI18n();
+  const contributionRegistry = useContributionRegistry();
 
   const routeContext = useMemo(
     () => decodeRouteContextFromSearch(location.search),
@@ -152,6 +154,16 @@ export function usePageRuntime(
           initialContext: effectiveAdditionalContext,
         },
   );
+  let contributedRuntime: SchemaRuntime | null = runtime;
+  for (const hook of contributionRegistry.listPageRuntimeHooks('after-create')) {
+    contributedRuntime =
+      (hook.run({
+        runtime: contributedRuntime,
+        schema,
+        additionalContext: effectiveAdditionalContext,
+        dataSourceManager,
+      }) as SchemaRuntime | null | undefined) ?? contributedRuntime;
+  }
 
   // Real-time data sync: subscribe to model changes via SSE
   const modelCodes = useMemo(() => {
@@ -170,7 +182,7 @@ export function usePageRuntime(
   useDataSync(dataSourceManager, modelCodes);
 
   return {
-    runtime: disableRuntime ? null : runtime,
+    runtime: disableRuntime ? null : contributedRuntime,
     dataSourceManager,
     t,
     locale,

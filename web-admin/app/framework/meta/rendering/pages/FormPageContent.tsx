@@ -31,7 +31,7 @@ import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMess
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { SubTable } from '~/framework/meta/components/SubTable';
-import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
+import { ContributedSubTableViewer as SubTableViewer } from '~/framework/extensions/contributed-components';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
 import { BlockRenderer, BlockErrorBoundary, type PageContentProps } from '@auraboot/runtime-kernel';
 import { DslFormFillProvider } from '~/framework/meta/rendering/DslFormFillContext';

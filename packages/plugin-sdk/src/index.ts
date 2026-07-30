@@ -20,6 +20,14 @@ export type {
   FeatureRegistration,
   PermissionGroupRegistration,
   DataSourceProviderRegistration,
+  ContributionMetadata,
+  RendererRegistration,
+  ComponentLoaderRegistration,
+  PageRuntimeHookPhase,
+  PageRuntimeHookRegistration,
+  ServiceProviderRegistration,
+  AssetRegistration,
+  I18nRegistration,
 } from './context.js'
 
 export type { PluginState } from './lifecycle.js'

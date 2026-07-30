@@ -20,6 +20,7 @@ import type { DataSourceRef } from '@auraboot/dsl-types'
 import type { SlotRegistry } from '../extensions/slot-registry.js'
 import type { WidgetRegistry, ColumnRendererRegistry } from '../widgets/widget-registry.js'
 import type { DataSourceRegistry } from '../data-source/registry.js'
+import type { ContributionRegistry } from '../extensions/contribution-registry.js'
 
 export interface LoaderOptions {
   routeRegistry: RouteRegistry
@@ -27,6 +28,7 @@ export interface LoaderOptions {
   widgetRegistry: WidgetRegistry
   columnRegistry: ColumnRendererRegistry
   dataSourceRegistry: DataSourceRegistry
+  contributionRegistry: ContributionRegistry
   /** Returns true if a feature key is entitled for the current tenant/user. */
   hasFeature: (key: string) => boolean
 }
@@ -40,11 +42,29 @@ export interface PluginRecord {
 
 type ActionHandler = (...args: unknown[]) => unknown | Promise<unknown>
 
+const ACTIVATION_PHASE_ORDER = {
+  foundation: 0,
+  feature: 1,
+  application: 2,
+} as const
+
+const activationPhase = (definition: PluginDefinition) =>
+  definition.manifest.activationPhase ?? 'feature'
+
 export class PluginLoader {
   private readonly records = new Map<string, PluginRecord>()
   private readonly actions = new Map<string, ActionHandler>()
 
   constructor(private readonly opts: LoaderOptions) {}
+
+  /**
+   * Configure the entitlement predicate before activation while preserving
+   * the loader/registry identities already observed by React consumers.
+   */
+  setFeatureGate(hasFeature: LoaderOptions['hasFeature']): void {
+    this.opts.hasFeature = hasFeature
+    this.opts.contributionRegistry.setFeatureGate(hasFeature)
+  }
 
   /** Register a plugin definition (transition discovered → installed). */
   install(definition: PluginDefinition): void {
@@ -78,8 +98,19 @@ export class PluginLoader {
       const record = this.records.get(code)!
       if (record.state !== 'enabled') continue
 
+      const inactiveDependency =
+        record.definition.manifest.dependencies?.plugins?.find(
+          (dependency) => this.records.get(dependency)?.state !== 'active',
+        )
+      if (inactiveDependency) {
+        record.inactiveReason = `dependency inactive: ${inactiveDependency}`
+        continue
+      }
+
       // License gate
-      const featureKeys = record.definition.manifest.license?.featureKeys ?? []
+      const license = record.definition.manifest.license
+      const featureKeys =
+        license?.required === false ? [] : license?.featureKeys ?? []
       const missingFeature = featureKeys.find(k => !this.opts.hasFeature(k))
       if (missingFeature) {
         record.state = 'enabled'
@@ -93,6 +124,7 @@ export class PluginLoader {
         record.state = 'active'
         activated.push(code)
       } catch (err) {
+        this.opts.contributionRegistry.removeByPlugin(code)
         record.state = 'licensed'
         record.inactiveReason = `setup failed: ${err instanceof Error ? err.message : String(err)}`
         // eslint-disable-next-line no-console
@@ -149,6 +181,25 @@ export class PluginLoader {
           visiting.delete(code)
           return false
         }
+        const dependency = this.records.get(dep)!
+        if (
+          dependency.state !== 'enabled' &&
+          dependency.state !== 'active'
+        ) {
+          record.inactiveReason = `dependency not enabled: ${dep}`
+          visiting.delete(code)
+          return false
+        }
+        if (
+          ACTIVATION_PHASE_ORDER[activationPhase(dependency.definition)] >
+          ACTIVATION_PHASE_ORDER[activationPhase(record.definition)]
+        ) {
+          record.inactiveReason =
+            `dependency '${dep}' is in later activation phase ` +
+            `'${activationPhase(dependency.definition)}'`
+          visiting.delete(code)
+          return false
+        }
         if (!visit(dep)) {
           record.inactiveReason = `dependency failed: ${dep}`
           visiting.delete(code)
@@ -161,12 +212,28 @@ export class PluginLoader {
       return true
     }
 
-    for (const code of this.records.keys()) visit(code)
+    const codes = [...this.records.keys()].sort((left, right) => {
+      const leftRecord = this.records.get(left)!
+      const rightRecord = this.records.get(right)!
+      return (
+        ACTIVATION_PHASE_ORDER[activationPhase(leftRecord.definition)] -
+          ACTIVATION_PHASE_ORDER[activationPhase(rightRecord.definition)] ||
+        left.localeCompare(right)
+      )
+    })
+    for (const code of codes) visit(code)
     return order
   }
 
   private makeContext(pluginCode: string): PluginContext {
-    const { routeRegistry, slotRegistry, widgetRegistry, columnRegistry, dataSourceRegistry, hasFeature } = this.opts
+    const {
+      routeRegistry,
+      slotRegistry,
+      widgetRegistry,
+      columnRegistry,
+      dataSourceRegistry,
+      contributionRegistry,
+    } = this.opts
 
     const log = (level: 'debug' | 'info' | 'warn' | 'error', msg: string, meta?: Record<string, unknown>) => {
       // eslint-disable-next-line no-console
@@ -207,6 +274,24 @@ export class PluginLoader {
       registerDataSourceProvider: (reg) => {
         dataSourceRegistry.register({ ...reg, plugin: pluginCode })
       },
+      registerRenderer: (reg) => {
+        contributionRegistry.register('renderer', pluginCode, reg)
+      },
+      registerComponentLoader: (reg) => {
+        contributionRegistry.register('component-loader', pluginCode, reg)
+      },
+      registerPageRuntimeHook: (reg) => {
+        contributionRegistry.register('page-runtime-hook', pluginCode, reg)
+      },
+      registerServiceProvider: (reg) => {
+        contributionRegistry.register('service-provider', pluginCode, reg)
+      },
+      registerAsset: (reg) => {
+        contributionRegistry.register('asset', pluginCode, reg)
+      },
+      registerI18n: (reg) => {
+        contributionRegistry.register('i18n', pluginCode, reg)
+      },
       log: {
         debug: (msg, meta) => log('debug', msg, meta),
         info: (msg, meta) => log('info', msg, meta),
@@ -214,7 +299,7 @@ export class PluginLoader {
         error: (msg, meta) => log('error', msg, meta),
       },
       invoke: (code, ...args) => this.invoke(code, ...args),
-      hasFeature,
+      hasFeature: (key) => this.opts.hasFeature(key),
     }
   }
 }

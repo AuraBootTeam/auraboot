@@ -29,9 +29,11 @@ import coreDashboardPlugin from '~/plugins/core-dashboard'
 import coreEmailPlugin from '~/plugins/core-email'
 import coreDecisionOpsPlugin from '~/plugins/core-decisionops'
 
-// Enterprise plugins — empty in OSS, populated by enterprise overlay
-// (see auraboot-enterprise/web-admin-ext/.../boot-plugins-ent.ts).
-import { ENT_PLUGINS } from './boot-plugins-ent.js'
+// Build-time composition manifest. OSS resolves the virtual module to an
+// empty list; Enterprise points AURA_WEB_CONTRIBUTION_MANIFEST at its private
+// generated manifest. Browser boot consumes this runtime manifest; the route
+// manifest separately feeds the shared SSR/client React Router build graph.
+import { ENTERPRISE_PLUGINS } from 'virtual:auraboot-web-contributions'
 
 const CORE_PLUGINS = [
   coreDemoPlugin,
@@ -65,13 +67,17 @@ let bootedOnce = false
  *                   shell should pass an EntitlementContext-backed check.
  */
 export async function bootCorePlugins(opts: { hasFeature?: (key: string) => boolean; force?: boolean } = {}): Promise<readonly string[]> {
+  const existingKernel = getKernel()
+  if (opts.hasFeature && !opts.force) {
+    existingKernel.pluginLoader.setFeatureGate(opts.hasFeature)
+  }
   if (bootedOnce && !opts.force) {
-    return getKernel().pluginLoader.list().filter(r => r.state === 'active').map(r => r.definition.manifest.code)
+    return existingKernel.pluginLoader.list().filter(r => r.state === 'active').map(r => r.definition.manifest.code)
   }
   if (opts.force) resetKernel({ hasFeature: opts.hasFeature })
 
   const kernel = getKernel()
-  const ALL_PLUGINS = [...CORE_PLUGINS, ...ENT_PLUGINS]
+  const ALL_PLUGINS = [...CORE_PLUGINS, ...ENTERPRISE_PLUGINS]
   for (const plugin of ALL_PLUGINS) {
     try {
       kernel.pluginLoader.install(plugin)
@@ -85,7 +91,7 @@ export async function bootCorePlugins(opts: { hasFeature?: (key: string) => bool
   const activated = await kernel.pluginLoader.activateAll()
   bootedOnce = true
   // eslint-disable-next-line no-console
-  console.info(`[boot-plugins] activated ${activated.length}/${ALL_PLUGINS.length} plugins (${CORE_PLUGINS.length} core + ${ENT_PLUGINS.length} ent):`, activated.join(', '))
+  console.info(`[boot-plugins] activated ${activated.length}/${ALL_PLUGINS.length} plugins (${CORE_PLUGINS.length} core + ${ENTERPRISE_PLUGINS.length} ent):`, activated.join(', '))
   return activated
 }
 

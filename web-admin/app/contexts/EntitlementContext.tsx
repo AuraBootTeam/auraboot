@@ -19,13 +19,32 @@ interface EntitlementSnapshot {
   warning?: EntitlementWarning;
 }
 
+export function resolveFeatureEntitlement(
+  ready: boolean,
+  enabled: boolean,
+  entitlements: readonly EntitlementSnapshot[],
+  featureKey: string,
+): boolean {
+  if (!ready) return false;
+  if (!enabled) return false;
+  return entitlements.some(
+    (entitlement) =>
+      ['active', 'trial', 'grace'].includes(entitlement.status) &&
+      entitlement.features?.includes(featureKey),
+  );
+}
+
 interface EntitlementContextType {
   enabled: boolean;
   entitlements: EntitlementSnapshot[];
   loading: boolean;
+  /** True once the first entitlement request (or unauthenticated shortcut) resolves. */
+  ready: boolean;
   getEntitlement: (pluginId: string) => EntitlementSnapshot | undefined;
   isPluginActive: (pluginId: string) => boolean;
   hasFeature: (pluginId: string, featureKey: string) => boolean;
+  /** Fail-closed feature lookup used by the plugin activation boundary. */
+  hasFeatureKey: (featureKey: string) => boolean;
   getWarnings: () => EntitlementSnapshot[];
   refresh: () => void;
 }
@@ -34,9 +53,11 @@ const EntitlementContext = createContext<EntitlementContextType>({
   enabled: false,
   entitlements: [],
   loading: false,
+  ready: false,
   getEntitlement: () => undefined,
   isPluginActive: () => true,
   hasFeature: () => true,
+  hasFeatureKey: () => false,
   getWarnings: () => [],
   refresh: () => {},
 });
@@ -46,10 +67,18 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
   const [enabled, setEnabled] = useState(false);
   const [entitlements, setEntitlements] = useState<EntitlementSnapshot[]>([]);
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
 
   const fetchEntitlements = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      setEnabled(false);
+      setEntitlements([]);
+      setLoading(false);
+      setReady(true);
+      return;
+    }
     try {
+      setReady(false);
       setLoading(true);
       const resp = await fetch('/api/entitlements');
       if (resp.ok) {
@@ -68,6 +97,7 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
       setEntitlements([]);
     } finally {
       setLoading(false);
+      setReady(true);
     }
   }, [isAuthenticated]);
 
@@ -100,6 +130,12 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
     [enabled, entitlements],
   );
 
+  const hasFeatureKey = useCallback(
+    (featureKey: string) =>
+      resolveFeatureEntitlement(ready, enabled, entitlements, featureKey),
+    [enabled, entitlements, ready],
+  );
+
   const getWarnings = useCallback(() => entitlements.filter((e) => e.warning), [entitlements]);
 
   return (
@@ -108,9 +144,11 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
         enabled,
         entitlements,
         loading,
+        ready,
         getEntitlement,
         isPluginActive,
         hasFeature,
+        hasFeatureKey,
         getWarnings,
         refresh: fetchEntitlements,
       }}

@@ -61,7 +61,7 @@ import {
   sessionStorage,
 } from '~/shared/services/session';
 import { AuthProvider } from '~/contexts/AuthContext';
-import { EntitlementProvider } from '~/contexts/EntitlementContext';
+import { EntitlementProvider, useEntitlement } from '~/contexts/EntitlementContext';
 import { DslRegistryProvider } from '~/contexts/DslRegistryContext';
 import { AuraBotProvider } from '~/plugins/core-aurabot/components-shell';
 import { QueryProvider } from '~/providers/QueryProvider';
@@ -255,21 +255,28 @@ function AppDirectionSync({ locale }: { locale: string }) {
   return null;
 }
 
+/**
+ * Activates the kernel only after the first entitlement snapshot resolves.
+ * A required commercial feature stays fail-closed when the entitlement
+ * module is unavailable, the snapshot is stale, or the feature is missing.
+ */
+function CorePluginBootstrap({ enabled }: { enabled: boolean }) {
+  const { ready, hasFeatureKey } = useEntitlement();
+
+  useEffect(() => {
+    if (!enabled || !ready) return;
+    void import('~/framework/boot-plugins').then(({ bootCorePlugins }) =>
+      bootCorePlugins({ hasFeature: hasFeatureKey }),
+    );
+  }, [enabled, hasFeatureKey, ready]);
+
+  return null;
+}
+
 export default function App() {
   const data = useLoaderData<typeof loader>() as RootLoaderData;
   const setFederationRuntimeProfile = useFederationStore((state) => state.setRuntimeProfile);
   const bootCoreRuntime = shouldBootCorePlugins(data.runtimeProfile);
-
-  // M3.7 — boot kernel + activate core plugins once on mount. Plugin
-  // setup() registers NavigationResources, widgets, etc. into the kernel
-  // singleton so menu / breadcrumb / widget resolution can derive from a
-  // single source. See app/framework/boot-plugins.ts.
-  useEffect(() => {
-    if (!bootCoreRuntime) {
-      return;
-    }
-    void import('~/framework/boot-plugins').then(({ bootCorePlugins }) => bootCorePlugins());
-  }, [bootCoreRuntime]);
 
   useEffect(() => {
     setFederationRuntimeProfile(data.runtimeProfile);
@@ -316,6 +323,7 @@ export default function App() {
           <AuthProvider>
             <AuthSessionRevalidator enabled={bootCoreRuntime} isAuthenticated={!!data.user} />
             <EntitlementProvider>
+              <CorePluginBootstrap enabled={bootCoreRuntime} />
               <DslRegistryProvider>{sharedProviders}</DslRegistryProvider>
             </EntitlementProvider>
           </AuthProvider>

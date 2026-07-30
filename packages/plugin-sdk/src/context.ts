@@ -15,6 +15,55 @@ import type { NavigationResource } from '@auraboot/nav-model'
  */
 export type PropsSchema = Record<string, unknown>
 
+export interface ContributionMetadata {
+  /** Stable ID within the contribution kind. */
+  id: string
+  /** Optional item-level entitlement gate. */
+  featureKey?: string
+  /** Explicit ordering only where composition is meaningful. */
+  priority?: number
+}
+
+export interface RendererRegistration extends ContributionMetadata {
+  component: unknown
+  propsSchema?: PropsSchema
+}
+
+export interface ComponentLoaderRegistration extends ContributionMetadata {
+  load: () => Promise<unknown>
+  exportName?: string
+  componentName?: string
+  aliases?: string[]
+}
+
+export type PageRuntimeHookPhase =
+  | 'before-create'
+  | 'after-create'
+  | 'before-dispose'
+
+export interface PageRuntimeHookRegistration extends ContributionMetadata {
+  phase: PageRuntimeHookPhase
+  run: (runtime: unknown) => unknown
+}
+
+export interface ServiceProviderRegistration extends ContributionMetadata {
+  token: string
+  provider: unknown
+  /** A token has one primary provider and any number of ordered decorators. */
+  mode?: 'primary' | 'decorator'
+}
+
+export interface AssetRegistration extends ContributionMetadata {
+  url: string
+  integrity?: string
+}
+
+export interface I18nRegistration extends ContributionMetadata {
+  locale: string
+  namespace: string
+  messages: Readonly<Record<string, unknown>>
+}
+
 export interface WidgetRegistration {
   /** Widget type code (matches `FieldSchema.widget`). */
   type: WidgetType
@@ -109,6 +158,22 @@ export interface PluginContext {
 
   /** Register a data source provider for a given DataSourceRef.type. */
   registerDataSourceProvider(reg: DataSourceProviderRegistration): void
+
+  /** Register a generic schema/runtime renderer without replacing a core map file. */
+  registerRenderer(reg: RendererRegistration): void
+
+  /** Register a lazy runtime component loader keyed by the DSL component ID. */
+  registerComponentLoader(reg: ComponentLoaderRegistration): void
+
+  /** Register an ordered page-runtime lifecycle hook. */
+  registerPageRuntimeHook(reg: PageRuntimeHookRegistration): void
+
+  /** Register a tokenized service provider or decorator. */
+  registerServiceProvider(reg: ServiceProviderRegistration): void
+
+  /** Register namespaced build/runtime assets and translations. */
+  registerAsset(reg: AssetRegistration): void
+  registerI18n(reg: I18nRegistration): void
 
   /** Convenience: emit a structured log entry attributed to this plugin. */
   log: {

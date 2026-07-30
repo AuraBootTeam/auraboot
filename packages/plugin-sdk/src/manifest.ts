@@ -48,4 +48,10 @@ export interface PluginManifest {
 
   /** Permission codes this plugin contributes. */
   permissions?: string[]
+
+  /**
+   * Explicit setup phase. Dependencies may point to the same or an earlier
+   * phase, never to a later phase.
+   */
+  activationPhase?: 'foundation' | 'feature' | 'application'
 }
