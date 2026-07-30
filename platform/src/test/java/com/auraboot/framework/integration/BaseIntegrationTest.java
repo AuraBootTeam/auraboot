@@ -270,12 +270,63 @@ public class BaseIntegrationTest {
                     // are not a reliable proof that the database rows are still usable.
                     testRole = createTestRole();
                     testUserRole = createTestUserRole();
+                    ensureHermeticEmbeddingProfile();
                 });
                 testDataInitialized = true;
             } catch (Exception e) {
                 throw new RuntimeException("Failed to setup test data", e);
             }
         }
+    }
+
+    /**
+     * Keep RAG integration tests hermetic when every real provider key is deliberately
+     * removed from the test process.
+     *
+     * <p>Knowledge-base creation correctly fails closed when no embedding profile is
+     * configured. The integration suite still needs a provider-neutral profile so it can
+     * exercise KB/document lifecycle code without borrowing a developer's provider
+     * environment. The profile contains no credential; tests either mock the embedding
+     * boundary or verify the product's graceful no-vector fallback, so no external
+     * request can be made from this fixture.
+     */
+    private void ensureHermeticEmbeddingProfile() {
+        Integer existing = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM ab_cloud_config
+                WHERE config_level = 'tenant'
+                  AND tenant_id = ?
+                  AND service_type = 'embedding'
+                  AND provider_code = 'integration-test'
+                  AND deleted_flag = FALSE
+                """,
+                Integer.class,
+                testTenant.getId());
+        if (existing != null && existing > 0) {
+            return;
+        }
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO ab_cloud_config (
+                    pid, config_level, tenant_id, service_type, provider_code,
+                    config, enabled, priority, created_by, updated_by, deleted_flag
+                )
+                VALUES (?, 'tenant', ?, 'embedding', 'integration-test',
+                        ?::jsonb, TRUE, -100, ?, ?, FALSE)
+                """,
+                UniqueIdGenerator.generate(),
+                testTenant.getId(),
+                """
+                {
+                  "displayName": "Integration Test Embedding",
+                  "defaultModel": "integration-test-embedding",
+                  "dimensions": 1536
+                }
+                """,
+                testUser.getPid(),
+                testUser.getPid());
     }
 
     protected void applyTestMetaContext() {
