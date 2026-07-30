@@ -211,6 +211,7 @@ interface LadderRung {
   qty: string | number;
   price: string | number;
   current?: boolean;
+  rangeLabel?: string;
 }
 
 /**
@@ -452,13 +453,28 @@ function priceFactorPercent(value: unknown): number {
 function formatUnitPrice(value: unknown): string {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return formatValue(value);
-  return parsed.toFixed(4);
+  return parsed
+    .toFixed(6)
+    .replace(/(\.\d*?[1-9])0+$/, '$1')
+    .replace(/\.0+$/, '');
 }
 
 function factoredUnitPrice(value: unknown, factor: unknown): string {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return formatValue(value);
-  return ((parsed * priceFactorPercent(factor)) / 100).toFixed(4);
+  return formatUnitPrice((parsed * priceFactorPercent(factor)) / 100);
+}
+
+function ladderRangeLabel(rungs: LadderRung[], index: number): string {
+  const explicit = String(rungs[index]?.rangeLabel ?? '').trim();
+  if (explicit) return explicit;
+  const current = Number(rungs[index]?.qty);
+  if (!Number.isFinite(current)) return `${String(rungs[index]?.qty ?? '')}+`;
+  const next = rungs
+    .map((rung) => Number(rung.qty))
+    .filter((qty) => Number.isFinite(qty) && qty > current)
+    .sort((left, right) => left - right)[0];
+  return next === undefined ? `${current}+` : `${current}–${next - 1}`;
 }
 
 function PriceComparison({
@@ -475,6 +491,9 @@ function PriceComparison({
   t: (key: string) => string;
 }) {
   const factorText = `${Number(priceFactorPercent(factor).toFixed(2))}%`;
+  const displayedFactored = Number.isFinite(Number(original))
+    ? factoredUnitPrice(original, factor)
+    : formatUnitPrice(factored);
   return (
     <div
       data-testid="review-drawer-price-comparison"
@@ -499,7 +518,7 @@ function PriceComparison({
           {localized(locale, t, '系数后单价', 'After factor')}
         </div>
         <div className="text-text mt-1 font-mono text-base font-semibold tabular-nums">
-          {formatUnitPrice(factored)}
+          {displayedFactored}
         </div>
       </div>
     </div>
@@ -520,19 +539,35 @@ function PriceLadder({
   t: (key: string) => string;
 }) {
   const factorText = `${Number(priceFactorPercent(factor).toFixed(2))}%`;
+  const currentIndex = rungs.findIndex((rung) => rung.current);
+  const selectedIndex = currentIndex >= 0 ? currentIndex : 0;
+  const selected = rungs[selectedIndex];
   return (
     <div
       className="border-border bg-subtle rounded-control w-full overflow-hidden border text-xs tabular-nums"
       data-testid={`review-drawer-candidate-${rowKey}-ladder`}
     >
+      <div
+        data-testid={`review-drawer-candidate-${rowKey}-ladder-summary`}
+        className="border-border bg-accent-weak text-text flex flex-wrap items-center justify-between gap-2 border-b px-2 py-2"
+      >
+        <span className="font-medium">
+          {localized(locale, t, '当前数量区间', 'Current quantity range')}{' '}
+          {ladderRangeLabel(rungs, selectedIndex)}
+        </span>
+        <span className="font-mono font-semibold">
+          {formatUnitPrice(selected.price)} × {factorText} →{' '}
+          {factoredUnitPrice(selected.price, factor)}
+        </span>
+      </div>
       <div className="text-text-2 border-border grid grid-cols-[minmax(72px,0.75fr)_minmax(92px,1fr)_minmax(112px,1fr)] border-b px-2 py-1.5 text-[11px] font-medium">
-        <span>{localized(locale, t, '数量', 'Qty')}</span>
+        <span>{localized(locale, t, '数量区间', 'Qty range')}</span>
         <span className="text-right">{localized(locale, t, '原始单价', 'Original')}</span>
         <span className="text-right">
           {localized(locale, t, '系数后', 'After factor')} ({factorText})
         </span>
       </div>
-      {rungs.map((rung) => (
+      {rungs.map((rung, index) => (
         <div
           key={String(rung.qty)}
           data-testid={rung.current ? `review-drawer-ladder-current-${rowKey}` : undefined}
@@ -541,7 +576,7 @@ function PriceLadder({
           }`}
         >
           <span className="flex items-center gap-1.5 whitespace-nowrap">
-            {String(rung.qty)}+
+            {ladderRangeLabel(rungs, index)}
             {rung.current && (
               <span className="rounded-pill bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-white">
                 {localized(locale, t, '当前', 'Current')}
@@ -624,6 +659,11 @@ function FieldRows({
   layout?: 'rows' | 'compact-grid';
 }) {
   const isCompactGrid = layout === 'compact-grid';
+  const hasUsableLadder = fields.some((field) => {
+    if (field.format !== 'ladder') return false;
+    const rungs = parseLadderRungs(readFieldValue(record, field, fallbackRecord));
+    return Boolean(rungs && rungs.length >= 2);
+  });
 
   return (
     <div
@@ -638,12 +678,14 @@ function FieldRows({
         const key = String(field.key || field.field || field.label);
         const label = getLocalizedText(field.label || key, locale, t);
         const rawValue = readFieldValue(record, field, fallbackRecord);
+        const ladder = field.format === 'ladder' ? parseLadderRungs(rawValue) : null;
+        if (field.format === 'price-comparison' && hasUsableLadder) return null;
+        if (field.format === 'ladder' && (!ladder || ladder.length < 2)) return null;
         if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
         const mappedValue = applyValueMap(rawValue, field, locale, t);
         const rendersComparisons = isComparisonList(mappedValue);
         const value = rendersComparisons ? '' : formatConfiguredValue(rawValue, field, locale, t);
         const isMultiline = value.includes('\n') || value.length > 86;
-        const ladder = field.format === 'ladder' ? parseLadderRungs(rawValue) : null;
         const externalUrl = field.format === 'link' ? safeExternalUrl(rawValue) : null;
         const fieldValue =
           field.format === 'price-comparison' ? (
@@ -1271,6 +1313,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
 
   useEffect(() => {
     setSelectedCandidateKey('');
+    setIsEditFormOpen(false);
     if (candidatesConfig.selection?.bind) {
       writeRuntimeState(runtime, candidatesConfig.selection.bind, {});
     }
@@ -1298,6 +1341,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   // inline empty state instead of collapsing to a floating "展开行级复核" pill.
   const closeDrawer = () => {
     setSelectedCandidateKey('');
+    setIsEditFormOpen(false);
     if (candidatesConfig.selection?.bind) {
       writeRuntimeState(runtime, candidatesConfig.selection.bind, {});
     }
@@ -1562,6 +1606,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
       </div>
 
       <DrawerEditForm
+        key={selectedRecordKey}
         config={(block as any).editForm}
         record={record}
         runtime={runtime}
@@ -1936,6 +1981,14 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                     const scoreColor = item.statusColorField
                       ? readPath(candidate, item.statusColorField)
                       : undefined;
+                    const detailFields: any[] = Array.isArray(item.detailFields)
+                      ? item.detailFields
+                      : [];
+                    const hasUsableLadder = detailFields.some((field: any) => {
+                      if (field.format !== 'ladder') return false;
+                      const rungs = parseLadderRungs(readFieldValue(candidate, field));
+                      return Boolean(rungs && rungs.length >= 2);
+                    });
                     return (
                       <button
                         key={rowKey}
@@ -1962,10 +2015,16 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                               {titleText}
                             </div>
                             <dl className="mt-2 grid gap-x-3 gap-y-1.5 text-xs sm:grid-cols-2">
-                              {(item.detailFields || []).map((field: any) => {
+                              {detailFields.map((field: any) => {
                                 const key = String(field.key || field.field || field.label);
                                 const label = getLocalizedText(field.label || key, locale, t);
                                 const rawValue = readFieldValue(candidate, field);
+                                const ladder =
+                                  field.format === 'ladder' ? parseLadderRungs(rawValue) : null;
+                                if (field.format === 'price-comparison' && hasUsableLadder)
+                                  return null;
+                                if (field.format === 'ladder' && (!ladder || ladder.length < 2))
+                                  return null;
                                 if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
                                 const value = formatConfiguredValue(rawValue, field, locale, t);
                                 return (
@@ -2002,11 +2061,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                                           locale={locale}
                                           t={t}
                                         />
-                                      ) : field.format === 'ladder' &&
-                                        parseLadderRungs(rawValue) ? (
+                                      ) : field.format === 'ladder' && ladder ? (
                                         <PriceLadder
                                           rowKey={rowKey}
-                                          rungs={parseLadderRungs(rawValue)!}
+                                          rungs={ladder}
                                           factor={readFieldValue(candidate, {
                                             field: field.factorField,
                                           })}

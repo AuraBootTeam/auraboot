@@ -63,6 +63,7 @@ const SALES_B_USER: QuoteRoleUser = {
 };
 
 const SET_COUNT = 200;
+const FLAT_SET_COUNT = 2;
 const PRICE_FACTOR = 105;
 const RECENT_UNIT_PRICE = 0.021;
 const YUNHAN_UNIT_PRICE = 0.0163;
@@ -78,6 +79,37 @@ async function fillDialogField(page: Page, field: string, value: string): Promis
   // the first numeric value and re-renders the element.
   await input.fill(value);
   await expect(input).toHaveValue(value);
+}
+
+async function updateQuotePricingInputs(
+  page: Page,
+  setCount: number,
+  priceFactor: number,
+): Promise<void> {
+  await page.getByRole('tab', { name: /资料上传|Materials/ }).click();
+  await page.getByRole('button', { name: /修改套数|Edit Sets/ }).click();
+  await expect(page.getByTestId('form-dialog')).toBeVisible({ timeout: 15_000 });
+  await fillDialogField(page, 'qo_quote_set_count', String(setCount));
+  await fillDialogField(page, 'qo_quote_price_factor', String(priceFactor));
+  const recomputeResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/meta/commands/execute/qo_quote_common:recompute_quantities') &&
+      response.request().method() === 'POST',
+    { timeout: 30_000 },
+  );
+  await page.getByTestId('form-dialog-submit').click();
+  const recomputeBody = (await (await recomputeResponsePromise).json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
+  expect(
+    String(recomputeBody.code),
+    `recompute_quantities response: ${JSON.stringify(recomputeBody).slice(0, 600)}`,
+  ).toBe('0');
+  const recomputeClose = page.getByRole('button', { name: /^(关闭|Close)$/ });
+  await expect(recomputeClose).toBeVisible({ timeout: 60_000 });
+  await recomputeClose.click();
+  await expect(page.getByTestId('form-dialog')).toBeHidden();
 }
 
 async function expectEditActionInsideDrawer(page: Page, actionTestId: string): Promise<void> {
@@ -473,7 +505,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
               source: 'yunhan',
               matchedBy: 'mpn',
               keyword: 'RC0603FR-0710KL',
-              ladderNums: [50, 500, 5000],
+              ladderNums: [5000, 500000, 5000000],
               ladderPrices: [YUNHAN_UNIT_PRICE, 0.0148, 0.012],
               detailUrl: `https://www.ickey.cn/detail/mock/ordinary-sales-${suffix}.html`,
             },
@@ -537,6 +569,17 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         );
 
         await openQuoteDetailFromList(page, created);
+        await expect(
+          page.locator(
+            [
+              '[data-testid="ab:detail:qo_quote_common:tab:comments"]',
+              '[data-testid="ab:detail:qo_quote_common:tab:activity"]',
+              '[data-testid="ab:detail:qo_quote_common:tab:__comments__"]',
+              '[data-testid="ab:detail:qo_quote_common:tab:__activity__"]',
+            ].join(', '),
+          ),
+          'quote detail intentionally hides generic comments and activity entries',
+        ).toHaveCount(0);
 
         // 4. A single imported quote walks each price channel. Every accepted decision is read
         // back as the ordinary employee, directly covering the production 403 regression.
@@ -554,6 +597,37 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         await executeCommand(page, 'qo_quote_common:rollup_cost', {}, quoteId, 'update');
         await generateAndValidateWorkbook(page, quoteId, 'recent-purchase', 1, testInfo);
 
+        // A flat price keeps its unit price when the set count changes; only real quantity,
+        // line amount and the local factor change. This is the no-ladder half of the release gate.
+        step = 'modify set count and factor for flat recent-purchase price';
+        await updateQuotePricingInputs(page, FLAT_SET_COUNT, PRICE_FACTOR);
+        await expect
+          .poll(
+            async () => {
+              const currentLine = await readDynamicRecord(page, 'qo_quote_line_common', lineId);
+              return [
+                Number(currentLine.qo_ql_qty),
+                Number(currentLine.qo_ql_unit_cost).toFixed(6),
+                String(currentLine.qo_ql_price_source ?? ''),
+              ].join('|');
+            },
+            { timeout: 60_000, intervals: [1000, 1500, 2500] },
+          )
+          .toBe(
+            [
+              7600 * FLAT_SET_COUNT,
+              (RECENT_UNIT_PRICE * (PRICE_FACTOR / 100)).toFixed(6),
+              'purchase_analysis_recent_price',
+            ].join('|'),
+          );
+        await generateAndValidateWorkbook(
+          page,
+          quoteId,
+          'recent-purchase-flat-sets-factor',
+          FLAT_SET_COUNT,
+          testInfo,
+        );
+
         step = 'adopt yunhan ladder and export';
         await adoptEvidence(page, lineId, yunhanEvidenceId, 'yunhan');
         await expect
@@ -564,41 +638,14 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
               ),
             { timeout: 20_000, intervals: [500, 1000, 1500] },
           )
-          .toBeCloseTo(YUNHAN_UNIT_PRICE, 6);
+          .toBeCloseTo(YUNHAN_UNIT_PRICE * (PRICE_FACTOR / 100), 6);
         await executeCommand(page, 'qo_quote_common:rollup_cost', {}, quoteId, 'update');
-        await generateAndValidateWorkbook(page, quoteId, 'yunhan', 1, testInfo);
+        await generateAndValidateWorkbook(page, quoteId, 'yunhan', FLAT_SET_COUNT, testInfo);
 
-        // 5. Modify sets and factor from the actual toolbar. The async command must finish,
-        // replace the accepted decision version, and keep the selected Yunhan evidence raw.
+        // 5. Moving from 15,200 to 1,520,000 pieces crosses from the 5,000 tier to the
+        // 500,000 tier. The selected supplier raw price and factor-derived cost must both move.
         step = 'modify set count and price factor';
-        await page.getByRole('tab', { name: /资料上传|Materials/ }).click();
-        await page.getByRole('button', { name: /修改套数|Edit Sets/ }).click();
-        await expect(page.getByTestId('form-dialog')).toBeVisible({ timeout: 15_000 });
-        await fillDialogField(page, 'qo_quote_set_count', String(SET_COUNT));
-        await fillDialogField(page, 'qo_quote_price_factor', String(PRICE_FACTOR));
-        await expect(page.getByTestId('form-dialog-field-qo_quote_set_count')).toHaveValue(
-          String(SET_COUNT),
-        );
-        const recomputeResponsePromise = page.waitForResponse(
-          (response) =>
-            response
-              .url()
-              .includes('/api/meta/commands/execute/qo_quote_common:recompute_quantities') &&
-            response.request().method() === 'POST',
-          { timeout: 30_000 },
-        );
-        await page.getByTestId('form-dialog-submit').click();
-        const recomputeBody = (await (await recomputeResponsePromise)
-          .json()
-          .catch(() => ({}))) as Record<string, unknown>;
-        expect(
-          String(recomputeBody.code),
-          `recompute_quantities response: ${JSON.stringify(recomputeBody).slice(0, 600)}`,
-        ).toBe('0');
-        const recomputeClose = page.getByRole('button', { name: /^(关闭|Close)$/ });
-        await expect(recomputeClose).toBeVisible({ timeout: 60_000 });
-        await recomputeClose.click();
-        await expect(page.getByTestId('form-dialog')).toBeHidden();
+        await updateQuotePricingInputs(page, SET_COUNT, PRICE_FACTOR);
         await expect
           .poll(
             async () => {
@@ -628,7 +675,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
               SET_COUNT,
               PRICE_FACTOR,
               7600 * SET_COUNT,
-              (YUNHAN_UNIT_PRICE * (PRICE_FACTOR / 100)).toFixed(6),
+              (0.0148 * (PRICE_FACTOR / 100)).toFixed(6),
               'yunhan',
             ].join('|'),
           );
@@ -664,8 +711,12 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
             },
           )
           .toBeGreaterThanOrEqual(0);
+        expect(
+          headers.some((text) => /总用量|Total Qty/i.test(text)),
+          `Waterfall should not expose duplicate total quantity: ${JSON.stringify(headers)}`,
+        ).toBe(false);
         await expect(factoredRow.locator('td, [role="cell"]').nth(yunhanColumn)).toContainText(
-          '0.0171',
+          '0.0155',
         );
         await factoredRow.click();
         const recentCandidateAfterFactor = page.getByTestId(
@@ -674,15 +725,18 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         await expect(recentCandidateAfterFactor).toContainText('原始单价');
         await expect(recentCandidateAfterFactor).toContainText('系数后单价');
         await expect(recentCandidateAfterFactor).toContainText('0.0210');
-        await expect(recentCandidateAfterFactor).toContainText('0.0221');
+        await expect(recentCandidateAfterFactor).toContainText('0.02205');
         await recentCandidateAfterFactor.screenshot({
           path: testInfo.outputPath('ordinary-sales-non-ladder-factor-price.png'),
         });
         const yunhanCandidate = page.getByTestId(`review-drawer-candidate-${yunhanEvidenceId}`);
-        await expect(yunhanCandidate).toContainText('原始单价');
-        await expect(yunhanCandidate).toContainText('系数后单价');
-        await expect(yunhanCandidate).toContainText('0.0163');
-        await expect(yunhanCandidate).toContainText('0.0171');
+        await expect(
+          yunhanCandidate.getByTestId('review-drawer-price-comparison'),
+          'a usable ladder is the single price presentation',
+        ).toHaveCount(0);
+        await expect(yunhanCandidate).toContainText('500000–4999999');
+        await expect(yunhanCandidate).toContainText('0.0148');
+        await expect(yunhanCandidate).toContainText('0.01554');
         await expect(yunhanCandidate).toContainText('当前');
         await expect(yunhanCandidate).toContainText('0.0126');
         const yunhanLadder = page.getByTestId(`review-drawer-candidate-${yunhanEvidenceId}-ladder`);
@@ -760,7 +814,9 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       await expect(previewPanel).toContainText(REPRICE_MPN);
       await expect(previewPanel).toContainText('YAGEO');
       await expect(previewPanel).toContainText('10kΩ ±1% 62.5mW 0402 chip resistor');
-      await expect(previewPanel).toContainText('0.0100');
+      await expect(page.getByTestId('review-drawer-price-comparison')).toHaveCount(0);
+      await expect(previewPanel).toContainText('1000+');
+      await expect(previewPanel).toContainText('0.01');
       await expect(previewPanel).toContainText('0.0105');
       await expect(previewPanel).toContainText('当前');
       await expectEditActionInsideDrawer(page, 'review-drawer-edit-confirm');
@@ -827,6 +883,26 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         { fieldName: 'qo_pe_quote_line_id', operator: 'EQ', value: lineId },
       ]);
       expect(evidenceDuringPreview).toHaveLength(evidenceBeforePreview.length);
+
+      // Regression: closing the outer floating drawer while a preview is open used to leave the
+      // parent in edit mode. Clicking the same row then reopened a completely blank drawer.
+      await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/ }).click();
+      await expect(page.getByTestId('review-drawer')).toBeHidden();
+      await page.getByTestId(`table-row-${lineId}`).click();
+      await expect(page.getByTestId('review-drawer')).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByTestId('review-drawer-content-grid')).not.toHaveClass(/hidden/);
+      await expect(page.getByTestId('review-drawer-edit-open')).toBeVisible();
+
+      // Recreate the preview once so the explicit inner Cancel contract remains covered as well.
+      await page.getByTestId('review-drawer-edit-open').click();
+      await page
+        .getByTestId('review-drawer-edit-field-searchText')
+        .locator('input')
+        .fill(REPRICE_MPN);
+      await page.getByTestId('review-drawer-edit-submit').click();
+      await expect(page.getByTestId('review-drawer-edit-preview')).toBeVisible({
+        timeout: 20_000,
+      });
 
       // Cancel means the preview is discarded from the business flow. The technical preview
       // audit may remain server-side, but quote facts and the next exported workbook stay intact.

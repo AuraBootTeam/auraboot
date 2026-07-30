@@ -2085,19 +2085,20 @@ describe('ReviewDrawerBlockRenderer', () => {
     );
 
     const tier = screen.getByTestId('review-drawer-candidate-EV-TIER');
+    expect(tier.querySelector('[data-testid="review-drawer-price-comparison"]')).toBeNull();
+    expect(tier).toHaveTextContent('当前数量区间 1–99');
     expect(tier).toHaveTextContent('原始单价');
-    expect(tier).toHaveTextContent('系数后单价');
     expect(tier).toHaveTextContent('0.0285');
-    expect(tier).toHaveTextContent('0.0570');
-    expect(tier).toHaveTextContent('数量');
+    expect(tier).toHaveTextContent('0.057');
+    expect(tier).toHaveTextContent('数量区间');
     expect(tier).toHaveTextContent('系数后 (200%)');
     expect(screen.getByTestId('review-drawer-ladder-current-EV-TIER')).toHaveTextContent('当前');
-    expect(screen.getByTestId('review-drawer-ladder-current-EV-TIER')).toHaveTextContent('0.0570');
+    expect(screen.getByTestId('review-drawer-ladder-current-EV-TIER')).toHaveTextContent('0.057');
     expect(tier).not.toHaveTextContent('"type":"jsonb"');
 
     const flat = screen.getByTestId('review-drawer-candidate-EV-FLAT');
-    expect(flat).toHaveTextContent('0.0310');
-    expect(flat).toHaveTextContent('0.0620');
+    expect(flat).toHaveTextContent('0.031');
+    expect(flat).toHaveTextContent('0.062');
     expect(flat).not.toHaveTextContent('阶梯价');
   });
 
