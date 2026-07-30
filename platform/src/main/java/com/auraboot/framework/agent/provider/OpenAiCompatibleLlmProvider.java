@@ -798,7 +798,7 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
 
         // Normalize stop reason
         String stopReason;
-        if ("tool_calls".equals(finishReason)) {
+        if (toolCalls != null && !toolCalls.isEmpty()) {
             stopReason = "tool_use";
         } else if ("length".equals(finishReason)) {
             stopReason = "max_tokens";

@@ -21,6 +21,9 @@
 
 import { test, expect } from '@playwright/test';
 
+const LIVE_PROVIDER = process.env.AURA_LIVE_LLM_PROVIDER?.trim();
+const LIVE_MODEL = process.env.AURA_LIVE_LLM_MODEL?.trim();
+
 test.describe('AI Colleagues (DSL pages)', () => {
   test.setTimeout(30_000);
 
@@ -395,7 +398,8 @@ test.describe('AI Colleagues (DSL pages)', () => {
         communication_style: 'professional',
         status: 'active',
         visibility: 'private',
-        model: 'provider-default',
+        model: LIVE_MODEL || 'provider-default',
+        guardrails: JSON.stringify(LIVE_PROVIDER ? { provider: LIVE_PROVIDER } : {}),
         proactive_policy: JSON.stringify({
           enabled: true,
           allowedChannels: ['schedule'],

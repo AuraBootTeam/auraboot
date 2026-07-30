@@ -556,10 +556,11 @@ public class ChatTurnRuntime {
             }
 
             String stopReason = response.getStopReason();
+            boolean responseHasToolUse = hasToolUse(response);
             runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.modelResponse(
                     round, stopReason, Map.of("contentBlockCount", response.getContent().size())));
             lastRuntimeState = runtimeState;
-            if ("required".equals(toolChoice) && !hasToolUse(response)) {
+            if ("required".equals(toolChoice) && !responseHasToolUse) {
                 runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.turnFailed(
                         round, "required_tool_call_missing"));
                 lastRuntimeState = runtimeState;
@@ -569,7 +570,8 @@ public class ChatTurnRuntime {
                 return new TurnOutcome.Failed(msg, null);
             }
 
-            if ("end_turn".equals(stopReason) || "max_tokens".equals(stopReason) || stopReason == null) {
+            if (!responseHasToolUse
+                    && ("end_turn".equals(stopReason) || "max_tokens".equals(stopReason) || stopReason == null)) {
                 reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.turnCompleted(round));
                 callbacks.onFinalResponse(roundContext, response);
                 return completeFinalResponse(response, spec.messages(),
@@ -579,7 +581,7 @@ public class ChatTurnRuntime {
                         spec.sink(), spec.traceId(), anyToolFailed);
             }
 
-            if ("tool_use".equals(stopReason)) {
+            if (responseHasToolUse) {
                 recordToolUseResponse(response, spec.messages());
 
                 List<LlmChatRequest.ContentBlock> toolResultBlocks = new ArrayList<>();

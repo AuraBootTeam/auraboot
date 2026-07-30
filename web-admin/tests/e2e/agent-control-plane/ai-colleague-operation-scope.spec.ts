@@ -25,6 +25,7 @@ const UNIQUE = `scope${Date.now().toString(36)}`;
 const COLLEAGUE_NAME = `E2E Scoped ${UNIQUE}`;
 const ACCOUNT_NAME = `E2E Account ${UNIQUE}`;
 const SHOTS = 'test-results/digital-employee';
+const LIVE_PROVIDER = process.env.AURA_LIVE_LLM_PROVIDER?.trim();
 
 async function createColleague(page: Page) {
   const hydrated = page.waitForResponse((r) => r.url().includes('/agent/providers/configured'), {
@@ -38,6 +39,15 @@ async function createColleague(page: Page) {
   await expect(page.locator('[data-testid="wizard-step-personality"]')).toBeVisible();
   await page.locator('[data-testid="wizard-btn-next"]').click();
   await expect(page.locator('[data-testid="wizard-step-review"]')).toBeVisible();
+  if (LIVE_PROVIDER) {
+    const providerSelect = page.locator('[data-testid="review-provider-select"]');
+    await expect(
+      providerSelect.locator(`option[value="${LIVE_PROVIDER}"]`),
+      `the live provider ${LIVE_PROVIDER} must be selectable in the wizard`,
+    ).toHaveCount(1);
+    await providerSelect.selectOption(LIVE_PROVIDER);
+    await expect(providerSelect).toHaveValue(LIVE_PROVIDER);
+  }
   await Promise.all([
     page.waitForResponse((r) => r.url().includes('/agent-definition/create')),
     page.locator('[data-testid="wizard-btn-create"]').click(),
@@ -154,9 +164,7 @@ test.describe('Digital employee — allowed operations', () => {
     // Waiting for text is what makes the survival below mean refusal.
     const reply = chat.locator('[data-testid="chat-msg-agent"]').first();
     await expect(reply).toBeVisible({ timeout: 180_000 });
-    await expect
-      .poll(async () => (await reply.innerText()).trim().length, { timeout: 120_000 })
-      .toBeGreaterThan(10);
+    await expect(reply).toContainText(/\S.{9,}/s, { timeout: 120_000 });
     await page.screenshot({ path: `${SHOTS}/31-delete-refused.png`, fullPage: true });
 
     // --- and the record is still there ------------------------------------

@@ -18,6 +18,7 @@ import { test, expect, type Page } from '@playwright/test';
 const UNIQUE = `susp${Date.now().toString(36)}`;
 const COLLEAGUE_NAME = `E2E Suspendable ${UNIQUE}`;
 const SHOTS = 'test-results/digital-employee';
+const LIVE_PROVIDER = process.env.AURA_LIVE_LLM_PROVIDER?.trim();
 
 async function createColleague(page: Page): Promise<void> {
   const hydrated = page.waitForResponse((r) => r.url().includes('/agent/providers/configured'), {
@@ -31,6 +32,15 @@ async function createColleague(page: Page): Promise<void> {
   await expect(page.locator('[data-testid="wizard-step-personality"]')).toBeVisible();
   await page.locator('[data-testid="wizard-btn-next"]').click();
   await expect(page.locator('[data-testid="wizard-step-review"]')).toBeVisible();
+  if (LIVE_PROVIDER) {
+    const providerSelect = page.locator('[data-testid="review-provider-select"]');
+    await expect(
+      providerSelect.locator(`option[value="${LIVE_PROVIDER}"]`),
+      `the live provider ${LIVE_PROVIDER} must be selectable in the wizard`,
+    ).toHaveCount(1);
+    await providerSelect.selectOption(LIVE_PROVIDER);
+    await expect(providerSelect).toHaveValue(LIVE_PROVIDER);
+  }
   await Promise.all([
     page.waitForResponse((r) => r.url().includes('/agent-definition/create')),
     page.locator('[data-testid="wizard-btn-create"]').click(),

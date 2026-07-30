@@ -25,6 +25,7 @@ import { test, expect } from '@playwright/test';
 const UNIQUE = `talk${Date.now().toString(36)}`;
 const COLLEAGUE_NAME = `E2E Talker ${UNIQUE}`;
 const SHOTS = 'test-results/digital-employee';
+const LIVE_PROVIDER = process.env.AURA_LIVE_LLM_PROVIDER?.trim();
 
 test.describe('Digital employee — conversation', () => {
   // Belongs to the live tier: a stub answers, and answering is what a mute
@@ -71,6 +72,14 @@ test.describe('Digital employee — conversation', () => {
       providerSelect,
       'no configured provider — any colleague created now would be mute by construction',
     ).toBeVisible();
+    if (LIVE_PROVIDER) {
+      await expect(
+        providerSelect.locator(`option[value="${LIVE_PROVIDER}"]`),
+        `the live provider ${LIVE_PROVIDER} must be selectable in the wizard`,
+      ).toHaveCount(1);
+      await providerSelect.selectOption(LIVE_PROVIDER);
+      await expect(providerSelect).toHaveValue(LIVE_PROVIDER);
+    }
 
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('/agent-definition/create')),
