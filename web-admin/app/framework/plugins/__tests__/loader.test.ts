@@ -5,6 +5,7 @@ import { RouteRegistryImpl } from '../../routing/registry'
 import { SlotRegistry } from '../../extensions/slot-registry'
 import { WidgetRegistry, ColumnRendererRegistry } from '../../widgets/widget-registry'
 import { DataSourceRegistry } from '../../data-source/registry'
+import { ContributionRegistry } from '../../extensions/contribution-registry'
 
 const makeLoader = (features: string[] = []) => {
   const featureSet = new Set(features)
@@ -14,19 +15,30 @@ const makeLoader = (features: string[] = []) => {
     widgetRegistry: new WidgetRegistry(),
     columnRegistry: new ColumnRendererRegistry(),
     dataSourceRegistry: new DataSourceRegistry(),
+    contributionRegistry: new ContributionRegistry((k) => featureSet.has(k)),
     hasFeature: (k) => featureSet.has(k),
   })
 }
 
-const stubPlugin = (code: string, opts: { features?: string[]; deps?: string[]; setup?: (ctx: any) => void } = {}) =>
+const stubPlugin = (code: string, opts: { features?: string[]; licenseRequired?: boolean; deps?: string[]; phase?: 'foundation' | 'feature' | 'application'; setup?: (ctx: any) => void } = {}) =>
   definePlugin({
     manifest: {
       code,
       name: code,
       version: '0.1.0',
       kind: 'oss',
-      ...(opts.features ? { license: { featureKeys: opts.features } } : {}),
+      ...(opts.features
+        ? {
+            license: {
+              featureKeys: opts.features,
+              ...(opts.licenseRequired === undefined
+                ? {}
+                : { required: opts.licenseRequired }),
+            },
+          }
+        : {}),
       ...(opts.deps ? { dependencies: { plugins: opts.deps } } : {}),
+      ...(opts.phase ? { activationPhase: opts.phase } : {}),
     },
     setup: opts.setup ?? (() => {}),
   })
@@ -73,6 +85,17 @@ describe('PluginLoader', () => {
     expect(await loader.activateAll()).toEqual(['ent.x'])
   })
 
+  it('does not gate a plugin whose license requirement is explicitly optional', async () => {
+    const loader = makeLoader([])
+    loader.install(stubPlugin('ent.optional', {
+      features: ['ent_optional'],
+      licenseRequired: false,
+    }))
+    loader.enable('ent.optional')
+
+    expect(await loader.activateAll()).toEqual(['ent.optional'])
+  })
+
   it('respects plugin dependencies (topological)', async () => {
     const loader = makeLoader()
     const order: string[] = []
@@ -84,6 +107,35 @@ describe('PluginLoader', () => {
     expect(order).toEqual(['a', 'b', 'c'])
   })
 
+  it('orders activation phases and rejects dependencies on a later phase', async () => {
+    const loader = makeLoader()
+    const order: string[] = []
+    loader.install(stubPlugin('app', {
+      phase: 'application',
+      setup: () => order.push('app'),
+    }))
+    loader.install(stubPlugin('foundation', {
+      phase: 'foundation',
+      setup: () => order.push('foundation'),
+    }))
+    loader.install(stubPlugin('invalid', {
+      phase: 'foundation',
+      deps: ['app'],
+      setup: () => order.push('invalid'),
+    }))
+    loader.enable('app')
+    loader.enable('foundation')
+    loader.enable('invalid')
+
+    await loader.activateAll()
+
+    expect(order).toEqual(['foundation', 'app'])
+    expect(
+      loader.list().find((record) => record.definition.manifest.code === 'invalid')
+        ?.inactiveReason,
+    ).toMatch(/later activation phase/)
+  })
+
   it('marks dependent inactive when dependency missing', async () => {
     const loader = makeLoader()
     loader.install(stubPlugin('b', { deps: ['a'] }))
@@ -91,6 +143,39 @@ describe('PluginLoader', () => {
     await loader.activateAll()
     expect(loader.list()[0]!.state).toBe('enabled')
     expect(loader.list()[0]!.inactiveReason).toMatch(/missing dependency: a/)
+  })
+
+  it('does not activate a plugin whose installed dependency is disabled', async () => {
+    const loader = makeLoader()
+    loader.install(stubPlugin('a'))
+    loader.install(stubPlugin('b', { deps: ['a'] }))
+    loader.enable('b')
+
+    expect(await loader.activateAll()).toEqual([])
+    expect(
+      loader.list().find((record) => record.definition.manifest.code === 'b')
+        ?.inactiveReason,
+    ).toMatch(/dependency not enabled: a/)
+  })
+
+  it('does not activate a dependent after its dependency setup fails', async () => {
+    const loader = makeLoader()
+    const dependentSetup = vi.fn()
+    loader.install(stubPlugin('a', {
+      setup: () => {
+        throw new Error('dependency setup failed')
+      },
+    }))
+    loader.install(stubPlugin('b', { deps: ['a'], setup: dependentSetup }))
+    loader.enable('a')
+    loader.enable('b')
+
+    expect(await loader.activateAll()).toEqual([])
+    expect(dependentSetup).not.toHaveBeenCalled()
+    expect(
+      loader.list().find((record) => record.definition.manifest.code === 'b')
+        ?.inactiveReason,
+    ).toMatch(/dependency inactive: a/)
   })
 
   it('records setup error and keeps state at licensed', async () => {
@@ -111,6 +196,7 @@ describe('PluginLoader', () => {
       widgetRegistry: new WidgetRegistry(),
       columnRegistry: new ColumnRendererRegistry(),
       dataSourceRegistry: new DataSourceRegistry(),
+      contributionRegistry: new ContributionRegistry(),
       hasFeature: () => true,
     })
     loader.install(definePlugin({

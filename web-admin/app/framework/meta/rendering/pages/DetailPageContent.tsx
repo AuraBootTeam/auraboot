@@ -47,7 +47,7 @@ import {
 import { ReportGenerateButton } from '~/framework/smart/components/report/ReportGenerateButton';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { InlineApprovalPanel } from '~/framework/smart/components/approval/InlineApprovalPanel';
-import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
+import { ContributedSubTableViewer as SubTableViewer } from '~/framework/extensions/contributed-components';
 import { EmbeddedListBlockRenderer } from '~/framework/meta/rendering/blocks/EmbeddedListBlockRenderer';
 import { MonthlyGridViewer } from '~/framework/meta/rendering/blocks/MonthlyGridViewer';
 import { FieldHistoryViewer } from '~/framework/meta/rendering/blocks/FieldHistoryViewer';

@@ -6,6 +6,7 @@
 
 import { COMPONENT_RUNTIME_MANIFEST } from '~/framework/meta/registry/components/ComponentRuntimeManifest';
 import type { ComponentRuntimeConfig } from '~/framework/meta/registry/components/ComponentConfig';
+import { getKernel } from '~/framework/bootstrap';
 
 interface RuntimeEntry {
   loader: () => Promise<Record<string, any>>;
@@ -61,9 +62,27 @@ Object.entries(COMPONENT_RUNTIME_MANIFEST).forEach(([type, runtime]) => {
 });
 
 export function getRuntimeComponentEntry(name: string): RuntimeEntry | undefined {
-  return runtimeEntryMap.get(name);
+  const coreEntry = runtimeEntryMap.get(name);
+  if (coreEntry) return coreEntry;
+  const contribution = getKernel().contributionRegistry.getComponentLoader(name);
+  if (!contribution) return undefined;
+  const exportName =
+    contribution.exportName || contribution.componentName || 'default';
+  return {
+    loader: contribution.load as () => Promise<Record<string, any>>,
+    exportName,
+    componentName: contribution.componentName || exportName || contribution.id,
+  };
 }
 
 export function listRuntimeComponentNames(): string[] {
-  return Array.from(runtimeEntryMap.keys());
+  const contributed = getKernel()
+    .contributionRegistry.listDiagnostics()
+    .filter(
+      (diagnostic) =>
+        diagnostic.kind === 'component-loader' &&
+        diagnostic.status === 'registered',
+    )
+    .map((diagnostic) => diagnostic.id);
+  return [...new Set([...runtimeEntryMap.keys(), ...contributed])];
 }

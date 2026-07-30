@@ -14,6 +14,7 @@ import { PluginLoader, type LoaderOptions } from './plugins/loader.js'
 import { SlotRegistry } from './extensions/slot-registry.js'
 import { WidgetRegistry, ColumnRendererRegistry } from './widgets/widget-registry.js'
 import { DataSourceRegistry } from './data-source/registry.js'
+import { ContributionRegistry } from './extensions/contribution-registry.js'
 import { initBlockRegistry } from '~/ui/schema-renderer/BlockRegistry'
 import { initViewRegistry } from '~/ui/schema-renderer/ViewRegistry'
 
@@ -24,6 +25,7 @@ export interface Kernel {
   widgetRegistry: WidgetRegistry
   columnRegistry: ColumnRendererRegistry
   dataSourceRegistry: DataSourceRegistry
+  contributionRegistry: ContributionRegistry
 }
 
 export interface KernelOptions {
@@ -50,6 +52,8 @@ export function createKernel(opts: KernelOptions = {}): Kernel {
   const widgetRegistry = new WidgetRegistry()
   const columnRegistry = new ColumnRendererRegistry()
   const dataSourceRegistry = new DataSourceRegistry()
+  const hasFeature = opts.hasFeature ?? (() => true)
+  const contributionRegistry = new ContributionRegistry(hasFeature)
 
   const pluginLoader = new PluginLoader({
     routeRegistry,
@@ -57,7 +61,8 @@ export function createKernel(opts: KernelOptions = {}): Kernel {
     widgetRegistry,
     columnRegistry,
     dataSourceRegistry,
-    hasFeature: opts.hasFeature ?? (() => true),
+    contributionRegistry,
+    hasFeature,
   })
 
   return {
@@ -67,6 +72,7 @@ export function createKernel(opts: KernelOptions = {}): Kernel {
     widgetRegistry,
     columnRegistry,
     dataSourceRegistry,
+    contributionRegistry,
   }
 }
 

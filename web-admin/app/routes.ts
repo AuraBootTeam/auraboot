@@ -1,10 +1,24 @@
-import { type RouteConfig, index, layout, route } from '@react-router/dev/routes';
+import {
+  type RouteConfig,
+  type RouteConfigEntry,
+  index,
+  layout,
+  route,
+} from '@react-router/dev/routes';
 import { coreRoutes } from '../packages/core/route-manifest';
 
-// OSS build: core routes only. Enterprise overlay re-injects this file to
-// add enterpriseRoutes() + platformRoutes() + PlatformLayout wrapper.
-// See auraboot-enterprise/web-admin-ext/plugins/ent-platform-guard/overlay/app/routes.ts
-// and scripts/build-web-admin.sh.
+const webRouteManifest = process.env.AURA_WEB_ROUTE_MANIFEST
+  ? await import(/* @vite-ignore */ process.env.AURA_WEB_ROUTE_MANIFEST)
+  : null;
+const ENTERPRISE_ROUTES: RouteConfigEntry[] =
+  webRouteManifest?.ENTERPRISE_ROUTES ?? [];
+const PLATFORM_ROUTES: RouteConfigEntry[] =
+  webRouteManifest?.PLATFORM_ROUTES ?? [];
+const PLATFORM_LAYOUT =
+  webRouteManifest?.PLATFORM_LAYOUT ?? './routes/PlatformLayout.tsx';
+
+// OSS build: core routes only. A private build-time route manifest contributes
+// enterpriseRoutes() + platformRoutes() + the PlatformLayout wrapper.
 
 export default [
   // API routes (always)
@@ -44,8 +58,15 @@ export default [
   // gating, AdminLayout) stays in OSS because it serves any future product
   // built on AuraBoot, not commerce specifically.
 
-  // Legacy main app layout — core routes only in OSS; enterprise overlay injects more.
-  layout('./routes/DefaultLayout.tsx', [index('./routes/_index.tsx'), ...coreRoutes()]),
+  // Main app layout — core routes in OSS plus optional typed private routes.
+  layout('./routes/DefaultLayout.tsx', [
+    index('./routes/_index.tsx'),
+    ...ENTERPRISE_ROUTES,
+    ...(PLATFORM_ROUTES.length > 0
+      ? [layout(PLATFORM_LAYOUT, PLATFORM_ROUTES)]
+      : []),
+    ...coreRoutes(),
+  ]),
 
   // Public shared view
   route('/share/:token', './routes/share.$token.tsx'),

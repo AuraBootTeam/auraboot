@@ -106,7 +106,10 @@ export function initBlockRegistry(): void {
     component: lazy(() => import('~/framework/meta/rendering/blocks/TabsBlockRenderer'), 'TabsBlockRenderer'),
   });
   BlockRegistry.register('sub-table', {
-    component: lazy(() => import('~/framework/meta/rendering/blocks/SubTableViewer'), 'SubTableViewer'),
+    component: lazy(
+      () => import('~/framework/extensions/contributed-components'),
+      'ContributedSubTableViewer',
+    ),
   });
   BlockRegistry.register('embedded-list', {
     component: lazy(
@@ -167,8 +170,8 @@ export function initBlockRegistry(): void {
   });
   BlockRegistry.register('review-drawer', {
     component: lazy(
-      () => import('~/framework/meta/rendering/blocks/ReviewDrawerBlockRenderer'),
-      'ReviewDrawerBlockRenderer',
+      () => import('~/framework/extensions/contributed-components'),
+      'ContributedReviewDrawer',
     ),
   });
   BlockRegistry.register('status-banner', {

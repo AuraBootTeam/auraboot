@@ -4,7 +4,9 @@
 // graceful empty state that points the user at the working "Member List" tab.
 
 import { BuildingOffice2Icon } from '@heroicons/react/24/outline';
+import type React from 'react';
 import { useI18n } from '~/contexts/I18nContext';
+import { useContributionRegistry } from '~/framework/extensions/use-contribution';
 
 export interface OrgTreePickerProps {
   value?: string[];
@@ -16,7 +18,7 @@ export interface OrgTreePickerProps {
   disabledPids?: string[];
 }
 
-export function OrgTreePicker(_props: OrgTreePickerProps) {
+function CoreOrgTreePicker(_props: OrgTreePickerProps) {
   const { t } = useI18n();
   return (
     <div
@@ -40,6 +42,15 @@ export function OrgTreePicker(_props: OrgTreePickerProps) {
       </p>
     </div>
   );
+}
+
+export function OrgTreePicker(props: OrgTreePickerProps) {
+  const registry = useContributionRegistry();
+  const registration = registry.getRenderer('org-tree-picker');
+  const Component = registration?.component as
+    | React.ComponentType<OrgTreePickerProps>
+    | undefined;
+  return Component ? <Component {...props} /> : <CoreOrgTreePicker {...props} />;
 }
 
 export default OrgTreePicker;

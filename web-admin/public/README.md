@@ -23,28 +23,13 @@ The header slot is a 32×32 square next to the "AuraBoot" wordmark, so the
 inline `<img>` references the icon-only mark (`/android-chrome-192x192.png`),
 **not** the horizontal wordmark logos under `auraboot-enterprise/logo/`.
 
-## Regenerating from source
+## Asset provenance
 
-Source PNGs live in `auraboot-enterprise/logo/` (full set 16 → 1024).
-The icon-only mark used in this repo comes from
-`auraboot-enterprise/build/web-admin-overlaid/public/logo192.png`.
-
-```bash
-SRC=/path/to/auraboot-enterprise/build/web-admin-overlaid/public
-DST=auraboot/web-admin/public
-
-cp "$SRC/logo192.png" "$DST/android-chrome-192x192.png"
-cp "$SRC/logo512.png" "$DST/android-chrome-512x512.png"
-sips -z 180 180 "$SRC/logo192.png" --out "$DST/apple-touch-icon.png"
-sips -z  32  32 "$SRC/logo192.png" --out "$DST/favicon-32x32.png"
-sips -z  16  16 "$SRC/logo192.png" --out "$DST/favicon-16x16.png"
-
-# Multi-size .ico (16 / 32 / 48)
-sips -z 48 48 "$DST/android-chrome-192x192.png" --out /tmp/ab48.png
-npx --yes png-to-ico \
-  "$DST/favicon-16x16.png" "$DST/favicon-32x32.png" /tmp/ab48.png \
-  > "$DST/favicon.ico"
-```
+The checked-in files in this directory are the OSS Web Admin source assets.
+Do not source or regenerate them from an Enterprise build/composition output:
+those directories are derived and may be garbage-collected. Brand updates
+must start from the approved source artwork, regenerate the complete size set,
+and commit the resulting files here.
 
 ## .gitignore note
 
