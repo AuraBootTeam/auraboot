@@ -9,6 +9,7 @@ import {
   openQuoteDetailFromList,
   queryDynamicRecords,
   seedQuoteForCorrectedBomUpload,
+  setYunhanMockScenario,
   type CreatedRows,
 } from './quote-e2e-helpers';
 
@@ -96,6 +97,7 @@ test.describe('QuoteOps visual feedback golden', () => {
   test('surfaces pending-recognition feedback for an unreadable quick-lane BOM', async ({
     page,
   }, testInfo) => {
+    await setYunhanMockScenario(page, 'unrecognized-bom');
     const created: CreatedRows = await seedQuoteForCorrectedBomUpload(page);
     const invalidWorkbookPath = createInvalidCorrectedBomWorkbook(
       testInfo.outputPath('invalid-corrected-bom.xlsx'),
@@ -182,6 +184,7 @@ test.describe('QuoteOps visual feedback golden', () => {
       await expect(main).toContainText(/待云汉识别/i);
     } finally {
       await cleanupRows(page, created);
+      await setYunhanMockScenario(page, 'release-default');
     }
   });
 });

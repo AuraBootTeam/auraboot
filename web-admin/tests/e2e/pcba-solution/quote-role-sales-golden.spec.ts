@@ -1,6 +1,4 @@
-import fs from 'node:fs';
 import path from 'node:path';
-import * as XLSX from 'xlsx';
 import type { Browser, BrowserContext, Response, TestInfo } from '@playwright/test';
 import { test, expect, type Page } from '../../fixtures';
 import { ensureSidebarExpanded } from '../helpers';
@@ -16,17 +14,20 @@ import {
   queryDynamicRecords,
   readDynamicRecord,
   reassignRecordOwnerByEmail,
+  setYunhanMockScenario,
   QUOTE_ROLE_TEST_PASSWORD,
+  yunhanMockControlUrl,
   type CreatedRows,
   type QuoteRoleUser,
 } from './quote-e2e-helpers';
+import { validateQuoteWorkbook } from './quote-workbook-assertions';
 
 /**
  * Quote full-chain deep golden led by the SALES ROLE (qo_sales), with admin parity.
  *
  * Drives the sales person's real day: create customer + BOM project (own data, self-scope),
  * create a quote from the UI form (customer/project reference dropdowns + corrected-BOM
- * upload), adopt recent-purchase/Yunhan/manual prices, change sets + price factor, edit a
+ * upload), adopt recent-purchase/Yunhan prices, change sets + price factor, edit a
  * material through a non-mutating Yunhan preview, prove cancel leaves the quote/Excel untouched,
  * explicitly confirm the preview, then generate and parse the quote Excel after every business
  * state (3 sheets, no broken formulas, no raw field codes). An administrator repeats the
@@ -112,66 +113,6 @@ async function expectLegacyPricingActionsHidden(page: Page): Promise<void> {
     '“录入人工价”入口暂时下线，原 action、command 与用例保留',
   ).toHaveCount(0);
   await expect(page.getByTestId('review-drawer-edit-open')).toBeVisible();
-}
-
-function sheetRows(workbook: XLSX.WorkBook, sheetName: string): unknown[][] {
-  const sheet = workbook.Sheets[sheetName];
-  expect(sheet, `sheet ${sheetName} exists`).toBeTruthy();
-  return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' }) as unknown[][];
-}
-
-function validateQuoteWorkbook(
-  filePath: string,
-  expectedSetCount: number,
-  expectedLine?: { mpn: string; unitCost: number },
-): void {
-  const workbook = XLSX.read(fs.readFileSync(filePath), {
-    type: 'buffer',
-    cellText: false,
-    sheetStubs: true,
-  });
-  expect(workbook.SheetNames).toEqual(['报价单', 'BOM明细', '加工明细']);
-  const quoteSheet = workbook.Sheets['报价单'];
-  expect(Number(quoteSheet.G15?.v), '报价单!G15 单次订单量来自报价套数').toBe(expectedSetCount);
-  expect(String(quoteSheet.H15?.f ?? '')).toContain('BOM明细');
-  expect(String(quoteSheet.I15?.f ?? '')).toContain('加工明细');
-  expect(String(quoteSheet.J15?.f ?? '')).toBe('(H15+I15)*30%');
-  expect(String(quoteSheet.K15?.f ?? '')).toBe('ROUND((H15+I15+J15),2)');
-  expect(String(quoteSheet.L15?.f ?? '')).toBe('G15*K15');
-  expect(String(quoteSheet.P15?.f ?? '')).toBe('N15+M15+L15');
-  const bomRows = sheetRows(workbook, 'BOM明细');
-  expect(bomRows.length, 'BOM 明细 has header + imported lines').toBeGreaterThanOrEqual(3);
-  for (const sheetName of workbook.SheetNames) {
-    const sheet = workbook.Sheets[sheetName];
-    for (const key of Object.keys(sheet)) {
-      if (key.startsWith('!')) continue;
-      const value = sheet[key] as { v?: unknown; f?: string };
-      const text = `${value.v ?? ''}${value.f ?? ''}`;
-      expect(text, `${sheetName}!${key} has no broken formula`).not.toMatch(
-        /#REF!|#DIV\/0!|#VALUE!/,
-      );
-    }
-  }
-  const flat = JSON.stringify(bomRows.slice(0, 4));
-  expect(flat, 'no raw qo_* field codes leak into the workbook').not.toMatch(
-    /qo_(quote|ql|pe)_[a-z_]+/,
-  );
-  if (expectedLine) {
-    const headerIndex = bomRows.findIndex((row) => row.some((cell) => String(cell) === '材料单价'));
-    expect(headerIndex, 'BOM 明细应包含材料单价表头').toBeGreaterThanOrEqual(0);
-    const headers = bomRows[headerIndex].map(String);
-    const unitPriceColumn = headers.indexOf('材料单价');
-    const processPointColumn = headers.indexOf('加工点数');
-    const materialRow = bomRows
-      .slice(headerIndex + 1)
-      .find((row) => row.some((cell) => String(cell).includes(expectedLine.mpn)));
-    expect(materialRow, `BOM 明细应包含修正后的物料 ${expectedLine.mpn}`).toBeTruthy();
-    expect(Number(materialRow?.[unitPriceColumn])).toBeCloseTo(expectedLine.unitCost, 4);
-    expect(
-      Number(materialRow?.[processPointColumn]),
-      '修正物料的加工点数应完成重算',
-    ).toBeGreaterThan(0);
-  }
 }
 
 function parseJsonObject(value: unknown): Record<string, unknown> {
@@ -292,7 +233,10 @@ async function generateAndValidateWorkbook(
   const download = await downloadPromise;
   const exportPath = path.join(testInfo.outputDir, `role-sales-${label}-${quoteId}.xlsx`);
   await download.saveAs(exportPath);
-  validateQuoteWorkbook(exportPath, expectedSetCount, expectedLine);
+  validateQuoteWorkbook(exportPath, {
+    expectedSetCount,
+    expectedBomLine: expectedLine,
+  });
   return exportPath;
 }
 
@@ -347,18 +291,8 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
     browser,
   }, testInfo) => {
     const { context, page } = await openQuoteRolePage(browser, SALES_USER);
-    const mockControlUrl = String(process.env.YUNHAN_MOCK_CONTROL_URL ?? '').replace(/\/$/, '');
-    expect(
-      mockControlUrl,
-      'YUNHAN_MOCK_CONTROL_URL is required; never consume live Yunhan quota in E2E',
-    ).toBeTruthy();
-    const defaultScenarioResponse = await page.request.post(
-      `${mockControlUrl}/__control/scenario/release-default`,
-    );
-    expect(
-      defaultScenarioResponse.ok(),
-      `reset Yunhan mock scenario: HTTP ${defaultScenarioResponse.status()} ${await defaultScenarioResponse.text()}`,
-    ).toBe(true);
+    const mockControlUrl = yunhanMockControlUrl();
+    await setYunhanMockScenario(page, 'release-default');
     const forbidden: ForbiddenHit[] = [];
     let step = 'login';
     page.on('response', (resp: Response) => {
@@ -770,13 +704,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       // explicitly confirms. The browser calls the protocol-level local Yunhan fake so the gate
       // never spends live API quota.
       step = 'preview material reprice through Yunhan mock';
-      const scenarioResponse = await page.request.post(
-        `${mockControlUrl}/__control/scenario/reprice-v2`,
-      );
-      expect(
-        scenarioResponse.ok(),
-        `switch Yunhan mock scenario: HTTP ${scenarioResponse.status()} ${await scenarioResponse.text()}`,
-      ).toBe(true);
+      await setYunhanMockScenario(page, 'reprice-v2');
 
       await page.getByRole('tab', { name: /BOM价格|BOM Price/ }).click();
       await page.getByTestId(`table-row-${lineId}`).click();
@@ -1128,10 +1056,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       try {
         const adminPage = await adminGoldenContext.newPage();
         await loginViaUI(adminPage, ADMIN_EMAIL, ADMIN_PASSWORD);
-        const adminScenarioResponse = await adminPage.request.post(
-          `${mockControlUrl}/__control/scenario/reprice-v2`,
-        );
-        expect(adminScenarioResponse.ok(), 'admin Yunhan mock scenario switch').toBe(true);
+        await setYunhanMockScenario(adminPage, 'reprice-v2');
         await openQuoteDetailFromList(adminPage, created);
         await adminPage.getByRole('tab', { name: /BOM价格|BOM Price/ }).click();
         await adminPage.getByTestId(`table-row-${lineId}`).click();

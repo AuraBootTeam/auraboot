@@ -483,6 +483,27 @@ export async function executeCommand(
   return commandData;
 }
 
+export function yunhanMockControlUrl(): string {
+  const controlUrl = String(process.env.YUNHAN_MOCK_CONTROL_URL ?? '').replace(/\/$/, '');
+  expect(
+    controlUrl,
+    'YUNHAN_MOCK_CONTROL_URL is required; release E2E must not consume live Yunhan quota',
+  ).toBeTruthy();
+  return controlUrl;
+}
+
+export async function setYunhanMockScenario(page: Page, scenario: string): Promise<void> {
+  const controlUrl = yunhanMockControlUrl();
+  const response = await page.request.post(
+    `${controlUrl}/__control/scenario/${encodeURIComponent(scenario)}`,
+  );
+  const body = await response.text();
+  expect(
+    response.ok(),
+    `switch Yunhan mock to ${scenario}: HTTP ${response.status()} ${body}`,
+  ).toBe(true);
+}
+
 export async function dynamicCreate(
   page: Page,
   model: string,

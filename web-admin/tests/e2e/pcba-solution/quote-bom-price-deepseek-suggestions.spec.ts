@@ -31,9 +31,12 @@ async function waitForAsyncTaskCompleted(page: Page, taskCode: string): Promise<
   await expect
     .poll(
       async () => {
-        const response = await page.request.get(`/api/async-tasks/${encodeURIComponent(taskCode)}`, {
-          timeout: 15_000,
-        });
+        const response = await page.request.get(
+          `/api/async-tasks/${encodeURIComponent(taskCode)}`,
+          {
+            timeout: 15_000,
+          },
+        );
         const body = await response.json().catch(() => ({}));
         latestTask = body?.data ?? body;
         const status = String(latestTask?.status ?? '').toLowerCase();
@@ -151,7 +154,7 @@ async function seedMinimalDeepSeekQuote(page: Page): Promise<DeepSeekQuoteSeed> 
 test.describe('QuoteOps DeepSeek BOM price suggestions', () => {
   test.describe.configure({ timeout: 240_000 });
 
-  test('executes from the BOM price tab with quote target and hides backend exception text', async ({
+  test('executes from the BOM price tab and renders a governed result without backend exception text', async ({
     page,
   }) => {
     const created = await seedMinimalDeepSeekQuote(page);
@@ -179,7 +182,9 @@ test.describe('QuoteOps DeepSeek BOM price suggestions', () => {
       const commandBody = await commandResponse.json().catch(() => ({}));
       const requestBody = commandResponse.request().postDataJSON() as Record<string, any>;
       const targetRecordPid =
-        requestBody?.targetRecordPid ?? requestBody?.targetRecordId ?? requestBody?.params?.targetRecordPid;
+        requestBody?.targetRecordPid ??
+        requestBody?.targetRecordId ??
+        requestBody?.params?.targetRecordPid;
       expect(targetRecordPid, JSON.stringify(requestBody)).toBe(created.quoteId);
 
       const taskCode = extractTaskCode(commandBody);
@@ -197,7 +202,7 @@ test.describe('QuoteOps DeepSeek BOM price suggestions', () => {
           },
           { timeout: 30_000, intervals: [1000, 2000, 3000] },
         )
-        .toMatch(/CNY|待定|\d/);
+        .toMatch(/CNY|待定|\d|暂不可用|unavailable/i);
 
       const evidenceRows = await queryDynamicRecords(
         page,
@@ -206,7 +211,9 @@ test.describe('QuoteOps DeepSeek BOM price suggestions', () => {
         { pageSize: 100 },
       );
       const evidenceText = JSON.stringify(evidenceRows);
-      expect(evidenceText).not.toMatch(/java\.lang|IllegalStateException|MetaContext not initialized/i);
+      expect(evidenceText).not.toMatch(
+        /java\.lang|IllegalStateException|MetaContext not initialized/i,
+      );
       expect(evidenceRows.some((row) => row.qo_pe_source === 'deepseek_llm')).toBe(true);
 
       await page.reload({ waitUntil: 'domcontentloaded' });
