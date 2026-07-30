@@ -184,11 +184,104 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             };
             log.warn("Execution principal resolution rejected a turn: reason={}, errorType={}",
                     e.reason(), e.getClass().getSimpleName());
-            sink.onError(message, null);
-            return new TurnOutcome.Failed(message, e);
+            TurnOutcome.Failed failed = new TurnOutcome.Failed(message, e);
+            try {
+                sink.onError(message, null);
+            } catch (Exception sinkError) {
+                // A disconnected SSE client must not erase the rejection from
+                // audit/eval telemetry.
+                log.warn("Failed to emit execution-principal rejection to sink: {}",
+                        sinkError.getMessage(), sinkError);
+            }
+            recordPreExecutionRejection(request, failed);
+            return failed;
         } finally {
             TurnScopeContext.clear();
         }
+    }
+
+    /**
+     * Record a turn rejected before {@link #beginTurn(TurnRequest)} could
+     * materialize its execution principal.
+     *
+     * <p>An identity/deployment rejection is still a terminal turn. Before
+     * this seam, the caller received an SSE error but no
+     * {@link TurnCompletedEvent}; consequently the all-terminal-turn
+     * observation loop silently excluded missing, inactive, and denied named
+     * agents. Build a deliberately non-executable context (no
+     * {@link ExecutionPrincipal}, no {@link ContextEnvelope}, no inbound
+     * persistence), retain the real triage + planner route, and emit the same
+     * terminal audit/event/metrics surfaces as an accepted turn.
+     *
+     * <p>Each side effect is isolated. Rejection telemetry must never replace
+     * the safe failure already returned to the caller, and an audit or metrics
+     * outage must not prevent the terminal event from being attempted.
+     */
+    private void recordPreExecutionRejection(TurnRequest request, TurnOutcome.Failed failed) {
+        TurnContext ctx;
+        TurnRoute route;
+        try {
+            ctx = buildPreExecutionRejectionContext(request);
+            route = TurnExecutionPlanner.isRagOnlyChannel(request.channel())
+                    ? TurnRoute.ragOnlyForced()
+                    : TurnRoute.from(decideInitialExecutionPlan(request, ctx));
+        } catch (Exception telemetryContextError) {
+            log.warn("Could not materialize pre-execution rejection telemetry: {}",
+                    telemetryContextError.getMessage(), telemetryContextError);
+            return;
+        }
+
+        try {
+            sideEffects.metricsRecorder().recordTurnBegin(ctx);
+        } catch (Exception metricsError) {
+            log.warn("Pre-execution rejection begin metric failed: {}",
+                    metricsError.getMessage(), metricsError);
+        }
+        try {
+            sideEffects.auditWriter().writeFailure(ctx, failed);
+        } catch (Exception auditError) {
+            log.warn("Pre-execution rejection audit failed: {}",
+                    auditError.getMessage(), auditError);
+        }
+        try {
+            sideEffects.eventEmitter().emit(new TurnCompletedEvent(ctx, failed, route));
+        } catch (Exception eventError) {
+            log.warn("Pre-execution rejection terminal event failed: {}",
+                    eventError.getMessage(), eventError);
+        }
+        try {
+            sideEffects.metricsRecorder().recordTurnEnd(ctx, failed);
+        } catch (Exception metricsError) {
+            log.warn("Pre-execution rejection end metric failed: {}",
+                    metricsError.getMessage(), metricsError);
+        }
+    }
+
+    private TurnContext buildPreExecutionRejectionContext(TurnRequest request) {
+        String profileId = resolveProfileId(request);
+        TriageVerdict verdict = runTriage(request, profileId);
+        TriageBucket effectiveBucket = request.precomputedBucket() != null
+                ? request.precomputedBucket()
+                : (verdict != null ? verdict.bucket() : null);
+        return new TurnContext(
+                com.auraboot.framework.common.util.UniqueIdGenerator.generate(),
+                request.tenantId(),
+                request.userId(),
+                request.humanMemberId(),
+                null,
+                request.agentCode(),
+                request.channel(),
+                profileId,
+                null,
+                request.conversationId(),
+                null,
+                effectiveBucket,
+                allowedReadOnlyToolsFor(effectiveBucket, verdict),
+                null,
+                null,
+                java.time.Instant.now(),
+                null,
+                null);
     }
 
 
@@ -302,15 +395,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 log.debug("Agent turn execution plan: turnId={}, RAG-only channel {} forced to SYNC_AGENT_TURN",
                         ctx.turnId(), request.channel());
             } else {
-                turnPlan = turnExecutionPlanner.decide(
-                        new TurnExecutionPlanner.TurnExecutionInput(
-                                agentCode,
-                                ctx.triageBucket(),
-                                ctx.allowedReadOnlyTools(),
-                                optionFlag(request, "explicitDurableRequest", "durableWorkflow", "durable"),
-                                optionFlag(request, "requiresApproval"),
-                                optionFlag(request, "externalSideEffect"),
-                                optionFlag(request, "batch")));
+                turnPlan = decideInitialExecutionPlan(request, ctx);
                 initialMode = turnPlan.initialMode();
                 route = TurnRoute.from(turnPlan);
                 log.debug("Agent turn execution plan: turnId={}, initialMode={}, reason={}, signals={}",
@@ -377,6 +462,20 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             recordFinalizeFailure(ctx, outcome, e);
         }
         return outcome;
+    }
+
+    private TurnExecutionPlanner.TurnExecutionPlan decideInitialExecutionPlan(
+            TurnRequest request,
+            TurnContext ctx) {
+        return turnExecutionPlanner.decide(
+                new TurnExecutionPlanner.TurnExecutionInput(
+                        request.agentCode(),
+                        ctx.triageBucket(),
+                        ctx.allowedReadOnlyTools(),
+                        optionFlag(request, "explicitDurableRequest", "durableWorkflow", "durable"),
+                        optionFlag(request, "requiresApproval"),
+                        optionFlag(request, "externalSideEffect"),
+                        optionFlag(request, "batch")));
     }
 
     @Override

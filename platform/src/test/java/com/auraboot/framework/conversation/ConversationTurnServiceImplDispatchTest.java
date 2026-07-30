@@ -19,6 +19,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +57,7 @@ import static org.mockito.Mockito.*;
 @ActiveProfiles("integration-test")
 @Transactional
 @Rollback(true)
+@RecordApplicationEvents
 @DisplayName("ConversationTurnServiceImpl.runTurn — agentCode dispatch")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -84,6 +87,9 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ApplicationEvents applicationEvents;
 
     private ResponseSink sink;
 
@@ -275,6 +281,46 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
             verify(agentChatPort, never()).runAgentTurn(any(), any(), any());
             verify(chatService, never()).executeAuraBotTurn(any(), any(), any());
             verify(sink, atLeastOnce()).onError(contains("no longer available"), any());
+        });
+    }
+
+    @Test
+    @Order(5)
+    @DisplayName("principal resolver rejects missing named agent -> one routed Failed terminal event")
+    void principalResolutionMissing_emitsRoutedFailedTerminalEvent() {
+        withTestIdentity(() -> {
+            String agentCode = "missing_before_begin";
+            when(executionPrincipalResolver.resolve(
+                    argThat(request -> agentCode.equals(request.agentCode()))))
+                    .thenThrow(new ExecutionPrincipalResolutionException(
+                            ExecutionPrincipalResolutionException.Reason.AGENT_MISSING,
+                            "Agent definition not found: agentCode=" + agentCode));
+
+            TurnOutcome outcome =
+                    turnService.runTurn(buildTurnRequest(agentCode, "run monthly reconciliation"), sink);
+
+            assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+            assertThat(((TurnOutcome.Failed) outcome).errorMessage())
+                    .contains("no longer available")
+                    .doesNotContain(agentCode);
+
+            java.util.List<TurnCompletedEvent> terminalEvents =
+                    applicationEvents.stream(TurnCompletedEvent.class).toList();
+            assertThat(terminalEvents).hasSize(1);
+            TurnCompletedEvent terminal = terminalEvents.getFirst();
+            assertThat(terminal.ctx().agentCode()).isEqualTo(agentCode);
+            assertThat(terminal.ctx().executionPrincipal()).isNull();
+            assertThat(terminal.ctx().contextEnvelope()).isNull();
+            assertThat(terminal.ctx().inboundMessageId()).isNull();
+            assertThat(terminal.ctx().triageBucket()).isNotNull();
+            assertThat(terminal.outcome()).isInstanceOf(TurnOutcome.Failed.class);
+            assertThat(terminal.route()).isNotNull();
+            assertThat(terminal.route().initialMode()).isEqualTo("NAMED_AGENT_TURN");
+            assertThat(terminal.route().decisionReason()).isEqualTo("NAMED_AGENT_PROFILE");
+
+            verify(sink).onError(contains("no longer available"), isNull());
+            verifyNoInteractions(agentChatPort);
+            verifyNoInteractions(chatService);
         });
     }
 

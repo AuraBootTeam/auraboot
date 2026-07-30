@@ -364,7 +364,7 @@ assert_ge "S3 后台任务: ab_agent_task row created" \
 # S4's whole point IS the S3 assertion above: the explain-prefixed 导出
 # message must NOT have produced a second ACP_RUN row. Make it explicit:
 assert_eq "S4 咨询不误触发: explain-prefixed turn stayed non-durable" \
-  "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb->>'triageBucket'='LIGHT_CHAT'")" "2"
+  "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb->>'input'='为什么导出会失败' AND detail::jsonb->>'triageBucket'='LIGHT_CHAT' AND detail::jsonb->>'decisionReason'='SYNC_CHAT_TURN'")" "1"
 assert_eq "S6 具名路由: NAMED_AGENT_TURN routed and failure observed" \
   "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb->>'initialMode'='NAMED_AGENT_TURN' AND obs_title LIKE 'turn.failed%' AND COALESCE(detail::jsonb->>'error', '') <> ''")" "1"
 
