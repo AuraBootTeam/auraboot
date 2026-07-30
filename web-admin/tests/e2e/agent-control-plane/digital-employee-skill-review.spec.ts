@@ -100,11 +100,10 @@ test.describe('Digital employee — bound skill drives a real customer review', 
     expect(sampleName, 'a seeded customer must have a name to ground on').toBeTruthy();
 
     // Reach the colleague the way a person does — click through, don't build the URL.
-    await page.goto('/ai/colleagues', { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-      { timeout: 20_000 },
-    );
+    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-testid="agent-colleagues-grid"]')).toBeVisible({
+      timeout: 20_000,
+    });
 
     const card = page.locator('[data-testid^="agent-card-"]', { hasText: COLLEAGUE_NAME });
     await expect(card, 'the ops colleague must be listed').toBeVisible({ timeout: 20_000 });

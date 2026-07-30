@@ -83,6 +83,9 @@ const FIELD_LABELS: Record<string, string[]> = {
 };
 
 const OPTION_LABELS: Record<string, Record<string, string[]>> = {
+  agent_type: {
+    autonomous: ['自主', 'Autonomous', 'autonomous'],
+  },
   task_priority: {
     critical: ['紧急', 'Critical', 'critical'],
     high: ['高', 'High', 'high'],
@@ -790,8 +793,14 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     await fillFormField(page, 'agent_code', agentCode);
     await fillFormField(page, 'name', agentName);
     await fillFormField(page, 'description', `E2E CRUD agent — ${uid}`);
-    await selectFormField(page, 'agent_type', 'autonomous').catch(() => null);
-    await fillFormField(page, 'model', 'claude-sonnet-4-6').catch(() => null);
+    await fillFormField(
+      page,
+      'model',
+      process.env.AURA_LIVE_LLM_MODEL?.trim() || 'provider-default',
+    ).catch(() => null);
+    // agent_type is required. Swallowing a failed selection made the later
+    // "row not found" assertion hide a client-side validation failure.
+    await selectFormField(page, 'agent_type', 'autonomous');
     await selectFormField(page, 'status', 'active').catch(() => null);
 
     // Soul Profile fields (may be in a separate section)
@@ -801,25 +810,24 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
       () => null,
     );
 
-    const cmdPromise = page
-      .waitForResponse(
-        (r) =>
-          r.url().includes('/api/meta/commands/execute/') &&
-          r.request().method().toLowerCase() === 'post',
-        { timeout: 15_000 },
-      )
-      .catch(() => null);
+    const cmdPromise = page.waitForResponse(
+      (r) =>
+        r.url().includes('/api/meta/commands/execute/') &&
+        r.request().method().toLowerCase() === 'post',
+      { timeout: 20_000 },
+    );
+    // Start observing before the click. The success toast can disappear
+    // before the command response has been awaited on a fast local stack.
+    const toastPromise = waitForToast(page);
 
     await clickSaveButton(page);
-    await cmdPromise;
-    await waitForToast(page).catch(() => {});
+    const [cmdResponse] = await Promise.all([cmdPromise, toastPromise]);
+    expect(cmdResponse.status(), 'agent create command must return success').toBeLessThan(400);
 
-    await page
-      .waitForURL(
-        (url) => url.pathname.includes('/p/agent_definition') && !url.pathname.includes('/new'),
-        { timeout: 10_000 },
-      )
-      .catch(() => {});
+    await page.waitForURL(
+      (url) => url.pathname.includes('/p/agent_definition') && !url.pathname.includes('/new'),
+      { timeout: 15_000 },
+    );
 
     const row = await findRowInPaginatedList(page, agentName);
     await expect(row).toBeVisible({ timeout: 8_000 });

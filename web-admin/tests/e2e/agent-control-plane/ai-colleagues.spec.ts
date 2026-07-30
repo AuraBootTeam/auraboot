@@ -2,20 +2,21 @@
  * AI Colleagues & Settings Hub — E2E Tests
  *
  * Coverage:
- * - AI Colleagues card grid page (/ai/colleagues)
+ * - AI Colleagues card grid page (/p/c/ai_colleagues)
  *   - AuraBot card with Official badge, first position, no edit button
  *   - Regular agent cards with edit/chat buttons
  *   - Navigation to agent detail page with 7 tabs
  *   - Detail page tab switching
  *   - Draft → immutable release → deployment rollback
  *   - Create button presence
- * - AI Settings hub page (/ai/settings)
+ * - AI Settings hub page
  *   - 6 settings cards visible with titles and descriptions
  *   - Card navigation to target pages
  *   - Each card has an icon
  *
- * NOTE: These pages are not yet in sidebar menus, so page.goto() is used.
- *       This is acceptable per AGENTS.md exception for new pages.
+ * NOTE: The DSL page uses the canonical /p/c route. Direct navigation is used
+ *       in the page-level rendering cases; the journey test separately proves
+ *       sidebar reachability.
  */
 
 import { test, expect } from '@playwright/test';
@@ -30,13 +31,13 @@ test.describe('AI Colleagues (DSL pages)', () => {
   test('colleagues page loads with title, subtitle, create button, and card grid', async ({
     page,
   }) => {
-    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
-
-    // Wait for API response
-    await page.waitForResponse(
-      (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-      { timeout: 10_000 },
-    );
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
+        { timeout: 10_000 },
+      ),
+      page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' }),
+    ]);
 
     // Page title
     await expect(page.locator('h1')).toContainText(/AI Colleagues|AI 同事/);
@@ -59,11 +60,13 @@ test.describe('AI Colleagues (DSL pages)', () => {
   test('AuraBot card is first, shows Official + Full Power badges, chat button, no edit button', async ({
     page,
   }) => {
-    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-      { timeout: 10_000 },
-    );
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
+        { timeout: 10_000 },
+      ),
+      page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' }),
+    ]);
 
     const aurabotCard = page.locator('[data-testid="aurabot-card"]');
     if (!(await aurabotCard.isVisible({ timeout: 8_000 }).catch(() => false))) {
@@ -94,11 +97,13 @@ test.describe('AI Colleagues (DSL pages)', () => {
   });
 
   test('AuraBot card shows status badge and type badge', async ({ page }) => {
-    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-      { timeout: 10_000 },
-    );
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
+        { timeout: 10_000 },
+      ),
+      page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' }),
+    ]);
 
     const aurabotCard = page.locator('[data-testid="aurabot-card"]');
     if (!(await aurabotCard.isVisible({ timeout: 8_000 }).catch(() => false))) {
@@ -120,11 +125,13 @@ test.describe('AI Colleagues (DSL pages)', () => {
   });
 
   test('non-AuraBot agent card has edit and chat buttons', async ({ page }) => {
-    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-      { timeout: 10_000 },
-    );
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
+        { timeout: 10_000 },
+      ),
+      page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' }),
+    ]);
 
     // Find any non-AuraBot card
     const agentCards = page.locator('[data-testid^="agent-card-"]');
@@ -167,11 +174,13 @@ test.describe('AI Colleagues (DSL pages)', () => {
   });
 
   test('clicking edit on agent card navigates to detail page with 7 tabs', async ({ page }) => {
-    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
-    const listResponse = await page.waitForResponse(
-      (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-      { timeout: 10_000 },
-    );
+    const [listResponse] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
+        { timeout: 10_000 },
+      ),
+      page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' }),
+    ]);
 
     // Extract a non-aurabot agent PID from the API response
     const body = await listResponse.json().catch(() => ({}));
@@ -210,11 +219,13 @@ test.describe('AI Colleagues (DSL pages)', () => {
 
   test('detail page Profile tab shows form fields and back button', async ({ page }) => {
     // Get a valid agent PID from the list API
-    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
-    const listResponse = await page.waitForResponse(
-      (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-      { timeout: 10_000 },
-    );
+    const [listResponse] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
+        { timeout: 10_000 },
+      ),
+      page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' }),
+    ]);
     const body = await listResponse.json().catch(() => ({}));
     const records = (body as any)?.data?.records ?? [];
     const nonAurabot = records.find((r: any) => r.agent_code !== 'aurabot');
@@ -249,11 +260,13 @@ test.describe('AI Colleagues (DSL pages)', () => {
 
   test('detail page tab switching works across all 7 tabs', async ({ page }) => {
     // Get a valid agent PID from the list API
-    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
-    const listResponse = await page.waitForResponse(
-      (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-      { timeout: 10_000 },
-    );
+    const [listResponse] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
+        { timeout: 10_000 },
+      ),
+      page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' }),
+    ]);
     const body = await listResponse.json().catch(() => ({}));
     const records = (body as any)?.data?.records ?? [];
     const nonAurabot = records.find((r: any) => r.agent_code !== 'aurabot');
@@ -460,12 +473,13 @@ test.describe('AI Colleagues (DSL pages)', () => {
     await page.getByTestId('tab-schedules').click();
     await scheduleListResponse;
 
-    await expect(page.getByText(scheduleTitle)).toBeVisible();
-    await expect(page.getByText(/0 0 9 \* \* \* · Asia\/Shanghai/)).toBeVisible();
-    await expect(page.getByText(/8 \/ day · 2 concurrent/)).toBeVisible();
-    await expect(page.getByText('active', { exact: true })).toBeVisible();
+    const scheduleRow = page.locator('tr', { hasText: scheduleTitle });
+    await expect(scheduleRow).toBeVisible();
+    await expect(scheduleRow.getByText(/0 0 9 \* \* \* · Asia\/Shanghai/)).toBeVisible();
+    await expect(scheduleRow.getByText(/8 \/ day · 2 concurrent|每日 8 次 · 并发 2/)).toBeVisible();
+    await expect(scheduleRow.getByText(/^(active|启用)$/)).toBeVisible();
 
-    await page.getByTestId(/run-schedule-now-/).click();
+    await scheduleRow.getByTestId(/run-schedule-now-/).click();
     await expect(page.getByRole('dialog', { name: /Run schedule now|立即运行计划/ })).toBeVisible();
     const triggerResponse = page.waitForResponse(
       (response) =>

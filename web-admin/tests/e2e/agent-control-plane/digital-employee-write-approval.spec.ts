@@ -94,11 +94,10 @@ test.describe('Digital employee — write + approval through the browser UI', ()
     const recordName = `UITEST写场景-${Date.now()}`;
     expect(await crmAccountCount(page.request, recordName)).toBe(0);
 
-    await page.goto('/ai/colleagues', { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-      { timeout: 20_000 },
-    );
+    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-testid="agent-colleagues-grid"]')).toBeVisible({
+      timeout: 20_000,
+    });
 
     const card = page.locator('[data-testid^="agent-card-"]', { hasText: COLLEAGUE_NAME });
     await expect(card, 'the write colleague must be listed').toBeVisible({ timeout: 20_000 });

@@ -20,10 +20,9 @@ const COLLEAGUE_NAME = `E2E Suspendable ${UNIQUE}`;
 const SHOTS = 'test-results/digital-employee';
 
 async function createColleague(page: Page): Promise<void> {
-  const hydrated = page.waitForResponse(
-    (r) => r.url().includes('/agent/providers/configured'),
-    { timeout: 30_000 },
-  );
+  const hydrated = page.waitForResponse((r) => r.url().includes('/agent/providers/configured'), {
+    timeout: 30_000,
+  });
   await page.goto('/p/c/ai_colleague_new', { waitUntil: 'domcontentloaded' });
   await hydrated;
   await page.locator('[data-testid="wizard-template-skip"]').click();
@@ -45,10 +44,9 @@ async function createColleague(page: Page): Promise<void> {
 /** Opens this colleague's chat the way a person does — from its card. */
 async function openChat(page: Page) {
   await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
-  await page.waitForResponse(
-    (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-    { timeout: 20_000 },
-  );
+  await expect(page.locator('[data-testid="agent-colleagues-grid"]')).toBeVisible({
+    timeout: 20_000,
+  });
   const card = page.locator('[data-testid^="agent-card-"]', { hasText: COLLEAGUE_NAME });
   await expect(card).toBeVisible({ timeout: 20_000 });
   await card.locator('[data-testid^="agent-chat-"]').first().click();
@@ -121,8 +119,9 @@ test.describe('Digital employee — suspend and resume', () => {
     const notice = chat.getByText(/suspended|停用|no longer available|不再可用/i).first();
     await expect(notice, 'the page must say why nothing happened').toBeVisible({ timeout: 20_000 });
     const noticeText = await notice.innerText();
-    expect(noticeText, 'a user-facing message must not carry the raw agent code')
-        .not.toMatch(/e2e_suspendable[a-z0-9_]*/i);
+    expect(noticeText, 'a user-facing message must not carry the raw agent code').not.toMatch(
+      /e2e_suspendable[a-z0-9_]*/i,
+    );
 
     // --- resume, and it works again ---------------------------------------
     await page.goto(detailUrl, { waitUntil: 'domcontentloaded' });

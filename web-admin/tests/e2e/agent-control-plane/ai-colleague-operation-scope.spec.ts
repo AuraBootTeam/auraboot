@@ -27,10 +27,9 @@ const ACCOUNT_NAME = `E2E Account ${UNIQUE}`;
 const SHOTS = 'test-results/digital-employee';
 
 async function createColleague(page: Page) {
-  const hydrated = page.waitForResponse(
-    (r) => r.url().includes('/agent/providers/configured'),
-    { timeout: 30_000 },
-  );
+  const hydrated = page.waitForResponse((r) => r.url().includes('/agent/providers/configured'), {
+    timeout: 30_000,
+  });
   await page.goto('/p/c/ai_colleague_new', { waitUntil: 'domcontentloaded' });
   await hydrated;
   await page.locator('[data-testid="wizard-template-skip"]').click();
@@ -72,8 +71,16 @@ test.describe('Digital employee — allowed operations', () => {
     // --- clear Delete, in the interface -----------------------------------
     await createColleague(page);
     const detailUrl = page.url();
-    await page.getByRole('tab', { name: /Tools|工具/ }).first().click()
-      .catch(() => page.locator('nav[aria-label="Tabs"] button', { hasText: /Tools|工具/ }).first().click());
+    await page
+      .getByRole('tab', { name: /Tools|工具/ })
+      .first()
+      .click()
+      .catch(() =>
+        page
+          .locator('nav[aria-label="Tabs"] button', { hasText: /Tools|工具/ })
+          .first()
+          .click(),
+      );
 
     const deleteToggle = page.locator('[data-testid="op-toggle-delete"]');
     await expect(deleteToggle).toBeVisible({ timeout: 20_000 });
@@ -90,19 +97,29 @@ test.describe('Digital employee — allowed operations', () => {
     // The save used to POST a route that was mapped to nothing: 404, swallowed,
     // with a success toast on screen and the record untouched. Asserting the
     // status is what tells "saved" apart from "said saved".
-    expect(updateResponse.status(), 'the save must actually reach a real endpoint')
-        .toBeLessThan(400);
+    expect(updateResponse.status(), 'the save must actually reach a real endpoint').toBeLessThan(
+      400,
+    );
     // Assert on what the browser actually sent. The outcome alone cannot tell
     // "the interface never sent the change" apart from "the server dropped it",
     // and those need different fixes.
     const sentOps = (updateRequest.postDataJSON() as Record<string, unknown>)?.allowed_operations;
-    expect(sentOps, 'the cleared operation must be absent from the saved payload')
-        .not.toContain('delete');
+    expect(sentOps, 'the cleared operation must be absent from the saved payload').not.toContain(
+      'delete',
+    );
 
     // Saved state, not remembered state: reload and look again.
     await page.goto(detailUrl, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('tab', { name: /Tools|工具/ }).first().click()
-      .catch(() => page.locator('nav[aria-label="Tabs"] button', { hasText: /Tools|工具/ }).first().click());
+    await page
+      .getByRole('tab', { name: /Tools|工具/ })
+      .first()
+      .click()
+      .catch(() =>
+        page
+          .locator('nav[aria-label="Tabs"] button', { hasText: /Tools|工具/ })
+          .first()
+          .click(),
+      );
     await expect(
       page.locator('[data-testid="op-toggle-delete"] input[type="checkbox"]'),
       'the cleared checkbox must come back cleared, or the operator was told a lie',
@@ -115,10 +132,9 @@ test.describe('Digital employee — allowed operations', () => {
 
     // --- now ask it to delete ---------------------------------------------
     await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-      { timeout: 20_000 },
-    );
+    await expect(page.locator('[data-testid="agent-colleagues-grid"]')).toBeVisible({
+      timeout: 20_000,
+    });
     const card = page.locator('[data-testid^="agent-card-"]', { hasText: COLLEAGUE_NAME });
     await card.locator('[data-testid^="agent-chat-"]').first().click();
     const chat = page.locator('[data-testid="agent-chat-page"]');
