@@ -245,7 +245,9 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
     );
 
     fireEvent.click(screen.getByTestId('review-drawer-edit-open'));
-    expect(screen.getByTestId('review-drawer-content-grid').classList.contains('hidden')).toBe(true);
+    expect(screen.getByTestId('review-drawer-content-grid').classList.contains('hidden')).toBe(
+      true,
+    );
     const exact = screen.getByRole('radio', { name: '精确型号' }) as HTMLInputElement;
     expect(exact.checked).toBe(true);
     const search = screen
@@ -261,8 +263,14 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
       '确认并采用后才会更新报价',
     );
     expect(screen.getByText('NEW-MPN')).toBeInTheDocument();
-    expect(screen.getByTestId('review-drawer-price-comparison')).toBeInTheDocument();
+    expect(screen.queryByTestId('review-drawer-price-comparison')).toBeNull();
     expect(screen.getByTestId('review-drawer-ladder-current-priceLadderRows')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('review-drawer-candidate-priceLadderRows-ladder-summary'),
+    ).toHaveTextContent('100+');
+    expect(
+      screen.getByTestId('review-drawer-candidate-priceLadderRows-ladder-summary'),
+    ).toHaveTextContent('0.08 × 200% → 0.16');
     expect(screen.getByTestId('review-drawer-field-link-detailUrl')).toHaveAttribute(
       'href',
       'https://www.ickey.cn/detail/new',
@@ -282,7 +290,9 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
 
     fireEvent.click(screen.getByTestId('review-drawer-edit-cancel'));
     expect(screen.queryByTestId('review-drawer-edit-preview')).toBeNull();
-    expect(screen.getByTestId('review-drawer-content-grid').classList.contains('hidden')).toBe(false);
+    expect(screen.getByTestId('review-drawer-content-grid').classList.contains('hidden')).toBe(
+      false,
+    );
     expect(executeSimpleWorkbenchAction).toHaveBeenCalledTimes(1);
     expect(executeSimpleWorkbenchAction.mock.calls[0][1].args.command).toBe(
       'qo_quote_line_common:preview_reprice',
@@ -356,5 +366,53 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
     expect(screen.queryByTestId('review-drawer-edit-confirm')).toBeNull();
     fireEvent.click(screen.getByTestId('review-drawer-edit-back'));
     expect(screen.getByTestId('review-drawer-edit-field-searchText')).toBeInTheDocument();
+  });
+
+  it('keeps the raw-to-factored card for a flat supplier price with six-decimal precision', async () => {
+    executeSimpleWorkbenchAction.mockResolvedValueOnce({
+      previewId: 'RP-FLAT',
+      status: 'ready',
+      confirmable: true,
+      productModel: 'FLAT-MPN',
+      unitPrice: 0.013123,
+      factoredUnitPrice: 0.014435,
+      priceFactor: 110,
+    });
+    render(<ReviewDrawerBlockRenderer block={twoPhaseBlock()} runtime={makeRuntime(LINE)} />);
+
+    fireEvent.click(screen.getByTestId('review-drawer-edit-open'));
+    fireEvent.click(screen.getByTestId('review-drawer-edit-submit'));
+    await waitFor(() =>
+      expect(screen.getByTestId('review-drawer-price-comparison')).toBeInTheDocument(),
+    );
+
+    expect(screen.getByTestId('review-drawer-price-comparison')).toHaveTextContent('0.013123');
+    expect(screen.getByTestId('review-drawer-price-comparison')).toHaveTextContent('0.014435');
+    expect(screen.queryByTestId('review-drawer-candidate-priceLadderRows-ladder')).toBeNull();
+  });
+
+  it('does not reopen a blank drawer after the outer close button interrupts a preview', async () => {
+    executeSimpleWorkbenchAction.mockResolvedValueOnce({
+      previewId: 'RP-CLOSE',
+      status: 'ready',
+      confirmable: true,
+      productModel: 'NEW-MPN',
+    });
+    const value = twoPhaseBlock();
+    (value as any).closeClearsContext = false;
+    render(<ReviewDrawerBlockRenderer block={value} runtime={makeRuntime(LINE)} />);
+
+    fireEvent.click(screen.getByTestId('review-drawer-edit-open'));
+    fireEvent.click(screen.getByTestId('review-drawer-edit-submit'));
+    await waitFor(() =>
+      expect(screen.getByTestId('review-drawer-edit-preview')).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭复核浮层' }));
+    expect(screen.queryByTestId('review-drawer')).toBeNull();
+    fireEvent.click(screen.getByTestId('review-drawer-minimized'));
+
+    expect(screen.getByTestId('review-drawer-content-grid')).not.toHaveClass('hidden');
+    expect(screen.getByTestId('review-drawer-edit-open')).toBeInTheDocument();
   });
 });
