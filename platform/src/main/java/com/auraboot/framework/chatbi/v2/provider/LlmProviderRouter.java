@@ -2,7 +2,6 @@ package com.auraboot.framework.chatbi.v2.provider;
 
 import com.auraboot.framework.semantic.dto.SemanticMetaResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -13,26 +12,25 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 3-level LLM fallback router. PRD 17 §10.
+ * Ordered, provider-neutral LLM fallback router. PRD 17 §10.
  *
  * <p>Routing tiers, in order:
  *
  * <ol>
- *   <li><b>Primary</b> — {@link AnthropicLlmProvider} when wired</li>
- *   <li><b>Secondary</b> — {@link OpenAiLlmProvider} when wired</li>
+ *   <li><b>Configured providers</b> — Spring order, when wired</li>
  *   <li><b>Tertiary</b> — catalog-bound deterministic parsing in
  *       {@code TokenLexer}; the router returns {@link IntentResult#empty()} to
  *       signal the downgrade.</li>
  * </ol>
  *
  * <p>Each provider tier owns a tiny in-process circuit breaker keyed by
- * provider name: {@value #FAIL_THRESHOLD} consecutive failures within
+ * provider routing key: {@value #FAIL_THRESHOLD} consecutive failures within
  * {@value #WINDOW_SECONDS}s opens the breaker for {@value #OPEN_SECONDS}s,
  * during which the router skips that tier. A successful call resets the
  * counter immediately.
  *
- * <p>Why hand-rolled instead of resilience4j: the surface is tiny (2 providers,
- * 1 metric), depending on resilience4j just for a counter would add a
+ * <p>Why hand-rolled instead of resilience4j: the surface is tiny (one metric),
+ * depending on resilience4j just for a counter would add a
  * 1.5MB transitive set and obscure the actual policy.
  */
 @Slf4j
@@ -42,17 +40,11 @@ public class LlmProviderRouter {
     static final int FAIL_THRESHOLD = 5;
     static final long WINDOW_SECONDS = 30L;
     static final long OPEN_SECONDS = 30L;
-    static final String PRIMARY_KEY = "anthropic";
-    static final String SECONDARY_KEY = "openai";
-
-    private final ObjectProvider<AnthropicLlmProvider> primary;
-    private final ObjectProvider<OpenAiLlmProvider> secondary;
+    private final List<LlmProvider> providers;
     private final ConcurrentHashMap<String, Breaker> breakers = new ConcurrentHashMap<>();
 
-    public LlmProviderRouter(ObjectProvider<AnthropicLlmProvider> primary,
-                             ObjectProvider<OpenAiLlmProvider> secondary) {
-        this.primary = primary;
-        this.secondary = secondary;
+    public LlmProviderRouter(List<LlmProvider> providers) {
+        this.providers = providers == null ? List.of() : List.copyOf(providers);
     }
 
     /**
@@ -62,18 +54,20 @@ public class LlmProviderRouter {
     public RouteOutcome translate(String nlQuery,
                                   SemanticMetaResponse catalog,
                                   ConversationContext ctx) {
-        List<Attempt> attempts = new ArrayList<>(3);
-
-        IntentResult primaryResult = tryProvider(PRIMARY_KEY, primary.getIfAvailable(),
-                nlQuery, catalog, ctx, attempts);
-        if (isAcceptable(primaryResult)) {
-            return new RouteOutcome(primaryResult, PRIMARY_KEY, attempts);
-        }
-
-        IntentResult secondaryResult = tryProvider(SECONDARY_KEY, secondary.getIfAvailable(),
-                nlQuery, catalog, ctx, attempts);
-        if (isAcceptable(secondaryResult)) {
-            return new RouteOutcome(secondaryResult, SECONDARY_KEY, attempts);
+        List<Attempt> attempts = new ArrayList<>(providers.size() + 1);
+        for (LlmProvider provider : providers) {
+            if (provider == null) {
+                continue;
+            }
+            String key = provider.routingKey();
+            if (key == null || key.isBlank()) {
+                key = provider.getClass().getSimpleName();
+            }
+            IntentResult result = tryProvider(
+                    key, provider, nlQuery, catalog, ctx, attempts);
+            if (isAcceptable(result)) {
+                return new RouteOutcome(result, key, attempts);
+            }
         }
 
         // Tertiary: caller invokes the catalog-bound lexer on empty.

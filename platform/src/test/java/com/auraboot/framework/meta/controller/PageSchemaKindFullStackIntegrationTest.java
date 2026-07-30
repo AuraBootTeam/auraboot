@@ -71,7 +71,7 @@ class PageSchemaKindFullStackIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setup() {
         // Grant page.page.manage permission to the test role so PermissionInterceptor passes.
-        grantPermissionToTestRole(
+        grantCommittedPermissionToTestRole(
                 PERMISSION_CODE,
                 "page",
                 "page",

@@ -29,16 +29,15 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
 const COLLEAGUE_CODE = 'ops_xiaoao_crm_review';
 const COLLEAGUE_NAME = '客户运营助理·小奥';
 const REVIEW_SKILL = 'crm_quarterly_review';
-// The digital-employee golden runs --live against oss-golden-stack, which seeds the
-// qianwen LLM provider (Cloud Config) from the DASHSCOPE key the runner requires.
-// A named agent resolves its LLM via guardrails.provider + model, NOT the env key
-// the generic AuraBot uses.
-const LLM_PROVIDER = 'qianwen';
-const LLM_MODEL = 'qwen-plus';
 const SHOTS = 'test-results/digital-employee';
 
 /** Seed the ops colleague if it is not already present (idempotent). */
 async function ensureOpsColleague(request: APIRequestContext): Promise<void> {
+  const llmProvider = process.env.AURA_LIVE_LLM_PROVIDER;
+  const llmModel = process.env.AURA_LIVE_LLM_MODEL;
+  expect(llmProvider, 'AURA_LIVE_LLM_PROVIDER must select the live adapter').toBeTruthy();
+  expect(llmModel, 'AURA_LIVE_LLM_MODEL must select the live model').toBeTruthy();
+
   const list = await request.get(
     `/api/dynamic/agent-definition/list?pageNum=1&pageSize=20&keyword=${COLLEAGUE_CODE}`,
   );
@@ -54,13 +53,14 @@ async function ensureOpsColleague(request: APIRequestContext): Promise<void> {
       name: COLLEAGUE_NAME,
       description: '季度客户结构复盘助理(只读,不自动执行)',
       agent_type: 'reactive',
-      model: LLM_MODEL,
+      model: llmModel,
       system_prompt:
         '你是客户运营助理。用户请求季度复盘时,必须用 list:crm_account 拉取真实客户数据,' +
-        '按行业与评级分析结构,给出结构化复盘并提议拓客动作。只读,不自动执行写操作。用简体中文回复。',
+        '先在【事实样本】中逐条列出返回的真实客户名称,再按行业与评级分析结构；' +
+        '字段缺失时明确说明,不得猜测。给出结构化复盘并提议拓客动作。只读,不自动执行写操作。用简体中文回复。',
       // The bound skill contributes its governed read tool (list:crm_account) to the turn.
       skills: JSON.stringify([REVIEW_SKILL]),
-      guardrails: JSON.stringify({ provider: LLM_PROVIDER }),
+      guardrails: JSON.stringify({ provider: llmProvider }),
       status: 'active',
     },
   });
@@ -88,9 +88,7 @@ test.describe('Digital employee — bound skill drives a real customer review', 
     // Read the real customer population the skill will ground on, so the assertions
     // are not tied to a fixed seed size. Goes through the same BFF the app uses
     // (session cookie from storageState), so it sees exactly what the colleague sees.
-    const listResp = await page.request.get(
-      '/api/dynamic/crm_account/list?pageNum=1&pageSize=5',
-    );
+    const listResp = await page.request.get('/api/dynamic/crm_account/list?pageNum=1&pageSize=5');
     expect(listResp.ok(), 'customer list query must succeed').toBeTruthy();
     const listData = (await listResp.json())?.data ?? {};
     const customerTotal: number = listData.total ?? 0;
@@ -103,11 +101,10 @@ test.describe('Digital employee — bound skill drives a real customer review', 
     expect(sampleName, 'a seeded customer must have a name to ground on').toBeTruthy();
 
     // Reach the colleague the way a person does — click through, don't build the URL.
-    await page.goto('/ai/colleagues', { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-      { timeout: 20_000 },
-    );
+    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-testid="agent-colleagues-grid"]')).toBeVisible({
+      timeout: 20_000,
+    });
 
     const card = page.locator('[data-testid^="agent-card-"]', { hasText: COLLEAGUE_NAME });
     await expect(card, 'the ops colleague must be listed').toBeVisible({ timeout: 20_000 });
@@ -118,7 +115,7 @@ test.describe('Digital employee — bound skill drives a real customer review', 
 
     const input = chat.locator('[data-testid="aurabot-input"]');
     await expect(input).toBeVisible({ timeout: 20_000 });
-    await input.fill('请对我们的客户做一次季度客户结构复盘');
+    await input.fill('请对我们的客户做一次季度客户结构复盘，并先列出本次分析所依据的真实客户名称');
     await chat.locator('[data-testid="aurabot-send"]').click();
 
     // The user bubble appearing proves the send happened, and nothing more.
@@ -128,9 +125,10 @@ test.describe('Digital employee — bound skill drives a real customer review', 
 
     // The agent role marker on the bubble is the only thing that proves a reply.
     const reply = chat.locator('[data-testid="chat-msg-agent"]').last();
-    await expect(reply, 'the colleague must actually reply (role marker), not stay mute').toBeVisible(
-      { timeout: 200_000 },
-    );
+    await expect(
+      reply,
+      'the colleague must actually reply (role marker), not stay mute',
+    ).toBeVisible({ timeout: 200_000 });
 
     // The load-bearing grounding check: the review must name a REAL customer from the
     // CRM read. A generic or hallucinated answer cannot produce the seeded record's

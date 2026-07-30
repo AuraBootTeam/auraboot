@@ -152,6 +152,12 @@ public class AgentReplyTask {
             log.warn("Agent {} not found, skipping reply for conversation {}", agentId, conversationId);
             return;
         }
+        if (initiatorUserId == null || initiatorUserId <= 0L) {
+            log.warn("Group-chat agent reply has no authenticated initiator; refusing system-user-0 fallback "
+                            + "(conversation={}, agent={})",
+                    conversationId, agentId);
+            return;
+        }
 
         List<Long> humanMemberIds = new ArrayList<>(messagePort.getHumanMemberIds(conversationId, tenantId));
 
@@ -191,10 +197,9 @@ public class AgentReplyTask {
         AgentTurnOverrides overrides = AgentTurnOverrides.builder()
                 .systemPromptOverride(systemPrompt)
                 .messagesOverride(history)
-                // Group-chat agents historically don't have ToolProviderRegistry tools;
-                // explicit empty list signals "skip registry discovery, use only
-                // extraTools". TODO(DC.3c+): wire agent.getTools() field properly.
-                .toolDefsOverride(List.of())
+                // A null replacement means the shared registry performs the
+                // same governed Tool/Skill discovery as 1:1 chat. Handoff
+                // stays additive through extraTools.
                 .extraTools(extraTools)
                 .effectivePermissions(effectivePermissions)
                 .persistSessionTape(false)            // group-chat history is in ab_im_message; no tape
@@ -202,7 +207,7 @@ public class AgentReplyTask {
 
         TurnRequest req = new TurnRequest(
                 tenantId,
-                /*userId=*/ 0L,                       // group-chat agent reply isn't user-driven; 0 is the system caller marker
+                initiatorUserId,
                 /*humanMemberId=*/ null,
                 "im_group",
                 agent.getAgentCode(),
@@ -216,7 +221,11 @@ public class AgentReplyTask {
                 /*inboundMessageId=*/ null,
                 parentTaskPid,                        // null on root, upstream taskPid on handoff hops
                 overrides,                            // server-only context bag (DC.3a)
-                /*legacyRequest=*/ buildLegacyChatRequest(agent.getAgentCode(), triggerContent, conversationId));
+                /*legacyRequest=*/ buildLegacyChatRequest(
+                        agent.getAgentCode(),
+                        triggerContent,
+                        conversationId,
+                        agent.getKnowledgeBaseIds()));
 
         String turnId = java.util.UUID.randomUUID().toString();
         String agentName = agent.getName() != null ? agent.getName() : agent.getAgentCode();
@@ -318,12 +327,17 @@ public class AgentReplyTask {
                 .build());
     }
 
-    private static ChatRequest buildLegacyChatRequest(String agentCode, String message, Long conversationId) {
+    private static ChatRequest buildLegacyChatRequest(
+            String agentCode,
+            String message,
+            Long conversationId,
+            List<String> knowledgeBaseIds) {
         ChatRequest req = new ChatRequest();
         req.setAgentCode(agentCode);
         req.setMessage(message);
         req.setConversationId(conversationId);
         req.setSessionId("im-group-" + conversationId);
+        req.setKnowledgeBaseIds(knowledgeBaseIds);
         return req;
     }
 

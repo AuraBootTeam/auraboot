@@ -183,7 +183,7 @@ public class AuraBotConversationService {
     }
 
     private AuraBotConversationMessage toMessage(ImMessage message) {
-        Map<String, String> metadata = readMetadata(message.getCardPayload());
+        com.fasterxml.jackson.databind.JsonNode metadata = readMessageMetadata(message.getCardPayload());
         String sender;
         if (ImConstants.SENDER_TYPE_HUMAN.equals(message.getSenderType())) {
             sender = "user";
@@ -199,13 +199,36 @@ public class AuraBotConversationService {
                 .sender(sender)
                 .type(message.getMessageType())
                 .content(message.getContent())
-                .traceId(metadata.get("traceId"))
+                .traceId(metadata.path("traceId").asText(null))
                 // D.1: surface persisted thinking so the frontend can render
                 // the reasoning pane after a page reload.
                 .thinkingContent(message.getThinkingContent())
                 .thinkingSignature(message.getThinkingSignature())
+                .retrievalEvidence(readRetrievalEvidence(metadata))
                 .createdAt(message.getCreatedAt())
                 .build();
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode readMessageMetadata(String rawMetadata) {
+        if (rawMetadata == null || rawMetadata.isBlank()) {
+            return objectMapper.createObjectNode();
+        }
+        try {
+            return objectMapper.readTree(rawMetadata);
+        } catch (Exception e) {
+            return objectMapper.createObjectNode();
+        }
+    }
+
+    private java.util.List<RagContextProvider.RetrievalEvidence> readRetrievalEvidence(
+            com.fasterxml.jackson.databind.JsonNode metadata) {
+        if (metadata == null || !metadata.path("retrievalEvidence").isArray()) {
+            return java.util.List.of();
+        }
+        return objectMapper.convertValue(
+                metadata.path("retrievalEvidence"),
+                new com.fasterxml.jackson.core.type.TypeReference<
+                        java.util.List<RagContextProvider.RetrievalEvidence>>() {});
     }
 
     private boolean isAuraBotConversation(ImConversation conversation) {

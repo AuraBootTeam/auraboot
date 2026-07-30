@@ -1,12 +1,19 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.config.AgentProperties;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalResolver;
+import com.auraboot.framework.agent.identity.DelegationGrant;
+import com.auraboot.framework.agent.identity.ExecutionPrincipal;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
+import com.auraboot.framework.agent.identity.Initiator;
 import com.auraboot.framework.agent.dto.AgentPlanStep;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.BusinessIntentFrame;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.runtime.AgentRuntimeStateFactory;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelope;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeFactory;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.TraceContext;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -28,9 +35,11 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -85,8 +94,10 @@ class AgentRunServiceSyncTest {
     @Mock private AgentSkillService skillService;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private LlmProvider provider;
+    @Mock private ExecutionPrincipalResolver executionPrincipalResolver;
 
     private AgentRunService service;
+    private ObjectMapper objectMapper;
 
     private static final Long TENANT_ID = 7L;
     private static final String TASK_PID = "task-001";
@@ -94,7 +105,7 @@ class AgentRunServiceSyncTest {
 
     @BeforeEach
     void setUp() {
-        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper = new ObjectMapper().findAndRegisterModules();
         service = new AgentRunService(
                 agentProperties,
                 toolProviderRegistry,
@@ -116,7 +127,9 @@ class AgentRunServiceSyncTest {
                 groundingService,
                 skillService,
                 eventPublisher,
-                new AgentRuntimeStateFactory()
+                new AgentRuntimeStateFactory(),
+                executionPrincipalResolver,
+                new ContextEnvelopeFactory()
         );
         // executeTaskSync explicitly does NOT manage MetaContext — caller's
         // job. Bind a system tenant for tests so the deeper code paths that
@@ -126,12 +139,123 @@ class AgentRunServiceSyncTest {
 
     @AfterEach
     void tearDown() {
+        ExecutionPrincipalContext.clear();
         MetaContext.clear();
     }
 
     // =========================================================================
     // Tests
     // =========================================================================
+
+    @Test
+    @DisplayName("scheduled async entry resolves an employee principal instead of user 0")
+    void scheduledEntryResolvesEmployeePrincipal() {
+        ExecutionPrincipal principal = new ExecutionPrincipal(
+                TENANT_ID,
+                301L,
+                401L,
+                "USR_AGENT",
+                "agent-scheduled",
+                501L,
+                "EMP_SCHEDULED",
+                new Initiator(
+                        Initiator.Type.SCHEDULE,
+                        null,
+                        null,
+                        "schedule:SCH_1"),
+                DelegationGrant.employeeAutonomous(),
+                AGENT_CODE,
+                "AGENT_RELEASE_1",
+                "DEPLOYMENT_1",
+                "release-hash-1",
+                "schedule:SCH_1",
+                ExecutionPrincipal.Type.DIGITAL_EMPLOYEE,
+                Set.of(11L));
+        when(executionPrincipalResolver.resolve(any())).thenReturn(principal);
+        when(agentProperties.isEnabled()).thenReturn(false);
+
+        service.executeScheduledTask(
+                TENANT_ID, TASK_PID, AGENT_CODE, "SCH_1");
+
+        ArgumentCaptor<ExecutionPrincipalResolver.ResolveRequest> request =
+                ArgumentCaptor.forClass(ExecutionPrincipalResolver.ResolveRequest.class);
+        verify(executionPrincipalResolver).resolve(request.capture());
+        assertThat(request.getValue().initiatorOverride().type())
+                .isEqualTo(Initiator.Type.SCHEDULE);
+        assertThat(request.getValue().initiatorUserId()).isNull();
+        assertThat(ExecutionPrincipalContext.current()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("approval resume restores the exact persisted principal and envelope")
+    void resumeRestoresPersistedExecutionContext() throws Exception {
+        ExecutionPrincipal principal = new ExecutionPrincipal(
+                TENANT_ID,
+                301L,
+                401L,
+                "USR_AGENT",
+                "agent-resume",
+                501L,
+                "EMP_RESUME",
+                Initiator.human(101L, 201L, "approval"),
+                DelegationGrant.employeeAutonomous(),
+                AGENT_CODE,
+                "AGENT_RELEASE_V1",
+                "DEPLOYMENT_1",
+                "release-hash-v1",
+                "approval",
+                ExecutionPrincipal.Type.DIGITAL_EMPLOYEE,
+                Set.of(11L));
+        ContextEnvelope envelope = new ContextEnvelopeFactory().compile(
+                new ContextEnvelopeFactory.CompileRequest(
+                        "RUN_V1",
+                        principal,
+                        "approval",
+                        null,
+                        null,
+                        null,
+                        "ACP_RUN",
+                        Set.of(),
+                        List.of("KB_1"),
+                        Map.of("durable", true),
+                        "zh-CN",
+                        "Asia/Shanghai",
+                        Instant.parse("2026-07-29T10:00:00Z")));
+        when(dynamicDataMapper.selectByQuery(
+                argThat(sql -> sql != null && sql.contains("context_envelope")),
+                anyMap()))
+                .thenReturn(List.of(Map.of(
+                        "context_envelope", objectMapper.writeValueAsString(envelope),
+                        "context_envelope_hash", envelope.envelopeHash())));
+        when(agentProperties.isEnabled()).thenReturn(false);
+
+        service.executeTaskWithResume(
+                TENANT_ID,
+                TASK_PID,
+                AGENT_CODE,
+                "RUN_V1");
+
+        verifyNoInteractions(executionPrincipalResolver);
+        assertThat(ExecutionPrincipalContext.current()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("async principal resolution failure is persisted as blocked task evidence")
+    void asyncPrincipalResolutionFailureIsPersisted() {
+        when(executionPrincipalResolver.resolve(any()))
+                .thenThrow(new IllegalStateException("employee identity is broken"));
+
+        service.executeScheduledTask(
+                TENANT_ID, TASK_PID, AGENT_CODE, "SCH_BROKEN");
+
+        verify(runLifecycleService).failTask(
+                eq(TENANT_ID),
+                eq(TASK_PID),
+                argThat(message -> message.contains("Execution principal/context setup failed")
+                        && message.contains("employee identity is broken")));
+        verify(agentProperties, never()).isEnabled();
+        assertThat(ExecutionPrincipalContext.current()).isEmpty();
+    }
 
     @Test
     @DisplayName("agent runtime disabled -> RunOutcome.Skipped (no run row created)")
@@ -159,8 +283,8 @@ class AgentRunServiceSyncTest {
         when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")),
                 anyMap()))
                 .thenReturn(List.of(agentDef));
-        when(providerFactory.resolveProviderByModel("claude-test")).thenReturn("anthropic");
-        when(providerFactory.getDefaultModel(anyString())).thenReturn("claude-test");
+        when(providerFactory.resolveProviderByModel("model-under-test")).thenReturn("provider-under-test");
+        when(providerFactory.getDefaultModel(anyString())).thenReturn("model-under-test");
         when(runLifecycleService.countActiveRuns(eq(TENANT_ID), eq(AGENT_CODE), anyString()))
                 .thenReturn(99); // way over cap
 
@@ -189,8 +313,8 @@ class AgentRunServiceSyncTest {
         when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")),
                 anyMap()))
                 .thenReturn(List.of(baseAgentDef()));
-        when(providerFactory.resolveProviderByModel("claude-test")).thenReturn("anthropic");
-        when(providerFactory.getDefaultModel(anyString())).thenReturn("claude-test");
+        when(providerFactory.resolveProviderByModel("model-under-test")).thenReturn("provider-under-test");
+        when(providerFactory.getDefaultModel(anyString())).thenReturn("model-under-test");
         when(runLifecycleService.countActiveRuns(any(), any(), any())).thenReturn(0);
         // Every provider in the chain returns null — none configured
         when(providerFactory.resolveConfig(any(), anyString())).thenReturn(null);
@@ -216,9 +340,9 @@ class AgentRunServiceSyncTest {
 
         assertThat(outcome).isInstanceOf(RunOutcome.Failed.class);
         assertThat(((RunOutcome.Failed) outcome).errorMessage())
-                .contains("LLM provider not available: anthropic");
+                .contains("LLM provider not available: provider-under-test");
         verify(runLifecycleService, times(1)).failRun(eq(TENANT_ID), anyString(), eq(TASK_PID),
-                any(), argThat(msg -> msg != null && msg.contains("LLM provider not available: anthropic")));
+                any(), argThat(msg -> msg != null && msg.contains("LLM provider not available: provider-under-test")));
         verifyNoInteractions(stepLoopService);
     }
 
@@ -278,39 +402,39 @@ class AgentRunServiceSyncTest {
         when(aiTraceService.createTrace(any(), anyString(), anyString(), any(), anyMap()))
                 .thenReturn(TraceContext.builder().build());
         Map<String, Object> agentDef = baseAgentDef();
-        agentDef.put("model", "gpt-4o");
-        agentDef.put("guardrails", "{\"provider\":\"openai\"}");
+        agentDef.put("model", "preferred-model");
+        agentDef.put("guardrails", "{\"provider\":\"preferred-provider\"}");
         when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_definition")),
                 anyMap()))
                 .thenReturn(List.of(agentDef));
-        when(providerFactory.getDefaultModel(anyString())).thenReturn("gpt-4o");
+        when(providerFactory.getDefaultModel(anyString())).thenReturn("preferred-model");
         when(runLifecycleService.countActiveRuns(any(), any(), any())).thenReturn(0);
 
-        LlmProviderFactory.ProviderConfig anthropicConfig = LlmProviderFactory.ProviderConfig.builder()
-                .providerCode("anthropic")
-                .apiKey("sk-anthropic")
-                .baseUrl("https://api.anthropic.example")
-                .defaultModel("claude-test")
+        LlmProviderFactory.ProviderConfig unrelatedConfig = LlmProviderFactory.ProviderConfig.builder()
+                .providerCode("unrelated-provider")
+                .apiKey("sk-unrelated")
+                .baseUrl("https://llm.example.test")
+                .defaultModel("unrelated-model")
                 .maxTokens(4000)
                 .build();
-        when(providerFactory.resolveConfig(eq(TENANT_ID), eq("openai"))).thenReturn(null);
-        when(providerFactory.resolveConfig(eq(TENANT_ID), eq("anthropic"))).thenReturn(anthropicConfig);
+        when(providerFactory.resolveConfig(eq(TENANT_ID), eq("preferred-provider"))).thenReturn(null);
+        when(providerFactory.resolveConfig(eq(TENANT_ID), eq("unrelated-provider"))).thenReturn(unrelatedConfig);
         when(providerFactory.listConfiguredProviders(eq(TENANT_ID))).thenReturn(List.of(
                 LlmProviderFactory.ProviderInfo.builder()
-                        .providerCode("anthropic")
-                        .displayName("Anthropic")
-                        .apiFormat("messages")
+                        .providerCode("unrelated-provider")
+                        .displayName("Unrelated provider")
+                        .apiFormat("chat")
                         .configured(true)
                         .build()));
-        when(providerFactory.getProvider("anthropic")).thenReturn(provider);
+        when(providerFactory.getProvider("unrelated-provider")).thenReturn(provider);
 
         RunOutcome outcome = service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
 
         assertThat(outcome).isInstanceOf(RunOutcome.Failed.class);
         assertThat(((RunOutcome.Failed) outcome).errorMessage())
                 .contains("No LLM provider configured")
-                .contains("openai");
-        verify(providerFactory, never()).getProvider("anthropic");
+                .contains("preferred-provider");
+        verify(providerFactory, never()).getProvider("unrelated-provider");
         verifyNoInteractions(stepLoopService);
     }
 
@@ -373,18 +497,18 @@ class AgentRunServiceSyncTest {
                 .containsEntry("schemaVersion", "agent-runtime-state/v1")
                 .containsEntry("executionKind", "acp_run")
                 .containsEntry("agentCode", AGENT_CODE)
-                .containsEntry("providerCode", "anthropic")
-                .containsEntry("model", "claude-test");
+                .containsEntry("providerCode", "provider-under-test")
+                .containsEntry("model", "model-under-test");
         assertThat((String) runtimeState.get("stateHash")).hasSize(64);
         assertThat(runtimeState.get("context")).isInstanceOf(Map.class);
 
         Map<String, Object> fallbackAudit = (Map<String, Object>) parsed.get("fallbackAudit");
         Map<String, Object> providerAudit = (Map<String, Object>) fallbackAudit.get("provider");
         assertThat(providerAudit)
-                .containsEntry("preferred", "anthropic")
-                .containsEntry("resolved", "anthropic")
+                .containsEntry("preferred", "provider-under-test")
+                .containsEntry("resolved", "provider-under-test")
                 .containsEntry("fallbackUsed", false);
-        assertThat((List<Object>) providerAudit.get("chain")).contains("anthropic");
+        assertThat((List<Object>) providerAudit.get("chain")).contains("provider-under-test");
         Map<String, Object> toolDiscovery = (Map<String, Object>) fallbackAudit.get("toolDiscovery");
         assertThat(toolDiscovery).containsEntry("mode", "registry_all");
 
@@ -464,7 +588,7 @@ class AgentRunServiceSyncTest {
 
         assertThat(outcome).isInstanceOf(RunOutcome.Success.class);
         verify(providerFactory, times(1)).getProvider("stub");
-        verify(providerFactory, never()).getProvider("anthropic");
+        verify(providerFactory, never()).getProvider("provider-under-test");
     }
 
     @Test
@@ -617,15 +741,15 @@ class AgentRunServiceSyncTest {
         when(dynamicDataMapper.selectByQuery(argThat(sql -> sql != null && sql.contains("ab_agent_memory")),
                 anyMap()))
                 .thenReturn(List.of());
-        when(providerFactory.resolveProviderByModel("claude-test")).thenReturn("anthropic");
-        when(providerFactory.getDefaultModel(anyString())).thenReturn("claude-test");
+        when(providerFactory.resolveProviderByModel("model-under-test")).thenReturn("provider-under-test");
+        when(providerFactory.getDefaultModel(anyString())).thenReturn("model-under-test");
         when(runLifecycleService.countActiveRuns(any(), any(), any())).thenReturn(0);
         // First provider in chain has a usable api key
         LlmProviderFactory.ProviderConfig cfg = LlmProviderFactory.ProviderConfig.builder()
-                .providerCode("anthropic")
+                .providerCode("provider-under-test")
                 .apiKey("sk-test")
                 .baseUrl("https://api.example.com")
-                .defaultModel("claude-test")
+                .defaultModel("model-under-test")
                 .maxTokens(4000)
                 .build();
         when(providerFactory.resolveConfig(any(), anyString())).thenReturn(cfg);
@@ -652,7 +776,7 @@ class AgentRunServiceSyncTest {
         def.put("agent_code", AGENT_CODE);
         def.put("name", "Test Agent");
         def.put("system_prompt", "You are a test agent.");
-        def.put("model", "claude-test");
+        def.put("model", "model-under-test");
         def.put("status", "active");
         return def;
     }

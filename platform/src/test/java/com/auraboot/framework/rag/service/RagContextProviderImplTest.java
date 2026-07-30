@@ -194,7 +194,7 @@ class RagContextProviderImplTest {
         String context = provider.retrieveContext(1L, "query", List.of("kb1"));
 
         assertThat(context).contains("## Retrieved Knowledge");
-        assertThat(context).contains("[Source: raw-doc, Chunk 0]");
+        assertThat(context).contains("[Evidence chunk:chunk-raw] raw-doc / Chunk 0");
         assertThat(context).contains("raw only");
         verify(ragRetrievalService).retrieve(1L, "query", List.of("kb1"), 5, null);
         // G6: the raw-only path now records a trace too (no-op unless tracing enabled)
@@ -244,11 +244,12 @@ class RagContextProviderImplTest {
         String context = provider.retrieveContext(1L, "query", List.of("kb1"));
 
         assertThat(context).contains("## Retrieved Knowledge");
-        assertThat(context).contains("[Compiled: D7 retrieval decision]");
-        assertThat(context).contains("[Source: raw-doc, Chunk 1]");
+        assertThat(context)
+                .contains("[Evidence compiled:compiled.decision.d7] D7 retrieval decision");
+        assertThat(context).contains("[Evidence chunk:chunk-1] raw-doc / Chunk 1");
         // RRF with compiled weight 1.5: top compiled page precedes top raw chunk
-        assertThat(context.indexOf("[Compiled: D7 retrieval decision]"))
-                .isLessThan(context.indexOf("[Source: raw-doc, Chunk 1]"));
+        assertThat(context.indexOf("[Evidence compiled:compiled.decision.d7]"))
+                .isLessThan(context.indexOf("[Evidence chunk:chunk-1]"));
         verify(d7Service).retrieve(1L, "query", 2);
         verify(ragRetrievalService).retrieve(1L, "query", List.of("kb1"), 4, null);
         verify(traceWriter).recordRetrieval(1L, "query", List.of(match), rawResults);

@@ -25,6 +25,8 @@ const AGENT_NAME = `Knowledge Colleague ${UNIQUE}`;
 const KB_NAME = `Binding Manual ${UNIQUE}`;
 const UNIQUE_FACT = `CALIBRATION-${UNIQUE.toUpperCase()}-137-DAYS`;
 const SCREENSHOT_DIR = 'test-results/agent-knowledge-binding';
+const RUNTIME_PROVIDER = process.env.AURA_LIVE_LLM_PROVIDER?.trim();
+const RUNTIME_MODEL = process.env.AURA_LIVE_LLM_MODEL?.trim() || 'provider-default';
 
 let agentPid = '';
 let knowledgeBasePid = '';
@@ -93,9 +95,9 @@ async function seedNamedAgent(request: APIRequestContext): Promise<string> {
       name: AGENT_NAME,
       description: 'Named colleague used to prove explicit knowledge binding',
       agent_type: 'reactive',
-      model: 'MiniMax-M2.5',
+      model: RUNTIME_MODEL,
       system_prompt: 'Answer from the assigned handbook evidence when it is available.',
-      guardrails: JSON.stringify({ provider: 'minimaxi' }),
+      guardrails: JSON.stringify(RUNTIME_PROVIDER ? { provider: RUNTIME_PROVIDER } : {}),
       status: 'active',
     },
   });
@@ -173,6 +175,25 @@ test.describe('AI colleague detail — explicit knowledge binding', () => {
       path: `${SCREENSHOT_DIR}/knowledge-binding-reloaded.png`,
     });
 
+    // Saving changes only the mutable draft. Runtime turns are deliberately
+    // pinned to an immutable deployed release, so publish the knowledge
+    // binding before expecting a new conversation to see it.
+    await page.locator('[data-testid="tab-releases"]').click();
+    await expect(page.locator('[data-testid="agent-release-draft-state"]')).toContainText(
+      /Unpublished changes|存在未发布变更|草稿变更尚未发布/,
+    );
+    await page.locator('[data-testid="publish-agent-release"]').click();
+    const publishResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/api/agent/definitions/${agentPid}/publish`) &&
+        response.request().method() === 'POST',
+    );
+    await page.locator('[data-testid="confirm-publish-agent-release"]').click();
+    expect((await publishResponse).status()).toBe(200);
+    await expect(page.locator('[data-testid="agent-release-2"]')).toContainText(
+      /Deployed|已部署|当前部署/,
+    );
+
     await page.locator('[data-testid="back-to-colleagues"]').click();
     await expect(page.locator('[data-testid="agent-colleagues-grid"]')).toBeVisible({
       timeout: 20_000,
@@ -231,9 +252,7 @@ test.describe('AI colleague detail — explicit knowledge binding', () => {
           const traceDetail = await page.request.get(`/api/ai/traces/${resolvedTraceId}`);
           if (!traceDetail.ok()) return false;
           const spans = (await traceDetail.json())?.spans ?? [];
-          const promptSpan = spans.find(
-            (span: { name?: string }) => span.name === 'render_prompt',
-          );
+          const promptSpan = spans.find((span: { name?: string }) => span.name === 'render_prompt');
           promptOutput = asObject(promptSpan?.output);
           return promptOutput.hasRetrievedKnowledge;
         },

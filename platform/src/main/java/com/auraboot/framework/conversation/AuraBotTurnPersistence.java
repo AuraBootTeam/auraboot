@@ -64,6 +64,7 @@ public class AuraBotTurnPersistence implements TurnSideEffects.Persistence {
     private final AuraBotAgentResolver agentResolver;
     private final ImMessageMapper imMessageMapper;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final com.auraboot.framework.rag.service.RetrievalEvidenceLedger retrievalEvidenceLedger;
 
     @Override
     public Long persistInbound(TurnRequest request,
@@ -171,16 +172,32 @@ public class AuraBotTurnPersistence implements TurnSideEffects.Persistence {
                 ? ctx.agentCode()
                 : AuraBotAgentResolver.DEFAULT_AGENT_CODE;
         long agentId = agentResolver.resolve(ctx.tenantId(), resolveCode);
+        String persistedPayload = cardPayload;
+        if (artifacts != null && !artifacts.retrievalEvidence().isEmpty()) {
+            try {
+                java.util.Map<String, Object> metadata = new java.util.LinkedHashMap<>();
+                if (ctx.traceId() != null) {
+                    metadata.put("traceId", ctx.traceId());
+                }
+                metadata.put("retrievalEvidence", artifacts.retrievalEvidence());
+                persistedPayload = objectMapper.writeValueAsString(metadata);
+            } catch (Exception e) {
+                throw new IllegalStateException("Could not serialize retrieval evidence", e);
+            }
+        }
         ImMessage saved = imMessageService.sendAgentMessage(
                 ctx.conversationId(),
                 ctx.tenantId(),
                 agentId,
                 messageType,
                 content,
-                cardPayload,
+                persistedPayload,
                 outboundClientMsgId(ctx),
                 artifacts != null ? artifacts.thinkingContent() : null,
                 artifacts != null ? artifacts.thinkingSignature() : null);
+        if (artifacts != null && !artifacts.retrievalEvidence().isEmpty()) {
+            retrievalEvidenceLedger.record(ctx, artifacts.retrievalEvidence());
+        }
         return saved != null ? saved.getId() : null;
     }
 

@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.provider;
 
 import com.auraboot.framework.agent.dto.LlmChatRequest;
+import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +33,14 @@ class OpenAiCompatibleLlmProviderTest {
         Method m = OpenAiCompatibleLlmProvider.class.getDeclaredMethod("convertMessageToOpenAi", LlmChatRequest.Message.class);
         m.setAccessible(true);
         return (Map<String, Object>) m.invoke(provider, message);
+    }
+
+    private LlmChatResponse convertResponse(OpenAiCompatibleLlmProvider provider, Map<String, Object> response)
+            throws Exception {
+        Method method = OpenAiCompatibleLlmProvider.class.getDeclaredMethod(
+                "convertResponse", Map.class, Map.class);
+        method.setAccessible(true);
+        return (LlmChatResponse) method.invoke(provider, response, Map.of());
     }
 
     private OpenAiCompatibleLlmProvider createProvider() {
@@ -77,6 +86,33 @@ class OpenAiCompatibleLlmProviderTest {
         assertThat(isToolUnsupported(provider, "qwen-plus")).isFalse();
         assertThat(isToolUnsupported(provider, "glm-4")).isFalse();
         assertThat(isToolUnsupported(provider, "moonshot-v1-8k")).isFalse();
+    }
+
+    @Test
+    void responseToolBlocksOverrideInconsistentFinishReason() throws Exception {
+        OpenAiCompatibleLlmProvider provider = createProvider();
+        Map<String, Object> response = Map.of(
+                "choices", List.of(Map.of(
+                        "finish_reason", "stop",
+                        "message", Map.of(
+                                "content", "",
+                                "tool_calls", List.of(Map.of(
+                                        "id", "call-1",
+                                        "function", Map.of(
+                                                "name", "crm_customer_find",
+                                                "arguments", "{\"name\":\"Acme\"}")))))),
+                "usage", Map.of("prompt_tokens", 10, "completion_tokens", 3));
+
+        LlmChatResponse converted = convertResponse(provider, response);
+
+        assertThat(converted.getStopReason()).isEqualTo("tool_use");
+        assertThat(converted.getContent()).singleElement()
+                .satisfies(block -> {
+                    assertThat(block.getType()).isEqualTo("tool_use");
+                    assertThat(block.getId()).isEqualTo("call-1");
+                    assertThat(block.getName()).isEqualTo("crm_customer_find");
+                    assertThat(block.getInput()).containsEntry("name", "Acme");
+                });
     }
 
     @Test

@@ -244,12 +244,17 @@ public class SubAgentRunner {
         // logically belongs to U's parent.
         Long createdBy = parent.get("created_by") == null
                 ? null : ((Number) parent.get("created_by")).longValue();
-        // Fallback to the MetaContext user only when the parent has no owner
-        // (legacy seed rows or system-initiated parent). This is not the
-        // common path; we accept null too (NOT NULL is not enforced on
-        // ab_agent_run.created_by).
+        // Legacy rows may have no owner. Prefer the explicit principal's
+        // initiator attribution and only then the actor; MetaContext is an
+        // HTTP-entry compatibility fallback, never runtime authority.
         if (createdBy == null) {
-            createdBy = MetaContext.getCurrentUserId();
+            createdBy = com.auraboot.framework.agent.identity.ExecutionPrincipalContext.current()
+                    .map(principal -> principal.initiator().userId() != null
+                            ? principal.initiator().userId()
+                            : principal.actorUserId())
+                    .orElseGet(() -> MetaContext.exists()
+                            ? MetaContext.getCurrentUserId()
+                            : null);
         }
         String taskTitle = truncate(subtaskMessage, 480);
 

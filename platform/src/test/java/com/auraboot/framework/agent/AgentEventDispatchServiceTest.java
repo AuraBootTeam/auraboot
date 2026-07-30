@@ -341,4 +341,24 @@ class AgentEventDispatchServiceTest extends BaseIntegrationTest {
             jdbcTemplate.update("DELETE FROM ab_agent_definition WHERE pid = ?", agentPid);
         }
     }
+
+    @Test
+    @Order(13)
+    void matchesTrigger_failsClosedWhenConditionPayloadIsMissing() {
+        String triggersJson = """
+                {"triggers":[{"eventType":"record_created","condition":"risk=high"}]}
+                """;
+
+        assertThat(dispatchService.matchesTrigger(
+                triggersJson, "record_created", null, null)).isFalse();
+    }
+
+    @Test
+    @Order(14)
+    void evaluateSimpleCondition_failsClosedWhenConditionIsMalformed() {
+        assertThat(dispatchService.evaluateSimpleCondition(
+                "malformed-condition", Map.of("risk", "high"))).isFalse();
+        assertThat(dispatchService.evaluateSimpleCondition(
+                "risk=", Map.of("risk", "high"))).isFalse();
+    }
 }

@@ -29,11 +29,7 @@ test.describe('Agent Control Plane @smoke', () => {
   const missionUpdatedTitle = `MissionUpd_${uid}`;
   const agentName = `Agent_${uid}`;
   const agentCode = `agent_${uid.toLowerCase()}`;
-  const taskTitles = [
-    `ScanTrends_${uid}`,
-    `WriteReport_${uid}`,
-    `AnalyzeComp_${uid}`,
-  ];
+  const taskTitles = [`ScanTrends_${uid}`, `WriteReport_${uid}`, `AnalyzeComp_${uid}`];
   const scheduleName = `DailyScan_${uid}`;
   const artifactTitle = `Report_${uid}`;
   const policyName = `CostGate_${uid}`;
@@ -51,14 +47,23 @@ test.describe('Agent Control Plane @smoke', () => {
   // Seed Data — comprehensive across all entity types
   // =========================================================================
   test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+    const ctx = await browser.newContext({
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    });
     const page = await ctx.newPage();
     try {
       // Probe whether ACP plugin is installed by trying to create a mission
       const probeResult = await executeCommandViaApi(
-        page, 'acp:create_mission',
-        { title: `probe_${uid}`, description: 'Plugin probe', mission_status: 'active', priority: 1 },
-        undefined, 'create',
+        page,
+        'acp:create_mission',
+        {
+          title: `probe_${uid}`,
+          description: 'Plugin probe',
+          mission_status: 'active',
+          priority: 1,
+        },
+        undefined,
+        'create',
         { allowHttpError: true },
       );
       if (!probeResult.recordId) {
@@ -67,18 +72,34 @@ test.describe('Agent Control Plane @smoke', () => {
       }
       // Probe succeeded — now create the actual mission with correct title
       const mResult = await executeCommandViaApi(
-        page, 'acp:create_mission',
-        { title: missionTitle, description: 'E2E test mission', mission_status: 'active', priority: 1 },
-        undefined, 'create',
+        page,
+        'acp:create_mission',
+        {
+          title: missionTitle,
+          description: 'E2E test mission',
+          mission_status: 'active',
+          priority: 1,
+        },
+        undefined,
+        'create',
       );
       missionPid = mResult.recordId;
       expect(missionPid, 'Mission should be created').toBeTruthy();
 
       // Create agent definition
       const aResult = await executeCommandViaApi(
-        page, 'acp:create_agent_definition',
-        { agent_code: agentCode, name: agentName, description: 'E2E test agent', agent_type: 'autonomous', model: 'claude-sonnet-4-6', status: 'active' },
-        undefined, 'create',
+        page,
+        'acp:create_agent_definition',
+        {
+          agent_code: agentCode,
+          name: agentName,
+          description: 'E2E test agent',
+          agent_type: 'autonomous',
+          model: 'claude-sonnet-4-6',
+          status: 'active',
+        },
+        undefined,
+        'create',
       );
       agentPid = aResult.recordId;
       expect(agentPid, 'Agent should be created').toBeTruthy();
@@ -88,7 +109,8 @@ test.describe('Agent Control Plane @smoke', () => {
       const priorities = ['high', 'critical', 'medium'];
       for (let i = 0; i < 3; i++) {
         const tResult = await executeCommandViaApi(
-          page, 'acp:create_agent_task',
+          page,
+          'acp:create_agent_task',
           {
             title: taskTitles[i],
             description: `E2E test task ${i + 1}`,
@@ -98,7 +120,8 @@ test.describe('Agent Control Plane @smoke', () => {
             assignee_id: agentCode,
             mission_id: missionPid,
           },
-          undefined, 'create',
+          undefined,
+          'create',
         );
         taskPids.push(tResult.recordId);
         expect(tResult.recordId, `Task ${i + 1} should be created`).toBeTruthy();
@@ -106,8 +129,10 @@ test.describe('Agent Control Plane @smoke', () => {
 
       // Create schedule (task_template is TEXT column)
       const sResult = await executeCommandViaApi(
-        page, 'acp:create_agent_schedule',
+        page,
+        'acp:create_agent_schedule',
         {
+          agent_code: agentCode,
           title: scheduleName,
           description: 'Daily trend scan',
           schedule_type: 'cron',
@@ -115,30 +140,37 @@ test.describe('Agent Control Plane @smoke', () => {
           schedule_status: 'active',
           timezone: 'Asia/Shanghai',
           mission_id: missionPid,
+          daily_run_budget: 8,
+          concurrency_limit: 1,
+          missed_run_policy: 'skip',
           task_template: JSON.stringify({ title: 'Auto scan', assignee_id: agentCode }),
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       schedulePid = sResult.recordId;
       expect(schedulePid, 'Schedule should be created').toBeTruthy();
 
       // Create artifact
       const artResult = await executeCommandViaApi(
-        page, 'acp:create_agent_artifact',
+        page,
+        'acp:create_agent_artifact',
         {
           title: artifactTitle,
           artifact_type: 'report',
           content: 'E2E test report content',
           task_id: taskPids[0],
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       artifactPid = artResult.recordId;
       expect(artifactPid, 'Artifact should be created').toBeTruthy();
 
       // Create approval policy (TEXT columns for rules)
       const polResult = await executeCommandViaApi(
-        page, 'acp:create_approval_policy',
+        page,
+        'acp:create_approval_policy',
         {
           policy_name: policyName,
           description: 'Require approval for cost > $10',
@@ -148,14 +180,16 @@ test.describe('Agent Control Plane @smoke', () => {
           timeout_hours: 24,
           timeout_action: 'reject',
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       policyPid = polResult.recordId;
       expect(policyPid, 'Approval policy should be created').toBeTruthy();
 
       // Create memory entry
       const memResult = await executeCommandViaApi(
-        page, 'acp:create_agent_memory',
+        page,
+        'acp:create_agent_memory',
         {
           memory_title: memoryTitle,
           memory_type: 'lesson',
@@ -164,7 +198,8 @@ test.describe('Agent Control Plane @smoke', () => {
           importance: 8,
           category: 'best-practice',
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       memoryPid = memResult.recordId;
       expect(memoryPid, 'Memory should be created').toBeTruthy();
@@ -175,7 +210,10 @@ test.describe('Agent Control Plane @smoke', () => {
 
   // Skip all tests if ACP plugin is not installed
   test.beforeEach(async () => {
-    expect(acpPluginInstalled, 'ACP plugin (com.auraboot.agent-control-plane) must be installed for ACP smoke tests').toBe(true);
+    expect(
+      acpPluginInstalled,
+      'ACP plugin (com.auraboot.agent-control-plane) must be installed for ACP smoke tests',
+    ).toBe(true);
   });
 
   // =========================================================================
@@ -228,7 +266,9 @@ test.describe('Agent Control Plane @smoke', () => {
     // Wait for navigation to settle — page may redirect if NQ data is unavailable
     await page.waitForLoadState('domcontentloaded');
     const url = page.url();
-    expect(url, `Mission Control dashboard redirected unexpectedly to ${url}`).toContain('/aurabot/dashboard');
+    expect(url, `Mission Control dashboard redirected unexpectedly to ${url}`).toContain(
+      '/aurabot/dashboard',
+    );
     await expect(page).toHaveURL(/\/aurabot\/dashboard/, { timeout: 10000 });
 
     // Dashboard container should be visible
@@ -299,7 +339,11 @@ test.describe('Agent Control Plane @smoke', () => {
     // Click Observations tab — verify it renders
     await page.locator('[data-testid="mc-tab-observations"]').click();
     // Wait for API response to confirm tab loaded data
-    await page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200, { timeout: 10000 }).catch(() => {});
+    await page
+      .waitForResponse((resp) => resp.url().includes('/api/') && resp.status() === 200, {
+        timeout: 10000,
+      })
+      .catch(() => {});
 
     // Back to Dashboard
     await page.locator('[data-testid="mc-tab-dashboard"]').click();
@@ -392,14 +436,20 @@ test.describe('Agent Control Plane @smoke', () => {
   test('ACP-12: Mission update via command reflects in UI', async ({ page }) => {
     // Update mission title via API
     await executeCommandViaApi(
-      page, 'acp:update_mission',
+      page,
+      'acp:update_mission',
       { title: missionUpdatedTitle, description: 'Updated E2E mission' },
-      missionPid, 'update',
+      missionPid,
+      'update',
     );
 
     // Verify update via API
-    const pidFilter = encodeURIComponent(JSON.stringify([{ fieldName: 'pid', operator: 'EQ', value: missionPid }]));
-    const verifyResp = await page.request.get(`/api/dynamic/mission/list?pageSize=1&filters=${pidFilter}`);
+    const pidFilter = encodeURIComponent(
+      JSON.stringify([{ fieldName: 'pid', operator: 'EQ', value: missionPid }]),
+    );
+    const verifyResp = await page.request.get(
+      `/api/dynamic/mission/list?pageSize=1&filters=${pidFilter}`,
+    );
     const verifyData = await verifyResp.json();
     expect(verifyData.data?.records?.[0]?.title).toBe(missionUpdatedTitle);
   });
@@ -409,16 +459,12 @@ test.describe('Agent Control Plane @smoke', () => {
   // =========================================================================
   test('ACP-13: Mission status transition active → paused', async ({ page }) => {
     // Pause the mission
-    const result = await executeCommandViaApi(
-      page, 'acp:pause_mission',
-      {},
-      missionPid, 'update',
-    );
+    const result = await executeCommandViaApi(page, 'acp:pause_mission', {}, missionPid, 'update');
     expect((result as any).success !== false, 'Pause mission should succeed').toBeTruthy();
 
     // Verify via API that status changed
     const listResp = await page.request.get(
-      `/api/dynamic/mission/list?pageSize=200&filters=${encodeURIComponent(JSON.stringify([{fieldName:'pid',operator:'EQ',value:missionPid}]))}`,
+      `/api/dynamic/mission/list?pageSize=200&filters=${encodeURIComponent(JSON.stringify([{ fieldName: 'pid', operator: 'EQ', value: missionPid }]))}`,
     );
     const listData = await listResp.json();
     expect(listData.success === true || listData.code === '0' || listData.code === 0).toBe(true);
@@ -435,22 +481,28 @@ test.describe('Agent Control Plane @smoke', () => {
 
     // Start the task (TODO → in_progress)
     const startResult = await executeCommandViaApi(
-      page, 'acp:start_task',
+      page,
+      'acp:start_task',
       {},
-      todoTaskPid, 'update',
+      todoTaskPid,
+      'update',
     );
     expect((startResult as any).success !== false, 'Start task should succeed').toBeTruthy();
 
     // Complete the task (in_progress → DONE)
     const completeResult = await executeCommandViaApi(
-      page, 'acp:complete_task',
+      page,
+      'acp:complete_task',
       {},
-      todoTaskPid, 'update',
+      todoTaskPid,
+      'update',
     );
     expect((completeResult as any).success !== false, 'Complete task should succeed').toBeTruthy();
 
     // Verify via API — filter by specific pid to avoid pagination issues
-    const pidFilter = encodeURIComponent(JSON.stringify([{ fieldName: 'pid', operator: 'EQ', value: todoTaskPid }]));
+    const pidFilter = encodeURIComponent(
+      JSON.stringify([{ fieldName: 'pid', operator: 'EQ', value: todoTaskPid }]),
+    );
     const listResp = await page.request.get(
       `/api/dynamic/agent-task/list?pageSize=10&filters=${pidFilter}`,
     );
@@ -500,7 +552,8 @@ test.describe('Agent Control Plane @smoke', () => {
   test('ACP-17: Agent dispatch creates run record', async ({ page }) => {
     // Create a fresh task for dispatch
     const dispatchTask = await executeCommandViaApi(
-      page, 'acp:create_agent_task',
+      page,
+      'acp:create_agent_task',
       {
         title: `Dispatch_Test_${uid}`,
         description: 'Test agent dispatch',
@@ -510,7 +563,8 @@ test.describe('Agent Control Plane @smoke', () => {
         assignee_id: agentCode,
         mission_id: missionPid,
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     expect(dispatchTask.recordId).toBeTruthy();
 
@@ -521,14 +575,19 @@ test.describe('Agent Control Plane @smoke', () => {
     expect(dispatchRes.ok(), 'Dispatch should return 200').toBeTruthy();
 
     // Wait for the run record to appear instead of sleeping.
-    await expect.poll(async () => {
-      const runsRes = await page.request.get(
-        '/api/datasource/list?datasourceId=nq:acp_recent_runs&format=records&maxItems=10',
-      );
-      if (!runsRes.ok()) return 0;
-      const runsData = await runsRes.json();
-      return (runsData.data?.records || []).length;
-    }, { timeout: 15000, intervals: [500, 1000, 1500] }).toBeGreaterThan(0);
+    await expect
+      .poll(
+        async () => {
+          const runsRes = await page.request.get(
+            '/api/datasource/list?datasourceId=nq:acp_recent_runs&format=records&maxItems=10',
+          );
+          if (!runsRes.ok()) return 0;
+          const runsData = await runsRes.json();
+          return (runsData.data?.records || []).length;
+        },
+        { timeout: 15000, intervals: [500, 1000, 1500] },
+      )
+      .toBeGreaterThan(0);
 
     // Check that a Run record was created
     const runsRes = await page.request.get(
@@ -601,7 +660,13 @@ test.describe('Agent Control Plane @smoke', () => {
     ];
 
     for (const tool of demoTools) {
-      const result = await executeCommandViaApi(page, 'acp:create_agent_tool', tool, undefined, 'create');
+      const result = await executeCommandViaApi(
+        page,
+        'acp:create_agent_tool',
+        tool,
+        undefined,
+        'create',
+      );
       expect(result.recordId, `Tool ${tool.tool_code} should be created`).toBeTruthy();
     }
 
@@ -619,7 +684,8 @@ test.describe('Agent Control Plane @smoke', () => {
 
     // Create a memory entry via command API
     const memResult = await executeCommandViaApi(
-      page, 'acp:create_agent_memory',
+      page,
+      'acp:create_agent_memory',
       {
         memory_title: memTitle,
         memory_content: 'Always validate inputs before processing',
@@ -628,7 +694,8 @@ test.describe('Agent Control Plane @smoke', () => {
         importance: 8,
         memory_agent_id: agentCode,
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     expect(memResult.recordId, 'Memory entry should be created').toBeTruthy();
 
@@ -656,7 +723,9 @@ test.describe('Agent Control Plane @smoke', () => {
       await runRows.first().click();
 
       // Wait for the expanded detail panel to appear
-      const detailContent = page.getByText(/工具调用|Tool Call Chain|错误信息|Error|Loading|No tool/i).first();
+      const detailContent = page
+        .getByText(/工具调用|Tool Call Chain|错误信息|Error|Loading|No tool/i)
+        .first();
       await expect(detailContent).toBeVisible({ timeout: 10000 });
     }
 
@@ -665,7 +734,9 @@ test.describe('Agent Control Plane @smoke', () => {
       '/api/datasource/list?datasourceId=nq:acp_run_detail&format=records',
     );
     const runDetailData = await runDetailResponse.json();
-    expect(runDetailData.success === true || runDetailData.code === '0' || runDetailData.code === 0).toBe(true);
+    expect(
+      runDetailData.success === true || runDetailData.code === '0' || runDetailData.code === 0,
+    ).toBe(true);
   });
 
   // =========================================================================
@@ -693,14 +764,16 @@ test.describe('Agent Control Plane @smoke', () => {
 
     // Create an artifact with markdown content via API
     const artResult = await executeCommandViaApi(
-      page, 'acp:create_agent_artifact',
+      page,
+      'acp:create_agent_artifact',
       {
         title: artTitle,
         artifact_type: 'report',
         content: '# Test Report\n\nThis is a **test** artifact with richtext content.',
         task_id: taskPids[0],
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     expect(artResult.recordId, 'Artifact should be created').toBeTruthy();
 
@@ -719,7 +792,8 @@ test.describe('Agent Control Plane @smoke', () => {
     // Create a parent task with sequential execution mode
     const parentTitle = `Parent_${uid}`;
     const parentResult = await executeCommandViaApi(
-      page, 'acp:create_agent_task',
+      page,
+      'acp:create_agent_task',
       {
         title: parentTitle,
         description: 'Parent task for sequential dispatch test',
@@ -730,7 +804,8 @@ test.describe('Agent Control Plane @smoke', () => {
         mission_id: missionPid,
         agent_config: JSON.stringify({ executionMode: 'sequential' }),
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     const parentPid = parentResult.recordId;
     expect(parentPid, 'Parent task should be created').toBeTruthy();
@@ -740,7 +815,8 @@ test.describe('Agent Control Plane @smoke', () => {
     const childPids: string[] = [];
     for (const childTitle of childTitles) {
       const childResult = await executeCommandViaApi(
-        page, 'acp:create_agent_task',
+        page,
+        'acp:create_agent_task',
         {
           title: childTitle,
           description: `Child task: ${childTitle}`,
@@ -751,7 +827,8 @@ test.describe('Agent Control Plane @smoke', () => {
           mission_id: missionPid,
           parent_id: parentPid,
         },
-        undefined, 'create',
+        undefined,
+        'create',
       );
       childPids.push(childResult.recordId);
       expect(childResult.recordId, `Child task ${childTitle} should be created`).toBeTruthy();
@@ -764,15 +841,22 @@ test.describe('Agent Control Plane @smoke', () => {
     expect(dispatchRes.ok(), 'Dispatch should return 200').toBeTruthy();
 
     // Wait for async processing to surface child tasks in the list.
-    await expect.poll(async () => {
-      const filterParam = encodeURIComponent(JSON.stringify([{ fieldName: 'parent_id', operator: 'EQ', value: parentPid }]));
-      const listResp = await page.request.get(
-        `/api/dynamic/agent-task/list?pageSize=50&filters=${filterParam}`,
-      );
-      if (!listResp.ok()) return 0;
-      const listData = await listResp.json();
-      return (listData.data?.records || []).length;
-    }, { timeout: 15000, intervals: [500, 1000, 1500] }).toBeGreaterThanOrEqual(2);
+    await expect
+      .poll(
+        async () => {
+          const filterParam = encodeURIComponent(
+            JSON.stringify([{ fieldName: 'parent_id', operator: 'EQ', value: parentPid }]),
+          );
+          const listResp = await page.request.get(
+            `/api/dynamic/agent-task/list?pageSize=50&filters=${filterParam}`,
+          );
+          if (!listResp.ok()) return 0;
+          const listData = await listResp.json();
+          return (listData.data?.records || []).length;
+        },
+        { timeout: 15000, intervals: [500, 1000, 1500] },
+      )
+      .toBeGreaterThanOrEqual(2);
   });
 
   // =========================================================================
@@ -783,7 +867,8 @@ test.describe('Agent Control Plane @smoke', () => {
 
     // Create a tool with API_CALL type
     const toolResult = await executeCommandViaApi(
-      page, 'acp:create_agent_tool',
+      page,
+      'acp:create_agent_tool',
       {
         tool_code: toolCode,
         tool_type: 'api_call',
@@ -792,7 +877,8 @@ test.describe('Agent Control Plane @smoke', () => {
         source_code: 'GET /api/datasource/list',
         tool_status: 'active',
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     expect(toolResult.recordId, 'API_CALL tool should be created').toBeTruthy();
 
@@ -824,7 +910,7 @@ test.describe('Agent Control Plane @smoke', () => {
     const nqs = ['acp_cost_by_agent', 'acp_daily_activity', 'acp_error_summary'];
     for (const nqCode of nqs) {
       const resp = await page.request.get(
-        `/api/datasource/list?datasourceId=nq:${nqCode}&format=records`
+        `/api/datasource/list?datasourceId=nq:${nqCode}&format=records`,
       );
       expect(resp.ok(), `NQ ${nqCode} should respond OK`).toBeTruthy();
       const data = await resp.json();
@@ -851,19 +937,15 @@ test.describe('Agent Control Plane @smoke', () => {
     await expect(analyticsView).toBeVisible({ timeout: 15000 });
 
     // Should have cost breakdown section (even if "no data" message)
-    await expect(
-      page.getByText(/30.*Cost|成本分布/i).first()
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/30.*Cost|成本分布/i).first()).toBeVisible({ timeout: 10000 });
 
     // Should have daily activity section
-    await expect(
-      page.getByText(/Daily Activity|每日活动/i).first()
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Daily Activity|每日活动/i).first()).toBeVisible({
+      timeout: 10000,
+    });
 
     // Should have error summary section
-    await expect(
-      page.getByText(/Recent Errors|最近错误/i).first()
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Recent Errors|最近错误/i).first()).toBeVisible({ timeout: 10000 });
   });
 
   // =========================================================================
@@ -901,7 +983,9 @@ test.describe('Agent Control Plane @smoke', () => {
   // =========================================================================
   // ACP-32: Agent definition form uses custom render components
   // =========================================================================
-  test('ACP-32: Agent definition DSL fields have custom renderComponent configured', async ({ page }) => {
+  test('ACP-32: Agent definition DSL fields have custom renderComponent configured', async ({
+    page,
+  }) => {
     // Verify the tools field uses agenttoolpicker renderComponent
     const fieldsRes = await page.request.get('/api/datasource/list', {
       params: { datasourceId: 'nq:acp_agent_tools_active', format: 'records', maxItems: '1' },
@@ -953,7 +1037,11 @@ test.describe('Agent Control Plane @smoke', () => {
     await expect(obsTab).toBeVisible({ timeout: 10000 });
     await obsTab.click();
     // Should show a section with observation data or at least the tab content area
-    await page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200, { timeout: 10000 }).catch(() => {});
+    await page
+      .waitForResponse((resp) => resp.url().includes('/api/') && resp.status() === 200, {
+        timeout: 10000,
+      })
+      .catch(() => {});
   });
 
   // =========================================================================
@@ -1014,7 +1102,10 @@ test.describe('Agent Control Plane @smoke', () => {
   test('ACP-39: Agent Definition has Soul Profile fields in schema', async ({ page }) => {
     // Verify soul profile fields exist in the model by fetching the agent record
     const res = await page.request.get(`/api/dynamic/agent-definition/list`, {
-      params: { pageSize: '10', filters: JSON.stringify([{ fieldName: 'agent_code', operator: 'EQ', value: agentCode }]) },
+      params: {
+        pageSize: '10',
+        filters: JSON.stringify([{ fieldName: 'agent_code', operator: 'EQ', value: agentCode }]),
+      },
     });
     expect(res.status()).toBe(200);
     const body = await res.json();
@@ -1029,7 +1120,8 @@ test.describe('Agent Control Plane @smoke', () => {
   // =========================================================================
   test('ACP-40: Update agent with Soul Profile fields', async ({ page }) => {
     const result = await executeCommandViaApi(
-      page, 'acp:update_agent_definition',
+      page,
+      'acp:update_agent_definition',
       {
         personality: 'Analytical and precise',
         expertise: 'Data analysis, financial modeling',
@@ -1037,7 +1129,8 @@ test.describe('Agent Control Plane @smoke', () => {
         boundaries: 'Cannot access production databases directly',
         soul_goals: 'Optimize data pipeline efficiency',
       },
-      agentPid, 'update',
+      agentPid,
+      'update',
     );
     expect((result as any).success !== false, 'Soul Profile update should succeed').toBeTruthy();
   });
@@ -1057,7 +1150,8 @@ test.describe('Agent Control Plane @smoke', () => {
   // =========================================================================
   test('ACP-42: Create agent skill via command', async ({ page }) => {
     const result = await executeCommandViaApi(
-      page, 'acp:create_agent_skill',
+      page,
+      'acp:create_agent_skill',
       {
         skill_code: `web_search_${uid.toLowerCase()}`,
         skill_name: `Web Search_${uid}`,
@@ -1069,7 +1163,8 @@ test.describe('Agent Control Plane @smoke', () => {
         skill_status: 'active',
         is_builtin: false,
       },
-      undefined, 'create',
+      undefined,
+      'create',
     );
     expect(result.recordId, 'Skill should be created').toBeTruthy();
   });
@@ -1127,7 +1222,10 @@ test.describe('Agent Control Plane @smoke', () => {
     // Every provider must be presentable, not just listed: a code with no
     // display name reaches the UI as a raw identifier.
     for (const provider of providers) {
-      expect(provider.displayName, `${provider.providerCode} must have a display name`).toBeTruthy();
+      expect(
+        provider.displayName,
+        `${provider.providerCode} must have a display name`,
+      ).toBeTruthy();
     }
   });
 

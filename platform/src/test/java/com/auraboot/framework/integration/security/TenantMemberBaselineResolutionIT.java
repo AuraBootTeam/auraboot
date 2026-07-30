@@ -3,6 +3,10 @@ package com.auraboot.framework.integration.security;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.service.UserService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -13,6 +17,7 @@ import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,19 +37,55 @@ class TenantMemberBaselineResolutionIT extends BaseIntegrationTest {
 
     @Autowired private UserPermissionService userPermissionService;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private UserService userService;
+    @Autowired private TenantMemberService tenantMemberService;
 
     private Long baselineRoleId;
     private Long boundPermissionId;
+    private Long createdPermissionId;
     private Long bindingId;
-    private final Long roleLessUserId = 778_899_001L;
-    private final Long roleLessMemberId = 778_899_002L;
+    private Long roleLessUserId;
+    private Long roleLessMemberId;
 
     @BeforeEach
     void setup() {
+        User roleLessUser = userService.signUp(
+                "baseline-roleless-" + System.nanoTime() + "@auraboot.test",
+                "test-password-123");
+        TenantMember roleLessMember = tenantMemberService.addMember(
+                roleLessUser.getId(),
+                testTenant.getId(),
+                "active");
+        roleLessUserId = roleLessUser.getId();
+        roleLessMemberId = roleLessMember.getId();
+
         // A real, existing permission to bind the baseline role to (any perm; FK-safe).
-        boundPermissionId = jdbc.queryForObject(
-                "SELECT id FROM ab_permission WHERE (deleted_flag = false OR deleted_flag IS NULL) ORDER BY id LIMIT 1",
-                Long.class);
+        List<Long> existingPermissionIds = jdbc.queryForList(
+                "SELECT id FROM ab_permission "
+                        + "WHERE tenant_id = ? "
+                        + "AND "
+                        + "(deleted_flag = false OR deleted_flag IS NULL) "
+                        + "ORDER BY id LIMIT 1",
+                Long.class,
+                testTenant.getId());
+        if (existingPermissionIds.isEmpty()) {
+            createdPermissionId =
+                    (System.currentTimeMillis() << 12) | (System.nanoTime() & 0xFFF);
+            jdbc.update(
+                    "INSERT INTO ab_permission "
+                            + "(id, pid, tenant_id, code, name, resource_type, resource_code, action, "
+                            + "source, status, deleted_flag, created_at, updated_at) "
+                            + "VALUES (?, ?, ?, ?, ?, 'test', 'tenant_member_baseline', 'read', "
+                            + "'test', 'active', false, now(), now())",
+                    createdPermissionId,
+                    "rl_perm_" + createdPermissionId,
+                    testTenant.getId(),
+                    "test.tenant_member.baseline." + createdPermissionId,
+                    "Tenant member baseline test permission");
+            boundPermissionId = createdPermissionId;
+        } else {
+            boundPermissionId = existingPermissionIds.get(0);
+        }
         assertThat(boundPermissionId).as("test needs at least one registered permission").isNotNull();
 
         // Seed the tenant_member baseline role in the test tenant (mirrors CrossTenant harness).
@@ -61,6 +102,9 @@ class TenantMemberBaselineResolutionIT extends BaseIntegrationTest {
                         + " status, deleted_flag, created_at, updated_at) "
                         + "VALUES (?, ?, ?, ?, ?, 'grant', 'active', false, now(), now())",
                 bindingId, "rp_tm_" + bindingId, testTenant.getId(), baselineRoleId, boundPermissionId);
+        // Direct SQL deliberately bypasses the role service/event listener, so
+        // simulate the production role-change eviction explicitly.
+        userPermissionService.evictRoleUsers(testTenant.getId(), baselineRoleId);
 
         // Caller = a member with NO ab_user_role rows in this tenant.
         MetaContext.setContext(testTenant.getId(), roleLessUserId, "u-tm-pid", "tm-tester");
@@ -71,8 +115,18 @@ class TenantMemberBaselineResolutionIT extends BaseIntegrationTest {
     @AfterEach
     void cleanup() {
         userPermissionService.evictUserPermissions(roleLessUserId);
+        if (roleLessMemberId != null) {
+            jdbc.update("DELETE FROM ab_user_role WHERE member_id = ?", roleLessMemberId);
+            jdbc.update("DELETE FROM ab_tenant_member WHERE id = ?", roleLessMemberId);
+        }
+        if (roleLessUserId != null) {
+            jdbc.update("DELETE FROM ab_user WHERE id = ?", roleLessUserId);
+        }
         if (bindingId != null) jdbc.update("DELETE FROM ab_role_permission WHERE id = ?", bindingId);
         if (baselineRoleId != null) jdbc.update("DELETE FROM ab_role WHERE id = ?", baselineRoleId);
+        if (createdPermissionId != null) {
+            jdbc.update("DELETE FROM ab_permission WHERE id = ?", createdPermissionId);
+        }
         MetaContext.clear();
     }
 

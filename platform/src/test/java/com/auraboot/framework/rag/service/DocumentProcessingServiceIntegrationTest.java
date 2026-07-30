@@ -284,7 +284,7 @@ class DocumentProcessingServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(15)
-    @DisplayName("PROC-09: Non-existent KB PID marks document as FAILED")
+    @DisplayName("PROC-09: Non-existent KB PID cannot mutate a document owned by another KB")
     void processDocument_nonExistentKb() {
         KnowledgeBaseDTO kb = createTestKb("Real KB for Doc");
         KbDocument doc = kbService.createDocument(
@@ -294,8 +294,8 @@ class DocumentProcessingServiceIntegrationTest extends BaseIntegrationTest {
         processingService.processDocument("non-existent-kb-pid", doc.getPid());
 
         Map<String, Object> docRow = getDocumentRow(doc.getPid());
-        assertThat(docRow.get("status")).isEqualTo("failed");
-        assertThat((String) docRow.get("error_message")).contains("Knowledge base not found");
+        assertThat(docRow.get("status")).isEqualTo("pending");
+        assertThat(docRow.get("error_message")).isNull();
     }
 
     // =========================================================================

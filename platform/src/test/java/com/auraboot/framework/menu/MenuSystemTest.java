@@ -141,22 +141,14 @@ class MenuSystemTest extends BaseIntegrationTest {
      * Create a unique permission and bind it to the test role.
      */
     private PermissionDTO createPermissionAndBind(String prefix) {
-        PermissionDTO perm = createPermissionOnly(prefix);
-
-        // Bind to test role
-        RolePermission binding = new RolePermission();
-        binding.setPid(UniqueIdGenerator.generate());
-        binding.setRoleId(getTestRole().getId());
-        binding.setPermissionId(perm.getId());
-        binding.setGrantType("grant");
-        binding.setPriority(100);
-        binding.setStatus("active");
-        binding.setDeletedFlag(false);
-        binding.setCreatedAt(Instant.now());
-        binding.setUpdatedAt(Instant.now());
-        rolePermissionMapper.insert(binding);
-
-        return perm;
+        String code = "MENU." + prefix + "_" + System.nanoTime() + ".view";
+        grantCommittedPermissionToTestRole(
+                code,
+                "menu",
+                prefix,
+                "view",
+                prefix + " View Permission");
+        return permissionService.findByCode(code);
     }
 
     /**

@@ -448,7 +448,9 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
                 "{\"type\":\"state_transition\",\"permissions\":[\"sc.showcase.manage\"],"
                         + "\"stateField\":\"sc_status\",\"fromStates\":[\"active\"],"
                         + "\"toState\":\"review\",\"priority\":3,\"platforms\":[\"web\",\"mobile\"]}");
-        userPermissionService.evictUserPermissions(adminUserId);
+        userPermissionService.evictPermissionDefinitions(adminTenantId);
+        userPermissionService.evictRoleUsers(adminTenantId, getTestRole().getId());
+        userPermissionService.evictUserPermissions(adminTenantId, adminUserId);
     }
 
     private void ensureShowcaseTable() {

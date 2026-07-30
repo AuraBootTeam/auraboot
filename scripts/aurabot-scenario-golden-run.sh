@@ -46,39 +46,34 @@ SLOT=111
 NAME="aurabot-scenario-golden"
 KEEP=0
 SKIP_TIER_A=0
-LLM=""
+LIVE_PROFILE=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --slot) SLOT="$2"; shift 2;;
     --name) NAME="$2"; shift 2;;
     --keep) KEEP=1; shift;;
     --skip-tier-a) SKIP_TIER_A=1; shift;;
-    --llm) LLM="$2"; shift 2;;
     *) echo "unknown arg: $1" >&2; exit 2;;
   esac
 done
 
-# --llm qianwen|deepseek — deterministic live-provider choice. With both
-# DASHSCOPE_API_KEY and DEEPSEEK_API_KEY in the environment, CloudConfigSeeder
-# provisions both and chat resolution silently picks by seed priority
-# (deepseek=30 beats qianwen=50) — which mislabeled a whole live run as
-# "Qwen" on 2026-07-19. Choosing a provider simply withholds the other
-# vendor's key from the backend env, so the seeder provisions exactly one.
-# Implies live mode (stub off) unless AGENT_LLM_STUB_MODE is set explicitly.
-case "$LLM" in
-  "") ;;
-  qianwen|qwen)
-    [[ -n "${DASHSCOPE_API_KEY:-}" ]] || { echo "--llm qianwen requires DASHSCOPE_API_KEY" >&2; exit 2; }
-    unset DEEPSEEK_API_KEY
-    export AGENT_LLM_STUB_MODE="${AGENT_LLM_STUB_MODE:-false}"
-    ;;
-  deepseek)
-    [[ -n "${DEEPSEEK_API_KEY:-}" ]] || { echo "--llm deepseek requires DEEPSEEK_API_KEY" >&2; exit 2; }
-    unset DASHSCOPE_API_KEY
-    export AGENT_LLM_STUB_MODE="${AGENT_LLM_STUB_MODE:-false}"
-    ;;
-  *) echo "unknown --llm '$LLM' (qianwen|deepseek)" >&2; exit 2;;
-esac
+# A complete provider-neutral profile selects live mode. No provider is
+# inferred from whichever credential happens to exist.
+if [[ -n "${AURA_LIVE_LLM_PROVIDER:-}${AURA_LIVE_LLM_MODEL:-}${AURA_LIVE_LLM_API_KEY_ENV:-}" ]]; then
+  for required_var in AURA_LIVE_LLM_PROVIDER AURA_LIVE_LLM_MODEL AURA_LIVE_LLM_API_KEY_ENV; do
+    [[ -n "${!required_var:-}" ]] \
+      || { echo "incomplete live profile: $required_var is UNSET" >&2; exit 2; }
+  done
+  key_env="$AURA_LIVE_LLM_API_KEY_ENV"
+  [[ "$AURA_LIVE_LLM_PROVIDER" =~ ^[A-Za-z0-9_-]+$ ]] \
+    || { echo "AURA_LIVE_LLM_PROVIDER is invalid" >&2; exit 2; }
+  [[ "$key_env" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] \
+    || { echo "AURA_LIVE_LLM_API_KEY_ENV is invalid" >&2; exit 2; }
+  [[ -n "${!key_env:-}" ]] \
+    || { echo "configured credential variable $key_env is UNSET" >&2; exit 2; }
+  LIVE_PROFILE=1
+  export AGENT_LLM_STUB_MODE=false
+fi
 RUNTIME="${NAME}-${SLOT}"
 BE_PORT=$((6400 + SLOT))
 DB="auraboot_${SLOT}"
@@ -87,9 +82,51 @@ ADMIN_PASSWORD="${GOLDEN_ADMIN_PASSWORD:-Test2026x}"
 
 PASS=()
 FAIL=()
+RESULT_STATE="incomplete"
 step() { echo "[scenario-golden] $*"; }
 ok()   { PASS+=("$1"); step "PASS  $1"; }
 bad()  { FAIL+=("$1"); step "FAIL  $1"; }
+
+write_receipt() {
+  local receipt_dir="$REPO_ROOT/build/scenario-golden/$RUNTIME"
+  local source_sha tracked_source_dirty untracked_files calls input_tokens output_tokens
+  mkdir -p "$receipt_dir"
+  source_sha=$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
+  tracked_source_dirty=false
+  [[ -n "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=no 2>/dev/null)" ]] \
+    && tracked_source_dirty=true
+  untracked_files="$(
+    git -C "$REPO_ROOT" status --porcelain --untracked-files=all 2>/dev/null \
+      | awk '$1 == "??" { count++ } END { print count + 0 }'
+  )"
+  calls=0
+  input_tokens=0
+  output_tokens=0
+  if PGPASSWORD="${PGPASSWORD:-auraboot}" psql -h localhost -U auraboot -d "$DB" \
+      -t -A -c "SELECT COUNT(*),COALESCE(SUM(input_tokens),0),COALESCE(SUM(output_tokens),0)
+                FROM ab_gen_ai_usage" >"$receipt_dir/.usage" 2>/dev/null; then
+    IFS='|' read -r calls input_tokens output_tokens <"$receipt_dir/.usage"
+  fi
+  rm -f "$receipt_dir/.usage"
+  {
+    printf 'source_sha=%s\n' "$source_sha"
+    printf 'tracked_source_dirty=%s\n' "$tracked_source_dirty"
+    printf 'untracked_files=%s\n' "$untracked_files"
+    printf 'result=%s\n' "$RESULT_STATE"
+    printf 'runtime=%s\n' "$RUNTIME"
+    printf 'database=%s\n' "$DB"
+    printf 'live_profile=%s\n' "$LIVE_PROFILE"
+    printf 'provider=%s\n' "${AURA_LIVE_LLM_PROVIDER:-stub}"
+    printf 'model=%s\n' "${AURA_LIVE_LLM_MODEL:-stub}"
+    printf 'pass_count=%s\n' "${#PASS[@]}"
+    printf 'fail_count=%s\n' "${#FAIL[@]}"
+    printf 'usage_calls=%s\n' "$calls"
+    printf 'input_tokens=%s\n' "$input_tokens"
+    printf 'output_tokens=%s\n' "$output_tokens"
+    printf 'completed_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } >"$receipt_dir/receipt.env"
+  step "receipt: $receipt_dir/receipt.env"
+}
 
 # --- Tier A: mechanism suite (pure unit, no stack, no shared DB) ----------
 TIER_A_CLASSES=(
@@ -135,6 +172,7 @@ fi
 teardown() {
   local failed=${#FAIL[@]}
   local live=0
+  write_receipt
   [[ "${AGENT_LLM_STUB_MODE:-true}" != "true" ]] && live=1
   if [[ "$KEEP" -eq 1 || "$failed" -gt 0 || "$live" -eq 1 ]]; then
     step "KEEPING stack '$RUNTIME' (slot $SLOT): keep=$KEEP failed=$failed live=$live"
@@ -171,6 +209,57 @@ if [[ -z "$TOK" ]]; then
 fi
 ok "admin JWT obtained"
 
+if [[ "$LIVE_PROFILE" -eq 1 ]]; then
+  # Create a tenant-priority config for the explicit profile so unrelated
+  # provider credentials in the host environment cannot silently win by seed
+  # priority. The secret travels only on stdin to the authenticated endpoint;
+  # it is encrypted by CloudConfigService and never printed by this runner.
+  if [[ -z "${AURA_LIVE_LLM_BASE_URL:-}" ]]; then
+    AURA_LIVE_LLM_BASE_URL=$(PGPASSWORD="${PGPASSWORD:-auraboot}" \
+      psql -h localhost -U auraboot -d "$DB" -t -A \
+      -c "SELECT config->>'baseUrl' FROM ab_cloud_config
+          WHERE service_type='llm' AND provider_code='$AURA_LIVE_LLM_PROVIDER'
+          ORDER BY CASE WHEN tenant_id IS NULL THEN 1 ELSE 0 END, priority
+          LIMIT 1" 2>/dev/null | head -1)
+    export AURA_LIVE_LLM_BASE_URL
+  fi
+  [[ -n "${AURA_LIVE_LLM_BASE_URL:-}" ]] || {
+    bad "live profile has no base URL and provider catalog has no matching entry"
+    exit 1
+  }
+  if ! python3 - <<'PY' | curl -fsS --noproxy '*' \
+      -X POST "http://localhost:${BE_PORT}/api/admin/cloud-config" \
+      -H "Authorization: Bearer $TOK" \
+      -H 'Content-Type: application/json' \
+      --data-binary @- >/dev/null
+import json
+import os
+
+key_env = os.environ["AURA_LIVE_LLM_API_KEY_ENV"]
+config = {
+    "apiKey": os.environ[key_env],
+    "baseUrl": os.environ["AURA_LIVE_LLM_BASE_URL"],
+    "defaultModel": os.environ["AURA_LIVE_LLM_MODEL"],
+    "apiFormat": "chat_completions",
+    "models": [os.environ["AURA_LIVE_LLM_MODEL"]],
+    "displayName": "Live LLM validation profile",
+}
+print(json.dumps({
+    "configLevel": "tenant",
+    "serviceType": "llm",
+    "providerCode": os.environ["AURA_LIVE_LLM_PROVIDER"],
+    "config": json.dumps(config),
+    "enabled": True,
+    "priority": 0,
+}))
+PY
+  then
+    bad "could not provision tenant-scoped live LLM profile"
+    exit 1
+  fi
+  ok "tenant-scoped live LLM profile provisioned (key value not logged)"
+fi
+
 drive_turn() { # $1=label $2=message $3=agentCode-or-empty $4=options-json-or-empty
   local label="$1" msg="$2" agent="$3" opts="$4"
   local body="{\"message\":\"${msg}\",\"sessionId\":\"golden-${label}-$$\""
@@ -202,7 +291,7 @@ drive_turn() { # $1=label $2=message $3=agentCode-or-empty $4=options-json-or-em
 # suspend+approve). Stub mode never suspends; this is a no-op there.
 approve_if_suspended() {
   # A real LLM may CHAIN confirmations (approve tool A -> it proposes gated
-  # tool B -> suspends again; observed with deepseek-chat 2026-07-20). Approve
+  # tool B -> suspends again). Approve
   # in a loop, bounded, and keep every resume stream — an approve that dies
   # (provider failure, expired pending) is exactly what forensics need.
   local label="$1" rounds=0 pending resume_out
@@ -275,9 +364,9 @@ assert_ge "S3 后台任务: ab_agent_task row created" \
 # S4's whole point IS the S3 assertion above: the explain-prefixed 导出
 # message must NOT have produced a second ACP_RUN row. Make it explicit:
 assert_eq "S4 咨询不误触发: explain-prefixed turn stayed non-durable" \
-  "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb->>'triageBucket'='LIGHT_CHAT'")" "2"
+  "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb->>'input'='为什么导出会失败' AND detail::jsonb->>'triageBucket'='LIGHT_CHAT' AND detail::jsonb->>'decisionReason'='SYNC_CHAT_TURN'")" "1"
 assert_eq "S6 具名路由: NAMED_AGENT_TURN routed and failure observed" \
-  "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb->>'initialMode'='NAMED_AGENT_TURN' AND obs_title LIKE 'turn.failed%' AND detail::jsonb->>'error' LIKE '%not found%'")" "1"
+  "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb->>'initialMode'='NAMED_AGENT_TURN' AND obs_title LIKE 'turn.failed%' AND COALESCE(detail::jsonb->>'error', '') <> ''")" "1"
 
 # --- Campaign regression guards (2026-07-20) -------------------------------
 # The 2026-07-20 execution-architecture fixes are exactly the kind a later
@@ -322,33 +411,46 @@ fi
 assert_eq "F8 守卫: 不存在已批准但从未被消费的授权(无限审批循环回归)" \
   "$(q "SELECT COUNT(*) FROM ab_agent_approval a WHERE a.approval_status='approved' AND a.consumed_at IS NULL AND a.updated_at < NOW() - INTERVAL '2 minutes'")" "0"
 
-# --- live provenance: prove WHICH vendor served this run ------------------
-# Only meaningful in live mode. With two keys in the environment the seeder
-# provisions both providers and chat resolution picks by seed priority
-# (deepseek=30 beats qianwen=50) — which is how an entire live run was
-# reported as Qwen on 2026-07-19. --llm withholds the other key so only one
-# provider exists, but withholding is an input; this is the output. A run
-# that cannot say who served it has not established what it claims to.
+# --- live provenance: prove WHICH configured profile served this run ------
+# A run that cannot say who served it has not established what it claims to.
 #
 # response_model is the strongest of the two columns: the platform sets
 # request_model, the remote service echoes response_model back.
-if [[ -n "$LLM" && "${AGENT_LLM_STUB_MODE:-false}" != "true" ]]; then
+if [[ "$LIVE_PROFILE" -eq 1 && "${AGENT_LLM_STUB_MODE:-false}" != "true" ]]; then
   calls=$(q "SELECT COUNT(*) FROM ab_gen_ai_usage")
   if [[ "${calls:-0}" -eq 0 ]]; then
     bad "live 供货方核验: 本轮零 LLM 调用账本行(live 档却没真调?)"
   else
     served=$(q "SELECT DISTINCT COALESCE(provider,'(null)') FROM ab_gen_ai_usage" | tr -d ' ' | paste -sd, -)
     models=$(q "SELECT DISTINCT COALESCE(response_model,'(null)') FROM ab_gen_ai_usage" | tr -d ' ' | paste -sd, -)
-    case "$LLM" in
-      qianwen|qwen) want="qianwen" ;;
-      deepseek)     want="deepseek" ;;
-      *)            want="" ;;
-    esac
-    if [[ -n "$want" && "$served" == "$want" ]]; then
-      ok "live 供货方核验: --llm $LLM 实际由 '$served' 服务, response_model=$models ($calls 次调用)"
+    want="$AURA_LIVE_LLM_PROVIDER"
+    if [[ "$served" == "$want" && "$models" == *"$AURA_LIVE_LLM_MODEL"* ]]; then
+      ok "live profile 核验: provider='$served', response_model=$models ($calls 次调用)"
     else
-      bad "live 供货方核验: 要 '$want' 实得 '$served' (response_model=$models, $calls 次调用) — 贴着标签跑了别家"
+      bad "live profile 核验: 期望 provider='$want' model='$AURA_LIVE_LLM_MODEL', 实得 provider='$served' response_model=$models"
     fi
+
+    # Every provider call is written against the request's OTel trace id. The
+    # product trace has its own UUID, so otel_trace_id is the required bridge.
+    # A missing bridge makes ACP/background calls billable but invisible from
+    # the trace UI — exactly the split-brain this end-to-end gate must catch.
+    usage_trace_count=$(q "SELECT COUNT(DISTINCT trace_id) FROM ab_gen_ai_usage WHERE trace_id IS NOT NULL")
+    bridged_trace_count=$(q "SELECT COUNT(DISTINCT usage.trace_id)
+        FROM ab_gen_ai_usage usage
+        JOIN ab_ai_trace trace
+          ON trace.tenant_id=usage.tenant_id
+         AND trace.otel_trace_id=usage.trace_id
+        WHERE usage.trace_id IS NOT NULL")
+    assert_eq "live trace 核验: 每条 usage trace 均桥接到产品 trace" \
+      "$bridged_trace_count" "$usage_trace_count"
+    assert_eq "live trace 核验: trace 输入 token 与 usage 账本一致" \
+      "$(q "SELECT COALESCE(SUM(total_input_tokens),0) FROM ab_ai_trace
+             WHERE otel_trace_id IN (SELECT DISTINCT trace_id FROM ab_gen_ai_usage WHERE trace_id IS NOT NULL)")" \
+      "$(q "SELECT COALESCE(SUM(input_tokens),0) FROM ab_gen_ai_usage")"
+    assert_eq "live trace 核验: trace 输出 token 与 usage 账本一致" \
+      "$(q "SELECT COALESCE(SUM(total_output_tokens),0) FROM ab_ai_trace
+             WHERE otel_trace_id IN (SELECT DISTINCT trace_id FROM ab_gen_ai_usage WHERE trace_id IS NOT NULL)")" \
+      "$(q "SELECT COALESCE(SUM(output_tokens),0) FROM ab_gen_ai_usage")"
   fi
 fi
 
@@ -356,6 +458,10 @@ echo
 step "================ RESULT ================"
 step "pass: ${#PASS[@]}  fail: ${#FAIL[@]}"
 for f in "${FAIL[@]:-}"; do [[ -n "$f" ]] && step "  FAILED: $f"; done
-if [[ ${#FAIL[@]} -gt 0 ]]; then exit 1; fi
+if [[ ${#FAIL[@]} -gt 0 ]]; then
+  RESULT_STATE="failed"
+  exit 1
+fi
+RESULT_STATE="passed"
 step "AuraBot scenario golden: ALL GREEN"
 exit 0

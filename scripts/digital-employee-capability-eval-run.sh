@@ -15,14 +15,15 @@
 #   ./scripts/digital-employee-capability-eval-run.sh --keep     # keep stack for inspection
 #   ./scripts/digital-employee-capability-eval-run.sh --slot 83  # pick a runtime slot
 #
-# Credentials (never printed, only reported SET/UNSET):
-#   DASHSCOPE_API_KEY   preferred — qwen
-#   DEEPSEEK_API_KEY    fallback
-#   AURA_LIVE_EVAL_MODEL  optional per-run model override
+# Provider-neutral live profile (credential value is never printed):
+#   AURA_LIVE_LLM_PROVIDER
+#   AURA_LIVE_LLM_MODEL
+#   AURA_LIVE_LLM_API_KEY_ENV
+#   AURA_LIVE_LLM_BASE_URL (optional when provider catalog supplies it)
 #
 # WHY A DEDICATED RUNNER (the incident this exists to prevent): the live evals are
 # excluded from every default gradle task, so for months nothing ran them. When
-# DeepSeek retired the `deepseek-chat` model name, all 14 live capability evals
+# an upstream provider retired a model identifier, all live capability evals
 # broke silently — the layer that proves the agent works was itself dead, and the
 # only reason anyone found out was running it by hand. A gate nobody runs is not
 # a gate. scripts/perf-ci/cron.example wires this into the nightly rotation, and
@@ -30,8 +31,24 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORKSPACE_ROOT="$(cd "$REPO_ROOT/.." && pwd)"
-[ -x "$WORKSPACE_ROOT/dev.sh" ] || WORKSPACE_ROOT="$(cd "$REPO_ROOT/../.." && pwd)"
+WORKSPACE_ROOT=""
+for workspace_candidate in \
+  "$REPO_ROOT/.." \
+  "$REPO_ROOT/../.." \
+  "$REPO_ROOT/../../.." \
+  "$REPO_ROOT/../../../.."
+do
+  workspace_candidate="$(cd "$workspace_candidate" && pwd)"
+  if [ -x "$workspace_candidate/dev.sh" ]; then
+    WORKSPACE_ROOT="$workspace_candidate"
+    break
+  fi
+done
+if [ -z "$WORKSPACE_ROOT" ]; then
+  printf '[capability-eval] FAIL: could not locate workspace dev.sh above %s\n' \
+    "$REPO_ROOT" >&2
+  exit 2
+fi
 
 SLOT="${SLOT:-83}"
 KEEP=0
@@ -52,16 +69,32 @@ LOG="$RUN_DIR/capability-eval.log"
 
 log() { printf '[capability-eval] %s\n' "$*"; }
 
-# --- credential check (report SET/UNSET, never the value) --------------------
-if [ -n "${DASHSCOPE_API_KEY:-}" ]; then
-  log "live provider credential: DASHSCOPE_API_KEY=SET (qwen preferred)"
-elif [ -n "${DEEPSEEK_API_KEY:-}" ]; then
-  log "live provider credential: DEEPSEEK_API_KEY=SET (deepseek fallback)"
-else
-  log "FAIL: no live LLM credential. Set DASHSCOPE_API_KEY (preferred) or DEEPSEEK_API_KEY."
-  log "  Without one every eval self-skips — and a suite that skips everything reports"
-  log "  green while proving nothing. Refusing to run."
+# --- explicit live profile check (report SET/UNSET, never key value) --------
+for required_var in \
+  AURA_LIVE_LLM_PROVIDER \
+  AURA_LIVE_LLM_MODEL \
+  AURA_LIVE_LLM_API_KEY_ENV
+do
+  if [ -z "${!required_var:-}" ]; then
+    log "FAIL: $required_var is UNSET; refusing a live suite that would self-skip."
+    exit 2
+  fi
+done
+
+key_env="$AURA_LIVE_LLM_API_KEY_ENV"
+if [[ ! "$key_env" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+  log "FAIL: AURA_LIVE_LLM_API_KEY_ENV is not a valid environment variable name."
   exit 2
+fi
+if [ -z "${!key_env:-}" ]; then
+  log "FAIL: configured live credential variable $key_env is UNSET."
+  exit 2
+fi
+log "live profile: provider=$AURA_LIVE_LLM_PROVIDER model=$AURA_LIVE_LLM_MODEL key=$key_env=SET"
+if [ -n "${AURA_LIVE_LLM_BASE_URL:-}" ]; then
+  log "live profile base URL: SET"
+else
+  log "live profile base URL: UNSET (provider catalog must supply it)"
 fi
 
 DB_NAME="auraboot_${SLOT}"
@@ -189,11 +222,25 @@ if [ "$summary_rc" -ne 0 ] || [ "$rc" -ne 0 ]; then
 fi
 
 git_sha="$(git -C "$REPO_ROOT" rev-parse HEAD)"
-provider="deepseek"
-[ -n "${DASHSCOPE_API_KEY:-}" ] && provider="qwen"
+tracked_source_dirty=false
+[[ -n "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=no)" ]] \
+  && tracked_source_dirty=true
+untracked_files="$(
+  git -C "$REPO_ROOT" status --porcelain --untracked-files=all \
+    | awk '$1 == "??" { count++ } END { print count + 0 }'
+)"
 {
   printf 'git_sha=%s\n' "$git_sha"
-  printf 'provider=%s\n' "$provider"
+  printf 'tracked_source_dirty=%s\n' "$tracked_source_dirty"
+  printf 'untracked_files=%s\n' "$untracked_files"
+  printf 'provider=%s\n' "$AURA_LIVE_LLM_PROVIDER"
+  printf 'model=%s\n' "$AURA_LIVE_LLM_MODEL"
+  printf 'api_key_env=%s\n' "$AURA_LIVE_LLM_API_KEY_ENV"
+  printf 'required_suites=19\n'
+  printf 'tests=32\n'
+  printf 'skipped=0\n'
+  printf 'failures=0\n'
+  printf 'errors=0\n'
   printf 'completed_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf 'summary=%s\n' "$RUN_DIR/summary.txt"
 } >"$RUN_DIR/receipt.env"

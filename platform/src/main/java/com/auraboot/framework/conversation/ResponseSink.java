@@ -91,6 +91,16 @@ public interface ResponseSink {
     }
 
     /**
+     * Structured retrieval provenance for the current turn. Transport adapters
+     * send this before the final response so clients can render citations from
+     * trusted retrieval data instead of parsing model-authored source prose.
+     */
+    default void onRetrievalEvidence(
+            java.util.List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence> evidence) {
+        // default no-op
+    }
+
+    /**
      * Phase C.3b: structured tool-result envelope produced by
      * {@code ResultContractEmitter} after each {@code dsl_query} /
      * {@code dsl_command} execution. SSE adapter serialises as the

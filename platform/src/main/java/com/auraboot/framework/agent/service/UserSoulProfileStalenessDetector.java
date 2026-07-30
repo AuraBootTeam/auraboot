@@ -34,8 +34,6 @@ import java.util.Map;
 public class UserSoulProfileStalenessDetector {
 
     static final long LOCK_KEY = 7308L;
-    private static final String DEFAULT_PROVIDER = "openai";
-
     private final JdbcTemplate jdbcTemplate;
     private final MemoryEmbeddingService memoryEmbeddingService;
     private final EmbeddingService embeddingService;
@@ -128,7 +126,7 @@ public class UserSoulProfileStalenessDetector {
 
             double[] profileEmbedding;
             try {
-                float[] v = embeddingService.embed(tenantId, profileText, DEFAULT_PROVIDER);
+                float[] v = embeddingService.embed(tenantId, profileText, null);
                 profileEmbedding = v == null ? null : toDoubles(v);
             } catch (RuntimeException e) {
                 // Allowed catch: embedding provider outage must not abort the

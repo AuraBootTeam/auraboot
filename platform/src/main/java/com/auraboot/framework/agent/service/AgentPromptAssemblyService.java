@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +31,9 @@ public class AgentPromptAssemblyService {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+
+    @Autowired(required = false)
+    private AgentReleaseDeploymentService releaseDeploymentService;
 
     // Token budget per section (approximate: chars / 4 ≈ tokens)
     private static final int SOUL_MAX_CHARS         = 2000;  // ~500 tokens
@@ -87,6 +91,11 @@ public class AgentPromptAssemblyService {
      * soul_goals) and the free-text {@code system_prompt} field into a readable narrative.
      */
     private String loadSoulProfile(Long tenantId, String agentCode) {
+        if (releaseDeploymentService != null) {
+            Map<String, Object> definition =
+                    releaseDeploymentService.runtimeDefinition(tenantId, agentCode);
+            return formatSoulProfile(definition);
+        }
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT name, description, personality, expertise, communication_style, "
                 + "boundaries, soul_goals, system_prompt "
@@ -101,7 +110,10 @@ public class AgentPromptAssemblyService {
             return null;
         }
 
-        Map<String, Object> def = rows.get(0);
+        return formatSoulProfile(rows.get(0));
+    }
+
+    private String formatSoulProfile(Map<String, Object> def) {
         StringBuilder soul = new StringBuilder();
 
         String name = str(def, "name");

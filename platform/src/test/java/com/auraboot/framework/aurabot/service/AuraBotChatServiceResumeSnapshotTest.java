@@ -11,6 +11,7 @@ import com.auraboot.framework.agent.runtime.PendingToolSnapshot;
 import com.auraboot.framework.agent.runtime.PendingToolSnapshotFactory;
 import com.auraboot.framework.agent.service.ToolLoopService;
 import com.auraboot.framework.agent.trace.AiTraceService;
+import com.auraboot.framework.agent.trace.TraceContext;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
@@ -173,7 +174,14 @@ class AuraBotChatServiceResumeSnapshotTest {
     void resumeResolvesProviderConfigWhenPendingHasNoStoredSecret() throws Exception {
         AuraBotPendingContinuationService service = newService();
         MetaContext.setContext(1L, 100L, null, "tester");
+        MetaContext.setOtelTraceId("resume-otel-trace-1");
         TurnContext ctx = TurnContext.legacyDefault(1L, 100L, 100L);
+        TraceContext resumeTrace = TraceContext.builder()
+                .traceId("product-resume-trace-1")
+                .tenantId(1L)
+                .sessionId("session-1")
+                .startTime(java.time.Instant.now())
+                .build();
         Map<String, Object> input = Map.of("pe_pc_code", "E2E-PCBA-CMP-1");
         AgentToolDefinition toolDef = AgentToolDefinition.builder()
                 .name("cmd_pe_create_procurement_comparison_draft")
@@ -228,6 +236,14 @@ class AuraBotChatServiceResumeSnapshotTest {
         when(llmProviderFactory.getProvider("openai")).thenReturn(provider);
         when(provider.chat(any(LlmChatRequest.class), eq("fresh-key"), eq("https://fresh.example")))
                 .thenReturn(endTurnResponse("Draft created."));
+        when(aiTraceService.createTrace(
+                eq(1L),
+                eq("session-1"),
+                any(),
+                eq(100L),
+                any(),
+                eq("resume-otel-trace-1")))
+                .thenReturn(resumeTrace);
 
         TurnOutcome outcome = service.resumeApprovedChatTool(ctx, pending, sink);
 
@@ -236,7 +252,24 @@ class AuraBotChatServiceResumeSnapshotTest {
         ArgumentCaptor<LlmChatRequest> requestCaptor = ArgumentCaptor.forClass(LlmChatRequest.class);
         verify(provider).chat(requestCaptor.capture(), eq("fresh-key"), eq("https://fresh.example"));
         assertThat(requestCaptor.getValue().getModel()).isEqualTo("test-model");
-        verify(sink).onDone("Draft created.", null);
+        verify(sink).onDone("Draft created.", "product-resume-trace-1");
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> traceMetadata =
+                ArgumentCaptor.forClass((Class<Map<String, Object>>) (Class<?>) Map.class);
+        verify(aiTraceService).createTrace(
+                eq(1L),
+                eq("session-1"),
+                eq("Resume confirmed action: cmd_pe_create_procurement_comparison_draft"),
+                eq(100L),
+                traceMetadata.capture(),
+                eq("resume-otel-trace-1"));
+        assertThat(traceMetadata.getValue())
+                .containsEntry("turn_id", ctx.turnId())
+                .containsEntry("turn_phase", "resume")
+                .containsEntry("provider_code", "openai")
+                .containsEntry("pending_tool_id", "toolu-write");
+        verify(aiTraceService).endTrace(resumeTrace, "Draft created.", "success");
+        verify(aiTraceService, never()).findActiveTrace(any());
     }
 
     @Test

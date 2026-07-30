@@ -24,5 +24,7 @@ public class AuraBotConversationMessage {
      */
     private String thinkingContent;
     private String thinkingSignature;
+    private java.util.List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence>
+            retrievalEvidence;
     private Instant createdAt;
 }

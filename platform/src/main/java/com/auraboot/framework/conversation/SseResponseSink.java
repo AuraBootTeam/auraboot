@@ -110,6 +110,15 @@ public class SseResponseSink implements ResponseSink {
     }
 
     @Override
+    public void onRetrievalEvidence(
+            List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence> evidence) {
+        if (evidence == null || evidence.isEmpty()) {
+            return;
+        }
+        sendJsonString("retrieval_evidence", Map.of("evidence", evidence));
+    }
+
+    @Override
     public void onResultContract(ResultContract contract) {
         // Byte-for-byte parity with the legacy ResultContractEmitter.send():
         //   emitter.send(SseEmitter.event().name("result_contract")

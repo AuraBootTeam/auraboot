@@ -180,7 +180,7 @@ class ChatTurnRuntimeTest {
     }
 
     @Test
-    @DisplayName("runToolLoop denies write tools before execution inside a read-only envelope")
+    @DisplayName("runToolLoop trusts tool blocks over an inconsistent provider stop reason")
     void runToolLoop_readOnlyEnvelopeDeniesWriteToolBeforeExecution() throws Exception {
         LlmProvider provider = mock(LlmProvider.class);
         RecordingSink sink = new RecordingSink();
@@ -200,7 +200,10 @@ class ChatTurnRuntimeTest {
                 .requiresConfirmation(false)
                 .build();
         LlmChatResponse toolUse = LlmChatResponse.builder()
-                .stopReason("tool_use")
+                // Some OpenAI-compatible providers have returned a tool call
+                // alongside finish_reason=stop. The block is authoritative:
+                // treating this as a final response strands the turn with no text.
+                .stopReason("end_turn")
                 .content(List.of(LlmChatResponse.ContentBlock.builder()
                         .type("tool_use")
                         .id("tool-1")

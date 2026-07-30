@@ -51,7 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * because these are HARD — the point is to surface the real limit, not to manufacture a pass.
  *
  * <p>Opt-in: {@code @Tag("agent-eval-live")} + a live credential resolved from the environment by
- * {@link LiveLlmSeeder} (qwen preferred, DeepSeek fallback).
+ * {@link LiveLlmSeeder} (the explicit provider-neutral live profile).
  */
 @Slf4j
 @Tag("agent-eval-live")
@@ -59,16 +59,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
-        "agent.anthropic.api-key=",
         "agent.llm.stub-mode=false",
 })
 class AgentFormFillHardLiveIT extends BaseIntegrationTest {
 
     /**
-     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * Resolved from the environment (the explicit provider-neutral live profile) rather than
      * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider and its
      * model name in every live IT is what silently broke this whole layer when
-     * DeepSeek retired {@code deepseek-chat}.
+     * an upstream provider retired a model identifier.
      */
     private LiveLlmSeeder.LiveProvider liveProvider;
 

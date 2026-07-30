@@ -2,6 +2,7 @@ package com.auraboot.framework.rag.service;
 
 import com.auraboot.framework.file.entity.FileEntity;
 import com.auraboot.framework.file.service.FileService;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.rag.entity.KbDocument;
 import com.auraboot.framework.rag.entity.KnowledgeBase;
@@ -40,7 +41,12 @@ public class DocumentProcessingService {
      */
     @Async("asyncTaskExecutor")
     public void processDocument(String kbPid, String docPid) {
-        processDocumentNow(kbPid, docPid);
+        processDocumentNow(MetaContext.getCurrentTenantId(), kbPid, docPid);
+    }
+
+    @Async("asyncTaskExecutor")
+    public void processDocument(Long tenantId, String kbPid, String docPid) {
+        processDocumentNow(tenantId, kbPid, docPid);
     }
 
     /**
@@ -49,62 +55,68 @@ public class DocumentProcessingService {
      * hop would make the reconcile pass report success before the work had actually happened).
      */
     public void processDocumentNow(String kbPid, String docPid) {
+        processDocumentNow(MetaContext.getCurrentTenantId(), kbPid, docPid);
+    }
+
+    public void processDocumentNow(Long tenantId, String kbPid, String docPid) {
         log.info("Starting document processing: kb={}, doc={}", kbPid, docPid);
 
         // Mark as PROCESSING
         jdbcTemplate.update(
-                "UPDATE ab_kb_document SET status = 'processing', process_started_at = NOW() WHERE pid = ?",
-                docPid);
+                "UPDATE ab_kb_document SET status = 'processing', process_started_at = NOW() "
+                        + "WHERE tenant_id = ? AND kb_id = ? AND pid = ?",
+                tenantId, kbPid, docPid);
 
         try {
             KbDocument doc = docMapper.selectOne(
-                    new LambdaQueryWrapper<KbDocument>().eq(KbDocument::getPid, docPid));
+                    new LambdaQueryWrapper<KbDocument>()
+                            .eq(KbDocument::getTenantId, tenantId)
+                            .eq(KbDocument::getKbId, kbPid)
+                            .eq(KbDocument::getPid, docPid));
             if (doc == null) {
                 log.error("Document not found: {}", docPid);
                 return;
             }
 
-            KnowledgeBase kb = kbService.findKbByPid(kbPid);
+            KnowledgeBase kb = kbService.findKb(tenantId, kbPid);
             if (kb == null) {
-                markFailed(docPid, "Knowledge base not found: " + kbPid);
+                markFailed(tenantId, kbPid, docPid, "Knowledge base not found: " + kbPid);
                 return;
             }
 
             // 1. Parse: extract text from file
             String text = extractText(doc);
             if (text == null || text.isBlank()) {
-                markFailed(docPid, "No text content extracted from document");
+                markFailed(tenantId, kbPid, docPid, "No text content extracted from document");
                 return;
             }
 
-            // A run that died mid-ingest can have left chunks behind, and the ingest pipeline only
-            // ever INSERTs — so clear them first, or a reconcile / manual reprocess double-inserts
-            // every chunk it already wrote.
-            int stale = jdbcTemplate.update("DELETE FROM ab_kb_chunk WHERE doc_id = ?", docPid);
-            if (stale > 0) {
-                log.info("Cleared {} chunk(s) from a previous incomplete run of doc={}", stale, docPid);
-            }
+            // Each attempt writes a new immutable DocumentVersion. Old active
+            // release chunks remain available for rollback; failed/incomplete
+            // versions are invisible because retrieval pins both active
+            // document_version_pid and active index_release_pid.
 
             // 2-4. Chunk → store → embed via the shared pipeline (G9)
             KbChunkIngestPipeline.IngestOutcome outcome = ingestPipeline.ingestChunks(
                     doc.getTenantId(), kbPid, docPid, text,
                     kb.getChunkSize(), kb.getChunkOverlap(), kb.getEmbeddingProvider(), null);
             if (outcome.chunkCount() == 0) {
-                markFailed(docPid, "Chunking produced no results");
+                markFailed(tenantId, kbPid, docPid, "Chunking produced no results");
                 return;
             }
 
             // 5. Update document and KB counters
-            kbService.updateDocumentAfterProcessing(docPid, "completed",
+            kbService.updateDocumentAfterProcessing(
+                    tenantId, kbPid, docPid, "completed",
                     text.length(), outcome.chunkCount(), null);
-            kbService.refreshKbCounters(kbPid);
+            kbService.refreshKbCounters(tenantId, kbPid);
 
             log.info("Document processed: doc={}, chars={}, chunks={}, embedded={}",
                     docPid, text.length(), outcome.chunkCount(), outcome.embeddedCount());
 
         } catch (Exception e) {
             log.error("Document processing failed: doc={}", docPid, e);
-            markFailed(docPid, e.getMessage());
+            markFailed(tenantId, kbPid, docPid, e.getMessage());
         }
     }
 
@@ -197,11 +209,12 @@ public class DocumentProcessingService {
         return sb.toString();
     }
 
-    private void markFailed(String docPid, String error) {
+    private void markFailed(Long tenantId, String kbPid, String docPid, String error) {
         jdbcTemplate.update(
                 "UPDATE ab_kb_document SET status = 'failed', error_message = ?, "
-                + "process_completed_at = NOW() WHERE pid = ?",
+                + "process_completed_at = NOW() "
+                + "WHERE tenant_id = ? AND kb_id = ? AND pid = ?",
                 error != null && error.length() > 2000 ? error.substring(0, 2000) : error,
-                docPid);
+                tenantId, kbPid, docPid);
     }
 }

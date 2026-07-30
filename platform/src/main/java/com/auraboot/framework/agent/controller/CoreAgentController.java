@@ -10,6 +10,7 @@ import com.auraboot.framework.agent.service.AgentDefinitionService;
 import com.auraboot.framework.agent.service.AgentEventDispatchService;
 import com.auraboot.framework.agent.service.AgentLifecycleService;
 import com.auraboot.framework.agent.service.AgentOrganizationService;
+import com.auraboot.framework.agent.service.AgentReleaseDeploymentService;
 import com.auraboot.framework.agent.service.McpServerConfigService;
 import com.auraboot.framework.agent.spi.AgentExecutionService;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -37,6 +38,7 @@ public class CoreAgentController {
     private final AgentOrganizationService agentOrganizationService;
     private final AgentDefinitionService agentDefinitionService;
     private final AgentLifecycleService agentLifecycleService;
+    private final AgentReleaseDeploymentService releaseDeploymentService;
     private final ToolProviderRegistry toolProviderRegistry;
 
     @GetMapping("/status")
@@ -423,6 +425,70 @@ public class CoreAgentController {
             @PathVariable String agentPid) {
         return lifecycle(() -> agentLifecycleService.resume(
                 agentPid, MetaContext.exists() ? MetaContext.getCurrentUserId() : null));
+    }
+
+    /** Publish the current editable blueprint as an immutable runtime release. */
+    @PostMapping("/definitions/{agentPid}/publish")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
+    public ResponseEntity<ApiResponse<AgentReleaseDeploymentService.PublishedRelease>>
+            publishAgent(@PathVariable String agentPid) {
+        return ResponseEntity.ok(ApiResponse.success(
+                releaseDeploymentService.publish(
+                        MetaContext.getCurrentTenantId(),
+                        agentPid,
+                        MetaContext.getCurrentUserId())));
+    }
+
+    /** Release history and the currently deployed version for Agent Studio. */
+    @GetMapping("/definitions/{agentPid}/releases")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> listAgentReleases(
+            @PathVariable String agentPid) {
+        return ResponseEntity.ok(ApiResponse.success(
+                releaseDeploymentService.listReleases(
+                        MetaContext.getCurrentTenantId(),
+                        agentPid)));
+    }
+
+    /** Read the effective invocation audience/channel policy of the active deployment. */
+    @GetMapping("/definitions/{agentPid}/deployment-policy")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
+    public ResponseEntity<ApiResponse<AgentReleaseDeploymentService.DeploymentPolicy>>
+            getDeploymentPolicy(@PathVariable String agentPid) {
+        return ResponseEntity.ok(ApiResponse.success(
+                releaseDeploymentService.getDeploymentPolicy(
+                        MetaContext.getCurrentTenantId(),
+                        agentPid)));
+    }
+
+    /** Update the versioned invocation gate without mutating an immutable release. */
+    @PutMapping("/definitions/{agentPid}/deployment-policy")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
+    public ResponseEntity<ApiResponse<AgentReleaseDeploymentService.DeploymentPolicy>>
+            updateDeploymentPolicy(
+                    @PathVariable String agentPid,
+                    @RequestBody Map<String, Object> policy) {
+        return ResponseEntity.ok(ApiResponse.success(
+                releaseDeploymentService.updateDeploymentPolicy(
+                        MetaContext.getCurrentTenantId(),
+                        agentPid,
+                        policy,
+                        MetaContext.getCurrentUserId())));
+    }
+
+    /** Roll the stable deployment pointer back to an existing immutable release. */
+    @PostMapping("/definitions/{agentPid}/releases/{releasePid}/deploy")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
+    public ResponseEntity<ApiResponse<AgentReleaseDeploymentService.PublishedRelease>>
+            deployAgentRelease(
+                    @PathVariable String agentPid,
+                    @PathVariable String releasePid) {
+        return ResponseEntity.ok(ApiResponse.success(
+                releaseDeploymentService.deployRelease(
+                        MetaContext.getCurrentTenantId(),
+                        agentPid,
+                        releasePid,
+                        MetaContext.getCurrentUserId())));
     }
 
     private ResponseEntity<ApiResponse<AgentLifecycleService.Transition>> lifecycle(

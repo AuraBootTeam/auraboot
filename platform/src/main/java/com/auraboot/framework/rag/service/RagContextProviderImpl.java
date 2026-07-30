@@ -85,7 +85,10 @@ public class RagContextProviderImpl implements RagContextProvider {
                             d7KnowledgeProperties.getRrfK(),
                             d7KnowledgeProperties.getCompiledRrfWeight()),
                     maxTokens);
-            return new RetrievedContext(context, diagnostics(outcome));
+            return new RetrievedContext(
+                    context,
+                    diagnostics(outcome),
+                    evidence(outcome, rawResults, query));
         }
 
         int rawTopK = d7KnowledgeProperties.getRawTopK() > 0
@@ -105,7 +108,10 @@ public class RagContextProviderImpl implements RagContextProvider {
                         d7KnowledgeProperties.getRrfK(),
                         d7KnowledgeProperties.getCompiledRrfWeight()),
                 maxTokens);
-        return new RetrievedContext(context, diagnostics(outcome, compiledMatches.size()));
+        return new RetrievedContext(
+                context,
+                diagnostics(outcome, compiledMatches.size()),
+                evidence(outcome, rawResults, query));
     }
 
     private static RetrievalDiagnostics diagnostics(RetrievalOutcome outcome) {
@@ -130,5 +136,33 @@ public class RagContextProviderImpl implements RagContextProvider {
                 results.size() + Math.max(additionalResultCount, 0),
                 scores,
                 outcome != null ? outcome.getWarnings() : List.of());
+    }
+
+    private static List<RetrievalEvidence> evidence(
+            RetrievalOutcome outcome,
+            List<RetrievalResult> results,
+            String query) {
+        String path = outcome != null ? outcome.getPath() : "none";
+        List<String> warnings = outcome != null ? outcome.getWarnings() : List.of();
+        return results.stream()
+                .map(result -> new RetrievalEvidence(
+                        "chunk:" + result.getChunkPid(),
+                        query,
+                        result.getKbPid(),
+                        result.getKbName(),
+                        result.getIndexReleasePid(),
+                        result.getDocumentPid(),
+                        result.getDocumentVersionPid(),
+                        result.getDocName(),
+                        result.getChunkPid(),
+                        result.getChunkIndex(),
+                        path,
+                        result.getVectorScore(),
+                        result.getBm25Score(),
+                        result.getHybridScore(),
+                        result.getRerankScore(),
+                        result.getCitationLocator(),
+                        warnings))
+                .toList();
     }
 }

@@ -261,7 +261,11 @@ class RagDocumentSyncListenerIntegrationTest extends BaseIntegrationTest {
                 "SELECT pid FROM ab_kb_document WHERE " + ACTIVE_DOC_FILTER + " LIMIT 1",
                 String.class, sourceEntityId);
         return jdbcTemplate.queryForObject(
-                "SELECT content FROM ab_kb_chunk WHERE doc_id = ? ORDER BY chunk_index LIMIT 1",
+                "SELECT c.content FROM ab_kb_chunk c "
+                        + "JOIN ab_kb_document d ON d.pid = c.doc_id "
+                        + "WHERE c.doc_id = ? "
+                        + "AND c.document_version_pid = d.active_version_pid "
+                        + "ORDER BY c.chunk_index LIMIT 1",
                 String.class, docPid);
     }
 }

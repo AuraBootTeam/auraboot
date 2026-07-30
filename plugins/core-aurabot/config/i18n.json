@@ -70,6 +70,524 @@
     "refType": "ui"
   },
   {
+    "key": "aurabot.chat.input.placeholder",
+    "source": "import",
+    "zh-CN": "输入消息…（按 Enter 发送）",
+    "en-US": "Type a message... (Enter to send)",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chat.input.keyboard_hint",
+    "source": "import",
+    "zh-CN": "Cmd+J 打开｜Enter 发送｜Shift+Enter 换行",
+    "en-US": "Cmd+J open | Enter send | Shift+Enter newline",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chat.attach_image",
+    "source": "import",
+    "zh-CN": "添加图片",
+    "en-US": "Attach image",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chat.remove",
+    "source": "import",
+    "zh-CN": "移除",
+    "en-US": "Remove",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chat.knowledge_bases",
+    "source": "import",
+    "zh-CN": "知识库",
+    "en-US": "Knowledge bases",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chat.knowledge_base_document_count",
+    "source": "import",
+    "zh-CN": "{count} 篇",
+    "en-US": "{count} docs",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chat.trace.view",
+    "source": "import",
+    "zh-CN": "查看追踪",
+    "en-US": "View trace",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.template.title",
+    "source": "import",
+    "zh-CN": "创建 AI 同事",
+    "en-US": "Create AI Colleague",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.template.subtitle",
+    "source": "import",
+    "zh-CN": "从模板开始，或从零配置。",
+    "en-US": "Start from a template or build from scratch.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.template.sectionLabel",
+    "source": "import",
+    "zh-CN": "选择模板",
+    "en-US": "Start from a template",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.template.startFromScratch",
+    "source": "import",
+    "zh-CN": "或从零开始 →",
+    "en-US": "Or start from scratch →",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.step.identity",
+    "source": "import",
+    "zh-CN": "身份",
+    "en-US": "Identity",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.step.personality",
+    "source": "import",
+    "zh-CN": "角色与风格",
+    "en-US": "Personality",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.step.review",
+    "source": "import",
+    "zh-CN": "确认",
+    "en-US": "Review",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.identity.title",
+    "source": "import",
+    "zh-CN": "定义 AI 同事",
+    "en-US": "Define your AI Colleague",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.identity.subtitle",
+    "source": "import",
+    "zh-CN": "设置名称、职责和运行方式。",
+    "en-US": "Give your colleague a name, purpose, and personality.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.personality.title",
+    "source": "import",
+    "zh-CN": "塑造角色与沟通风格",
+    "en-US": "Shape the personality",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.personality.subtitle",
+    "source": "import",
+    "zh-CN": "定义 AI 同事如何沟通和行动。",
+    "en-US": "Define how your colleague communicates and behaves.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.review.title",
+    "source": "import",
+    "zh-CN": "确认 AI 同事配置",
+    "en-US": "Review your AI Colleague",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.review.subtitle",
+    "source": "import",
+    "zh-CN": "创建前请确认以下信息。",
+    "en-US": "Confirm the details before creating.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.field.name",
+    "source": "import",
+    "zh-CN": "名称",
+    "en-US": "Name",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.field.name.placeholder",
+    "source": "import",
+    "zh-CN": "例如：采购助理",
+    "en-US": "e.g. Procurement Assistant",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.field.description",
+    "source": "import",
+    "zh-CN": "职责说明",
+    "en-US": "Description",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.field.description.placeholder",
+    "source": "import",
+    "zh-CN": "这位 AI 同事负责什么？",
+    "en-US": "What does this colleague do?",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.field.avatar",
+    "source": "import",
+    "zh-CN": "头像",
+    "en-US": "Avatar",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.field.agentType",
+    "source": "import",
+    "zh-CN": "运行类型",
+    "en-US": "Agent Type",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.field.personality",
+    "source": "import",
+    "zh-CN": "角色说明",
+    "en-US": "Role Description",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.field.personality.placeholder",
+    "source": "import",
+    "zh-CN": "描述这位 AI 同事的专业角色、边界和行为方式……",
+    "en-US": "Describe this colleague's role, boundaries, and behavior...",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.field.commStyle",
+    "source": "import",
+    "zh-CN": "沟通风格",
+    "en-US": "Communication Style",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.field.systemPrompt.toggle",
+    "source": "import",
+    "zh-CN": "高级：系统提示词",
+    "en-US": "Advanced: System Prompt",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.field.systemPrompt.placeholder",
+    "source": "import",
+    "zh-CN": "覆盖默认系统提示词；留空则根据角色说明和沟通风格自动生成。",
+    "en-US": "Override the default system prompt. Leave empty to auto-generate.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.field.systemPrompt.hint",
+    "source": "import",
+    "zh-CN": "留空时，系统会根据角色说明和沟通风格生成提示词。",
+    "en-US": "If left empty, a prompt will be generated from the role description and communication style.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.field.provider",
+    "source": "import",
+    "zh-CN": "AI 服务",
+    "en-US": "AI service",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.field.provider.none",
+    "source": "import",
+    "zh-CN": "尚未配置 AI 服务。请先在 AI 设置中添加 API Key，否则该同事无法回答。",
+    "en-US": "No AI service is configured yet. Add an API key under AI Settings first.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.type.reactive",
+    "source": "import",
+    "zh-CN": "响应式",
+    "en-US": "Reactive",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.type.reactive.desc",
+    "source": "import",
+    "zh-CN": "收到请求时执行，适合问答和按需任务。",
+    "en-US": "Responds when asked. Best for Q&A and on-demand tasks.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.type.autonomous",
+    "source": "import",
+    "zh-CN": "自主式",
+    "en-US": "Autonomous",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.type.autonomous.desc",
+    "source": "import",
+    "zh-CN": "由人员委派目标后独立执行。",
+    "en-US": "Runs independently after a person delegates a goal.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.type.proactive",
+    "source": "import",
+    "zh-CN": "主动式数字员工",
+    "en-US": "Proactive digital employee",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.type.proactive.desc",
+    "source": "import",
+    "zh-CN": "可由受治理的计划或事件唤醒，并受静默时段、预算和管理范围约束。",
+    "en-US": "Can wake from governed schedules or events, with quiet hours, budgets and manager scope.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.style.professional",
+    "source": "import",
+    "zh-CN": "专业",
+    "en-US": "Professional",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.style.friendly",
+    "source": "import",
+    "zh-CN": "友好",
+    "en-US": "Friendly",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.style.concise",
+    "source": "import",
+    "zh-CN": "简洁",
+    "en-US": "Concise",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.style.detailed",
+    "source": "import",
+    "zh-CN": "详细",
+    "en-US": "Detailed",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.btn.back",
+    "source": "import",
+    "zh-CN": "上一步",
+    "en-US": "Back",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.btn.next",
+    "source": "import",
+    "zh-CN": "下一步",
+    "en-US": "Next",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.btn.create",
+    "source": "import",
+    "zh-CN": "创建 AI 同事",
+    "en-US": "Create AI Colleague",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.btn.creating",
+    "source": "import",
+    "zh-CN": "创建中……",
+    "en-US": "Creating...",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.backToList",
+    "source": "import",
+    "zh-CN": "返回 AI 同事",
+    "en-US": "Back to AI Colleagues",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.error.nameRequired",
+    "source": "import",
+    "zh-CN": "请输入名称",
+    "en-US": "Name is required",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.error.noProvider",
+    "source": "import",
+    "zh-CN": "请先选择 AI 服务；如列表为空，请到 AI 设置添加 API Key。",
+    "en-US": "Choose an AI service first. Add an API key under AI Settings if the list is empty.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.error.createFailed",
+    "source": "import",
+    "zh-CN": "AI 同事创建失败",
+    "en-US": "Failed to create AI Colleague",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.wizard.success",
+    "source": "import",
+    "zh-CN": "AI 同事创建成功",
+    "en-US": "AI Colleague created successfully",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.template.procurement.name",
+    "source": "import",
+    "zh-CN": "采购审批助理",
+    "en-US": "Procurement Approver",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.template.procurement.desc",
+    "source": "import",
+    "zh-CN": "审核采购订单、预算与审批规则。",
+    "en-US": "Reviews purchase orders, budgets, and approval rules.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.template.weeklyReport.name",
+    "source": "import",
+    "zh-CN": "周报撰写助理",
+    "en-US": "Weekly Report Writer",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.template.weeklyReport.desc",
+    "source": "import",
+    "zh-CN": "根据活动和项目进展生成团队周报。",
+    "en-US": "Generates team weekly reports from activity and project data.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.template.customerService.name",
+    "source": "import",
+    "zh-CN": "客户服务助理",
+    "en-US": "Customer Service Agent",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.template.customerService.desc",
+    "source": "import",
+    "zh-CN": "处理客户咨询、查询订单并拟定回复。",
+    "en-US": "Handles inquiries, checks orders, and drafts responses.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.template.dataAnalyst.name",
+    "source": "import",
+    "zh-CN": "数据分析助理",
+    "en-US": "Data Analyst",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.template.dataAnalyst.desc",
+    "source": "import",
+    "zh-CN": "查询数据、生成业务洞察和图表建议。",
+    "en-US": "Queries data and generates business insights.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.template.onboarding.name",
+    "source": "import",
+    "zh-CN": "入职引导助理",
+    "en-US": "Onboarding Guide",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.template.onboarding.desc",
+    "source": "import",
+    "zh-CN": "帮助新员工熟悉平台、资源与入职任务。",
+    "en-US": "Helps new employees navigate resources and onboarding tasks.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.channel.web",
+    "source": "import",
+    "zh-CN": "网页对话",
+    "en-US": "Web chat",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.channel.imGroup",
+    "source": "import",
+    "zh-CN": "IM 群聊",
+    "en-US": "IM group",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.channel.schedule",
+    "source": "import",
+    "zh-CN": "定时任务",
+    "en-US": "Scheduled task",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.channel.event",
+    "source": "import",
+    "zh-CN": "事件",
+    "en-US": "Event",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.channel.webhook",
+    "source": "import",
+    "zh-CN": "Webhook",
+    "en-US": "Webhook",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.channel.api",
+    "source": "import",
+    "zh-CN": "API",
+    "en-US": "API",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.initiator.human",
+    "source": "import",
+    "zh-CN": "人员",
+    "en-US": "Person",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.initiator.system",
+    "source": "import",
+    "zh-CN": "系统",
+    "en-US": "System",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.initiator.schedule",
+    "source": "import",
+    "zh-CN": "定时任务",
+    "en-US": "Scheduled task",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.initiator.event",
+    "source": "import",
+    "zh-CN": "事件",
+    "en-US": "Event",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.initiator.agentHandoff",
+    "source": "import",
+    "zh-CN": "AI 同事转交",
+    "en-US": "AI colleague handoff",
+    "refType": "ui"
+  },
+  {
     "key": "aurabot.shell.empty.hint",
     "source": "import",
     "zh-CN": "试试输入 echo hello,体验回路",
@@ -158,6 +676,41 @@
     "source": "import",
     "zh-CN": "复制",
     "en-US": "Copy",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chatbi.data_query",
+    "source": "import",
+    "zh-CN": "数据查询",
+    "en-US": "Data query",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chatbi.records",
+    "source": "import",
+    "zh-CN": "条记录",
+    "en-US": "records",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chatbi.record",
+    "source": "import",
+    "zh-CN": "条记录",
+    "en-US": "record",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chatbi.more_records",
+    "source": "import",
+    "zh-CN": "另有",
+    "en-US": "and",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chatbi.truncated",
+    "source": "import",
+    "zh-CN": "已截断",
+    "en-US": "truncated",
     "refType": "ui"
   }
 ]

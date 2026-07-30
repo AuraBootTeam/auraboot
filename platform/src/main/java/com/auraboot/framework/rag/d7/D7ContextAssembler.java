@@ -21,8 +21,8 @@ public class D7ContextAssembler {
         int budget = maxTokens > 0 ? maxTokens : Integer.MAX_VALUE;
         StringBuilder sb = new StringBuilder("\n\n## Retrieved Knowledge\n");
         sb.append("Reviewed compiled pages and raw chunks, ranked by relevance. ");
-        sb.append("Prefer compiled pages; cite sources using the listed paths or ");
-        sb.append("[Source: docName, Chunk N] format.\n\n");
+        sb.append("Prefer compiled pages. Cite only the stable evidence identifiers ");
+        sb.append("shown below; never invent a source identifier.\n\n");
         int used = VectorUtils.estimateTokens(sb.toString());
         int emitted = 0;
         int dropped = 0;
@@ -47,7 +47,8 @@ public class D7ContextAssembler {
     private String renderCompiledBlock(D7CompiledKnowledgeMatch match) {
         StringBuilder sb = new StringBuilder();
         D7CompiledKnowledgePage page = match.getPage();
-        sb.append("### [Compiled: ").append(nonBlank(page.getTitle(), page.getId())).append("]\n");
+        sb.append("### [Evidence compiled:").append(page.getId()).append("] ")
+                .append(nonBlank(page.getTitle(), page.getId())).append("\n");
         sb.append("- Page ID: `").append(page.getId()).append("`\n");
         sb.append("- Type: `").append(nonBlank(page.getType(), "unknown")).append("`\n");
         sb.append("- Stale status: `").append(nonBlank(page.getStaleStatus(), "unknown")).append("`\n");
@@ -60,7 +61,8 @@ public class D7ContextAssembler {
     }
 
     private String renderRawBlock(com.auraboot.framework.rag.dto.RetrievalResult r) {
-        return "### [Source: " + r.getDocName() + ", Chunk " + r.getChunkIndex() + "]\n"
+        return "### [Evidence chunk:" + r.getChunkPid() + "] "
+                + r.getDocName() + " / Chunk " + r.getChunkIndex() + "\n"
                 + r.getContent() + "\n\n---\n\n";
     }
 

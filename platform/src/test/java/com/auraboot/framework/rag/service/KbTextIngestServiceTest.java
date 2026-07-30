@@ -15,6 +15,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -54,8 +55,12 @@ class KbTextIngestServiceTest {
         txManager = mock(PlatformTransactionManager.class);
         when(txManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
         // Real pipeline wired with the same mocks — preserves chunk/embed assertions (G9)
+        KnowledgeLineageService lineageService = mock(KnowledgeLineageService.class);
+        when(lineageService.beginIngest(anyLong(), anyString(), anyString()))
+                .thenReturn(new KnowledgeLineageService.IngestLineage("dv1", "ir1", 1));
         KbChunkIngestPipeline pipeline =
-                new KbChunkIngestPipeline(chunkingService, embeddingService, jdbcTemplate);
+                new KbChunkIngestPipeline(
+                        chunkingService, embeddingService, jdbcTemplate, lineageService);
         svc = new KbTextIngestService(kbService, docMapper, pipeline, jdbcTemplate, txManager);
         svc.initTx();
     }
@@ -64,7 +69,10 @@ class KbTextIngestServiceTest {
     private void stubKb(String kbPid, String provider) {
         KnowledgeBase kb = mock(KnowledgeBase.class);
         when(kb.getEmbeddingProvider()).thenReturn(provider);
-        when(kbService.findKbByPid(kbPid)).thenReturn(kb);
+        when(kb.getStatus()).thenReturn("active");
+        when(kb.getChunkSize()).thenReturn(500);
+        when(kb.getChunkOverlap()).thenReturn(50);
+        when(kbService.findKb(1L, kbPid)).thenReturn(kb);
     }
 
     private static ChunkingService.ChunkResult chunk(int idx, String text) {
@@ -76,12 +84,12 @@ class KbTextIngestServiceTest {
     @Test
     void blankText_returnsNull_noKbLookup() {
         assertNull(svc.ingestText(1L, "KB1", "crawler", "u1", "Doc", "   "));
-        verify(kbService, never()).findKbByPid(anyString());
+        verify(kbService, never()).findKb(anyLong(), anyString());
     }
 
     @Test
     void unknownKb_returnsNull() {
-        when(kbService.findKbByPid("KB1")).thenReturn(null);
+        when(kbService.findKb(1L, "KB1")).thenReturn(null);
         assertNull(svc.ingestText(1L, "KB1", "crawler", "u1", "Doc", "some text"));
         verify(docMapper, never()).insert(any(KbDocument.class));
     }
@@ -104,9 +112,10 @@ class KbTextIngestServiceTest {
         verify(embeddingService).embedBatch(eq(1L), any(), eq("zhipu"));
         // 2 embedding UPDATEs (one per chunk) — proves vectors are written back
         verify(jdbcTemplate, times(2)).update(contains("UPDATE ab_kb_chunk SET embedding"),
-                anyString(), anyString());
-        verify(kbService).updateDocumentAfterProcessing(anyString(), eq("completed"), eq(11), eq(2), eq(null));
-        verify(kbService).refreshKbCounters("KB1");
+                anyString(), eq(1L), anyString(), eq("dv1"), eq("ir1"));
+        verify(kbService).updateDocumentAfterProcessing(
+                eq(1L), eq("KB1"), anyString(), eq("completed"), eq(11), eq(2), eq(null));
+        verify(kbService).refreshKbCounters(1L, "KB1");
     }
 
 
@@ -170,25 +179,24 @@ class KbTextIngestServiceTest {
     }
 
     @Test
-    void defaultsProviderToOpenai_whenKbHasNone() {
+    void missingEmbeddingProfileFailsClosed() {
         stubKb("KB1", null);
-        when(docMapper.selectList(any())).thenReturn(List.of());
-        when(chunkingService.chunk(any(), anyInt(), anyInt())).thenReturn(List.of(chunk(0, "x")));
-        when(embeddingService.embedBatch(anyLong(), any(), eq("openai")))
-                .thenReturn(List.of(new float[]{0.1f}));
 
-        svc.ingestText(1L, "KB1", "crawler", "u1", "Doc", "x");
+        assertThrows(
+                IllegalStateException.class,
+                () -> svc.ingestText(1L, "KB1", "crawler", "u1", "Doc", "x"));
 
-        verify(embeddingService).embedBatch(eq(1L), any(), eq("openai"));
+        verify(embeddingService, never()).embedBatch(anyLong(), any(), anyString());
     }
 
     // ---- idempotent dedup ----
 
     @Test
-    void reingest_deletesPriorDocAndChunks() {
+    void reingestCreatesNewVersionWithoutDeletingPriorDocumentOrChunks() {
         KbDocument prior = mock(KbDocument.class);
         when(prior.getPid()).thenReturn("OLD-DOC");
-        when(prior.getId()).thenReturn(99L);
+        when(prior.getContentHash()).thenReturn("old-hash");
+        when(prior.getStatus()).thenReturn("completed");
         stubKb("KB1", "openai");
         when(docMapper.selectList(any())).thenReturn(List.of(prior));
         when(chunkingService.chunk(any(), anyInt(), anyInt())).thenReturn(List.of(chunk(0, "x")));
@@ -197,9 +205,14 @@ class KbTextIngestServiceTest {
 
         svc.ingestText(1L, "KB1", "crawler", "u1", "Doc", "x");
 
-        verify(jdbcTemplate).update(eq("DELETE FROM ab_kb_chunk WHERE doc_id = ?"), eq("OLD-DOC"));
-        verify(docMapper).deleteById(99L);
-        verify(docMapper).insert(any(KbDocument.class));
+        verify(jdbcTemplate, never()).update(
+                contains("DELETE FROM ab_kb_chunk"),
+                any(Object[].class));
+        verify(docMapper, never()).deleteById(99L);
+        verify(docMapper, never()).insert(any(KbDocument.class));
+        verify(jdbcTemplate).update(
+                contains("UPDATE ab_kb_document SET doc_name"),
+                any(Object[].class));
     }
 
     // ---- edge cases ----
@@ -212,7 +225,8 @@ class KbTextIngestServiceTest {
 
         svc.ingestText(1L, "KB1", "crawler", "u1", "Doc", "text");
 
-        verify(kbService).updateDocumentAfterProcessing(anyString(), eq("failed"), eq(0), eq(0), eq("No chunks"));
+        verify(kbService).updateDocumentAfterProcessing(
+                eq(1L), eq("KB1"), anyString(), eq("failed"), eq(0), eq(0), eq("No chunks"));
         verify(embeddingService, never()).embedBatch(anyLong(), any(), anyString());
     }
 
@@ -229,7 +243,10 @@ class KbTextIngestServiceTest {
         org.junit.jupiter.api.Assertions.assertNotNull(docPid);
         // no embedding vector written; chunk marked 'failed' (retry pickup state), doc still completed
         verify(jdbcTemplate, never()).update(contains("SET embedding = ?::vector"), anyString(), anyString());
-        verify(jdbcTemplate).update(contains("embedding_status = 'failed'"), any(Object.class));
-        verify(kbService).updateDocumentAfterProcessing(anyString(), eq("completed"), anyInt(), anyInt(), eq(null));
+        verify(jdbcTemplate).update(
+                contains("embedding_status = 'failed'"),
+                eq(1L), eq("KB1"), anyString(), eq("dv1"), eq("ir1"));
+        verify(kbService).updateDocumentAfterProcessing(
+                eq(1L), eq("KB1"), anyString(), eq("completed"), anyInt(), anyInt(), eq(null));
     }
 }

@@ -233,6 +233,11 @@ public class AnthropicLlmProvider implements LlmProvider {
     }
 
     @Override
+    public Set<String> supportedApiFormats() {
+        return Set.of("messages");
+    }
+
+    @Override
     public boolean supportsTools() {
         return true;
     }
@@ -808,6 +813,18 @@ public class AnthropicLlmProvider implements LlmProvider {
             if (model.contains(pattern)) return true;
         }
         return false;
+    }
+
+    @Override
+    public ModelCapabilityProfile modelCapabilities(String model) {
+        return new ModelCapabilityProfile(
+                true,
+                true,
+                supportsTools(),
+                false,
+                true,
+                supportsVision(model),
+                supportsThinking(model));
     }
 
     /**

@@ -52,16 +52,18 @@ interface AgentRecord {
 const AURABOT_CODE = 'aurabot';
 
 const TYPE_COLORS: Record<string, string> = {
-  reactive: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  copilot: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  autonomous: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-  workflow: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+  reactive: 'bg-accent-weak text-accent dark:bg-accent-weak/30 dark:text-accent',
+  copilot: 'bg-accent-weak text-accent dark:bg-accent-weak/30 dark:text-accent',
+  autonomous:
+    'bg-status-amber-bg text-status-amber dark:bg-status-amber-bg/30 dark:text-status-amber',
+  workflow:
+    'bg-status-green-bg text-status-green dark:bg-status-green-bg/30 dark:text-status-green',
 };
 
 const STATUS_STYLES: Record<string, { dot: string; text: string }> = {
-  active: { dot: 'bg-green-500', text: 'text-green-700 dark:text-green-400' },
-  disabled: { dot: 'bg-gray-400', text: 'text-gray-500 dark:text-gray-400' },
-  draft: { dot: 'bg-yellow-500', text: 'text-yellow-700 dark:text-yellow-400' },
+  active: { dot: 'bg-status-green-bg0', text: 'text-status-green dark:text-status-green' },
+  disabled: { dot: 'bg-status-gray-bg', text: 'text-text-3 dark:text-text-3' },
+  draft: { dot: 'bg-status-amber-bg0', text: 'text-status-amber dark:text-status-amber' },
 };
 
 function getInitial(name: string): string {
@@ -73,16 +75,16 @@ function getInitial(name: string): string {
 
 function avatarColor(str: string): string {
   const colors = [
-    'bg-blue-500',
-    'bg-indigo-500',
-    'bg-purple-500',
+    'bg-accent',
+    'bg-accent-weak0',
+    'bg-accent-weak0',
     'bg-pink-500',
-    'bg-rose-500',
-    'bg-orange-500',
-    'bg-amber-500',
-    'bg-teal-500',
-    'bg-cyan-500',
-    'bg-emerald-500',
+    'bg-status-red-bg0',
+    'bg-status-amber-bg0',
+    'bg-status-amber-bg0',
+    'bg-status-green-bg0',
+    'bg-accent-weak0',
+    'bg-status-green-bg0',
   ];
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -107,7 +109,7 @@ function AgentAvatar({ agent, size = 'md' }: { agent: AgentRecord; size?: 'sm' |
 
   return (
     <div
-      className={`${sizeMap[size]} flex items-center justify-center rounded-full font-semibold text-white ${isAuraBot ? 'bg-gradient-to-br from-blue-500 to-violet-600' : avatarColor(agent.agent_code)}`}
+      className={`${sizeMap[size]} flex items-center justify-center rounded-full font-semibold text-white ${isAuraBot ? 'from-accent-weak0 to-accent-hover bg-gradient-to-br' : avatarColor(agent.agent_code)}`}
     >
       {isAuraBot ? <SparklesIcon className="h-6 w-6" /> : getInitial(agent.name)}
     </div>
@@ -127,8 +129,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function TypeBadge({ agentType }: { agentType: string }) {
-  const cls =
-    TYPE_COLORS[agentType] ?? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300';
+  const cls = TYPE_COLORS[agentType] ?? 'bg-subtle text-text-2 dark:bg-subtle dark:text-text-3';
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${cls}`}
@@ -144,7 +145,7 @@ function VisibilityBadge({ visibility }: { visibility: 'private' | 'team' | 'ten
   if (v === 'private') {
     return (
       <span
-        className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+        className="bg-subtle text-text-3 dark:bg-subtle dark:text-text-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
         data-testid="visibility-badge-private"
       >
         <LockClosedIcon className="h-3 w-3" />
@@ -155,7 +156,7 @@ function VisibilityBadge({ visibility }: { visibility: 'private' | 'team' | 'ten
   if (v === 'team') {
     return (
       <span
-        className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-medium text-purple-600 dark:bg-purple-900/30 dark:text-purple-300"
+        className="bg-accent-weak text-accent dark:bg-accent-weak/30 dark:text-accent inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
         data-testid="visibility-badge-team"
       >
         <UserGroupIcon className="h-3 w-3" />
@@ -165,7 +166,7 @@ function VisibilityBadge({ visibility }: { visibility: 'private' | 'team' | 'ten
   }
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-300"
+      className="bg-accent-weak text-accent dark:bg-accent-weak/30 dark:text-accent inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
       data-testid="visibility-badge-tenant"
     >
       <GlobeAltIcon className="h-3 w-3" />
@@ -178,14 +179,14 @@ function AuraBotCard({ agent, onChat }: { agent: AgentRecord; onChat: () => void
   const { t } = useI18n();
   return (
     <div
-      className="relative overflow-hidden rounded-xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 via-white to-violet-50 p-5 shadow-sm transition-all duration-200 hover:shadow-md dark:border-blue-800 dark:from-blue-950/40 dark:via-gray-900 dark:to-violet-950/30"
+      className="border-accent from-accent-weak to-accent-weak dark:border-accent dark:from-accent/40 dark:via-subtle dark:to-accent-hover/30 relative overflow-hidden rounded-xl border-2 bg-gradient-to-br via-white p-5 shadow-sm transition-all duration-200 hover:shadow-md"
       data-testid="aurabot-card"
     >
       <div className="absolute top-3 right-3 flex items-center gap-1.5">
-        <span className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+        <span className="bg-accent inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold text-white">
           {t('ai.colleagues.badge.official', undefined, 'Official')}
         </span>
-        <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-violet-500 to-blue-500 px-2 py-0.5 text-[11px] font-semibold text-white">
+        <span className="from-accent-weak0 to-accent-weak0 inline-flex items-center gap-1 rounded-full bg-gradient-to-r px-2 py-0.5 text-[11px] font-semibold text-white">
           <BoltIcon className="h-3 w-3" />
           {t('ai.colleagues.badge.fullPower', undefined, 'Full Power')}
         </span>
@@ -194,12 +195,14 @@ function AuraBotCard({ agent, onChat }: { agent: AgentRecord; onChat: () => void
       <div className="mt-1 flex items-start gap-4">
         <AgentAvatar agent={agent} size="lg" />
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-lg font-semibold text-gray-900 dark:text-white">
-            {agent.name}
-          </h3>
-          <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
+          <h3 className="text-text truncate text-lg font-semibold dark:text-white">{agent.name}</h3>
+          <p className="text-text-3 dark:text-text-3 mt-1 line-clamp-2 text-sm">
             {agent.description ||
-              t('ai.colleagues.aurabot.desc', undefined, 'Built-in AI assistant with full data access')}
+              t(
+                'ai.colleagues.aurabot.desc',
+                undefined,
+                'Built-in AI assistant with full data access',
+              )}
           </p>
         </div>
       </div>
@@ -212,7 +215,7 @@ function AuraBotCard({ agent, onChat }: { agent: AgentRecord; onChat: () => void
         </div>
         <button
           onClick={onChat}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          className="bg-accent hover:bg-accent-hover inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
           data-testid="aurabot-chat-btn"
         >
           <ChatBubbleLeftRightIcon className="h-4 w-4" />
@@ -235,16 +238,16 @@ function AgentCard({
   const { t } = useI18n();
   return (
     <div
-      className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all duration-200 hover:border-gray-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
+      className="border-border bg-panel hover:border-border-strong dark:border-border dark:bg-subtle dark:hover:border-border-strong rounded-xl border p-5 shadow-sm transition-all duration-200 hover:shadow-md"
       data-testid={`agent-card-${agent.agent_code}`}
     >
       <div className="flex items-start gap-3">
         <AgentAvatar agent={agent} />
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-text truncate text-base font-semibold dark:text-white">
             {agent.name}
           </h3>
-          <p className="mt-0.5 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-text-3 dark:text-text-3 mt-0.5 line-clamp-2 text-sm">
             {agent.description || t('ai.colleagues.noDescription', undefined, 'No description')}
           </p>
         </div>
@@ -255,16 +258,14 @@ function AgentCard({
         <TypeBadge agentType={agent.agent_type} />
         <VisibilityBadge visibility={agent.visibility} />
         {agent.model && (
-          <span className="truncate text-[11px] text-gray-400 dark:text-gray-500">
-            {agent.model}
-          </span>
+          <span className="text-text-3 dark:text-text-3 truncate text-[11px]">{agent.model}</span>
         )}
       </div>
 
       <div className="mt-4 flex items-center justify-end gap-2">
         <button
           onClick={onEdit}
-          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+          className="border-border text-text-2 hover:bg-subtle dark:border-border dark:text-text-3 dark:hover:bg-subtle inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors"
           data-testid={`agent-edit-${agent.agent_code}`}
         >
           <PencilSquareIcon className="h-4 w-4" />
@@ -272,7 +273,7 @@ function AgentCard({
         </button>
         <button
           onClick={onChat}
-          className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          className="bg-accent hover:bg-accent-hover inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-white transition-colors"
           data-testid={`agent-chat-${agent.agent_code}`}
         >
           <ChatBubbleLeftRightIcon className="h-4 w-4" />
@@ -287,11 +288,11 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
   const { t } = useI18n();
   return (
     <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
-      <UserCircleIcon className="mb-4 h-16 w-16 text-gray-300 dark:text-gray-600" />
-      <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+      <UserCircleIcon className="text-text-3 dark:text-text-2 mb-4 h-16 w-16" />
+      <h3 className="text-text text-lg font-medium dark:text-white">
         {t('ai.colleagues.empty.title', undefined, 'No AI colleagues yet')}
       </h3>
-      <p className="mt-1 max-w-sm text-sm text-gray-500 dark:text-gray-400">
+      <p className="text-text-3 dark:text-text-3 mt-1 max-w-sm text-sm">
         {t(
           'ai.colleagues.empty.description',
           undefined,
@@ -300,7 +301,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       </p>
       <button
         onClick={onCreate}
-        className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        className="bg-accent hover:bg-accent-hover mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
       >
         <PlusIcon className="h-4 w-4" />
         {t('ai.colleagues.create', undefined, 'Create AI Colleague')}
@@ -311,21 +312,21 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
 
 function CardSkeleton() {
   return (
-    <div className="animate-pulse rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
+    <div className="border-border bg-panel dark:border-border dark:bg-subtle animate-pulse rounded-xl border p-5">
       <div className="flex items-start gap-3">
-        <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-700" />
+        <div className="bg-border dark:bg-subtle h-12 w-12 rounded-full" />
         <div className="flex-1 space-y-2">
-          <div className="h-4 w-1/2 rounded bg-gray-200 dark:bg-gray-700" />
-          <div className="h-3 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
+          <div className="bg-border dark:bg-subtle h-4 w-1/2 rounded" />
+          <div className="bg-border dark:bg-subtle h-3 w-3/4 rounded" />
         </div>
       </div>
       <div className="mt-3 flex gap-2">
-        <div className="h-5 w-14 rounded-full bg-gray-200 dark:bg-gray-700" />
-        <div className="h-5 w-16 rounded-full bg-gray-200 dark:bg-gray-700" />
+        <div className="bg-border dark:bg-subtle h-5 w-14 rounded-full" />
+        <div className="bg-border dark:bg-subtle h-5 w-16 rounded-full" />
       </div>
       <div className="mt-4 flex justify-end gap-2">
-        <div className="h-8 w-16 rounded-lg bg-gray-200 dark:bg-gray-700" />
-        <div className="h-8 w-16 rounded-lg bg-gray-200 dark:bg-gray-700" />
+        <div className="bg-border dark:bg-subtle h-8 w-16 rounded-lg" />
+        <div className="bg-border dark:bg-subtle h-8 w-16 rounded-lg" />
       </div>
     </div>
   );
@@ -374,23 +375,25 @@ export function AgentColleaguesGrid(_props?: { block?: unknown; runtime?: unknow
   }, [agents]);
 
   const handleCreate = () => navigate('/p/c/ai_colleague_new');
-  const handleEdit = (agent: AgentRecord) => navigate(`/p/c/ai_colleague_detail?agentPid=${agent.pid}`);
-  const handleChat = (agent: AgentRecord) => navigate(`/p/c/ai_colleague_chat?agentPid=${agent.pid}`);
+  const handleEdit = (agent: AgentRecord) =>
+    navigate(`/p/c/ai_colleague_detail?agentPid=${agent.pid}`);
+  const handleChat = (agent: AgentRecord) =>
+    navigate(`/p/c/ai_colleague_chat?agentPid=${agent.pid}`);
 
   return (
     <div className={workspacePageClassName('contentPadded')} data-testid="agent-colleagues-grid">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          <h1 className="text-text text-2xl font-semibold dark:text-white">
             {t('ai.colleagues.title', undefined, 'AI Colleagues')}
           </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-text-3 dark:text-text-3 mt-1 text-sm">
             {t('ai.colleagues.subtitle', undefined, 'Manage your AI team members')}
           </p>
         </div>
         <button
           onClick={handleCreate}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+          className="bg-accent hover:bg-accent-hover inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors"
           data-testid="create-agent-btn"
         >
           <PlusIcon className="h-4 w-4" />

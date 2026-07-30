@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
+import com.auraboot.framework.agent.runtime.policy.RiskScale;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
@@ -531,21 +532,9 @@ public class DeclaredAgentToolResolver {
     }
 
     private String normalizeRiskLevel(Object riskLevel, String fallback) {
-        if (riskLevel == null) {
-            return fallback;
-        }
-        String normalized = String.valueOf(riskLevel).trim().toUpperCase(Locale.ROOT);
-        if (normalized.startsWith("R") && normalized.length() == 2) {
-            normalized = "L" + normalized.substring(1);
-        }
-        return switch (normalized) {
-            case "L0", "L1", "L2", "L3", "L4" -> normalized;
-            case "LOW" -> "L0";
-            case "MEDIUM" -> "L2";
-            case "HIGH" -> "L3";
-            case "CRITICAL" -> "L4";
-            default -> fallback;
-        };
+        return RiskScale.parseOrDefault(
+                riskLevel,
+                RiskScale.parseOrDefault(fallback, RiskScale.L1)).code();
     }
 
     private String confirmationPolicy(String riskLevel) {

@@ -401,41 +401,6 @@ class ReportDefinitionControllerIT extends BaseIntegrationTest {
     }
 
     private void grant(String code, String resourceType, String resourceCode, String action, String name) {
-        Permission permission = permissionMapper.findByCode(code);
-        if (permission == null) {
-            permission = new Permission();
-            permission.setPid(UniqueIdGenerator.generate());
-            permission.setCode(code);
-            permission.setName(name);
-            permission.setResourceType(resourceType);
-            permission.setResourceCode(resourceCode);
-            permission.setAction(action);
-            permission.setSource("manual");
-            permission.setStatus("active");
-            permission.setDeletedFlag(false);
-            permission.setTenantId(getTestTenant().getId());
-            permission.setCreatedAt(Instant.now());
-            permission.setUpdatedAt(Instant.now());
-            permissionMapper.insert(permission);
-        }
-        boolean notAssigned = rolePermissionMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<RolePermission>()
-                        .eq(RolePermission::getRoleId, getTestRole().getId())
-                        .eq(RolePermission::getPermissionId, permission.getId())
-                        .eq(RolePermission::getDeletedFlag, false)
-        ).isEmpty();
-        if (notAssigned) {
-            RolePermission rp = new RolePermission();
-            rp.setPid(UniqueIdGenerator.generate());
-            rp.setRoleId(getTestRole().getId());
-            rp.setPermissionId(permission.getId());
-            rp.setGrantType("grant");
-            rp.setStatus("active");
-            rp.setDeletedFlag(false);
-            rp.setTenantId(getTestTenant().getId());
-            rp.setCreatedAt(Instant.now());
-            rp.setUpdatedAt(Instant.now());
-            rolePermissionMapper.insert(rp);
-        }
+        grantCommittedPermissionToTestRole(code, resourceType, resourceCode, action, name);
     }
 }

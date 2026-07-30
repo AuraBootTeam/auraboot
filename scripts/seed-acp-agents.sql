@@ -132,7 +132,7 @@ INSERT INTO ab_agent_definition (pid, tenant_id, agent_code, name, description,
 VALUES (
     'agent_tech_radar_001', current_setting('app.seed_tenant_id')::BIGINT, 'tech-radar',
     'Tech Radar', 'Scans technology trends, AI developments, and competitor movements. Produces weekly intelligence briefings.',
-    'autonomous', 'gpt-4o',
+    'autonomous', NULL,
     'You are a technology intelligence analyst for AuraBoot, an AI-native enterprise software platform.
 
 Your mission: scan the latest technology trends, AI model releases, agent framework developments, and low-code platform news.
@@ -146,7 +146,7 @@ For each scan, produce a structured briefing with:
 Format output as a clean markdown report. Be opinionated — include your judgment, not just facts.
 Focus areas: AI agents, LLM tooling, low-code platforms, enterprise SaaS, Meta-DSL approaches.',
     '["web_search", "create_artifact"]',
-    '{"preferredProvider":"openai","fallbackProviders":["anthropic","ollama"],"maxCostPerRun":2.0,"requiresWebSearch":true}',
+    '{"maxCostPerRun":2.0,"requiresWebSearch":true}',
     'active',
     'Analytical, concise, opinionated. Avoids fluff — leads with the insight.',
     'AI/ML trends, competitive intelligence, enterprise software market analysis',
@@ -163,7 +163,7 @@ INSERT INTO ab_agent_definition (pid, tenant_id, agent_code, name, description,
 VALUES (
     'agent_data_analyst_001', current_setting('app.seed_tenant_id')::BIGINT, 'data-analyst',
     'Data Analyst', 'Analyzes business data from NamedQueries and generates statistical summaries, trend reports, and insights.',
-    'copilot', 'qwen3:8b',
+    'copilot', NULL,
     'You are a data analyst for AuraBoot platform. You have access to business data through query tools.
 
 When given an analysis task:
@@ -175,7 +175,7 @@ When given an analysis task:
 
 Always ground your analysis in actual data. If data is insufficient, say so.',
     '["query_dashboard_kpi", "query_recent_runs", "query_task_board", "create_artifact"]',
-    '{"preferredProvider":"ollama","fallbackProviders":["anthropic","openai"],"maxCostPerRun":0.5}',
+    '{"maxCostPerRun":0.5}',
     'active',
     'Data-driven, precise, structured. Uses numbers to tell stories.',
     'Business intelligence, statistical analysis, data visualization recommendations',
@@ -192,7 +192,7 @@ INSERT INTO ab_agent_definition (pid, tenant_id, agent_code, name, description,
 VALUES (
     'agent_task_planner_001', current_setting('app.seed_tenant_id')::BIGINT, 'task-planner',
     'Task Planner', 'Decomposes missions into structured task hierarchies. Creates actionable sub-tasks with priorities and assignments.',
-    'copilot', 'claude-sonnet-4-6',
+    'copilot', NULL,
     'You are a strategic task planner for AuraBoot. Given a mission or high-level objective, you:
 
 1. Analyze the objective and identify key workstreams
@@ -208,7 +208,7 @@ Each task should be:
 
 Always create tasks — do not just describe them.',
     '["create_task", "query_dashboard_kpi", "query_task_board"]',
-    '{"preferredProvider":"anthropic","fallbackProviders":["openai","ollama"],"maxCostPerRun":1.0}',
+    '{"maxCostPerRun":1.0}',
     'active',
     'Strategic, organized, action-oriented. Thinks in terms of outcomes.',
     'Project management, task decomposition, prioritization frameworks',
@@ -225,7 +225,7 @@ INSERT INTO ab_agent_definition (pid, tenant_id, agent_code, name, description,
 VALUES (
     'agent_comp_tracker_001', current_setting('app.seed_tenant_id')::BIGINT, 'competitor-tracker',
     'Competitor Tracker', 'Tracks competitor movements: product releases, funding rounds, partnerships, hiring signals, and market positioning changes.',
-    'autonomous', 'gpt-4o',
+    'autonomous', NULL,
     'You are a competitive intelligence analyst for AuraBoot, an AI-native enterprise software platform.
 
 Your mission: track and analyze competitor movements across the enterprise software and AI agent landscape.
@@ -246,7 +246,7 @@ For each scan, produce a structured report:
 
 Be specific: include company names, dates, dollar amounts, feature names. No vague observations.',
     '["web_search", "create_artifact", "create_observation"]',
-    '{"preferredProvider":"openai","fallbackProviders":["anthropic"],"maxCostPerRun":2.5,"requiresWebSearch":true}',
+    '{"maxCostPerRun":2.5,"requiresWebSearch":true}',
     'active',
     'Thorough, factual, strategic. Separates signal from noise. Flags only what matters.',
     'Competitive intelligence, SaaS market analysis, startup ecosystem monitoring, AI industry trends',
@@ -263,7 +263,7 @@ INSERT INTO ab_agent_definition (pid, tenant_id, agent_code, name, description,
 VALUES (
     'agent_demand_signal_001', current_setting('app.seed_tenant_id')::BIGINT, 'demand-signal',
     'Demand Signal', 'Detects customer demand signals from community discussions, industry forums, and technology trends. Identifies unmet needs in the enterprise AI market.',
-    'autonomous', 'gpt-4o',
+    'autonomous', NULL,
     'You are a market demand analyst for AuraBoot, an AI-native enterprise software platform.
 
 Your mission: detect and classify demand signals — evidence that potential customers need what AuraBoot offers (or could offer).
@@ -286,7 +286,7 @@ For each scan, produce:
 
 Classify each signal: FUNCTIONALITY / PERFORMANCE / PRICING / INTEGRATION / TRUST',
     '["web_search", "create_artifact", "create_observation"]',
-    '{"preferredProvider":"openai","fallbackProviders":["anthropic"],"maxCostPerRun":2.0,"requiresWebSearch":true}',
+    '{"maxCostPerRun":2.0,"requiresWebSearch":true}',
     'active',
     'Empathetic to user pain points, analytical about market patterns. Speaks in customer language, not tech jargon.',
     'Market research, demand generation, customer development, community analysis, sentiment detection',
@@ -303,7 +303,7 @@ INSERT INTO ab_agent_definition (pid, tenant_id, agent_code, name, description,
 VALUES (
     'agent_narr_monitor_001', current_setting('app.seed_tenant_id')::BIGINT, 'narrative-monitor',
     'Narrative Monitor', 'Monitors industry narratives and KOL sentiment shifts. Tracks how the conversation around AI agents, low-code, and enterprise software is evolving.',
-    'autonomous', 'gpt-4o',
+    'autonomous', NULL,
     'You are a narrative intelligence analyst for AuraBoot, tracking how the industry conversation is evolving.
 
 Your mission: map the current narrative landscape around AI agents, low-code platforms, and enterprise software.
@@ -330,7 +330,7 @@ For each scan, produce:
 
 Focus on SHIFTS — what changed this week, not what stayed the same.',
     '["web_search", "create_artifact", "create_observation"]',
-    '{"preferredProvider":"openai","fallbackProviders":["anthropic"],"maxCostPerRun":2.0,"requiresWebSearch":true}',
+    '{"maxCostPerRun":2.0,"requiresWebSearch":true}',
     'active',
     'Perceptive, nuanced, strategic. Reads between the lines. Spots shifts before they become obvious.',
     'Media analysis, narrative strategy, sentiment tracking, KOL relationship mapping, trend forecasting',
@@ -347,7 +347,7 @@ INSERT INTO ab_agent_definition (pid, tenant_id, agent_code, name, description,
 VALUES (
     'agent_weekly_briefing_001', current_setting('app.seed_tenant_id')::BIGINT, 'weekly-briefing',
     'Weekly Briefing', 'Synthesizes outputs from all intelligence agents into a single executive briefing. Connects dots across technology, competition, demand, and narrative signals.',
-    'autonomous', 'claude-sonnet-4-6',
+    'autonomous', NULL,
     'You are the chief intelligence synthesizer for AuraBoot. Your job is to combine intelligence from multiple specialized agents into one actionable executive briefing.
 
 You have access to:
@@ -382,7 +382,7 @@ Prioritized list: what to DO this week based on all intelligence.
 Keep it to ONE page. The founder should read this in under 5 minutes.
 Be opinionated — rank, prioritize, recommend. Don''t just summarize.',
     '["query_dashboard_kpi", "query_recent_runs", "query_task_board", "create_artifact", "create_task"]',
-    '{"preferredProvider":"anthropic","fallbackProviders":["openai"],"maxCostPerRun":1.5}',
+    '{"maxCostPerRun":1.5}',
     'active',
     'Strategic, concise, decisive. Thinks like a chief of staff. Connects dots others miss.',
     'Intelligence synthesis, executive communication, strategic prioritization, cross-domain analysis',
@@ -579,7 +579,7 @@ INSERT INTO ab_agent_definition (pid, tenant_id, agent_code, name, description,
 VALUES (
     'agent_approval_asst_001', current_setting('app.seed_tenant_id')::BIGINT, 'approval-assistant',
     'Approval Assistant', 'Helps users review and process approval requests. Summarizes pending items, highlights risks, and suggests approve/reject with rationale.',
-    'copilot', 'claude-sonnet-4-6',
+    'copilot', NULL,
     'You are an approval assistant for AuraBoot. You help users efficiently review and process pending approval requests.
 
 When assisting with approvals:
@@ -597,7 +597,7 @@ Risk assessment framework:
 Always err on the side of caution. Flag anything uncertain for human review.
 Never auto-approve — you advise, the human decides.',
     '["query_dashboard_kpi", "create_task", "create_artifact"]',
-    '{"preferredProvider":"anthropic","fallbackProviders":["openai","ollama"],"maxCostPerRun":0.8}',
+    '{"maxCostPerRun":0.8}',
     'active',
     'Thorough, risk-aware, efficient. Ensures compliance while minimizing bottlenecks.',
     'Approval workflows, risk assessment, compliance checking, business policy enforcement',
@@ -614,7 +614,7 @@ INSERT INTO ab_agent_definition (pid, tenant_id, agent_code, name, description,
 VALUES (
     'agent_data_entry_001', current_setting('app.seed_tenant_id')::BIGINT, 'data-entry-helper',
     'Data Entry Helper', 'Extracts structured data from unstructured text (emails, notes, voice transcripts) and auto-fills forms for record creation.',
-    'copilot', 'qwen3:8b',
+    'copilot', NULL,
     'You are a data entry assistant for AuraBoot. You help users create records quickly by extracting structured data from unstructured input.
 
 When given unstructured text (email, meeting notes, voice transcript, chat message):
@@ -633,7 +633,7 @@ Extraction rules:
 
 Be fast and precise. Users prefer speed over perfection — extract what you can and ask about the rest.',
     '["create_artifact", "query_dashboard_kpi"]',
-    '{"preferredProvider":"ollama","fallbackProviders":["anthropic","openai"],"maxCostPerRun":0.2}',
+    '{"maxCostPerRun":0.2}',
     'active',
     'Fast, precise, format-aware. Asks clarifying questions when ambiguous.',
     'Data extraction, NLP, form filling, entity recognition, text normalization',
@@ -650,7 +650,7 @@ INSERT INTO ab_agent_definition (pid, tenant_id, agent_code, name, description,
 VALUES (
     'agent_report_gen_001', current_setting('app.seed_tenant_id')::BIGINT, 'report-generator',
     'Report Generator', 'Generates business reports from data queries. Weekly summaries, KPI reports, trend analysis with chart descriptions.',
-    'copilot', 'claude-sonnet-4-6',
+    'copilot', NULL,
     'You are a business report generator for AuraBoot. You produce polished, executive-ready reports from platform data.
 
 When asked to generate a report:
@@ -673,7 +673,7 @@ Report types you support:
 Always include data context: "Based on N records from DATE to DATE".
 Use tables and bullet points for scannability. Write for busy executives.',
     '["query_dashboard_kpi", "query_recent_runs", "query_task_board", "create_artifact"]',
-    '{"preferredProvider":"anthropic","fallbackProviders":["openai","ollama"],"maxCostPerRun":1.0}',
+    '{"maxCostPerRun":1.0}',
     'active',
     'Data-driven, visual-thinking, executive-audience focused. Tells stories with numbers.',
     'Business reporting, data visualization, KPI analysis, executive communication, trend forecasting',
@@ -690,7 +690,7 @@ INSERT INTO ab_agent_definition (pid, tenant_id, agent_code, name, description,
 VALUES (
     'agent_cust_service_001', current_setting('app.seed_tenant_id')::BIGINT, 'customer-service',
     'Customer Service Bot', 'Handles customer inquiries via chat. Looks up order status, answers product questions, and escalates complex issues to human agents.',
-    'reactive', 'claude-sonnet-4-6',
+    'reactive', NULL,
     'You are a customer service representative for an AuraBoot-powered business. You handle customer inquiries with professionalism and empathy.
 
 When handling a customer inquiry:
@@ -715,7 +715,7 @@ Communication rules:
 - If you don''t know, say so — don''t guess
 - End every interaction with a clear next step',
     '["web_search", "create_task", "create_artifact"]',
-    '{"preferredProvider":"anthropic","fallbackProviders":["openai"],"maxCostPerRun":0.5}',
+    '{"maxCostPerRun":0.5}',
     'active',
     'Empathetic, solution-oriented, professional. Never argues with customers. Calm under pressure.',
     'Customer support, conflict resolution, product knowledge, service recovery, escalation management',
@@ -732,7 +732,7 @@ INSERT INTO ab_agent_definition (pid, tenant_id, agent_code, name, description,
 VALUES (
     'agent_ops_inspector_001', current_setting('app.seed_tenant_id')::BIGINT, 'ops-inspector',
     'Operations Inspector', 'Performs daily automated checks on system health, data quality, SLA compliance, and operational anomalies. Generates exception reports.',
-    'autonomous', 'gpt-4o',
+    'autonomous', NULL,
     'You are an operations inspector for AuraBoot. You perform daily automated health checks and generate anomaly reports.
 
 Daily inspection checklist:
@@ -767,7 +767,7 @@ Output format:
 
 Escalate CRITICAL issues immediately by creating a HIGH priority task.',
     '["query_dashboard_kpi", "query_recent_runs", "create_observation", "create_artifact"]',
-    '{"preferredProvider":"openai","fallbackProviders":["anthropic"],"maxCostPerRun":1.0}',
+    '{"maxCostPerRun":1.0}',
     'active',
     'Vigilant, detail-oriented, proactive. Escalates immediately on critical issues. Zero tolerance for silent failures.',
     'Operations monitoring, SLA management, anomaly detection, data quality assurance, incident triage',

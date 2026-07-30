@@ -24,11 +24,14 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
 const COLLEAGUE_CODE = 'ops_xiaoao_crm_writer';
 const COLLEAGUE_NAME = '客户录入助理·小奥';
 const WRITE_COMMAND = 'cmd:crm:create_account';
-const LLM_PROVIDER = 'qianwen';
-const LLM_MODEL = 'qwen-plus';
 const SHOTS = 'test-results/digital-employee';
 
 async function ensureWriteColleague(request: APIRequestContext): Promise<void> {
+  const llmProvider = process.env.AURA_LIVE_LLM_PROVIDER;
+  const llmModel = process.env.AURA_LIVE_LLM_MODEL;
+  expect(llmProvider, 'AURA_LIVE_LLM_PROVIDER must select the live adapter').toBeTruthy();
+  expect(llmModel, 'AURA_LIVE_LLM_MODEL must select the live model').toBeTruthy();
+
   const list = await request.get(
     `/api/dynamic/agent-definition/list?pageNum=1&pageSize=20&keyword=${COLLEAGUE_CODE}`,
   );
@@ -44,7 +47,7 @@ async function ensureWriteColleague(request: APIRequestContext): Promise<void> {
       name: COLLEAGUE_NAME,
       description: '客户录入助理(写操作需用户确认)',
       agent_type: 'reactive',
-      model: LLM_MODEL,
+      model: llmModel,
       system_prompt:
         '你是客户录入助理。用户给出客户信息时,调用 crm:create_account 工具创建客户;' +
         '系统会弹出确认框由用户确认,你直接调用工具即可。用简体中文回复。',
@@ -52,7 +55,7 @@ async function ensureWriteColleague(request: APIRequestContext): Promise<void> {
       // Scope discovery to the CRM model so unrelated (ACP fixture) tools do not flood
       // the turn and make the model pick unreliably.
       allowed_models: JSON.stringify(['crm_account']),
-      guardrails: JSON.stringify({ provider: LLM_PROVIDER }),
+      guardrails: JSON.stringify({ provider: llmProvider }),
       status: 'active',
     },
   });
@@ -91,11 +94,10 @@ test.describe('Digital employee — write + approval through the browser UI', ()
     const recordName = `UITEST写场景-${Date.now()}`;
     expect(await crmAccountCount(page.request, recordName)).toBe(0);
 
-    await page.goto('/ai/colleagues', { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-      { timeout: 20_000 },
-    );
+    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-testid="agent-colleagues-grid"]')).toBeVisible({
+      timeout: 20_000,
+    });
 
     const card = page.locator('[data-testid^="agent-card-"]', { hasText: COLLEAGUE_NAME });
     await expect(card, 'the write colleague must be listed').toBeVisible({ timeout: 20_000 });

@@ -32,19 +32,6 @@ public interface AgentOrganizationService {
     void removeFromOrg(Long agentId);
 
     /**
-     * Get the effective tenant member ID for permission evaluation.
-     *
-     * <p>If the agent has an employee_id (independent mode), returns the
-     * linked service member's ID. Otherwise falls back to the triggering
-     * user's member ID (proxy mode).</p>
-     *
-     * @param agentId       the agent definition ID
-     * @param triggerUserId the user ID of the human who triggered the agent
-     * @return the member ID to use for permission checks
-     */
-    Long getAgentMemberId(Long agentId, Long triggerUserId);
-
-    /**
      * Where this agent sits in the org chart, or {@code enrolled=false} if it does not.
      *
      * <p>Exists because the enrolled state was invisible to the UI: the agent detail page reads the

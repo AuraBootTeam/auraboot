@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class AgentEvalCaseImportIT extends BaseIntegrationTest {
 
-    private static final String AGENT_CODE = "eval_it_agent";
+    private String agentCode;
     private static final String CASE_ID = "eval-it-1";
     private static final String PLUGIN_PID = "test-eval-plugin-pid";
 
@@ -50,12 +50,14 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
     @BeforeEach
     void cleanSlate() {
         tenantId = getTestTenant().getId();
+        agentCode = "eval_it_agent_" + com.auraboot.framework.common.util.UniqueIdGenerator
+                .generate().toLowerCase();
         jdbcTemplate.update(
                 "DELETE FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ?",
-                tenantId, AGENT_CODE);
+                tenantId, agentCode);
         jdbcTemplate.update(
                 "DELETE FROM ab_agent_definition WHERE tenant_id = ? AND agent_code = ?",
-                tenantId, AGENT_CODE);
+                tenantId, agentCode);
     }
 
     @AfterEach
@@ -63,10 +65,10 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
         if (tenantId != null) {
             jdbcTemplate.update(
                     "DELETE FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ?",
-                    tenantId, AGENT_CODE);
+                    tenantId, agentCode);
             jdbcTemplate.update(
                     "DELETE FROM ab_agent_definition WHERE tenant_id = ? AND agent_code = ?",
-                    tenantId, AGENT_CODE);
+                    tenantId, agentCode);
         }
     }
 
@@ -83,7 +85,7 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
                 .build();
 
         AgentDefinitionDTO dto = AgentDefinitionDTO.builder()
-                .agentCode(AGENT_CODE)
+                .agentCode(agentCode)
                 .name("Eval IT Agent")
                 .description("Eval case import integration test agent")
                 .agentType("reactive")
@@ -98,7 +100,7 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
         List<AgentEvalCase> rows = evalCaseMapper.selectList(
                 new LambdaQueryWrapper<AgentEvalCase>()
                         .eq(AgentEvalCase::getTenantId, tenantId)
-                        .eq(AgentEvalCase::getAgentCode, AGENT_CODE)
+                        .eq(AgentEvalCase::getAgentCode, agentCode)
                         .eq(AgentEvalCase::getDeletedFlag, false));
 
         assertEquals(1, rows.size(), "expected exactly 1 eval case row after first import");
@@ -121,7 +123,7 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
                 .build();
 
         AgentDefinitionDTO dto2 = AgentDefinitionDTO.builder()
-                .agentCode(AGENT_CODE)
+                .agentCode(agentCode)
                 .name("Eval IT Agent")
                 .description("Eval case import integration test agent")
                 .agentType("reactive")
@@ -136,7 +138,7 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
         List<AgentEvalCase> rows2 = evalCaseMapper.selectList(
                 new LambdaQueryWrapper<AgentEvalCase>()
                         .eq(AgentEvalCase::getTenantId, tenantId)
-                        .eq(AgentEvalCase::getAgentCode, AGENT_CODE)
+                        .eq(AgentEvalCase::getAgentCode, agentCode)
                         .eq(AgentEvalCase::getDeletedFlag, false));
 
         assertEquals(1, rows2.size(),
@@ -158,7 +160,7 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
                 .build();
 
         AgentDefinitionDTO dto = AgentDefinitionDTO.builder()
-                .agentCode(AGENT_CODE)
+                .agentCode(agentCode)
                 .name("Lifecycle IT Agent")
                 .description("Eval case lifecycle integration test")
                 .agentType("reactive")
@@ -172,7 +174,7 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
         // Confirm 1 active eval case exists before rollback
         int activeBeforeRollback = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ? AND deleted_flag = FALSE",
-                Integer.class, tenantId, AGENT_CODE);
+                Integer.class, tenantId, agentCode);
         assertEquals(1, activeBeforeRollback, "precondition: 1 active eval case before rollback");
 
         // Rollback: should soft-delete eval cases
@@ -180,7 +182,7 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
 
         int activeAfterRollback = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ? AND deleted_flag = FALSE",
-                Integer.class, tenantId, AGENT_CODE);
+                Integer.class, tenantId, agentCode);
         assertEquals(0, activeAfterRollback,
                 "after rollback, eval cases must be soft-deleted (deleted_flag = TRUE)");
 
@@ -189,7 +191,7 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
 
         int activeAfterRestore = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ? AND deleted_flag = FALSE",
-                Integer.class, tenantId, AGENT_CODE);
+                Integer.class, tenantId, agentCode);
         assertEquals(1, activeAfterRestore,
                 "after restore, eval cases must be active again (deleted_flag = FALSE)");
     }
@@ -207,7 +209,7 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
                 .build();
 
         AgentDefinitionDTO dto = AgentDefinitionDTO.builder()
-                .agentCode(AGENT_CODE)
+                .agentCode(agentCode)
                 .name("Eval IT Agent")
                 .description("Eval case import integration test agent")
                 .agentType("reactive")

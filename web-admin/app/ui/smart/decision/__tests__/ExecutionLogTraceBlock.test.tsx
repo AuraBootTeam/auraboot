@@ -215,31 +215,31 @@ describe('ExecutionLogTraceBlock', () => {
     );
     expect(await screen.findByTestId('elta-row-log-1')).toHaveTextContent('SLA 截止时间');
     expect(screen.getByTestId('elta-row-log-1')).not.toHaveTextContent('sla_deadline');
-    expect(screen.getByLabelText('log-status')).toHaveTextContent('命中');
-    expect(screen.getByLabelText('log-status')).toHaveTextContent('未命中');
-    expect(screen.getByLabelText('log-status')).not.toHaveTextContent('MATCHED');
-    expect(screen.getByLabelText('log-status')).not.toHaveTextContent('NOT_MATCHED');
-    expect(screen.getByLabelText('log-caller-type')).toHaveTextContent('自动化');
-    expect(screen.getByLabelText('log-caller-type')).toHaveTextContent('事件策略');
-    expect(screen.getByLabelText('log-caller-type')).toHaveTextContent('权限');
-    expect(screen.getByLabelText('log-caller-type')).not.toHaveTextContent('AUTOMATION');
-    expect(screen.getByLabelText('log-caller-type')).not.toHaveTextContent('EVENT_POLICY');
-    expect(screen.getByLabelText('log-caller-type')).not.toHaveTextContent('PERMISSION');
-    expect(screen.getByLabelText('log-matched')).toHaveTextContent('全部');
-    expect(screen.getByLabelText('log-matched')).toHaveTextContent('命中');
-    expect(screen.getByLabelText('log-matched')).toHaveTextContent('未命中');
-    expect(screen.getByLabelText('log-matched')).not.toHaveTextContent('true');
-    expect(screen.getByLabelText('log-matched')).not.toHaveTextContent('false');
-    expect(screen.getByLabelText('log-rollout-arm')).toHaveTextContent('基线');
-    expect(screen.getByLabelText('log-rollout-arm')).toHaveTextContent('候选');
-    expect(screen.getByLabelText('log-rollout-arm')).not.toHaveTextContent('BASELINE');
-    expect(screen.getByLabelText('log-rollout-arm')).not.toHaveTextContent('CANDIDATE');
+    expect(screen.getByTestId('log-status')).toHaveTextContent('命中');
+    expect(screen.getByTestId('log-status')).toHaveTextContent('未命中');
+    expect(screen.getByTestId('log-status')).not.toHaveTextContent('MATCHED');
+    expect(screen.getByTestId('log-status')).not.toHaveTextContent('NOT_MATCHED');
+    expect(screen.getByTestId('log-caller-type')).toHaveTextContent('自动化');
+    expect(screen.getByTestId('log-caller-type')).toHaveTextContent('事件策略');
+    expect(screen.getByTestId('log-caller-type')).toHaveTextContent('权限');
+    expect(screen.getByTestId('log-caller-type')).not.toHaveTextContent('AUTOMATION');
+    expect(screen.getByTestId('log-caller-type')).not.toHaveTextContent('EVENT_POLICY');
+    expect(screen.getByTestId('log-caller-type')).not.toHaveTextContent('PERMISSION');
+    expect(screen.getByTestId('log-matched')).toHaveTextContent('全部');
+    expect(screen.getByTestId('log-matched')).toHaveTextContent('命中');
+    expect(screen.getByTestId('log-matched')).toHaveTextContent('未命中');
+    expect(screen.getByTestId('log-matched')).not.toHaveTextContent('true');
+    expect(screen.getByTestId('log-matched')).not.toHaveTextContent('false');
+    expect(screen.getByTestId('log-rollout-arm')).toHaveTextContent('基线');
+    expect(screen.getByTestId('log-rollout-arm')).toHaveTextContent('候选');
+    expect(screen.getByTestId('log-rollout-arm')).not.toHaveTextContent('BASELINE');
+    expect(screen.getByTestId('log-rollout-arm')).not.toHaveTextContent('CANDIDATE');
 
-    fireEvent.change(screen.getByLabelText('log-status'), { target: { value: 'MATCHED' } });
-    fireEvent.change(screen.getByLabelText('log-caller-type'), { target: { value: 'AUTOMATION' } });
-    fireEvent.change(screen.getByLabelText('log-matched'), { target: { value: 'true' } });
-    fireEvent.change(screen.getByLabelText('log-rollout-arm'), { target: { value: 'CANDIDATE' } });
-    fireEvent.change(screen.getByLabelText('log-min-duration'), { target: { value: '10' } });
+    fireEvent.change(screen.getByTestId('log-status'), { target: { value: 'MATCHED' } });
+    fireEvent.change(screen.getByTestId('log-caller-type'), { target: { value: 'AUTOMATION' } });
+    fireEvent.change(screen.getByTestId('log-matched'), { target: { value: 'true' } });
+    fireEvent.change(screen.getByTestId('log-rollout-arm'), { target: { value: 'CANDIDATE' } });
+    fireEvent.change(screen.getByTestId('log-min-duration'), { target: { value: '10' } });
     fireEvent.click(screen.getByTestId('elta-apply'));
 
     await waitFor(() =>
@@ -359,7 +359,9 @@ describe('ExecutionLogTraceBlock', () => {
     });
 
     render(
-      <MemoryRouter initialEntries={['/p/decisionops_execution_logs?traceId=trace-permission-model-1']}>
+      <MemoryRouter
+        initialEntries={['/p/decisionops_execution_logs?traceId=trace-permission-model-1']}
+      >
         <ExecutionLogTraceBlock block={{ props: { mode: 'list', pageSize: 50 } }} />
       </MemoryRouter>,
     );
@@ -650,13 +652,19 @@ describe('ExecutionLogTraceBlock', () => {
     expect(screen.getByTestId('elta-linked-action-evidence')).toHaveTextContent('发送短信');
     expect(screen.getByTestId('elta-linked-action-evidence')).not.toHaveTextContent('SEND_SMS');
     expect(screen.getByTestId('elta-linked-action-evidence')).toHaveTextContent('幂等键 已记录');
-    expect(screen.getByTestId('elta-linked-action-evidence')).not.toHaveTextContent('sla-1:SEND_SMS');
+    expect(screen.getByTestId('elta-linked-action-evidence')).not.toHaveTextContent(
+      'sla-1:SEND_SMS',
+    );
     expect(screen.getByTestId('elta-linked-action-evidence')).toHaveTextContent('等待重试');
     expect(screen.getByTestId('elta-action-retry-sla-action-log-1')).toHaveTextContent('重试 2/3');
     expect(screen.getByTestId('elta-linked-action-evidence')).toHaveTextContent('失败原因');
     expect(screen.getByTestId('elta-linked-action-evidence')).toHaveTextContent('短信发送失败');
-    expect(screen.getByTestId('elta-linked-action-evidence')).not.toHaveTextContent('failureReason');
-    expect(screen.getByTestId('elta-linked-action-evidence')).not.toHaveTextContent('sms_delivery_failed');
+    expect(screen.getByTestId('elta-linked-action-evidence')).not.toHaveTextContent(
+      'failureReason',
+    );
+    expect(screen.getByTestId('elta-linked-action-evidence')).not.toHaveTextContent(
+      'sms_delivery_failed',
+    );
     expect(screen.getByTestId('elta-linked-action-evidence')).toHaveTextContent('+8613800138000');
     expect(screen.getByTestId('elta-empty')).toHaveTextContent('无匹配日志');
   });
@@ -1153,9 +1161,7 @@ describe('ExecutionLogTraceBlock', () => {
       '投递追踪 ep-webhook-evt-failed',
     );
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('投递状态 投递失败');
-    expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent(
-      '失败原因 Webhook 投递失败',
-    );
+    expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('失败原因 Webhook 投递失败');
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('错误信息 dispatcher down');
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('业务记录 REQ-001');
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('task_long_leave');
@@ -1207,9 +1213,7 @@ describe('ExecutionLogTraceBlock', () => {
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent(
       '业务记录 REQ-MISSING-CONFIG',
     );
-    expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent(
-      '缺少流程标识，无法启动流程',
-    );
+    expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('缺少流程标识，无法启动流程');
     expect(screen.getByTestId('elta-action-retry-action-log-9')).toHaveTextContent('重试 1/3');
     expect(screen.getByTestId('elta-action-replay-action-log-9')).toHaveTextContent('重放');
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('patch_leave_status');
@@ -1218,7 +1222,9 @@ describe('ExecutionLogTraceBlock', () => {
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('模型 leave_request');
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('业务记录 REQ-001');
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('更新字段 status, priority');
-    expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('错误信息 model field status is readonly');
+    expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent(
+      '错误信息 model field status is readonly',
+    );
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('动作类型 更新记录');
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('字段数 2');
     expect(screen.getByTestId('elta-action-retry-action-log-10')).toHaveTextContent('重试 1/3');
@@ -1243,7 +1249,9 @@ describe('ExecutionLogTraceBlock', () => {
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('失败原因 写入审计失败');
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('租户 101');
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('规则 audit_leave_request');
-    expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('接收对象 AUDIT:leave_request');
+    expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent(
+      '接收对象 AUDIT:leave_request',
+    );
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('消息 长假申请审计 REQ-001');
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('审计记录 AUD-001');
     expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent(

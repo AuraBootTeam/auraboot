@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.provider;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.dto.LlmChunk;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
 import com.auraboot.framework.agent.trace.GenAiUsageRecorder;
 import com.auraboot.framework.application.tenant.MetaContext;
 import io.micrometer.tracing.Tracer;
@@ -56,7 +57,7 @@ public class UsageRecordingLlmProvider implements LlmProvider {
 
     @Override
     public LlmChatResponse chat(LlmChatRequest request, String apiKey, String baseUrl) throws Exception {
-        Long tenantId = MetaContext.getCurrentTenantId();
+        Long tenantId = currentTenantId();
         String traceId = currentTraceId();
         LlmChatResponse response = delegate.chat(request, apiKey, baseUrl);
         recordUsage(tenantId, traceId, request, response);
@@ -65,7 +66,7 @@ public class UsageRecordingLlmProvider implements LlmProvider {
 
     @Override
     public Flux<LlmChunk> streamChat(LlmChatRequest request, String apiKey, String baseUrl) {
-        Long tenantId = MetaContext.getCurrentTenantId();
+        Long tenantId = currentTenantId();
         String traceId = currentTraceId();
         return delegate.streamChat(request, apiKey, baseUrl)
                 .doOnNext(chunk -> {
@@ -92,6 +93,12 @@ public class UsageRecordingLlmProvider implements LlmProvider {
         return tracer.currentSpan().context().traceId();
     }
 
+    private Long currentTenantId() {
+        return ExecutionPrincipalContext.current()
+                .map(principal -> principal.tenantId())
+                .orElseGet(MetaContext::getCurrentTenantId);
+    }
+
     private void recordUsage(Long tenantId, String traceId, LlmChatRequest request, LlmChatResponse response) {
         if (response == null) {
             return;
@@ -115,8 +122,18 @@ public class UsageRecordingLlmProvider implements LlmProvider {
     }
 
     @Override
+    public java.util.Set<String> supportedApiFormats() {
+        return delegate.supportedApiFormats();
+    }
+
+    @Override
     public boolean supportsTools() {
         return delegate.supportsTools();
+    }
+
+    @Override
+    public ModelCapabilityProfile modelCapabilities(String model) {
+        return delegate.modelCapabilities(model);
     }
 
     @Override

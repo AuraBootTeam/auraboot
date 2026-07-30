@@ -15,10 +15,24 @@ package com.auraboot.framework.conversation;
  * etc. — when added, follow the same nullable-field discipline so legacy
  * call sites that pass {@link #EMPTY} keep compiling unchanged.
  */
-public record TurnArtifacts(String thinkingContent, String thinkingSignature) {
+public record TurnArtifacts(
+        String thinkingContent,
+        String thinkingSignature,
+        java.util.List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence>
+                retrievalEvidence) {
 
     /** Sentinel for turns that produced no artifacts. */
-    public static final TurnArtifacts EMPTY = new TurnArtifacts(null, null);
+    public static final TurnArtifacts EMPTY = new TurnArtifacts(null, null, java.util.List.of());
+
+    public TurnArtifacts(String thinkingContent, String thinkingSignature) {
+        this(thinkingContent, thinkingSignature, java.util.List.of());
+    }
+
+    public TurnArtifacts {
+        retrievalEvidence = retrievalEvidence == null
+                ? java.util.List.of()
+                : java.util.List.copyOf(retrievalEvidence);
+    }
 
     public static TurnArtifacts of(String thinkingContent, String thinkingSignature) {
         if ((thinkingContent == null || thinkingContent.isEmpty())
@@ -26,5 +40,18 @@ public record TurnArtifacts(String thinkingContent, String thinkingSignature) {
             return EMPTY;
         }
         return new TurnArtifacts(thinkingContent, thinkingSignature);
+    }
+
+    public static TurnArtifacts of(
+            String thinkingContent,
+            String thinkingSignature,
+            java.util.List<com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalEvidence>
+                    retrievalEvidence) {
+        if ((thinkingContent == null || thinkingContent.isEmpty())
+                && (thinkingSignature == null || thinkingSignature.isEmpty())
+                && (retrievalEvidence == null || retrievalEvidence.isEmpty())) {
+            return EMPTY;
+        }
+        return new TurnArtifacts(thinkingContent, thinkingSignature, retrievalEvidence);
     }
 }

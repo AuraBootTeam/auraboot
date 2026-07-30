@@ -11,9 +11,14 @@ import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.auraboot.framework.rbac.entity.Role;
+import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.entity.UserRole;
+import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.rbac.service.UserRoleService;
+import com.auraboot.framework.permission.entity.Permission;
+import com.auraboot.framework.permission.mapper.PermissionMapper;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.test.util.TestResourceTracker;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
@@ -22,17 +27,22 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.File;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * 基础集成测试
@@ -84,6 +94,19 @@ public class BaseIntegrationTest {
     @Autowired
     private EnvironmentService environmentService;
 
+    @Autowired
+    private PermissionMapper permissionMapper;
+
+    @Autowired
+    private RolePermissionMapper rolePermissionMapper;
+
+    @Autowired
+    private UserPermissionService userPermissionService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    private final List<Long> committedTestRolePermissionIds = new ArrayList<>();
 
     // 资源追踪器 - 每个测试独立
     private TestResourceTracker resourceTracker;
@@ -105,7 +128,126 @@ public class BaseIntegrationTest {
 
     @AfterEach
     public void clearTenantContext() {
-        MetaContext.clear();
+        try {
+            cleanupCommittedTestPermissions();
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    /**
+     * Grants a permission in a committed transaction so the real
+     * {@code PermissionInterceptor} can observe it from the MockMvc request
+     * transaction. Only role-permission rows created by the current test are
+     * tracked and removed in {@link #clearTenantContext()}, preserving both
+     * real permission enforcement and PERMIT/DENY test isolation.
+     */
+    protected void grantCommittedPermissionToTestRole(
+            String code,
+            String resourceType,
+            String resourceCode,
+            String action,
+            String name
+    ) {
+        synchronized (TEST_DATA_LOCK) {
+            TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+            transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+            Long createdRolePermissionId = transactionTemplate.execute(status -> {
+                applyTestMetaContext();
+                Permission permission = permissionMapper.findByCode(code);
+                if (permission == null) {
+                    permission = new Permission();
+                    permission.setPid(UniqueIdGenerator.generate());
+                    permission.setCode(code);
+                    permission.setName(name);
+                    permission.setResourceType(resourceType);
+                    permission.setResourceCode(resourceCode);
+                    permission.setAction(action);
+                    permission.setSource("test");
+                    permission.setStatus("active");
+                    permission.setDeletedFlag(false);
+                    permission.setTenantId(getTestTenant().getId());
+                    permission.setCreatedAt(Instant.now());
+                    permission.setUpdatedAt(Instant.now());
+                    permissionMapper.insert(permission);
+                }
+
+                List<RolePermission> existing = rolePermissionMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<RolePermission>()
+                                .eq(RolePermission::getRoleId, getTestRole().getId())
+                                .eq(RolePermission::getPermissionId, permission.getId())
+                                .eq(RolePermission::getDeletedFlag, false)
+                );
+                if (!existing.isEmpty()) {
+                    return null;
+                }
+
+                RolePermission rolePermission = new RolePermission();
+                rolePermission.setPid(UniqueIdGenerator.generate());
+                rolePermission.setRoleId(getTestRole().getId());
+                rolePermission.setPermissionId(permission.getId());
+                rolePermission.setGrantType("grant");
+                rolePermission.setStatus("active");
+                rolePermission.setDeletedFlag(false);
+                rolePermission.setTenantId(getTestTenant().getId());
+                rolePermission.setCreatedAt(Instant.now());
+                rolePermission.setUpdatedAt(Instant.now());
+                rolePermissionMapper.insert(rolePermission);
+                return rolePermission.getId();
+            });
+            if (createdRolePermissionId != null) {
+                committedTestRolePermissionIds.add(createdRolePermissionId);
+            }
+            userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
+            userPermissionService.evictRoleUsers(
+                    getTestTenant().getId(),
+                    getTestRole().getId());
+            userPermissionService.evictUserPermissions(
+                    getTestTenant().getId(),
+                    getTestUser().getId());
+        }
+    }
+
+    private void cleanupCommittedTestPermissions() {
+        List<Long> ids;
+        synchronized (TEST_DATA_LOCK) {
+            if (committedTestRolePermissionIds.isEmpty()) {
+                return;
+            }
+            ids = List.copyOf(committedTestRolePermissionIds);
+            committedTestRolePermissionIds.clear();
+        }
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+                && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCompletion(int status) {
+                            cleanupCommittedTestPermissionIds(ids);
+                        }
+                    });
+            return;
+        }
+        cleanupCommittedTestPermissionIds(ids);
+    }
+
+    private void cleanupCommittedTestPermissionIds(List<Long> ids) {
+        synchronized (TEST_DATA_LOCK) {
+            TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+            transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+            transactionTemplate.executeWithoutResult(status -> {
+                applyTestMetaContext();
+                ids.forEach(id -> jdbcTemplate.update(
+                        "DELETE FROM ab_role_permission WHERE id = ?",
+                        id));
+            });
+            userPermissionService.evictRoleUsers(
+                    getTestTenant().getId(),
+                    getTestRole().getId());
+            userPermissionService.evictUserPermissions(
+                    getTestTenant().getId(),
+                    getTestUser().getId());
+        }
     }
 
     /**
@@ -128,12 +270,63 @@ public class BaseIntegrationTest {
                     // are not a reliable proof that the database rows are still usable.
                     testRole = createTestRole();
                     testUserRole = createTestUserRole();
+                    ensureHermeticEmbeddingProfile();
                 });
                 testDataInitialized = true;
             } catch (Exception e) {
                 throw new RuntimeException("Failed to setup test data", e);
             }
         }
+    }
+
+    /**
+     * Keep RAG integration tests hermetic when every real provider key is deliberately
+     * removed from the test process.
+     *
+     * <p>Knowledge-base creation correctly fails closed when no embedding profile is
+     * configured. The integration suite still needs a provider-neutral profile so it can
+     * exercise KB/document lifecycle code without borrowing a developer's provider
+     * environment. The profile contains no credential; tests either mock the embedding
+     * boundary or verify the product's graceful no-vector fallback, so no external
+     * request can be made from this fixture.
+     */
+    private void ensureHermeticEmbeddingProfile() {
+        Integer existing = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM ab_cloud_config
+                WHERE config_level = 'tenant'
+                  AND tenant_id = ?
+                  AND service_type = 'embedding'
+                  AND provider_code = 'integration-test'
+                  AND deleted_flag = FALSE
+                """,
+                Integer.class,
+                testTenant.getId());
+        if (existing != null && existing > 0) {
+            return;
+        }
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO ab_cloud_config (
+                    pid, config_level, tenant_id, service_type, provider_code,
+                    config, enabled, priority, created_by, updated_by, deleted_flag
+                )
+                VALUES (?, 'tenant', ?, 'embedding', 'integration-test',
+                        ?::jsonb, TRUE, -100, ?, ?, FALSE)
+                """,
+                UniqueIdGenerator.generate(),
+                testTenant.getId(),
+                """
+                {
+                  "displayName": "Integration Test Embedding",
+                  "defaultModel": "integration-test-embedding",
+                  "dimensions": 1536
+                }
+                """,
+                testUser.getPid(),
+                testUser.getPid());
     }
 
     protected void applyTestMetaContext() {

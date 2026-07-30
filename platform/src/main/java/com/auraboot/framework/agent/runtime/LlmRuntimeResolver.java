@@ -12,6 +12,13 @@ import java.util.Map;
  */
 public final class LlmRuntimeResolver {
 
+    /**
+     * Provider-neutral value used by dictionary-backed forms. An enum item cannot use an empty
+     * value, while the runtime contract represents "use the selected provider's default model"
+     * as {@code null}. Keep that UI/storage sentinel at this single resolution boundary.
+     */
+    public static final String PROVIDER_DEFAULT_MODEL = "provider-default";
+
     private static final ObjectMapper FALLBACK_MAPPER = new ObjectMapper();
 
     private LlmRuntimeResolver() {
@@ -41,7 +48,7 @@ public final class LlmRuntimeResolver {
             }
         }
 
-        String model = nonBlankString(agentDef.get("model"));
+        String model = agentModel(agentDef.get("model"));
         if (model != null && providerFactory != null) {
             String matched = providerFactory.resolveProviderByModel(model);
             if (matched != null && !matched.isBlank()) {
@@ -82,7 +89,7 @@ public final class LlmRuntimeResolver {
                                            String providerCode,
                                            boolean forceFallback) {
         if (!forceFallback && agentDef != null) {
-            String model = nonBlankString(agentDef.get("model"));
+            String model = agentModel(agentDef.get("model"));
             if (model != null) {
                 return model;
             }
@@ -97,7 +104,7 @@ public final class LlmRuntimeResolver {
                                                       Map<String, Object> agentDef,
                                                       String providerCode) {
         if (agentDef != null && providerFactory != null) {
-            String model = nonBlankString(agentDef.get("model"));
+            String model = agentModel(agentDef.get("model"));
             if (model != null) {
                 String inferredProvider = providerFactory.resolveProviderByModel(model);
                 if (providerCode != null && providerCode.equals(inferredProvider)) {
@@ -141,6 +148,11 @@ public final class LlmRuntimeResolver {
 
     private static ObjectMapper mapper(ObjectMapper objectMapper) {
         return objectMapper != null ? objectMapper : FALLBACK_MAPPER;
+    }
+
+    private static String agentModel(Object value) {
+        String model = nonBlankString(value);
+        return PROVIDER_DEFAULT_MODEL.equalsIgnoreCase(model) ? null : model;
     }
 
     private static String nonBlankString(Object value) {

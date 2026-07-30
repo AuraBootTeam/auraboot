@@ -266,25 +266,17 @@ public class NlModelingService {
     private LlmChatResponse callLlm(String systemPrompt, List<LlmChatRequest.Message> messages) {
         Long tenantId = MetaContext.getCurrentTenantId();
 
-        // Resolve provider and config (prefer anthropic, fallback to any configured)
-        LlmProviderFactory.ProviderConfig config = providerFactory.resolveConfig(tenantId, "anthropic");
-        String providerCode = "anthropic";
+        // Resolve the tenant's explicit/default provider profile without
+        // preferring a vendor in business logic.
+        LlmProviderFactory.ProviderConfig config =
+                providerFactory.resolveConfig(tenantId, null);
         if (config == null) {
-            // Try to find any configured provider
-            var providers = providerFactory.listConfiguredProviders(tenantId);
-            if (providers.isEmpty()) {
-                log.error("No LLM provider configured for NL modeling");
-                return null;
-            }
-            providerCode = providers.get(0).getProviderCode();
-            config = providerFactory.resolveConfig(tenantId, providerCode);
-        }
-        if (config == null) {
-            log.error("Cannot resolve LLM config for provider: {}", providerCode);
+            log.error("No LLM provider configured for NL modeling");
             return null;
         }
 
-        String effectiveProviderCode = LlmProviderFactory.effectiveProviderCode(providerCode, config);
+        String effectiveProviderCode =
+                LlmProviderFactory.effectiveProviderCode(null, config);
         LlmProvider provider = providerFactory.getProvider(effectiveProviderCode);
 
         LlmChatRequest request = LlmChatRequest.builder()

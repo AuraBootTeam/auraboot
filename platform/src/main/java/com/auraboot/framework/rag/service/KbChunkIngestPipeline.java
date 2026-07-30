@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,6 +37,7 @@ public class KbChunkIngestPipeline {
     private final ChunkingService chunkingService;
     private final EmbeddingService embeddingService;
     private final JdbcTemplate jdbcTemplate;
+    private final KnowledgeLineageService lineageService;
 
     /** Result of one ingest run. {@code chunkCount == embeddedCount + failedCount}. */
     public record IngestOutcome(int chunkCount, int embeddedCount, int failedCount) {
@@ -50,6 +52,7 @@ public class KbChunkIngestPipeline {
      * @param chunkOverlap nullable; falls back to {@value #DEFAULT_CHUNK_OVERLAP}
      * @param metadataFn   nullable per-chunk JSON metadata supplier
      */
+    @Transactional
     public IngestOutcome ingestChunks(long tenantId, String kbPid, String docPid, String text,
                                       Integer chunkSize, Integer chunkOverlap, String embeddingProvider,
                                       Function<ChunkingService.ChunkResult, String> metadataFn) {
@@ -57,7 +60,15 @@ public class KbChunkIngestPipeline {
         int overlap = chunkOverlap != null && chunkOverlap >= 0 ? chunkOverlap : DEFAULT_CHUNK_OVERLAP;
 
         List<ChunkingService.ChunkResult> chunks = chunkingService.chunk(text, size, overlap);
+        KnowledgeLineageService.IngestLineage lineage =
+                lineageService.beginIngest(tenantId, kbPid, docPid);
         if (chunks.isEmpty()) {
+            lineageService.activateIngest(
+                    tenantId,
+                    kbPid,
+                    docPid,
+                    lineage.documentVersionPid(),
+                    lineage.indexReleasePid());
             return IngestOutcome.EMPTY;
         }
 
@@ -69,10 +80,13 @@ public class KbChunkIngestPipeline {
             chunkTexts.add(chunk.content());
             String metadata = metadataFn != null ? metadataFn.apply(chunk) : null;
             jdbcTemplate.update(
-                    "INSERT INTO ab_kb_chunk (pid, tenant_id, kb_id, doc_id, chunk_index, "
+                    "INSERT INTO ab_kb_chunk (pid, tenant_id, kb_id, doc_id, "
+                    + "document_version_pid, index_release_pid, chunk_index, "
                     + "content, char_count, token_count, metadata, tsv, embedding_status, created_at, updated_at) "
-                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, to_tsvector('simple', ?), 'pending', NOW(), NOW())",
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, "
+                    + "to_tsvector('simple', ?), 'pending', NOW(), NOW())",
                     chunkPid, tenantId, kbPid, docPid,
+                    lineage.documentVersionPid(), lineage.indexReleasePid(),
                     chunk.index(), chunk.content(), chunk.charCount(), chunk.tokenCount(),
                     metadata, CjkBigramSegmenter.segment(chunk.content()));
         }
@@ -83,14 +97,26 @@ public class KbChunkIngestPipeline {
             List<float[]> embeddings = embeddingService.embedBatch(tenantId, chunkTexts, embeddingProvider);
             for (int i = 0; i < chunkPids.size(); i++) {
                 float[] emb = i < embeddings.size() ? embeddings.get(i) : null;
-                if (emb != null) {
+                if (emb != null && emb.length == lineage.embeddingDimension()) {
                     jdbcTemplate.update(
                             "UPDATE ab_kb_chunk SET embedding = ?::vector, embedding_status = 'completed', "
-                            + "updated_at = NOW() WHERE pid = ?",
-                            VectorUtils.toVectorString(emb), chunkPids.get(i));
+                            + "updated_at = NOW() WHERE tenant_id = ? AND pid = ? "
+                            + "AND document_version_pid = ? AND index_release_pid = ?",
+                            VectorUtils.toVectorString(emb), tenantId, chunkPids.get(i),
+                            lineage.documentVersionPid(), lineage.indexReleasePid());
                     embedded++;
                 } else {
-                    markFailed(chunkPids.get(i));
+                    if (emb != null) {
+                        log.warn(
+                                "Embedding dimension mismatch for doc {}: expected={} actual={}",
+                                docPid, lineage.embeddingDimension(), emb.length);
+                    }
+                    markFailed(
+                            tenantId,
+                            kbPid,
+                            chunkPids.get(i),
+                            lineage.documentVersionPid(),
+                            lineage.indexReleasePid());
                     failed++;
                 }
             }
@@ -98,17 +124,35 @@ public class KbChunkIngestPipeline {
             log.warn("Embedding failed for doc {} ({} chunks marked failed for retry): {}",
                     docPid, chunkPids.size() - embedded, e.getMessage());
             for (int i = embedded; i < chunkPids.size(); i++) {
-                markFailed(chunkPids.get(i));
+                markFailed(
+                        tenantId,
+                        kbPid,
+                        chunkPids.get(i),
+                        lineage.documentVersionPid(),
+                        lineage.indexReleasePid());
                 failed++;
             }
         }
 
+        lineageService.activateIngest(
+                tenantId,
+                kbPid,
+                docPid,
+                lineage.documentVersionPid(),
+                lineage.indexReleasePid());
         return new IngestOutcome(chunks.size(), embedded, failed);
     }
 
-    private void markFailed(String chunkPid) {
+    private void markFailed(
+            long tenantId,
+            String kbPid,
+            String chunkPid,
+            String documentVersionPid,
+            String indexReleasePid) {
         jdbcTemplate.update(
-                "UPDATE ab_kb_chunk SET embedding_status = 'failed', updated_at = NOW() WHERE pid = ?",
-                chunkPid);
+                "UPDATE ab_kb_chunk SET embedding_status = 'failed', updated_at = NOW() "
+                        + "WHERE tenant_id = ? AND kb_id = ? AND pid = ? "
+                        + "AND document_version_pid = ? AND index_release_pid = ?",
+                tenantId, kbPid, chunkPid, documentVersionPid, indexReleasePid);
     }
 }

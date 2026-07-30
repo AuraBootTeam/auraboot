@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.constant.Status;
@@ -29,6 +30,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -132,6 +136,12 @@ public class MetaFieldOrchestratorControllerIntegrationTest extends BaseIntegrat
         MetaModelDTO published = metaModelService.publish(model.getPid(), "C-4 T5 IT seed publish");
         assertNotNull(published, "model publish must return non-null");
         assertThat(published.getStatus()).isEqualTo("published");
+        grantCommittedPermissionToTestRole(
+                com.auraboot.framework.permission.constants.MetaPermission.MODEL_MANAGE,
+                "meta",
+                "model",
+                "update",
+                "Model Manage");
 
         // MetaContext-priming filter: re-establishes the tenant ThreadLocal on
         // every dispatch so the platform's tenant-line interceptor + the
@@ -144,7 +154,22 @@ public class MetaFieldOrchestratorControllerIntegrationTest extends BaseIntegrat
                     getTestUser().getPid(),
                     getTestUser().getUserName());
             MetaContext.setMemberId(getTestTenantMember().getId());
-            chain.doFilter(request, response);
+            CustomUserDetails userDetails = new CustomUserDetails(
+                    getTestUser().getUserName(),
+                    "test-password",
+                    getTestUser().getId(),
+                    getTestUser().getPid(),
+                    AuthorityUtils.createAuthorityList("role_admin"),
+                    true, true, true, true);
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken(
+                            userDetails, null, userDetails.getAuthorities()));
+            try {
+                chain.doFilter(request, response);
+            } finally {
+                SecurityContextHolder.clearContext();
+                MetaContext.clear();
+            }
         };
         mockMvc = MockMvcBuilders
                 .webAppContextSetup(webApplicationContext)

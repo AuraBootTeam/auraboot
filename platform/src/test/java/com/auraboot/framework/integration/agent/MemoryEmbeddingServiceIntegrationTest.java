@@ -3,6 +3,7 @@ package com.auraboot.framework.integration.agent;
 import com.auraboot.framework.agent.service.MemoryEmbeddingService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.rag.service.EmbeddingService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -10,10 +11,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Commit;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.when;
 import com.auraboot.framework.integration.TestIdGenerator;
 
 /**
@@ -29,6 +35,7 @@ class MemoryEmbeddingServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private MemoryEmbeddingService service;
     @Autowired private JdbcTemplate jdbc;
+    @MockitoBean private EmbeddingService embeddingService;
 
     private Long tenantId;
 
@@ -91,7 +98,13 @@ class MemoryEmbeddingServiceIntegrationTest extends BaseIntegrationTest {
                         + "(pid, tenant_id, memory_agent_id, memory_type, memory_content, importance, scope, created_at, updated_at, deleted_flag) "
                         + "VALUES (?, ?, 'a', 'fact', 'c', 5, 'user', NOW(), NOW(), FALSE)",
                 pid, tenantId);
-        // No CloudConfig seeded in the test tenant → provider resolution returns null → resolveEmbedding must null-out.
+        when(embeddingService.embed(
+                anyLong(),
+                anyString(),
+                nullable(String.class))).thenReturn(null);
+        // The provider boundary is explicitly unavailable; global provider
+        // configuration (including a developer's Qwen key) must not make this
+        // deterministic failure-path test perform a live network call.
         double[] v = service.resolveEmbedding(pid);
         assertThat(v).isNull();
         Integer hasEmbedding = jdbc.queryForObject(

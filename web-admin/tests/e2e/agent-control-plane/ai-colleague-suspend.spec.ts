@@ -18,12 +18,12 @@ import { test, expect, type Page } from '@playwright/test';
 const UNIQUE = `susp${Date.now().toString(36)}`;
 const COLLEAGUE_NAME = `E2E Suspendable ${UNIQUE}`;
 const SHOTS = 'test-results/digital-employee';
+const LIVE_PROVIDER = process.env.AURA_LIVE_LLM_PROVIDER?.trim();
 
 async function createColleague(page: Page): Promise<void> {
-  const hydrated = page.waitForResponse(
-    (r) => r.url().includes('/agent/providers/configured'),
-    { timeout: 30_000 },
-  );
+  const hydrated = page.waitForResponse((r) => r.url().includes('/agent/providers/configured'), {
+    timeout: 30_000,
+  });
   await page.goto('/p/c/ai_colleague_new', { waitUntil: 'domcontentloaded' });
   await hydrated;
   await page.locator('[data-testid="wizard-template-skip"]').click();
@@ -32,6 +32,15 @@ async function createColleague(page: Page): Promise<void> {
   await expect(page.locator('[data-testid="wizard-step-personality"]')).toBeVisible();
   await page.locator('[data-testid="wizard-btn-next"]').click();
   await expect(page.locator('[data-testid="wizard-step-review"]')).toBeVisible();
+  if (LIVE_PROVIDER) {
+    const providerSelect = page.locator('[data-testid="review-provider-select"]');
+    await expect(
+      providerSelect.locator(`option[value="${LIVE_PROVIDER}"]`),
+      `the live provider ${LIVE_PROVIDER} must be selectable in the wizard`,
+    ).toHaveCount(1);
+    await providerSelect.selectOption(LIVE_PROVIDER);
+    await expect(providerSelect).toHaveValue(LIVE_PROVIDER);
+  }
   await Promise.all([
     page.waitForResponse((r) => r.url().includes('/agent-definition/create')),
     page.locator('[data-testid="wizard-btn-create"]').click(),
@@ -45,10 +54,9 @@ async function createColleague(page: Page): Promise<void> {
 /** Opens this colleague's chat the way a person does — from its card. */
 async function openChat(page: Page) {
   await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
-  await page.waitForResponse(
-    (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-    { timeout: 20_000 },
-  );
+  await expect(page.locator('[data-testid="agent-colleagues-grid"]')).toBeVisible({
+    timeout: 20_000,
+  });
   const card = page.locator('[data-testid^="agent-card-"]', { hasText: COLLEAGUE_NAME });
   await expect(card).toBeVisible({ timeout: 20_000 });
   await card.locator('[data-testid^="agent-chat-"]').first().click();
@@ -121,8 +129,9 @@ test.describe('Digital employee — suspend and resume', () => {
     const notice = chat.getByText(/suspended|停用|no longer available|不再可用/i).first();
     await expect(notice, 'the page must say why nothing happened').toBeVisible({ timeout: 20_000 });
     const noticeText = await notice.innerText();
-    expect(noticeText, 'a user-facing message must not carry the raw agent code')
-        .not.toMatch(/e2e_suspendable[a-z0-9_]*/i);
+    expect(noticeText, 'a user-facing message must not carry the raw agent code').not.toMatch(
+      /e2e_suspendable[a-z0-9_]*/i,
+    );
 
     // --- resume, and it works again ---------------------------------------
     await page.goto(detailUrl, { waitUntil: 'domcontentloaded' });

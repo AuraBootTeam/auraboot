@@ -1,6 +1,11 @@
 package com.auraboot.framework.integration.agent;
 
+import com.auraboot.framework.agent.identity.DelegationGrant;
+import com.auraboot.framework.agent.identity.ExecutionPrincipal;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
+import com.auraboot.framework.agent.identity.Initiator;
 import com.auraboot.framework.agent.service.AgentMemoryService;
+import com.auraboot.framework.agent.service.AgentReleaseDeploymentService;
 import com.auraboot.framework.agent.service.AgentRunService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -20,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.lang.reflect.Method;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -34,22 +40,62 @@ class AgentRunSoulProfileInjectionIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private AgentRunService agentRunService;
     @Autowired private AgentMemoryService memory;
+    @Autowired private AgentReleaseDeploymentService releaseDeploymentService;
     @Autowired private JdbcTemplate jdbc;
 
     private Long tenantId;
     private final String agent = "aurabot";
+    private ExecutionPrincipal principal;
 
     @BeforeEach
     void setup() {
         long base = System.nanoTime() % 1_000_000;
         tenantId = 9_790_000L + base;
         MetaContext.setContext(tenantId, testUser.getId(), testUser.getPid(), testUser.getUserName());
+        String definitionPid = UniqueIdGenerator.generate();
+        jdbc.update(
+                """
+                INSERT INTO ab_agent_definition (
+                    pid, tenant_id, agent_code, name, model, system_prompt,
+                    status, visibility, created_by, updated_by, deleted_flag)
+                VALUES (?, ?, ?, 'Soul profile test agent', 'qwen-plus',
+                        'Test prompt', 'active', 'tenant', ?, ?, FALSE)
+                """,
+                definitionPid,
+                tenantId,
+                agent,
+                testUser.getId(),
+                testUser.getId());
+        AgentReleaseDeploymentService.RuntimeBinding binding =
+                releaseDeploymentService.requireActive(tenantId, agent);
+        principal = new ExecutionPrincipal(
+                tenantId,
+                testUser.getId(),
+                testTenantMember.getId(),
+                testUser.getPid(),
+                testUser.getUserName(),
+                null,
+                null,
+                Initiator.human(testUser.getId(), testTenantMember.getId(), "test"),
+                DelegationGrant.directUser(),
+                agent,
+                binding.releasePid(),
+                binding.deploymentPid(),
+                binding.releaseHash(),
+                "test",
+                ExecutionPrincipal.Type.HUMAN_DELEGATED,
+                Set.of(testRole.getId()));
+        ExecutionPrincipalContext.restore(principal);
     }
 
     @AfterEach
     void cleanup() {
-        jdbc.update("DELETE FROM ab_agent_memory WHERE tenant_id = ?", tenantId);
-        jdbc.update("DELETE FROM ab_agent_user_soul_profile WHERE tenant_id = ?", tenantId);
+        try {
+            jdbc.update("DELETE FROM ab_agent_memory WHERE tenant_id = ?", tenantId);
+            jdbc.update("DELETE FROM ab_agent_user_soul_profile WHERE tenant_id = ?", tenantId);
+        } finally {
+            ExecutionPrincipalContext.clear();
+        }
     }
 
     private String invokeLoadMemorySection(Long tid, String agentCode) throws Exception {
@@ -118,6 +164,7 @@ class AgentRunSoulProfileInjectionIntegrationTest extends BaseIntegrationTest {
                 9, true, "tenant", null);
         // Seed a profile for some user, but clear the context so no user id is present
         seedActiveProfile(tenantId, "someone_else");
+        ExecutionPrincipalContext.clear();
         MetaContext.clear();
         MetaContext.setSystemTenantContext(tenantId);
         try {
@@ -128,6 +175,7 @@ class AgentRunSoulProfileInjectionIntegrationTest extends BaseIntegrationTest {
             // Restore for @AfterEach
             MetaContext.setContext(tenantId, testUser.getId(), testUser.getPid(),
                     testUser.getUserName());
+            ExecutionPrincipalContext.restore(principal);
         }
     }
 

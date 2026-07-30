@@ -68,12 +68,16 @@ public class AuraBotPendingContinuationService implements PendingContinuationSer
                                               PendingToolSnapshot pending,
                                               ResponseSink sink) {
         ResponseSinkContext.set(sink);
+        TraceContext trace = createResumeTrace(ctx, pending);
         try {
-            return doResumeApprovedInner(ctx, pending, sink);
+            TurnOutcome outcome = doResumeApprovedInner(ctx, pending, sink, trace);
+            finishResumeTrace(trace, outcome);
+            return outcome;
         } catch (Exception e) {
             String safeError = safeExceptionMessage(e);
             log.error("resumeApprovedChatTool failed: errorType={}, message={}",
                     e.getClass().getSimpleName(), safeError);
+            aiTraceService.endTraceWithError(trace, safeError);
             sink.onError(safeError, null);
             return new TurnOutcome.Failed(safeError, e);
         } finally {
@@ -84,11 +88,10 @@ public class AuraBotPendingContinuationService implements PendingContinuationSer
 
     private TurnOutcome doResumeApprovedInner(TurnContext ctx,
                                               PendingToolSnapshot pending,
-                                              ResponseSink sink) {
+                                              ResponseSink sink,
+                                              TraceContext trace) {
         String toolId = pending.getToolId();
         String sessionId = pending.getSessionId();
-
-        TraceContext trace = aiTraceService.findActiveTrace(sessionId);
         String tid = trace != null ? trace.getTraceId() : null;
 
         List<LlmChatRequest.Message> messages = LlmMessageTapeSupport.deserializeMessages(pending.getMessages());
@@ -121,7 +124,6 @@ public class AuraBotPendingContinuationService implements PendingContinuationSer
                 : pending.getProviderCode();
         LlmProvider provider = llmProviderFactory.getProvider(resumeProviderCode);
         if (provider == null) {
-            aiTraceService.endTraceWithError(trace, "LLM provider not available");
             String msg = "LLM provider not available: " + resumeProviderCode;
             sink.onError(msg, tid);
             return new TurnOutcome.Failed(msg, null);
@@ -131,7 +133,6 @@ public class AuraBotPendingContinuationService implements PendingContinuationSer
         String resumeBaseUrl = firstNonBlank(pending.getBaseUrl(),
                 resumeConfig != null ? resumeConfig.getBaseUrl() : null);
         if (resumeApiKey == null) {
-            aiTraceService.endTraceWithError(trace, "LLM provider config unavailable");
             String msg = "LLM provider config unavailable for resume: " + resumeProviderCode;
             sink.onError(msg, tid);
             return new TurnOutcome.Failed(msg, null);
@@ -275,7 +276,6 @@ public class AuraBotPendingContinuationService implements PendingContinuationSer
                                              Exception error) {
                 SpanContext llmSpan = span instanceof SpanContext sc ? sc : null;
                 aiTraceService.endSpan(llmSpan, Map.of("error", message), "error");
-                aiTraceService.endTraceWithError(trace, message);
             }
 
             @Override
@@ -290,12 +290,14 @@ public class AuraBotPendingContinuationService implements PendingContinuationSer
 
             @Override
             public void onFinalResponse(ChatTurnRuntime.ChatToolLoopRound round, LlmChatResponse response) {
-                aiTraceService.endTrace(trace, chatTurnRuntime.finalResponseText(response), "success");
+                // The public resume entrypoint owns the product-trace terminal
+                // transition so success, failure, budget rejection and a second
+                // suspension all close exactly once.
             }
 
             @Override
             public void onLoopExhausted(String message) {
-                aiTraceService.endTraceWithError(trace, message);
+                // See onFinalResponse: finishResumeTrace handles every outcome.
             }
 
             @Override
@@ -405,6 +407,50 @@ public class AuraBotPendingContinuationService implements PendingContinuationSer
                 return AuraBotPendingContinuationService.this.buildToolDescription(toolName);
             }
         };
+    }
+
+    /**
+     * Every HTTP continuation has a new OTel trace and therefore needs a new
+     * product trace. Re-attaching to the initial trace loses the continuation's
+     * OTel id, leaving provider usage billable but invisible from the trace UI.
+     * The stable turn id in metadata keeps all phases of the logical turn
+     * queryable as one lineage without pretending that separate requests share
+     * one W3C trace.
+     */
+    private TraceContext createResumeTrace(TurnContext ctx, PendingToolSnapshot pending) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("turn_id", ctx.turnId());
+        metadata.put("turn_phase", "resume");
+        metadata.put("provider_code", firstNonBlank(pending.getProviderCode(), "unknown"));
+        metadata.put("pending_tool_id", firstNonBlank(pending.getToolId(), pending.getToolName(), "unknown"));
+        return aiTraceService.createTrace(
+                ctx.tenantId(),
+                pending.getSessionId(),
+                "Resume confirmed action: " + firstNonBlank(pending.getDescription(), pending.getToolName(), "action"),
+                ctx.userId(),
+                metadata,
+                MetaContext.getOtelTraceId());
+    }
+
+    private void finishResumeTrace(TraceContext trace, TurnOutcome outcome) {
+        if (outcome instanceof TurnOutcome.Failed failed) {
+            aiTraceService.endTraceWithError(trace, firstNonBlank(
+                    failed.errorMessage(), "Continuation failed without a diagnostic"));
+            return;
+        }
+        if (outcome instanceof TurnOutcome.Success success) {
+            aiTraceService.endTrace(trace, firstNonBlank(success.finalResponse(), "[completed]"), "success");
+            return;
+        }
+        if (outcome instanceof TurnOutcome.Interrupted interrupted) {
+            aiTraceService.endTrace(trace, firstNonBlank(
+                    interrupted.partialResponse(), interrupted.reason(), "[interrupted]"), "success");
+            return;
+        }
+        if (outcome instanceof TurnOutcome.PendingConfirmation pendingConfirmation) {
+            aiTraceService.endTrace(trace, firstNonBlank(
+                    pendingConfirmation.partialResponse(), "[suspended]"), "success");
+        }
     }
 
     private List<LlmChatRequest.Tool> toolsFromPendingSnapshot(PendingToolSnapshot pending) {
@@ -592,12 +638,14 @@ public class AuraBotPendingContinuationService implements PendingContinuationSer
         }
     }
 
-    private String firstNonBlank(String first, String second) {
-        if (first != null && !first.isBlank()) {
-            return first;
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
         }
-        if (second != null && !second.isBlank()) {
-            return second;
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
         }
         return null;
     }

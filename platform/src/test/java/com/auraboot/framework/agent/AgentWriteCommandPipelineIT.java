@@ -56,7 +56,7 @@ import org.springframework.test.context.ActiveProfiles;
  * {@code ConversationTurnServiceImplResumeTest}; the command executor directly in
  * {@code CommandExecutorDslEnhancementTest}) but not the integrated <em>agent
  * tool path → DB</em>. The live scenario (create → confirm_required → /execute
- * APPROVED → DB row) was verified end-to-end against real qwen; this fixes it as a
+ * APPROVED → DB row) was verified end-to-end against a real live profile; this fixes it as a
  * deterministic, LLM-free regression guard.
  *
  * <p>Deterministic + self-contained: it seeds its own model + field + physical table

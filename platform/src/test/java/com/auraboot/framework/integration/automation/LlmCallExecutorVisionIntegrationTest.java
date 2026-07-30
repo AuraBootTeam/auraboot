@@ -5,6 +5,7 @@ import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.dto.LlmChunk;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.provider.ModelCapabilityProfile;
 import reactor.core.publisher.Flux;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.impl.LlmCallExecutor;
@@ -81,6 +82,15 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
                         .maxTokens(4096)
                         .build());
         when(llmProviderFactory.getProvider(providerCode)).thenReturn(provider);
+        lenient().when(provider.modelCapabilities(anyString()))
+                .thenReturn(new ModelCapabilityProfile(
+                        true,
+                        true,
+                        true,
+                        false,
+                        true,
+                        "anthropic".equals(providerCode),
+                        false));
     }
 
     /**
@@ -254,8 +264,8 @@ class LlmCallExecutorVisionIntegrationTest extends BaseIntegrationTest {
 
         assertThatThrownBy(() -> executor.execute(action, ctx))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("openai-compatible")
-                .hasMessageContaining("does not support vision");
+                .hasMessageContaining("deepseek-chat")
+                .hasMessageContaining("capability=vision");
 
         verify(provider, never()).streamChat(any(), anyString(), anyString());
     }

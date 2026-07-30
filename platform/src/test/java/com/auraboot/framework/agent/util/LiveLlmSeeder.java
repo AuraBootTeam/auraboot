@@ -2,117 +2,208 @@ package com.auraboot.framework.agent.util;
 
 import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
 /**
- * Shared seeding for {@code @Tag("agent-eval-live")} integration tests.
+ * Provider-neutral live LLM profile used by all business capability tests.
  *
- * <p><strong>Why this exists.</strong> Every live eval IT used to carry its own
- * {@code seedDeepSeek()} with the provider code, baseUrl and — critically — the
- * <em>model name</em> hard-coded inline. That duplication (31 files pinned
- * {@code deepseek-chat}) silently rotted the entire live eval layer the day
- * DeepSeek retired that model name: every live capability eval failed with
- * {@code 400 invalid_request_error}, and nothing noticed because these tests are
- * excluded from the default task unless {@code -PincludeLiveEvals} is passed.
+ * <p>Business tests do not select a vendor, infer one from whatever key happens
+ * to exist, or carry provider model names. The release runner supplies one
+ * explicit profile:
  *
- * <p><strong>Contract.</strong> Provider identity comes from the environment, never
- * from source. A test asks for "a live provider" and gets whichever one the
- * operator has credentials for, preferring qwen (owner has a standing plan):
+ * <ul>
+ *   <li>{@code AURA_LIVE_LLM_PROVIDER}</li>
+ *   <li>{@code AURA_LIVE_LLM_MODEL}</li>
+ *   <li>{@code AURA_LIVE_LLM_API_KEY_ENV}</li>
+ *   <li>{@code AURA_LIVE_LLM_BASE_URL} (optional when the provider catalog has one)</li>
+ * </ul>
  *
- * <ol>
- *   <li>{@code DASHSCOPE_API_KEY} → {@code qianwen} (qwen-plus, OpenAI-compatible)</li>
- *   <li>{@code DEEPSEEK_API_KEY} → {@code deepseek}</li>
- * </ol>
- *
- * <p>Model names are overridable per-run ({@code AURA_LIVE_EVAL_MODEL}) so a
- * provider-side rename is a one-line env change, not a 31-file sweep. Keys are
- * read from the environment and never logged — see the workspace rule on
- * reporting secrets as SET/UNSET only.
+ * <p>The API-key variable is dereferenced exactly once and its value is never
+ * logged or placed in a test name/assertion. Provider-specific defaults belong
+ * to the provider catalog or an explicit validation profile, not this class.
  */
 public final class LiveLlmSeeder {
 
-    /** Provider code understood by {@code LlmProviderFactory} for qwen/DashScope. */
-    public static final String QIANWEN = "qianwen";
-    /** Provider code for DeepSeek. */
-    public static final String DEEPSEEK = "deepseek";
+    static final String PROVIDER_ENV = "AURA_LIVE_LLM_PROVIDER";
+    static final String MODEL_ENV = "AURA_LIVE_LLM_MODEL";
+    static final String API_KEY_ENV_ENV = "AURA_LIVE_LLM_API_KEY_ENV";
+    static final String BASE_URL_ENV = "AURA_LIVE_LLM_BASE_URL";
 
-    private static final String QIANWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode";
-    private static final String DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+    private static final Pattern ENV_NAME =
+            Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    /** Current model names. Kept here (one place) rather than inline in every IT. */
-    private static final String QIANWEN_DEFAULT_MODEL = "qwen-plus";
-    private static final String DEEPSEEK_DEFAULT_MODEL = "deepseek-v4-flash";
-
-    private LiveLlmSeeder() {}
+    private LiveLlmSeeder() {
+    }
 
     /**
-     * The live provider this environment can actually reach, or {@code null} when no
-     * live credential is present (callers turn that into an {@code assumeTrue} skip).
+     * Resolve the explicit live profile, or {@code null} when it is incomplete.
+     * The capability runner treats that as a hard failure; individual opt-in
+     * tests may turn it into an assumption skip.
      */
     public static LiveProvider resolve() {
-        String dashscope = System.getenv("DASHSCOPE_API_KEY");
-        if (dashscope != null && !dashscope.isBlank()) {
-            return new LiveProvider(QIANWEN, dashscope, QIANWEN_BASE_URL, model(QIANWEN_DEFAULT_MODEL),
-                    "通义千问 (Qwen) — live eval");
-        }
-        String deepseek = System.getenv("DEEPSEEK_API_KEY");
-        if (deepseek != null && !deepseek.isBlank()) {
-            return new LiveProvider(DEEPSEEK, deepseek, DEEPSEEK_BASE_URL, model(DEEPSEEK_DEFAULT_MODEL),
-                    "DeepSeek — live eval");
-        }
-        return null;
+        return resolve(System.getenv());
     }
 
-    /** Per-run model override, so a provider-side rename needs no code change. */
-    private static String model(String fallback) {
-        String override = System.getenv("AURA_LIVE_EVAL_MODEL");
-        return override != null && !override.isBlank() ? override : fallback;
+    static LiveProvider resolve(Map<String, String> environment) {
+        if (environment == null) {
+            return null;
+        }
+        String providerCode = normalized(environment.get(PROVIDER_ENV));
+        String model = normalized(environment.get(MODEL_ENV));
+        String apiKeyEnv = normalized(environment.get(API_KEY_ENV_ENV));
+        if (providerCode == null || model == null || apiKeyEnv == null
+                || !ENV_NAME.matcher(apiKeyEnv).matches()) {
+            return null;
+        }
+        String apiKey = normalized(environment.get(apiKeyEnv));
+        if (apiKey == null) {
+            return null;
+        }
+        return new LiveProvider(
+                providerCode,
+                apiKey,
+                apiKeyEnv,
+                normalized(environment.get(BASE_URL_ENV)),
+                model);
     }
 
-    /** Human-readable reason for the {@code assumeTrue} skip message. */
+    /** Human-readable skip reason containing variable names, never values. */
     public static String skipReason() {
-        return "no live LLM credential (DASHSCOPE_API_KEY or DEEPSEEK_API_KEY) — skipping live eval";
+        String apiKeyEnv = normalized(System.getenv(API_KEY_ENV_ENV));
+        if (normalized(System.getenv(PROVIDER_ENV)) == null
+                || normalized(System.getenv(MODEL_ENV)) == null
+                || apiKeyEnv == null) {
+            return "incomplete provider-neutral live profile: set "
+                    + PROVIDER_ENV + ", " + MODEL_ENV + " and " + API_KEY_ENV_ENV;
+        }
+        if (!ENV_NAME.matcher(apiKeyEnv).matches()
+                || normalized(System.getenv(apiKeyEnv)) == null) {
+            return "configured live API-key environment variable is unset or invalid: "
+                    + apiKeyEnv;
+        }
+        return "live LLM profile is unavailable";
     }
 
     /**
-     * Seed the resolved provider as a tenant-scoped LLM config so it sorts ahead of any
-     * platform-level provider. Idempotent: clears prior seeds for this provider first.
+     * Seed the selected profile as a tenant-scoped configuration. When the
+     * optional base URL is absent, reuse the matching provider-catalog URL;
+     * never guess a vendor endpoint in business-test code.
      */
-    public static void seed(LiveProvider provider, Long tenantId,
-                           CloudConfigService cloudConfigService, JdbcTemplate jdbcTemplate) {
+    public static LiveProvider seed(
+            LiveProvider provider,
+            Long tenantId,
+            CloudConfigService cloudConfigService,
+            JdbcTemplate jdbcTemplate) {
+        if (provider == null || tenantId == null) {
+            throw new IllegalArgumentException("live provider and tenantId are required");
+        }
+        String baseUrl = provider.baseUrl() != null
+                ? provider.baseUrl()
+                : catalogBaseUrl(provider.providerCode(), tenantId, jdbcTemplate);
+        if (baseUrl == null) {
+            throw new IllegalStateException(
+                    "No base URL supplied and provider catalog has none for "
+                            + provider.providerCode());
+        }
+
         clear(provider, tenantId, jdbcTemplate);
 
-        String configJson = "{"
-                + "\"apiKey\":\"" + provider.apiKey() + "\","
-                + "\"baseUrl\":\"" + provider.baseUrl() + "\","
-                + "\"defaultModel\":\"" + provider.model() + "\","
-                + "\"apiFormat\":\"chat_completions\","
-                + "\"models\":[\"" + provider.model() + "\"],"
-                + "\"displayName\":\"" + provider.displayName() + "\""
-                + "}";
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("apiKey", provider.apiKey());
+        config.put("baseUrl", baseUrl);
+        config.put("defaultModel", provider.model());
+        config.put("apiFormat", "chat_completions");
+        config.put("models", List.of(provider.model()));
+        config.put("displayName", "Live LLM validation profile");
 
-        CloudConfigSaveRequest req = new CloudConfigSaveRequest();
-        req.setConfigLevel("tenant");
-        req.setServiceType("llm");
-        req.setProviderCode(provider.providerCode());
-        req.setConfig(configJson);
-        req.setEnabled(true);
-        req.setPriority(0);
-        cloudConfigService.saveConfig(req);
+        CloudConfigSaveRequest request = new CloudConfigSaveRequest();
+        request.setConfigLevel("tenant");
+        request.setServiceType("llm");
+        request.setProviderCode(provider.providerCode());
+        request.setConfig(toJson(config));
+        request.setEnabled(true);
+        request.setPriority(0);
+        cloudConfigService.saveConfig(request);
+        return new LiveProvider(
+                provider.providerCode(),
+                provider.apiKey(),
+                provider.apiKeyEnvironmentVariable(),
+                baseUrl,
+                provider.model());
     }
 
-    /** Remove this provider's seeded rows for the tenant. */
-    public static void clear(LiveProvider provider, Long tenantId, JdbcTemplate jdbcTemplate) {
+    /** Remove this profile's seeded rows for the tenant. */
+    public static void clear(
+            LiveProvider provider,
+            Long tenantId,
+            JdbcTemplate jdbcTemplate) {
         jdbcTemplate.update(
-                "DELETE FROM ab_cloud_config WHERE service_type='llm' AND provider_code=? AND tenant_id=?",
-                provider.providerCode(), tenantId);
+                "DELETE FROM ab_cloud_config "
+                        + "WHERE service_type='llm' AND provider_code=? AND tenant_id=?",
+                provider.providerCode(),
+                tenantId);
+    }
+
+    private static String catalogBaseUrl(
+            String providerCode,
+            Long tenantId,
+            JdbcTemplate jdbcTemplate) {
+        List<String> urls = jdbcTemplate.query(
+                """
+                SELECT config ->> 'baseUrl'
+                FROM ab_cloud_config
+                WHERE service_type = 'llm'
+                  AND provider_code = ?
+                  AND (tenant_id = ? OR tenant_id IS NULL)
+                ORDER BY CASE WHEN tenant_id = ? THEN 0 ELSE 1 END, priority
+                LIMIT 1
+                """,
+                (rs, rowNum) -> rs.getString(1),
+                providerCode,
+                tenantId,
+                tenantId);
+        return urls.isEmpty() ? null : normalized(urls.get(0));
+    }
+
+    private static String toJson(Map<String, Object> config) {
+        try {
+            return OBJECT_MAPPER.writeValueAsString(config);
+        } catch (Exception e) {
+            throw new IllegalStateException("Could not encode live LLM profile", e);
+        }
+    }
+
+    private static String normalized(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     /**
-     * A reachable live provider. {@code apiKey} is a live credential — never log,
-     * print, or embed it in an assertion message.
+     * In-memory credential is deliberately excluded from {@link #toString()}.
      */
-    public record LiveProvider(String providerCode, String apiKey, String baseUrl,
-                               String model, String displayName) {
+    public record LiveProvider(
+            String providerCode,
+            String apiKey,
+            String apiKeyEnvironmentVariable,
+            String baseUrl,
+            String model) {
+
+        @Override
+        public String toString() {
+            return "LiveProvider[providerCode=" + providerCode
+                    + ", apiKeyEnvironmentVariable=" + apiKeyEnvironmentVariable
+                    + ", baseUrl=" + baseUrl
+                    + ", model=" + model
+                    + "]";
+        }
     }
 }

@@ -7,6 +7,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Abstraction for LLM providers (Anthropic, OpenAI, DeepSeek, Qianwen, etc.).
@@ -21,8 +22,24 @@ public interface LlmProvider {
     /** Human-readable display name */
     String getDisplayName();
 
+    /**
+     * Wire protocols implemented by this adapter. Provider codes remain
+     * tenant/catalog data; the factory selects an adapter by protocol.
+     */
+    default Set<String> supportedApiFormats() {
+        return Set.of();
+    }
+
     /** Whether this provider supports tool/function calling */
     boolean supportsTools();
+
+    /**
+     * Capabilities of a concrete model behind this adapter. Implementations
+     * must keep vendor/model detection inside the adapter layer.
+     */
+    default ModelCapabilityProfile modelCapabilities(String model) {
+        return ModelCapabilityProfile.conservative(supportsTools());
+    }
 
     /** Call the LLM API and return a unified response */
     LlmChatResponse chat(LlmChatRequest request, String apiKey, String baseUrl) throws Exception;

@@ -18,7 +18,7 @@
     "displayGroupOrder": 95,
     "name:zh-CN": "模型服务配置",
     "name:en": "Model / LLM Provider Config",
-    "description": "查看与配置 LLM/DeepSeek 模型服务(AI 中心)",
+    "description": "查看与配置 LLM Provider 与模型服务(AI 中心)",
     "includes": [
       "ai_center"
     ],

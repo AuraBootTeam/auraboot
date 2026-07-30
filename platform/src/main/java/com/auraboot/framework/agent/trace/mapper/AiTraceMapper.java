@@ -42,12 +42,30 @@ public interface AiTraceMapper extends BaseMapper<AiTrace> {
     Long selectTenantByTraceId(@Param("traceId") String traceId);
 
     @Update("""
-        UPDATE ab_ai_trace
+        UPDATE ab_ai_trace AS trace
         SET output = #{output},
             status = #{status},
             end_time = #{endTime},
-            duration_ms = #{durationMs}
-        WHERE trace_id = #{traceId}
+            duration_ms = #{durationMs},
+            total_input_tokens = COALESCE((
+                SELECT SUM(usage.input_tokens)::integer
+                FROM ab_gen_ai_usage usage
+                WHERE usage.tenant_id = trace.tenant_id
+                  AND usage.trace_id = trace.otel_trace_id
+            ), trace.total_input_tokens),
+            total_output_tokens = COALESCE((
+                SELECT SUM(usage.output_tokens)::integer
+                FROM ab_gen_ai_usage usage
+                WHERE usage.tenant_id = trace.tenant_id
+                  AND usage.trace_id = trace.otel_trace_id
+            ), trace.total_output_tokens),
+            total_cost = COALESCE((
+                SELECT SUM(usage.amount)
+                FROM ab_gen_ai_usage usage
+                WHERE usage.tenant_id = trace.tenant_id
+                  AND usage.trace_id = trace.otel_trace_id
+            ), trace.total_cost)
+        WHERE trace.trace_id = #{traceId}
     """)
     @InterceptorIgnore(tenantLine = "true")
     int finishTraceSuccess(
@@ -58,12 +76,30 @@ public interface AiTraceMapper extends BaseMapper<AiTrace> {
             @Param("durationMs") long durationMs);
 
     @Update("""
-        UPDATE ab_ai_trace
+        UPDATE ab_ai_trace AS trace
         SET status = 'error',
             error_message = #{errorMessage},
             end_time = #{endTime},
-            duration_ms = #{durationMs}
-        WHERE trace_id = #{traceId}
+            duration_ms = #{durationMs},
+            total_input_tokens = COALESCE((
+                SELECT SUM(usage.input_tokens)::integer
+                FROM ab_gen_ai_usage usage
+                WHERE usage.tenant_id = trace.tenant_id
+                  AND usage.trace_id = trace.otel_trace_id
+            ), trace.total_input_tokens),
+            total_output_tokens = COALESCE((
+                SELECT SUM(usage.output_tokens)::integer
+                FROM ab_gen_ai_usage usage
+                WHERE usage.tenant_id = trace.tenant_id
+                  AND usage.trace_id = trace.otel_trace_id
+            ), trace.total_output_tokens),
+            total_cost = COALESCE((
+                SELECT SUM(usage.amount)
+                FROM ab_gen_ai_usage usage
+                WHERE usage.tenant_id = trace.tenant_id
+                  AND usage.trace_id = trace.otel_trace_id
+            ), trace.total_cost)
+        WHERE trace.trace_id = #{traceId}
     """)
     @InterceptorIgnore(tenantLine = "true")
     int finishTraceError(

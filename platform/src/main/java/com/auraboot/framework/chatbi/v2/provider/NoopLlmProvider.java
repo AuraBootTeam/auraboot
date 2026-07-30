@@ -13,16 +13,19 @@ import org.springframework.stereotype.Component;
  * falls back to v1 keyword behaviour (or, in W2, returns an empty Token list
  * with a TODO marker — see {@link com.auraboot.framework.chatbi.v2.lexer.DefaultTokenLexer}).
  *
- * <p>Activated by {@code aura.chatbi.v2.llm-provider=noop} or absence of the
- * property; W4 will register Anthropic / OpenAI providers under different
- * values and let one win.
+ * <p>Activated only by {@code aura.chatbi.v2.llm-provider=noop}. The default
+ * is the provider-neutral platform-backed implementation.
  */
 @Component
 @ConditionalOnProperty(
         name = "aura.chatbi.v2.llm-provider",
-        havingValue = "noop",
-        matchIfMissing = true)
+        havingValue = "noop")
 public class NoopLlmProvider implements LlmProvider {
+
+    @Override
+    public String routingKey() {
+        return "noop";
+    }
 
     @Override
     public IntentResult translate(String nlQuery, SemanticMetaResponse catalog, ConversationContext ctx) {

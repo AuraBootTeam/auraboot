@@ -538,7 +538,7 @@
         "fields": [
           {
             "field": "title",
-            "colSpan": 8,
+            "colSpan": 12,
             "required": true
           },
           {
@@ -1337,6 +1337,11 @@
         "blockType": "table",
         "columns": [
           {
+            "field": "agent_code",
+            "width": 180,
+            "sortable": true
+          },
+          {
             "field": "title",
             "width": 200,
             "sortable": true
@@ -1463,6 +1468,11 @@
         },
         "fields": [
           {
+            "field": "agent_code",
+            "colSpan": 4,
+            "required": true
+          },
+          {
             "field": "title",
             "colSpan": 8,
             "required": true
@@ -1491,6 +1501,37 @@
           {
             "field": "max_runs",
             "colSpan": 4
+          },
+          {
+            "field": "daily_run_budget",
+            "colSpan": 4,
+            "required": true
+          },
+          {
+            "field": "concurrency_limit",
+            "colSpan": 4,
+            "required": true
+          },
+          {
+            "field": "missed_run_policy",
+            "colSpan": 4,
+            "required": true
+          },
+          {
+            "field": "quiet_hours_start",
+            "colSpan": 3
+          },
+          {
+            "field": "quiet_hours_end",
+            "colSpan": 3
+          },
+          {
+            "field": "manager_member_id",
+            "colSpan": 3
+          },
+          {
+            "field": "agent_release_pid",
+            "colSpan": 3
           },
           {
             "field": "mission_id",

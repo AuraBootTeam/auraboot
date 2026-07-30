@@ -70,6 +70,7 @@ export type AuraBotSseEventName =
   | 'tool_start'
   | 'tool_result'
   | 'result_contract'
+  | 'retrieval_evidence'
   | 'warning'
   | 'confirm_required'
   | 'done'
@@ -87,6 +88,8 @@ export interface ChatStreamOptions {
   onToolResult?: (toolId: string, result: Record<string, any>, success: boolean) => void;
   /** Structured Skill/tool output from the backend (spec: ResultContract). */
   onResultContract?: (contract: ResultContract) => void;
+  /** Trusted retrieval provenance used to render source cards and links. */
+  onRetrievalEvidence?: (evidence: RetrievalEvidence[]) => void;
   onConfirmRequired?: (
     toolId: string,
     toolName: string,
@@ -121,6 +124,25 @@ export interface ChatStreamOptions {
   onWarning?: (warnings: string[]) => void;
 }
 
+export interface RetrievalEvidence {
+  evidenceId: string;
+  kbPid?: string;
+  kbName?: string;
+  indexReleasePid?: string;
+  documentPid?: string;
+  documentVersionPid?: string;
+  documentName?: string;
+  chunkPid: string;
+  chunkIndex: number;
+  path: string;
+  vectorScore: number;
+  lexicalScore: number;
+  fusedScore: number;
+  rerankScore: number;
+  citationLocator?: string;
+  warnings: string[];
+}
+
 export interface AuraBotConversationItem {
   conversationId: number;
   title: string;
@@ -148,6 +170,7 @@ export interface AuraBotConversationMessage {
    */
   thinkingContent?: string | null;
   thinkingSignature?: string | null;
+  retrievalEvidence?: RetrievalEvidence[];
   createdAt: string;
 }
 
@@ -570,6 +593,15 @@ async function processSSEStream(
                   (typeof data === 'string' ? JSON.parse(data) : data) as ResultContract,
                 );
                 break;
+              case 'retrieval_evidence': {
+                const evidence = Array.isArray(
+                  (data as { evidence?: unknown }).evidence,
+                )
+                  ? (data as { evidence: RetrievalEvidence[] }).evidence
+                  : [];
+                callbacks.onRetrievalEvidence?.(evidence);
+                break;
+              }
               case 'thinking':
                 // P0-2: Anthropic Extended Thinking. Backend emits one event
                 // per thinking content block (not per delta), so the panel

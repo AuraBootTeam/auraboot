@@ -34,6 +34,44 @@ class LlmResponseGuardTest {
     }
 
     @Test
+    @DisplayName("requireContent rejects blank text and incomplete tool blocks")
+    void requireContent_semanticallyEmptyBlocks_throwsOperationSpecificFailure() {
+        LlmChatResponse response = LlmChatResponse.builder()
+                .stopReason("end_turn")
+                .content(List.of(
+                        LlmChatResponse.ContentBlock.builder()
+                                .type("text")
+                                .text("   ")
+                                .build(),
+                        LlmChatResponse.ContentBlock.builder()
+                                .type("tool_use")
+                                .id("call-1")
+                                .name(" ")
+                                .build()))
+                .build();
+
+        assertThatThrownBy(() -> LlmResponseGuard.requireContent(response, "named-agent chat"))
+                .isInstanceOf(LlmResponseGuard.EmptyLlmResponseException.class)
+                .hasMessage("Empty response from LLM during named-agent chat");
+    }
+
+    @Test
+    @DisplayName("requireContent accepts a complete tool call without visible text")
+    void requireContent_completeToolCall_returnsSameInstance() {
+        LlmChatResponse response = LlmChatResponse.builder()
+                .stopReason("tool_use")
+                .content(List.of(LlmChatResponse.ContentBlock.builder()
+                        .type("tool_use")
+                        .id("call-1")
+                        .name("crm_customer_find")
+                        .build()))
+                .build();
+
+        assertThat(LlmResponseGuard.requireContent(response, "named-agent chat"))
+                .isSameAs(response);
+    }
+
+    @Test
     @DisplayName("requireContent returns valid responses unchanged")
     void requireContent_validResponse_returnsSameInstance() {
         LlmChatResponse response = LlmChatResponse.builder()

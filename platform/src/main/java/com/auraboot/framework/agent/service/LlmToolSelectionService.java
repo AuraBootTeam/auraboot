@@ -324,12 +324,7 @@ public class LlmToolSelectionService {
 
     private LlmProviderFactory.ProviderConfig resolveFirstAvailableConfig(Long tenantId) {
         try {
-            LlmProviderFactory.ProviderConfig config = llmProviderFactory.resolveConfig(tenantId, "anthropic");
-            if (config != null) return config;
-            for (LlmProviderFactory.ProviderInfo info : llmProviderFactory.listConfiguredProviders(tenantId)) {
-                LlmProviderFactory.ProviderConfig c = llmProviderFactory.resolveConfig(tenantId, info.getProviderCode());
-                if (c != null) return c;
-            }
+            return llmProviderFactory.resolveConfig(tenantId, null);
         } catch (Exception e) {
             log.debug("LLM availability check failed: {}", e.getMessage());
         }

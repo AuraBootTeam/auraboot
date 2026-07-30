@@ -48,6 +48,9 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
     private RagContextProviderImpl ragContextProvider;
 
     @Autowired
+    private KnowledgeLineageService lineageService;
+
+    @Autowired
     private com.auraboot.framework.rag.d7.D7ContextAssembler d7ContextAssembler;
 
     @Autowired
@@ -151,6 +154,8 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
         KbDocument doc = kbService.createDocument(
                 getTestTenant().getId(), getTestUser().getId(), kb.getPid(),
                 "pipeline-doc.md", "MD", "fp-pipe", 100L, "file", null);
+        KnowledgeLineageService.IngestLineage lineage = lineageService.beginIngest(
+                getTestTenant().getId(), kb.getPid(), doc.getPid());
 
         // Chunk text
         String text = "AuraBoot is a low-code platform.\n\nIt supports plugin architecture.\n\nRAG enables AI search.";
@@ -166,17 +171,28 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
             String chunkPid = UniqueIdGenerator.generate();
             ChunkingService.ChunkResult chunk = chunks.get(i);
             jdbcTemplate.update(
-                    "INSERT INTO ab_kb_chunk (pid, tenant_id, kb_id, doc_id, chunk_index, "
+                    "INSERT INTO ab_kb_chunk (pid, tenant_id, kb_id, doc_id, "
+                    + "document_version_pid, index_release_pid, chunk_index, "
                     + "content, char_count, token_count, tsv, embedding, embedding_status, created_at, updated_at) "
-                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, to_tsvector('simple', ?), ?::vector, 'completed', NOW(), NOW())",
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, to_tsvector('simple', ?), "
+                    + "?::vector, 'completed', NOW(), NOW())",
                     chunkPid, getTestTenant().getId(), kb.getPid(), doc.getPid(),
+                    lineage.documentVersionPid(), lineage.indexReleasePid(),
                     chunk.index(), chunk.content(), chunk.charCount(), chunk.tokenCount(),
                     chunk.content(), VectorUtils.toVectorString(embeddings[i]));
         }
+        lineageService.activateIngest(
+                getTestTenant().getId(),
+                kb.getPid(),
+                doc.getPid(),
+                lineage.documentVersionPid(),
+                lineage.indexReleasePid());
 
         // Update counters
-        kbService.updateDocumentAfterProcessing(doc.getPid(), "completed", text.length(), chunks.size(), null);
-        kbService.refreshKbCounters(kb.getPid());
+        kbService.updateDocumentAfterProcessing(
+                getTestTenant().getId(), kb.getPid(), doc.getPid(),
+                "completed", text.length(), chunks.size(), null);
+        kbService.refreshKbCounters(getTestTenant().getId(), kb.getPid());
 
         // Mock embedding for query
         float[] queryEmbedding = createTestEmbedding(1536, 0.1f); // close to embedding1
@@ -231,7 +247,7 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
                 getTestTenant().getId(), getTestUser().getId(), kb.getPid(),
                 "dummy.txt", "txt", "fp-dummy", 10L, "file", null);
         insertChunkWithEmbedding(kb.getPid(), doc.getPid(), 0, "Some content", 0.5f);
-        kbService.refreshKbCounters(kb.getPid());
+        kbService.refreshKbCounters(getTestTenant().getId(), kb.getPid());
 
         when(embeddingService.embed(anyLong(), anyString(), anyString())).thenReturn(null);
 
@@ -255,7 +271,8 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
         String context = d7ContextAssembler.buildFusedContext(
                 com.auraboot.framework.rag.d7.D7RagFusion.fuse(java.util.List.of(), results, 60, 1.5), 0);
         assertThat(context).contains("Retrieved Knowledge");
-        assertThat(context).contains("[Source: guide.md, Chunk 0]");
+        assertThat(context).contains("[Evidence chunk:c1]");
+        assertThat(context).contains("guide.md / Chunk 0");
         assertThat(context).contains("Plugin system overview");
     }
 
@@ -279,7 +296,7 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
                 getTestTenant().getId(), getTestUser().getId(), kb.getPid(),
                 "spi-doc.txt", "txt", "fp-spi", 10L, "file", null);
         insertChunkWithEmbedding(kb.getPid(), doc.getPid(), 0, "SPI test content", 0.5f);
-        kbService.refreshKbCounters(kb.getPid());
+        kbService.refreshKbCounters(getTestTenant().getId(), kb.getPid());
 
         boolean result = ragContextProvider.hasActiveKnowledgeBases(getTestTenant().getId());
         assertThat(result).isTrue();
@@ -304,7 +321,7 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
                 "spi-retrieve.md", "MD", "fp-spi-ret", 100L, "file", null);
         float[] emb = createTestEmbedding(1536, 0.3f);
         insertChunkWithEmbedding(kb.getPid(), doc.getPid(), 0, "Plugin system overview content", 0.3f);
-        kbService.refreshKbCounters(kb.getPid());
+        kbService.refreshKbCounters(getTestTenant().getId(), kb.getPid());
 
         // Mock query embedding (close to stored)
         when(embeddingService.embed(eq(getTestTenant().getId()), anyString(), anyString()))
@@ -382,7 +399,7 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
                 getTestTenant().getId(), getTestUser().getId(), kb.getPid(),
                 "disabled-doc.txt", "txt", "fp-dis", 10L, "file", null);
         insertChunkWithEmbedding(kb.getPid(), doc.getPid(), 0, "Disabled content", 0.5f);
-        kbService.refreshKbCounters(kb.getPid());
+        kbService.refreshKbCounters(getTestTenant().getId(), kb.getPid());
         kbService.toggleStatus(getTestTenant().getId(), kb.getPid()); // ACTIVE → DISABLED
 
         // Only check this specific KB — other tests may have created active KBs
@@ -443,12 +460,23 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
                                             String content, float embeddingBase) {
         String chunkPid = UniqueIdGenerator.generate();
         float[] embedding = createTestEmbedding(1536, embeddingBase);
+        KnowledgeLineageService.IngestLineage lineage = lineageService.beginIngest(
+                getTestTenant().getId(), kbPid, docPid);
         jdbcTemplate.update(
-                "INSERT INTO ab_kb_chunk (pid, tenant_id, kb_id, doc_id, chunk_index, "
+                "INSERT INTO ab_kb_chunk (pid, tenant_id, kb_id, doc_id, "
+                + "document_version_pid, index_release_pid, chunk_index, "
                 + "content, char_count, token_count, tsv, embedding, embedding_status, created_at, updated_at) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, to_tsvector('simple', ?), ?::vector, 'completed', NOW(), NOW())",
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, to_tsvector('simple', ?), "
+                + "?::vector, 'completed', NOW(), NOW())",
                 chunkPid, getTestTenant().getId(), kbPid, docPid,
+                lineage.documentVersionPid(), lineage.indexReleasePid(),
                 index, content, content.length(), content.length() / 4,
                 content, VectorUtils.toVectorString(embedding));
+        lineageService.activateIngest(
+                getTestTenant().getId(),
+                kbPid,
+                docPid,
+                lineage.documentVersionPid(),
+                lineage.indexReleasePid());
     }
 }

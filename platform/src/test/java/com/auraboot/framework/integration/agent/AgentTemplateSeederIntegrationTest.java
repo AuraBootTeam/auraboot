@@ -56,7 +56,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT COUNT(*) FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE",
                 Integer.class,
                 SYSTEM_TENANT_ID);
-        assertThat(count).isEqualTo(7);
+        assertThat(count).isEqualTo(8);
     }
 
     @Test
@@ -66,7 +66,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "SELECT * FROM ab_agent_skill WHERE tenant_id = ? AND is_builtin = TRUE ORDER BY skill_code",
                 SYSTEM_TENANT_ID);
 
-        assertThat(skills).hasSize(7);
+        assertThat(skills).hasSize(8);
         for (Map<String, Object> skill : skills) {
             assertThat(skill.get("skill_code")).isNotNull();
             assertThat(skill.get("skill_name")).isNotNull();
@@ -96,6 +96,7 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
                 "data_entry_assistant",
                 "report_analysis",
                 "crm_operations",
+                "crm_quarterly_review",
                 "ops_inspector",
                 "dsl.command",
                 "dsl.query"
@@ -104,6 +105,22 @@ class AgentTemplateSeederIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(4)
+    void quarterlyReviewSkill_requiresVerifiableCustomerNamesAndNoFabricatedDimensions() {
+        String prompt = jdbcTemplate.queryForObject(
+                "SELECT prompt_template FROM ab_agent_skill WHERE tenant_id = ? AND skill_code = ?",
+                String.class,
+                SYSTEM_TENANT_ID,
+                "crm_quarterly_review");
+
+        assertThat(prompt)
+                .contains("【事实样本】")
+                .contains("真实客户名称")
+                .contains("数据缺失")
+                .contains("不得猜测");
+    }
+
+    @Test
+    @Order(5)
     void builtinSkills_idempotent_noduplicatesOnRerun() {
         // Calling seed() a second time should not insert duplicates (ON CONFLICT DO UPDATE
         // only refreshes execution_config + updated_at, never inserts new rows).

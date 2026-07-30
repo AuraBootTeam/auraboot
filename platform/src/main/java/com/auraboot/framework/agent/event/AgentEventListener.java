@@ -53,7 +53,7 @@ public class AgentEventListener {
         Map<String, Object> payload = event.getPayload();
 
         try {
-            List<String> matchedAgents = eventDispatchService.findMatchingAgents(
+            List<String> matchedAgents = eventDispatchService.findMatchingProactiveAgents(
                     tenantId, eventType, modelCode, payload);
 
             if (matchedAgents.isEmpty()) {
@@ -62,7 +62,7 @@ public class AgentEventListener {
                 return;
             }
 
-            List<String> taskPids = eventDispatchService.dispatchMatchedAgents(
+            List<String> taskPids = eventDispatchService.dispatchAndExecuteMatchedAgents(
                     tenantId, matchedAgents, eventType, payload);
 
             log.info("Event-driven dispatch complete: event={}, modelCode={}, tenant={}, " +

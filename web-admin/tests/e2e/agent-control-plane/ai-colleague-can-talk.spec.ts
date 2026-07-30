@@ -25,6 +25,7 @@ import { test, expect } from '@playwright/test';
 const UNIQUE = `talk${Date.now().toString(36)}`;
 const COLLEAGUE_NAME = `E2E Talker ${UNIQUE}`;
 const SHOTS = 'test-results/digital-employee';
+const LIVE_PROVIDER = process.env.AURA_LIVE_LLM_PROVIDER?.trim();
 
 test.describe('Digital employee — conversation', () => {
   // Belongs to the live tier: a stub answers, and answering is what a mute
@@ -51,11 +52,10 @@ test.describe('Digital employee — conversation', () => {
 
   test('a colleague created through the wizard answers a real question', async ({ page }) => {
     // --- create one, through the interface a person would use --------------
-    const hydrated = page.waitForResponse(
-      (r) => r.url().includes('/agent/providers/configured'),
-      { timeout: 30_000 },
-    );
-    await page.goto('/ai/colleagues/new', { waitUntil: 'domcontentloaded' });
+    const hydrated = page.waitForResponse((r) => r.url().includes('/agent/providers/configured'), {
+      timeout: 30_000,
+    });
+    await page.goto('/p/c/ai_colleague_new', { waitUntil: 'domcontentloaded' });
     await hydrated;
     await page.locator('[data-testid="wizard-template-skip"]').click();
 
@@ -72,24 +72,35 @@ test.describe('Digital employee — conversation', () => {
       providerSelect,
       'no configured provider — any colleague created now would be mute by construction',
     ).toBeVisible();
+    if (LIVE_PROVIDER) {
+      await expect(
+        providerSelect.locator(`option[value="${LIVE_PROVIDER}"]`),
+        `the live provider ${LIVE_PROVIDER} must be selectable in the wizard`,
+      ).toHaveCount(1);
+      await providerSelect.selectOption(LIVE_PROVIDER);
+      await expect(providerSelect).toHaveValue(LIVE_PROVIDER);
+    }
 
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('/agent-definition/create')),
       page.locator('[data-testid="wizard-btn-create"]').click(),
     ]);
-    await expect(page).toHaveURL(/\/ai\/colleagues\/[^/]+$/, { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/p\/c\/ai_colleague_detail\?agentPid=/, {
+      timeout: 20_000,
+    });
 
     // --- now talk to it, reached the way a person reaches it ---------------
     // Clicking through rather than constructing the chat URL: the id in the
     // address bar is not necessarily the id that route wants, and a test that
     // builds its own URL tests the test's idea of routing.
-    await page.goto('/ai/colleagues', { waitUntil: 'domcontentloaded' });
-    await page.waitForResponse(
-      (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
-      { timeout: 20_000 },
-    );
+    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-testid="agent-colleagues-grid"]')).toBeVisible({
+      timeout: 20_000,
+    });
     const card = page.locator('[data-testid^="agent-card-"]', { hasText: COLLEAGUE_NAME });
-    await expect(card, 'the colleague just created must be listed').toBeVisible({ timeout: 20_000 });
+    await expect(card, 'the colleague just created must be listed').toBeVisible({
+      timeout: 20_000,
+    });
     await card.locator('[data-testid^="agent-chat-"]').first().click();
     const chat = page.locator('[data-testid="agent-chat-page"]');
     await expect(chat).toBeVisible({ timeout: 20_000 });
@@ -131,8 +142,10 @@ test.describe('Digital employee — conversation', () => {
     // character canned string. That is precisely the shape of pass this file
     // was written to rule out, and it is what the screenshot caught the first
     // time it ran.
-    expect(answer, 'stub mode proves the plumbing, not that the colleague can answer')
-        .not.toContain('[stub response]');
+    expect(
+      answer,
+      'stub mode proves the plumbing, not that the colleague can answer',
+    ).not.toContain('[stub response]');
 
     // An error rendered inside the assistant bubble is still an assistant
     // bubble. Visibility alone would call that a pass.
@@ -140,6 +153,8 @@ test.describe('Digital employee — conversation', () => {
       /Failed|失败|错误|Error|未配置|not configured|Tool execution failed/i,
     );
     // Raw identifiers leaking into a user-facing reply is a §2.2 blocker.
-    expect(answer, 'the reply must not leak raw command codes').not.toMatch(/\bcmd[_:][a-z0-9_:]+/i);
+    expect(answer, 'the reply must not leak raw command codes').not.toMatch(
+      /\bcmd[_:][a-z0-9_:]+/i,
+    );
   });
 });

@@ -120,10 +120,21 @@ echo "[de-golden] === digital employee journey golden — name=$NAME slot=$SLOT 
 if [[ "$LIVE" == 1 ]]; then
   # The live tier costs real money and is not deterministic, which is why it is
   # opt-in and belongs to the nightly rotation rather than to every run.
-  [[ -n "${DASHSCOPE_API_KEY:-}${DEEPSEEK_API_KEY:-}" ]] \
-    || die "--live needs a provider key in the environment (DASHSCOPE_API_KEY or DEEPSEEK_API_KEY)"
+  for required_var in AURA_LIVE_LLM_PROVIDER AURA_LIVE_LLM_MODEL AURA_LIVE_LLM_API_KEY_ENV; do
+    [[ -n "${!required_var:-}" ]] \
+      || die "--live requires $required_var"
+  done
+  key_env="$AURA_LIVE_LLM_API_KEY_ENV"
+  [[ "$AURA_LIVE_LLM_PROVIDER" =~ ^[A-Za-z0-9_-]+$ ]] \
+    || die "AURA_LIVE_LLM_PROVIDER is invalid"
+  [[ "$AURA_LIVE_LLM_MODEL" =~ ^[A-Za-z0-9._:-]+$ ]] \
+    || die "AURA_LIVE_LLM_MODEL is invalid"
+  [[ "$key_env" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] \
+    || die "AURA_LIVE_LLM_API_KEY_ENV is invalid"
+  [[ -n "${!key_env:-}" ]] \
+    || die "configured credential variable $key_env is UNSET"
   export AGENT_LLM_STUB_MODE=false
-  echo "[de-golden] mode: LIVE — a real model answers; the full suite runs"
+  echo "[de-golden] mode: LIVE — provider=$AURA_LIVE_LLM_PROVIDER model=$AURA_LIVE_LLM_MODEL key=$key_env=SET"
 else
   # The default tier asserts that the plumbing works: that a colleague can be
   # created, enrolled, suspended and hold a turn at all. Whether the model
@@ -158,8 +169,84 @@ NO_PROXY=localhost,127.0.0.1 PW_PROFILE=contract \
 GOLDEN_RC=${PIPESTATUS[0]}
 set -e 2>/dev/null || true
 
+USAGE_CALLS=0
+USAGE_MISMATCHES=0
+STUCK_INTERACTIVE_TURNS=0
+if [[ "$LIVE" == 1 ]]; then
+  echo "[de-golden]     verify live provider/model ledger + interactive terminality"
+  set +e
+  usage_gate=$(
+    PGPASSWORD="$PGPASSWORD" psql \
+      -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" \
+      -v ON_ERROR_STOP=1 \
+      -v expected_provider="$AURA_LIVE_LLM_PROVIDER" \
+      -v expected_model="$AURA_LIVE_LLM_MODEL" \
+      -t -A <<'SQL'
+        SELECT
+          COUNT(*),
+          COUNT(*) FILTER (
+            WHERE provider IS DISTINCT FROM :'expected_provider'
+               OR request_model IS DISTINCT FROM :'expected_model'
+               OR response_model IS DISTINCT FROM :'expected_model'
+          )
+        FROM ab_gen_ai_usage;
+SQL
+  )
+  usage_gate_rc=$?
+  terminal_gate=$(
+    PGPASSWORD="$PGPASSWORD" psql \
+      -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" \
+      -v ON_ERROR_STOP=1 \
+      -t -A <<'SQL'
+        SELECT COUNT(*)
+        FROM ab_agent_task
+        WHERE deleted_flag = false
+          AND assignee_type = 'ai'
+          AND task_status = 'in_progress'
+          AND COALESCE(input_data, '{}')::jsonb ? 'turnId';
+SQL
+  )
+  terminal_gate_rc=$?
+  set -e 2>/dev/null || true
+
+  if [[ "$usage_gate_rc" != 0 || ! "$usage_gate" =~ ^[0-9]+\|[0-9]+$ ]]; then
+    echo "[de-golden] FAIL: could not verify the live usage ledger"
+    [[ "$GOLDEN_RC" == 0 ]] && GOLDEN_RC=4
+  else
+    IFS='|' read -r USAGE_CALLS USAGE_MISMATCHES <<<"$usage_gate"
+    echo "[de-golden]     usage calls=$USAGE_CALLS mismatched-provider-or-model=$USAGE_MISMATCHES"
+    if [[ "$USAGE_CALLS" == 0 || "$USAGE_MISMATCHES" != 0 ]]; then
+      echo "[de-golden] FAIL: live browser evidence was not produced exclusively by the selected provider/model"
+      [[ "$GOLDEN_RC" == 0 ]] && GOLDEN_RC=4
+    fi
+  fi
+
+  if [[ "$terminal_gate_rc" != 0 || ! "$terminal_gate" =~ ^[0-9]+$ ]]; then
+    echo "[de-golden] FAIL: could not verify interactive task terminality"
+    [[ "$GOLDEN_RC" == 0 ]] && GOLDEN_RC=5
+  else
+    STUCK_INTERACTIVE_TURNS="$terminal_gate"
+    echo "[de-golden]     stuck interactive turns=$STUCK_INTERACTIVE_TURNS"
+    if [[ "$STUCK_INTERACTIVE_TURNS" != 0 ]]; then
+      echo "[de-golden] FAIL: at least one browser-driven turn is stranded in progress"
+      [[ "$GOLDEN_RC" == 0 ]] && GOLDEN_RC=5
+    fi
+  fi
+fi
+
 echo "[de-golden] 4/4 result"
 SHOTS=$(find test-results/digital-employee -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
+# A clean run has no "<n> failed" summary line. With `set -euo pipefail`,
+# grep's expected no-match exit code would otherwise terminate the runner
+# before it writes the PASS banner and receipt.
+set +e
+PASSED_COUNT=$(grep -aoE '[0-9]+ passed' "/tmp/de-golden-run.$$.log" 2>/dev/null | tail -1 | awk '{print $1}')
+SKIPPED_COUNT=$(grep -aoE '[0-9]+ skipped' "/tmp/de-golden-run.$$.log" 2>/dev/null | tail -1 | awk '{print $1}')
+FAILED_COUNT=$(grep -aoE '[0-9]+ failed' "/tmp/de-golden-run.$$.log" 2>/dev/null | tail -1 | awk '{print $1}')
+set -e 2>/dev/null || true
+PASSED_COUNT=${PASSED_COUNT:-0}
+SKIPPED_COUNT=${SKIPPED_COUNT:-0}
+FAILED_COUNT=${FAILED_COUNT:-0}
 if [[ "$GOLDEN_RC" == 0 ]]; then
   echo "[de-golden] ============================================"
   echo "[de-golden]   DIGITAL EMPLOYEE GOLDEN: PASS  (name=$NAME slot=$SLOT, mode=$([[ "$LIVE" == 1 ]] && echo LIVE || echo STUB))"
@@ -169,8 +256,7 @@ if [[ "$GOLDEN_RC" == 0 ]]; then
   # row under test cannot be found — which declares success for the case where
   # the thing being tested is missing — so the count is worth a person's eye
   # even though it does not fail the gate.
-  SKIPPED=$(grep -aoE '[0-9]+ skipped' "/tmp/de-golden-run.$$.log" 2>/dev/null | tail -1)
-  [[ -n "$SKIPPED" ]] && echo "[de-golden]   $SKIPPED — check what, a skip on 'row not found' is a pass for a missing thing"
+  [[ "$SKIPPED_COUNT" != 0 ]] && echo "[de-golden]   $SKIPPED_COUNT skipped — check what, a skip on 'row not found' is a pass for a missing thing"
   echo "[de-golden]   screenshots: web-admin/test-results/digital-employee/ ($SHOTS)"
   echo "[de-golden] ============================================"
   # A pass with no screenshots means the evidence step silently stopped
@@ -188,6 +274,33 @@ else
   echo "[de-golden]   the stack is still up — inspect it before destroying"
   echo "[de-golden] ############################################"
 fi
+
+RECEIPT_DIR="$REPO_ROOT/build/digital-employee-golden/$NAME"
+mkdir -p "$RECEIPT_DIR"
+SOURCE_SHA=$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
+TRACKED_SOURCE_DIRTY=false
+[[ -n "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=no 2>/dev/null)" ]] \
+  && TRACKED_SOURCE_DIRTY=true
+{
+  printf 'source_sha=%s\n' "$SOURCE_SHA"
+  printf 'tracked_source_dirty=%s\n' "$TRACKED_SOURCE_DIRTY"
+  printf 'result=%s\n' "$([[ "$GOLDEN_RC" == 0 ]] && echo passed || echo failed)"
+  printf 'runtime=%s\n' "$NAME"
+  printf 'database=%s\n' "$PGDATABASE"
+  printf 'live_profile=%s\n' "$LIVE"
+  printf 'provider=%s\n' "${AURA_LIVE_LLM_PROVIDER:-stub}"
+  printf 'model=%s\n' "${AURA_LIVE_LLM_MODEL:-stub}"
+  printf 'api_key_env=%s\n' "${AURA_LIVE_LLM_API_KEY_ENV:-none}"
+  printf 'passed=%s\n' "$PASSED_COUNT"
+  printf 'skipped=%s\n' "$SKIPPED_COUNT"
+  printf 'failed=%s\n' "$FAILED_COUNT"
+  printf 'usage_calls=%s\n' "$USAGE_CALLS"
+  printf 'usage_mismatches=%s\n' "$USAGE_MISMATCHES"
+  printf 'stuck_interactive_turns=%s\n' "$STUCK_INTERACTIVE_TURNS"
+  printf 'screenshots=%s\n' "$SHOTS"
+  printf 'completed_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+} >"$RECEIPT_DIR/receipt.env"
+echo "[de-golden] receipt: $RECEIPT_DIR/receipt.env"
 
 rm -f "/tmp/de-golden-run.$$.log"
 exit "$GOLDEN_RC"

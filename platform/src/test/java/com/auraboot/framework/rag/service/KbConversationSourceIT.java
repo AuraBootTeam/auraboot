@@ -90,6 +90,8 @@ class KbConversationSourceIT extends BaseIntegrationTest {
         String secondDocPid = kbTextIngestService.ingestText(
                 tenantId, kbPid, "conversation", candidatePid, "退款要多久才能到账？", body);
         assertNotNull(secondDocPid);
+        assertEquals(docPid, secondDocPid,
+                "unchanged content must reuse the logical document and active immutable version");
 
         // ab_kb_document is soft-deleted (KbDocument is @TableLogic), so the superseded document
         // stays as a tombstone row. What must be true is that exactly one LIVE document remains —
@@ -102,12 +104,19 @@ class KbConversationSourceIT extends BaseIntegrationTest {
                 "re-publishing a candidate must replace its live KB document, not add a second one");
         assertEquals(secondDocPid, liveDocs.get(0), "the surviving document must be the newest one");
 
-        // The superseded document's chunks are hard-deleted, which is what actually keeps the
-        // stale answer out of retrieval — the tombstone alone would not.
-        Integer staleChunks = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ab_kb_chunk WHERE doc_id = ?", Integer.class, docPid);
-        assertEquals(0, staleChunks,
-                "the superseded document's chunks must be gone, or retrieval would still recall the old answer");
+        Integer activeChunks = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_kb_chunk c "
+                        + "JOIN ab_kb_document d ON d.pid = c.doc_id "
+                        + "WHERE d.pid = ? "
+                        + "AND c.document_version_pid = d.active_version_pid",
+                Integer.class,
+                docPid);
+        Integer totalChunks = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_kb_chunk WHERE doc_id = ?",
+                Integer.class,
+                docPid);
+        assertEquals(activeChunks, totalChunks,
+                "an unchanged re-publish must not create a duplicate historical version");
 
         jdbcTemplate.update("DELETE FROM ab_kb_chunk WHERE doc_id IN (?, ?)", docPid, secondDocPid);
         jdbcTemplate.update("DELETE FROM ab_kb_document WHERE source_entity_id = ?", candidatePid);

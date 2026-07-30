@@ -41,7 +41,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
-        "agent.anthropic.api-key=",
         "agent.llm.stub-mode=false",
         "aura.agent.online-eval.judge=llm",
 })

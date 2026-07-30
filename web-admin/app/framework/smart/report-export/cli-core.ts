@@ -4,8 +4,8 @@
  *
  * Pure request -> PDF logic for the JVM↔Node subprocess boundary, separated from
  * the cli.ts entrypoint so it is unit-testable without spawning a process or a
- * real browser. The headless browser is resolved at runtime (prod: "playwright";
- * dev/golden: "@playwright/test") via a non-literal dynamic import, so neither
+ * real browser. The headless browser is resolved at runtime (dev/golden:
+ * "@playwright/test"; prod: "playwright") via a non-literal dynamic import, so neither
  * the build nor a missing dev dependency breaks module load — the production
  * renderer image provides playwright (DDR §7/§9).
  */
@@ -28,7 +28,12 @@ export interface ChromiumLike {
 
 /** Resolve a Playwright-compatible chromium from prod or dev packages. */
 export async function loadChromium(): Promise<ChromiumLike> {
-  const candidates = ['playwright', '@playwright/test'];
+  // Prefer the project-pinned dev dependency before an ambient production
+  // package. Tooling environments can expose a different Playwright version via
+  // NODE_PATH; selecting it first makes the required browser revision drift
+  // away from the lockfile. Production images only install `playwright`, so the
+  // second candidate remains the production path.
+  const candidates = ['@playwright/test', 'playwright'];
   for (const pkg of candidates) {
     try {
       const mod: { chromium?: ChromiumLike } = await import(pkg);

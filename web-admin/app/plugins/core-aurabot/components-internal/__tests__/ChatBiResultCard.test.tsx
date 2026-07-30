@@ -22,7 +22,7 @@ describe('ChatBiResultCard', () => {
       />,
     );
 
-    expect(screen.getByText('Data Query')).toBeInTheDocument();
+    expect(screen.getByText('数据查询')).toBeInTheDocument();
     expect(screen.getByText('supplier_name')).toBeInTheDocument();
     expect(screen.getByText('Shenzhen Precision Components')).toBeInTheDocument();
     expect(screen.getByText('01SUPPLIER')).toBeInTheDocument();

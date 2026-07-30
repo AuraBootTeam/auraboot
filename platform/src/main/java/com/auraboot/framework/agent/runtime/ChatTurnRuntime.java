@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.dto.LlmChunk;
 import com.auraboot.framework.agent.provider.LlmProvider;
+import com.auraboot.framework.agent.provider.ModelCapabilityProfile;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.runtime.policy.ExecutionEnvelope;
 import com.auraboot.framework.agent.runtime.policy.ExecutionEnvelopePlanner;
@@ -17,6 +18,9 @@ import com.auraboot.framework.agent.runtime.policy.ToolPolicyCall;
 import com.auraboot.framework.agent.runtime.policy.ToolPolicyDecision;
 import com.auraboot.framework.agent.runtime.policy.ToolPolicyEngine;
 import com.auraboot.framework.agent.runtime.context.AgentContextBlock;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext;
+import com.auraboot.framework.agent.runtime.context.ConversationContextWindowManager;
+import com.auraboot.framework.agent.runtime.context.RuntimeBudgetGuard;
 import com.auraboot.framework.agent.util.ReasoningTagSanitizer;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.conversation.ResponseSink;
@@ -49,15 +53,32 @@ public class ChatTurnRuntime {
     private final ExecutionEnvelopePlanner executionEnvelopePlanner;
     private final ToolMetadataRegistry toolMetadataRegistry;
     private final ToolPolicyEngine toolPolicyEngine;
+    private final ConversationContextWindowManager contextWindowManager;
 
     public ChatTurnRuntime() {
-        this(new ExecutionEnvelopePlanner(), new ToolMetadataRegistry(), new ToolPolicyEngine());
+        this(
+                new ExecutionEnvelopePlanner(),
+                new ToolMetadataRegistry(),
+                new ToolPolicyEngine(),
+                new ConversationContextWindowManager());
     }
 
-    @Autowired
     public ChatTurnRuntime(ExecutionEnvelopePlanner executionEnvelopePlanner,
                            ToolMetadataRegistry toolMetadataRegistry,
                            ToolPolicyEngine toolPolicyEngine) {
+        this(
+                executionEnvelopePlanner,
+                toolMetadataRegistry,
+                toolPolicyEngine,
+                new ConversationContextWindowManager());
+    }
+
+    @Autowired
+    public ChatTurnRuntime(
+            ExecutionEnvelopePlanner executionEnvelopePlanner,
+            ToolMetadataRegistry toolMetadataRegistry,
+            ToolPolicyEngine toolPolicyEngine,
+            ConversationContextWindowManager contextWindowManager) {
         this.executionEnvelopePlanner = executionEnvelopePlanner != null
                 ? executionEnvelopePlanner
                 : new ExecutionEnvelopePlanner();
@@ -67,6 +88,9 @@ public class ChatTurnRuntime {
         this.toolPolicyEngine = toolPolicyEngine != null
                 ? toolPolicyEngine
                 : new ToolPolicyEngine();
+        this.contextWindowManager = contextWindowManager != null
+                ? contextWindowManager
+                : new ConversationContextWindowManager();
     }
 
     public record ChatToolLoopSpec(
@@ -95,7 +119,9 @@ public class ChatTurnRuntime {
             ObjectMapper objectMapper) {
         public ChatToolLoopSpec {
             operation = operation == null || operation.isBlank() ? "chat tool-loop" : operation;
-            messages = messages == null ? new ArrayList<>() : messages;
+            messages = messages == null
+                    ? new ArrayList<>()
+                    : new ArrayList<>(messages);
             tools = tools == null ? List.of() : tools;
             toolDefinitions = toolDefinitions == null ? List.of() : toolDefinitions;
             actorPermissions = actorPermissions == null ? Set.of() : Set.copyOf(actorPermissions);
@@ -327,12 +353,27 @@ public class ChatTurnRuntime {
             sink.onError(msg, traceId);
             return new TurnOutcome.Failed(msg, null);
         }
+        request.setMessages(compileContextWindow(
+                request.getMessages(),
+                request.getMaxTokens()));
+        RuntimeBudgetGuard budgetGuard = RuntimeBudgetGuard.current(
+                provider, request.getModel());
+        try {
+            budgetGuard.beforeStep(0);
+        } catch (RuntimeBudgetGuard.RuntimeBudgetExceededException e) {
+            return budgetFailure(sink, traceId, e);
+        }
 
         ReasoningTagSanitizer textSanitizer = new ReasoningTagSanitizer();
         StringBuilder accumulated = new StringBuilder();
         StringBuilder thinkingFallback = new StringBuilder();
         LlmChatResponse aggregate = null;
         for (LlmChunk chunk : provider.streamChat(request, apiKey, baseUrl).toIterable()) {
+            try {
+                budgetGuard.checkDeadline();
+            } catch (RuntimeBudgetGuard.RuntimeBudgetExceededException e) {
+                return budgetFailure(sink, traceId, e);
+            }
             if (chunk == null) {
                 continue;
             }
@@ -360,6 +401,11 @@ public class ChatTurnRuntime {
             sink.onWarnings(aggregate.getWarnings());
         }
         emitThinkingBlocks(aggregate, thinkingFallback, sink);
+        try {
+            budgetGuard.record(aggregate);
+        } catch (RuntimeBudgetGuard.RuntimeBudgetExceededException e) {
+            return budgetFailure(sink, traceId, e);
+        }
 
         String finalText = accumulated.isEmpty()
                 ? LlmMessageTapeSupport.extractTextFromResponse(aggregate)
@@ -380,6 +426,10 @@ public class ChatTurnRuntime {
         if (spec == null || callbacks == null) {
             throw new IllegalArgumentException("Chat tool-loop spec and callbacks are required");
         }
+        List<LlmChatRequest.Message> compiledMessages =
+                compileContextWindow(spec.messages(), spec.maxTokens());
+        spec.messages().clear();
+        spec.messages().addAll(compiledMessages);
 
         // The per-round setCapabilityCeiling below publishes the planner-resolved
         // ceiling so the authorization record matches what this loop enforces. That
@@ -392,7 +442,14 @@ public class ChatTurnRuntime {
         try {
         AgentExecutionState lastRuntimeState = null;
         boolean anyToolFailed = false;   // F7: any failed tool call in this turn
+        RuntimeBudgetGuard budgetGuard = RuntimeBudgetGuard.current(
+                spec.provider(), spec.model());
         for (int round = 0; round < spec.maxToolRounds(); round++) {
+            try {
+                budgetGuard.beforeStep(round);
+            } catch (RuntimeBudgetGuard.RuntimeBudgetExceededException e) {
+                return budgetFailure(spec.sink(), spec.traceId(), e);
+            }
             ChatToolLoopRound preliminaryRound = new ChatToolLoopRound(
                     spec.ctx(),
                     spec.agentCode(),
@@ -428,8 +485,12 @@ public class ChatTurnRuntime {
             List<ToolDefinition> roundToolDefinitions = filterToolDefinitions(
                     envelope, catalogAllowedDefinitions, spec.ctx(), spec.actorPermissions());
             List<LlmChatRequest.Tool> roundTools = filterLlmTools(spec.tools(), roundToolDefinitions);
-            String toolChoice = resolveToolChoiceForRound(spec.provider(), spec.providerCode(), roundTools,
-                    spec.messages(), spec.requireInitialToolCall());
+                String toolChoice = resolveToolChoiceForRound(
+                        spec.provider(),
+                        spec.model(),
+                        roundTools,
+                        spec.messages(),
+                        spec.requireInitialToolCall());
             String effectiveSystemPrompt = applyToolChoicePrompt(spec.systemPrompt(), toolChoice, roundTools);
             ChatToolLoopRound roundContext = new ChatToolLoopRound(
                     spec.ctx(),
@@ -483,15 +544,23 @@ public class ChatTurnRuntime {
                 return new TurnOutcome.Failed(msg, e);
             }
             callbacks.afterProviderResponse(roundContext, providerSpan, response);
+            try {
+                budgetGuard.record(response);
+            } catch (RuntimeBudgetGuard.RuntimeBudgetExceededException e) {
+                reduceRuntimeState(callbacks, runtimeState,
+                        AgentRuntimeEvent.turnFailed(round, e.reasonCode()));
+                return budgetFailure(spec.sink(), spec.traceId(), e);
+            }
             if (response.getWarnings() != null && !response.getWarnings().isEmpty()) {
                 spec.sink().onWarnings(response.getWarnings());
             }
 
             String stopReason = response.getStopReason();
+            boolean responseHasToolUse = hasToolUse(response);
             runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.modelResponse(
                     round, stopReason, Map.of("contentBlockCount", response.getContent().size())));
             lastRuntimeState = runtimeState;
-            if ("required".equals(toolChoice) && !hasToolUse(response)) {
+            if ("required".equals(toolChoice) && !responseHasToolUse) {
                 runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.turnFailed(
                         round, "required_tool_call_missing"));
                 lastRuntimeState = runtimeState;
@@ -501,7 +570,8 @@ public class ChatTurnRuntime {
                 return new TurnOutcome.Failed(msg, null);
             }
 
-            if ("end_turn".equals(stopReason) || "max_tokens".equals(stopReason) || stopReason == null) {
+            if (!responseHasToolUse
+                    && ("end_turn".equals(stopReason) || "max_tokens".equals(stopReason) || stopReason == null)) {
                 reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.turnCompleted(round));
                 callbacks.onFinalResponse(roundContext, response);
                 return completeFinalResponse(response, spec.messages(),
@@ -511,7 +581,7 @@ public class ChatTurnRuntime {
                         spec.sink(), spec.traceId(), anyToolFailed);
             }
 
-            if ("tool_use".equals(stopReason)) {
+            if (responseHasToolUse) {
                 recordToolUseResponse(response, spec.messages());
 
                 List<LlmChatRequest.ContentBlock> toolResultBlocks = new ArrayList<>();
@@ -726,6 +796,50 @@ public class ChatTurnRuntime {
                 com.auraboot.framework.agent.service.StepContext.setCapabilityCeiling(previousCapabilityCeiling);
             }
         }
+    }
+
+    private TurnOutcome budgetFailure(
+            ResponseSink sink,
+            String traceId,
+            RuntimeBudgetGuard.RuntimeBudgetExceededException error) {
+        String message = error.getMessage() + " (" + error.reasonCode() + ")";
+        log.warn(
+                "Agent runtime budget stopped turn: reason={}, tokens={}, costMicros={}",
+                error.reasonCode(),
+                error.consumedTokens(),
+                error.consumedCostMicros());
+        sink.onError(message, traceId);
+        return new TurnOutcome.Failed(message, error);
+    }
+
+    private List<LlmChatRequest.Message> compileContextWindow(
+            List<LlmChatRequest.Message> messages,
+            int fallbackTokenBudget) {
+        Long envelopeTokenBudget = ContextEnvelopeContext.current()
+                .map(envelope -> envelope.tokenBudget())
+                .filter(value -> value != null && value > 0)
+                .orElse(null);
+        Integer tokenBudget = null;
+        if (envelopeTokenBudget != null) {
+            tokenBudget = (int) Math.min(
+                    Integer.MAX_VALUE, envelopeTokenBudget);
+        } else if (fallbackTokenBudget > 0) {
+            tokenBudget = fallbackTokenBudget;
+        }
+        ConversationContextWindowManager.CompactionResult result =
+                contextWindowManager.compact(messages, tokenBudget);
+        if (result.compacted()) {
+            log.info(
+                    "Conversation context compacted: version={}, sourceMessages={}, "
+                            + "inputChars={}, outputChars={}, budgetChars={}, sourceHash={}",
+                    result.summaryVersion(),
+                    result.sourceMessageCount(),
+                    result.inputChars(),
+                    result.outputChars(),
+                    result.charBudget(),
+                    result.sourceHash());
+        }
+        return new ArrayList<>(result.messages());
     }
 
     private PendingChatTool pendingContext(ChatToolLoopSpec spec,
@@ -997,15 +1111,18 @@ public class ChatTurnRuntime {
     }
 
     private String resolveToolChoiceForRound(LlmProvider provider,
-                                             String providerCode,
+                                             String model,
                                              List<LlmChatRequest.Tool> tools,
                                              List<LlmChatRequest.Message> messages,
                                              boolean requireInitialToolCall) {
         if (!requireInitialToolCall) {
             return null;
         }
-        String actualProviderCode = provider != null ? provider.getProviderCode() : null;
-        if (!"openai".equals(actualProviderCode) && !"openai".equals(providerCode)) {
+        if (provider == null) {
+            return null;
+        }
+        ModelCapabilityProfile capabilities = provider.modelCapabilities(model);
+        if (capabilities == null || !capabilities.requiredToolChoice()) {
             return null;
         }
         if (tools == null || tools.isEmpty()) {

@@ -549,7 +549,8 @@ tasks.register('instrumentMainOffline') {
 // 配置测试任务使用JUnit Platform
 test {
     useJUnitPlatform {
-        // Real-LLM evals (@Tag("agent-eval-live")) call DeepSeek for real. They are
+        // Real-LLM evals (@Tag("agent-eval-live")) call the explicit
+        // AURA_LIVE_LLM_* validation profile. They are
         // non-deterministic by construction and cost money on every run, so they must not
         // ride along with the ordinary suite: back-to-back runs of identical code produced
         // 32 and then 44 failures purely because these classes answered differently the
@@ -557,8 +558,9 @@ test {
         //
         //     ./gradlew :test -PincludeLiveEvals
         //
-        // Without a DEEPSEEK_API_KEY they already self-skip via Assumptions; the problem is
-        // the machine that HAS a key, where they turn a regression signal into noise.
+        // Without a complete live profile they self-skip via Assumptions; the
+        // dedicated runner rejects missing/skipped inventory so a release gate
+        // cannot accidentally report green while proving nothing.
         if (!project.hasProperty('includeLiveEvals')) {
             excludeTags 'agent-eval-live'
         }

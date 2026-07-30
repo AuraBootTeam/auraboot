@@ -107,8 +107,9 @@ public class QueryRewriteService {
         return scored.stream()
                 .map(sr -> {
                     RetrievalResult r = sr.result();
-                    // Update hybrid score to reflect reranking
-                    r.setHybridScore(sr.score());
+                    // Preserve the retrieval-layer fused score and record the
+                    // reranker verdict separately for evidence/audit consumers.
+                    r.setRerankScore(sr.score());
                     return r;
                 })
                 .toList();

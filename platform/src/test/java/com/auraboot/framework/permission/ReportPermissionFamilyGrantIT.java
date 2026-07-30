@@ -60,6 +60,7 @@ class ReportPermissionFamilyGrantIT extends BaseIntegrationTest {
 
     private Long tenantId;
     private String runTag;
+    private String tenantPid;
 
     // role pids/ids minted for this run (cleaned up in AfterEach)
     private Long roleGenerateId;   // holds meta.report.generate
@@ -68,9 +69,17 @@ class ReportPermissionFamilyGrantIT extends BaseIntegrationTest {
 
     @BeforeEach
     void setup() {
-        applyTestMetaContext();
-        tenantId = testTenant.getId();
         runTag = Long.toString(System.nanoTime() & 0x7fffffffffffffffL, 36);
+        tenantId = (System.currentTimeMillis() << 12) | (System.nanoTime() & 0xFFF);
+        tenantPid = UniqueIdGenerator.generate();
+        jdbc.update(
+                "INSERT INTO ab_tenant "
+                        + "(id, pid, name, display_name, status, deleted_flag, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, 'active', false, NOW(), NOW())",
+                tenantId,
+                tenantPid,
+                "report-grant-it-" + runTag,
+                "Report Grant Migration IT " + runTag);
     }
 
     @AfterEach
@@ -84,8 +93,7 @@ class ReportPermissionFamilyGrantIT extends BaseIntegrationTest {
         }
         // seeded stopgap permission rows (scoped to this run via pid prefix)
         jdbc.update("DELETE FROM ab_permission WHERE tenant_id = ? AND pid LIKE ?", tenantId, "seed_" + runTag + "_%");
-        // migration-minted clean permission rows for this tenant (only this test seeds report codes for
-        // the integration-test-tenant, which starts with none, so this is safe + scoped to the tenant)
+        // migration-minted clean permission rows are isolated to this test tenant.
         jdbc.update(
                 "DELETE FROM ab_permission WHERE tenant_id = ? AND code IN "
                         + "('report.definition.view','report.definition.manage','report.export.execute','report.schedule.manage')",
@@ -93,6 +101,7 @@ class ReportPermissionFamilyGrantIT extends BaseIntegrationTest {
         if (roleGenerateId != null) jdbc.update("DELETE FROM ab_role WHERE id = ?", roleGenerateId);
         if (roleReadId != null) jdbc.update("DELETE FROM ab_role WHERE id = ?", roleReadId);
         if (roleUpdateId != null) jdbc.update("DELETE FROM ab_role WHERE id = ?", roleUpdateId);
+        jdbc.update("DELETE FROM ab_tenant WHERE id = ? AND pid = ?", tenantId, tenantPid);
         MetaContext.clear();
     }
 

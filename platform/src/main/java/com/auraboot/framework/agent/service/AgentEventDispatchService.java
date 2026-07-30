@@ -35,6 +35,8 @@ public class AgentEventDispatchService {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final AgentRunService agentRunService;
+    private final ProactiveTriggerPolicyService proactiveTriggerPolicy;
 
     /** Debounce window: suppress duplicate (tenant+agent+eventType+modelCode) within this period. */
     static final long DEBOUNCE_MS = 30_000L;
@@ -58,9 +60,38 @@ public class AgentEventDispatchService {
      */
     public List<String> findMatchingAgents(Long tenantId, String eventType,
                                             String modelCode, Map<String, Object> eventData) {
+        return findMatchingAgents(
+                tenantId, eventType, modelCode, eventData, false);
+    }
+
+    /**
+     * Production event entry. Only explicitly proactive, enrolled employees
+     * may wake from a business event; the broader matcher above remains useful
+     * for configuration preview.
+     */
+    public List<String> findMatchingProactiveAgents(
+            Long tenantId,
+            String eventType,
+            String modelCode,
+            Map<String, Object> eventData) {
+        return findMatchingAgents(
+                tenantId, eventType, modelCode, eventData, true);
+    }
+
+    private List<String> findMatchingAgents(
+            Long tenantId,
+            String eventType,
+            String modelCode,
+            Map<String, Object> eventData,
+            boolean proactiveOnly) {
         List<Map<String, Object>> agents = jdbcTemplate.queryForList(
                 "SELECT agent_code, event_triggers FROM ab_agent_definition " +
                 "WHERE tenant_id = ? AND status = 'active' AND event_triggers IS NOT NULL " +
+                (proactiveOnly
+                        ? "AND agent_type = 'proactive' "
+                                + "AND employee_id IS NOT NULL "
+                                + "AND system_user_id IS NOT NULL "
+                        : "") +
                 "AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
                 tenantId);
 
@@ -113,6 +144,37 @@ public class AgentEventDispatchService {
         return taskPids;
     }
 
+    /**
+     * Apply proactive policy, persist a task, and enter the same durable Agent
+     * run path used by schedules. Returned task ids are only the executions
+     * that actually passed the gate.
+     */
+    public List<String> dispatchAndExecuteMatchedAgents(
+            Long tenantId,
+            List<String> agentCodes,
+            String eventType,
+            Map<String, Object> eventData) {
+        List<String> taskPids = new ArrayList<>();
+        for (String agentCode : agentCodes) {
+            ProactiveTriggerPolicyService.Decision decision =
+                    proactiveTriggerPolicy.evaluateAndClaimEvent(
+                            tenantId, agentCode, Instant.now());
+            if (!decision.allowed()) {
+                log.warn("Event-triggered proactive run blocked: agent={}, event={}, reason={}",
+                        agentCode, eventType, decision.reason());
+                continue;
+            }
+            String taskPid = createEventTask(
+                    tenantId, agentCode, eventType, eventData, "todo");
+            taskPids.add(taskPid);
+            agentRunService.executeEventTask(
+                    tenantId, taskPid, agentCode, eventType);
+            log.info("Event-triggered proactive run started: agent={}, event={}, taskPid={}",
+                    agentCode, eventType, taskPid);
+        }
+        return List.copyOf(taskPids);
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // Trigger matching
     // ──────────────────────────────────────────────────────────────────────────
@@ -161,8 +223,10 @@ public class AgentEventDispatchService {
 
         // 3. condition is optional; simple key=value check against eventData
         String condition = (String) trigger.get("condition");
-        if (condition != null && !condition.isBlank() && eventData != null) {
-            if (!evaluateSimpleCondition(condition, eventData)) return false;
+        if (condition != null && !condition.isBlank()) {
+            if (eventData == null || !evaluateSimpleCondition(condition, eventData)) {
+                return false;
+            }
         }
 
         return true;
@@ -171,17 +235,23 @@ public class AgentEventDispatchService {
     /**
      * Evaluate a simple {@code key=value} condition against eventData.
      * Only the first pair (split on first '=') is evaluated.
-     * Returns true if the condition key/value pair cannot be parsed (safe default).
+     * Returns false if the condition key/value pair cannot be parsed. Production
+     * proactive triggers must fail closed when their guard is malformed.
      *
      * @param condition "newStatus=QUALIFIED" style expression
      * @param eventData flat map of event payload values
-     * @return true if condition is satisfied or cannot be evaluated
+     * @return true only when a valid condition is satisfied
      */
     public boolean evaluateSimpleCondition(String condition, Map<String, Object> eventData) {
         int idx = condition.indexOf('=');
-        if (idx <= 0) return true; // unparseable — allow through
+        if (idx <= 0 || idx == condition.length() - 1 || eventData == null) {
+            return false;
+        }
         String key = condition.substring(0, idx).trim();
         String expectedValue = condition.substring(idx + 1).trim();
+        if (key.isEmpty() || expectedValue.isEmpty()) {
+            return false;
+        }
         Object actual = eventData.get(key);
         return actual != null && expectedValue.equalsIgnoreCase(actual.toString().trim());
     }
@@ -192,6 +262,16 @@ public class AgentEventDispatchService {
 
     private String createEventTask(Long tenantId, String agentCode, String eventType,
                                     Map<String, Object> eventData) {
+        return createEventTask(
+                tenantId, agentCode, eventType, eventData, "backlog");
+    }
+
+    private String createEventTask(
+            Long tenantId,
+            String agentCode,
+            String eventType,
+            Map<String, Object> eventData,
+            String taskStatus) {
         String taskPid = UniqueIdGenerator.generate();
         String inputJson = serializeEventData(eventData);
         String title = "Event-triggered: " + eventType + " → " + agentCode;
@@ -200,9 +280,10 @@ public class AgentEventDispatchService {
                 "INSERT INTO ab_agent_task " +
                 "(pid, tenant_id, title, description, task_status, assignee_type, assignee_id, " +
                 " input_data, tags, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, 'backlog', 'agent', ?, ?, ?, NOW(), NOW())",
+                "VALUES (?, ?, ?, ?, ?, 'agent', ?, ?, ?, NOW(), NOW())",
                 taskPid, tenantId, title,
                 "Auto-created by event-driven dispatch. EventType=" + eventType,
+                taskStatus,
                 agentCode,
                 inputJson,
                 "event_triggered," + eventType.toLowerCase()

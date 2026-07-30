@@ -32,5 +32,5 @@ public class ToolMetadata {
     @Builder.Default
     ToolMetadataTrustLevel metadataTrustLevel = ToolMetadataTrustLevel.INFERRED;
     @Builder.Default
-    String policyVersion = "v1";
+    String policyVersion = RiskScale.VERSION;
 }

@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.trace.entity.AiTrace;
 import com.auraboot.framework.agent.trace.entity.AiTraceSpan;
 import com.auraboot.framework.agent.trace.mapper.AiTraceMapper;
 import com.auraboot.framework.agent.trace.mapper.AiTraceSpanMapper;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -38,7 +39,13 @@ public class AiTraceService {
 
     public TraceContext createTrace(Long tenantId, String sessionId, String userMessage,
                                     Long userId, Map<String, Object> metadata) {
-        return createTrace(tenantId, sessionId, userMessage, userId, metadata, null);
+        return createTrace(
+                tenantId,
+                sessionId,
+                userMessage,
+                userId,
+                metadata,
+                MetaContext.getOtelTraceId());
     }
 
     /**

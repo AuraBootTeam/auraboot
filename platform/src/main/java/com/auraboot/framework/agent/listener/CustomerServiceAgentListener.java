@@ -77,7 +77,11 @@ public class CustomerServiceAgentListener {
             log.info("CS Agent: created task {} for email from {}", taskPid, event.getSenderEmail());
 
             // Dispatch to agent runtime
-            agentRunService.executeTask(tenantId, taskPid, CS_AGENT_CODE);
+            agentRunService.executeEventTask(
+                    tenantId,
+                    taskPid,
+                    CS_AGENT_CODE,
+                    "inbound_email");
 
         } catch (Exception e) {
             log.error("CS Agent: failed to process InboundEmailEvent {}: {}", event.getEventId(), e.getMessage(), e);

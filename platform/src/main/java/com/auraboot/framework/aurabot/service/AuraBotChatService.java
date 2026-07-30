@@ -419,6 +419,8 @@ public class AuraBotChatService {
         // --- Trace: create trace ---
         Map<String, Object> traceMetadata = new HashMap<>();
         traceMetadata.put("provider_code", providerCode);
+        traceMetadata.put("turn_id", ctx.turnId());
+        traceMetadata.put("turn_phase", "initial");
         if (request.getPageContext() != null) {
             traceMetadata.put("page_context", Map.of(
                     "kind", Objects.toString(request.getPageContext().getKind(), ""),
@@ -524,6 +526,9 @@ public class AuraBotChatService {
         // screen would tell them apart.
         if (!contextWarnings.isEmpty()) {
             sink.onWarnings(contextWarnings);
+        }
+        if (!contextAssembly.retrievalEvidence().isEmpty()) {
+            sink.onRetrievalEvidence(contextAssembly.retrievalEvidence());
         }
         String systemPrompt = buildSystemPrompt(tenantId, request, effectiveResolved, contextBundle);
         if (bif != null) {
@@ -718,12 +723,21 @@ public class AuraBotChatService {
                         modelSchemaText,
                         retrieved.context(),
                         request != null ? request.getKnowledgeBaseIds() : null));
-        return new ContextAssembly(contextBundle, retrieved.diagnostics());
+        return new ContextAssembly(
+                contextBundle,
+                retrieved.diagnostics(),
+                retrieved.evidence());
     }
 
     private record ContextAssembly(
             AgentContextBundle bundle,
-            RagContextProvider.RetrievalDiagnostics retrievalDiagnostics) {
+            RagContextProvider.RetrievalDiagnostics retrievalDiagnostics,
+            List<RagContextProvider.RetrievalEvidence> retrievalEvidence) {
+        private ContextAssembly {
+            retrievalEvidence = retrievalEvidence == null
+                    ? List.of()
+                    : List.copyOf(retrievalEvidence);
+        }
     }
 
     /**

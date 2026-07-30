@@ -83,6 +83,9 @@ const FIELD_LABELS: Record<string, string[]> = {
 };
 
 const OPTION_LABELS: Record<string, Record<string, string[]>> = {
+  agent_type: {
+    autonomous: ['自主', 'Autonomous', 'autonomous'],
+  },
   task_priority: {
     critical: ['紧急', 'Critical', 'critical'],
     high: ['高', 'High', 'high'],
@@ -301,10 +304,14 @@ async function selectFormField(page: Page, fieldCode: string, optionValue: strin
       .first()
       .inputValue()
       .catch(() => '');
-    if (inputValue === optionValue || optionLabels.some((label) => inputValue === label)) return true;
+    if (inputValue === optionValue || optionLabels.some((label) => inputValue === label))
+      return true;
 
     const visibleText = await container.innerText().catch(() => '');
-    if (labelPattern.test(visibleText) || visibleText.toLowerCase().includes(optionValue.toLowerCase())) {
+    if (
+      labelPattern.test(visibleText) ||
+      visibleText.toLowerCase().includes(optionValue.toLowerCase())
+    ) {
       return true;
     }
 
@@ -316,7 +323,10 @@ async function selectFormField(page: Page, fieldCode: string, optionValue: strin
         .locator('xpath=following::*[@role="combobox" or self::button or self::select][1]')
         .first();
       const triggerText = (await trigger.textContent({ timeout: 500 }).catch(() => '')) ?? '';
-      if (labelPattern.test(triggerText) || triggerText.toLowerCase().includes(optionValue.toLowerCase())) {
+      if (
+        labelPattern.test(triggerText) ||
+        triggerText.toLowerCase().includes(optionValue.toLowerCase())
+      ) {
         return true;
       }
     }
@@ -783,8 +793,14 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     await fillFormField(page, 'agent_code', agentCode);
     await fillFormField(page, 'name', agentName);
     await fillFormField(page, 'description', `E2E CRUD agent — ${uid}`);
-    await selectFormField(page, 'agent_type', 'autonomous').catch(() => null);
-    await fillFormField(page, 'model', 'claude-sonnet-4-6').catch(() => null);
+    await fillFormField(
+      page,
+      'model',
+      process.env.AURA_LIVE_LLM_MODEL?.trim() || 'provider-default',
+    ).catch(() => null);
+    // agent_type is required. Swallowing a failed selection made the later
+    // "row not found" assertion hide a client-side validation failure.
+    await selectFormField(page, 'agent_type', 'autonomous');
     await selectFormField(page, 'status', 'active').catch(() => null);
 
     // Soul Profile fields (may be in a separate section)
@@ -794,25 +810,24 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
       () => null,
     );
 
-    const cmdPromise = page
-      .waitForResponse(
-        (r) =>
-          r.url().includes('/api/meta/commands/execute/') &&
-          r.request().method().toLowerCase() === 'post',
-        { timeout: 15_000 },
-      )
-      .catch(() => null);
+    const cmdPromise = page.waitForResponse(
+      (r) =>
+        r.url().includes('/api/meta/commands/execute/') &&
+        r.request().method().toLowerCase() === 'post',
+      { timeout: 20_000 },
+    );
+    // Start observing before the click. The success toast can disappear
+    // before the command response has been awaited on a fast local stack.
+    const toastPromise = waitForToast(page);
 
     await clickSaveButton(page);
-    await cmdPromise;
-    await waitForToast(page).catch(() => {});
+    const [cmdResponse] = await Promise.all([cmdPromise, toastPromise]);
+    expect(cmdResponse.status(), 'agent create command must return success').toBeLessThan(400);
 
-    await page
-      .waitForURL(
-        (url) => url.pathname.includes('/p/agent_definition') && !url.pathname.includes('/new'),
-        { timeout: 10_000 },
-      )
-      .catch(() => {});
+    await page.waitForURL(
+      (url) => url.pathname.includes('/p/agent_definition') && !url.pathname.includes('/new'),
+      { timeout: 15_000 },
+    );
 
     const row = await findRowInPaginatedList(page, agentName);
     await expect(row).toBeVisible({ timeout: 8_000 });
@@ -1591,12 +1606,16 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     await clickCreateButton(page);
     await waitForFormReady(page);
 
+    await fillFormField(page, 'agent_code', seededAgentCode);
     await fillFormField(page, 'title', scheduleTitle);
     await fillFormField(page, 'description', `E2E CRUD schedule — ${uid}`);
     await selectFormField(page, 'schedule_type', 'cron').catch(() => null);
     await fillFormField(page, 'cron_expression', '0 */30 * * * *').catch(() => null);
     await fillFormField(page, 'timezone', 'Asia/Shanghai').catch(() => null);
     await fillFormField(page, 'max_runs', '10').catch(() => null);
+    await fillFormField(page, 'daily_run_budget', '8');
+    await fillFormField(page, 'concurrency_limit', '1');
+    await selectFormField(page, 'missed_run_policy', 'skip');
     await fillFormField(page, 'mission_id', seededMissionPid).catch(() => null);
     // task_template is required — fill with valid JSON
     await fillFormField(
@@ -1700,12 +1719,16 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
       seedPage,
       CMD.createSchedule,
       {
+        agent_code: seededAgentCode,
         title: deleteScheduleTitle,
         description: 'Delete target schedule',
         schedule_type: 'cron',
         cron_expression: '0 0 * * * *',
         schedule_status: 'draft',
         timezone: 'utc',
+        daily_run_budget: 8,
+        concurrency_limit: 1,
+        missed_run_policy: 'skip',
         mission_id: seededMissionPid,
         task_template: JSON.stringify({
           title: 'Delete target scheduled task',
@@ -2242,35 +2265,51 @@ test.describe('ACP Form CRUD — Deep UI Tests', () => {
     await expectEmptySubmitBlocked(page, '/dynamic/mission');
   });
 
-  test('CRUD-30: Agent definition form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-30: Agent definition form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/agent-definition');
   });
 
-  test('CRUD-31: Agent task form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-31: Agent task form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/agent-task');
   });
 
-  test('CRUD-32: Agent tool form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-32: Agent tool form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/agent-tool');
   });
 
-  test('CRUD-33: Agent memory form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-33: Agent memory form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/agent-memory');
   });
 
-  test('CRUD-34: Agent skill form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-34: Agent skill form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/agent-skill');
   });
 
-  test('CRUD-35: Agent schedule form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-35: Agent schedule form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/agent-schedule');
   });
 
-  test('CRUD-36: Approval policy form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-36: Approval policy form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/approval-policy');
   });
 
-  test('CRUD-37: Agent artifact form — empty submit blocked, field error surfaced', async ({ page }) => {
+  test('CRUD-37: Agent artifact form — empty submit blocked, field error surfaced', async ({
+    page,
+  }) => {
     await expectEmptySubmitBlocked(page, '/dynamic/agent-artifact');
   });
 });

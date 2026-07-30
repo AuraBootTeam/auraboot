@@ -49,6 +49,11 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
     }
 
     @Override
+    public Set<String> supportedApiFormats() {
+        return Set.of("chat_completions");
+    }
+
+    @Override
     public boolean supportsTools() {
         return true;
     }
@@ -509,6 +514,25 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
         return false;
     }
 
+    @Override
+    public ModelCapabilityProfile modelCapabilities(String model) {
+        return new ModelCapabilityProfile(
+                true,
+                true,
+                supportsTools(),
+                true,
+                true,
+                supportsVision(model),
+                supportsThinking(model));
+    }
+
+    private boolean supportsThinking(String model) {
+        if (model == null || model.isBlank()) {
+            return false;
+        }
+        return model.toLowerCase(Locale.ROOT).startsWith("deepseek-v4");
+    }
+
     /**
      * Translate our internal (Anthropic-shaped) image block into the OpenAI wire shape:
      * {@code {"type":"image_url","image_url":{"url":"data:image/png;base64,..."}}}.
@@ -774,7 +798,7 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
 
         // Normalize stop reason
         String stopReason;
-        if ("tool_calls".equals(finishReason)) {
+        if (toolCalls != null && !toolCalls.isEmpty()) {
             stopReason = "tool_use";
         } else if ("length".equals(finishReason)) {
             stopReason = "max_tokens";

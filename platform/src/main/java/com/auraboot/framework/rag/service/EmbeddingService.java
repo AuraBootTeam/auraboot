@@ -178,7 +178,8 @@ public class EmbeddingService {
                 providerCode = enabled.get(0).getProviderCode();
                 log.debug("Auto-resolved EMBEDDING provider: {}", providerCode);
             } else {
-                providerCode = "openai";
+                log.error("No enabled embedding provider is configured for tenant {}", tenantId);
+                return null;
             }
         }
 

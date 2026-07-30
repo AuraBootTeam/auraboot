@@ -134,6 +134,13 @@ public class PermissionSnapshotCache {
             cache(ROLE_PERMISSION_CACHE)
                     .evict(new RolePermissionKey(tenantId, roleId, LocalDate.now()));
         }
+        if (tenantId != null) {
+            // Role creation/deletion can change the implicit tenant_member
+            // baseline. Cached negative lookups must not survive that change,
+            // otherwise a tenant initialized after its first permission check
+            // remains permanently role-less until the cache TTL expires.
+            cache(BASELINE_ROLE_CACHE).evict(new BaselineRoleKey(tenantId));
+        }
         // A role grant can affect many users, and the implicit baseline role has no membership rows.
         // Clearing this small, short-lived projection is safer than attempting an incomplete fan-out.
         cache(EFFECTIVE_PERMISSION_CACHE).clear();

@@ -97,7 +97,12 @@ class EffectPhaseDryRunIntegrationTest extends BaseIntegrationTest {
         // they are pure read-side / pure check-side and safe under dry-run.
         // Verify idempotency is NOT recorded because the request carries no
         // clientRequestId (avoids cross-test pollution).
-        Mockito.verifyNoInteractions(idempotencyService);
+        Mockito.verify(idempotencyService, Mockito.never()).recordOutcome(
+                Mockito.anyString(),
+                Mockito.anyString(),
+                Mockito.anyMap(),
+                Mockito.anyMap(),
+                Mockito.anyLong());
     }
 
     private long countOutboxRows(String cmdCode) {

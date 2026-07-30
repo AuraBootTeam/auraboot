@@ -9,6 +9,8 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, CheckCircle, XCircle } from 'lucide-react';
+import { useI18n } from '~/contexts/I18nContext';
+import { formatToolDisplayName } from './toolDisplayName';
 
 // ============================================================================
 // Types
@@ -23,11 +25,6 @@ interface ToolResultCardProps {
 // ============================================================================
 // Helpers
 // ============================================================================
-
-/** Strip prefix (cmd__, nq__, builtin__) and replace __ with ' › ' */
-function formatToolName(name: string): string {
-  return name.replace(/^(cmd__|nq__|builtin__)/, '').replace(/__/g, ' › ');
-}
 
 /** Truncate a cell value for display */
 function truncateValue(val: unknown, maxLen = 40): string {
@@ -53,11 +50,16 @@ const MAX_ROWS = 10;
 const MAX_COLS = 6;
 
 export function ToolResultCard({ toolName, result, success }: ToolResultCardProps) {
+  const { t, locale } = useI18n();
   const [expanded, setExpanded] = useState(false);
 
   const records = extractRecords(result);
-  const displayName = formatToolName(toolName);
+  const displayName = formatToolDisplayName(toolName, locale.toLowerCase().startsWith('zh'));
   const recordCount = records ? records.length : null;
+  const recordLabel = (count: number) =>
+    count === 1
+      ? t('aurabot.chatbi.record', undefined, '条记录')
+      : t('aurabot.chatbi.records', undefined, '条记录');
 
   // Determine columns from first record
   const columns = records && records.length > 0 ? Object.keys(records[0]).slice(0, MAX_COLS) : [];
@@ -80,7 +82,7 @@ export function ToolResultCard({ toolName, result, success }: ToolResultCardProp
           </span>
           {recordCount !== null && (
             <span className="mr-1 ml-auto text-xs text-gray-400 dark:text-gray-500">
-              {recordCount} record{recordCount !== 1 ? 's' : ''}
+              {recordCount} {recordLabel(recordCount)}
             </span>
           )}
           {expanded ? (
@@ -125,7 +127,8 @@ export function ToolResultCard({ toolName, result, success }: ToolResultCardProp
                 </table>
                 {records.length > MAX_ROWS && (
                   <div className="border-t border-gray-50 px-2 py-1 text-center text-xs text-gray-400 dark:border-gray-700/50 dark:text-gray-500">
-                    ... and {records.length - MAX_ROWS} more
+                    {t('aurabot.chatbi.more_records', undefined, '另有')} {records.length - MAX_ROWS}{' '}
+                    {recordLabel(records.length - MAX_ROWS)}
                   </div>
                 )}
               </div>

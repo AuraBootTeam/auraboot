@@ -63,19 +63,17 @@ class EmbeddingServiceBranchTest {
     }
 
     @Test
-    @DisplayName("embedBatch defaults to 'openai' when providerCode null")
+    @DisplayName("embedBatch auto-resolves enabled providers when providerCode is null")
     void embedBatchDefaultProviderWhenNull() {
-        when(cloudConfigService.getEffectiveConfig(anyLong(), anyString(), anyString())).thenReturn(null);
         service.embedBatch(1L, List.of("a"), null);
-        verify(cloudConfigService).getEffectiveConfig(1L, "embedding", "openai");
+        verify(cloudConfigService).getEnabledProviders(1L, "embedding");
     }
 
     @Test
-    @DisplayName("embedBatch defaults to 'openai' when providerCode blank")
+    @DisplayName("embedBatch auto-resolves enabled providers when providerCode is blank")
     void embedBatchDefaultProviderWhenBlank() {
-        when(cloudConfigService.getEffectiveConfig(anyLong(), anyString(), anyString())).thenReturn(null);
         service.embedBatch(1L, List.of("a"), "   ");
-        verify(cloudConfigService).getEffectiveConfig(1L, "embedding", "openai");
+        verify(cloudConfigService).getEnabledProviders(1L, "embedding");
     }
 
     @Test

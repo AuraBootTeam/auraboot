@@ -35,16 +35,16 @@ interface AgentInfo {
 
 function avatarColor(str: string): string {
   const colors = [
-    'bg-blue-500',
-    'bg-indigo-500',
-    'bg-purple-500',
+    'bg-accent',
+    'bg-accent-weak0',
+    'bg-accent-weak0',
     'bg-pink-500',
-    'bg-rose-500',
-    'bg-orange-500',
-    'bg-amber-500',
-    'bg-teal-500',
-    'bg-cyan-500',
-    'bg-emerald-500',
+    'bg-status-red-bg0',
+    'bg-status-amber-bg0',
+    'bg-status-amber-bg0',
+    'bg-status-green-bg0',
+    'bg-accent-weak0',
+    'bg-status-green-bg0',
   ];
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -66,7 +66,7 @@ function AgentAvatar({ agent }: { agent: AgentInfo }) {
 
   return (
     <div
-      className={`flex h-9 w-9 items-center justify-center rounded-full font-semibold text-white ${isAuraBot ? 'bg-gradient-to-br from-blue-500 to-violet-600' : avatarColor(agent.agent_code)}`}
+      className={`flex h-9 w-9 items-center justify-center rounded-full font-semibold text-white ${isAuraBot ? 'from-accent-weak0 to-accent-hover bg-gradient-to-br' : avatarColor(agent.agent_code)}`}
     >
       {isAuraBot ? <SparklesIcon className="h-5 w-5" /> : initial}
     </div>
@@ -123,7 +123,7 @@ export function AgentChatEmbed(_props?: { block?: unknown; runtime?: unknown }) 
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+        <div className="border-accent0 h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
       </div>
     );
   }
@@ -131,11 +131,8 @@ export function AgentChatEmbed(_props?: { block?: unknown; runtime?: unknown }) 
   if (error || !agent) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
-        <p className="text-sm text-gray-500">{error || 'Agent not found'}</p>
-        <Link
-          to="/p/c/ai_colleagues"
-          className="text-sm font-medium text-blue-600 hover:text-blue-700"
-        >
+        <p className="text-text-3 text-sm">{error || 'Agent not found'}</p>
+        <Link to="/p/c/ai_colleagues" className="text-accent hover:text-accent text-sm font-medium">
           {t('ai.chat.backToColleagues', undefined, 'Back to AI Colleagues')}
         </Link>
       </div>
@@ -144,11 +141,11 @@ export function AgentChatEmbed(_props?: { block?: unknown; runtime?: unknown }) 
 
   return (
     <div className="flex h-full flex-col" data-testid="agent-chat-page">
-      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
+      <div className="border-border bg-panel dark:border-border dark:bg-subtle flex items-center justify-between border-b px-4 py-3">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/p/c/ai_colleagues')}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+            className="text-text-3 hover:bg-subtle hover:text-text-2 dark:hover:bg-subtle dark:hover:text-text-3 rounded-lg p-1.5 transition-colors"
             title={t('ai.chat.back', undefined, 'Back')}
             data-testid="agent-chat-back-btn"
           >
@@ -158,13 +155,11 @@ export function AgentChatEmbed(_props?: { block?: unknown; runtime?: unknown }) 
           <AgentAvatar agent={agent} />
 
           <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+            <h1 className="text-text truncate text-sm font-semibold dark:text-white">
               {agent.name}
             </h1>
             {agent.description && (
-              <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-                {agent.description}
-              </p>
+              <p className="text-text-3 dark:text-text-3 truncate text-xs">{agent.description}</p>
             )}
           </div>
         </div>
@@ -172,7 +167,7 @@ export function AgentChatEmbed(_props?: { block?: unknown; runtime?: unknown }) 
         <div className="flex items-center gap-1">
           <button
             onClick={handleNewSession}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+            className="text-text-3 hover:bg-subtle hover:text-text-2 dark:hover:bg-subtle dark:hover:text-text-3 rounded-lg p-1.5 transition-colors"
             title={t('ai.chat.newSession', undefined, 'New Conversation')}
             data-testid="agent-chat-new-session-btn"
           >
@@ -181,7 +176,7 @@ export function AgentChatEmbed(_props?: { block?: unknown; runtime?: unknown }) 
 
           <button
             onClick={() => navigate(`/p/c/ai_colleague_detail?agentPid=${agentPid}`)}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+            className="text-text-3 hover:bg-subtle hover:text-text-2 dark:hover:bg-subtle dark:hover:text-text-3 rounded-lg p-1.5 transition-colors"
             title={t('ai.chat.settings', undefined, 'Agent Settings')}
             data-testid="agent-chat-settings-btn"
           >

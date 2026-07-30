@@ -12,10 +12,28 @@ public final class LlmResponseGuard {
     }
 
     public static LlmChatResponse requireContent(LlmChatResponse response, String operation) {
-        if (response == null || response.getContent() == null || response.getContent().isEmpty()) {
+        if (response == null
+                || response.getContent() == null
+                || response.getContent().stream().noneMatch(LlmResponseGuard::isActionableBlock)) {
             throw new EmptyLlmResponseException(operation);
         }
         return response;
+    }
+
+    private static boolean isActionableBlock(LlmChatResponse.ContentBlock block) {
+        if (block == null || block.getType() == null) {
+            return false;
+        }
+        if ("text".equals(block.getType())) {
+            return block.getText() != null && !block.getText().isBlank();
+        }
+        if ("tool_use".equals(block.getType())) {
+            return block.getId() != null
+                    && !block.getId().isBlank()
+                    && block.getName() != null
+                    && !block.getName().isBlank();
+        }
+        return false;
     }
 
     public static final class EmptyLlmResponseException extends IllegalStateException {

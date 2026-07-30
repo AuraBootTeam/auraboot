@@ -9,6 +9,7 @@ import com.auraboot.framework.agent.mapper.AgentEvalCaseMapper;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
+import com.auraboot.framework.agent.runtime.policy.RiskScale;
 import com.auraboot.framework.agent.entity.AbCapabilityEvalRun;
 import com.auraboot.framework.agent.eval.CapabilityEvalRegressionGate;
 import com.auraboot.framework.agent.mapper.AbCapabilityEvalRunMapper;
@@ -622,25 +623,22 @@ public class CapabilityEvalService {
     }
 
     private boolean isHighRisk(String riskLevel) {
-        return "L3".equals(riskLevel) || "L4".equals(riskLevel);
+        return riskLevel != null && RiskScale.parse(riskLevel).requiresHumanApproval();
     }
 
     private String normalizeRiskLevel(String riskLevel) {
         if (riskLevel == null || riskLevel.isBlank()) {
             return null;
         }
-        String normalized = riskLevel.trim().toUpperCase(Locale.ROOT);
-        if (normalized.startsWith("R") && normalized.length() == 2) {
-            normalized = "L" + normalized.substring(1);
+        try {
+            return RiskScale.parse(riskLevel).code();
+        } catch (IllegalArgumentException ignored) {
+            return null;
         }
-        return switch (normalized) {
-            case "L0", "L1", "L2", "L3", "L4" -> normalized;
-            default -> null;
-        };
     }
 
     private int riskRank(String riskLevel) {
-        return riskLevel == null ? -1 : Integer.parseInt(riskLevel.substring(1));
+        return riskLevel == null ? -1 : RiskScale.parse(riskLevel).ordinal();
     }
 
     private record SafetyAssessment(boolean compliant,

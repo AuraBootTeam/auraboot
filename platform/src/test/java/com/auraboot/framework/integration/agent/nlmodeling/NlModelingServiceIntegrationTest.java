@@ -51,18 +51,18 @@ class NlModelingServiceIntegrationTest extends BaseIntegrationTest {
                 .thenReturn(mockResponse);
 
         LlmProviderFactory.ProviderConfig config = LlmProviderFactory.ProviderConfig.builder()
-                .providerCode("openai")
+                .providerCode("provider-under-test")
                 .apiKey("test-key")
-                .baseUrl("https://api.openai.com")
-                .defaultModel("gpt-4o")
+                .baseUrl("https://provider.invalid")
+                .defaultModel("model-under-test")
                 .maxTokens(8192)
                 .build();
 
-        when(providerFactory.resolveConfig(any(), anyString())).thenReturn(config);
+        when(providerFactory.resolveConfig(any(), eq(null))).thenReturn(config);
         when(providerFactory.getProvider(anyString())).thenReturn(mockProvider);
         when(providerFactory.listConfiguredProviders(any())).thenReturn(List.of(
                 LlmProviderFactory.ProviderInfo.builder()
-                        .providerCode("openai").displayName("OpenAI")
+                        .providerCode("provider-under-test").displayName("Provider under test")
                         .apiFormat("chat_completions").configured(true)
                         .build()
         ));
@@ -128,7 +128,7 @@ class NlModelingServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(4)
     void generate_withNoProviderConfigured_returnsError() {
-        when(providerFactory.resolveConfig(any(), anyString())).thenReturn(null);
+        when(providerFactory.resolveConfig(any(), eq(null))).thenReturn(null);
         when(providerFactory.listConfiguredProviders(any())).thenReturn(List.of());
 
         NlModelingRequest request = NlModelingRequest.builder()
@@ -718,14 +718,14 @@ class NlModelingServiceIntegrationTest extends BaseIntegrationTest {
                 .thenReturn(emptyResponse);
 
         LlmProviderFactory.ProviderConfig config = LlmProviderFactory.ProviderConfig.builder()
-                .providerCode("openai")
+                .providerCode("provider-under-test")
                 .apiKey("test-key")
-                .baseUrl("https://api.openai.com")
-                .defaultModel("gpt-4o")
+                .baseUrl("https://provider.invalid")
+                .defaultModel("model-under-test")
                 .maxTokens(8192)
                 .build();
 
-        when(providerFactory.resolveConfig(any(), anyString())).thenReturn(config);
+        when(providerFactory.resolveConfig(any(), eq(null))).thenReturn(config);
         when(providerFactory.getProvider(anyString())).thenReturn(mockProvider);
 
         NlModelingRequest request = NlModelingRequest.builder()

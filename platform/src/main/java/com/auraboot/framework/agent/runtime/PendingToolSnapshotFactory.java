@@ -6,6 +6,7 @@ import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.runtime.context.AgentContextBlock;
 import com.auraboot.framework.agent.runtime.context.AgentContextProvenance;
 import com.auraboot.framework.agent.runtime.context.AgentContextSource;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext;
 import com.auraboot.framework.conversation.TurnContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -97,6 +98,8 @@ public class PendingToolSnapshotFactory {
                 .channelSessionPid(firstNonBlank(snapshot.getChannelSessionPid(),
                         ctx != null ? ctx.channelSessionId() : null))
                 .triageBucket(ctx != null && ctx.triageBucket() != null ? ctx.triageBucket().name() : null)
+                .executionPrincipal(ctx != null ? ctx.executionPrincipal() : null)
+                .contextEnvelope(ctx != null ? ctx.contextEnvelope() : null)
                 .toolId(snapshot.getToolId())
                 .toolName(snapshot.getToolName())
                 .toolVersion(toolVersion)
@@ -207,6 +210,8 @@ public class PendingToolSnapshotFactory {
 
     private Map<String, Object> buildExtension(Snapshot snapshot) {
         Map<String, Object> extension = new LinkedHashMap<>(safeMap(snapshot.getExtension()));
+        ContextEnvelopeContext.current().ifPresent(envelope ->
+                extension.put("contextEnvelopeHash", envelope.envelopeHash()));
         if (snapshot.getRuntimeSystemPrompt() == null && snapshot.getToolChoice() == null) {
             return extension;
         }

@@ -1,6 +1,8 @@
 package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.dto.ChatRequest;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalResolver;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeFactory;
 import com.auraboot.framework.agent.port.AgentChatPort;
 import com.auraboot.framework.aurabot.service.AuraBotChatService;
 import com.auraboot.framework.agent.runtime.PendingContinuationService;
@@ -52,7 +54,9 @@ class AssistantModelFallbackTest {
                 mock(TurnExecutionPlanner.class),
                 mock(TurnSideEffects.class),
                 mock(PendingToolStore.class),
-                new ObjectMapper());
+                new ObjectMapper(),
+                mock(ExecutionPrincipalResolver.class),
+                new ContextEnvelopeFactory());
         ReflectionTestUtils.setField(service, "dynamicDataMapper", mapper);
         ReflectionTestUtils.setField(service, "agentChatPort", mock(AgentChatPort.class));
     }

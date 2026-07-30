@@ -3,6 +3,10 @@ package com.auraboot.framework.conversation;
 import com.auraboot.framework.agent.identity.ChannelSessionResolver;
 import com.auraboot.framework.agent.identity.AgentUserProfileResolver;
 import com.auraboot.framework.agent.identity.AuraBotAgentResolver;
+import com.auraboot.framework.agent.identity.ExecutionPrincipal;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalResolutionException;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalResolver;
 import com.auraboot.framework.agent.port.AgentChatPort;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.service.AgentApprovalGateService;
@@ -14,6 +18,10 @@ import com.auraboot.framework.agent.runtime.PendingContextFreshnessValidator;
 import com.auraboot.framework.agent.runtime.PendingContinuationService;
 import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.agent.runtime.PendingToolSnapshot;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelope;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeFactory;
+import com.auraboot.framework.agent.service.AgentReleaseDeploymentService;
 import com.auraboot.framework.agent.triage.PreGroundingTriage;
 import com.auraboot.framework.agent.triage.TriageBucket;
 import com.auraboot.framework.agent.triage.TriageRequest;
@@ -35,6 +43,7 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -68,6 +77,10 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     private final TurnSideEffects sideEffects;
     private final PendingToolStore pendingToolStore;
     private final ObjectMapper objectMapper;
+    private final ExecutionPrincipalResolver executionPrincipalResolver;
+    private final ContextEnvelopeFactory contextEnvelopeFactory;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AgentReleaseDeploymentService releaseDeploymentService;
 
     /** Optional named-agent port. When the bean is absent, named-agent traffic
      *  surfaces a Failed outcome through the sink — same observability surface
@@ -130,13 +143,17 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                                         TurnExecutionPlanner turnExecutionPlanner,
                                         @Qualifier("turnSideEffects") TurnSideEffects sideEffects,
                                         PendingToolStore pendingToolStore,
-                                        ObjectMapper objectMapper) {
+                                        ObjectMapper objectMapper,
+                                        ExecutionPrincipalResolver executionPrincipalResolver,
+                                        ContextEnvelopeFactory contextEnvelopeFactory) {
         this.chatService = chatService;
         this.pendingContinuationService = pendingContinuationService;
         this.turnExecutionPlanner = turnExecutionPlanner;
         this.sideEffects = sideEffects;
         this.pendingToolStore = pendingToolStore;
         this.objectMapper = objectMapper;
+        this.executionPrincipalResolver = executionPrincipalResolver;
+        this.contextEnvelopeFactory = contextEnvelopeFactory;
     }
 
     @Override
@@ -148,9 +165,123 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         TurnScopeContext.set(request.conversationId(), request.channel());
         try {
             return runTurnDispatch(request, sink);
+        } catch (ExecutionPrincipalResolutionException e) {
+            // Identity resolution is deliberately fail-closed, but its diagnostic
+            // strings contain internal identifiers and configuration details. This
+            // chokepoint is the first user-facing boundary, so translate the typed
+            // reason here while preserving the full cause in server logs.
+            String message = switch (e.reason()) {
+                case AGENT_INACTIVE ->
+                    "This AI colleague is suspended and is not taking new work. "
+                            + "An administrator can resume it from its profile page.";
+                case AGENT_MISSING -> "This AI colleague is no longer available.";
+                case INVOCATION_DENIED ->
+                    "You cannot use this AI colleague from the current channel or account.";
+                case CONFIGURATION_INVALID ->
+                    "This AI colleague is temporarily unavailable because its runtime "
+                            + "configuration is incomplete. An administrator can review "
+                            + "its release and identity settings.";
+            };
+            log.warn("Execution principal resolution rejected a turn: reason={}, errorType={}",
+                    e.reason(), e.getClass().getSimpleName());
+            TurnOutcome.Failed failed = new TurnOutcome.Failed(message, e);
+            try {
+                sink.onError(message, null);
+            } catch (Exception sinkError) {
+                // A disconnected SSE client must not erase the rejection from
+                // audit/eval telemetry.
+                log.warn("Failed to emit execution-principal rejection to sink: {}",
+                        sinkError.getMessage(), sinkError);
+            }
+            recordPreExecutionRejection(request, failed);
+            return failed;
         } finally {
             TurnScopeContext.clear();
         }
+    }
+
+    /**
+     * Record a turn rejected before {@link #beginTurn(TurnRequest)} could
+     * materialize its execution principal.
+     *
+     * <p>An identity/deployment rejection is still a terminal turn. Before
+     * this seam, the caller received an SSE error but no
+     * {@link TurnCompletedEvent}; consequently the all-terminal-turn
+     * observation loop silently excluded missing, inactive, and denied named
+     * agents. Build a deliberately non-executable context (no
+     * {@link ExecutionPrincipal}, no {@link ContextEnvelope}, no inbound
+     * persistence), retain the real triage + planner route, and emit the same
+     * terminal audit/event/metrics surfaces as an accepted turn.
+     *
+     * <p>Each side effect is isolated. Rejection telemetry must never replace
+     * the safe failure already returned to the caller, and an audit or metrics
+     * outage must not prevent the terminal event from being attempted.
+     */
+    private void recordPreExecutionRejection(TurnRequest request, TurnOutcome.Failed failed) {
+        TurnContext ctx;
+        TurnRoute route;
+        try {
+            ctx = buildPreExecutionRejectionContext(request);
+            route = TurnExecutionPlanner.isRagOnlyChannel(request.channel())
+                    ? TurnRoute.ragOnlyForced()
+                    : TurnRoute.from(decideInitialExecutionPlan(request, ctx));
+        } catch (Exception telemetryContextError) {
+            log.warn("Could not materialize pre-execution rejection telemetry: {}",
+                    telemetryContextError.getMessage(), telemetryContextError);
+            return;
+        }
+
+        try {
+            sideEffects.metricsRecorder().recordTurnBegin(ctx);
+        } catch (Exception metricsError) {
+            log.warn("Pre-execution rejection begin metric failed: {}",
+                    metricsError.getMessage(), metricsError);
+        }
+        try {
+            sideEffects.auditWriter().writeFailure(ctx, failed);
+        } catch (Exception auditError) {
+            log.warn("Pre-execution rejection audit failed: {}",
+                    auditError.getMessage(), auditError);
+        }
+        try {
+            sideEffects.eventEmitter().emit(new TurnCompletedEvent(ctx, failed, route));
+        } catch (Exception eventError) {
+            log.warn("Pre-execution rejection terminal event failed: {}",
+                    eventError.getMessage(), eventError);
+        }
+        try {
+            sideEffects.metricsRecorder().recordTurnEnd(ctx, failed);
+        } catch (Exception metricsError) {
+            log.warn("Pre-execution rejection end metric failed: {}",
+                    metricsError.getMessage(), metricsError);
+        }
+    }
+
+    private TurnContext buildPreExecutionRejectionContext(TurnRequest request) {
+        String profileId = resolveProfileId(request);
+        TriageVerdict verdict = runTriage(request, profileId);
+        TriageBucket effectiveBucket = request.precomputedBucket() != null
+                ? request.precomputedBucket()
+                : (verdict != null ? verdict.bucket() : null);
+        return new TurnContext(
+                com.auraboot.framework.common.util.UniqueIdGenerator.generate(),
+                request.tenantId(),
+                request.userId(),
+                request.humanMemberId(),
+                null,
+                request.agentCode(),
+                request.channel(),
+                profileId,
+                null,
+                request.conversationId(),
+                null,
+                effectiveBucket,
+                allowedReadOnlyToolsFor(effectiveBucket, verdict),
+                null,
+                null,
+                java.time.Instant.now(),
+                null,
+                null);
     }
 
 
@@ -211,6 +342,12 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
 
     /** The {@code model} column of an agent definition, or {@code null} if unset/absent. */
     private String configuredAgentModel(Long tenantId, String agentCode) {
+        if (releaseDeploymentService != null) {
+            Object model = releaseDeploymentService
+                    .runtimeDefinition(tenantId, agentCode)
+                    .get("model");
+            return model == null ? null : model.toString();
+        }
         try {
             String sql = "SELECT model FROM ab_agent_definition WHERE tenant_id = #{params.tenantId} "
                     + "AND agent_code = #{params.agentCode} AND deleted_flag = FALSE LIMIT 1";
@@ -258,15 +395,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 log.debug("Agent turn execution plan: turnId={}, RAG-only channel {} forced to SYNC_AGENT_TURN",
                         ctx.turnId(), request.channel());
             } else {
-                turnPlan = turnExecutionPlanner.decide(
-                        new TurnExecutionPlanner.TurnExecutionInput(
-                                agentCode,
-                                ctx.triageBucket(),
-                                ctx.allowedReadOnlyTools(),
-                                optionFlag(request, "explicitDurableRequest", "durableWorkflow", "durable"),
-                                optionFlag(request, "requiresApproval"),
-                                optionFlag(request, "externalSideEffect"),
-                                optionFlag(request, "batch")));
+                turnPlan = decideInitialExecutionPlan(request, ctx);
                 initialMode = turnPlan.initialMode();
                 route = TurnRoute.from(turnPlan);
                 log.debug("Agent turn execution plan: turnId={}, initialMode={}, reason={}, signals={}",
@@ -293,11 +422,16 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             } else {
                 if (initialMode == TurnExecutionPlanner.InitialExecutionMode.DURABLE_WORKFLOW) {
                     outcome = isAcpRuntimeWired()
-                            ? dispatchToAcpRun(ctx, legacyRequest, capturingSink)
+                            ? runAsPrincipal(
+                                    ctx,
+                                    () -> dispatchToAcpRun(ctx, legacyRequest, capturingSink))
                             : acpRuntimeUnavailableOutcome(ctx, capturingSink);
                 } else {
                     applyConfiguredAssistantModel(ctx.tenantId(), legacyRequest);
-                    outcome = chatService.executeAuraBotTurn(ctx, legacyRequest, capturingSink);
+                    outcome = runAsPrincipal(
+                            ctx,
+                            () -> chatService.executeAuraBotTurn(
+                                    ctx, legacyRequest, capturingSink));
                 }
             }
             if (outcome == null) {
@@ -320,13 +454,28 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
 
         try {
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
-                    capturingSink.capturedContent(), capturingSink.capturedSignature()), route);
+                    capturingSink.capturedContent(), capturingSink.capturedSignature(),
+                    capturingSink.capturedRetrievalEvidence()), route);
         } catch (Exception e) {
             // Side effects must never block the outcome from being returned to the caller,
             // but the failure must not vanish silently (P-006).
             recordFinalizeFailure(ctx, outcome, e);
         }
         return outcome;
+    }
+
+    private TurnExecutionPlanner.TurnExecutionPlan decideInitialExecutionPlan(
+            TurnRequest request,
+            TurnContext ctx) {
+        return turnExecutionPlanner.decide(
+                new TurnExecutionPlanner.TurnExecutionInput(
+                        request.agentCode(),
+                        ctx.triageBucket(),
+                        ctx.allowedReadOnlyTools(),
+                        optionFlag(request, "explicitDurableRequest", "durableWorkflow", "durable"),
+                        optionFlag(request, "requiresApproval"),
+                        optionFlag(request, "externalSideEffect"),
+                        optionFlag(request, "batch")));
     }
 
     @Override
@@ -399,8 +548,20 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             }
         }
 
-        // 2. Rebuild TurnContext from the saved pending state.
-        TurnContext ctx = rebuildContext(pending);
+        // 2. Rebuild TurnContext from the saved pending state. New snapshots
+        // carry the exact principal + envelope captured at suspend time; their
+        // hash is verified before any approved tool may execute. Legacy rows
+        // use the resolver-compatible fallback in rebuildContext.
+        TurnContext ctx;
+        try {
+            ctx = rebuildContext(pending);
+        } catch (RuntimeException e) {
+            String msg = "pending execution context is invalid — refusing resume";
+            log.warn("{} (turnId={}, reason={})",
+                    msg, pending.getTurnId(), e.getMessage());
+            sink.onError(msg, null);
+            return new TurnOutcome.Failed(msg, e);
+        }
         sideEffects.metricsRecorder().recordTurnBegin(ctx);
 
         // D.1: same wrapping discipline as runTurn — the resumed Anthropic
@@ -410,8 +571,10 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         // 3. Dispatch by decision.
         TurnOutcome outcome;
         try {
-            outcome = switch (decision) {
-                case APPROVED -> pendingContinuationService.resumeApprovedChatTool(ctx, pending, capturingSink);
+            ConfirmDecision effectiveDecision = decision;
+            outcome = runAsPrincipal(ctx, () -> switch (effectiveDecision) {
+                case APPROVED -> pendingContinuationService.resumeApprovedChatTool(
+                        ctx, pending, capturingSink);
                 case DENIED -> {
                     String reason = "User denied the operation";
                     capturingSink.onDone("", null);
@@ -422,7 +585,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                     capturingSink.onDone("", null);
                     yield new TurnOutcome.Interrupted(reason, "user_cancelled");
                 }
-            };
+            });
             if (outcome == null) {
                 String msg = "resumeTurn pending continuation returned null outcome";
                 log.error(msg);
@@ -435,7 +598,8 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
 
         try {
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
-                    capturingSink.capturedContent(), capturingSink.capturedSignature()),
+                    capturingSink.capturedContent(), capturingSink.capturedSignature(),
+                    capturingSink.capturedRetrievalEvidence()),
                     TurnRoute.resumedAfterConfirmation());
         } catch (Exception e) {
             recordFinalizeFailure(ctx, outcome, e);
@@ -563,7 +727,8 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         try {
             // ACP approval resume: continuation executes on the durable engine.
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
-                    capturingSink.capturedContent(), capturingSink.capturedSignature()),
+                    capturingSink.capturedContent(), capturingSink.capturedSignature(),
+                    capturingSink.capturedRetrievalEvidence()),
                     new TurnRoute(
                             TurnExecutionPlanner.InitialExecutionMode.DURABLE_WORKFLOW.name(),
                             "RESUMED_AFTER_APPROVAL",
@@ -790,6 +955,47 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         // propagating a phantom pid into TurnContext.
         String channelSessionId = resolveResumeChannelSessionId(
                 pending.getChannelSessionPid(), pending.getTenantId());
+        ExecutionPrincipal principal = pending.getExecutionPrincipal();
+        ContextEnvelope envelope = pending.getContextEnvelope();
+        java.time.Instant beginAt;
+        if (principal != null || envelope != null) {
+            if (principal == null || envelope == null
+                    || !contextEnvelopeFactory.verify(envelope)
+                    || !principal.equals(envelope.principal())
+                    || !java.util.Objects.equals(pending.getTenantId(), envelope.tenantId())
+                    || !java.util.Objects.equals(pending.getAgentCode(), envelope.agentCode())
+                    || !java.util.Objects.equals(pending.getUserId(), principal.initiator().userId())
+                    || !java.util.Objects.equals(pending.getHumanMemberId(), principal.initiator().memberId())) {
+                throw new IllegalStateException(
+                        "persisted ExecutionPrincipal/ContextEnvelope integrity mismatch");
+            }
+            beginAt = envelope.createdAt();
+        } else {
+            // Compatibility for pending rows created before context-envelope/v1.
+            principal = resolveExecutionPrincipal(
+                    pending.getTenantId(),
+                    pending.getUserId(),
+                    pending.getHumanMemberId(),
+                    pending.getAgentCode(),
+                    pending.getChannel());
+            beginAt = java.time.Instant.now();
+            envelope = contextEnvelopeFactory.compile(
+                    new ContextEnvelopeFactory.CompileRequest(
+                            pending.getTurnId(),
+                            principal,
+                            pending.getChannel(),
+                            pending.getProfileId(),
+                            channelSessionId,
+                            pending.getConversationId(),
+                            pending.getTriageBucket(),
+                            Set.of(),
+                            List.of(),
+                            Map.of(),
+                            null,
+                            null,
+                            beginAt,
+                            true));
+        }
         return new TurnContext(
                 pending.getTurnId(),
                 pending.getTenantId(),
@@ -806,7 +1012,9 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 Set.of(),                              // allowedReadOnlyTools — already suspended
                 null,                                  // traceId — chat impl re-attaches via aiTraceService.findActiveTrace
                 pending.getTaskPid(),                  // DC.3c: resume finalization closes the original named-agent task
-                java.time.Instant.now());
+                beginAt,
+                principal,
+                envelope);
     }
 
     /**
@@ -909,7 +1117,10 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         // DC.3a: pass server-only overrides through to the AgentChatPort SPI
         // (4-arg variant). Aurabot REST callers always pass null; group-chat
         // AgentReplyTask passes a populated AgentTurnOverrides.
-        TurnOutcome outcome = agentChatPort.runAgentTurn(ctxWithTask, legacyRequest, sink, request.overrides());
+        TurnOutcome outcome = runAsPrincipal(
+                ctxWithTask,
+                () -> agentChatPort.runAgentTurn(
+                        ctxWithTask, legacyRequest, sink, request.overrides()));
         // Surface taskPid on Success.meta so AgentReplyTask (handoff caller) can
         // use it as parentTaskPid for the next hop.
         return attachTaskPidToOutcome(outcome, taskPid);
@@ -1010,6 +1221,12 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     }
 
     private TurnContext beginTurn(TurnRequest request) {
+        ExecutionPrincipal principal = resolveExecutionPrincipal(
+                request.tenantId(),
+                request.userId(),
+                request.humanMemberId(),
+                request.agentCode(),
+                request.channel());
         String profileId = resolveProfileId(request);
         // Phase C.1: Stage 2.5 Pre-Grounding Triage runs BEFORE persistence so the
         // verdict can be written onto the inbound row + carried in TurnContext.
@@ -1030,8 +1247,29 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         // scoped state) has a stable scope key. {@code profileId=null} means
         // "tenant default profile" per the SPI contract — not "no profile".
         String channelSessionId = resolveChannelSessionId(request, profileId);
+        String turnId =
+                com.auraboot.framework.common.util.UniqueIdGenerator.generate();
+        java.time.Instant beginAt = java.time.Instant.now();
+        Set<String> allowedReadOnlyTools =
+                allowedReadOnlyToolsFor(effectiveBucket, verdict);
+        ContextEnvelope envelope = contextEnvelopeFactory.compile(
+                new ContextEnvelopeFactory.CompileRequest(
+                        turnId,
+                        principal,
+                        request.channel(),
+                        profileId,
+                        channelSessionId,
+                        request.conversationId(),
+                        effectiveBucket != null ? effectiveBucket.name() : null,
+                        allowedReadOnlyTools,
+                        requestedKnowledgeBaseIds(request),
+                        request.options(),
+                        optionText(request, "locale"),
+                        optionText(request, "timezone"),
+                        beginAt,
+                        true));
         return new TurnContext(
-                com.auraboot.framework.common.util.UniqueIdGenerator.generate(),
+                turnId,
                 request.tenantId(),
                 request.userId(),
                 request.humanMemberId(),
@@ -1043,10 +1281,63 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 request.conversationId(),
                 inboundMessageId,
                 effectiveBucket,
-                allowedReadOnlyToolsFor(effectiveBucket, verdict),
+                allowedReadOnlyTools,
                 null,                                // traceId — set inside chat impl (kept null on TurnContext for Phase A)
                 null,                                // taskPid — chokepoint dispatch later fills via withTaskPid (DC.3c)
-                java.time.Instant.now());
+                beginAt,
+                principal,
+                envelope);
+    }
+
+    private ExecutionPrincipal resolveExecutionPrincipal(
+            Long tenantId,
+            Long initiatorUserId,
+            Long initiatorMemberId,
+            String agentCode,
+            String channel) {
+        if (tenantId == null) {
+            throw new IllegalStateException("tenantId is required for principal resolution");
+        }
+        return executionPrincipalResolver.resolve(
+                new ExecutionPrincipalResolver.ResolveRequest(
+                        tenantId,
+                        initiatorUserId,
+                        initiatorMemberId,
+                        agentCode,
+                        channel));
+    }
+
+    private List<String> requestedKnowledgeBaseIds(TurnRequest request) {
+        if (request == null
+                || request.legacyRequest() == null
+                || request.legacyRequest().getKnowledgeBaseIds() == null) {
+            return List.of();
+        }
+        return request.legacyRequest().getKnowledgeBaseIds();
+    }
+
+    private String optionText(TurnRequest request, String key) {
+        if (request == null || request.options() == null || key == null) {
+            return null;
+        }
+        Object value = request.options().get(key);
+        return value == null || String.valueOf(value).isBlank()
+                ? null
+                : String.valueOf(value);
+    }
+
+    private <T> T runAsPrincipal(TurnContext ctx, java.util.function.Supplier<T> action) {
+        if (ctx == null || ctx.executionPrincipal() == null) {
+            throw new IllegalStateException(
+                    "ExecutionPrincipal is required at the agent runtime boundary");
+        }
+        if (ctx.contextEnvelope() == null) {
+            throw new IllegalStateException(
+                    "ContextEnvelope is required at the agent runtime boundary");
+        }
+        return ExecutionPrincipalContext.callAs(
+                ctx.executionPrincipal(),
+                () -> ContextEnvelopeContext.callWith(ctx.contextEnvelope(), action));
     }
 
     private static Set<String> allowedReadOnlyToolsFor(TriageBucket effectiveBucket, TriageVerdict verdict) {

@@ -3,7 +3,6 @@ package com.auraboot.framework.rag.controller;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.PathSafetyUtils;
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.file.entity.FileEntity;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.rag.dto.*;
 import com.auraboot.framework.rag.entity.KbChunk;
@@ -13,6 +12,9 @@ import com.auraboot.framework.rag.service.DocGenerationService;
 import com.auraboot.framework.rag.service.InternalDocImportService;
 import com.auraboot.framework.rag.service.KbUrlIngestService;
 import com.auraboot.framework.rag.service.KnowledgeBaseService;
+import com.auraboot.framework.rag.service.KnowledgeIndexRebuildService;
+import com.auraboot.framework.rag.service.KnowledgeBaseAccessPolicy;
+import com.auraboot.framework.rag.service.KnowledgeBaseGrantService;
 import com.auraboot.framework.rag.service.RagRetrievalService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
@@ -23,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * REST controller for RAG knowledge base management.
@@ -41,6 +44,9 @@ public class KnowledgeBaseController {
     private final DocGenerationService docGenerationService;
     private final InternalDocImportService internalDocImportService;
     private final FileService fileService;
+    private final KnowledgeIndexRebuildService indexRebuildService;
+    private final KnowledgeBaseAccessPolicy accessPolicy;
+    private final KnowledgeBaseGrantService grantService;
 
     // =========================================================================
     // Knowledge Base CRUD
@@ -50,13 +56,24 @@ public class KnowledgeBaseController {
     @RequirePermission(MetaPermission.AI_KNOWLEDGE_READ)
     public ApiResponse<List<KnowledgeBaseDTO>> list() {
         Long tenantId = MetaContext.getCurrentTenantId();
-        return ApiResponse.success(kbService.listKnowledgeBases(tenantId));
+        Set<String> readable = Set.copyOf(accessPolicy.listReadableMetadata(tenantId));
+        return ApiResponse.success(kbService.listKnowledgeBases(tenantId).stream()
+                .filter(kb -> readable.contains(kb.getPid()))
+                .toList());
+    }
+
+    @GetMapping("/embedding-profiles")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
+    public ApiResponse<List<KnowledgeBaseService.EmbeddingProfile>> embeddingProfiles() {
+        return ApiResponse.success(kbService.listEmbeddingProfiles(
+                MetaContext.getCurrentTenantId()));
     }
 
     @GetMapping("/{kbPid}")
     @RequirePermission(MetaPermission.AI_KNOWLEDGE_READ)
     public ApiResponse<KnowledgeBaseDTO> get(@PathVariable String kbPid) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        accessPolicy.requireReadable(tenantId, kbPid);
         KnowledgeBaseDTO kb = kbService.getKnowledgeBase(tenantId, kbPid);
         if (kb == null) return ApiResponse.error("Knowledge base not found");
         return ApiResponse.success(kb);
@@ -76,6 +93,7 @@ public class KnowledgeBaseController {
                                                   @RequestBody CreateKnowledgeBaseRequest request) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
+        accessPolicy.requireManage(tenantId, kbPid);
         KnowledgeBaseDTO updated = kbService.updateKnowledgeBase(tenantId, userId, kbPid, request);
         if (updated == null) return ApiResponse.error("Knowledge base not found");
         return ApiResponse.success(updated);
@@ -85,6 +103,7 @@ public class KnowledgeBaseController {
     @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
     public ApiResponse<Boolean> delete(@PathVariable String kbPid) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        accessPolicy.requireManage(tenantId, kbPid);
         return ApiResponse.success(kbService.deleteKnowledgeBase(tenantId, kbPid));
     }
 
@@ -92,6 +111,7 @@ public class KnowledgeBaseController {
     @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
     public ApiResponse<Boolean> toggleStatus(@PathVariable String kbPid) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        accessPolicy.requireManage(tenantId, kbPid);
         return ApiResponse.success(kbService.toggleStatus(tenantId, kbPid));
     }
 
@@ -107,15 +127,99 @@ public class KnowledgeBaseController {
     @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
     public ApiResponse<Map<String, Object>> reindex(@PathVariable String kbPid) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        int count = kbService.reindexChunkTsv(tenantId, kbPid);
-        if (count < 0) return ApiResponse.error("Knowledge base not found");
-        return ApiResponse.success(Map.of("reindexedChunks", count));
+        accessPolicy.requireActiveManage(tenantId, kbPid);
+        var result = indexRebuildService.rebuildText(
+                tenantId, MetaContext.getCurrentUserId(), kbPid);
+        if (!"active".equals(result.state())) {
+            return ApiResponse.error(result.errorMessage());
+        }
+        return ApiResponse.success(Map.of(
+                "releasePid", result.releasePid(),
+                "releaseType", result.releaseType(),
+                "state", result.state(),
+                "reindexedChunks", result.indexedChunks()));
+    }
+
+    @PostMapping("/{kbPid}/rebuild-vector-index")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
+    public ApiResponse<KnowledgeIndexRebuildService.RebuildResult> rebuildVectorIndex(
+            @PathVariable String kbPid) {
+        accessPolicy.requireActiveManage(
+                MetaContext.getCurrentTenantId(), kbPid);
+        var result = indexRebuildService.rebuildVector(
+                MetaContext.getCurrentTenantId(),
+                MetaContext.getCurrentUserId(),
+                kbPid);
+        if (!"active".equals(result.state())) {
+            return ApiResponse.error(result.errorMessage());
+        }
+        return ApiResponse.success(result);
+    }
+
+    @GetMapping("/{kbPid}/index-releases")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_READ)
+    public ApiResponse<List<Map<String, Object>>> listIndexReleases(
+            @PathVariable String kbPid) {
+        accessPolicy.requireActiveReadable(
+                MetaContext.getCurrentTenantId(), kbPid);
+        return ApiResponse.success(indexRebuildService.listReleases(
+                MetaContext.getCurrentTenantId(), kbPid));
+    }
+
+    @PostMapping("/{kbPid}/index-releases/{releasePid}/activate")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
+    public ApiResponse<Boolean> activateIndexRelease(
+            @PathVariable String kbPid,
+            @PathVariable String releasePid) {
+        accessPolicy.requireActiveManage(
+                MetaContext.getCurrentTenantId(), kbPid);
+        return ApiResponse.success(indexRebuildService.activateExisting(
+                MetaContext.getCurrentTenantId(), kbPid, releasePid));
+    }
+
+    @GetMapping("/{kbPid}/access-grants")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
+    public ApiResponse<List<Map<String, Object>>> listAccessGrants(
+            @PathVariable String kbPid) {
+        accessPolicy.requireActiveManage(
+                MetaContext.getCurrentTenantId(), kbPid);
+        return ApiResponse.success(grantService.list(
+                MetaContext.getCurrentTenantId(), kbPid));
+    }
+
+    @PostMapping("/{kbPid}/access-grants")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
+    public ApiResponse<Map<String, String>> saveAccessGrant(
+            @PathVariable String kbPid,
+            @RequestBody KnowledgeBaseGrantService.GrantRequest request) {
+        accessPolicy.requireActiveManage(
+                MetaContext.getCurrentTenantId(), kbPid);
+        String pid = grantService.save(
+                MetaContext.getCurrentTenantId(),
+                MetaContext.getCurrentUserId(),
+                kbPid,
+                request);
+        return ApiResponse.success(Map.of("pid", pid));
+    }
+
+    @DeleteMapping("/{kbPid}/access-grants/{grantPid}")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
+    public ApiResponse<Boolean> deleteAccessGrant(
+            @PathVariable String kbPid,
+            @PathVariable String grantPid) {
+        accessPolicy.requireActiveManage(
+                MetaContext.getCurrentTenantId(), kbPid);
+        return ApiResponse.success(grantService.delete(
+                MetaContext.getCurrentTenantId(), kbPid, grantPid));
     }
 
     @GetMapping("/{kbPid}/documents")
     @RequirePermission(MetaPermission.AI_KNOWLEDGE_READ)
     public ApiResponse<List<KbDocumentDTO>> listDocuments(@PathVariable String kbPid) {
-        return ApiResponse.success(kbService.listDocuments(kbPid));
+        accessPolicy.requireReadable(
+                MetaContext.getCurrentTenantId(), kbPid);
+        return ApiResponse.success(
+                kbService.listDocuments(MetaContext.getCurrentTenantId(), kbPid));
     }
 
     @PostMapping("/{kbPid}/documents/upload")
@@ -124,26 +228,27 @@ public class KnowledgeBaseController {
                                                        @RequestParam("file") MultipartFile file) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
+        accessPolicy.requireActiveManage(tenantId, kbPid);
+        kbService.requireActiveKnowledgeBase(tenantId, kbPid);
+
+        String extension = extensionOf(file.getOriginalFilename());
+        String docType = resolveDocType(extension);
+        if (docType == null) {
+            return ApiResponse.error("Unsupported file type: " + extension);
+        }
 
         // 1. Upload file via FileService
         var uploadResult = fileService.uploadFile(file, userId);
         String filePid = uploadResult.getFileId(); // getFileId() returns the entity pid
 
-        // 2. Resolve file entity for metadata
-        FileEntity fileEntity = fileService.findByPid(filePid);
-
-        // 3. Determine doc type from extension
-        String ext = fileEntity != null ? fileEntity.getFileExtension() : null;
-        String docType = resolveDocType(ext);
-        if (docType == null) {
-            return ApiResponse.error("Unsupported file type: " + ext);
-        }
+        // File type was validated before the upload, so an invalid request
+        // cannot leave an orphaned storage object behind.
         KbDocument doc = kbService.createDocument(tenantId, userId, kbPid,
                 uploadResult.getOriginalName(), docType, filePid,
                 uploadResult.getFileSize(), "file", null);
 
         // 5. Trigger async processing
-        docProcessingService.processDocument(kbPid, doc.getPid());
+        docProcessingService.processDocument(tenantId, kbPid, doc.getPid());
 
         return ApiResponse.success(KbDocumentDTO.builder()
                 .pid(doc.getPid())
@@ -159,7 +264,10 @@ public class KnowledgeBaseController {
     @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
     public ApiResponse<Boolean> deleteDocument(@PathVariable String kbPid,
                                                  @PathVariable String docPid) {
-        return ApiResponse.success(kbService.deleteDocument(kbPid, docPid));
+        accessPolicy.requireActiveManage(
+                MetaContext.getCurrentTenantId(), kbPid);
+        return ApiResponse.success(kbService.deleteDocument(
+                MetaContext.getCurrentTenantId(), kbPid, docPid));
     }
 
     /**
@@ -176,6 +284,7 @@ public class KnowledgeBaseController {
     public ApiResponse<KbDocumentDTO> addDocumentFromUrl(@PathVariable String kbPid,
                                                            @RequestBody Map<String, String> request) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        accessPolicy.requireActiveManage(tenantId, kbPid);
         String url = request.get("url");
 
         String docPid;
@@ -190,7 +299,7 @@ public class KnowledgeBaseController {
             return ApiResponse.error("Could not fetch the URL: " + e.getMessage());
         }
 
-        return ApiResponse.success(kbService.listDocuments(kbPid).stream()
+        return ApiResponse.success(kbService.listDocuments(tenantId, kbPid).stream()
                 .filter(d -> docPid.equals(d.getPid()))
                 .findFirst()
                 .orElse(null));
@@ -204,10 +313,12 @@ public class KnowledgeBaseController {
     @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
     public ApiResponse<Boolean> reprocessDocument(@PathVariable String kbPid,
                                                     @PathVariable String docPid) {
-        if (!kbService.resetDocumentForReprocess(kbPid, docPid)) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        accessPolicy.requireActiveManage(tenantId, kbPid);
+        if (!kbService.resetDocumentForReprocess(tenantId, kbPid, docPid)) {
             return ApiResponse.error("Document not found: " + docPid);
         }
-        docProcessingService.processDocument(kbPid, docPid);
+        docProcessingService.processDocument(tenantId, kbPid, docPid);
         return ApiResponse.success(true);
     }
 
@@ -220,7 +331,10 @@ public class KnowledgeBaseController {
     public ApiResponse<List<KbChunk>> listChunks(@PathVariable String kbPid,
                                                    @PathVariable String docPid,
                                                    @RequestParam(defaultValue = "50") int limit) {
-        return ApiResponse.success(kbService.listChunks(docPid, limit));
+        accessPolicy.requireReadable(
+                MetaContext.getCurrentTenantId(), kbPid);
+        return ApiResponse.success(kbService.listChunks(
+                MetaContext.getCurrentTenantId(), kbPid, docPid, limit));
     }
 
     // =========================================================================
@@ -300,6 +414,17 @@ public class KnowledgeBaseController {
             case "png", "jpg", "jpeg", "gif", "webp" -> "image";
             default -> null;
         };
+    }
+
+    private static String extensionOf(String filename) {
+        if (filename == null) {
+            return null;
+        }
+        int dot = filename.lastIndexOf('.');
+        if (dot < 0 || dot == filename.length() - 1) {
+            return null;
+        }
+        return filename.substring(dot + 1);
     }
 
     private java.nio.file.Path resolveWorkspacePath(String path, String context) {

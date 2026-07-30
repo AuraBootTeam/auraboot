@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.provider;
 
 import com.auraboot.framework.agent.crosstenant.CrossTenantAclDeniedException;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
 import com.auraboot.framework.agent.nlmodeling.NlModelingService;
 import com.auraboot.framework.agent.nlmodeling.dto.NlApplyRequest;
 import com.auraboot.framework.agent.nlmodeling.dto.NlModelingRequest;
@@ -735,7 +736,9 @@ public class PlatformToolProvider implements ToolProvider {
             // Cannot attribute per-row ACL to one model; tenant predicate already enforced.
             return rows;
         }
-        Long userId = MetaContext.getCurrentUserId();
+        Long userId = ExecutionPrincipalContext.current()
+                .map(principal -> principal.actorUserId())
+                .orElseGet(MetaContext::getCurrentUserId);
 
         // Row-level ACL (SELF / DEPARTMENT / PROJECT / CUSTOM) — narrows to accessible rows.
         List<Map<String, Object>> filtered =

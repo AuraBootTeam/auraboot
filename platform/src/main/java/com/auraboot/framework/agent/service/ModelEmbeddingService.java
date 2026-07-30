@@ -23,7 +23,6 @@ public class ModelEmbeddingService {
     private final EmbeddingService embeddingService;
     private final DynamicDataMapper dynamicDataMapper;
 
-    private static final String DEFAULT_PROVIDER = "openai";
     private static final double SIMILARITY_THRESHOLD = 0.92;
 
     /**
@@ -41,7 +40,7 @@ public class ModelEmbeddingService {
         }
 
         try {
-            float[] vector = embeddingService.embed(tenantId, displayName, DEFAULT_PROVIDER);
+            float[] vector = embeddingService.embed(tenantId, displayName, null);
             if (vector == null) {
                 log.warn("Embedding provider returned null for model {} — provider may not be configured", modelCode);
                 return false;
@@ -79,7 +78,7 @@ public class ModelEmbeddingService {
         }
 
         try {
-            float[] queryVector = embeddingService.embed(tenantId, queryText, DEFAULT_PROVIDER);
+            float[] queryVector = embeddingService.embed(tenantId, queryText, null);
             if (queryVector == null) {
                 log.debug("Embedding provider not configured — skipping semantic search");
                 return List.of();

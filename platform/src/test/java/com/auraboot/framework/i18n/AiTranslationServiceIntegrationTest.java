@@ -50,7 +50,7 @@ class AiTranslationServiceIntegrationTest extends BaseIntegrationTest {
     @MockitoBean
     private LlmProviderFactory llmProviderFactory;
 
-    @MockitoBean(name = "anthropicLlmProvider")
+    @MockitoBean(name = "providerUnderTest")
     private LlmProvider llmProvider;
 
     /** Unique prefix per test run to avoid key collisions */
@@ -79,15 +79,15 @@ class AiTranslationServiceIntegrationTest extends BaseIntegrationTest {
 
         // LLM provider returns valid JSON translation
         LlmProviderFactory.ProviderConfig cfg = LlmProviderFactory.ProviderConfig.builder()
-                .providerCode("anthropic")
+                .providerCode("provider-under-test")
                 .apiKey("test-key-xxx")
-                .baseUrl("https://api.anthropic.com")
-                .defaultModel("claude-sonnet-4-6")
+                .baseUrl("https://provider.invalid")
+                .defaultModel("model-under-test")
                 .maxTokens(4096)
                 .build();
 
-        when(llmProviderFactory.resolveConfig(anyLong(), eq("anthropic"))).thenReturn(cfg);
-        when(llmProviderFactory.getProvider("anthropic")).thenReturn(llmProvider);
+        when(llmProviderFactory.resolveConfig(anyLong(), eq(null))).thenReturn(cfg);
+        when(llmProviderFactory.getProvider("provider-under-test")).thenReturn(llmProvider);
         when(llmProviderFactory.listConfiguredProviders(anyLong())).thenReturn(List.of());
 
         String llmJson = "{\"" + key + "\": \"こんにちは\"}";
@@ -142,14 +142,14 @@ class AiTranslationServiceIntegrationTest extends BaseIntegrationTest {
 
         // Even if LLM is configured, the key should be skipped
         LlmProviderFactory.ProviderConfig cfg = LlmProviderFactory.ProviderConfig.builder()
-                .providerCode("anthropic")
+                .providerCode("provider-under-test")
                 .apiKey("test-key-xxx")
-                .baseUrl("https://api.anthropic.com")
-                .defaultModel("claude-sonnet-4-6")
+                .baseUrl("https://provider.invalid")
+                .defaultModel("model-under-test")
                 .maxTokens(4096)
                 .build();
-        when(llmProviderFactory.resolveConfig(anyLong(), eq("anthropic"))).thenReturn(cfg);
-        when(llmProviderFactory.getProvider("anthropic")).thenReturn(llmProvider);
+        when(llmProviderFactory.resolveConfig(anyLong(), eq(null))).thenReturn(cfg);
+        when(llmProviderFactory.getProvider("provider-under-test")).thenReturn(llmProvider);
         when(llmProviderFactory.listConfiguredProviders(anyLong())).thenReturn(List.of());
 
         AiTranslateRequest request = AiTranslateRequest.builder()
@@ -181,14 +181,14 @@ class AiTranslationServiceIntegrationTest extends BaseIntegrationTest {
         i18nResourceService.create(buildResource(key, sourceLang, "损坏", "approved"));
 
         LlmProviderFactory.ProviderConfig cfg = LlmProviderFactory.ProviderConfig.builder()
-                .providerCode("anthropic")
+                .providerCode("provider-under-test")
                 .apiKey("test-key")
-                .baseUrl("https://api.anthropic.com")
-                .defaultModel("claude-sonnet-4-6")
+                .baseUrl("https://provider.invalid")
+                .defaultModel("model-under-test")
                 .maxTokens(4096)
                 .build();
-        when(llmProviderFactory.resolveConfig(anyLong(), eq("anthropic"))).thenReturn(cfg);
-        when(llmProviderFactory.getProvider("anthropic")).thenReturn(llmProvider);
+        when(llmProviderFactory.resolveConfig(anyLong(), eq(null))).thenReturn(cfg);
+        when(llmProviderFactory.getProvider("provider-under-test")).thenReturn(llmProvider);
         when(llmProviderFactory.listConfiguredProviders(anyLong())).thenReturn(List.of());
 
         // LLM returns non-JSON text
@@ -232,7 +232,7 @@ class AiTranslationServiceIntegrationTest extends BaseIntegrationTest {
         i18nResourceService.create(buildResource(key, sourceLang, sourceValue, "approved"));
 
         // No LLM configured
-        when(llmProviderFactory.resolveConfig(anyLong(), anyString())).thenReturn(null);
+        when(llmProviderFactory.resolveConfig(anyLong(), eq(null))).thenReturn(null);
         when(llmProviderFactory.listConfiguredProviders(anyLong())).thenReturn(List.of());
 
         AiTranslateRequest request = AiTranslateRequest.builder()

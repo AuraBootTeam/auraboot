@@ -37,6 +37,7 @@ class KbChunkIngestPipelineTest {
     @Mock private ChunkingService chunkingService;
     @Mock private EmbeddingService embeddingService;
     @Mock private JdbcTemplate jdbcTemplate;
+    @Mock private KnowledgeLineageService lineageService;
 
     private KbChunkIngestPipeline pipeline;
 
@@ -46,7 +47,10 @@ class KbChunkIngestPipelineTest {
 
     @BeforeEach
     void setUp() {
-        pipeline = new KbChunkIngestPipeline(chunkingService, embeddingService, jdbcTemplate);
+        pipeline = new KbChunkIngestPipeline(
+                chunkingService, embeddingService, jdbcTemplate, lineageService);
+        lenient().when(lineageService.beginIngest(anyLong(), anyString(), anyString()))
+                .thenReturn(new KnowledgeLineageService.IngestLineage("dv1", "ir1", 1));
     }
 
     @Test
@@ -60,6 +64,7 @@ class KbChunkIngestPipelineTest {
         assertThat(outcome.embeddedCount()).isZero();
         assertThat(outcome.failedCount()).isZero();
         verify(jdbcTemplate, never()).update(anyString(), any(Object[].class));
+        verify(lineageService).activateIngest(1L, "kb1", "doc1", "dv1", "ir1");
     }
 
     @Test
@@ -77,9 +82,9 @@ class KbChunkIngestPipelineTest {
         assertThat(outcome.failedCount()).isZero();
         // 2 pending inserts + 2 completed updates
         verify(jdbcTemplate, times(2)).update(contains("INSERT INTO ab_kb_chunk"),
-                any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         verify(jdbcTemplate, times(2)).update(contains("embedding_status = 'completed'"),
-                anyString(), anyString());
+                anyString(), anyLong(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -94,7 +99,9 @@ class KbChunkIngestPipelineTest {
 
         assertThat(outcome.embeddedCount()).isEqualTo(1);
         assertThat(outcome.failedCount()).isEqualTo(1);
-        verify(jdbcTemplate, times(1)).update(contains("embedding_status = 'failed'"), any(Object.class));
+        verify(jdbcTemplate, times(1)).update(
+                contains("embedding_status = 'failed'"),
+                anyLong(), anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -111,7 +118,9 @@ class KbChunkIngestPipelineTest {
         assertThat(outcome.embeddedCount()).isZero();
         assertThat(outcome.failedCount()).isEqualTo(2);
         // batch-failure path marks every stored chunk failed in one statement per chunk
-        verify(jdbcTemplate, times(2)).update(contains("embedding_status = 'failed'"), any(Object.class));
+        verify(jdbcTemplate, times(2)).update(
+                contains("embedding_status = 'failed'"),
+                anyLong(), anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -136,7 +145,7 @@ class KbChunkIngestPipelineTest {
         ArgumentCaptor<Object> metaCaptor = ArgumentCaptor.forClass(Object.class);
         verify(jdbcTemplate).update(contains("?::jsonb"),
                 any(), any(), any(), any(), any(), any(), any(), any(),
-                metaCaptor.capture(), any());
+                any(), any(), metaCaptor.capture(), any());
         assertThat(metaCaptor.getValue()).isEqualTo("{\"filePath\":\"x.md\",\"chunkIndex\":0}");
     }
 }

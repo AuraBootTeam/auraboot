@@ -399,12 +399,11 @@ public class AiSearchServiceImpl implements AiSearchService {
 
     private boolean isLlmAvailable(Long tenantId) {
         try {
-            LlmProviderFactory.ProviderConfig config = llmProviderFactory.resolveConfig(tenantId, "anthropic");
-            if (config != null && config.getApiKey() != null && !config.getApiKey().isBlank()) {
-                return true;
-            }
-            List<LlmProviderFactory.ProviderInfo> providers = llmProviderFactory.listConfiguredProviders(tenantId);
-            return !providers.isEmpty();
+            LlmProviderFactory.ProviderConfig config =
+                    llmProviderFactory.resolveConfig(tenantId, null);
+            return config != null
+                    && config.getApiKey() != null
+                    && !config.getApiKey().isBlank();
         } catch (Exception e) {
             log.debug("LLM availability check failed: {}", e.getMessage());
             return false;
@@ -412,15 +411,7 @@ public class AiSearchServiceImpl implements AiSearchService {
     }
 
     private LlmProviderFactory.ProviderConfig resolveFirstAvailableConfig(Long tenantId) {
-        LlmProviderFactory.ProviderConfig config = llmProviderFactory.resolveConfig(tenantId, "anthropic");
-        if (config != null) return config;
-
-        List<LlmProviderFactory.ProviderInfo> providers = llmProviderFactory.listConfiguredProviders(tenantId);
-        for (LlmProviderFactory.ProviderInfo info : providers) {
-            LlmProviderFactory.ProviderConfig c = llmProviderFactory.resolveConfig(tenantId, info.getProviderCode());
-            if (c != null) return c;
-        }
-        return null;
+        return llmProviderFactory.resolveConfig(tenantId, null);
     }
 
     private String extractTextContent(LlmChatResponse response) {

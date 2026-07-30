@@ -108,42 +108,13 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     private void grantAnnouncementManageToTestRole() {
-        Permission permission = permissionMapper.findByCode(MetaPermission.ANNOUNCEMENT_MANAGE);
-        if (permission == null) {
-            permission = new Permission();
-            permission.setPid(UniqueIdGenerator.generate());
-            permission.setCode(MetaPermission.ANNOUNCEMENT_MANAGE);
-            permission.setName("Manage announcements");
-            permission.setResourceType("dashboard");
-            permission.setResourceCode("dashboard:announcement");
-            permission.setAction("manage");
-            permission.setSource("test");
-            permission.setStatus("active");
-            permission.setDeletedFlag(false);
-            permission.setTenantId(getTestTenant().getId());
-            permission.setCreatedAt(java.time.Instant.now());
-            permission.setUpdatedAt(java.time.Instant.now());
-            permissionMapper.insert(permission);
-        }
-        boolean notAssigned = rolePermissionMapper.selectList(
-                new LambdaQueryWrapper<RolePermission>()
-                        .eq(RolePermission::getRoleId, getTestRole().getId())
-                        .eq(RolePermission::getPermissionId, permission.getId())
-                        .eq(RolePermission::getDeletedFlag, false)).isEmpty();
-        if (notAssigned) {
-            RolePermission rp = new RolePermission();
-            rp.setPid(UniqueIdGenerator.generate());
-            rp.setRoleId(getTestRole().getId());
-            rp.setPermissionId(permission.getId());
-            rp.setGrantType("grant");
-            rp.setStatus("active");
-            rp.setDeletedFlag(false);
-            rp.setTenantId(getTestTenant().getId());
-            rp.setCreatedAt(java.time.Instant.now());
-            rp.setUpdatedAt(java.time.Instant.now());
-            rolePermissionMapper.insert(rp);
-        }
-        userPermissionService.evictUserPermissions(getTestUser().getId());
+        grantCommittedPermissionToTestRole(
+                MetaPermission.ANNOUNCEMENT_MANAGE,
+                "dashboard",
+                "dashboard:announcement",
+                "manage",
+                "Manage announcements"
+        );
     }
 
     @AfterEach

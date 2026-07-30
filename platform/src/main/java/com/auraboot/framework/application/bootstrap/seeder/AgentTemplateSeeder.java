@@ -77,9 +77,9 @@ public class AgentTemplateSeeder {
 
         // Default execution_config for skills without special opt-in.
         String defaultExecutionConfig = "{}";
-        // report_analysis is a multi-hop reasoning skill — opt it in to Anthropic
-        // Extended Thinking by default. Read by StepLoopService.resolveThinkingConfig
-        // (mirrors ab_agent_definition.execution_config contract).
+        // report_analysis is a multi-hop reasoning skill — request the generic
+        // thinking capability. The selected adapter decides whether it can
+        // honor or explicitly reject/degrade that request.
         String reportAnalysisExecutionConfig =
                 "{\"thinking_enabled\":true,\"thinking_budget_tokens\":8000}";
 
@@ -271,10 +271,12 @@ public class AgentTemplateSeeder {
                 你是「客户运营复盘专员」。这是一个固定的季度客户结构复盘 playbook,严格按步骤执行,不要跳步、不要即兴发挥:
 
                 1. 调用 list:crm_account 拉取全部客户。只使用查询返回的真实记录,严禁编造客户名、数字或评级。
-                2. 按行业分组统计:每个行业的客户数与占比。
-                3. 按评级分组统计:A/B/C 各级客户数与占比,并算出 A 级客户占比。
-                4. 识别结构性风险:① 客户过度集中在单一行业(占比 > 40%);② 低评级(C)客户占比偏高;③ 某行业只剩 1 家客户(一旦流失即出现空白)。
-                5. 输出一份结构化复盘:
+                2. 先输出【事实样本】:逐条列出查询返回的真实客户名称(最多 10 家),作为本次复盘的可核验证据;即使行业或评级字段缺失也不得省略客户名称。
+                3. 按行业分组统计:每个行业的客户数与占比;字段缺失时明确写“数据缺失”,不得猜测。
+                4. 按评级分组统计:A/B/C 各级客户数与占比,并算出 A 级客户占比;字段缺失时明确写“数据缺失”,不得猜测。
+                5. 识别结构性风险:① 客户过度集中在单一行业(占比 > 40%);② 低评级(C)客户占比偏高;③ 某行业只剩 1 家客户(一旦流失即出现空白)。
+                6. 输出一份结构化复盘:
+                   - 【事实样本】真实客户名称列表
                    - 【总览】客户总数、行业分布、评级分布(关键数字加粗)
                    - 【结构风险】逐条列出识别到的风险,并指名具体是哪些客户或行业
                    - 【建议动作】针对薄弱行业与低评级客户,给出可执行的拓客/升级建议,每条以「建议:」开头
@@ -326,7 +328,7 @@ public class AgentTemplateSeeder {
                 UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
                 "tpl_aurabot_internal", "AuraBot 全功能助手",
                 "内部全功能AI助手模板，适合管理员和超级用户。掌握所有内置技能，可执行任意操作。",
-                "claude-sonnet-4-6",
+                null,
                 """
                 你是 AuraBot，{{tenantName}} 的智能企业助手。
                 你帮助用户理解业务数据、建议操作方案，并在授权范围内执行操作。
@@ -355,7 +357,7 @@ public class AgentTemplateSeeder {
                 UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
                 "tpl_approval_assistant", "审批助手",
                 "专注审批流程的AI助手模板。严守审批政策边界，适合业务审批场景。",
-                "claude-haiku-4-5-20251001",
+                null,
                 """
                 你是审批助手，专门协助处理 {{tenantName}} 的审批工作。
                 你的职责：
@@ -387,7 +389,7 @@ public class AgentTemplateSeeder {
                 UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
                 "tpl_customer_service", "客服机器人",
                 "对外部署的客服AI助手模板。权限最小化，专注客户问题解决，支持RAG知识库问答。",
-                "claude-haiku-4-5-20251001",
+                null,
                 """
                 你是 {{tenantName}} 的客服助手，负责解答客户咨询和处理常见问题。
                 你的职责：

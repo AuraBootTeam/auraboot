@@ -13,6 +13,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RetrievalResult {
+    private String kbPid;
+    private String documentPid;
+    private String documentVersionPid;
+    private String indexReleasePid;
     private String chunkPid;
     private String docName;
     private String kbName;
@@ -26,4 +30,7 @@ public class RetrievalResult {
     private double bm25Score = 0;
     @Builder.Default
     private double hybridScore = 0;
+    @Builder.Default
+    private double rerankScore = 0;
+    private String citationLocator;
 }

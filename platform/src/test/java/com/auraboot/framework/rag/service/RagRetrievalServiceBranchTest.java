@@ -31,6 +31,7 @@ class RagRetrievalServiceBranchTest {
     @Mock private KnowledgeBaseService kbService;
     @Mock private QueryRewriteService queryRewriteService;
     @Mock private JdbcTemplate jdbcTemplate;
+    @Mock private KnowledgeBaseAccessPolicy accessPolicy;
 
     private RagRetrievalService service;
     private RagRetrievalProperties props;
@@ -40,7 +41,7 @@ class RagRetrievalServiceBranchTest {
         props = new RagRetrievalProperties();
         service = new RagRetrievalService(embeddingService, kbService, queryRewriteService, jdbcTemplate,
                 new RagRetrievalMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()),
-                props);
+                props, accessPolicy);
         // Every retrieve(…, List.of("kb1"), …) below now runs an ownership check first:
         // resolveTargetKbs queries `... WHERE tenant_id = ? AND pid IN (?)` before searching, and
         // refuses if the requested pid is not owned. In these unit tests kb1 IS the tenant's, so the
@@ -48,8 +49,10 @@ class RagRetrievalServiceBranchTest {
         // single-vararg empty-list query `... AND status = 'active'` a couple of tests stub for
         // themselves.) These branch tests are about degradation and ranking, not the boundary; the
         // boundary itself is asserted in RagRetrievalTenantScopingIT against a real database.
-        lenient().when(jdbcTemplate.queryForList(anyString(), eq(String.class), eq(1L), eq("kb1")))
+        lenient().when(accessPolicy.resolveReadable(eq(1L), eq(List.of("kb1"))))
                 .thenReturn(List.of("kb1"));
+        lenient().when(accessPolicy.resolveReadable(eq(1L), eq(null)))
+                .thenReturn(List.of());
     }
 
     @Test
@@ -69,7 +72,7 @@ class RagRetrievalServiceBranchTest {
     void retrieveNoActiveKbs() {
         when(queryRewriteService.rewrite(anyString()))
                 .thenReturn(new QueryRewriteService.QueryRewriteResult("q", "q", false));
-        when(jdbcTemplate.queryForList(anyString(), eq(String.class), eq(1L)))
+        when(accessPolicy.resolveReadable(eq(1L), eq(null)))
                 .thenReturn(Collections.emptyList());
 
         List<RetrievalResult> result = service.retrieve(1L, "q", null, null, null);
@@ -81,7 +84,7 @@ class RagRetrievalServiceBranchTest {
     void retrieveNullFirstKb() {
         when(queryRewriteService.rewrite(anyString()))
                 .thenReturn(new QueryRewriteService.QueryRewriteResult("q", "q", false));
-        when(kbService.findKbByPid("kb1")).thenReturn(null);
+        when(kbService.findKb(1L, "kb1")).thenReturn(null);
 
         List<RetrievalResult> result = service.retrieve(1L, "q", List.of("kb1"), null, null);
         assertTrue(result.isEmpty());
@@ -94,7 +97,7 @@ class RagRetrievalServiceBranchTest {
                 .thenReturn(new QueryRewriteService.QueryRewriteResult("q", "q", false));
         KnowledgeBase kb = new KnowledgeBase();
         kb.setEmbeddingProvider("openai");
-        when(kbService.findKbByPid("kb1")).thenReturn(kb);
+        when(kbService.findKb(1L, "kb1")).thenReturn(kb);
         when(embeddingService.embed(eq(1L), eq("q"), eq("openai")))
                 .thenThrow(new RuntimeException("api down"));
         when(jdbcTemplate.queryForList(anyString(), any(Object[].class)))
@@ -113,7 +116,7 @@ class RagRetrievalServiceBranchTest {
                 .thenReturn(new QueryRewriteService.QueryRewriteResult("q", "q", false));
         KnowledgeBase kb = new KnowledgeBase();
         kb.setEmbeddingProvider("openai");
-        when(kbService.findKbByPid("kb1")).thenReturn(kb);
+        when(kbService.findKb(1L, "kb1")).thenReturn(kb);
         when(embeddingService.embed(eq(1L), eq("q"), eq("openai"))).thenReturn(new float[]{0.1f, 0.2f});
         lenient().when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
         when(queryRewriteService.rerank(any(), eq("q"), eq(20))).thenReturn(List.of());
@@ -176,7 +179,7 @@ class RagRetrievalServiceBranchTest {
                 .thenReturn(new QueryRewriteService.QueryRewriteResult(query, query, false));
         KnowledgeBase kb = new KnowledgeBase();
         kb.setEmbeddingProvider("openai");
-        when(kbService.findKbByPid("kb1")).thenReturn(kb);
+        when(kbService.findKb(1L, "kb1")).thenReturn(kb);
         when(embeddingService.embed(eq(1L), eq(query), eq("openai"))).thenReturn(null); // keyword-fallback
         lenient().when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
     }
@@ -219,7 +222,7 @@ class RagRetrievalServiceBranchTest {
                 .thenReturn(new QueryRewriteService.QueryRewriteResult(query, query, false));
         KnowledgeBase kb = new KnowledgeBase();
         kb.setEmbeddingProvider("openai");
-        when(kbService.findKbByPid("kb1")).thenReturn(kb);
+        when(kbService.findKb(1L, "kb1")).thenReturn(kb);
         when(embeddingService.embed(eq(1L), eq(query), eq("openai"))).thenReturn(new float[]{0.1f, 0.2f});
         lenient().when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
         // hybrid mode → real cosine distance present, so the vector-similarity leg gates.
@@ -238,7 +241,7 @@ class RagRetrievalServiceBranchTest {
                 .thenReturn(new QueryRewriteService.QueryRewriteResult(query, query, false));
         KnowledgeBase kb = new KnowledgeBase();
         kb.setEmbeddingProvider("openai");
-        when(kbService.findKbByPid("kb1")).thenReturn(kb);
+        when(kbService.findKb(1L, "kb1")).thenReturn(kb);
         when(embeddingService.embed(eq(1L), eq(query), eq("openai"))).thenReturn(new float[]{0.1f, 0.2f});
         lenient().when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(List.of());
         RetrievalResult near = chunk("the relevant chunk", 0.40);   // similarity 0.60 ≥ 0.20

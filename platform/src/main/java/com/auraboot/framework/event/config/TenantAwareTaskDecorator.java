@@ -1,5 +1,9 @@
 package com.auraboot.framework.event.config;
 
+import com.auraboot.framework.agent.identity.ExecutionPrincipal;
+import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelope;
+import com.auraboot.framework.agent.runtime.context.ContextEnvelopeContext;
 import com.auraboot.framework.application.tenant.MetaContext;
 import org.springframework.core.task.TaskDecorator;
 
@@ -18,15 +22,25 @@ public class TenantAwareTaskDecorator implements TaskDecorator {
         // roleIds, memberId, envId and the OTel trace id — so IM @AI / group-chat
         // @Async workers lost their environment scope and had a broken trace.
         MetaContext.Snapshot snapshot = MetaContext.snapshot();
-        if (snapshot == null) {
+        ExecutionPrincipal executionPrincipal =
+                ExecutionPrincipalContext.current().orElse(null);
+        ContextEnvelope contextEnvelope =
+                ContextEnvelopeContext.current().orElse(null);
+        if (snapshot == null && executionPrincipal == null && contextEnvelope == null) {
             return runnable;
         }
 
         return () -> {
-            MetaContext.restore(snapshot);
+            if (snapshot != null) {
+                MetaContext.restore(snapshot);
+            }
+            ExecutionPrincipalContext.restore(executionPrincipal);
+            ContextEnvelopeContext.restore(contextEnvelope);
             try {
                 runnable.run();
             } finally {
+                ContextEnvelopeContext.clear();
+                ExecutionPrincipalContext.clear();
                 MetaContext.clear();
             }
         };

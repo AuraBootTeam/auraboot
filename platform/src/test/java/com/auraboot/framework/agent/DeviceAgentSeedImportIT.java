@@ -83,7 +83,7 @@ class DeviceAgentSeedImportIT extends BaseIntegrationTest {
                 .name("Device Diagnostics Agent")
                 .description("Read-first device diagnostic agent (alarms / andon / equipment status; advise-only).")
                 .agentType("reactive")
-                .model("deepseek-chat")
+                .model(null)
                 .systemPrompt("You are the read-first Device Diagnostics Agent. Gather evidence, diagnose, advise only — never execute device control or write actions.")
                 .tools(READ_TOOLS)
                 .skills(List.of("dsl.query"))

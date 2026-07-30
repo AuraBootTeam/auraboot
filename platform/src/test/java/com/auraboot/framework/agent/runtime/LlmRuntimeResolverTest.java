@@ -96,6 +96,20 @@ class LlmRuntimeResolverTest {
     }
 
     @Test
+    @DisplayName("provider-default sentinel resolves to the configured provider model")
+    void providerDefaultSentinelResolvesWithoutBeingSentToTheProvider() {
+        Map<String, Object> agentDef = Map.of("model", LlmRuntimeResolver.PROVIDER_DEFAULT_MODEL);
+        when(providerFactory.getDefaultModel("qianwen")).thenReturn("qwen-plus");
+
+        assertThat(LlmRuntimeResolver.resolveAgentProviderCode(
+                objectMapper, providerFactory, agentDef)).isNull();
+        assertThat(LlmRuntimeResolver.resolveAgentModel(
+                providerFactory, agentDef, "qianwen")).isEqualTo("qwen-plus");
+        assertThat(LlmRuntimeResolver.resolveAgentModelForProvider(
+                providerFactory, agentDef, "qianwen")).isEqualTo("qwen-plus");
+    }
+
+    @Test
     @DisplayName("malformed guardrails do not prevent model based provider inference")
     void malformedGuardrailsDoNotPreventModelBasedProviderInference() {
         Map<String, Object> agentDef = Map.of(

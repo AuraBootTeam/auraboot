@@ -65,14 +65,16 @@ public class DocumentReconcileService {
             int attempts = ((Number) row.get("process_retry_count")).intValue() + 1;
 
             if (attempts > MAX_RETRIES) {
-                exhaust(docPid, (String) row.get("doc_name"), attempts - 1);
+                exhaust(tenantId, kbPid, docPid, (String) row.get("doc_name"), attempts - 1);
                 continue;
             }
 
             // Count the attempt before running it: a parse that reliably kills the worker must not
             // be able to retry forever.
             jdbcTemplate.update(
-                    "UPDATE ab_kb_document SET process_retry_count = ? WHERE pid = ?", attempts, docPid);
+                    "UPDATE ab_kb_document SET process_retry_count = ? "
+                            + "WHERE tenant_id = ? AND kb_id = ? AND pid = ?",
+                    attempts, tenantId, kbPid, docPid);
 
             if (reprocess(kbPid, docPid, tenantId, attempts)) {
                 recovered++;
@@ -93,7 +95,7 @@ public class DocumentReconcileService {
             MetaContext.setSystemTenantContext(tenantId);
         }
         try {
-            processingService.processDocumentNow(kbPid, docPid);
+            processingService.processDocumentNow(tenantId, kbPid, docPid);
         } finally {
             if (owns) {
                 MetaContext.clear();
@@ -103,7 +105,9 @@ public class DocumentReconcileService {
         // processDocumentNow swallows parse errors and records them on the row, so a normal return
         // proves nothing — read the resulting status back rather than counting the call as a win.
         String status = jdbcTemplate.queryForObject(
-                "SELECT status FROM ab_kb_document WHERE pid = ?", String.class, docPid);
+                "SELECT status FROM ab_kb_document "
+                        + "WHERE tenant_id = ? AND kb_id = ? AND pid = ?",
+                String.class, tenantId, kbPid, docPid);
         if ("completed".equals(status)) {
             metrics.recordDocumentReconcile("recovered", 1);
             log.info("Reclaimed stranded document {} (attempt {}/{})", docPid, attempt, MAX_RETRIES);
@@ -116,13 +120,19 @@ public class DocumentReconcileService {
         return false;
     }
 
-    private void exhaust(String docPid, String docName, int attempts) {
+    private void exhaust(
+            long tenantId,
+            String kbPid,
+            String docPid,
+            String docName,
+            int attempts) {
         jdbcTemplate.update(
                 "UPDATE ab_kb_document SET status = 'failed', error_message = ?, "
-                + "process_completed_at = NOW() WHERE pid = ?",
+                + "process_completed_at = NOW() "
+                + "WHERE tenant_id = ? AND kb_id = ? AND pid = ?",
                 "Parsing did not complete after " + attempts
                         + " attempts (the worker restarted mid-parse). Re-upload or reprocess the document.",
-                docPid);
+                tenantId, kbPid, docPid);
         metrics.recordDocumentReconcile("exhausted", 1);
         log.warn("Document {} ({}) permanently failed after {} parse attempts", docPid, docName, attempts);
     }

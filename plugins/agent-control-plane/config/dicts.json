@@ -16,6 +16,16 @@
         }
       },
       {
+        "value": "proactive",
+        "label": "Proactive Digital Employee",
+        "label:zh-CN": "主动履职数字员工",
+        "sortNo": 15,
+        "status": "enabled",
+        "extension": {
+          "color": "violet"
+        }
+      },
+      {
         "value": "copilot",
         "label": "Copilot",
         "label:zh-CN": "协作 Agent",
@@ -1015,58 +1025,45 @@
     ]
   },
   {
+    "code": "acp_agent_visibility",
+    "name": "Agent Visibility",
+    "name:zh-CN": "Agent 可见范围",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "private",
+        "label": "Private",
+        "label:zh-CN": "仅自己",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "team",
+        "label": "Team",
+        "label:zh-CN": "团队",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "tenant",
+        "label": "Tenant",
+        "label:zh-CN": "全组织",
+        "sortNo": 30,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
     "code": "acp_ai_model",
     "name": "AI Model",
     "name:zh-CN": "AI 模型",
     "dictType": "static",
     "items": [
       {
-        "value": "claude-opus-4-6",
-        "label": "Claude Opus 4.6",
-        "label:zh-CN": "Claude Opus 4.6",
+        "value": "provider-default",
+        "label": "Deployment default",
+        "label:zh-CN": "部署默认模型",
         "sortNo": 10,
-        "status": "enabled"
-      },
-      {
-        "value": "claude-sonnet-4-6",
-        "label": "Claude Sonnet 4.6",
-        "label:zh-CN": "Claude Sonnet 4.6",
-        "sortNo": 20,
-        "status": "enabled"
-      },
-      {
-        "value": "claude-haiku-4-5",
-        "label": "Claude Haiku 4.5",
-        "label:zh-CN": "Claude Haiku 4.5",
-        "sortNo": 30,
-        "status": "enabled"
-      },
-      {
-        "value": "gpt-4o",
-        "label": "GPT-4o",
-        "label:zh-CN": "GPT-4o",
-        "sortNo": 40,
-        "status": "enabled"
-      },
-      {
-        "value": "MiniMax-Text-01",
-        "label": "MiniMax-Text-01",
-        "label:zh-CN": "MiniMax-Text-01",
-        "sortNo": 45,
-        "status": "enabled"
-      },
-      {
-        "value": "abab6.5-chat",
-        "label": "abab6.5-chat",
-        "label:zh-CN": "abab6.5-chat",
-        "sortNo": 46,
-        "status": "enabled"
-      },
-      {
-        "value": "custom",
-        "label": "Custom",
-        "label:zh-CN": "自定义",
-        "sortNo": 50,
         "status": "enabled"
       }
     ]
@@ -1318,6 +1315,28 @@
         "extension": {
           "color": "amber"
         }
+      }
+    ]
+  },
+  {
+    "code": "acp_missed_run_policy",
+    "name": "Missed Run Policy",
+    "name:zh-CN": "错过触发策略",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "skip",
+        "label": "Skip",
+        "label:zh-CN": "跳过",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "catch_up_once",
+        "label": "Catch up once",
+        "label:zh-CN": "补跑一次",
+        "sortNo": 20,
+        "status": "enabled"
       }
     ]
   }

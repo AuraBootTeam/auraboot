@@ -5,7 +5,7 @@
     "displayName:en": "Create Agent Definition",
     "type": "create",
     "modelCode": "agent_definition",
-    "inputFields": ["agent_code", "name", "description", "avatar_url", "agent_type", "model", "system_prompt", "tools", "skills", "guardrails", "status", "personality", "expertise", "communication_style", "boundaries", "soul_goals"]
+    "inputFields": ["agent_code", "name", "description", "avatar_url", "agent_type", "model", "system_prompt", "tools", "skills", "guardrails", "status", "visibility", "personality", "expertise", "communication_style", "boundaries", "soul_goals", "proactive_policy"]
   },
   {
     "code": "acp:update_agent_definition",
@@ -13,7 +13,7 @@
     "displayName:en": "Update Agent Definition",
     "type": "update",
     "modelCode": "agent_definition",
-    "inputFields": ["agent_code", "name", "description", "avatar_url", "agent_type", "model", "system_prompt", "tools", "skills", "guardrails", "status", "personality", "expertise", "communication_style", "boundaries", "soul_goals"]
+    "inputFields": ["agent_code", "name", "description", "avatar_url", "agent_type", "model", "system_prompt", "tools", "skills", "guardrails", "status", "visibility", "personality", "expertise", "communication_style", "boundaries", "soul_goals", "proactive_policy"]
   },
   {
     "code": "acp:delete_agent_definition",
@@ -221,7 +221,7 @@
     "displayName:en": "Create Schedule",
     "type": "create",
     "modelCode": "agent_schedule",
-    "inputFields": ["mission_id", "title", "description", "schedule_type", "cron_expression", "interval_ms", "event_trigger", "task_template", "schedule_status", "timezone", "max_runs"]
+    "inputFields": ["agent_code", "mission_id", "title", "description", "schedule_type", "cron_expression", "interval_ms", "event_trigger", "task_template", "schedule_status", "timezone", "max_runs", "manager_member_id", "quiet_hours_start", "quiet_hours_end", "daily_run_budget", "concurrency_limit", "missed_run_policy", "agent_release_pid"]
   },
   {
     "code": "acp:update_agent_schedule",
@@ -229,7 +229,7 @@
     "displayName:en": "Update Schedule",
     "type": "update",
     "modelCode": "agent_schedule",
-    "inputFields": ["mission_id", "title", "description", "schedule_type", "cron_expression", "interval_ms", "event_trigger", "task_template", "schedule_status", "timezone", "max_runs"]
+    "inputFields": ["agent_code", "mission_id", "title", "description", "schedule_type", "cron_expression", "interval_ms", "event_trigger", "task_template", "schedule_status", "timezone", "max_runs", "manager_member_id", "quiet_hours_start", "quiet_hours_end", "daily_run_budget", "concurrency_limit", "missed_run_policy", "agent_release_pid"]
   },
   {
     "code": "acp:delete_agent_schedule",
