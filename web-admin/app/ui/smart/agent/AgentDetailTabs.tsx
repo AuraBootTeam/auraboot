@@ -166,6 +166,33 @@ type TabKey = 'profile' | 'tools' | 'knowledge' | 'memory' | 'releases' | 'runs'
 
 const AGENT_TYPES = ['reactive', 'copilot', 'autonomous', 'proactive', 'workflow'];
 const COMM_STYLES = ['professional', 'friendly', 'concise', 'detailed'];
+const DEPLOYMENT_CHANNELS = [
+  { value: 'web', labelKey: 'ai.colleagues.policy.channel.web', fallback: 'Web chat' },
+  { value: 'im_group', labelKey: 'ai.colleagues.policy.channel.imGroup', fallback: 'IM group' },
+  {
+    value: 'schedule',
+    labelKey: 'ai.colleagues.policy.channel.schedule',
+    fallback: 'Scheduled task',
+  },
+  { value: 'event', labelKey: 'ai.colleagues.policy.channel.event', fallback: 'Event' },
+  { value: 'webhook', labelKey: 'ai.colleagues.policy.channel.webhook', fallback: 'Webhook' },
+  { value: 'api', labelKey: 'ai.colleagues.policy.channel.api', fallback: 'API' },
+] as const;
+const DEPLOYMENT_INITIATORS = [
+  { value: 'human', labelKey: 'ai.colleagues.policy.initiator.human', fallback: 'Person' },
+  { value: 'system', labelKey: 'ai.colleagues.policy.initiator.system', fallback: 'System' },
+  {
+    value: 'schedule',
+    labelKey: 'ai.colleagues.policy.initiator.schedule',
+    fallback: 'Scheduled task',
+  },
+  { value: 'event', labelKey: 'ai.colleagues.policy.initiator.event', fallback: 'Event' },
+  {
+    value: 'agent_handoff',
+    labelKey: 'ai.colleagues.policy.initiator.agentHandoff',
+    fallback: 'AI colleague handoff',
+  },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Tab definitions
@@ -2324,6 +2351,7 @@ export function ReleasesTab({
   readOnly: boolean;
 }) {
   const { t } = useI18n();
+  const { timezone, formats } = useTimezone();
   const toast = useToastContext();
   const [releases, setReleases] = useState<AgentReleaseItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2641,20 +2669,20 @@ export function ReleasesTab({
                 {t('ai.colleagues.policy.channels', undefined, 'Allowed channels')}
               </legend>
               <div className="mt-2 flex flex-wrap gap-3">
-                {['web', 'im_group', 'schedule', 'event', 'webhook', 'api'].map((channel) => (
-                  <label key={channel} className="inline-flex items-center gap-2 text-sm">
+                {DEPLOYMENT_CHANNELS.map((channel) => (
+                  <label key={channel.value} className="inline-flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
                       checked={(deploymentPolicy.channelPolicy.allowedChannels ?? []).includes(
-                        channel,
+                        channel.value,
                       )}
                       disabled={readOnly || policySaving}
                       onChange={(event) =>
-                        updatePolicyArray('allowedChannels', channel, event.target.checked)
+                        updatePolicyArray('allowedChannels', channel.value, event.target.checked)
                       }
-                      data-testid={`deployment-channel-${channel}`}
+                      data-testid={`deployment-channel-${channel.value}`}
                     />
-                    {channel}
+                    {t(channel.labelKey, undefined, channel.fallback)}
                   </label>
                 ))}
               </div>
@@ -2665,20 +2693,20 @@ export function ReleasesTab({
                 {t('ai.colleagues.policy.initiators', undefined, 'Allowed initiator types')}
               </legend>
               <div className="mt-2 flex flex-wrap gap-3">
-                {['human', 'system', 'schedule', 'event', 'agent_handoff'].map((kind) => (
-                  <label key={kind} className="inline-flex items-center gap-2 text-sm">
+                {DEPLOYMENT_INITIATORS.map((kind) => (
+                  <label key={kind.value} className="inline-flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
                       checked={(
                         deploymentPolicy.channelPolicy.allowedInitiatorTypes ?? []
-                      ).includes(kind)}
+                      ).includes(kind.value)}
                       disabled={readOnly || policySaving}
                       onChange={(event) =>
-                        updatePolicyArray('allowedInitiatorTypes', kind, event.target.checked)
+                        updatePolicyArray('allowedInitiatorTypes', kind.value, event.target.checked)
                       }
-                      data-testid={`deployment-initiator-${kind}`}
+                      data-testid={`deployment-initiator-${kind.value}`}
                     />
-                    {kind}
+                    {t(kind.labelKey, undefined, kind.fallback)}
                   </label>
                 ))}
               </div>
@@ -2868,7 +2896,7 @@ export function ReleasesTab({
                 </p>
               </div>
               <time className="text-text-3 dark:text-text-3 text-sm">
-                {new Date(release.published_at).toLocaleString()}
+                {formatInTimezone(release.published_at, formats.datetime, timezone)}
               </time>
               {!readOnly && !release.deployed && (
                 <button
