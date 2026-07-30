@@ -61,10 +61,6 @@ const SALES_B_USER: QuoteRoleUser = {
   roleCodes: ['qo_sales'],
 };
 
-const MANUAL_UNIT_PRICE = 1.2345;
-const MANUAL_SUPPLIER = 'Smoke Manual Supplier';
-const MANUAL_REASON = 'sales role golden manual adoption';
-const MANUAL_VALID_UNTIL = '2026-12-31';
 const SET_COUNT = 200;
 const PRICE_FACTOR = 105;
 const RECENT_UNIT_PRICE = 0.021;
@@ -106,6 +102,18 @@ async function expectEditActionInsideDrawer(page: Page, actionTestId: string): P
   );
 }
 
+async function expectLegacyPricingActionsHidden(page: Page): Promise<void> {
+  await expect(
+    page.getByTestId('review-drawer-candidate-action-source_price'),
+    '“重新查价(此行)”已由两阶段“修正物料信息并重新查价”替代',
+  ).toHaveCount(0);
+  await expect(
+    page.getByTestId('review-drawer-candidate-action-record_manual_price'),
+    '“录入人工价”入口暂时下线，原 action、command 与用例保留',
+  ).toHaveCount(0);
+  await expect(page.getByTestId('review-drawer-edit-open')).toBeVisible();
+}
+
 function sheetRows(workbook: XLSX.WorkBook, sheetName: string): unknown[][] {
   const sheet = workbook.Sheets[sheetName];
   expect(sheet, `sheet ${sheetName} exists`).toBeTruthy();
@@ -127,9 +135,10 @@ function validateQuoteWorkbook(
   expect(Number(quoteSheet.G15?.v), '报价单!G15 单次订单量来自报价套数').toBe(expectedSetCount);
   expect(String(quoteSheet.H15?.f ?? '')).toContain('BOM明细');
   expect(String(quoteSheet.I15?.f ?? '')).toContain('加工明细');
-  expect(String(quoteSheet.J15?.f ?? '')).toBe('ROUND(K15-H15-I15,2)');
-  expect(String(quoteSheet.K15?.f ?? '')).toBe('IF(G15=0,0,ROUND(L15/G15,6))');
-  expect(String(quoteSheet.P15?.f ?? '')).toBe('ROUND(N15+M15+L15,2)');
+  expect(String(quoteSheet.J15?.f ?? '')).toBe('(H15+I15)*30%');
+  expect(String(quoteSheet.K15?.f ?? '')).toBe('ROUND((H15+I15+J15),2)');
+  expect(String(quoteSheet.L15?.f ?? '')).toBe('G15*K15');
+  expect(String(quoteSheet.P15?.f ?? '')).toBe('N15+M15+L15');
   const bomRows = sheetRows(workbook, 'BOM明细');
   expect(bomRows.length, 'BOM 明细 has header + imported lines').toBeGreaterThanOrEqual(3);
   for (const sheetName of workbook.SheetNames) {
@@ -214,6 +223,7 @@ async function adoptEvidence(
   await priceRow.click();
   const drawer = page.getByTestId('review-drawer');
   await expect(drawer).toBeVisible({ timeout: 20_000 });
+  await expectLegacyPricingActionsHidden(page);
   const candidate = page.getByTestId(`review-drawer-candidate-${evidenceId}`);
   await expect(candidate).toBeVisible({ timeout: 20_000 });
   await candidate.click();
@@ -755,67 +765,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         await setupContext.close();
       }
 
-      // 6. Record and adopt a manual price under the updated factor, then export again.
-      step = 'record manual price and export';
-      await page.getByRole('tab', { name: /BOM价格|BOM Price/ }).click();
-      const priceRow = page.getByTestId(`table-row-${lineId}`);
-      await expect(priceRow).toBeVisible({ timeout: 20_000 });
-      await priceRow.click();
-      const drawer = page.getByTestId('review-drawer');
-      await expect(drawer).toBeVisible({ timeout: 20_000 });
-      await page.getByTestId('review-drawer-candidate-action-record_manual_price').click();
-      // manual price collects via the platform FormDialog (standard DSL inputFields sugar)
-      await expect(page.getByTestId('form-dialog')).toBeVisible({ timeout: 15_000 });
-      await fillDialogField(page, 'unitPrice', String(MANUAL_UNIT_PRICE));
-      await fillDialogField(page, 'supplierName', MANUAL_SUPPLIER);
-      await fillDialogField(page, 'sourceNote', 'smoke sales golden');
-      await fillDialogField(page, 'reason', MANUAL_REASON);
-      await fillDialogField(page, 'validUntil', MANUAL_VALID_UNTIL);
-      await expect(page.getByTestId('form-dialog-field-unitPrice')).toHaveValue(
-        String(MANUAL_UNIT_PRICE),
-      );
-      await expect(page.getByTestId('form-dialog-field-validUntil')).toHaveValue(
-        MANUAL_VALID_UNTIL,
-      );
-      const manualResponsePromise = page.waitForResponse(
-        (response) =>
-          response
-            .url()
-            .includes('/api/meta/commands/execute/qo_quote_line_common:record_manual_price') &&
-          response.request().method() === 'POST',
-        { timeout: 30_000 },
-      );
-      await page.getByTestId('form-dialog-submit').click();
-      const manualBody = (await (await manualResponsePromise).json().catch(() => ({}))) as Record<
-        string,
-        unknown
-      >;
-      expect(
-        String(manualBody.code),
-        `record_manual_price response: ${JSON.stringify(manualBody).slice(0, 600)}`,
-      ).toBe('0');
-
-      await expect
-        .poll(
-          async () => {
-            const evidences = await queryDynamicRecords(page, 'qo_price_evidence_common', [
-              { fieldName: 'qo_pe_quote_line_id', operator: 'EQ', value: lineId },
-              { fieldName: 'qo_pe_source', operator: 'EQ', value: 'manual' },
-            ]);
-            if (evidences.length === 0) return 'no-evidence';
-            const line = await readDynamicRecord(page, 'qo_quote_line_common', lineId);
-            return `${Number(evidences[0].qo_pe_unit_price).toFixed(4)}|${Number(line.qo_ql_unit_cost).toFixed(4)}`;
-          },
-          { timeout: 20_000, intervals: [500, 1000, 1500] },
-        )
-        .toBe(
-          `${MANUAL_UNIT_PRICE.toFixed(4)}|${(MANUAL_UNIT_PRICE * (PRICE_FACTOR / 100)).toFixed(4)}`,
-        );
-
-      await executeCommand(page, 'qo_quote_common:rollup_cost', {}, quoteId, 'update');
-      await generateAndValidateWorkbook(page, quoteId, 'manual', SET_COUNT, testInfo);
-
-      // 7. Two-phase material reprice. Preview is deliberately non-mutating: the old material,
+      // 6. Two-phase material reprice. Preview is deliberately non-mutating: the old material,
       // accepted decision, evidence and generated Excel remain authoritative until the user
       // explicitly confirms. The browser calls the protocol-level local Yunhan fake so the gate
       // never spends live API quota.
@@ -1185,6 +1135,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         await openQuoteDetailFromList(adminPage, created);
         await adminPage.getByRole('tab', { name: /BOM价格|BOM Price/ }).click();
         await adminPage.getByTestId(`table-row-${lineId}`).click();
+        await expectLegacyPricingActionsHidden(adminPage);
         await adminPage.getByTestId('review-drawer-edit-open').click();
         await adminPage
           .getByTestId('review-drawer-edit-field-searchText')

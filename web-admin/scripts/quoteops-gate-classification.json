@@ -1,6 +1,7 @@
 {
   "$comment": "Classification of every pcba-solution quote/bom Playwright spec relative to the focused quoteops RELEASE gate (playwright.config.ts `quoteOpsCurrentSpecNames` / --project=quoteops, driven by aura-quote scripts/run-quoteops-bom-gate.sh). Every spec on disk MUST be in one of the two lists below (enforced by check-quoteops-gate-drift.mjs). This exists because a spec listed on the gate's command line but missing from quoteOpsCurrentSpecNames is DROPPED SILENTLY by the project testMatch and the gate goes GREEN without running it (2026-06 incident, OSS#1156 / DDR-2026-06-29 §8). Adding a new pcba-solution quote/bom spec forces a conscious choice here; it never silently escapes the gate.",
   "excludedFromQuoteOpsGate": {
-    "$comment": "Specs that intentionally run under the broader chromium / enterprise-* Playwright projects, NOT the focused quoteops release gate. Keep the reason accurate; if a spec should be part of the release gate, add it to quoteOpsCurrentSpecNames in playwright.config.ts instead of here."
+    "$comment": "Specs that intentionally do not run in the focused quoteops release gate. Keep the reason accurate; if a spec should be part of the release gate, add it to quoteOpsCurrentSpecNames in playwright.config.ts instead of here.",
+    "quote-bom-price-manual-adoption": "Temporarily excluded while the 录入人工价 UI entry is hidden. The spec and underlying action/command code remain intact for direct restoration."
   }
 }
