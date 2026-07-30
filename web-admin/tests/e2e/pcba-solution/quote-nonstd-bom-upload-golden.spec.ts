@@ -6,7 +6,9 @@ import {
   openQuoteDetailFromList,
   queryDynamicRecords,
   seedQuoteForCorrectedBomUpload,
+  setYunhanMockScenario,
   type CreatedRows,
+  yunhanMockControlUrl,
 } from './quote-e2e-helpers';
 
 function parseSnapshot(value: unknown): Record<string, unknown> {
@@ -48,9 +50,18 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
   test('uploads non-standard BOM and automatically runs Yunhan pricing + process-fee matching', async ({
     page,
   }, testInfo) => {
+    const mpnSuffix = `-E2E-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+    const expectedMpns = [
+      `1N4148W${mpnSuffix}`,
+      `CL10B104KB8NNNC${mpnSuffix}`,
+      `RC0603FR-0710KL${mpnSuffix}`,
+      `WMF2400TEE${mpnSuffix}`,
+    ];
     const workbookPath = createNonStandardBomWorkbook(
       testInfo.outputPath('customer-nonstd-bom-e2e.xlsx'),
+      mpnSuffix,
     );
+    await setYunhanMockScenario(page, 'release-default');
     const consoleIssues: string[] = [];
     page.on('console', (message) => {
       const text = message.text();
@@ -131,14 +142,9 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
       { fieldName: 'qo_ql_quote_id', operator: 'EQ', value: created.quoteId },
     ]);
     expect(quoteLines).toHaveLength(4);
-    expect(quoteLines.map((row) => String(row.qo_ql_mpn)).sort()).toEqual([
-      '1N4148W',
-      'CL10B104KB8NNNC',
-      'RC0603FR-0710KL',
-      'WMF2400TEE',
-    ]);
+    expect(quoteLines.map((row) => String(row.qo_ql_mpn)).sort()).toEqual(expectedMpns);
 
-    const resistorLine = quoteLines.find((row) => row.qo_ql_mpn === 'WMF2400TEE');
+    const resistorLine = quoteLines.find((row) => row.qo_ql_mpn === `WMF2400TEE${mpnSuffix}`);
     expect(resistorLine, 'the blank-package 0201 resistor line must be imported').toBeTruthy();
     expect(String(resistorLine?.qo_ql_package ?? '')).toBe('');
     expect(Number(resistorLine?.qo_ql_qty)).toBe(3);
@@ -185,24 +191,20 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
                   String(parseSnapshot(row.qo_pe_snapshot).matchedBy),
                 ),
               ),
-            // At least one line must have been priced by a *live* Yunhan call this run, not served
-            // from the recent-price cache — otherwise a stale database lets this golden pass while
-            // the upload lane is completely broken.
-            //
-            // This used to also require `qo_pe_source_ref === 'yunhan:refresh'`, which quietly made
-            // it assert something else: `<source>:refresh` is only the placeholder written while the
-            // row is pending; onCaptured overwrites it with the Yunhan goods id and only onNotFound
-            // leaves it in place. So the check really meant "some line was NOT found", and passed
-            // because the fixture always happened to contain one unmatched row. Improving the match
-            // rate then turned it red — a green that depended on the product working *less* well.
-            freshYunhanRequestObserved: evidence.some((row) => {
-              const snapshot = parseSnapshot(row.qo_pe_snapshot);
-              return (
-                snapshot.commandCode === 'qo_quote_common:batch_source_prices' &&
-                String(snapshot.refreshedAt ?? '').length > 0 &&
-                String(snapshot.matchedBy) !== 'recent_cache'
-              );
-            }),
+            // The scenario reset clears the managed mock's request log before upload. Combined with
+            // per-run unique MPNs, an observed upload-bom request proves this run crossed the real
+            // protocol boundary instead of being satisfied by retained recent-cache evidence.
+            mockUploadRequestObserved: await page.request
+              .get(`${yunhanMockControlUrl()}/__control/requests`)
+              .then(async (response) => {
+                expect(response.ok(), 'read managed Yunhan mock request log').toBe(true);
+                const body = (await response.json()) as {
+                  requests?: Array<{ path?: unknown }>;
+                };
+                return (body.requests ?? []).some((request) =>
+                  String(request.path ?? '').endsWith('/search-v1/products/upload-bom'),
+                );
+              }),
           };
         },
         { timeout: 90_000, intervals: [1_000, 2_000, 3_000] },
@@ -213,7 +215,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
         noBlankSourceRef: true,
         notFoundUsesRefreshRef: true,
         capturedUsesAutoLane: true,
-        freshYunhanRequestObserved: true,
+        mockUploadRequestObserved: true,
       });
 
     // The same UI upload must also have triggered process-point calculation. The matching row
