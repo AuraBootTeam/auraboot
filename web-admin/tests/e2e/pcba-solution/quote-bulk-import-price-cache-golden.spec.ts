@@ -16,20 +16,19 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
- * Golden: BOM import materializes correlated rows in bulk, and historical recent-cache evidence
- * never bypasses the managed pricing connector.
+ * Golden: BOM import materializes correlated rows in bulk, and every current row crosses the
+ * managed Yunhan connector even when matching historical evidence exists.
  *
  * Guards the two delivered performance features:
  *   1. bulk import (platform bulkCreate + three-phase handler) — the risk of batching is *id
  *      correlation*, so this asserts the bidirectional import-row <-> quote-line linkage row by row
  *      (qo_bir_quote_line_id -> line, line.qo_ql_source_ref -> back, and same-row MPN). An
  *      off-by-one / mis-ordered batch fails here.
- *   2. historical cache bypass — even when an MPN carries a fresh legacy recent-cache row, every
- *      imported line is re-sourced through the managed connector. The historical row remains
- *      immutable audit evidence and is never the current decision source.
+ *   2. current sourcing authority — historical recent-cache evidence remains readable for audit
+ *      but must never satisfy a new pricing run or create another {@code recent_cache} result.
  *
  * Deterministic by construction: the import runs against the managed mock's not-found scenario,
- * then legacy cache evidence is seeded explicitly before the normal pricing scenario is restored.
+ * then historical evidence is seeded explicitly before the normal pricing scenario is restored.
  * The managed mock request log proves this run crossed the real connector boundary.
  */
 
@@ -37,7 +36,8 @@ import path from 'node:path';
 // database must never be able to satisfy a later run's cache assertions.
 const RUN_ID = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.toUpperCase();
 const SYNTHETIC_MPNS = ['A1', 'B2', 'C3'].map((suffix) => `E2E-BULKCACHE-${RUN_ID}-${suffix}`);
-const CACHED_UNIT_PRICE = 0.1234;
+const HISTORICAL_UNIT_PRICE = 0.1234;
+const HISTORICAL_SOURCE_REF = `golden:historical-cache-seed:${RUN_ID}`;
 
 function createSyntheticBomWorkbook(filePath: string): string {
   mkdirSync(path.dirname(filePath), { recursive: true });
@@ -64,10 +64,10 @@ function parseSnapshot(value: unknown): Record<string, unknown> {
   }
 }
 
-test.describe('QuoteOps bulk import + historical cache bypass golden', () => {
+test.describe('QuoteOps bulk import + current sourcing golden', () => {
   test.describe.configure({ timeout: 300_000 });
 
-  test('imports correlated rows in bulk and re-sources every MPN despite historical cache rows', async ({
+  test('imports correlated rows in bulk and ignores historical recent-cache evidence', async ({
     page,
   }, testInfo) => {
     await setYunhanMockScenario(page, 'reprice-v1');
@@ -183,7 +183,7 @@ test.describe('QuoteOps bulk import + historical cache bypass golden', () => {
         'every BOM row must produce its quote line',
       ).toEqual([...SYNTHETIC_MPNS].sort());
 
-      // ── 3. historical cache bypass: seed legacy cache evidence, then source ──
+      // ── 3. seed historical cache evidence, then prove it is never adopted ──
       // qo_pe_valid_until is a DATE column — the platform rejects datetime values for it.
       const validUntil = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
       for (const mpn of SYNTHETIC_MPNS) {
@@ -195,12 +195,16 @@ test.describe('QuoteOps bulk import + historical cache bypass golden', () => {
             qo_pe_quote_line_id: `GOLDEN-CACHE-SRC-${mpn}`,
             qo_pe_part_no: mpn,
             qo_pe_source: 'yunhan',
-            qo_pe_source_ref: 'golden:cache-seed',
+            qo_pe_source_ref: HISTORICAL_SOURCE_REF,
             qo_pe_status: 'captured',
-            qo_pe_unit_price: CACHED_UNIT_PRICE,
+            qo_pe_unit_price: HISTORICAL_UNIT_PRICE,
             qo_pe_currency: 'CNY',
             qo_pe_valid_until: validUntil,
-            qo_pe_snapshot: JSON.stringify({ matchedBy: 'recent_cache', historicalSeed: true }),
+            qo_pe_snapshot: JSON.stringify({
+              matchedBy: 'recent_cache',
+              historicalSeed: true,
+              reusedFromEvidence: `GOLDEN-LEGACY-${mpn}`,
+            }),
           },
           created.rows,
         );
@@ -256,7 +260,7 @@ test.describe('QuoteOps bulk import + historical cache bypass golden', () => {
         await Promise.all(
           SYNTHETIC_MPNS.map((mpn) =>
             queryDynamicRecords(page, 'qo_price_evidence_common', [
-              { fieldName: 'qo_pe_source_ref', operator: 'EQ', value: 'golden:cache-seed' },
+              { fieldName: 'qo_pe_source_ref', operator: 'EQ', value: HISTORICAL_SOURCE_REF },
               { fieldName: 'qo_pe_part_no', operator: 'EQ', value: mpn },
             ]),
           ),
@@ -268,7 +272,7 @@ test.describe('QuoteOps bulk import + historical cache bypass golden', () => {
           (e) =>
             parseSnapshot(e.qo_pe_snapshot).matchedBy === 'recent_cache' &&
             parseSnapshot(e.qo_pe_snapshot).historicalSeed === true &&
-            String(e.qo_pe_unit_price ?? '').startsWith(String(CACHED_UNIT_PRICE)),
+            String(e.qo_pe_unit_price ?? '').startsWith(String(HISTORICAL_UNIT_PRICE)),
         ),
         'legacy cache evidence must remain immutable, auditable, and detached from current lines',
       ).toBe(true);

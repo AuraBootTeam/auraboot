@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
+import java.net.ConnectException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -96,6 +97,7 @@ class CommandHandlerAsyncTaskExecutorTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getErrorMessage()).contains("No plugin command handler");
+        assertThat(result.isRetryable()).isFalse();
     }
 
     @Test
@@ -114,7 +116,22 @@ class CommandHandlerAsyncTaskExecutorTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getErrorMessage()).contains("source_file_id is required");
+        assertThat(result.isRetryable()).isFalse();
         assertThat(DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test
+    void marksTypedTransientInfrastructureFailureRetryable() throws Exception {
+        CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(handler.execute(org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new ConnectException("provider temporarily unreachable"));
+        when(extensionRegistry.getCommandHandler(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(Optional.of(handler));
+
+        AsyncTaskResult result = executor.execute(params("bom:import_material_library"), noop);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.isRetryable()).isTrue();
     }
 
     @Test
@@ -174,5 +191,6 @@ class CommandHandlerAsyncTaskExecutorTest {
         AsyncTaskResult result = executor.execute(params(null), noop);
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getErrorMessage()).contains("handlerCode");
+        assertThat(result.isRetryable()).isFalse();
     }
 }

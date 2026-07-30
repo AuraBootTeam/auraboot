@@ -68,8 +68,33 @@ const PRICE_FACTOR = 105;
 const RECENT_UNIT_PRICE = 0.021;
 const YUNHAN_UNIT_PRICE = 0.0163;
 const REPRICE_MPN = 'TEST-REPRICE-0603';
+const SQL_BUDGET = {
+  preview: Number(process.env.QUOTE_SQL_BUDGET_PREVIEW ?? 100),
+  confirm: Number(process.env.QUOTE_SQL_BUDGET_CONFIRM ?? 500),
+  excel: Number(process.env.QUOTE_SQL_BUDGET_EXCEL ?? 250),
+} as const;
 
 type ForbiddenHit = { step: string; url: string; status: number };
+
+async function assertSqlBudget(
+  response: Response,
+  label: string,
+  budget: number,
+  testInfo: TestInfo,
+): Promise<void> {
+  expect(Number.isInteger(budget) && budget > 0, `${label} SQL budget must be positive`).toBe(true);
+  const rawCount = response.headers()['x-sql-count'];
+  expect(rawCount, `${label} must expose X-SQL-Count from the real backend`).toBeTruthy();
+  const count = Number(rawCount);
+  expect(Number.isInteger(count) && count >= 0, `${label} invalid X-SQL-Count=${rawCount}`).toBe(
+    true,
+  );
+  await testInfo.attach(`sql-budget-${label}.json`, {
+    body: JSON.stringify({ label, count, budget, url: response.url() }, null, 2),
+    contentType: 'application/json',
+  });
+  expect(count, `${label} SQL count ${count} exceeds budget ${budget}`).toBeLessThanOrEqual(budget);
+}
 
 async function fillDialogField(page: Page, field: string, value: string): Promise<void> {
   const input = page.getByTestId(`form-dialog-field-${field}`);
@@ -91,7 +116,10 @@ function pricingCompletionModal(page: Page) {
 async function dismissPricingCompletion(page: Page): Promise<void> {
   const modal = pricingCompletionModal(page);
   if (!(await modal.isVisible().catch(() => false))) return;
-  await modal.getByRole('button', { name: /^(关闭|Close)$/ }).last().click();
+  await modal
+    .getByRole('button', { name: /^(关闭|Close)$/ })
+    .last()
+    .click();
   await expect(modal).toBeHidden({ timeout: 15_000 });
 }
 
@@ -127,7 +155,10 @@ async function updateQuotePricingInputs(
   ).toBe('0');
   const completionModal = pricingCompletionModal(page);
   await expect(completionModal).toBeVisible({ timeout: 60_000 });
-  await completionModal.getByRole('button', { name: /^(关闭|Close)$/ }).last().click();
+  await completionModal
+    .getByRole('button', { name: /^(关闭|Close)$/ })
+    .last()
+    .click();
   await expect(completionModal).toBeHidden({ timeout: 15_000 });
   await expect(page.getByTestId('form-dialog')).toBeHidden();
 }
@@ -277,7 +308,9 @@ async function generateAndValidateWorkbook(
   );
   const downloadPromise = page.waitForEvent('download', { timeout: 60_000 });
   await action.click();
-  const body = (await (await responsePromise).json().catch(() => ({}))) as Record<string, unknown>;
+  const response = await responsePromise;
+  await assertSqlBudget(response, `excel-${label}`, SQL_BUDGET.excel, testInfo);
+  const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   expect(
     String(body.code),
     `generate_document(${label}): ${JSON.stringify(body).slice(0, 600)}`,
@@ -823,7 +856,14 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         { timeout: 60_000 },
       );
       await page.getByTestId('review-drawer-edit-submit').click();
-      const previewBody = (await (await previewResponsePromise).json().catch(() => ({}))) as Record<
+      const previewResponse = await previewResponsePromise;
+      await assertSqlBudget(
+        previewResponse,
+        'reprice-preview-initial',
+        SQL_BUDGET.preview,
+        testInfo,
+      );
+      const previewBody = (await previewResponse.json().catch(() => ({}))) as Record<
         string,
         unknown
       >;
@@ -927,7 +967,21 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         .getByTestId('review-drawer-edit-field-searchText')
         .locator('input')
         .fill(REPRICE_MPN);
+      const cancelPreviewResponsePromise = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response
+            .url()
+            .includes('/api/meta/commands/execute/qo_quote_line_common:preview_reprice'),
+        { timeout: 60_000 },
+      );
       await page.getByTestId('review-drawer-edit-submit').click();
+      await assertSqlBudget(
+        await cancelPreviewResponsePromise,
+        'reprice-preview-before-cancel',
+        SQL_BUDGET.preview,
+        testInfo,
+      );
       await expect(page.getByTestId('review-drawer-edit-preview')).toBeVisible({
         timeout: 20_000,
       });
@@ -977,9 +1031,17 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         { timeout: 60_000 },
       );
       await page.getByTestId('review-drawer-edit-submit').click();
-      const secondPreviewBody = (await (await secondPreviewResponsePromise)
-        .json()
-        .catch(() => ({}))) as Record<string, unknown>;
+      const secondPreviewResponse = await secondPreviewResponsePromise;
+      await assertSqlBudget(
+        secondPreviewResponse,
+        'reprice-preview-before-confirm',
+        SQL_BUDGET.preview,
+        testInfo,
+      );
+      const secondPreviewBody = (await secondPreviewResponse.json().catch(() => ({}))) as Record<
+        string,
+        unknown
+      >;
       expect(String(secondPreviewBody.code), JSON.stringify(secondPreviewBody).slice(0, 800)).toBe(
         '0',
       );
@@ -995,7 +1057,9 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         { timeout: 60_000 },
       );
       await page.getByTestId('review-drawer-edit-confirm').click();
-      const confirmBody = (await (await confirmResponsePromise).json().catch(() => ({}))) as Record<
+      const confirmResponse = await confirmResponsePromise;
+      await assertSqlBudget(confirmResponse, 'reprice-confirm', SQL_BUDGET.confirm, testInfo);
+      const confirmBody = (await confirmResponse.json().catch(() => ({}))) as Record<
         string,
         unknown
       >;
@@ -1171,7 +1235,21 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
           .locator('input')
           .fill(REPRICE_MPN);
         await expectEditActionInsideDrawer(adminPage, 'review-drawer-edit-submit');
+        const adminPreviewResponsePromise = adminPage.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            response
+              .url()
+              .includes('/api/meta/commands/execute/qo_quote_line_common:preview_reprice'),
+          { timeout: 60_000 },
+        );
         await adminPage.getByTestId('review-drawer-edit-submit').click();
+        await assertSqlBudget(
+          await adminPreviewResponsePromise,
+          'admin-reprice-preview',
+          SQL_BUDGET.preview,
+          testInfo,
+        );
         const adminPreview = adminPage.getByTestId('review-drawer-edit-preview');
         await expect(adminPreview).toBeVisible({ timeout: 20_000 });
         await adminPage
@@ -1193,9 +1271,17 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
           { timeout: 60_000 },
         );
         await adminPage.getByTestId('review-drawer-edit-confirm').click();
-        const adminConfirmBody = (await (await adminConfirmResponsePromise)
-          .json()
-          .catch(() => ({}))) as Record<string, unknown>;
+        const adminConfirmResponse = await adminConfirmResponsePromise;
+        await assertSqlBudget(
+          adminConfirmResponse,
+          'admin-reprice-confirm',
+          SQL_BUDGET.confirm,
+          testInfo,
+        );
+        const adminConfirmBody = (await adminConfirmResponse.json().catch(() => ({}))) as Record<
+          string,
+          unknown
+        >;
         expect(String(adminConfirmBody.code), JSON.stringify(adminConfirmBody).slice(0, 1000)).toBe(
           '0',
         );

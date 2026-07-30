@@ -51,6 +51,7 @@ test.describe('PCBA quote BOM price ladder + MOQ warning', () => {
       );
       expect(ladderRows).toEqual(
         expect.arrayContaining([
+          '当前数量区间 1000–2999 0.009 × 100% → 0.009',
           '100–999 0.0092 0.0092',
           '1000–2999 当前 0.009 0.009',
           '50000+ 0.0082 0.0082',

@@ -4,6 +4,7 @@ import com.auraboot.framework.meta.dto.AsyncTaskSubmitRequest;
 import com.auraboot.framework.meta.entity.AsyncTask;
 import com.auraboot.framework.meta.mapper.AsyncTaskMapper;
 import com.auraboot.framework.meta.service.AsyncTaskExecutor;
+import com.auraboot.framework.meta.service.AsyncTaskResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,11 +40,12 @@ class AsyncTaskServiceImplTest {
     private AsyncTaskMapper asyncTaskMapper;
     private AsyncTaskServiceImpl service;
     private AsyncTaskServiceImpl selfProxy;
+    private AsyncTaskExecutor executor;
 
     @BeforeEach
     void setUp() {
         asyncTaskMapper = mock(AsyncTaskMapper.class);
-        AsyncTaskExecutor executor = mock(AsyncTaskExecutor.class);
+        executor = mock(AsyncTaskExecutor.class);
         when(executor.getTaskType()).thenReturn("command-handler");
 
         service = new AsyncTaskServiceImpl(asyncTaskMapper, List.of(executor));
@@ -100,5 +102,46 @@ class AsyncTaskServiceImplTest {
         service.submitTask(request(), 123L, 45L);
 
         verify(selfProxy, times(1)).executeTaskAsync(eq(1L), eq(123L));
+    }
+
+    @Test
+    void deterministicFailureIsTerminalWithoutWholeTaskRetry() {
+        AsyncTask task = executableTask();
+        when(asyncTaskMapper.selectById(1L)).thenReturn(task);
+        when(executor.execute(any(), any()))
+                .thenReturn(AsyncTaskResult.nonRetryableFailure("invalid quote state"));
+
+        service.executeTaskAsync(1L, 123L);
+
+        assertThat(task.getStatus()).isEqualTo(AsyncTask.STATUS_FAILED);
+        assertThat(task.getRetryCount()).isZero();
+        assertThat(task.getErrorMessage()).isEqualTo("invalid quote state");
+        verify(selfProxy, never()).executeTaskAsync(anyLong(), anyLong());
+    }
+
+    @Test
+    void retryableFailureSchedulesOneWholeTaskRetry() {
+        AsyncTask task = executableTask();
+        when(asyncTaskMapper.selectById(1L)).thenReturn(task);
+        when(executor.execute(any(), any()))
+                .thenReturn(AsyncTaskResult.retryableFailure("connection refused"));
+
+        service.executeTaskAsync(1L, 123L);
+
+        assertThat(task.getStatus()).isEqualTo(AsyncTask.STATUS_PENDING);
+        assertThat(task.getRetryCount()).isEqualTo(1);
+        verify(selfProxy, times(1)).executeTaskAsync(1L, 123L);
+    }
+
+    private AsyncTask executableTask() {
+        AsyncTask task = new AsyncTask();
+        task.setId(1L);
+        task.setTenantId(123L);
+        task.setTaskCode("TASK-1");
+        task.setTaskType("command-handler");
+        task.setStatus(AsyncTask.STATUS_PENDING);
+        task.setRetryCount(0);
+        task.setMaxRetries(3);
+        return task;
     }
 }
