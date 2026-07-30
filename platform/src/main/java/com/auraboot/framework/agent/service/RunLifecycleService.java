@@ -182,14 +182,17 @@ public class RunLifecycleService {
 
     void failRun(Long tenantId, String runPid, String taskPid, LocalDateTime startedAt, String error) {
         LocalDateTime now = LocalDateTime.now();
+        String diagnostic = error == null || error.isBlank()
+                ? "Agent execution failed without a diagnostic"
+                : error;
         Map<String, Object> runUpdate = new HashMap<>();
         runUpdate.put("run_status", "failed");
         runUpdate.put("completed_at", now);
         runUpdate.put("duration_ms", ChronoUnit.MILLIS.between(startedAt, now));
-        runUpdate.put("error_message", error);
+        runUpdate.put("error_message", diagnostic);
         runUpdate.put("updated_at", now);
         dynamicDataMapper.update("ab_agent_run", runUpdate, Map.of("pid", runPid));
-        failTask(tenantId, taskPid, error);
+        failTask(tenantId, taskPid, diagnostic);
     }
 
     void failTask(Long tenantId, String taskPid, String error) {

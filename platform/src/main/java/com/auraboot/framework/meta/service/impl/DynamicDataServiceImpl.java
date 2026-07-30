@@ -37,6 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.*;
@@ -139,6 +140,34 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     // Lazy lookup to break circular dependency: DynamicDataService → AutomationTriggerService → CreateRecordExecutor → DynamicDataService
     private AutomationTriggerService getAutomationTriggerService() {
         return applicationContext.getBean(AutomationTriggerService.class);
+    }
+
+    /**
+     * Automation handlers execute asynchronously and may immediately re-read the record. Submitting
+     * them before the surrounding CRUD transaction commits creates a race where a valid record is
+     * reported as missing. Register against the transaction boundary when one exists; direct
+     * non-transactional callers retain immediate dispatch.
+     */
+    private void triggerAutomationAfterCommit(String description, Runnable trigger) {
+        Runnable safeTrigger = () -> {
+            try {
+                trigger.run();
+            } catch (Exception e) {
+                log.error("Failed to trigger {}: {}", description, logSafe(e.getMessage()), e);
+            }
+        };
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+                && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            safeTrigger.run();
+                        }
+                    });
+            return;
+        }
+        safeTrigger.run();
     }
 
     // Lazy lookup (mirrors getAutomationTriggerService) for F3 record-level SLA activation.
@@ -1230,12 +1259,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
 
         // Trigger automations for record creation
-        try {
-            getAutomationTriggerService().onRecordCreate(modelCode, recordIdValue, createdRecord);
-        } catch (Exception e) {
-            log.error("Failed to trigger automations for create: model={}, id={}: {}",
-                    logSafe(modelCode), logSafe(recordIdValue), logSafe(e.getMessage()), e);
-        }
+        Map<String, Object> automationRecord = new LinkedHashMap<>(createdRecord);
+        triggerAutomationAfterCommit(
+                "automations for create: model=" + logSafe(modelCode)
+                        + ", id=" + logSafe(recordIdValue),
+                () -> getAutomationTriggerService()
+                        .onRecordCreate(modelCode, recordIdValue, automationRecord));
 
         // F3: activate record-level SLA (targetType=RECORD) for this model, if any.
         try {
@@ -1619,12 +1648,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
 
             // Trigger automations for record update
-            try {
-                getAutomationTriggerService().onRecordUpdate(modelCode, recordId, existingRecord, updatedRecord);
-            } catch (Exception e) {
-                log.error("Failed to trigger automations for update: model={}, id={}: {}",
-                        logSafe(modelCode), logSafe(recordId), logSafe(e.getMessage()), e);
-            }
+            Map<String, Object> automationBefore = new LinkedHashMap<>(existingRecord);
+            Map<String, Object> automationAfter = new LinkedHashMap<>(updatedRecord);
+            triggerAutomationAfterCommit(
+                    "automations for update: model=" + logSafe(modelCode)
+                            + ", id=" + logSafe(recordId),
+                    () -> getAutomationTriggerService().onRecordUpdate(
+                            modelCode, recordId, automationBefore, automationAfter));
 
             return updatedRecord;
 
