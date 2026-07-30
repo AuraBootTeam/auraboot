@@ -22,6 +22,7 @@ import {
   waitForDynamicPageLoad,
   waitForFormReady,
   findRowInPaginatedList,
+  clickRowActionByLocator,
 } from '../helpers/index';
 import { expectAcpUiPage, gotoAcpUiPage, toAcpUiPath } from './route-helpers';
 
@@ -575,21 +576,16 @@ test.describe('ACP Exception Handling & Interaction Feedback', () => {
     if (!row) throw new Error(`Created mission "${deleteMissionTitle}" is missing from the list`);
     await expect(row).toBeVisible({ timeout: 5000 });
 
-    // Click delete on the row
-    const deleteBtn = row
-      .locator('button:has-text("删除"), button:has-text("Delete"), [data-testid*="delete"]')
-      .first();
-    await expect(deleteBtn, 'Created mission must expose its delete action').toBeVisible({
-      timeout: 5000,
-    });
-
     const commandResponsePromise = page
       .waitForResponse((r) => r.url().includes('/commands/execute/') && r.status() === 200, {
         timeout: 10000,
       })
       .catch(() => null);
 
-    await deleteBtn.click();
+    // Secondary actions are intentionally grouped in the row's overflow menu.
+    // The shared helper checks both the direct slot and the real portal-rendered
+    // menu, and fails closed when the delete action is absent.
+    await clickRowActionByLocator(page, row, 'delete', '删除');
 
     // A confirm dialog should appear — accept it
     const dialog = page.locator(
@@ -650,14 +646,7 @@ test.describe('ACP Exception Handling & Interaction Feedback', () => {
     if (!row) throw new Error(`Created mission "${confirmMissionTitle}" is missing from the list`);
     await expect(row).toBeVisible({ timeout: 5000 });
 
-    // Click delete
-    const deleteBtn = row
-      .locator('button:has-text("删除"), button:has-text("Delete"), [data-testid*="delete"]')
-      .first();
-    await expect(deleteBtn, 'Created mission must expose its delete action').toBeVisible({
-      timeout: 5000,
-    });
-    await deleteBtn.click();
+    await clickRowActionByLocator(page, row, 'delete', '删除');
 
     // Verify confirm dialog appears
     const dialog = page.locator(
@@ -722,14 +711,7 @@ test.describe('ACP Exception Handling & Interaction Feedback', () => {
     if (!row) throw new Error(`Created mission "${preservedTitle}" is missing from the list`);
     await expect(row).toBeVisible({ timeout: 5000 });
 
-    // Click delete
-    const deleteBtn = row
-      .locator('button:has-text("删除"), button:has-text("Delete"), [data-testid*="delete"]')
-      .first();
-    await expect(deleteBtn, 'Created mission must expose its delete action').toBeVisible({
-      timeout: 5000,
-    });
-    await deleteBtn.click();
+    await clickRowActionByLocator(page, row, 'delete', '删除');
 
     // Confirm dialog appears — dismiss it
     const dialog = page.locator(
@@ -787,14 +769,7 @@ test.describe('ACP Exception Handling & Interaction Feedback', () => {
     if (!row) throw new Error(`Created mission "${archiveMissionTitle}" is missing from the list`);
     await expect(row).toBeVisible({ timeout: 5000 });
 
-    // Find archive button on the row
-    const archiveBtn = row
-      .locator('button:has-text("归档"), button:has-text("Archive"), [data-testid*="archive"]')
-      .first();
-    await expect(archiveBtn, 'A completed mission must expose its archive action').toBeVisible({
-      timeout: 5000,
-    });
-    await archiveBtn.click();
+    await clickRowActionByLocator(page, row, 'archive', '归档');
 
     // Verify confirm dialog appears (archiving is irreversible)
     const dialog = page.locator(
