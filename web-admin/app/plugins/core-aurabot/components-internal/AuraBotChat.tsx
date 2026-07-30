@@ -90,6 +90,8 @@ function LoadingDots() {
 }
 
 function TraceLink({ traceId }: { traceId: string }) {
+  const { t } = useI18n();
+
   return (
     <a
       href={`/aurabot/traces/${traceId}`}
@@ -108,7 +110,7 @@ function TraceLink({ traceId }: { traceId: string }) {
         <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
         <circle cx="12" cy="12" r="3" />
       </svg>
-      View Trace
+      {t('aurabot.chat.trace.view', undefined, 'View trace')}
     </a>
   );
 }
@@ -431,6 +433,7 @@ function WelcomeMessage({ onQuickAction }: { onQuickAction: (msg: string) => voi
 
 function KnowledgeBaseSelector() {
   const { state, toggleKnowledgeBase } = useAuraBot();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -461,7 +464,7 @@ function KnowledgeBaseSelector() {
             ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400'
             : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700'
         }`}
-        title="Knowledge Bases"
+        title={t('aurabot.chat.knowledge_bases', undefined, 'Knowledge bases')}
         data-testid="kb-selector-trigger"
       >
         <BookIcon className="h-4.5 w-4.5" />
@@ -479,7 +482,7 @@ function KnowledgeBaseSelector() {
         >
           <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-700">
             <p className="text-xs font-semibold text-gray-500 uppercase dark:text-gray-400">
-              Knowledge Bases
+              {t('aurabot.chat.knowledge_bases', undefined, 'Knowledge bases')}
             </p>
           </div>
           <div className="max-h-48 overflow-y-auto py-1">
@@ -514,7 +517,13 @@ function KnowledgeBaseSelector() {
                     )}
                   </span>
                   <span className="flex-1 truncate">{kb.name}</span>
-                  <span className="text-[10px] text-gray-400">{kb.docCount} docs</span>
+                  <span className="text-[10px] text-gray-400">
+                    {t(
+                      'aurabot.chat.knowledge_base_document_count',
+                      { count: kb.docCount },
+                      `${kb.docCount} docs`,
+                    )}
+                  </span>
                 </button>
               );
             })}
@@ -527,6 +536,7 @@ function KnowledgeBaseSelector() {
 
 function SelectedKbChips() {
   const { state, toggleKnowledgeBase } = useAuraBot();
+  const { t } = useI18n();
   const { knowledgeBases, selectedKnowledgeBaseIds } = state;
 
   if (selectedKnowledgeBaseIds.length === 0) return null;
@@ -546,7 +556,7 @@ function SelectedKbChips() {
           <button
             onClick={() => toggleKnowledgeBase(kb.pid)}
             className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-blue-200 dark:hover:bg-blue-800"
-            title="Remove"
+            title={t('aurabot.chat.remove', undefined, 'Remove')}
           >
             <svg className="h-2.5 w-2.5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
@@ -776,7 +786,7 @@ export function AuraBotChat() {
                   type="button"
                   onClick={() => handleRemoveAttachment(idx)}
                   className="ml-1 rounded-full p-0.5 transition-colors hover:bg-blue-200 dark:hover:bg-blue-800"
-                  title="Remove"
+                  title={t('aurabot.chat.remove', undefined, 'Remove')}
                   data-testid={`aurabot-attachment-remove-${idx}`}
                 >
                   <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
@@ -809,7 +819,7 @@ export function AuraBotChat() {
               onClick={handleAttachClick}
               disabled={isLoading}
               className="flex-shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-gray-700"
-              title="Attach image"
+              title={t('aurabot.chat.attach_image', undefined, 'Attach image')}
               data-testid="aurabot-attach-image"
             >
               <PaperclipIcon className="h-4.5 w-4.5" />
@@ -831,7 +841,11 @@ export function AuraBotChat() {
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder="Type a message... (Enter to send)"
+                placeholder={t(
+                  'aurabot.chat.input.placeholder',
+                  undefined,
+                  'Type a message... (Enter to send)',
+                )}
                 data-testid="aurabot-input"
                 rows={1}
                 className="w-full resize-none rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -861,7 +875,11 @@ export function AuraBotChat() {
 
           {/* Keyboard hint */}
           <p className="mt-2 text-center text-xs text-gray-400">
-            Cmd+J open | Enter send | Shift+Enter newline
+            {t(
+              'aurabot.chat.input.keyboard_hint',
+              undefined,
+              'Cmd+J open | Enter send | Shift+Enter newline',
+            )}
           </p>
         </div>
       </div>

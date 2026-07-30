@@ -29,6 +29,9 @@ vi.mock('~/contexts/I18nContext', async (importActual) => {
   const actual = await importActual<Record<string, unknown>>();
   const CATALOG: Record<string, string> = {
     'aurabot.error.no_llm_provider': '未配置 LLM 服务商，请在云配置中添加 API Key。',
+    'aurabot.chat.input.placeholder': '输入消息…（按 Enter 发送）',
+    'aurabot.chat.input.keyboard_hint': 'Cmd+J 打开｜Enter 发送｜Shift+Enter 换行',
+    'aurabot.chat.attach_image': '添加图片',
   };
   return {
     ...actual,
@@ -95,6 +98,15 @@ function renderChatWithError(content: string) {
 }
 
 describe('AuraBotChat — error message i18n', () => {
+  it('localizes the visible composer controls under zh-CN', () => {
+    renderChatWithError('测试消息');
+
+    expect(screen.getByPlaceholderText('输入消息…（按 Enter 发送）')).toBeInTheDocument();
+    expect(screen.getByText('Cmd+J 打开｜Enter 发送｜Shift+Enter 换行')).toBeInTheDocument();
+    expect(screen.getByTitle('添加图片')).toBeInTheDocument();
+    expect(screen.queryByText(/Enter send/)).not.toBeInTheDocument();
+  });
+
   it('resolvesSentinelToLocalizedText — $i18n sentinel renders as localized text, no raw code leak', () => {
     renderChatWithError('$i18n:aurabot.error.no_llm_provider');
 

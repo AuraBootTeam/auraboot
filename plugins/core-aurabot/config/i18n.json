@@ -70,6 +70,55 @@
     "refType": "ui"
   },
   {
+    "key": "aurabot.chat.input.placeholder",
+    "source": "import",
+    "zh-CN": "输入消息…（按 Enter 发送）",
+    "en-US": "Type a message... (Enter to send)",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chat.input.keyboard_hint",
+    "source": "import",
+    "zh-CN": "Cmd+J 打开｜Enter 发送｜Shift+Enter 换行",
+    "en-US": "Cmd+J open | Enter send | Shift+Enter newline",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chat.attach_image",
+    "source": "import",
+    "zh-CN": "添加图片",
+    "en-US": "Attach image",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chat.remove",
+    "source": "import",
+    "zh-CN": "移除",
+    "en-US": "Remove",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chat.knowledge_bases",
+    "source": "import",
+    "zh-CN": "知识库",
+    "en-US": "Knowledge bases",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chat.knowledge_base_document_count",
+    "source": "import",
+    "zh-CN": "{count} 篇",
+    "en-US": "{count} docs",
+    "refType": "ui"
+  },
+  {
+    "key": "aurabot.chat.trace.view",
+    "source": "import",
+    "zh-CN": "查看追踪",
+    "en-US": "View trace",
+    "refType": "ui"
+  },
+  {
     "key": "aurabot.shell.empty.hint",
     "source": "import",
     "zh-CN": "试试输入 echo hello,体验回路",
