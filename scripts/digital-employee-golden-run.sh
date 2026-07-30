@@ -125,6 +125,10 @@ if [[ "$LIVE" == 1 ]]; then
       || die "--live requires $required_var"
   done
   key_env="$AURA_LIVE_LLM_API_KEY_ENV"
+  [[ "$AURA_LIVE_LLM_PROVIDER" =~ ^[A-Za-z0-9_-]+$ ]] \
+    || die "AURA_LIVE_LLM_PROVIDER is invalid"
+  [[ "$AURA_LIVE_LLM_MODEL" =~ ^[A-Za-z0-9._:-]+$ ]] \
+    || die "AURA_LIVE_LLM_MODEL is invalid"
   [[ "$key_env" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] \
     || die "AURA_LIVE_LLM_API_KEY_ENV is invalid"
   [[ -n "${!key_env:-}" ]] \
@@ -177,7 +181,7 @@ if [[ "$LIVE" == 1 ]]; then
       -v ON_ERROR_STOP=1 \
       -v expected_provider="$AURA_LIVE_LLM_PROVIDER" \
       -v expected_model="$AURA_LIVE_LLM_MODEL" \
-      -t -A -c "
+      -t -A <<'SQL'
         SELECT
           COUNT(*),
           COUNT(*) FILTER (
@@ -186,21 +190,21 @@ if [[ "$LIVE" == 1 ]]; then
                OR response_model IS DISTINCT FROM :'expected_model'
           )
         FROM ab_gen_ai_usage;
-      " 2>/dev/null
+SQL
   )
   usage_gate_rc=$?
   terminal_gate=$(
     PGPASSWORD="$PGPASSWORD" psql \
       -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" \
       -v ON_ERROR_STOP=1 \
-      -t -A -c "
+      -t -A <<'SQL'
         SELECT COUNT(*)
         FROM ab_agent_task
         WHERE deleted_flag = false
           AND assignee_type = 'ai'
           AND task_status = 'in_progress'
-          AND input_data ? 'turnId';
-      " 2>/dev/null
+          AND COALESCE(input_data, '{}')::jsonb ? 'turnId';
+SQL
   )
   terminal_gate_rc=$?
   set -e 2>/dev/null || true

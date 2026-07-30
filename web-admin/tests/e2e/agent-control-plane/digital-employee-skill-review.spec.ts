@@ -56,7 +56,8 @@ async function ensureOpsColleague(request: APIRequestContext): Promise<void> {
       model: llmModel,
       system_prompt:
         '你是客户运营助理。用户请求季度复盘时,必须用 list:crm_account 拉取真实客户数据,' +
-        '按行业与评级分析结构,给出结构化复盘并提议拓客动作。只读,不自动执行写操作。用简体中文回复。',
+        '先在【事实样本】中逐条列出返回的真实客户名称,再按行业与评级分析结构；' +
+        '字段缺失时明确说明,不得猜测。给出结构化复盘并提议拓客动作。只读,不自动执行写操作。用简体中文回复。',
       // The bound skill contributes its governed read tool (list:crm_account) to the turn.
       skills: JSON.stringify([REVIEW_SKILL]),
       guardrails: JSON.stringify({ provider: llmProvider }),
@@ -114,7 +115,7 @@ test.describe('Digital employee — bound skill drives a real customer review', 
 
     const input = chat.locator('[data-testid="aurabot-input"]');
     await expect(input).toBeVisible({ timeout: 20_000 });
-    await input.fill('请对我们的客户做一次季度客户结构复盘');
+    await input.fill('请对我们的客户做一次季度客户结构复盘，并先列出本次分析所依据的真实客户名称');
     await chat.locator('[data-testid="aurabot-send"]').click();
 
     // The user bubble appearing proves the send happened, and nothing more.
