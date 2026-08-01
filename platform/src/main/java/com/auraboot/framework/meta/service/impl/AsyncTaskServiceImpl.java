@@ -7,6 +7,7 @@ import com.auraboot.framework.meta.entity.AsyncTask;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.mapper.AsyncTaskMapper;
 import com.auraboot.framework.meta.service.AsyncTaskExecutor;
+import com.auraboot.framework.meta.service.AsyncTaskFailureClassifier;
 import com.auraboot.framework.meta.service.AsyncTaskResult;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -275,7 +276,7 @@ public class AsyncTaskServiceImpl {
                 asyncTaskMapper.updateById(task);
                 log.info("Async task completed: code={}, type={}", task.getTaskCode(), task.getTaskType());
             } else {
-                handleFailure(task, result.getErrorMessage());
+                handleFailure(task, result.getErrorMessage(), result.isRetryable());
             }
 
         } catch (Exception e) {
@@ -287,7 +288,7 @@ public class AsyncTaskServiceImpl {
             } else {
                 log.error("Async task execution failed: code={}, type={}",
                         task.getTaskCode(), task.getTaskType(), e);
-                handleFailure(task, e.getMessage());
+                handleFailure(task, e.getMessage(), AsyncTaskFailureClassifier.isRetryable(e));
             }
         } finally {
             runningTaskThreads.remove(task.getTaskCode());
@@ -319,7 +320,13 @@ public class AsyncTaskServiceImpl {
     /**
      * Handle task failure with optional retry.
      */
-    private void handleFailure(AsyncTask task, String errorMessage) {
+    private void handleFailure(AsyncTask task, String errorMessage, boolean retryable) {
+        if (!retryable) {
+            log.warn("Async task failed with a deterministic error; retry suppressed: code={}, error={}",
+                    task.getTaskCode(), errorMessage);
+            failTask(task, errorMessage);
+            return;
+        }
         task.setRetryCount(task.getRetryCount() + 1);
 
         if (task.getRetryCount() < task.getMaxRetries()) {

@@ -5,6 +5,7 @@ import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.meta.service.AsyncTaskExecutor;
+import com.auraboot.framework.meta.service.AsyncTaskFailureClassifier;
 import com.auraboot.framework.meta.service.AsyncTaskResult;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
@@ -79,12 +80,12 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
     @Override
     public AsyncTaskResult execute(JsonNode inputParams, ProgressCallback callback) {
         if (inputParams == null) {
-            return AsyncTaskResult.fail("Missing input params for command-handler task");
+            return AsyncTaskResult.nonRetryableFailure("Missing input params for command-handler task");
         }
         String handlerCode = text(inputParams, "handlerCode");
         String commandCode = text(inputParams, "commandCode");
         if (handlerCode == null || handlerCode.isBlank()) {
-            return AsyncTaskResult.fail("command-handler task missing handlerCode");
+            return AsyncTaskResult.nonRetryableFailure("command-handler task missing handlerCode");
         }
         Long tenantId = longValue(inputParams, "tenantId");
         Long userId = longValue(inputParams, "userId");
@@ -95,7 +96,8 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
 
         Optional<CommandHandlerExtension> pluginHandler = extensionRegistry.getCommandHandler(handlerCode);
         if (pluginHandler.isEmpty()) {
-            return AsyncTaskResult.fail("No plugin command handler found for: " + handlerCode);
+            return AsyncTaskResult.nonRetryableFailure(
+                    "No plugin command handler found for: " + handlerCode);
         }
         CommandHandlerExtension handler = pluginHandler.get();
 
@@ -178,17 +180,24 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
         } catch (CommandHandlerInvocationException wrapped) {
             log.error("Async command handler {} failed", handlerCode, wrapped.getCause());
             Throwable cause = wrapped.getCause();
-            return AsyncTaskResult.fail(cause.getMessage() != null ? cause.getMessage() : cause.toString());
+            return failureResult(cause);
         } catch (Exception ex) {
             // Async-task boundary: any handler failure (CommandHandlerExtension.execute
             // declares `throws Exception`) must be reported as a task failure result —
             // not swallowed and not rethrown — so the task framework records FAILED with
             // the message. This is a terminal boundary catch, not a self-heal/fallback.
             log.error("Async command handler {} failed", handlerCode, ex);
-            return AsyncTaskResult.fail(ex.getMessage() != null ? ex.getMessage() : ex.toString());
+            return failureResult(ex);
         } finally {
             queryScope.close();
         }
+    }
+
+    private AsyncTaskResult failureResult(Throwable failure) {
+        String message = failure.getMessage() != null ? failure.getMessage() : failure.toString();
+        return AsyncTaskFailureClassifier.isRetryable(failure)
+                ? AsyncTaskResult.retryableFailure(message)
+                : AsyncTaskResult.nonRetryableFailure(message);
     }
 
     private String text(JsonNode node, String field) {
