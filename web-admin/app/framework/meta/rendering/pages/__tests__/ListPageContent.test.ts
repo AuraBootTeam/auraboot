@@ -13,6 +13,7 @@ import {
   resolveFieldMetaDisplayName,
   resolveFieldMetaRenderComponent,
   resolveListSystemReferenceDisplayConfig,
+  shouldResolveListSystemReferenceValue,
   resolveListSavedViewPageKey,
   resolveListMiscBlocksPosition,
   resolveTableBlockRowActions,
@@ -119,6 +120,13 @@ describe('resolveListSystemReferenceDisplayConfig', () => {
 
   it('leaves normal business references on dynamic list resolution', () => {
     expect(resolveListSystemReferenceDisplayConfig('crm_account_common')).toBeUndefined();
+  });
+
+  it('only resolves path-style user identifiers, not already-projected display labels', () => {
+    expect(shouldResolveListSystemReferenceValue('01KYXD8DZNMG0S0FMRHY3VSMNC')).toBe(true);
+    expect(shouldResolveListSystemReferenceValue('user-9')).toBe(true);
+    expect(shouldResolveListSystemReferenceValue('Admin User')).toBe(false);
+    expect(shouldResolveListSystemReferenceValue('SOT qo_sales')).toBe(false);
   });
 });
 

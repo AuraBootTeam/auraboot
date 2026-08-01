@@ -19,6 +19,9 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
 
 import java.util.List;
 import java.util.Map;
@@ -28,8 +31,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +48,8 @@ class CommandTargetScopePhaseTest {
     @Mock private ApplicationContext applicationContext;
     @Mock private PermissionFacade permissionFacade;
     @Mock private TenantMemberService tenantMemberService;
+    @Mock private PlatformTransactionManager transactionManager;
+    @Mock private TransactionStatus transactionStatus;
 
     @Test
     void observeModeRecordsADenialWithoutBlockingTheCommand() {
@@ -142,6 +149,20 @@ class CommandTargetScopePhaseTest {
         phase.execute(ctx);
 
         assertThat(ctx.getTargetRecordReadable()).isNull();
+        verify(transactionManager).rollback(transactionStatus);
+    }
+
+    @Test
+    void evaluatesTheObservationInARequiresNewTransaction() {
+        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+        givenRecordIsReadable(true);
+
+        phase.execute(context("qo_quote_common", "REC-1"));
+
+        verify(transactionManager).getTransaction(argThat(definition ->
+                definition.getPropagationBehavior()
+                        == TransactionDefinition.PROPAGATION_REQUIRES_NEW));
+        verify(transactionManager).commit(transactionStatus);
     }
 
     /** An enforcing gate that cannot evaluate must fail closed, never degrade to a warning. */
@@ -234,8 +255,10 @@ class CommandTargetScopePhaseTest {
     }
 
     private CommandTargetScopePhase phase(String mode) {
+        when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+                .thenReturn(transactionStatus);
         CommandTargetScopePhase phase =
-                new CommandTargetScopePhase(dynamicDataService, applicationContext);
+                new CommandTargetScopePhase(dynamicDataService, applicationContext, transactionManager);
         ReflectionTestUtils.setField(phase, "mode", mode);
         return phase;
     }

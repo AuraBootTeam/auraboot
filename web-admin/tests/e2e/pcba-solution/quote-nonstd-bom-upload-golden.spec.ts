@@ -184,12 +184,10 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
             notFoundUsesRefreshRef: evidence
               .filter((row) => row.qo_pe_status === 'not_found')
               .every((row) => row.qo_pe_source_ref === 'yunhan:refresh'),
-            capturedUsesAutoLane: evidence
+            capturedUsesUploadBomLane: evidence
               .filter((row) => ['captured', 'usd_review'].includes(String(row.qo_pe_status)))
-              .every((row) =>
-                ['upload_bom', 'recent_cache'].includes(
-                  String(parseSnapshot(row.qo_pe_snapshot).matchedBy),
-                ),
+              .every(
+                (row) => String(parseSnapshot(row.qo_pe_snapshot).matchedBy) === 'upload_bom',
               ),
             // The scenario reset clears the managed mock's request log before upload. Combined with
             // per-run unique MPNs, an observed upload-bom request proves this run crossed the real
@@ -214,7 +212,7 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
         allTerminal: true,
         noBlankSourceRef: true,
         notFoundUsesRefreshRef: true,
-        capturedUsesAutoLane: true,
+        capturedUsesUploadBomLane: true,
         mockUploadRequestObserved: true,
       });
 

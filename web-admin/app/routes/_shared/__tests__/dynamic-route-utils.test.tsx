@@ -166,6 +166,47 @@ describe('DynamicField', () => {
     expect(screen.queryByText('user-1')).not.toBeInTheDocument();
   });
 
+  it('renders an already-resolved readonly user label without looking it up as a PID', async () => {
+    render(
+      <DynamicField
+        field={{
+          field: 'created_by',
+          label: '创建人',
+          component: 'userselect',
+        }}
+        value="SOT qo_sales"
+        onChange={vi.fn()}
+        readOnly
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('member-picker-readonly')).toHaveTextContent('SOT qo_sales');
+    });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps the raw user PID visible when lookup returns a non-success response', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false }) as unknown as typeof fetch;
+
+    render(
+      <DynamicField
+        field={{
+          field: 'sc_assignee',
+          label: '负责人',
+          component: 'userselect',
+        }}
+        value="missing-user-1"
+        onChange={vi.fn()}
+        readOnly
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('member-picker-readonly')).toHaveTextContent('missing-user-1');
+    });
+  });
+
   it('renders readonly organizationselect values as department labels', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,

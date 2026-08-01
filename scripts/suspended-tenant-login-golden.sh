@@ -22,7 +22,7 @@
 #
 set -euo pipefail
 
-SLOT="${E5_SLOT:-72}"
+SLOT="${E5_SLOT:-74}"
 BE_PORT=$((6400 + SLOT))
 DB="auraboot_e5_${SLOT}"
 KEEP=0
@@ -89,6 +89,7 @@ PG_DB="$DB" "$REPO_ROOT/scripts/db/flyway-migrate.sh" --edition oss >/dev/null
 
 log "backend :$BE_PORT"
 java -Xmx3g -Dspring.profiles.active=dev -Dserver.port="$BE_PORT" \
+  -Dauraboot.bootstrap.enabled=false \
   -Dspring.datasource.url="jdbc:postgresql://localhost:5432/${DB}?charSet=UTF8" \
   -Dspring.data.redis.host="${REDIS_HOST:-localhost}" -Dspring.data.redis.port="${REDIS_PORT:-6379}" \
   -Dspring.data.redis.database="$((SLOT % 16))" -Dspring.flyway.enabled=false \
@@ -100,6 +101,12 @@ for _ in $(seq 1 60); do
   [ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$BE_PORT/actuator/health")" = "200" ] && { BE_UP=1; break; }
 done
 [ "$BE_UP" = "1" ] || { grep -A4 "APPLICATION FAILED TO START" /tmp/e5-suspend-be.log | head -6 >&2; fail "backend never healthy on :$BE_PORT — see /tmp/e5-suspend-be.log"; }
+# A foreign process can answer the health probe when two hand-written goldens
+# accidentally reuse a slot. Health is not ownership: refuse to grade that
+# process's database and credentials as if they belonged to this run.
+if ! lsof -ti ":$BE_PORT" 2>/dev/null | grep -qx "$BE_PID"; then
+  fail "port $BE_PORT is served by a foreign process, not backend pid $BE_PID — choose another slot"
+fi
 
 BE="http://localhost:$BE_PORT"
 login() { curl -sS -X POST "$BE/api/auth/login" -H 'Content-Type: application/json' \

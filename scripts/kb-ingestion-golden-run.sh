@@ -35,6 +35,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STACK_NAME="kb-ingestion-golden"
 SLOT=2
 KEEP=0
+LIVE_PROVIDER="${AURA_LIVE_LLM_PROVIDER:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -75,9 +76,33 @@ trap teardown EXIT
 # straight into them.
 if [[ -n "${DASHSCOPE_API_KEY:-}" ]]; then
   KEY_STATE="SET"
+  # oss-golden-stack defaults to the deterministic stub provider. Vision suites only
+  # select themselves when a real DashScope key exists, so keep the backend and test
+  # selection on the same capability boundary.
+  export AGENT_LLM_STUB_MODE=false
 else
   KEY_STATE="UNSET — vector + chart goldens will skip"
+  export AGENT_LLM_STUB_MODE=true
 fi
+if [[ -z "$LIVE_PROVIDER" ]]; then
+  if [[ -n "${DASHSCOPE_API_KEY:-}" ]]; then LIVE_PROVIDER=qianwen
+  elif [[ -n "${DEEPSEEK_API_KEY:-}" ]]; then LIVE_PROVIDER=deepseek
+  fi
+fi
+case "$LIVE_PROVIDER" in
+  qianwen)
+    [[ -n "${DASHSCOPE_API_KEY:-}" ]] \
+      || { echo "[kb-golden] FATAL: qianwen selected but DASHSCOPE_API_KEY is unset" >&2; exit 2; }
+    STACK_ENV=(env -u DEEPSEEK_API_KEY)
+    ;;
+  deepseek)
+    [[ -n "${DEEPSEEK_API_KEY:-}" ]] \
+      || { echo "[kb-golden] FATAL: deepseek selected but DEEPSEEK_API_KEY is unset" >&2; exit 2; }
+    STACK_ENV=(env)
+    ;;
+  "") STACK_ENV=(env) ;;
+  *) echo "[kb-golden] FATAL: unsupported AURA_LIVE_LLM_PROVIDER=$LIVE_PROVIDER" >&2; exit 2 ;;
+esac
 if [[ "${AURA_SSRF_ALLOWED_PRIVATE_HOSTS:-}" == *127.0.0.1* ]]; then
   SSRF_STATE="allows 127.0.0.1"
 else
@@ -87,12 +112,13 @@ fi
 echo "[kb-golden] optional capabilities:"
 echo "[kb-golden]   DASHSCOPE_API_KEY               = $KEY_STATE"
 echo "[kb-golden]   AURA_SSRF_ALLOWED_PRIVATE_HOSTS = $SSRF_STATE"
+echo "[kb-golden]   live answer provider             = ${LIVE_PROVIDER:-none (answer golden skips)}"
 
 # destroy-then-up: reusing a slot inherits its old database, and bootstrap is skipped on a database
 # that already looks initialised — so the run would silently grade a stale environment.
 echo "[kb-golden] bringing up isolated stack '$STACK_NAME' (slot $SLOT, host-first, zero docker)"
 "$REPO_ROOT/scripts/oss-golden-stack.sh" destroy "$STACK_NAME" >/dev/null 2>&1 || true
-"$REPO_ROOT/scripts/oss-golden-stack.sh" up "$STACK_NAME" --slot "$SLOT" --ttl 2h
+"${STACK_ENV[@]}" "$REPO_ROOT/scripts/oss-golden-stack.sh" up "$STACK_NAME" --slot "$SLOT" --ttl 2h
 
 cd "$REPO_ROOT/web-admin"
 # shellcheck disable=SC2046
@@ -100,7 +126,10 @@ eval "$("$REPO_ROOT/scripts/oss-golden-stack.sh" env "$STACK_NAME")"
 
 echo "[kb-golden] running ${#SPECS[@]} golden suites"
 set +e
-npx playwright test -c playwright.gt5.config.ts "${SPECS[@]}" --reporter=line
+# These specs create and mutate tenant-scoped provider/KB state. Parallel files can
+# trip provider quota and cross-observe setup state, producing API-create failures
+# unrelated to ingestion correctness.
+npx playwright test -c playwright.gt5.config.ts "${SPECS[@]}" --workers=1 --reporter=line
 STATUS=$?
 set -e
 

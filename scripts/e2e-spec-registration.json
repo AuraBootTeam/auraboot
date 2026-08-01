@@ -9,7 +9,9 @@
     }
   ],
   "allow": {
-    "web-admin/tests/e2e/pcba-solution": {}
+    "web-admin/tests/e2e/pcba-solution": {
+      "quote-bom-price-manual-adoption": "Temporarily excluded while the 录入人工价 UI entry is hidden; the current quoteops release gate asserts the hidden-entry contract instead."
+    }
   },
   "baseline": {}
 }

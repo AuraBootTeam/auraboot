@@ -8,6 +8,7 @@ import {
   queryDynamicRecords,
   seedQuoteForCorrectedBomUpload,
   setYunhanMockScenario,
+  yunhanMockControlUrl,
   type CreatedRows,
 } from './quote-e2e-helpers';
 import { utils as XLSXUtils, write as xlsxWrite } from 'xlsx';
@@ -15,21 +16,21 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
- * Golden: BOM import materializes correlated rows in bulk, and a recently-priced MPN is served from
- * the price cache instead of the external lane.
+ * Golden: BOM import materializes correlated rows in bulk, and historical recent-cache evidence
+ * never bypasses the managed pricing connector.
  *
  * Guards the two delivered performance features:
  *   1. bulk import (platform bulkCreate + three-phase handler) — the risk of batching is *id
  *      correlation*, so this asserts the bidirectional import-row <-> quote-line linkage row by row
  *      (qo_bir_quote_line_id -> line, line.qo_ql_source_ref -> back, and same-row MPN). An
  *      off-by-one / mis-ordered batch fails here.
- *   2. incremental price cache (reuseRecentPrices) — a line whose MPN carries a fresh captured
- *      price is served from cache (snapshot.matchedBy='recent_cache'), not re-sourced.
+ *   2. historical cache bypass — even when an MPN carries a fresh legacy recent-cache row, every
+ *      imported line is re-sourced through the managed connector. The historical row remains
+ *      immutable audit evidence and is never the current decision source.
  *
- * Deterministic by construction: the import runs against the managed mock's
- * not-found scenario, then the "already priced" state is seeded explicitly
- * before the normal pricing scenario is restored. No live supplier state can
- * preempt the cache evidence.
+ * Deterministic by construction: the import runs against the managed mock's not-found scenario,
+ * then legacy cache evidence is seeded explicitly before the normal pricing scenario is restored.
+ * The managed mock request log proves this run crossed the real connector boundary.
  */
 
 // Unique per run: the handler writes reused-evidence rows of its own, and any residue left in the
@@ -63,10 +64,10 @@ function parseSnapshot(value: unknown): Record<string, unknown> {
   }
 }
 
-test.describe('QuoteOps bulk import + price cache golden', () => {
+test.describe('QuoteOps bulk import + historical cache bypass golden', () => {
   test.describe.configure({ timeout: 300_000 });
 
-  test('imports correlated rows in bulk and serves recently-priced MPNs from cache', async ({
+  test('imports correlated rows in bulk and re-sources every MPN despite historical cache rows', async ({
     page,
   }, testInfo) => {
     await setYunhanMockScenario(page, 'reprice-v1');
@@ -182,7 +183,7 @@ test.describe('QuoteOps bulk import + price cache golden', () => {
         'every BOM row must produce its quote line',
       ).toEqual([...SYNTHETIC_MPNS].sort());
 
-      // ── 3. price cache: seed a fresh captured price per MPN, then source ───
+      // ── 3. historical cache bypass: seed legacy cache evidence, then source ──
       // qo_pe_valid_until is a DATE column — the platform rejects datetime values for it.
       const validUntil = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
       for (const mpn of SYNTHETIC_MPNS) {
@@ -199,6 +200,7 @@ test.describe('QuoteOps bulk import + price cache golden', () => {
             qo_pe_unit_price: CACHED_UNIT_PRICE,
             qo_pe_currency: 'CNY',
             qo_pe_valid_until: validUntil,
+            qo_pe_snapshot: JSON.stringify({ matchedBy: 'recent_cache', historicalSeed: true }),
           },
           created.rows,
         );
@@ -213,7 +215,7 @@ test.describe('QuoteOps bulk import + price cache golden', () => {
         'execute',
       );
 
-      // Every line must be served from the cache — proven by the reuse marker on its evidence.
+      // Every current line must get terminal connector evidence without the retired cache marker.
       for (const line of lines) {
         await expect
           .poll(
@@ -229,21 +231,81 @@ test.describe('QuoteOps bulk import + price cache golden', () => {
             },
             { timeout: 120_000, intervals: [1000, 2000, 3000] },
           )
-          .toContainEqual(
-            expect.objectContaining({ matchedBy: 'recent_cache', status: 'captured' }),
+          .toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                status: expect.stringMatching(/captured|usd_review|not_found/),
+              }),
+            ]),
           );
+
+        const currentEvidence = await queryDynamicRecords(page, 'qo_price_evidence_common', [
+          { fieldName: 'qo_pe_quote_line_id', operator: 'EQ', value: String(line.pid) },
+        ]);
+        expect(
+          currentEvidence.every(
+            (e) => String(parseSnapshot(e.qo_pe_snapshot).matchedBy ?? '') !== 'recent_cache',
+          ),
+          `current line ${String(line.qo_ql_mpn)} must not be served from historical cache`,
+        ).toBe(true);
       }
 
-      const firstLineEvidence = await queryDynamicRecords(page, 'qo_price_evidence_common', [
-        { fieldName: 'qo_pe_quote_line_id', operator: 'EQ', value: String(lines[0].pid) },
-      ]);
+      // Query by this run's unique MPNs as well as the marker. A global marker query can be
+      // paginated by the dynamic-list API after repeated golden runs and silently hide a row.
+      const currentRunHistoricalEvidence = (
+        await Promise.all(
+          SYNTHETIC_MPNS.map((mpn) =>
+            queryDynamicRecords(page, 'qo_price_evidence_common', [
+              { fieldName: 'qo_pe_source_ref', operator: 'EQ', value: 'golden:cache-seed' },
+              { fieldName: 'qo_pe_part_no', operator: 'EQ', value: mpn },
+            ]),
+          ),
+        )
+      ).flat();
+      expect(currentRunHistoricalEvidence).toHaveLength(SYNTHETIC_MPNS.length);
       expect(
-        firstLineEvidence.some(
+        currentRunHistoricalEvidence.every(
           (e) =>
             parseSnapshot(e.qo_pe_snapshot).matchedBy === 'recent_cache' &&
+            parseSnapshot(e.qo_pe_snapshot).historicalSeed === true &&
             String(e.qo_pe_unit_price ?? '').startsWith(String(CACHED_UNIT_PRICE)),
         ),
-        'the reused evidence must carry the cached unit price, not a re-sourced one',
+        'legacy cache evidence must remain immutable, auditable, and detached from current lines',
+      ).toBe(true);
+
+      const mockRequestsResponse = await page.request.get(
+        `${yunhanMockControlUrl()}/__control/requests`,
+      );
+      expect(mockRequestsResponse.ok(), 'managed Yunhan request log is readable').toBe(true);
+      const mockRequestsBody = (await mockRequestsResponse.json()) as {
+        requests?: Array<{ path?: unknown; form?: Record<string, unknown> }>;
+      };
+      const singleRequestedKeywords = (mockRequestsBody.requests ?? [])
+        .filter((request) => String(request.path ?? '').endsWith('/get-single-goods-new'))
+        .flatMap((request) => {
+          const keyword = request.form?.keyword;
+          return Array.isArray(keyword) ? keyword.map(String) : [String(keyword ?? '')];
+        });
+      const batchRequestedKeywords = (mockRequestsBody.requests ?? [])
+        .filter((request) => String(request.path ?? '').endsWith('/upload-bom'))
+        .flatMap((request) => {
+          const raw = request.form?.excel_data;
+          const values = Array.isArray(raw) ? raw.map(String) : [String(raw ?? '')];
+          return values.flatMap((value) => {
+            try {
+              const rows = JSON.parse(value) as unknown[][];
+              return rows.flatMap((row) => row.map(String));
+            } catch {
+              return [];
+            }
+          });
+        });
+      const requestedKeywords = [...singleRequestedKeywords, ...batchRequestedKeywords];
+      expect(
+        SYNTHETIC_MPNS.every((mpn) => requestedKeywords.includes(mpn)),
+        `every imported MPN must cross the managed connector boundary: ${JSON.stringify(
+          mockRequestsBody,
+        ).slice(0, 1200)}`,
       ).toBe(true);
 
       const closeImportResult = page.getByRole('button', { name: /^(关闭|Close)$/i }).last();
@@ -253,20 +315,20 @@ test.describe('QuoteOps bulk import + price cache golden', () => {
       await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
       for (const line of lines) {
         const row = page.getByTestId(`table-row-${String(line.pid)}`);
-        await expect(row, `cached line ${String(line.qo_ql_mpn)} remains visible`).toBeVisible({
+        await expect(row, `re-sourced line ${String(line.qo_ql_mpn)} remains visible`).toBeVisible({
           timeout: 20_000,
         });
         await expect(row).toContainText(String(line.qo_ql_mpn));
       }
 
-      await testInfo.attach('bulk-cache-golden.png', {
+      await testInfo.attach('bulk-cache-bypass-golden.png', {
         body: await page.screenshot({ fullPage: true }),
         contentType: 'image/png',
       });
       await expect(consoleIssues).toEqual([]);
     } finally {
       // Evidence written by the sourcing handler is not tracked by the seed helpers; register it so
-      // this run leaves nothing behind that a later run could mistake for a cache hit.
+      // this run leaves no generated connector evidence behind.
       for (const lineId of importedLineIds) {
         const evidence = await queryDynamicRecords(page, 'qo_price_evidence_common', [
           { fieldName: 'qo_pe_quote_line_id', operator: 'EQ', value: lineId },

@@ -6,9 +6,9 @@
 
 | category | count | what it is |
 |---|--:|---|
-| **gate** | 42 | Correctness/quality checks (`check-*` / `validate-*` / `*-audit`). Run before push / in local gate runners. |
+| **gate** | 43 | Correctness/quality checks (`check-*` / `validate-*` / `*-audit`). Run before push / in local gate runners. |
 | **generator** | 4 | Regenerate a tracked artifact (manifests, snapshots). Output is committed; rerun when inputs change. |
-| **entrypoint** | 25 | Self-contained runners invoked by hand / crontab (owner has no CI). `refs=0` is normal here — nothing imports them. |
+| **entrypoint** | 26 | Self-contained runners invoked by hand / crontab (owner has no CI). `refs=0` is normal here — nothing imports them. |
 | **pipeline/lib** | 10 | Shared library modules for the aura-pipeline / other scripts. Not run directly. |
 | **tooling** | 66 | Reusable dev/ops helpers referenced by other scripts, package.json, or docs. |
 | **test** | 20 | Co-located `*.test.mjs` unit tests for the scripts above. |
@@ -19,7 +19,7 @@
 - **One-off migrations** (`migrate-*`, `*-split`, casing/backfill scripts) are **removed once the migration lands** — git history keeps them (`git log --all --full-history -- scripts/<name>`).
 - Before adding a script, check the tables below for an existing one to extend.
 
-## gate (42)
+## gate (43)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
@@ -64,6 +64,7 @@
 | `digital-employee-capability-eval-run.sh` | 0 | 2026-07-25 | Self-contained capability-eval runner for the digital-employee agent line. |
 | `mes-wms-golden-run.sh` | 0 | 2026-07-24 | mes-wms-golden-run.sh — self-contained golden gate runner for the 8 delivered MES/WMS FRs. |
 | `oss-e2e-gate-run.sh` | 0 | 2026-07-24 | oss-e2e-gate-run.sh — self-contained, one-command OSS E2E regression gate. |
+| `provider-neutral-architecture-gate.sh` | 0 | 2026-07-31 | Fail closed when agent/runtime fixtures or goldens hard-code a model provider. |
 | `validate-permission-codes.mjs` | 2 | 2026-05-08 | Cross-source permission-code validator. |
 | `validate-plugin-dashboards.mjs` | 1 | 2026-05-11 | Validates every plugins/<plugin>/config/dashboards/*.json against the Plan #8 |
 | `validate-plugin-i18n.mjs` | 1 | 2026-04-14 | Validates every plugins/<plugin>/config/i18n.json against the plugin i18n contract. |
@@ -79,12 +80,13 @@
 | `gen-coverage-manifest.mjs` | 2 | 2026-07-23 | Generate a coverage manifest from the DSL and the test tree. |
 | `generate-plugin-routes.mjs` | 5 | 2026-04-26 | scripts/generate-plugin-routes.mjs |
 
-## entrypoint (25)
+## entrypoint (26)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
 | `aurabot-scenario-golden-run.sh` | 0 | 2026-07-23 | aurabot-scenario-golden-run.sh — self-contained scenario golden for the |
 | `backlog-stats.sh` | 0 | 2026-03-26 | Backlog dashboard stats — counts GAP statuses across all backlog files |
+| `billing-it-run.sh` | 0 | 2026-07-31 | Exact-class billing integration-test runner with non-zero XML evidence checks. |
 | `deploy/prod-deploy.sh` | 0 | 2026-06-18 | Production deploy orchestrator. Runs the schema migration + release ledger |
 | `dev/ci-env-export.sh` | 0 | 2026-05-09 | ci-env-export.sh — env contract for generic CI runners. Defaults are |
 | `dev/enterprise-env-export.sh` | 0 | 2026-05-09 | enterprise-env-export.sh — env contract for the enterprise overlay |

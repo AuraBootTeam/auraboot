@@ -85,6 +85,10 @@ public class DefaultExecutionPrincipalResolver implements ExecutionPrincipalReso
             return resolveDigitalEmployee(
                     request, agentCode, agent, initiator, binding);
         }
+        if (initiator.type() == Initiator.Type.SYSTEM && initiatorMember != null) {
+            return resolveSystemDelegated(
+                    request, agentCode, initiator, initiatorMember, binding);
+        }
         if (initiator.type() != Initiator.Type.HUMAN) {
             throw new ExecutionPrincipalResolutionException(
                     "System/scheduled execution requires an enrolled digital employee: agentCode="
@@ -280,16 +284,53 @@ public class DefaultExecutionPrincipalResolver implements ExecutionPrincipalReso
                 roleIds(initiatorMember.getId(), request.tenantId()));
     }
 
+    /**
+     * An explicitly identified service account may invoke an unenrolled assistant without being
+     * misrepresented as a human. The account remains disabled for interactive authentication;
+     * runtime authority comes from its active tenant membership and roles.
+     */
+    private ExecutionPrincipal resolveSystemDelegated(
+            ResolveRequest request,
+            String agentCode,
+            Initiator initiator,
+            TenantMember initiatorMember,
+            AgentReleaseDeploymentService.RuntimeBinding binding) {
+        User actorUser = activeServiceAccountUser(initiator.userId(), agentCode);
+        return new ExecutionPrincipal(
+                request.tenantId(),
+                initiator.userId(),
+                initiatorMember.getId(),
+                actorUser.getPid(),
+                actorUser.getUserName(),
+                initiatorMember.getEmployeeId(),
+                null,
+                initiator,
+                DelegationGrant.directUser(),
+                agentCode,
+                binding.releasePid(),
+                binding.deploymentPid(),
+                binding.releaseHash(),
+                request.channel(),
+                ExecutionPrincipal.Type.SYSTEM,
+                roleIds(initiatorMember.getId(), request.tenantId()));
+    }
+
     private TenantMember resolveInitiatorMember(ResolveRequest request) {
-        if (request.initiatorOverride() != null
-                && request.initiatorOverride().type() != Initiator.Type.HUMAN) {
-            return null;
+        Initiator override = request.initiatorOverride();
+        if (override != null && override.type() != Initiator.Type.HUMAN) {
+            if (override.type() != Initiator.Type.SYSTEM
+                    || override.userId() == null
+                    || override.userId() <= 0L
+                    || override.memberId() == null
+                    || override.memberId() <= 0L) {
+                return null;
+            }
         }
-        Long userId = request.initiatorOverride() != null
-                ? request.initiatorOverride().userId()
+        Long userId = override != null
+                ? override.userId()
                 : request.initiatorUserId();
-        Long expectedMemberId = request.initiatorOverride() != null
-                ? request.initiatorOverride().memberId()
+        Long expectedMemberId = override != null
+                ? override.memberId()
                 : request.initiatorMemberId();
         TenantMember resolved = tenantMemberService.findByTenantIdAndUserId(
                 request.tenantId(), userId);
@@ -313,6 +354,19 @@ public class DefaultExecutionPrincipalResolver implements ExecutionPrincipalReso
                 || "deactivated".equalsIgnoreCase(user.getDeactivationStatus())) {
             throw new ExecutionPrincipalResolutionException(
                     "Execution actor user is not active: agentCode=" + agentCode);
+        }
+        return user;
+    }
+
+    private User activeServiceAccountUser(Long userId, String agentCode) {
+        User user = userService.findByUserId(userId);
+        if (user == null
+                || !"service_account".equalsIgnoreCase(user.getUserType())
+                || Boolean.TRUE.equals(user.getDeletedFlag())
+                || "deactivated".equalsIgnoreCase(user.getDeactivationStatus())) {
+            throw new ExecutionPrincipalResolutionException(
+                    "System execution actor is not an active service account: agentCode="
+                            + agentCode);
         }
         return user;
     }

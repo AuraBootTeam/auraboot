@@ -44,6 +44,8 @@ NAME="faq-loop-golden"
 SLOT=""
 KEEP=0
 SKIP_ITS=0
+IT_DB=""
+MANAGE_IT_DB=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -64,11 +66,22 @@ key_env="$AURA_LIVE_LLM_API_KEY_ENV"
   || { echo "FATAL: AURA_LIVE_LLM_API_KEY_ENV is invalid" >&2; exit 2; }
 [ -n "${!key_env:-}" ] \
   || { echo "FATAL: configured credential variable $key_env is UNSET" >&2; exit 2; }
+LIVE_ENV=(env AGENT_LLM_STUB_MODE=false)
+# The production seeder enables every provider whose credential exists. When the live profile asks
+# for Qianwen, leaving an unrelated DeepSeek key visible lets its lower numeric priority silently
+# win in the runtime stack, so the browser and the live ITs would not exercise the declared profile.
+[ "$AURA_LIVE_LLM_PROVIDER" = "qianwen" ] \
+  && LIVE_ENV=(env -u DEEPSEEK_API_KEY AGENT_LLM_STUB_MODE=false)
 
 log() { printf '\033[36m[faq-golden]\033[0m %s\n' "$*"; }
 STACK="$SCRIPT_DIR/oss-golden-stack.sh"
 
 cleanup() {
+  if [ "$MANAGE_IT_DB" -eq 1 ] && [ -n "$IT_DB" ]; then
+    log "dropping isolated backend-IT database $IT_DB"
+    psql -h "${PG_HOST:-localhost}" -p "${PG_PORT:-5432}" -d postgres -q \
+      -c "DROP DATABASE IF EXISTS \"$IT_DB\" WITH (FORCE);" >/dev/null 2>&1 || true
+  fi
   if [ "$KEEP" -eq 1 ]; then
     log "--keep: leaving the stack up ($NAME)"
     return
@@ -87,28 +100,24 @@ if [ "$SKIP_ITS" -eq 1 ]; then
 else
   log "0/6 backend ITs: fabrication gate (live LLM) + source_type really is 'conversation'"
 
-  # The ITs run against the SHARED integration-test database (application-integration-test.yml
-  # pins localhost:5432/aura_boot), not against the slot stack this script brings up. That database
-  # is provisioned out-of-band, and when it falls behind the migrations it does not announce it:
-  # KbConversationSourceIT fails with a CHECK-constraint violation on source_type='conversation',
-  # which reads exactly like the product bug it is designed to catch. It is not. Say so here, before
-  # anyone spends an afternoon on it.
-  IT_DB="${IT_PG_DB:-aura_boot}"
-  IT_CHECK=$(psql -h "${PG_HOST:-localhost}" -p "${PG_PORT:-5432}" -d "$IT_DB" -tAc \
-    "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='chk_doc_source';" 2>/dev/null || true)
-  case "$IT_CHECK" in
-    *conversation*) : ;;
-    "")
-      log "❌ integration-test DB '$IT_DB' has no chk_doc_source (or is unreachable) — environment-invalid, not a product failure"
-      exit 1 ;;
-    *)
-      log "❌ integration-test DB '$IT_DB' is BEHIND the migrations: chk_doc_source still forbids 'conversation'."
-      log "   This is environment drift, not a product failure — the migration and"
-      log "   KbTextIngestService.DB_SOURCE_TYPES both carry 'conversation' on main."
-      log "   Fix: refresh that database (scripts/reset-db.sh, PG_DB=$IT_DB) when no other worktree"
-      log "   is using it, then re-run. Do NOT 'fix' the product."
-      exit 1 ;;
-  esac
+  # Never grade against the shared aura_boot integration database. A single constraint probe used
+  # to declare it current while newer columns (for example knowledge-base visibility) were still
+  # absent, producing product-looking SQL failures. A slot-scoped, freshly migrated database makes
+  # the schema part of the evidence and is safe beside other worktrees.
+  IT_DB="${IT_PG_DB:-auraboot_faq_it_${SLOT}}"
+  if [ -z "${IT_PG_DB:-}" ]; then
+    MANAGE_IT_DB=1
+    IT_CONNECTIONS=$(psql -h "${PG_HOST:-localhost}" -p "${PG_PORT:-5432}" -d postgres -tAc \
+      "SELECT count(*) FROM pg_stat_activity WHERE datname='$IT_DB' AND pid <> pg_backend_pid();")
+    [ "$IT_CONNECTIONS" = "0" ] \
+      || { log "❌ $IT_CONNECTIONS connection(s) to $IT_DB — slot $SLOT belongs to another run"; exit 1; }
+    psql -h "${PG_HOST:-localhost}" -p "${PG_PORT:-5432}" -d postgres -q \
+      -c "DROP DATABASE IF EXISTS \"$IT_DB\" WITH (FORCE);"
+    psql -h "${PG_HOST:-localhost}" -p "${PG_PORT:-5432}" -d postgres -q \
+      -c "CREATE DATABASE \"$IT_DB\";"
+    PG_DB="$IT_DB" "$REPO_ROOT/scripts/db/flyway-migrate.sh" --edition oss >/dev/null
+  fi
+  log "    backend IT database=$IT_DB (fresh core migrations)"
 
   IT_CLASSES=(
     "com.auraboot.framework.agent.ConversationFaqExtractionLiveIT"
@@ -125,7 +134,12 @@ else
 
   # Leading colon: without it a multi-module build resolves `test` in a subproject and reports
   # "No tests found" while exiting 0.
-  "$REPO_ROOT/platform/gradlew" -p "$REPO_ROOT/platform" :test "${it_args[@]}" || true
+  "${LIVE_ENV[@]}" \
+    SPRING_DATASOURCE_URL="jdbc:postgresql://${PG_HOST:-localhost}:${PG_PORT:-5432}/$IT_DB?charSet=UTF8" \
+    SPRING_DATASOURCE_USERNAME="${IT_PG_USER:-ghj}" \
+    SPRING_DATASOURCE_PASSWORD="${IT_PG_PASSWORD:-}" \
+    "$REPO_ROOT/platform/gradlew" -p "$REPO_ROOT/platform" :test -PincludeLiveEvals \
+      "${it_args[@]}" || true
 
   for c in "${IT_CLASSES[@]}"; do
     xml="$REPO_ROOT/platform/build/test-results/test/TEST-${c}.xml"
@@ -140,7 +154,7 @@ fi
 
 # ---- 1. stack + plugin -------------------------------------------------------------------
 log "1/6 host-first stack up (slot $SLOT) + import core-faq-loop"
-bash "$STACK" up "$NAME" --slot "$SLOT" --plugin core-faq-loop
+"${LIVE_ENV[@]}" bash "$STACK" up "$NAME" --slot "$SLOT" --plugin core-faq-loop
 
 eval "$(bash "$STACK" env "$NAME" | grep '^export')"
 BE="${BACKEND_URL:?}"

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '../../fixtures';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { loginViaUI } from '../../helpers/wd-fixtures';
 import { ensureSidebarExpanded } from '../helpers';
 
 const DETAIL_PATH = '/p/c/enterprise_info_detail';
@@ -21,15 +22,7 @@ async function ensureLoggedIn(page: Page): Promise<void> {
   }
 
   const account = testAccount();
-  await page
-    .locator(
-      'input#identifier, input[name="identifier"], input#email, input[name="email"], input[type="email"]',
-    )
-    .first()
-    .fill(account.email);
-  await page.locator('input#password, input[name="password"], input[type="password"]').first().fill(account.password);
-  await page.locator('button[type="submit"], button:has-text("登录"), button:has-text("Login")').first().click();
-  await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 20_000 });
+  await loginViaUI(page, account.email, account.password);
   await page.goto(DETAIL_PATH, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 }
 

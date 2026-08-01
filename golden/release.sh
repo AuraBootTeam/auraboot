@@ -30,17 +30,18 @@ runner_for() {
     OSS-REL-RBAC)                   echo "./scripts/rbac-golden-run.sh" ;;
     OSS-REL-AURABOT)                echo "./scripts/aurabot-scenario-golden-run.sh" ;;
     OSS-REL-DIGITAL-EMPLOYEE)       echo "./scripts/digital-employee-golden-run.sh" ;;
-    OSS-REL-FAQ-LOOP)               echo "./scripts/faq-loop-golden-run.sh" ;;
+    OSS-REL-FAQ-LOOP)               echo "./scripts/faq-loop-golden-run.sh --slot ${OSS_FAQ_GOLDEN_SLOT:-73}" ;;
     OSS-REL-KB-INGESTION)           echo "./scripts/kb-ingestion-golden-run.sh" ;;
     OSS-REL-QUICK-FILTER)           echo "./scripts/quick-filter-chip-golden-run.sh" ;;
     OSS-REL-SUSPENDED-TENANT-API)   echo "./scripts/suspended-tenant-login-golden.sh" ;;
     OSS-REL-SUSPENDED-TENANT-UI)    echo "./scripts/suspended-tenant-login-ui-golden.sh" ;;
     OSS-REL-OEE-DASHBOARD)          echo "./scripts/host-oee-dashboard-golden.sh" ;;
+    OSS-REL-COLLAB-TRIO)            echo "./scripts/collab-trio-golden-run.sh" ;;
     *) return 1 ;;
   esac
 }
 
-ALL="OSS-REL-RBAC OSS-REL-AURABOT OSS-REL-DIGITAL-EMPLOYEE OSS-REL-FAQ-LOOP OSS-REL-KB-INGESTION OSS-REL-QUICK-FILTER OSS-REL-SUSPENDED-TENANT-API OSS-REL-SUSPENDED-TENANT-UI OSS-REL-OEE-DASHBOARD"
+ALL="OSS-REL-RBAC OSS-REL-AURABOT OSS-REL-DIGITAL-EMPLOYEE OSS-REL-FAQ-LOOP OSS-REL-KB-INGESTION OSS-REL-QUICK-FILTER OSS-REL-SUSPENDED-TENANT-API OSS-REL-SUSPENDED-TENANT-UI OSS-REL-OEE-DASHBOARD OSS-REL-COLLAB-TRIO"
 
 # Drift check: every release suite in the catalog must have a runner here, and vice
 # versa. Without it, adding a suite to the catalog and forgetting this file produces a
@@ -63,6 +64,11 @@ SELECTED="${GOLDEN_GATE_RELEASE_SUITES:-}"
 status=0
 ran=(); failed=(); skipped=()
 
+record_result() {
+  [ -n "${GOLDEN_GATE_RELEASE_RESULT_FILE:-}" ] || return 0
+  printf '%s\t%s\t%s\n' "$1" "$2" "${3:-}" >> "$GOLDEN_GATE_RELEASE_RESULT_FILE"
+}
+
 for id in $SELECTED; do
   cmd="$(runner_for "$id")" || {
     echo "[release] FAIL: unknown release suite id '$id' — golden/release.sh and test-catalog.json disagree"
@@ -77,13 +83,19 @@ for id in $SELECTED; do
   if [ "$id" = "OSS-REL-OEE-DASHBOARD" ] && [ "${OSS_GOLDEN_OEE_STACK:-}" != "1" ]; then
     echo "[release] SKIP $id — needs an already-running host stack; set OSS_GOLDEN_OEE_STACK=1 to run it. NOT green."
     skipped+=("$id")
+    record_result "$id" SKIP "OSS_GOLDEN_OEE_STACK is not enabled"
     continue
   fi
 
   echo ""
   echo "───────────── $id"
   echo "  \$ $cmd"
-  if bash -c "$cmd"; then ran+=("$id"); else status=1; failed+=("$id"); fi
+  if bash -c "$cmd"; then
+    ran+=("$id"); record_result "$id" PASS
+  else
+    failed+=("$id"); record_result "$id" FAIL "runner exited non-zero"
+    [ "$id" = "OSS-REL-OEE-DASHBOARD" ] || status=1
+  fi
 done
 
 echo ""

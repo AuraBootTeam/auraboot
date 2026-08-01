@@ -3,6 +3,7 @@ import {
   buildDetailRecordEndpoint,
   collectDetailDictCodes,
   enrichDetailField,
+  evaluateDetailVisibleWhen,
   extractBlockDataRows,
   getByDataPath,
   injectDetailRecordValueIntoCustomBlock,
@@ -452,6 +453,24 @@ describe('resolveVisibleTopLevelDetailBlocks', () => {
     expect(resolveVisibleTopLevelDetailBlocks(blocks, () => false).map((block) => block.id)).toEqual([
       'always',
     ]);
+  });
+});
+
+describe('evaluateDetailVisibleWhen', () => {
+  it('evaluates top-level detail visibility against reactive runtime state', () => {
+    const record = { status: 'completed' };
+
+    expect(
+      evaluateDetailVisibleWhen('state.showImportEvidence === true', record, {
+        state: { showImportEvidence: true },
+      }),
+    ).toBe(true);
+    expect(
+      evaluateDetailVisibleWhen('state.showImportEvidence === true', record, {
+        state: { showImportEvidence: false },
+      }),
+    ).toBe(false);
+    expect(evaluateDetailVisibleWhen("form.status == 'completed'", record)).toBe(true);
   });
 });
 

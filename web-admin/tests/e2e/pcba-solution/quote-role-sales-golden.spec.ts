@@ -81,11 +81,30 @@ async function fillDialogField(page: Page, field: string, value: string): Promis
   await expect(input).toHaveValue(value);
 }
 
+function pricingCompletionModal(page: Page) {
+  return page
+    .locator('div.fixed.inset-0')
+    .filter({ hasText: /修改套数\/价格系数已完成|Edit Sets \/ Price Factor.*completed/i })
+    .first();
+}
+
+async function dismissPricingCompletion(page: Page): Promise<void> {
+  const modal = pricingCompletionModal(page);
+  if (!(await modal.isVisible().catch(() => false))) return;
+  await modal.getByRole('button', { name: /^(关闭|Close)$/ }).last().click();
+  await expect(modal).toBeHidden({ timeout: 15_000 });
+}
+
 async function updateQuotePricingInputs(
   page: Page,
   setCount: number,
   priceFactor: number,
 ): Promise<void> {
+  // A prior async recompute may have reached terminal state between the last
+  // assertion and this call. Close that exact overlay before interacting with
+  // the toolbar behind it; waiting only for FormDialog to hide does not prove
+  // the async completion modal has unmounted.
+  await dismissPricingCompletion(page);
   await page.getByRole('tab', { name: /资料上传|Materials/ }).click();
   await page.getByRole('button', { name: /修改套数|Edit Sets/ }).click();
   await expect(page.getByTestId('form-dialog')).toBeVisible({ timeout: 15_000 });
@@ -106,9 +125,10 @@ async function updateQuotePricingInputs(
     String(recomputeBody.code),
     `recompute_quantities response: ${JSON.stringify(recomputeBody).slice(0, 600)}`,
   ).toBe('0');
-  const recomputeClose = page.getByRole('button', { name: /^(关闭|Close)$/ });
-  await expect(recomputeClose).toBeVisible({ timeout: 60_000 });
-  await recomputeClose.click();
+  const completionModal = pricingCompletionModal(page);
+  await expect(completionModal).toBeVisible({ timeout: 60_000 });
+  await completionModal.getByRole('button', { name: /^(关闭|Close)$/ }).last().click();
+  await expect(completionModal).toBeHidden({ timeout: 15_000 });
   await expect(page.getByTestId('form-dialog')).toBeHidden();
 }
 
@@ -724,7 +744,9 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         );
         await expect(recentCandidateAfterFactor).toContainText('原始单价');
         await expect(recentCandidateAfterFactor).toContainText('系数后单价');
-        await expect(recentCandidateAfterFactor).toContainText('0.0210');
+        // Price display trims insignificant trailing zeroes under the current
+        // candidate renderer; both forms represent the same raw unit price.
+        await expect(recentCandidateAfterFactor).toContainText(/0\.021(?:0)?/);
         await expect(recentCandidateAfterFactor).toContainText('0.02205');
         await recentCandidateAfterFactor.screenshot({
           path: testInfo.outputPath('ordinary-sales-non-ladder-factor-price.png'),
@@ -814,7 +836,13 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       await expect(previewPanel).toContainText(REPRICE_MPN);
       await expect(previewPanel).toContainText('YAGEO');
       await expect(previewPanel).toContainText('10kΩ ±1% 62.5mW 0402 chip resistor');
-      await expect(page.getByTestId('review-drawer-price-comparison')).toHaveCount(0);
+      // Thin compositions keep the page behind the review overlay mounted. Scope
+      // this assertion to the active preview so an unrelated background block
+      // cannot be mistaken for the supplier ladder rendered in this drawer.
+      await expect(previewPanel.getByTestId('review-drawer-price-comparison')).toHaveCount(0);
+      await expect(
+        previewPanel.getByTestId('review-drawer-candidate-priceLadderRows-ladder'),
+      ).toBeVisible();
       await expect(previewPanel).toContainText('1000+');
       await expect(previewPanel).toContainText('0.01');
       await expect(previewPanel).toContainText('0.0105');

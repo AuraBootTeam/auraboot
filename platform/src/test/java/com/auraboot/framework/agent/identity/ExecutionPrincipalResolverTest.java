@@ -216,6 +216,68 @@ class ExecutionPrincipalResolverTest {
     }
 
     @Test
+    @DisplayName("identified service account invokes an unenrolled assistant as a system principal")
+    void serviceAccountUsesSystemPrincipal() {
+        when(agentDefinitionMapper.findByTenantIdAndAgentCode(TENANT_ID, "public_assistant"))
+                .thenReturn(agent("public_assistant", null, null));
+        TenantMember serviceMember =
+                member(AGENT_MEMBER_ID, AGENT_USER_ID, null, "active");
+        when(tenantMemberService.findByTenantIdAndUserId(TENANT_ID, AGENT_USER_ID))
+                .thenReturn(serviceMember);
+        when(userRoleService.getRoleIdsByMemberIdAndTenantId(AGENT_MEMBER_ID, TENANT_ID))
+                .thenReturn(List.of());
+        when(userService.findByUserId(AGENT_USER_ID))
+                .thenReturn(serviceAccountUser(AGENT_USER_ID, "USR_SERVICE", "public-visitor"));
+        Initiator system = new Initiator(
+                Initiator.Type.SYSTEM,
+                AGENT_USER_ID,
+                AGENT_MEMBER_ID,
+                "cs_widget");
+
+        ExecutionPrincipal principal = resolver.resolve(
+                new ExecutionPrincipalResolver.ResolveRequest(
+                        TENANT_ID,
+                        AGENT_USER_ID,
+                        AGENT_MEMBER_ID,
+                        "public_assistant",
+                        "cs_widget",
+                        system));
+
+        assertThat(principal.type()).isEqualTo(ExecutionPrincipal.Type.SYSTEM);
+        assertThat(principal.actorUserId()).isEqualTo(AGENT_USER_ID);
+        assertThat(principal.actorMemberId()).isEqualTo(AGENT_MEMBER_ID);
+        assertThat(principal.initiator()).isEqualTo(system);
+        assertThat(principal.delegation().mode()).isEqualTo(DelegationGrant.Mode.DIRECT_USER);
+    }
+
+    @Test
+    @DisplayName("system principal rejects a human account mislabeled as a service actor")
+    void systemPrincipalRejectsHumanAccount() {
+        when(agentDefinitionMapper.findByTenantIdAndAgentCode(TENANT_ID, "public_assistant"))
+                .thenReturn(agent("public_assistant", null, null));
+        when(tenantMemberService.findByTenantIdAndUserId(TENANT_ID, AGENT_USER_ID))
+                .thenReturn(member(AGENT_MEMBER_ID, AGENT_USER_ID, null, "active"));
+        when(userService.findByUserId(AGENT_USER_ID))
+                .thenReturn(user(AGENT_USER_ID, "USR_HUMAN", "human"));
+        Initiator system = new Initiator(
+                Initiator.Type.SYSTEM,
+                AGENT_USER_ID,
+                AGENT_MEMBER_ID,
+                "cs_widget");
+
+        assertThatThrownBy(() -> resolver.resolve(
+                new ExecutionPrincipalResolver.ResolveRequest(
+                        TENANT_ID,
+                        AGENT_USER_ID,
+                        AGENT_MEMBER_ID,
+                        "public_assistant",
+                        "cs_widget",
+                        system)))
+                .isInstanceOf(ExecutionPrincipalResolutionException.class)
+                .hasMessageContaining("active service account");
+    }
+
+    @Test
     @DisplayName("deployment channel policy rejects an otherwise valid caller")
     void channelPolicyFailsClosed() {
         when(releaseDeploymentService.requireActive(TENANT_ID, "draft_agent"))
@@ -319,6 +381,13 @@ class ExecutionPrincipalResolverTest {
     private static User systemAgentUser(Long id, String pid, String username) {
         User user = user(id, pid, username);
         user.setUserType("system_agent");
+        user.setEnabled(false);
+        return user;
+    }
+
+    private static User serviceAccountUser(Long id, String pid, String username) {
+        User user = user(id, pid, username);
+        user.setUserType("service_account");
         user.setEnabled(false);
         return user;
     }

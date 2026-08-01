@@ -43,6 +43,16 @@ export interface MemberPickerProps {
 }
 
 /**
+ * Some read APIs already project a user PID to its display label but do not
+ * expose a separate `<field>_display` property. A label containing whitespace
+ * cannot be a path-style public PID, so treat it as resolved instead of issuing
+ * a guaranteed-to-fail `/api/admin/users/<label>` lookup.
+ */
+function isResolvedMemberLabel(value: string): boolean {
+  return /\s/u.test(value.trim());
+}
+
+/**
  * MemberPicker - User/member selection field with avatar chips
  */
 export const MemberPicker: React.FC<MemberPickerProps> = ({
@@ -132,6 +142,10 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
       const resolveMembers = async () => {
         const members: MemberOption[] = [];
         for (const id of selectedIds) {
+          if (isResolvedMemberLabel(id)) {
+            members.push({ id, name: id });
+            continue;
+          }
           try {
             const res = await fetch(`/api/admin/users/${id}`);
             if (res.ok) {
@@ -145,12 +159,14 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
                   email: String(result.data.email || ''),
                   department: result.data.department ? String(result.data.department) : undefined,
                 });
+                continue;
               }
             }
           } catch {
-            // CATCH: non-transactional HTTP call, fallback to ID display
-            members.push({ id, name: id });
+            // CATCH: non-transactional HTTP call; raw-value fallback is appended below.
           }
+          // Preserve the persisted value when a stale/deleted user cannot be resolved.
+          members.push({ id, name: id });
         }
         setSelectedMembers(members);
       };

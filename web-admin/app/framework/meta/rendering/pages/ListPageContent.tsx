@@ -171,6 +171,17 @@ export function resolveListSystemReferenceDisplayConfig(
   return LIST_SYSTEM_REFERENCE_DISPLAY_MODELS[modelCode];
 }
 
+/**
+ * System-reference detail endpoints accept public identifiers, not projected
+ * display labels. Some list APIs already return a label in the raw reference
+ * field; whitespace cannot occur in a path-style public PID, so such values
+ * should render directly instead of generating guaranteed 404 lookups.
+ */
+export function shouldResolveListSystemReferenceValue(value: string): boolean {
+  const normalized = value.trim();
+  return normalized.length > 0 && !/\s/u.test(normalized);
+}
+
 function pickSystemReferenceLabel(
   row: Record<string, any>,
   configuredDisplayField: string,
@@ -2826,7 +2837,7 @@ function ListPageContentInner(props: PageContentProps) {
             const systemConfig = resolveListSystemReferenceDisplayConfig(config.modelCode);
             if (systemConfig) {
               await Promise.all(
-                values.map(async (value) => {
+                values.filter(shouldResolveListSystemReferenceValue).map(async (value) => {
                   const result = await fetchResult<Record<string, any>>(
                     `${systemConfig.detailEndpoint}/${encodeURIComponent(value)}`,
                     {
@@ -4602,8 +4613,23 @@ function ListPageContentInner(props: PageContentProps) {
                 keyword={keyword}
                 onKeywordChange={setKeyword}
                 onSearch={() => {
-                  // Flush debounced URL sync + cancel pending auto-search, then search immediately
-                  syncKeywordToUrl.flush();
+                  // Enter is an explicit commit. Do not rely on flush(): the
+                  // debounce may already have fired (or been consumed by a
+                  // concurrent list-state update), in which case flush is a
+                  // no-op and a stale URL writer can drop the keyword. Commit
+                  // from the synchronous ref with a functional update so
+                  // pagination/filter params changed in the same tick survive.
+                  syncKeywordToUrl.cancel();
+                  setSearchParams(
+                    (prev) => {
+                      const p = new URLSearchParams(prev);
+                      const value = keywordRef.current.trim();
+                      if (value) p.set('keyword', value);
+                      else p.delete('keyword');
+                      return p;
+                    },
+                    { replace: true },
+                  );
                   debouncedSearch.cancel();
                   loadData({ page: 0, size: pagination.pageSize });
                 }}

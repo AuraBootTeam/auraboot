@@ -247,7 +247,10 @@ container_plugin_path() {
     local plugin="$1"
     local candidate
 
-    if path_has_plugin "$plugin"; then
+    # Bare profile entries are plugin names, never filesystem paths. Requiring
+    # an absolute path here prevents the caller's cwd from turning a plugin
+    # name into a relative import path rejected by the backend API.
+    if [[ "$plugin" = /* ]] && path_has_plugin "$plugin"; then
         printf '%s\n' "$plugin"
         return 0
     fi
