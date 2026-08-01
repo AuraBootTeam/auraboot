@@ -18,6 +18,13 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { uniqueId } from '../helpers';
 
+// The detail page is localized and the assertions below intentionally use its English labels.
+// Pin the locale just like the other knowledge-ingestion goldens so the suite does not inherit the
+// bootstrap user's zh-CN default.
+test.beforeEach(async ({ context }) => {
+  await context.addCookies([{ name: 'locale', value: 'en-US', domain: '127.0.0.1', path: '/' }]);
+});
+
 /** The page the backend will fetch. Chrome (nav/footer) is here so we can prove it gets dropped. */
 const PAGE_HTML = `<!doctype html>
 <html>
@@ -97,8 +104,6 @@ test.describe('S2 knowledge ingestion — URL fetch', () => {
       data: {
         name: KB_NAME,
         description: 'S2/M2 golden — URL ingestion',
-        embeddingProvider: 'openai',
-        embeddingModel: 'text-embedding-3-small',
         chunkSize: 300,
         chunkOverlap: 30,
       },
@@ -206,8 +211,6 @@ test.describe('S2 knowledge ingestion — URL is an SSRF sink', () => {
       data: {
         name: `S2 SSRF ${uniqueId('KB')}`,
         description: 'S2/M2 — SSRF refusal',
-        embeddingProvider: 'openai',
-        embeddingModel: 'text-embedding-3-small',
         chunkSize: 300,
         chunkOverlap: 30,
       },

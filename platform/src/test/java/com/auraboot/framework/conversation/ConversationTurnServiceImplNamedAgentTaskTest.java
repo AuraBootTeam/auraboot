@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -99,6 +100,55 @@ class ConversationTurnServiceImplNamedAgentTaskTest {
                 f.errorMessage() != null
                         && f.errorMessage().contains("Named-agent task close failed")
                         && f.errorMessage().contains("task update down")));
+    }
+
+    @Test
+    @DisplayName("failed named-agent turn closes its task instead of stranding in_progress")
+    void failedNamedAgentTurnClosesTask() {
+        ConversationTurnServiceImpl service = newService();
+        Long tenantId = 1L;
+        Long userId = 2L;
+        MetaContext.setContext(tenantId, userId, "user-2", "tester");
+        when(agentChatPort.agentExists(eq(tenantId), eq("sales_agent"))).thenReturn(true);
+        when(dynamicDataMapper.insert(eq("ab_agent_task"), any())).thenReturn(1);
+        when(agentChatPort.runAgentTurn(any(), any(), any(), any()))
+                .thenReturn(new TurnOutcome.Failed("provider timeout", null));
+
+        TurnOutcome outcome = service.runTurn(namedAgentTurn(tenantId, userId, "sales_agent"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+        verify(dynamicDataMapper, times(1)).update(
+                eq("ab_agent_task"),
+                argThat(updates -> "failed".equals(updates.get("task_status"))
+                        && updates.get("completed_at") != null
+                        && String.valueOf(updates.get("output_data")).contains("provider timeout")
+                        && !updates.containsKey("error_message")),
+                argThat(where -> where.get("pid") != null));
+    }
+
+    @Test
+    @DisplayName("interrupted named-agent turn closes its task as completed")
+    void interruptedNamedAgentTurnClosesTask() {
+        ConversationTurnServiceImpl service = newService();
+        Long tenantId = 1L;
+        Long userId = 2L;
+        MetaContext.setContext(tenantId, userId, "user-2", "tester");
+        when(agentChatPort.agentExists(eq(tenantId), eq("sales_agent"))).thenReturn(true);
+        when(dynamicDataMapper.insert(eq("ab_agent_task"), any())).thenReturn(1);
+        when(agentChatPort.runAgentTurn(any(), any(), any(), any()))
+                .thenReturn(new TurnOutcome.Interrupted("partial", "user_cancelled"));
+
+        TurnOutcome outcome = service.runTurn(namedAgentTurn(tenantId, userId, "sales_agent"), sink);
+
+        assertThat(outcome).isInstanceOf(TurnOutcome.Interrupted.class);
+        verify(dynamicDataMapper, times(1)).update(
+                eq("ab_agent_task"),
+                argThat(updates -> "completed".equals(updates.get("task_status"))
+                        && updates.get("completed_at") != null
+                        && String.valueOf(updates.get("output_data"))
+                                .contains("interrupted:user_cancelled")
+                        && !updates.containsKey("error_message")),
+                argThat(where -> where.get("pid") != null));
     }
 
     private ConversationTurnServiceImpl newService() {

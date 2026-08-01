@@ -138,7 +138,11 @@ test.describe('BOM LLM format-review UI (BOM-09/10 UI counterpart) @smoke', () =
       await expect(
         page.getByRole('heading', { name: /候选物料|Candidate Materials/i }),
       ).toBeVisible();
-      await expect(page.getByText(/导出影响与历史|Export Impact/i).last()).toBeVisible();
+      const exportHistory = page.getByTestId('review-drawer-tab-export');
+      await expect(exportHistory).toBeVisible();
+      await expect(exportHistory.locator('summary')).toContainText(
+        /决策历史与导出影响|导出影响与历史|Decision History.*Export|Export.*History/i,
+      );
     } finally {
       await context.close();
     }

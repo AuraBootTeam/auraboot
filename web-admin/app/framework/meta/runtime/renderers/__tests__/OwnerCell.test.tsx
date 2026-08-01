@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Avoid network in unit tests: teams resolve empty, user lookup "fails" → id fallback.
 vi.mock('~/shared/services/teamService', () => ({ fetchTeams: vi.fn().mockResolvedValue([]) }));
@@ -8,8 +8,13 @@ vi.mock('~/shared/services/http-client', () => ({ get: vi.fn().mockResolvedValue
 
 import { OwnerCell } from '../OwnerCell';
 import { cellRendererRegistry } from '../CellRendererRegistry';
+import { get } from '~/shared/services/http-client';
 
 describe('OwnerCell — polymorphic owner display', () => {
+  beforeEach(() => {
+    vi.mocked(get).mockClear();
+  });
+
   it('renders the team icon (👥) + id fallback for a team owner', async () => {
     const { container } = render(<OwnerCell ownerType="team" ownerId="team-1" />);
     await waitFor(() => expect(container.querySelector('svg')).toBeTruthy());
@@ -20,6 +25,12 @@ describe('OwnerCell — polymorphic owner display', () => {
     const { container } = render(<OwnerCell ownerType="user" ownerId="user-9" />);
     await waitFor(() => expect(container.querySelector('svg')).toBeTruthy());
     expect(container.textContent).toContain('user-9');
+  });
+
+  it('keeps an already-resolved owner label without looking it up as a PID', async () => {
+    const { container } = render(<OwnerCell ownerType="user" ownerId="Smoke Sales" />);
+    await waitFor(() => expect(container.textContent).toContain('Smoke Sales'));
+    expect(get).not.toHaveBeenCalled();
   });
 
   it('renders "-" when owner is unset', () => {

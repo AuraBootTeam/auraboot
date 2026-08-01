@@ -500,7 +500,7 @@ export async function ensureFilterFormOpen(page: Page, timeout = 5000): Promise<
  * This helper waits for both stages to complete by checking for
  * the presence of interactive form elements.
  */
-export async function waitForFormReady(page: Page, timeout = 10000): Promise<void> {
+export async function waitForFormReady(page: Page, timeout = 30000): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
 
   // Wait for any loading spinner to disappear
@@ -515,10 +515,10 @@ export async function waitForFormReady(page: Page, timeout = 10000): Promise<voi
       '.ant-form-item, ' +
       '[data-testid="dynamic-form"]',
   );
-  await formContent
-    .first()
-    .waitFor({ state: 'visible', timeout })
-    .catch(() => {});
+  // This is the readiness verdict, not a best-effort delay. Swallowing its
+  // timeout lets the test continue while the route still shows only skeletons,
+  // which is then misreported as a missing business field.
+  await formContent.first().waitFor({ state: 'visible', timeout });
 
   // Some dynamic forms render component-loader placeholders first
   // (for example "Loading SmartInput..."). Wait for those placeholders

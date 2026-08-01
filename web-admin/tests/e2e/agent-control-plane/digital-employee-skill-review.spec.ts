@@ -31,6 +31,21 @@ const COLLEAGUE_NAME = '客户运营助理·小奥';
 const REVIEW_SKILL = 'crm_quarterly_review';
 const SHOTS = 'test-results/digital-employee';
 
+async function seedReviewAccount(request: APIRequestContext): Promise<string> {
+  const suffix = Date.now().toString(36);
+  const name = `季度复盘样本-${suffix}`;
+  const created = await request.post('/api/dynamic/crm_account/create', {
+    data: {
+      crm_acc_name: name,
+      crm_acc_code: `review-${suffix}`,
+      crm_acc_industry: '软件',
+      crm_acc_rating: 'A',
+    },
+  });
+  expect(created.status(), 'the review must seed its own grounding account').toBeLessThan(400);
+  return name;
+}
+
 /** Seed the ops colleague if it is not already present (idempotent). */
 async function ensureOpsColleague(request: APIRequestContext): Promise<void> {
   const llmProvider = process.env.AURA_LIVE_LLM_PROVIDER;
@@ -84,11 +99,12 @@ test.describe('Digital employee — bound skill drives a real customer review', 
   }) => {
     // Self-seed the colleague so the golden is not born-red on a fresh stack.
     await ensureOpsColleague(page.request);
+    const sampleName = await seedReviewAccount(page.request);
 
     // Read the real customer population the skill will ground on, so the assertions
     // are not tied to a fixed seed size. Goes through the same BFF the app uses
     // (session cookie from storageState), so it sees exactly what the colleague sees.
-    const listResp = await page.request.get('/api/dynamic/crm_account/list?pageNum=1&pageSize=5');
+    const listResp = await page.request.get('/api/dynamic/crm_account/list?pageNum=1&pageSize=500');
     expect(listResp.ok(), 'customer list query must succeed').toBeTruthy();
     const listData = (await listResp.json())?.data ?? {};
     const customerTotal: number = listData.total ?? 0;
@@ -97,8 +113,10 @@ test.describe('Digital employee — bound skill drives a real customer review', 
       customerTotal,
       'the stack must have seeded customers for the review to ground on (env precondition)',
     ).toBeGreaterThan(0);
-    const sampleName = records[0]?.crm_acc_name;
-    expect(sampleName, 'a seeded customer must have a name to ground on').toBeTruthy();
+    expect(
+      records.some((record) => record.crm_acc_name === sampleName),
+      'the self-seeded customer must be visible to the same tenant before the live turn',
+    ).toBe(true);
 
     // Reach the colleague the way a person does — click through, don't build the URL.
     await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });

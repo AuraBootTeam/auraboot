@@ -2,6 +2,8 @@ package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.triage.TriageBucket;
 import com.auraboot.framework.agent.dto.ChatRequest;
+import com.auraboot.framework.agent.identity.Initiator;
+import com.auraboot.framework.agent.port.AgentTurnOverrides;
 
 import java.util.Map;
 
@@ -45,6 +47,48 @@ public record TurnRequest(
         TriageBucket precomputedBucket,
         Long inboundMessageId,                    // D.1: existing ab_im_message.id when inboundMode=EXISTING_MESSAGE_ID
         String parentTaskPid,                     // DC.3c Fix 3: ab_agent_task.pid of upstream hop (null = root turn)
-        com.auraboot.framework.agent.port.AgentTurnOverrides overrides,  // DC.3c: server-only context overrides; null = defaults
+        AgentTurnOverrides overrides,                  // DC.3c: server-only context overrides; null = defaults
+        Initiator initiatorOverride,                   // trusted channel adapters only; null = authenticated human
         ChatRequest legacyRequest                 // v4: original ChatRequest preserved for Phase A
-) {}
+) {
+    /**
+     * Compatibility constructor for ordinary authenticated-human channels. System-facing channel
+     * adapters use the canonical constructor and provide an explicit initiator.
+     */
+    public TurnRequest(
+            long tenantId,
+            long userId,
+            Long humanMemberId,
+            String channel,
+            String agentCode,
+            Long conversationId,
+            String clientMsgId,
+            String userMessage,
+            Map<String, Object> pageContext,
+            Map<String, Object> options,
+            InboundMode inboundMode,
+            TriageBucket precomputedBucket,
+            Long inboundMessageId,
+            String parentTaskPid,
+            AgentTurnOverrides overrides,
+            ChatRequest legacyRequest) {
+        this(
+                tenantId,
+                userId,
+                humanMemberId,
+                channel,
+                agentCode,
+                conversationId,
+                clientMsgId,
+                userMessage,
+                pageContext,
+                options,
+                inboundMode,
+                precomputedBucket,
+                inboundMessageId,
+                parentTaskPid,
+                overrides,
+                null,
+                legacyRequest);
+    }
+}

@@ -242,7 +242,7 @@ test.describe('Conversation → FAQ loop — menu reachability and the remaining
     await expect(
       main(page),
       'an empty required question is refused, and the form stays put',
-    ).toContainText(/必填|不能为空|required|cannot be empty/i, { timeout: 10000 });
+    ).toContainText(/必填|不能为空|请填写问题|required|cannot be empty/i, { timeout: 10000 });
     const afterEmpty = (await fetchCandidates(page)).find((c) => c.pid === pid);
     expect(afterEmpty?.faq_question, 'the empty submit persisted nothing').toBe(originalQuestion);
 

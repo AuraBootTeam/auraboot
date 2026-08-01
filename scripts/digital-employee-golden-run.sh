@@ -65,6 +65,7 @@ SLOT="72"
 KEEP=0
 REPEAT=1
 LIVE=0
+LIVE_ENV=(env)
 
 # One spec in this directory asserts `.not.toContain('[stub response]')`, and it
 # is right to: a colleague that cannot answer is the defect this whole suite was
@@ -101,8 +102,8 @@ done
 GOLDEN_RC=1
 cleanup() {
   local rc=$?
-  if [[ "$KEEP" == 1 || "$GOLDEN_RC" != 0 ]]; then
-    echo "[de-golden] leaving stack '$NAME' up for inspection (env: $GS env $NAME)"
+  if [[ "$KEEP" == 1 || "$rc" != 0 ]]; then
+    echo "[de-golden] leaving stack '$NAME' up for inspection after rc=$rc (env: $GS env $NAME)"
     echo "[de-golden] destroy it with: $GS destroy $NAME"
   else
     echo "[de-golden] tearing down stack '$NAME'..."
@@ -133,6 +134,12 @@ if [[ "$LIVE" == 1 ]]; then
     || die "AURA_LIVE_LLM_API_KEY_ENV is invalid"
   [[ -n "${!key_env:-}" ]] \
     || die "configured credential variable $key_env is UNSET"
+  # Make the declared live profile the only eligible seeded provider. A developer
+  # may have credentials for several vendors in the shell; letting a lower-priority
+  # unrelated provider win would make the receipt disagree with the requested run.
+  if [[ "$AURA_LIVE_LLM_PROVIDER" == "qianwen" ]]; then
+    LIVE_ENV=(env -u DEEPSEEK_API_KEY)
+  fi
   export AGENT_LLM_STUB_MODE=false
   echo "[de-golden] mode: LIVE — provider=$AURA_LIVE_LLM_PROVIDER model=$AURA_LIVE_LLM_MODEL key=$key_env=SET"
 else
@@ -145,7 +152,7 @@ fi
 
 echo "[de-golden] 1/4 fresh stack (destroy prior + up + import)"
 "$GS" destroy "$NAME" >/dev/null 2>&1 || true
-"$GS" up "$NAME" --slot "$SLOT" --ttl 2h || die "stack bring-up failed"
+"${LIVE_ENV[@]}" "$GS" up "$NAME" --slot "$SLOT" --ttl 2h || die "stack bring-up failed"
 # The e2e profile, not the default core one: core's seven plugins do not include
 # agent-control-plane, and without it two thirds of this suite fails on "ACP
 # plugin must be installed" — a harness answer wearing a product failure's
@@ -161,7 +168,7 @@ cd "$REPO_ROOT/web-admin" || die "web-admin not found"
 rm -rf test-results/digital-employee
 set +e
 PW_ARGS=(tests/e2e/agent-control-plane/ --project=contract
-         --repeat-each="$REPEAT" --reporter=line)
+         --workers=1 --repeat-each="$REPEAT" --reporter=line)
 # No --grep-invert: the spec self-skips under stub mode, and a reported skip is
 # better evidence than a test that was never selected.
 NO_PROXY=localhost,127.0.0.1 PW_PROFILE=contract \
@@ -193,20 +200,37 @@ if [[ "$LIVE" == 1 ]]; then
 SQL
   )
   usage_gate_rc=$?
-  terminal_gate=$(
-    PGPASSWORD="$PGPASSWORD" psql \
-      -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" \
-      -v ON_ERROR_STOP=1 \
-      -t -A <<'SQL'
-        SELECT COUNT(*)
-        FROM ab_agent_task
-        WHERE deleted_flag = false
-          AND assignee_type = 'ai'
-          AND task_status = 'in_progress'
-          AND COALESCE(input_data, '{}')::jsonb ? 'turnId';
+  terminal_gate=""
+  terminal_gate_rc=0
+  # Browser success can become visible a few seconds before the async approval
+  # continuation commits the task lifecycle update. A single immediate SELECT
+  # therefore reported a false stranded turn even though the exact row reached
+  # completed 3.7s later. Require bounded convergence instead: this still fails
+  # a genuinely stuck task, but gives the normal transaction/async tail up to
+  # 30 seconds to become observable.
+  for ((terminal_attempt = 1; terminal_attempt <= 30; terminal_attempt++)); do
+    terminal_gate=$(
+      PGPASSWORD="$PGPASSWORD" psql \
+        -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" \
+        -v ON_ERROR_STOP=1 \
+        -t -A <<'SQL'
+          SELECT COUNT(*)
+          FROM ab_agent_task
+          WHERE deleted_flag = false
+            AND assignee_type = 'ai'
+            AND task_status = 'in_progress'
+            AND COALESCE(input_data, '{}')::jsonb ? 'turnId';
 SQL
-  )
-  terminal_gate_rc=$?
+    )
+    terminal_gate_rc=$?
+    if [[ "$terminal_gate_rc" != 0 || "$terminal_gate" == 0 ]]; then
+      break
+    fi
+    if [[ "$terminal_attempt" == 1 ]]; then
+      echo "[de-golden]     waiting for interactive task terminality (max 30s)"
+    fi
+    sleep 1
+  done
   set -e 2>/dev/null || true
 
   if [[ "$usage_gate_rc" != 0 || ! "$usage_gate" =~ ^[0-9]+\|[0-9]+$ ]]; then
@@ -229,6 +253,18 @@ SQL
     echo "[de-golden]     stuck interactive turns=$STUCK_INTERACTIVE_TURNS"
     if [[ "$STUCK_INTERACTIVE_TURNS" != 0 ]]; then
       echo "[de-golden] FAIL: at least one browser-driven turn is stranded in progress"
+      echo "[de-golden]     stranded task details:"
+      PGPASSWORD="$PGPASSWORD" psql \
+        -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" \
+        -v ON_ERROR_STOP=1 \
+        -P pager=off \
+        -c "SELECT pid, assignee_id, input_data, created_at, updated_at
+              FROM ab_agent_task
+             WHERE deleted_flag = false
+               AND assignee_type = 'ai'
+               AND task_status = 'in_progress'
+               AND COALESCE(input_data, '{}')::jsonb ? 'turnId'
+             ORDER BY created_at" || true
       [[ "$GOLDEN_RC" == 0 ]] && GOLDEN_RC=5
     fi
   fi
@@ -271,7 +307,7 @@ else
   echo "[de-golden]   DIGITAL EMPLOYEE GOLDEN: FAIL (rc=$GOLDEN_RC)"
   echo "[de-golden]   artifacts:   web-admin/test-results/"
   echo "[de-golden]   screenshots: web-admin/test-results/digital-employee/ ($SHOTS)"
-  echo "[de-golden]   the stack is still up — inspect it before destroying"
+  echo "[de-golden]   use --keep on a focused rerun when live-stack inspection is needed"
   echo "[de-golden] ############################################"
 fi
 

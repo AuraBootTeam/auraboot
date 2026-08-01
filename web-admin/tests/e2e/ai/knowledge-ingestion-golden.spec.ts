@@ -112,8 +112,6 @@ test.describe('S2 knowledge ingestion — PPTX / XLSX', () => {
       data: {
         name: KB_NAME,
         description: 'S2/M1 golden — office document ingestion',
-        embeddingProvider: 'openai',
-        embeddingModel: 'text-embedding-3-small',
         chunkSize: 300,
         chunkOverlap: 30,
       },

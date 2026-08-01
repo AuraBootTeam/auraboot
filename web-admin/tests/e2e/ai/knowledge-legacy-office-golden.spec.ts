@@ -56,8 +56,6 @@ test.describe('S2 — legacy .ppt and .xls', () => {
       data: {
         name: KB_NAME,
         description: 'S2 — legacy binary Office formats',
-        embeddingProvider: 'openai',
-        embeddingModel: 'text-embedding-3-small',
         chunkSize: 300,
         chunkOverlap: 30,
       },

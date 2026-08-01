@@ -51,14 +51,14 @@ test.describe('PCBA quote BOM price ladder + MOQ warning', () => {
       );
       expect(ladderRows).toEqual(
         expect.arrayContaining([
-          '100+ 0.0092 0.0092',
-          '1000+ 当前 0.0090 0.0090',
+          '100–999 0.0092 0.0092',
+          '1000–2999 当前 0.009 0.009',
           '50000+ 0.0082 0.0082',
         ]),
       );
       await expect(
         page.getByTestId(`review-drawer-ladder-current-${created.ladderEvidenceId}`),
-      ).toHaveText(/1000\+\s*(?:当前)?\s*0\.009(?:0)?/);
+      ).toHaveText(/1000–2999\s*(?:当前)?\s*0\.009(?:0)?/);
       // 起订提醒: none — demand qty (1000) is at/above MOQ (100).
       await expect(ladderCandidate).not.toContainText('需按 MOQ');
 
@@ -90,7 +90,7 @@ test.describe('PCBA quote BOM price ladder + MOQ warning', () => {
           .allInnerTexts()
       ).map((text) => text.replace(/\s+/g, ' ').trim());
       expect(moqLadderRows).toEqual(
-        expect.arrayContaining(['100+ 当前 0.0051 0.0051', '5000+ 0.0039 0.0039']),
+        expect.arrayContaining(['100–999 当前 0.0051 0.0051', '5000+ 0.0039 0.0039']),
       );
     } finally {
       await cleanupRows(page, created);

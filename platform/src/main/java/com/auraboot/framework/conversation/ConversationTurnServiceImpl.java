@@ -1121,6 +1121,13 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 ctxWithTask,
                 () -> agentChatPort.runAgentTurn(
                         ctxWithTask, legacyRequest, sink, request.overrides()));
+        // Close against the task-aware context while it is still in scope. The
+        // outer turn context intentionally has no taskPid, and Failed / Interrupted
+        // outcomes have no metadata carrier. Deferring every close to finalizeTurn
+        // therefore stranded those terminal outcomes in in_progress forever.
+        // PendingConfirmation deliberately remains open; its persisted snapshot
+        // carries taskPid and the resume finalizer closes it.
+        closeNamedAgentTask(ctxWithTask, outcome);
         // Surface taskPid on Success.meta so AgentReplyTask (handoff caller) can
         // use it as parentTaskPid for the next hop.
         return attachTaskPidToOutcome(outcome, taskPid);
@@ -1226,7 +1233,8 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 request.userId(),
                 request.humanMemberId(),
                 request.agentCode(),
-                request.channel());
+                request.channel(),
+                request.initiatorOverride());
         String profileId = resolveProfileId(request);
         // Phase C.1: Stage 2.5 Pre-Grounding Triage runs BEFORE persistence so the
         // verdict can be written onto the inbound row + carried in TurnContext.
@@ -1295,6 +1303,22 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             Long initiatorMemberId,
             String agentCode,
             String channel) {
+        return resolveExecutionPrincipal(
+                tenantId,
+                initiatorUserId,
+                initiatorMemberId,
+                agentCode,
+                channel,
+                null);
+    }
+
+    private ExecutionPrincipal resolveExecutionPrincipal(
+            Long tenantId,
+            Long initiatorUserId,
+            Long initiatorMemberId,
+            String agentCode,
+            String channel,
+            com.auraboot.framework.agent.identity.Initiator initiatorOverride) {
         if (tenantId == null) {
             throw new IllegalStateException("tenantId is required for principal resolution");
         }
@@ -1304,7 +1328,8 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                         initiatorUserId,
                         initiatorMemberId,
                         agentCode,
-                        channel));
+                        channel,
+                        initiatorOverride));
     }
 
     private List<String> requestedKnowledgeBaseIds(TurnRequest request) {
@@ -1502,9 +1527,10 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 sideEffects.eventEmitter().emit(new TurnSuspendedEvent(ctx, pc));
             }
         }
-        // DC.3c Fix 3: close ab_agent_task by outcome type when this turn
-        // owns one (named-agent dispatch path created it; aurabot main path
-        // does not — ctx.taskPid() stays null there).
+        // Resume finalization receives the task-aware context reconstructed
+        // from PendingToolSnapshot and closes the original named-agent task.
+        // Initial named-agent dispatch closes while ctxWithTask is in scope;
+        // its outer context has no taskPid, so this is not a duplicate update.
         closeNamedAgentTask(ctx, outcome);
         sideEffects.metricsRecorder().recordTurnEnd(ctx, outcome);
     }
@@ -1563,24 +1589,31 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         }
         try {
             java.util.Map<String, Object> updates = new java.util.HashMap<>();
-            updates.put("updated_at", java.time.LocalDateTime.now());
+            java.time.LocalDateTime completedAt = java.time.LocalDateTime.now();
+            updates.put("updated_at", completedAt);
             switch (outcome) {
                 case TurnOutcome.Success s -> {
                     updates.put("task_status", "completed");
+                    updates.put("completed_at", completedAt);
                     if (s.meta() != null && s.meta().get("_handoff_to") != null) {
-                        updates.put("error_message", "handoff_to:" + s.meta().get("_handoff_to"));
+                        updates.put("output_data", taskOutcomeData(
+                                "handoff", "handoff_to:" + s.meta().get("_handoff_to")));
                     }
                 }
                 case TurnOutcome.Interrupted i -> {
                     updates.put("task_status", "completed");
+                    updates.put("completed_at", completedAt);
                     if (i.reason() != null) {
-                        updates.put("error_message", "interrupted:" + i.reason());
+                        updates.put("output_data", taskOutcomeData(
+                                "interrupted", "interrupted:" + i.reason()));
                     }
                 }
                 case TurnOutcome.Failed f -> {
                     updates.put("task_status", "failed");
-                    updates.put("error_message",
-                            f.errorMessage() != null ? f.errorMessage() : "unknown_error");
+                    updates.put("completed_at", completedAt);
+                    updates.put("output_data", taskOutcomeData(
+                            "failed",
+                            f.errorMessage() != null ? f.errorMessage() : "unknown_error"));
                 }
                 case TurnOutcome.PendingConfirmation pc -> {
                     // Leave in_progress; resume path closes it.
@@ -1601,17 +1634,20 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         }
     }
 
+    private String taskOutcomeData(String outcome, String detail) {
+        try {
+            return objectMapper.writeValueAsString(java.util.Map.of(
+                    "outcome", outcome,
+                    "detail", detail));
+        } catch (Exception e) {
+            // output_data is diagnostic; lifecycle closure must not fail merely
+            // because its optional JSON detail could not be serialized.
+            return "{}";
+        }
+    }
+
     private String namedAgentTaskPid(TurnContext ctx, TurnOutcome outcome) {
-        if (ctx != null && ctx.taskPid() != null) {
-            return ctx.taskPid();
-        }
-        if (outcome instanceof TurnOutcome.Success success && success.meta() != null) {
-            Object taskPid = success.meta().get("_taskPid");
-            if (taskPid instanceof String s && !s.isBlank()) {
-                return s;
-            }
-        }
-        return null;
+        return ctx != null ? ctx.taskPid() : null;
     }
 
     private String safeExceptionMessage(Exception e) {

@@ -144,6 +144,16 @@ describe('OSS plugin config audit', () => {
     );
   });
 
+  it('never resolves a bare plugin name against the caller working directory', () => {
+    const script = fs.readFileSync(path.join(repoRoot, 'scripts/import-plugins.sh'), 'utf8');
+
+    assert.match(
+      script,
+      /if \[\[ "\$plugin" = \/\* \]\] && path_has_plugin "\$plugin"; then/,
+      'only an explicit absolute plugin path may bypass configured plugin roots',
+    );
+  });
+
   it('supports explicit isolated-stack edition modes', () => {
     const script = fs.readFileSync(path.join(repoRoot, 'scripts/import-plugins.sh'), 'utf8');
 

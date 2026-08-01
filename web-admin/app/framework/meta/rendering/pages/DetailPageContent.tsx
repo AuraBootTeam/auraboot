@@ -69,6 +69,7 @@ import type {
 import { getPublicRecordPid } from '~/framework/meta/utils/publicRecordId';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
+import { useRuntimeStateSubscription } from '~/framework/meta/rendering/blocks/workbenchBlockUtils';
 
 interface RecordData {
   [key: string]: any;
@@ -501,6 +502,20 @@ export function resolveVisibleTopLevelDetailBlocks(
   });
 }
 
+export function evaluateDetailVisibleWhen(
+  visibleWhen: string | undefined,
+  recordData: Record<string, unknown> | null | undefined,
+  runtimeContext?: { state?: Record<string, unknown> } | null,
+): boolean {
+  const record = recordData || {};
+  return evaluateVisibleWhenExpression(visibleWhen, {
+    record,
+    row: record,
+    form: record,
+    state: runtimeContext?.state,
+  });
+}
+
 export function resolveSubTableDataSourceConfig(
   dataSource: BlockConfig['dataSource'] | undefined,
   schemaDataSources?: Record<string, DataSourceConfig>,
@@ -741,6 +756,7 @@ function DetailPageContentInner(props: PageContentProps) {
     showToast,
     additionalContext: runtimeContext,
   });
+  useRuntimeStateSubscription(runtime);
 
   // Use unified action handler for toolbar buttons (commandCode, navigateTo)
   const {
@@ -763,16 +779,14 @@ function DetailPageContentInner(props: PageContentProps) {
     showToast,
   });
 
-  // Evaluate visibleWhen expression against the record
+  // Evaluate visibleWhen against both the record and the reactive page state.
+  // Top-level blocks live outside BlockRenderer, so they must subscribe here;
+  // otherwise state.set updates sibling action bars but never reveals these blocks.
   const evaluateVisibleWhen = useCallback(
     (visibleWhen: string | undefined): boolean => {
-      return evaluateVisibleWhenExpression(visibleWhen, {
-        record: recordData || {},
-        row: recordData || {},
-        form: recordData || {},
-      });
+      return evaluateDetailVisibleWhen(visibleWhen, recordData, runtime?.getContext());
     },
-    [recordData],
+    [recordData, runtime],
   );
 
   // Resolve button label using i18n conventions

@@ -25,7 +25,9 @@ const AGENT_NAME = `Knowledge Colleague ${UNIQUE}`;
 const KB_NAME = `Binding Manual ${UNIQUE}`;
 const UNIQUE_FACT = `CALIBRATION-${UNIQUE.toUpperCase()}-137-DAYS`;
 const SCREENSHOT_DIR = 'test-results/agent-knowledge-binding';
-const RUNTIME_PROVIDER = process.env.AURA_LIVE_LLM_PROVIDER?.trim();
+const RUNTIME_PROVIDER =
+  process.env.AURA_LIVE_LLM_PROVIDER?.trim() ||
+  (process.env.AGENT_LLM_STUB_MODE === 'true' ? 'stub' : undefined);
 const RUNTIME_MODEL = process.env.AURA_LIVE_LLM_MODEL?.trim() || 'provider-default';
 
 let agentPid = '';
@@ -180,7 +182,7 @@ test.describe('AI colleague detail — explicit knowledge binding', () => {
     // binding before expecting a new conversation to see it.
     await page.locator('[data-testid="tab-releases"]').click();
     await expect(page.locator('[data-testid="agent-release-draft-state"]')).toContainText(
-      /Unpublished changes|存在未发布变更|草稿变更尚未发布/,
+      /Unpublished changes|Draft changes are not deployed|存在未发布变更|草稿变更尚未发布/,
     );
     await page.locator('[data-testid="publish-agent-release"]').click();
     const publishResponse = page.waitForResponse(
@@ -232,7 +234,8 @@ test.describe('AI colleague detail — explicit knowledge binding', () => {
             params: { pageNum: 1, pageSize: 20, sessionId },
           });
           if (!traces.ok()) return '';
-          const records = (await traces.json())?.records ?? [];
+          const body = await traces.json();
+          const records = (body?.data ?? body)?.records ?? [];
           return records[0]?.traceId ?? '';
         },
         { timeout: 60_000, message: 'named-agent turn must create a queryable trace' },
@@ -242,7 +245,8 @@ test.describe('AI colleague detail — explicit knowledge binding', () => {
     const traceList = await page.request.get('/api/ai/traces', {
       params: { pageNum: 1, pageSize: 20, sessionId },
     });
-    const traces = (await traceList.json())?.records ?? [];
+    const traceListBody = await traceList.json();
+    const traces = (traceListBody?.data ?? traceListBody)?.records ?? [];
     const resolvedTraceId = traces[0]?.traceId;
     expect(resolvedTraceId).toBeTruthy();
     let promptOutput: Record<string, any> = {};
@@ -251,7 +255,8 @@ test.describe('AI colleague detail — explicit knowledge binding', () => {
         async () => {
           const traceDetail = await page.request.get(`/api/ai/traces/${resolvedTraceId}`);
           if (!traceDetail.ok()) return false;
-          const spans = (await traceDetail.json())?.spans ?? [];
+          const body = await traceDetail.json();
+          const spans = (body?.data ?? body)?.spans ?? [];
           const promptSpan = spans.find((span: { name?: string }) => span.name === 'render_prompt');
           promptOutput = asObject(promptSpan?.output);
           return promptOutput.hasRetrievedKnowledge;

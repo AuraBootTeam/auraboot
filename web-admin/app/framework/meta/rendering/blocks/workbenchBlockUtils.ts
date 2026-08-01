@@ -42,10 +42,12 @@ export function useDataSourceSubscription(runtime: SchemaRuntime, dataSource?: s
   }, [runtime, dataSource]);
 }
 
-export function useRuntimeStateSubscription(runtime: SchemaRuntime): void {
+export function useRuntimeStateSubscription(runtime: SchemaRuntime | null): void {
   const [, forceUpdate] = useState(0);
 
   useEffect(() => {
+    if (!runtime) return undefined;
+
     const stateManager = runtime.getStateManager?.();
     const scopeId = runtime.getScopeId?.();
     const store = stateManager?.getStore?.(scopeId);

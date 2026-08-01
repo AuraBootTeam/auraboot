@@ -321,6 +321,16 @@ cmd_up() {
         || die "web-admin/node_modules not found in canonical checkout or existing worktrees"
       ln -sfn "$node_modules_seed" "$REPO_ROOT/web-admin/node_modules"
     fi
+    # A slot can be reused by a newer checkout/composition. Vite's on-disk optimized dependency
+    # cache is keyed by port for this runner; keeping it across destroy→up allowed React itself and
+    # a lazily optimized react-router chunk from different generations to coexist, producing an
+    # Invalid hook call in otherwise valid components. The runtime is exclusively owned here, so
+    # rebuild this exact slot cache as part of every fresh stack lifecycle.
+    local vite_cache_dir="$REPO_ROOT/web-admin/.vite/$vite_port"
+    case "$vite_cache_dir" in
+      "$REPO_ROOT/web-admin/.vite/"*) rm -rf "$vite_cache_dir" ;;
+      *) die "refusing to clear unexpected Vite cache path: $vite_cache_dir" ;;
+    esac
     spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/frontend.log" \
       env VITE_PORT="$vite_port" BFF_PORT="$bff_port" SPRING_BOOT_URL="http://127.0.0.1:$server_port" \
       BFF_INTERNAL_URL="http://127.0.0.1:$server_port" NODE_ENV=development \

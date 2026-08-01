@@ -6,7 +6,10 @@ export type BootstrapStatus = {
   reason?: string;
 };
 
-const BFF_URL = process.env.BFF_INTERNAL_URL || 'http://127.0.0.1:6443';
+const BFF_URL =
+  typeof process !== 'undefined' && process.env?.BFF_INTERNAL_URL
+    ? process.env.BFF_INTERNAL_URL
+    : '';
 
 export async function fetchBootstrapStatus(): Promise<BootstrapStatus | null> {
   try {

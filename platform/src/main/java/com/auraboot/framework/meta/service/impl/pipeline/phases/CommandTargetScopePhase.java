@@ -18,6 +18,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
 import java.util.Map;
@@ -62,6 +65,7 @@ public class CommandTargetScopePhase implements CommandPhase {
 
     private final DynamicDataService dynamicDataService;
     private final ApplicationContext applicationContext;
+    private final PlatformTransactionManager transactionManager;
 
     @Value("${aura.command.target-scope.mode:observe}")
     private String mode;
@@ -88,7 +92,7 @@ public class CommandTargetScopePhase implements CommandPhase {
 
         Boolean readable;
         try {
-            readable = evaluateReadable(ctx);
+            readable = evaluateReadableInIsolatedTransaction(ctx);
         } catch (RuntimeException ex) {
             if (enforcing) {
                 // A gate that cannot evaluate must fail closed. Never downgrade an enforcing check
@@ -132,6 +136,22 @@ public class CommandTargetScopePhase implements CommandPhase {
             throw new BusinessException(ResponseCode.FORBIDDEN,
                     "Access denied: you do not have permission to view this record");
         }
+    }
+
+    /**
+     * Keep an observational read failure from poisoning the command transaction.
+     *
+     * <p>PostgreSQL marks the whole transaction aborted after a statement error. Catching the
+     * resulting exception in observe mode is therefore not enough: every later phase still fails
+     * with {@code current transaction is aborted}. A new transaction gives the observation its own
+     * rollback boundary, so the documented "command unaffected" contract is actually true. In
+     * enforce mode the same exception is rethrown after the inner rollback and the gate still fails
+     * closed.</p>
+     */
+    private Boolean evaluateReadableInIsolatedTransaction(CommandPipelineContext ctx) {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return transaction.execute(status -> evaluateReadable(ctx));
     }
 
     /**

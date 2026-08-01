@@ -29,6 +29,13 @@ function loadTeamsOnce(): Promise<void> {
 
 async function resolveUserName(pid: string): Promise<string | undefined> {
   if (userNameCache.has(pid)) return userNameCache.get(pid);
+  // Some list projections already carry the owner display label in owner_id.
+  // Whitespace is not valid in a path-style public PID, so avoid a guaranteed
+  // 404 and keep the projected label as-is.
+  if (/\s/u.test(pid.trim())) {
+    userNameCache.set(pid, pid);
+    return pid;
+  }
   try {
     const result = await get<Record<string, any>>(`/api/admin/users/${pid}`);
     if (ResultHelper.isSuccess(result) && result.data) {
