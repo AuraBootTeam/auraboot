@@ -22,11 +22,11 @@ dependencies {
     compileOnly project(':')
 
     // Kafka Clients
-    implementation 'org.apache.kafka:kafka-clients:3.7.0'
+    implementation 'org.apache.kafka:kafka-clients:3.9.2'
 
     // Lombok
-    compileOnly 'org.projectlombok:lombok:1.18.40'
-    annotationProcessor 'org.projectlombok:lombok:1.18.40'
+    compileOnly 'org.projectlombok:lombok:1.18.46'
+    annotationProcessor 'org.projectlombok:lombok:1.18.46'
 
     // Spring conditional
     compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.5.14'
@@ -37,7 +37,7 @@ dependencies {
 
     // Root platform classes reference Jackson annotations; keep the compileOnly API visible
     // when this provider compiles against project(':') without the full root runtime graph.
-    compileOnly 'com.fasterxml.jackson.core:jackson-annotations:2.21'
+    compileOnly 'com.fasterxml.jackson.core:jackson-annotations:2.22'
 
     // SLF4J for @Slf4j
     compileOnly 'org.slf4j:slf4j-api:2.0.18'
