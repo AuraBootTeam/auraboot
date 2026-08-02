@@ -6,6 +6,7 @@ import path from 'node:path';
 import {
   buildModelRouteIndex,
   buildPageIndex,
+  manifestTarget,
   resolveConfiguredPath,
 } from './gen-coverage-manifest.mjs';
 
@@ -94,6 +95,11 @@ test('an environment-owned spec root resolves in clean and worktree checkouts', 
     () => resolveConfiguredPath('/repo/quote', '${AURA_CORE_PROJECT_ROOT}/web-admin', {}),
     /requires AURA_CORE_PROJECT_ROOT/,
   );
+});
+
+test('manifest target is stable when the plugin root is the repository root', () => {
+  assert.equal(manifestTarget('/worktrees/plugins', '/worktrees/plugins'), '.');
+  assert.equal(manifestTarget('/worktrees/quote', '/worktrees/quote/plugin-aura'), 'plugin-aura');
 });
 
 test('default model routes distinguish list, form, and detail evidence', () => {

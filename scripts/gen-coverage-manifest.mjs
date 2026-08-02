@@ -254,6 +254,10 @@ export function resolveConfiguredPath(repoRoot, configured, env = process.env) {
   return path.resolve(root, match[3] ?? '');
 }
 
+export function manifestTarget(repoRoot, pluginRoot) {
+  return path.relative(repoRoot, pluginRoot) || '.';
+}
+
 function gitCommit(root) {
   try {
     return execFileSync('git', ['-C', root, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim();
@@ -403,7 +407,7 @@ function main(argv) {
   const manifest = buildManifest({
     repoRoot, pluginRoot, only, specRoots,
     runId: `coverage-${path.basename(pluginRoot)}${only ? `-${only}` : ''}`,
-    target: path.relative(repoRoot, pluginRoot) || pluginRoot,
+    target: manifestTarget(repoRoot, pluginRoot),
   });
 
   fs.mkdirSync(path.dirname(path.resolve(repoRoot, out)), { recursive: true });
