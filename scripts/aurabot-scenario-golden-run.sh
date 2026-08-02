@@ -42,6 +42,21 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ -n "${AURA_WORKSPACE_ROOT:-}" ]]; then
+  WORKSPACE_ROOT="$AURA_WORKSPACE_ROOT"
+else
+  WORKSPACE_ROOT="$REPO_ROOT"
+  while [[ "$WORKSPACE_ROOT" != "/" && ! -f "$WORKSPACE_ROOT/dev.sh" ]]; do
+    WORKSPACE_ROOT="$(dirname "$WORKSPACE_ROOT")"
+  done
+  if [[ ! -f "$WORKSPACE_ROOT/dev.sh" ]]; then
+    main_worktree=$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null \
+      | awk '/^worktree /{print $2; exit}')
+    [[ -n "$main_worktree" ]] && WORKSPACE_ROOT="$(dirname "$main_worktree")"
+  fi
+fi
+[[ -f "$WORKSPACE_ROOT/dev.sh" ]] \
+  || { echo "cannot locate workspace root for golden evidence: $WORKSPACE_ROOT" >&2; exit 2; }
 SLOT=111
 NAME="aurabot-scenario-golden"
 KEEP=0
@@ -385,9 +400,13 @@ f10_tools=$(curl -s --noproxy '*' -m 30 -X POST \
     -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' \
     -H 'Accept: text/event-stream' \
     -d '{"message":"帮我处理一下这件事","sessionId":"guard-f10-'"$$"'"}' 2>/dev/null | head -c 400)
-f10_resolved=$(grep -c "resolved 0 tools via ToolDiscoveryPort" \
-    "$REPO_ROOT/../.workspace/golden/$RUNTIME/backend.log" 2>/dev/null || echo 0)
-assert_eq "F10 守卫: 无 model hint 的回合仍有工具(零工具即回归)" "$f10_resolved" "0"
+f10_log="$WORKSPACE_ROOT/.workspace/golden/$RUNTIME/backend.log"
+if [[ ! -f "$f10_log" ]]; then
+  bad "F10 守卫: backend evidence log missing ($f10_log)"
+else
+  f10_resolved=$(grep -c "resolved 0 tools via ToolDiscoveryPort" "$f10_log" || true)
+  assert_eq "F10 守卫: 无 model hint 的回合仍有工具(零工具即回归)" "$f10_resolved" "0"
+fi
 
 # F12 — keyword search must not ILIKE a physically non-text column.
 # Regression shape: the CAST guard is dropped and every keyword entry point

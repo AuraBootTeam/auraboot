@@ -62,6 +62,7 @@ export type BomWorkbenchSeed = CreatedRows & {
   secondaryEvidenceId: string;
   exportRevisionId: string;
   candidateCode: string;
+  secondaryCandidateCode: string;
   marker: string;
 };
 
@@ -1080,7 +1081,7 @@ export async function reassignRecordOwnerByEmail(
 
 export async function seedBomWorkbench(
   page: Page,
-  opts: { ownerEmail?: string } = {},
+  opts: { ownerEmail?: string; candidateCodes?: [string, string] } = {},
 ): Promise<BomWorkbenchSeed> {
   await ensureTenantAdminModelPermissions(page);
   const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
@@ -1099,7 +1100,8 @@ export async function seedBomWorkbench(
     primaryEvidenceId: '',
     secondaryEvidenceId: '',
     exportRevisionId: '',
-    candidateCode: `E2E-R-10K-A-${suffix}`,
+    candidateCode: opts.candidateCodes?.[0] ?? `E2E-R-10K-A-${suffix}`,
+    secondaryCandidateCode: opts.candidateCodes?.[1] ?? `E2E-R-10K-B-${suffix}`,
     marker,
   } as BomWorkbenchSeed;
 
@@ -1201,7 +1203,7 @@ export async function seedBomWorkbench(
         bom_std_qty: 2,
         bom_std_unit: 'PCS',
         bom_std_reason_code: 'match_multi_candidate',
-        bom_std_candidate_codes: `${created.candidateCode},E2E-R-10K-B-${suffix}`,
+        bom_std_candidate_codes: `${created.candidateCode},${created.secondaryCandidateCode}`,
         bom_std_manual_confirmed: false,
         bom_std_raw_hash: `raw-hash-${suffix}-1`,
         bom_std_exclusion_status: 'active',
@@ -1295,7 +1297,7 @@ export async function seedBomWorkbench(
       {
         bom_me_task_id: created.taskId,
         bom_me_canonical_line_id: created.standardLineId,
-        bom_me_material_code: `E2E-R-10K-B-${suffix}`,
+        bom_me_material_code: created.secondaryCandidateCode,
         bom_me_candidate_source: 'item_master',
         bom_me_status_color: 'yellow',
         bom_me_score: 0.91,

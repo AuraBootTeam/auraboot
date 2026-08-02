@@ -18,6 +18,10 @@ const KB_INGESTION = fs.readFileSync(
   path.join(ROOT, 'scripts', 'kb-ingestion-golden-run.sh'),
   'utf8',
 );
+const AURABOT = fs.readFileSync(
+  path.join(ROOT, 'scripts', 'aurabot-scenario-golden-run.sh'),
+  'utf8',
+);
 
 test('FAQ release dispatch supplies an isolated slot', () => {
   assert.match(
@@ -37,4 +41,17 @@ test('suspended tenant API golden owns bootstrap credentials', () => {
 test('knowledge ingestion aligns live vision selection with backend mode', () => {
   assert.match(KB_INGESTION, /export AGENT_LLM_STUB_MODE=false/);
   assert.match(KB_INGESTION, /--workers=1/);
+});
+
+test('AuraBot zero-match guard resolves linked-worktree evidence and returns one scalar count', () => {
+  assert.match(AURABOT, /f10_log="\$WORKSPACE_ROOT\/\.workspace\/golden\/\$RUNTIME\/backend\.log"/);
+  assert.match(AURABOT, /if \[\[ ! -f "\$f10_log" \]\]; then[\s\S]*?backend evidence log missing/);
+  assert.match(
+    AURABOT,
+    /f10_resolved=\$\(grep -c "resolved 0 tools via ToolDiscoveryPort" "\$f10_log" \|\| true\)/,
+  );
+  assert.doesNotMatch(
+    AURABOT,
+    /f10_resolved=\$\(grep -c "resolved 0 tools via ToolDiscoveryPort"[\s\S]*?\|\| echo 0\)/,
+  );
 });
