@@ -456,7 +456,8 @@ const statusBannerFields: PropertySchema<string>[] = [
   { key: 'failedStatuses', label: 'Failed statuses JSON', type: 'json' },
   // summaryFields: array of { key, label, field, linkField?, linkTo? }.
   { key: 'summaryFields', label: 'Summary fields JSON', type: 'json' },
-  // poll: { enabledWhenStatuses, reload, intervalMs, refreshPageWhenStatuses }.
+  // poll: { enabledWhenStatuses, reload, intervalMs, refreshPageWhenStatuses,
+  // revisionField, reloadOnRevisionChange, reloadOnStatusChange }.
   { key: 'poll', label: 'Polling JSON', type: 'json' },
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];

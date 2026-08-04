@@ -91,6 +91,9 @@ class HandlerPhaseTest {
     @Mock
     private AsyncTaskServiceImpl asyncTaskService;
 
+    @Mock
+    private org.springframework.transaction.PlatformTransactionManager platformTransactionManager;
+
     @InjectMocks
     private HandlerPhase phase;
 
@@ -99,6 +102,7 @@ class HandlerPhaseTest {
         ReflectionTestUtils.setField(phase, "fileService", fileService);
         ReflectionTestUtils.setField(phase, "storageProvider", storageProvider);
         ReflectionTestUtils.setField(phase, "asyncTaskService", asyncTaskService);
+        ReflectionTestUtils.setField(phase, "platformTransactionManager", platformTransactionManager);
         // Default: no chained secondaries (the common case). Individual tests override.
         lenient().when(extensionRegistry.getSecondaryCommandHandlers(any())).thenReturn(List.of());
     }
@@ -140,8 +144,10 @@ class HandlerPhaseTest {
                 .containsEntry("__handlerCode", PLUGIN_HANDLER_CODE)
                 .containsEntry("__currentUser", "2")
                 .containsKey(CommandHandlerExtension.DATA_ACCESSOR_KEY)
-                .containsKey(CommandHandlerExtension.FILE_ACCESSOR_KEY);
+                .containsKey(CommandHandlerExtension.FILE_ACCESSOR_KEY)
+                .containsKey(CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY);
         assertThat(handler.capturedContext.get().fileAccessor()).isInstanceOf(FileAccessor.class);
+        assertThat(handler.capturedContext.get().independentTransactionAccessor()).isNotNull();
         assertThat(ctx.getHandlerResults()).containsEntry("observedProcessKey", "po_approval");
     }
 

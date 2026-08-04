@@ -149,6 +149,9 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Well-known key for AsyncTaskAccessor in the settings map. */
     String ASYNC_TASK_ACCESSOR_KEY = AsyncTaskAccessor.SETTINGS_KEY;
 
+    /** Well-known key for independently committed, bounded checkpoint work. */
+    String INDEPENDENT_TRANSACTION_ACCESSOR_KEY = IndependentTransactionAccessor.SETTINGS_KEY;
+
     /**
      * Command execution context.
      */
@@ -207,6 +210,17 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         public AsyncTaskAccessor asyncTaskAccessor() {
             Object accessor = settings != null ? settings.get(ASYNC_TASK_ACCESSOR_KEY) : null;
             return accessor instanceof AsyncTaskAccessor ? (AsyncTaskAccessor) accessor : null;
+        }
+
+        /**
+         * Returns the host-owned REQUIRES_NEW bridge for bounded progress checkpoints.
+         * Long-running handlers must keep each callback small and internally consistent.
+         */
+        public IndependentTransactionAccessor independentTransactionAccessor() {
+            Object accessor = settings != null
+                    ? settings.get(INDEPENDENT_TRANSACTION_ACCESSOR_KEY) : null;
+            return accessor instanceof IndependentTransactionAccessor
+                    ? (IndependentTransactionAccessor) accessor : null;
         }
 
         public static Builder builder() {
