@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -822,6 +823,8 @@ function DrawerEditForm({
   locale,
   t,
   onOpenChange,
+  renderTriggerInHost = false,
+  triggerHost,
 }: {
   config: any;
   record: any;
@@ -829,6 +832,8 @@ function DrawerEditForm({
   locale: string;
   t: (key: string) => string;
   onOpenChange?: (open: boolean) => void;
+  renderTriggerInHost?: boolean;
+  triggerHost?: HTMLElement | null;
 }) {
   const fields: any[] = Array.isArray(config?.fields) ? config.fields : [];
   const [open, setOpen] = useState(false);
@@ -1004,6 +1009,30 @@ function DrawerEditForm({
     ? Boolean(readPath(preview, previewConfig.confirmableField || 'confirmable'))
     : false;
 
+  const openButton = (
+    <button
+      type="button"
+      data-testid="review-drawer-edit-open"
+      disabled={disabled}
+      onClick={begin}
+      className={`rounded-control border px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+        renderTriggerInHost
+          ? 'border-accent bg-panel text-accent hover:bg-accent-weak'
+          : 'border-border bg-panel text-text hover:bg-hover'
+      }`}
+    >
+      {getLocalizedText(
+        config.openLabel || { 'zh-CN': '编辑此行并重新查价', en: 'Edit this row' },
+        locale,
+        t,
+      )}
+    </button>
+  );
+
+  if (!open && renderTriggerInHost) {
+    return triggerHost ? createPortal(openButton, triggerHost) : null;
+  }
+
   return (
     <div
       data-testid="review-drawer-edit-form"
@@ -1012,19 +1041,7 @@ function DrawerEditForm({
       }`}
     >
       {!open ? (
-        <button
-          type="button"
-          data-testid="review-drawer-edit-open"
-          disabled={disabled}
-          onClick={begin}
-          className="rounded-control border-border bg-panel text-text hover:bg-hover border px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {getLocalizedText(
-            config.openLabel || { 'zh-CN': '编辑此行并重新查价', en: 'Edit this row' },
-            locale,
-            t,
-          )}
-        </button>
+        openButton
       ) : preview ? (
         <div
           data-testid="review-drawer-edit-preview"
@@ -1237,6 +1254,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const compareConfig = (block as any).compare || {};
   const candidatesConfig = (block as any).candidates || {};
   const hasCandidatesConfig = Boolean((block as any).candidates);
+  const editFormConfig = (block as any).editForm;
+  const renderEditTriggerInCandidatesHeader =
+    hasCandidatesConfig && editFormConfig?.openPlacement === 'candidates-header';
   const exportConfig = (block as any).exportImpact || {};
   const sourceConfig = (block as any).source || {};
   const sourceRecordConfig = sourceConfig.record || {};
@@ -1279,6 +1299,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     height: initialLayout.height,
   });
   const [runningAction, setRunningAction] = useState<string | null>(null);
+  const [editTriggerHost, setEditTriggerHost] = useState<HTMLDivElement | null>(null);
   const dragRef = useRef<PointerState | null>(null);
   const resizeRef = useRef<PointerState | null>(null);
   const layoutRef = useRef<DrawerLayoutState>({
@@ -1607,12 +1628,14 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
 
       <DrawerEditForm
         key={selectedRecordKey}
-        config={(block as any).editForm}
+        config={editFormConfig}
         record={record}
         runtime={runtime}
         locale={locale}
         t={t}
         onOpenChange={setIsEditFormOpen}
+        renderTriggerInHost={renderEditTriggerInCandidatesHeader}
+        triggerHost={editTriggerHost}
       />
 
       <div
@@ -1911,7 +1934,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
               data-testid="review-drawer-tab-candidates"
               className="rounded-card border-border bg-panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden border"
             >
-              <header className="border-border flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
+              <header
+                data-testid="review-drawer-candidates-header"
+                className="border-border flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2"
+              >
                 <h3 className="text-text min-w-0 flex-1 truncate text-sm font-semibold">
                   {getLocalizedText(
                     candidatesConfig.title || {
@@ -1922,6 +1948,13 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                     t,
                   )}
                 </h3>
+                {renderEditTriggerInCandidatesHeader && (
+                  <div
+                    ref={setEditTriggerHost}
+                    data-testid="review-drawer-edit-open-host"
+                    className="flex shrink-0"
+                  />
+                )}
                 {(exportConfig.actions || []).length > 0 && (
                   <div className="flex shrink-0 flex-wrap justify-end gap-2">
                     {exportConfig.actions.filter(isActionVisible).map((actionConfig: any) => {
@@ -2000,7 +2033,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                             writeRuntimeState(runtime, candidatesConfig.selection.bind, candidate);
                           }
                         }}
-                        className={`rounded-card block w-full border p-3 text-left ${
+                        className={`rounded-card block w-full border p-3 text-left select-text ${
                           active
                             ? 'bg-accent-weak border-accent'
                             : 'border-border bg-panel hover:bg-hover'

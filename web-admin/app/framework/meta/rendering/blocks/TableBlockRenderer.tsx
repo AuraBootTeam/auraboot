@@ -693,18 +693,16 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   return (
     <>
-      {(hasStaleRows || (dataSourceState?.loading && rawData.length > 0)) && (
+      {hasStaleRows && (
         <div
-          data-testid={hasStaleRows ? 'table-stale-state' : 'table-refreshing-state'}
+          data-testid="table-stale-state"
           role="status"
           className="border-warning/30 bg-warning/5 text-text mb-2 rounded-lg border px-4 py-2 text-sm"
         >
-          {hasStaleRows
-            ? stateTitle(
-                'stale',
-                'Showing preserved data because refresh failed. Retry before acting.',
-              )
-            : stateTitle('refreshing', 'Refreshing data…')}
+          {stateTitle(
+            'stale',
+            'Showing preserved data because refresh failed. Retry before acting.',
+          )}
         </div>
       )}
       <div

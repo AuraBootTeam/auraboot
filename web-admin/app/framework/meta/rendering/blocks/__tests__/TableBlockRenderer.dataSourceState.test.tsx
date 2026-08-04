@@ -86,4 +86,20 @@ describe('TableBlockRenderer data-source states', () => {
     expect(screen.getByTestId('table-stale-state')).toHaveTextContent('Connection lost');
     expect(screen.getByText('Batch A')).toBeInTheDocument();
   });
+
+  it('keeps preserved rows in place without an inline status during background refresh', () => {
+    render(
+      <TableBlockRenderer
+        block={block}
+        runtime={runtime([{ pid: '1', name: 'Batch A' }], {
+          data: [],
+          loading: true,
+          error: null,
+        })}
+      />,
+    );
+
+    expect(screen.queryByTestId('table-refreshing-state')).not.toBeInTheDocument();
+    expect(screen.getByText('Batch A')).toBeInTheDocument();
+  });
 });

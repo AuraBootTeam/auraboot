@@ -195,7 +195,15 @@ async function expectLegacyPricingActionsHidden(page: Page): Promise<void> {
     page.getByTestId('review-drawer-candidate-action-record_manual_price'),
     '“录入人工价”入口暂时下线，原 action、command 与用例保留',
   ).toHaveCount(0);
-  await expect(page.getByTestId('review-drawer-edit-open')).toBeVisible();
+  const editTrigger = page.getByTestId('review-drawer-edit-open');
+  await expect(editTrigger).toBeVisible();
+  expect(
+    await editTrigger.evaluate(
+      (element) => element.closest('[data-testid="review-drawer-candidates-header"]') !== null,
+    ),
+    '物料修正入口应位于查价候选标题栏',
+  ).toBe(true);
+  await expect(editTrigger).toHaveClass(/border-accent/);
 }
 
 function parseJsonObject(value: unknown): Record<string, unknown> {
@@ -777,6 +785,17 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         );
         await expect(recentCandidateAfterFactor).toContainText('原始单价');
         await expect(recentCandidateAfterFactor).toContainText('系数后单价');
+        expect(
+          await recentCandidateAfterFactor.evaluate(
+            (element) => window.getComputedStyle(element).userSelect,
+          ),
+          '候选报价文字应允许双击或拖动选择',
+        ).toBe('text');
+        const candidateTitle = recentCandidateAfterFactor.locator('div[title]').first();
+        await candidateTitle.dblclick();
+        await expect
+          .poll(() => page.evaluate(() => window.getSelection()?.toString() || ''))
+          .not.toBe('');
         // Price display trims insignificant trailing zeroes under the current
         // candidate renderer; both forms represent the same raw unit price.
         await expect(recentCandidateAfterFactor).toContainText(/0\.021(?:0)?/);
@@ -818,6 +837,10 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       await page.getByRole('tab', { name: /BOM价格|BOM Price/ }).click();
       await page.getByTestId(`table-row-${lineId}`).click();
       await expect(page.getByTestId('review-drawer')).toBeVisible({ timeout: 20_000 });
+      await expectLegacyPricingActionsHidden(page);
+      await page.getByTestId('review-drawer').screenshot({
+        path: testInfo.outputPath('quote-drawer-edit-action-placement.png'),
+      });
       const lineBeforePreview = await readDynamicRecord(page, 'qo_quote_line_common', lineId);
       const acceptedBeforePreview = await queryDynamicRecords(
         page,

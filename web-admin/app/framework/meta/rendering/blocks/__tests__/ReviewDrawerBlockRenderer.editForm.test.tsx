@@ -22,7 +22,10 @@ vi.mock('../workbenchBlockUtils', async (importOriginal) => {
   return { ...actual, executeSimpleWorkbenchAction };
 });
 
-function makeRuntime(selectedLine: Record<string, unknown>): SchemaRuntime {
+function makeRuntime(
+  selectedLine: Record<string, unknown>,
+  dataBySource: Record<string, any[]> = {},
+): SchemaRuntime {
   const context: Record<string, any> = {
     locale: 'zh-CN',
     t: (k: string) => k,
@@ -39,7 +42,7 @@ function makeRuntime(selectedLine: Record<string, unknown>): SchemaRuntime {
       evaluateObject: (obj: any) => obj,
     }),
     getDataSourceManager: () => ({
-      getData: () => [],
+      getData: (dataSourceId: string) => dataBySource[dataSourceId] || [],
       has: () => false,
       register: vi.fn(),
       reload: vi.fn().mockResolvedValue(undefined),
@@ -161,6 +164,35 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
     expect(config.args.targetRecordPid).toBe('L1');
     expect(config.args.payload).toEqual({ qo_ql_qty_per_set: '5', qo_ql_mpn: '1N4148W' });
     expect(config.args.reload).toEqual(['bomPriceWaterfall', 'bomPriceMetrics']);
+  });
+
+  it('places the configured edit trigger beside the candidate heading', () => {
+    const value = block();
+    (value as any).candidates = {
+      dataSource: 'evidence',
+      title: { 'zh-CN': '查价候选(多源对比)' },
+      item: { titleField: 'partNo' },
+    };
+    (value as any).editForm.openPlacement = 'candidates-header';
+
+    render(
+      <ReviewDrawerBlockRenderer
+        block={value}
+        runtime={makeRuntime(LINE, { evidence: [{ pid: 'EV-1', partNo: '1N4148W' }] })}
+      />,
+    );
+
+    const header = screen.getByTestId('review-drawer-candidates-header');
+    const host = screen.getByTestId('review-drawer-edit-open-host');
+    const trigger = screen.getByTestId('review-drawer-edit-open');
+    expect(header).toContainElement(trigger);
+    expect(host).toContainElement(trigger);
+    expect(trigger).toHaveClass('border-accent', 'text-accent');
+    expect(screen.getByTestId('review-drawer-candidate-EV-1')).toHaveClass('select-text');
+
+    fireEvent.click(trigger);
+    expect(screen.getByTestId('review-drawer-content-grid')).toHaveClass('hidden');
+    expect(screen.getByTestId('review-drawer-edit-form')).toBeInTheDocument();
   });
 
   it('omits a field the user cleared, so blank means keep the current value', async () => {
