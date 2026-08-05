@@ -34,6 +34,7 @@ import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.pf4j.BiTemporalAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.plugin.pf4j.AsyncTaskAccessorImpl;
+import com.auraboot.framework.plugin.pf4j.IndependentTransactionAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.FileAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.LlmProviderAccessorImpl;
 import com.auraboot.module.bitemporal.service.BiTemporalService;
@@ -82,6 +83,9 @@ public class HandlerPhase implements CommandPhase {
 
     @Autowired(required = false)
     private StorageProvider storageProvider;
+
+    @Autowired(required = false)
+    private org.springframework.transaction.PlatformTransactionManager platformTransactionManager;
 
     @Override public String name() { return "handler"; }
 
@@ -551,6 +555,11 @@ public class HandlerPhase implements CommandPhase {
             if (asyncTaskService != null && objectMapper != null) {
                 pluginSettings.put(CommandHandlerExtension.ASYNC_TASK_ACCESSOR_KEY,
                         new AsyncTaskAccessorImpl(asyncTaskService, objectMapper, tenantId, userId));
+            }
+            if (platformTransactionManager != null) {
+                pluginSettings.put(CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY,
+                        new IndependentTransactionAccessorImpl(
+                                platformTransactionManager, dynamicDataService));
             }
             CommandHandlerExtension.CommandContext pluginContext = CommandHandlerExtension.CommandContext.builder()
                     .tenantId(tenantId)

@@ -45,6 +45,9 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Well-known key for AsyncTaskAccessor in the settings map. */
     String ASYNC_TASK_ACCESSOR_KEY = AsyncTaskAccessor.SETTINGS_KEY;
 
+    /** Well-known key for independently committed, bounded checkpoint work. */
+    String INDEPENDENT_TRANSACTION_ACCESSOR_KEY = IndependentTransactionAccessor.SETTINGS_KEY;
+
     /**
      * Get the command type this handler processes.
      * Format: "namespace:command-name" (e.g., "billing:generate-invoice")
@@ -251,6 +254,14 @@ public interface CommandHandlerExtension extends ExtensionPoint {
         public AsyncTaskAccessor asyncTaskAccessor() {
             Object accessor = settings != null ? settings.get(ASYNC_TASK_ACCESSOR_KEY) : null;
             return accessor instanceof AsyncTaskAccessor ? (AsyncTaskAccessor) accessor : null;
+        }
+
+        /** Returns the host-owned REQUIRES_NEW bridge for bounded progress checkpoints. */
+        public IndependentTransactionAccessor independentTransactionAccessor() {
+            Object accessor = settings != null
+                    ? settings.get(INDEPENDENT_TRANSACTION_ACCESSOR_KEY) : null;
+            return accessor instanceof IndependentTransactionAccessor
+                    ? (IndependentTransactionAccessor) accessor : null;
         }
 
         public static Builder builder() {

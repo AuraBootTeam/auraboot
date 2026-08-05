@@ -1174,6 +1174,7 @@ export async function seedBomWorkbench(
         bom_raw_mpn: 'RC0603FR-0710KL',
         bom_raw_refdes: 'R1,R2',
         bom_raw_qty: '2',
+        bom_raw_visibility_status: 'committed',
         bom_raw_extra_columns_json: JSON.stringify({
           __parse_evidence: {
             profileCode: 'E2E_PROFILE',
@@ -1207,6 +1208,7 @@ export async function seedBomWorkbench(
         bom_std_manual_confirmed: false,
         bom_std_raw_hash: `raw-hash-${suffix}-1`,
         bom_std_exclusion_status: 'active',
+        bom_std_visibility_status: 'committed',
       },
       created.rows,
     );
@@ -1231,6 +1233,7 @@ export async function seedBomWorkbench(
         bom_std_manual_confirmed: false,
         bom_std_raw_hash: `raw-hash-${suffix}-2`,
         bom_std_exclusion_status: 'active',
+        bom_std_visibility_status: 'committed',
       },
       created.rows,
     );
@@ -1244,6 +1247,7 @@ export async function seedBomWorkbench(
         bom_mr_status_color: 'yellow',
         bom_mr_reason: '同规格存在多个候选物料，需人工确认',
         bom_mr_match_source: 'item_master',
+        bom_mr_visibility_status: 'committed',
       },
       created.rows,
     );
@@ -1257,6 +1261,7 @@ export async function seedBomWorkbench(
         bom_mr_status_color: 'green',
         bom_mr_reason: '100% 直接复制',
         bom_mr_match_source: 'direct_copy',
+        bom_mr_visibility_status: 'committed',
       },
       created.rows,
     );
@@ -1273,6 +1278,7 @@ export async function seedBomWorkbench(
         bom_me_score: 0.96,
         bom_me_rank: 1,
         bom_me_reason_code: 'match_multi_candidate',
+        bom_me_visibility_status: 'committed',
         bom_me_evidence_json: JSON.stringify({
           source: 'item_master',
           matchSource: 'mpn+spec',
@@ -1303,6 +1309,7 @@ export async function seedBomWorkbench(
         bom_me_score: 0.91,
         bom_me_rank: 2,
         bom_me_reason_code: 'match_multi_candidate',
+        bom_me_visibility_status: 'committed',
         bom_me_evidence_json: JSON.stringify({
           source: 'item_master',
           matchSource: 'spec',

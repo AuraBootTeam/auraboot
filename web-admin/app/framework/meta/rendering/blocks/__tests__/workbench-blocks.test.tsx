@@ -1059,6 +1059,58 @@ describe('StatusBannerBlockRenderer', () => {
     }
   });
 
+  it('polls only the lightweight source and reloads heavy sources on revision or phase changes', async () => {
+    let record = {
+      bom_task_status: 'parsing',
+      bom_task_result_revision: 3,
+      bom_task_current_phase: 'parsing',
+    };
+    const reload = vi.fn().mockResolvedValue(undefined);
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => record,
+        getState: () => ({ data: record, loading: false, error: null }),
+        has: () => true,
+        register: vi.fn(),
+        reload,
+        subscribe: vi.fn(() => () => undefined),
+      }),
+    }) as any;
+    const block: BlockConfig = {
+      id: 'task_status',
+      blockType: 'status-banner',
+      dataSource: 'summary',
+      statusField: 'bom_task_current_phase',
+      titleMap: { parsing: 'Parsing', matching: 'Matching' },
+      poll: {
+        enabledWhenStatuses: ['parsing', 'matching'],
+        intervalMs: 1500,
+        reload: ['summary'],
+        revisionField: 'bom_task_result_revision',
+        reloadOnRevisionChange: ['lines', 'candidates', 'evidence'],
+        reloadOnStatusChange: ['statistics', 'exports'],
+      },
+    };
+
+    const view = render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+    expect(reload).not.toHaveBeenCalled();
+
+    record = { ...record, bom_task_result_revision: 4 };
+    view.rerender(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+    await waitFor(() => {
+      expect(reload).toHaveBeenCalledWith(['lines', 'candidates', 'evidence']);
+    });
+    expect(reload).not.toHaveBeenCalledWith(['statistics', 'exports']);
+
+    reload.mockClear();
+    record = { ...record, bom_task_current_phase: 'matching' };
+    view.rerender(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+    await waitFor(() => {
+      expect(reload).toHaveBeenCalledWith(['statistics', 'exports']);
+    });
+    expect(reload).not.toHaveBeenCalledWith(['lines', 'candidates', 'evidence']);
+  });
+
   it('keeps long summary values inside their grid cells', () => {
     const longCustomerName = 'Golden SmartHub_MAIN_REV1.3_Design_MFG';
     const runtime = makeRuntime({

@@ -203,10 +203,19 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
     [polling],
   );
   const reloadDataSources = asStringArray(polling.reload);
+  const revisionField = String(polling.revisionField || '').trim();
+  const revisionValue = revisionField ? readPath(record, revisionField) : undefined;
+  const revisionKey =
+    revisionValue === undefined || revisionValue === null || revisionValue === ''
+      ? ''
+      : String(revisionValue);
+  const reloadOnRevisionChange = asStringArray(polling.reloadOnRevisionChange);
+  const reloadOnStatusChange = asStringArray(polling.reloadOnStatusChange);
   const pollIntervalMs = Number(polling.intervalMs || 3000);
   const manager = runtime.getDataSourceManager?.();
   const shouldPoll = Boolean(status && pollStatuses.has(status) && reloadDataSources.length > 0);
   const previousStatusRef = useRef(status);
+  const previousRevisionRef = useRef(revisionKey);
 
   useEffect(() => {
     if (!shouldPoll || !manager?.reload) return undefined;
@@ -238,8 +247,32 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
   }, [manager, pollIntervalMs, reloadDataSources.join('|'), shouldPoll]);
 
   useEffect(() => {
+    const previousRevision = previousRevisionRef.current;
+    previousRevisionRef.current = revisionKey;
+    if (
+      !manager?.reload ||
+      !previousRevision ||
+      !revisionKey ||
+      previousRevision === revisionKey ||
+      reloadOnRevisionChange.length === 0
+    ) {
+      return;
+    }
+    void Promise.resolve(manager.reload(reloadOnRevisionChange)).catch(() => undefined);
+  }, [manager, reloadOnRevisionChange.join('|'), revisionKey]);
+
+  useEffect(() => {
     const previousStatus = previousStatusRef.current;
     previousStatusRef.current = status;
+
+    if (
+      previousStatus &&
+      previousStatus !== status &&
+      manager?.reload &&
+      reloadOnStatusChange.length > 0
+    ) {
+      void Promise.resolve(manager.reload(reloadOnStatusChange)).catch(() => undefined);
+    }
 
     if (
       previousStatus &&
@@ -249,7 +282,7 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
     ) {
       window.location.reload();
     }
-  }, [pollStatuses, refreshPageStatuses, status]);
+  }, [manager, pollStatuses, refreshPageStatuses, reloadOnStatusChange.join('|'), status]);
 
   if (status && hideStatuses.has(status)) {
     return null;
