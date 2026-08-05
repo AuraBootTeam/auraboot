@@ -12,6 +12,12 @@ import {
   useRuntimeStateSubscription,
   writeRuntimeState,
 } from './workbenchBlockUtils';
+import {
+  collectSemanticResolutionTraces,
+  SemanticResolutionEvidence,
+} from './SemanticResolutionEvidence';
+
+export { collectSemanticResolutionTraces } from './SemanticResolutionEvidence';
 
 export interface ReviewDrawerBlockRendererProps {
   block: BlockConfig;
@@ -1487,6 +1493,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     : [];
   const sourceCards = Array.isArray(sourceConfig.cards) ? sourceConfig.cards : [];
   const sourcePolicies = Array.isArray(sourceConfig.policies) ? sourceConfig.policies : [];
+  const sourceResolutions = collectSemanticResolutionTraces(
+    sourceRecord,
+    sourceConfig.resolutionGroups,
+  );
   // Labeled JSON evidence blocks (e.g. handover snapshots). Structured/JSONB data belongs here as a
   // collapsible, formatted, labeled <pre> — not crammed into scalar summaryBadges where it renders as
   // raw inline JSON. Additive alongside the singular sourceConfig.jsonField.
@@ -1500,6 +1510,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     : [];
   const hasComparePanel = rawFields.length > 0 || canonicalFields.length > 0;
   const hasSourceDetails =
+    sourceResolutions.length > 0 ||
     sourceCards.length > 0 ||
     sourcePolicies.length > 0 ||
     sourceJsonFields.length > 0 ||
@@ -1760,6 +1771,12 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                     )}
                   </summary>
                   <div className="border-border space-y-3 border-t p-3">
+                    <SemanticResolutionEvidence
+                      traces={sourceResolutions}
+                      locale={locale}
+                      t={t}
+                      title={sourceConfig.resolutionTitle}
+                    />
                     {sourceCards.length > 0 && (
                       <div
                         data-testid="review-drawer-source-cards"
