@@ -107,6 +107,15 @@ public class ModelDefinition {
     private boolean softDelete = false;
 
     /**
+     * Whether records are append-only after creation.
+     *
+     * <p>This is a domain invariant, not a permission. Administrators, command
+     * handlers, field maps and side effects are all bound by it.</p>
+     */
+    @Builder.Default
+    private boolean immutable = false;
+
+    /**
      * Cross-field validation rules (model-level baseline).
      * Evaluated in Stage 8 (PRE_INVARIANT) after InvariantEngine.
      */

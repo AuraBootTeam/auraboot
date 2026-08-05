@@ -67,6 +67,15 @@ public class ModelDefinitionDTO {
     private Boolean isAbstract = false;
 
     /**
+     * Whether records in this model are append-only after creation.
+     *
+     * <p>When true, the runtime rejects update and delete operations across the
+     * dynamic-data and command-pipeline write paths. Creation remains allowed.</p>
+     */
+    @Builder.Default
+    private Boolean immutable = false;
+
+    /**
      * Parent model code for inheritance.
      */
     private String parentModelCode;

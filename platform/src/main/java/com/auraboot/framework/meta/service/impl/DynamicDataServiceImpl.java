@@ -1530,6 +1530,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         try {
             ModelDefinition model = getModelDefinition(modelCode);
+            ModelMutationGuard.assertMutable(model, "updated");
 
             // Check if record exists
             Map<String, Object> existingRecord = getById(modelCode, recordId);
@@ -1677,6 +1678,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         logOperation("delete", modelCode, recordId);
 
         ModelDefinition model = getModelDefinition(modelCode);
+        ModelMutationGuard.assertMutable(model, "deleted");
 
         // Get record before deletion for change tracking
         Map<String, Object> existingRecord = getById(modelCode, recordId);
@@ -2087,6 +2089,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         logOperation("batchUpdate", modelCode, dataList.size());
 
         ModelDefinition model = getModelDefinition(modelCode);
+        ModelMutationGuard.assertMutable(model, "batch updated");
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
 
         DynamicBatchResponse response = new DynamicBatchResponse();
@@ -2132,6 +2135,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         logOperation("batchDelete", modelCode, recordIds.size());
 
         ModelDefinition model = getModelDefinition(modelCode);
+        ModelMutationGuard.assertMutable(model, "batch deleted");
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
         String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
         String primaryKeyColumn = SqlSafetyUtils.requireIdentifier(
@@ -3630,6 +3634,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
                         // Delete existing child records if replace mode
                         if (Boolean.TRUE.equals(request.getReplaceExisting()) && isUpdate) {
+                            ModelMutationGuard.assertMutable(targetModel, "replaced");
                             deleteExistingChildRecords(relation, masterId);
                         }
 

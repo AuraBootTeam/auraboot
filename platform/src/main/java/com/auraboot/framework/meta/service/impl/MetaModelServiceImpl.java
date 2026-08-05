@@ -920,6 +920,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 .createdAt(DateUtil.toUtcLocalDateTime(model.getCreatedAt()))
                 .updatedAt(DateUtil.toUtcLocalDateTime(model.getUpdatedAt()))
                 .softDelete(resolveSoftDelete(model))
+                .immutable(resolveImmutable(model))
                 .rules(loadCrossFieldRules(model))
                 .extension(flatExt)
                 .build();
@@ -1179,6 +1180,15 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         if (model.getExtension() != null) {
             Object sd = model.getExtension().get("softDelete");
             return Boolean.TRUE.equals(sd) || "true".equals(String.valueOf(sd));
+        }
+        return false;
+    }
+
+    /** Resolve the append-only invariant from extension.immutable. */
+    private boolean resolveImmutable(Model model) {
+        if (model.getExtension() != null) {
+            Object immutable = model.getExtension().get("immutable");
+            return Boolean.TRUE.equals(immutable) || "true".equals(String.valueOf(immutable));
         }
         return false;
     }

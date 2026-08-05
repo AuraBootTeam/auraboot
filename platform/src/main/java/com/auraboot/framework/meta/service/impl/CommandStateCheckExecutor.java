@@ -209,6 +209,7 @@ public class CommandStateCheckExecutor {
         try {
             String tableName = metaModelService.getTableName(modelCode);
             Optional<ModelDefinition> modelOpt = metaModelService.getModelDefinition(modelCode);
+            modelOpt.ifPresent(model -> ModelMutationGuard.assertMutable(model, "state transitioned"));
             FieldDefinition stateDefinition = modelOpt
                     .flatMap(model -> findFieldDefinition(model, stateField))
                     .orElse(null);

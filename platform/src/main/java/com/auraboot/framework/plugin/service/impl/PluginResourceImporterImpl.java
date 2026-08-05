@@ -357,6 +357,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         if (dto.getModelCategory() != null) {
             extension.put("modelCategory", dto.getModelCategory());
         }
+        extension.put("immutable", Boolean.TRUE.equals(dto.getImmutable()));
         // Warn on unknown extension keys (informational, does not block)
         ExtensionBean.warnUnknownModelKeys(dto.getCode(), extension.keySet(), log);
         // tableName is a first-class column. Extract from extension as fallback (legacy format).

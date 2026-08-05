@@ -81,7 +81,7 @@ public class ExtensionBean {
             "uiSchema", "querySchema", "tags", "metadata",
             "enableNba", "skipTableCreation", "dataScope",
             "titleField", "subtitleField",
-            "endpointAdapter");
+            "endpointAdapter", "softDelete", "immutable");
 
     /**
      * Validate extension content: key count limit and value size limit.

@@ -188,6 +188,7 @@ class PluginResourceImporterImplApplyTest2 {
                 .description("desc")
                 .modelType("entity")
                 .tableName("tbl_m1")
+                .immutable(true)
                 .build();
 
         PluginResource result = importer.importModel(dto, "plg", "imp", 1L,
@@ -201,6 +202,7 @@ class PluginResourceImporterImplApplyTest2 {
         assertThat(captor.getValue().getCode()).isEqualTo("m1");
         assertThat(captor.getValue().getPluginPid()).isEqualTo("plg");
         assertThat(captor.getValue().getTableName()).isEqualTo("tbl_m1");
+        assertThat(captor.getValue().getExtension()).containsEntry("immutable", true);
     }
 
     @Test
