@@ -239,7 +239,8 @@ public class HandlerPhase implements CommandPhase {
             return;
         }
 
-        ModelMutationGuard.assertMutable(modelDef, "updated by handler result persistence");
+        ModelMutationGuard.assertMutableOrInsertedInThisCommand(
+                modelDef, "updated by handler result persistence", fieldMapResults, recordIdStr);
 
         String tableName = metaModelService.getTableName(modelCode);
         CommandExecutorUtils.validateSqlIdentifier(tableName, "handler field tableName");

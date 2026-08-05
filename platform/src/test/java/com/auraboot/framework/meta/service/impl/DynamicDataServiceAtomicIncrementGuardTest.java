@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.MetaModelService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -91,6 +92,45 @@ class DynamicDataServiceAtomicIncrementGuardTest {
     void non_numeric_field_throws_illegal_argument() {
         assertThrows(IllegalArgumentException.class,
                 () -> service.incrementWithinCap("cr_cj_profile", "rec-1", "cr_cj_name", 1L, null));
+    }
+
+    @Test
+    void immutable_model_rejects_atomic_increment_before_mapper_or_primary_key_lookup() {
+        ModelDefinition immutable = ModelDefinition.builder()
+                .code("cr_cj_profile")
+                .tableName("cr_cj_profile")
+                .immutable(true)
+                .fields(testModel.getFields())
+                .build();
+        when(metadataService.getModelDefinition("cr_cj_profile")).thenReturn(Optional.of(immutable));
+
+        MetaServiceException error = assertThrows(MetaServiceException.class,
+                () -> service.incrementWithinCap(
+                        "cr_cj_profile", "rec-1", "cr_cj_followed_count", 1L, null));
+
+        assertTrue(error.getMessage().contains("immutable"));
+        verify(metadataService, never()).getPrimaryKeyField(anyString());
+        verifyNoInteractions(mapper);
+    }
+
+    @Test
+    void command_only_model_rejects_direct_create_before_permissions_or_mapper() {
+        ModelDefinition protectedModel = ModelDefinition.builder()
+                .code("cr_cj_profile")
+                .tableName("cr_cj_profile")
+                .immutable(true)
+                .commandOnlyCreate(true)
+                .fields(testModel.getFields())
+                .build();
+        when(metadataService.getModelDefinition("cr_cj_profile"))
+                .thenReturn(Optional.of(protectedModel));
+
+        MetaServiceException error = assertThrows(MetaServiceException.class,
+                () -> service.create("cr_cj_profile", new java.util.HashMap<>(Map.of(
+                        "cr_cj_name", "forged"))));
+
+        assertTrue(error.getMessage().contains("authorized command"));
+        verifyNoInteractions(mapper);
     }
 
     @Test

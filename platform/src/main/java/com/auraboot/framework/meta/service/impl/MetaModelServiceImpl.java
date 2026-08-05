@@ -921,6 +921,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 .updatedAt(DateUtil.toUtcLocalDateTime(model.getUpdatedAt()))
                 .softDelete(resolveSoftDelete(model))
                 .immutable(resolveImmutable(model))
+                .commandOnlyCreate(resolveCommandOnlyCreate(model))
                 .rules(loadCrossFieldRules(model))
                 .extension(flatExt)
                 .build();
@@ -1027,6 +1028,14 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             if (def.getExtension() != null && !def.getExtension().isEmpty()) {
                 inner.putAll(def.getExtension());
             }
+            // Immutable is monotonic: a definition may opt in, while a partial update whose
+            // primitive boolean defaults to false must never silently remove the invariant.
+            if (def.isImmutable()) {
+                inner.put("immutable", true);
+            }
+            if (def.isCommandOnlyCreate()) {
+                inner.put("commandOnlyCreate", true);
+            }
             // Persist ModelDefinition.primaryKey into extension so it survives reloads.
             if (StringUtils.hasText(def.getPrimaryKey())) {
                 inner.put("primaryKey", def.getPrimaryKey());
@@ -1059,6 +1068,12 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         // Merge caller-supplied extension keys (e.g. endpointAdapter).
         if (def.getExtension() != null && !def.getExtension().isEmpty()) {
             extensionData.putAll(def.getExtension());
+        }
+        if (def.isImmutable()) {
+            extensionData.put("immutable", true);
+        }
+        if (def.isCommandOnlyCreate()) {
+            extensionData.put("commandOnlyCreate", true);
         }
         // Persist ModelDefinition.primaryKey into extension so it survives reloads.
         if (StringUtils.hasText(def.getPrimaryKey())) {
@@ -1189,6 +1204,15 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         if (model.getExtension() != null) {
             Object immutable = model.getExtension().get("immutable");
             return Boolean.TRUE.equals(immutable) || "true".equals(String.valueOf(immutable));
+        }
+        return false;
+    }
+
+    /** Resolve the command-only creation invariant from extension.commandOnlyCreate. */
+    private boolean resolveCommandOnlyCreate(Model model) {
+        if (model.getExtension() != null) {
+            Object value = model.getExtension().get("commandOnlyCreate");
+            return Boolean.TRUE.equals(value) || "true".equals(String.valueOf(value));
         }
         return false;
     }

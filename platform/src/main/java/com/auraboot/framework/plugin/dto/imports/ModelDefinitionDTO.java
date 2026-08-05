@@ -75,6 +75,10 @@ public class ModelDefinitionDTO {
     @Builder.Default
     private Boolean immutable = false;
 
+    /** Require an authorized command boundary for record creation. */
+    @Builder.Default
+    private Boolean commandOnlyCreate = false;
+
     /**
      * Parent model code for inheritance.
      */

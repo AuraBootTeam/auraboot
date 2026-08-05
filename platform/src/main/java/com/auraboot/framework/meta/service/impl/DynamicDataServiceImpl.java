@@ -809,6 +809,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                                               String counterCode, long delta, String capCode) {
         assertWritable(modelCode);
         ModelDefinition model = getModelDefinition(modelCode);
+        ModelMutationGuard.assertMutable(model, "incremented");
         String counterCol = resolveNumericColumn(model, counterCode);
         String capCol = null;
         if (capCode != null) {
@@ -1170,13 +1171,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (data == null || data.isEmpty()) {
             throw new MetaServiceException("Data cannot be null or empty");
         }
+        ModelDefinition model = getModelDefinition(modelCode);
+        ModelMutationGuard.assertCreateAllowed(model);
 
         // Field-level write permission (gap #1): strip fields the current user may not write
         stripNonWritableFields(modelCode, data);
 
         logOperation("create", modelCode, data.keySet());
-
-        ModelDefinition model = getModelDefinition(modelCode);
 
         // 检查表是否存在，如果不存在则自动创建
         ensureTableExists(modelCode);
@@ -1945,6 +1946,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         logOperation("batchCreate", modelCode, dataList.size());
 
         ModelDefinition model = getModelDefinition(modelCode);
+        ModelMutationGuard.assertCreateAllowed(model);
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
 
         DynamicBatchResponse response = new DynamicBatchResponse();
@@ -2021,6 +2023,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         logOperation("bulkCreate", modelCode, dataList.size());
 
         ModelDefinition model = getModelDefinition(modelCode);
+        ModelMutationGuard.assertCreateAllowed(model);
         ensureTableExists(modelCode);
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
         Set<String> jsonbColumns = JsonbFieldHelper.getJsonbHostColumns(model);
@@ -3004,6 +3007,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         Instant startTime = Instant.now();
         ModelDefinition model = getModelDefinition(modelCode);
+        ModelMutationGuard.assertCreateAllowed(model);
 
         try {
             // Validate file exists

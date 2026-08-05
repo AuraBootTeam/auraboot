@@ -102,7 +102,8 @@ public class ComputedFieldsPhase implements CommandPhase {
                 ? request.getTargetRecordId()
                 : (String) fieldMapResults.get("recordPid");
         if (!computedValues.isEmpty() && StringUtils.hasText(recordIdStr)) {
-            ModelMutationGuard.assertMutable(modelDef, "updated by computed fields");
+            ModelMutationGuard.assertMutableOrInsertedInThisCommand(
+                    modelDef, "updated by computed fields", fieldMapResults, recordIdStr);
             String tableName = metaModelService.getTableName(command.getModelCode());
             CommandExecutorUtils.validateSqlIdentifier(tableName, "computed field tableName");
             String sql = "SELECT id FROM " + tableName

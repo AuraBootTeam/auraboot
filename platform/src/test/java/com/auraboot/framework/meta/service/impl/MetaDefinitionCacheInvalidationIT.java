@@ -95,6 +95,32 @@ class MetaDefinitionCacheInvalidationIT extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("saveDefinition persists immutable and partial updates cannot unset it")
+    void saveDefinitionPersistsMonotonicImmutableContract() {
+        String code = "p5_model_immutable_" + System.currentTimeMillis() + "_" + System.nanoTime();
+        insertModelVersion(code, 1, true, "Immutable Model", "append-only");
+
+        metaModelService.saveDefinition(ModelDefinition.builder()
+                .code(code)
+                .sourceType("physical")
+                .immutable(true)
+                .commandOnlyCreate(true)
+                .build());
+        ModelDefinition protectedModel = metaModelService.getModelDefinition(code).orElseThrow();
+        assertThat(protectedModel.isImmutable()).isTrue();
+        assertThat(protectedModel.isCommandOnlyCreate()).isTrue();
+
+        metaModelService.saveDefinition(ModelDefinition.builder()
+                .code(code)
+                .sourceType("physical")
+                .extension(Map.of("description", "partial update"))
+                .build());
+        ModelDefinition retained = metaModelService.getModelDefinition(code).orElseThrow();
+        assertThat(retained.isImmutable()).isTrue();
+        assertThat(retained.isCommandOnlyCreate()).isTrue();
+    }
+
+    @Test
     @DisplayName("delete evicts cached current model definition")
     void deleteEvictsCachedCurrentModelDefinition() {
         String code = "p5_model_delete_" + System.currentTimeMillis() + "_" + System.nanoTime();

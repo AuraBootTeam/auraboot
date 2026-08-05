@@ -12,10 +12,11 @@ class ModelDefinitionDTOTest {
     @Test
     void immutableIsAFirstClassModelContract() throws Exception {
         ModelDefinitionDTO model = objectMapper.readValue(
-                "{\"code\":\"qdp_revision\",\"immutable\":true}",
+                "{\"code\":\"qdp_revision\",\"immutable\":true,\"commandOnlyCreate\":true}",
                 ModelDefinitionDTO.class);
 
         assertThat(model.getImmutable()).isTrue();
+        assertThat(model.getCommandOnlyCreate()).isTrue();
         assertThat(model.getUnknownFields()).isNull();
     }
 
@@ -26,5 +27,6 @@ class ModelDefinitionDTOTest {
                 ModelDefinitionDTO.class);
 
         assertThat(Boolean.TRUE.equals(model.getImmutable())).isFalse();
+        assertThat(Boolean.TRUE.equals(model.getCommandOnlyCreate())).isFalse();
     }
 }

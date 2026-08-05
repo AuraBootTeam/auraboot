@@ -328,6 +328,7 @@ public class CommandFieldMapExecutor {
                         "targetRecordPid is required for update operations");
             }
             // INSERT: generate pid and set audit timestamps for new records
+            ModelMutationGuard.assertCreateAllowed(modelDef);
             String newPid = UniqueIdGenerator.generate();
             java.time.Instant now = java.time.Instant.now();
             columnData.put("pid", newPid);

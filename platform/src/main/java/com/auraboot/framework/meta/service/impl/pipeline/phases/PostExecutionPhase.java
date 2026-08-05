@@ -5,6 +5,7 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.exception.ImmutableModelMutationException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.CommandSideEffectExecutor;
@@ -130,6 +131,9 @@ public class PostExecutionPhase implements CommandPhase {
                         target.getChildFilter(),
                         tenantId
                 );
+            } catch (ImmutableModelMutationException e) {
+                // Model invariants are release gates, not best-effort derived-field failures.
+                throw e;
             } catch (Exception e) {
                 log.warn("RollUp recalculation failed for {}.{}: {}",
                         target.getParentModelCode(), target.getParentFieldCode(), e.getMessage());
