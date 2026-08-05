@@ -15,6 +15,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.util.List;
 
 /**
  * Host-side implementation of the plugin file byte bridge.
@@ -45,6 +46,33 @@ public class FileAccessorImpl implements FileAccessor {
     }
 
     @Override
+    public FileMetadata describe(String fileId) {
+        FileEntity entity = requirePublicFile(fileId);
+        long size = entity.getFileSize() == null ? 0L : entity.getFileSize();
+        String ownerUserId = entity.getCreatedBy() == null ? null : entity.getCreatedBy().toString();
+        return new FileMetadata(
+                entity.getPid(),
+                entity.getOriginalName(),
+                size,
+                entity.getMimeType(),
+                ownerUserId,
+                entity.getStatus());
+    }
+
+    @Override
+    public boolean isLinkedTo(String fileId, String entityType, String entityId, String fieldName) {
+        requirePublicFile(fileId);
+        requireText(entityType, "entityType");
+        requireText(entityId, "entityId");
+        requireText(fieldName, "fieldName");
+        List<FileEntity> related = fileService.getFilesByEntityAndField(entityType, entityId, fieldName);
+        if (related == null || related.isEmpty()) {
+            return false;
+        }
+        return related.stream().anyMatch(entity -> fileId.equals(entity.getPid()));
+    }
+
+    @Override
     public SavedFile save(String originalName, String contentType, byte[] bytes) {
         if (bytes == null || bytes.length == 0) {
             throw new IllegalArgumentException("file bytes must not be empty");
@@ -64,6 +92,27 @@ public class FileAccessorImpl implements FileAccessor {
             return first;
         }
         return StringUtils.hasText(second) ? second : null;
+    }
+
+    private FileEntity requirePublicFile(String fileId) {
+        requireText(fileId, "fileId");
+        FileEntity entity = fileService.getFileById(fileId);
+        if (entity == null) {
+            throw new IllegalArgumentException("File not found: " + fileId);
+        }
+        if (!fileId.equals(entity.getPid())) {
+            throw new IllegalArgumentException("A stable public file pid is required: " + fileId);
+        }
+        if (Boolean.TRUE.equals(entity.getDeletedFlag()) || "deleted".equalsIgnoreCase(entity.getStatus())) {
+            throw new IllegalArgumentException("File is not active: " + fileId);
+        }
+        return entity;
+    }
+
+    private static void requireText(String value, String name) {
+        if (!StringUtils.hasText(value)) {
+            throw new IllegalArgumentException(name + " is required");
+        }
     }
 
     private static String safeOriginalName(String originalName) {
