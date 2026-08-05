@@ -152,6 +152,9 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Well-known key for independently committed, bounded checkpoint work. */
     String INDEPENDENT_TRANSACTION_ACCESSOR_KEY = IndependentTransactionAccessor.SETTINGS_KEY;
 
+    /** Well-known key for the command boundary's tenant-scoped idempotency identity. */
+    String CLIENT_REQUEST_ID_KEY = "__clientRequestId";
+
     /**
      * Command execution context.
      */
@@ -221,6 +224,23 @@ public interface CommandHandlerExtension extends ExtensionPoint {
                     ? settings.get(INDEPENDENT_TRANSACTION_ACCESSOR_KEY) : null;
             return accessor instanceof IndependentTransactionAccessor
                     ? (IndependentTransactionAccessor) accessor : null;
+        }
+
+        /**
+         * Returns the client request identity already authenticated and scoped by
+         * the command pipeline's idempotency boundary.
+         *
+         * <p>Handlers must prefer this server-owned value over a similarly named
+         * business-payload field. Older hosts omit the setting, in which case
+         * security-sensitive handlers should fail closed.</p>
+         */
+        public String clientRequestId() {
+            Object value = settings != null ? settings.get(CLIENT_REQUEST_ID_KEY) : null;
+            if (value == null) {
+                return null;
+            }
+            String text = String.valueOf(value).trim();
+            return text.isEmpty() ? null : text;
         }
 
         public static Builder builder() {

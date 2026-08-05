@@ -65,6 +65,32 @@ describe('HttpClient integration', () => {
       expect(init.body).toBe('{"name":"John"}');
     });
 
+    it('should generate a client request identity for command posts', async () => {
+      mockFetchSuccess({ ok: true });
+
+      await fetchResult('/api/meta/commands/execute/crm:release_qdp', {
+        method: 'post',
+        params: { payload: { requestPid: 'request-1' } },
+      });
+
+      const [, init] = (globalThis.fetch as any).mock.calls[0];
+      const body = JSON.parse(init.body);
+      expect(body.clientRequestId).toMatch(/^ui-/);
+      expect(body.payload).toEqual({ requestPid: 'request-1' });
+    });
+
+    it('should preserve an explicit command client request identity', async () => {
+      mockFetchSuccess({ ok: true });
+
+      await fetchResult('/api/meta/commands/execute/crm:release_qdp', {
+        method: 'post',
+        params: { clientRequestId: 'external-retry-1', payload: {} },
+      });
+
+      const [, init] = (globalThis.fetch as any).mock.calls[0];
+      expect(JSON.parse(init.body).clientRequestId).toBe('external-retry-1');
+    });
+
     it('should include auth header for protected routes', async () => {
       mockFetchSuccess();
 

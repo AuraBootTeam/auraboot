@@ -91,6 +91,7 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
         Long userId = longValue(inputParams, "userId");
         String modelCode = text(inputParams, "modelCode");
         String recordPid = text(inputParams, "recordPid");
+        String clientRequestId = text(inputParams, "clientRequestId");
         Map<String, Object> payload = mapValue(inputParams.get("payload"));
         Map<String, Object> handlerParams = mapValue(inputParams.get("handlerParams"));
 
@@ -111,6 +112,10 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             pluginSettings.put("__handlerCode", handlerCode);
             if (userId != null) {
                 pluginSettings.put("__currentUser", userId.toString());
+            }
+            if (clientRequestId != null && !clientRequestId.isBlank()) {
+                pluginSettings.put(CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
+                        clientRequestId.trim());
             }
             pluginSettings.put("__dataAccessor", new DynamicDataAccessorImpl(dynamicDataService));
             final ProgressCallback cb = callback;
