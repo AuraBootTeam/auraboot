@@ -42,6 +42,7 @@ class CommandHandlerAsyncTaskExecutorTest {
         in.put("tenantId", 123L);
         in.put("userId", 45L);
         in.put("modelCode", "bom_material_master");
+        in.put("clientRequestId", "client-request-async-1");
         ObjectNode payload = in.putObject("payload");
         payload.put("source_file_id", "01KFILE");
         return in;
@@ -86,6 +87,7 @@ class CommandHandlerAsyncTaskExecutorTest {
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(captured.get().settings()).containsEntry("__currentUser", "45");
+        assertThat(captured.get().clientRequestId()).isEqualTo("client-request-async-1");
     }
 
     @Test

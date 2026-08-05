@@ -143,10 +143,12 @@ class HandlerPhaseTest {
                 .containsEntry("__commandCode", BUSINESS_COMMAND_CODE)
                 .containsEntry("__handlerCode", PLUGIN_HANDLER_CODE)
                 .containsEntry("__currentUser", "2")
+                .containsEntry(CommandHandlerExtension.CLIENT_REQUEST_ID_KEY, "client-request-1")
                 .containsKey(CommandHandlerExtension.DATA_ACCESSOR_KEY)
                 .containsKey(CommandHandlerExtension.FILE_ACCESSOR_KEY)
                 .containsKey(CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY);
         assertThat(handler.capturedContext.get().fileAccessor()).isInstanceOf(FileAccessor.class);
+        assertThat(handler.capturedContext.get().clientRequestId()).isEqualTo("client-request-1");
         assertThat(handler.capturedContext.get().independentTransactionAccessor()).isNotNull();
         assertThat(ctx.getHandlerResults()).containsEntry("observedProcessKey", "po_approval");
     }
@@ -315,6 +317,7 @@ class HandlerPhaseTest {
         com.fasterxml.jackson.databind.JsonNode taskInput = taskCaptor.getValue().getInputParams();
         assertThat(taskInput.path("commandPermitScope").asText()).isEqualTo("SELF");
         assertThat(taskInput.path("commandExpectedVersion").asLong()).isEqualTo(6L);
+        assertThat(taskInput.path("clientRequestId").asText()).isEqualTo("client-request-1");
     }
 
     @Test
@@ -485,6 +488,7 @@ class HandlerPhaseTest {
 
         CommandExecuteRequest request = new CommandExecuteRequest();
         request.setPayload(Collections.emptyMap());
+        request.setClientRequestId("client-request-1");
         request.setDryRun(false);
         request.setTargetRecordId("po-1");
 

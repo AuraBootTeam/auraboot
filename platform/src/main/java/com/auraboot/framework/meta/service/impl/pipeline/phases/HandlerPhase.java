@@ -503,7 +503,7 @@ public class HandlerPhase implements CommandPhase {
             String effectiveRecordId = resolveEffectiveRecordId(request, fieldMapResults);
             String taskCode = submitAsyncHandlerTask(handlerCode, commandCode, modelCode,
                     effectiveRecordId, payload, asyncHandlerParams,
-                    tenantId, userId);
+                    tenantId, userId, request.getClientRequestId());
             handlerResults.put("async", true);
             handlerResults.put("taskCode", taskCode);
             handlerResults.put("taskType", CommandHandlerAsyncTaskExecutor.TASK_TYPE);
@@ -537,6 +537,10 @@ public class HandlerPhase implements CommandPhase {
             // Keep the established String shape expected by existing plugin handlers.
             if (userId != null) {
                 pluginSettings.put("__currentUser", userId.toString());
+            }
+            if (StringUtils.hasText(request.getClientRequestId())) {
+                pluginSettings.put(CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
+                        request.getClientRequestId().trim());
             }
             pluginSettings.put("__dataAccessor",
                     new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
@@ -647,7 +651,8 @@ public class HandlerPhase implements CommandPhase {
 
     private String submitAsyncHandlerTask(String handlerCode, String commandCode, String modelCode,
                                           String recordPid, Map<String, Object> payload,
-                                          Map<String, Object> handlerParams, Long tenantId, Long userId) {
+                                          Map<String, Object> handlerParams, Long tenantId, Long userId,
+                                          String clientRequestId) {
         Map<String, Object> input = new HashMap<>();
         input.put("handlerCode", handlerCode);
         input.put("commandCode", commandCode);
@@ -657,6 +662,9 @@ public class HandlerPhase implements CommandPhase {
         input.put("recordPid", recordPid);
         input.put("payload", payload != null ? payload : Collections.emptyMap());
         input.put("handlerParams", handlerParams);
+        if (StringUtils.hasText(clientRequestId)) {
+            input.put("clientRequestId", clientRequestId.trim());
+        }
         // The async executor never re-enters the pipeline, so the boundary's decision would be lost
         // at the thread hand-off — and the handler would run with no authority at all, which is the
         // exact path that failed in production. Persist the verdict WITH the task, so background

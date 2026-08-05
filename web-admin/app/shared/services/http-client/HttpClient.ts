@@ -61,19 +61,55 @@ export async function fetchResult<T>(
   options: FetchOptions = {},
   request?: Request,
 ): Promise<Result<T>> {
+  const effectiveOptions = withCommandClientRequestId(path, options);
+
   // Step 1: Create request context (auto-detect SSR/CSR)
   const context = await createRequestContext(request);
 
   // Step 2: Resolve authentication token
-  const token = await resolveAuthToken(path, context, options);
+  const token = await resolveAuthToken(path, context, effectiveOptions);
 
   // Step 3: Build complete request
-  const { url, init } = buildRequest(path, options, context, token);
+  const { url, init } = buildRequest(path, effectiveOptions, context, token);
 
   // Step 4: Execute fetch and handle errors
   const result = await executeFetch<T>(url, init);
 
   return result;
+}
+
+/**
+ * Give every command POST a request identity without exposing idempotency as a
+ * business form field. Explicit API-client identities are preserved verbatim;
+ * the generated value is created once before the request is handed to fetch, so
+ * transport-level retries reuse the same body.
+ */
+function withCommandClientRequestId(path: string, options: FetchOptions): FetchOptions {
+  if (
+    options.method?.toLowerCase() !== 'post' ||
+    !path.startsWith('/api/meta/commands/execute/') ||
+    !options.params ||
+    Array.isArray(options.params) ||
+    options.params.clientRequestId != null
+  ) {
+    return options;
+  }
+
+  return {
+    ...options,
+    params: {
+      ...options.params,
+      clientRequestId: createCommandClientRequestId(),
+    },
+  };
+}
+
+function createCommandClientRequestId(): string {
+  const randomUuid = globalThis.crypto?.randomUUID?.bind(globalThis.crypto);
+  if (randomUuid) {
+    return `ui-${randomUuid()}`;
+  }
+  return `ui-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
 }
 
 /**
