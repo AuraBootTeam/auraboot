@@ -127,8 +127,10 @@ class HandlerPhaseTest {
                         "statusField", "pr_po_status"
                 )
         ));
+        ctx.getRequest().setExpectedVersion(5);
 
-        phase.execute(ctx);
+        MetaContext.runWithCommandPermitPlan(
+                "SELF", 5L, "pr_purchase_order", "po-1", () -> phase.execute(ctx));
 
         verify(extensionRegistry).getCommandHandler(PLUGIN_HANDLER_CODE);
         verify(extensionRegistry, never()).getCommandHandler(BUSINESS_COMMAND_CODE);
@@ -144,10 +146,12 @@ class HandlerPhaseTest {
                 .containsEntry("__handlerCode", PLUGIN_HANDLER_CODE)
                 .containsEntry("__currentUser", "2")
                 .containsEntry(CommandHandlerExtension.CLIENT_REQUEST_ID_KEY, "client-request-1")
+                .containsEntry(CommandHandlerExtension.EXPECTED_VERSION_KEY, 5L)
                 .containsKey(CommandHandlerExtension.DATA_ACCESSOR_KEY)
                 .containsKey(CommandHandlerExtension.FILE_ACCESSOR_KEY)
                 .containsKey(CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY);
         assertThat(handler.capturedContext.get().fileAccessor()).isInstanceOf(FileAccessor.class);
+        assertThat(handler.capturedContext.get().expectedVersion()).isEqualTo(5L);
         assertThat(handler.capturedContext.get().clientRequestId()).isEqualTo("client-request-1");
         assertThat(handler.capturedContext.get().independentTransactionAccessor()).isNotNull();
         assertThat(ctx.getHandlerResults()).containsEntry("observedProcessKey", "po_approval");
@@ -297,6 +301,7 @@ class HandlerPhaseTest {
                 "handler", PLUGIN_HANDLER_CODE,
                 "handlerParams", Map.of("async", true)
         ));
+        ctx.getRequest().setExpectedVersion(6);
 
         MetaContext.runWithCommandPermitPlan(
                 "SELF", 6L, "pr_purchase_order", "po-1", () -> phase.execute(ctx));
@@ -318,6 +323,23 @@ class HandlerPhaseTest {
         assertThat(taskInput.path("commandPermitScope").asText()).isEqualTo("SELF");
         assertThat(taskInput.path("commandExpectedVersion").asLong()).isEqualTo(6L);
         assertThat(taskInput.path("clientRequestId").asText()).isEqualTo("client-request-1");
+    }
+
+    @Test
+    void execute_doesNotExposeAServerFilledVersionWhenTheCallerOmittedThePrecondition() throws Exception {
+        RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        when(metaModelService.getModelDefinition("pr_purchase_order")).thenReturn(Optional.empty());
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "custom",
+                "handler", PLUGIN_HANDLER_CODE));
+
+        MetaContext.runWithCommandPermitPlan(
+                "SELF", 9L, "pr_purchase_order", "po-1", () -> phase.execute(ctx));
+
+        assertThat(handler.capturedContext.get().expectedVersion()).isNull();
+        assertThat(handler.capturedContext.get().settings())
+                .doesNotContainKey(CommandHandlerExtension.EXPECTED_VERSION_KEY);
     }
 
     @Test

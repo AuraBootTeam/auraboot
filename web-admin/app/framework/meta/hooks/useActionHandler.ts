@@ -97,6 +97,23 @@ function toNonBlankString(value: unknown): string | undefined {
   return text.length > 0 ? text : undefined;
 }
 
+function toExpectedVersion(value: unknown): number | undefined {
+  if (value == null || (typeof value === 'string' && value.trim().length === 0)) {
+    return undefined;
+  }
+  const numeric = typeof value === 'number' ? value : Number(value);
+  return Number.isSafeInteger(numeric) && numeric >= 0 ? numeric : undefined;
+}
+
+function resolveTargetExpectedVersion(
+  targetRecordPid: string | undefined,
+  record: Record<string, any> | undefined,
+): number | undefined {
+  if (!targetRecordPid || !record) return undefined;
+  if (getLegacyCompatibleRecordPid(record) !== targetRecordPid) return undefined;
+  return toExpectedVersion(record.row_version ?? record.rowVersion);
+}
+
 function readPath(source: unknown, path: string): unknown {
   if (!source || typeof source !== 'object') return undefined;
   return path.split('.').reduce<unknown>((current, segment) => {
@@ -220,6 +237,7 @@ type ActionToastType = 'success' | 'error' | 'warning' | 'info';
 interface ExecuteCommandOptions {
   suppressAsyncSubmitToast?: boolean;
   asyncTaskLabel?: string;
+  expectedVersion?: number;
 }
 
 function notifyActionToast(
@@ -474,6 +492,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       if (normalizedOp) {
         body.operationType = normalizedOp;
       }
+      if (commandOptions.expectedVersion != null) {
+        body.expectedVersion = commandOptions.expectedVersion;
+      }
       const result = await fetchResult(`/api/meta/commands/execute/${commandCode}`, {
         method: 'post',
         params: body,
@@ -701,6 +722,10 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   normalizedButton.label || normalizedButton.content || normalizedButton.code,
                   locale,
                   t,
+                ),
+                expectedVersion: resolveTargetExpectedVersion(
+                  targetRecordPid,
+                  record || context.data,
                 ),
               },
             );

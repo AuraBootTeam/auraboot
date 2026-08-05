@@ -507,7 +507,7 @@ public class HandlerPhase implements CommandPhase {
             String effectiveRecordId = resolveEffectiveRecordId(request, fieldMapResults);
             String taskCode = submitAsyncHandlerTask(handlerCode, commandCode, modelCode,
                     effectiveRecordId, payload, asyncHandlerParams,
-                    tenantId, userId, request.getClientRequestId());
+                    tenantId, userId, request.getClientRequestId(), request.getExpectedVersion());
             handlerResults.put("async", true);
             handlerResults.put("taskCode", taskCode);
             handlerResults.put("taskType", CommandHandlerAsyncTaskExecutor.TASK_TYPE);
@@ -546,6 +546,11 @@ public class HandlerPhase implements CommandPhase {
                 pluginSettings.put(CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
                         request.getClientRequestId().trim());
             }
+            String effectiveRecordId = resolveEffectiveRecordId(request, fieldMapResults);
+            Long expectedVersion = MetaContext.getCommandExpectedVersion(modelCode, effectiveRecordId);
+            if (request.getExpectedVersion() != null && expectedVersion != null) {
+                pluginSettings.put(CommandHandlerExtension.EXPECTED_VERSION_KEY, expectedVersion);
+            }
             pluginSettings.put("__dataAccessor",
                     new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
             if (biTemporalService != null) {
@@ -574,7 +579,7 @@ public class HandlerPhase implements CommandPhase {
                     .namespace(namespace)
                     .commandType(handlerCode)
                     .modelCode(modelCode)
-                    .recordId(resolveEffectiveRecordId(request, fieldMapResults))
+                    .recordId(effectiveRecordId)
                     .payload(payload)
                     .settings(pluginSettings)
                     .dryRun(request.isDryRun())
@@ -656,7 +661,7 @@ public class HandlerPhase implements CommandPhase {
     private String submitAsyncHandlerTask(String handlerCode, String commandCode, String modelCode,
                                           String recordPid, Map<String, Object> payload,
                                           Map<String, Object> handlerParams, Long tenantId, Long userId,
-                                          String clientRequestId) {
+                                          String clientRequestId, Integer clientExpectedVersion) {
         Map<String, Object> input = new HashMap<>();
         input.put("handlerCode", handlerCode);
         input.put("commandCode", commandCode);
@@ -681,7 +686,7 @@ public class HandlerPhase implements CommandPhase {
         if (commandPermitScope != null) {
             input.put("commandPermitScope", commandPermitScope);
             Long expectedVersion = MetaContext.getCommandExpectedVersion(modelCode, recordPid);
-            if (expectedVersion != null) {
+            if (clientExpectedVersion != null && expectedVersion != null) {
                 input.put("commandExpectedVersion", expectedVersion);
             }
         }
