@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -43,6 +44,51 @@ class FileAccessorImplTest {
 
         assertThat(accessor.open("file-pid").readAllBytes()).isEqualTo(bytes);
         verify(storageProvider).download("stored.xlsx");
+    }
+
+    @Test
+    void describe_returns_storage_opaque_metadata_for_a_public_file_pid() {
+        FileEntity entity = file("file-pid", "stored-key.xlsx", "customer-bom.xlsx");
+        entity.setFileSize(123L);
+        entity.setMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        entity.setCreatedBy(42L);
+        entity.setStatus("active");
+        when(fileService.getFileById("file-pid")).thenReturn(entity);
+
+        FileAccessor accessor = new FileAccessorImpl(fileService, storageProvider, 42L);
+
+        assertThat(accessor.describe("file-pid")).isEqualTo(new FileAccessor.FileMetadata(
+                "file-pid",
+                "customer-bom.xlsx",
+                123L,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "42",
+                "active"));
+    }
+
+    @Test
+    void describe_rejects_storage_keys_and_internal_aliases() {
+        when(fileService.getFileById("stored-key.xlsx"))
+                .thenReturn(file("file-pid", "stored-key.xlsx", "customer-bom.xlsx"));
+        FileAccessor accessor = new FileAccessorImpl(fileService, storageProvider, 42L);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> accessor.describe("stored-key.xlsx"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("public file pid");
+    }
+
+    @Test
+    void isLinkedTo_requires_the_exact_public_pid_in_the_business_field_relation() {
+        FileEntity target = file("file-pid", "stored-key.xlsx", "customer-bom.xlsx");
+        when(fileService.getFileById("file-pid")).thenReturn(target);
+        when(fileService.getFilesByEntityAndField(
+                "crm_customer_request_common", "request-pid", "qdp_source_files"))
+                .thenReturn(List.of(target));
+        FileAccessor accessor = new FileAccessorImpl(fileService, storageProvider, 42L);
+
+        assertThat(accessor.isLinkedTo(
+                "file-pid", "crm_customer_request_common", "request-pid", "qdp_source_files"))
+                .isTrue();
     }
 
     @Test
@@ -95,5 +141,13 @@ class FileAccessorImplTest {
         ArgumentCaptor<MultipartFile> fileCaptor = ArgumentCaptor.forClass(MultipartFile.class);
         verify(fileService).uploadFile(fileCaptor.capture(), eq(42L));
         assertThat(fileCaptor.getValue().getOriginalFilename()).isEqualTo("原始-BOM.xlsx");
+    }
+
+    private static FileEntity file(String pid, String storageKey, String originalName) {
+        FileEntity entity = new FileEntity();
+        entity.setPid(pid);
+        entity.setFileName(storageKey);
+        entity.setOriginalName(originalName);
+        return entity;
     }
 }
