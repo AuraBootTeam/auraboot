@@ -137,10 +137,7 @@ function resolveCommandTargetRecordId(
   record: Record<string, any> | undefined,
   context: Record<string, any>,
 ): string | undefined {
-  const explicitTarget = resolveRuntimeTemplate(
-    actionDef.targetRecordPid ?? actionDef.targetRecordId,
-    runtimeContext,
-  );
+  const explicitTarget = resolveRuntimeTemplate(actionDef.targetRecordPid, runtimeContext);
   return (
     toNonBlankString(explicitTarget) ||
     getLegacyCompatibleRecordPid(record) ||
