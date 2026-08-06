@@ -16,6 +16,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
+import java.security.MessageDigest;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -25,14 +26,15 @@ import java.util.Map;
  * commands (see {@code CommandExecutorImpl} / {@code CompletionPhase}):
  *
  * <ol>
- *   <li><b>Idempotent replay</b> — for {@link RestRoute#idempotent()} routes carrying an
- *       {@code Idempotency-Key} header, a previously-recorded outcome is replayed byte-for-byte
- *       without re-running the handler ({@link IdempotencyService}).</li>
+ *   <li><b>Idempotent claim/replay</b> — for {@link RestRoute#idempotent()} routes carrying an
+ *       {@code Idempotency-Key} header, a database-atomic claim fences the handler and a completed
+ *       outcome is replayed byte-for-byte ({@link IdempotencyService}).</li>
  *   <li><b>JSON-schema pre-validation</b> — {@link RestRoute#requestJsonSchema()} is enforced
  *       against the request body before the handler runs ({@link RestSchemaValidator}).</li>
  *   <li><b>Transaction</b> — the handler + idempotency record run inside a transaction
- *       ({@link TransactionTemplate}, read-only when {@link RestRoute#readOnlyTx()}); any exception
- *       rolls the whole thing back. The handler writes into an in-memory
+ *       ({@link TransactionTemplate}, read-only when {@link RestRoute#readOnlyTx()} unless the
+ *       request must write an idempotency claim); any exception rolls the whole thing back. The
+ *       handler writes into an in-memory
  *       {@link BufferingPluginHttpResponse} that the dispatcher only flushes after commit, so a
  *       rollback never leaks a partially-written response.</li>
  *   <li><b>Audit fallback</b> — every request (success or failure) lands one
@@ -76,26 +78,32 @@ public class RestEndpointPipeline {
         final Long tenantId = ctx.tenantId();
         final Long userId = ctx.userId();
         final String idemKey = req.header(IDEMPOTENCY_HEADER);
+        final boolean scopedIdempotency = route.idempotent() && StringUtils.hasText(idemKey);
+        final Map<String, Object> requestIntent = scopedIdempotency ? requestIntent(req) : Map.of();
         final long start = System.currentTimeMillis();
-
-        // 1) Idempotent replay — short-circuit before opening a write transaction.
-        if (route.idempotent() && StringUtils.hasText(idemKey)) {
-            Map<String, Object> cached = idempotencyService.checkIdempotency(idemKey, tenantId);
-            if (cached != null) {
-                log.debug("Idempotent replay for {} key={} tenant={}", routeCode, idemKey, tenantId);
-                BufferingPluginHttpResponse replay = BufferingPluginHttpResponse.fromOutcomeMap(cached);
-                replay.header("X-Idempotent-Replay", "true");
-                return replay;
-            }
-        }
 
         final String[] phase = {"init"};
         final TransactionTemplate tx = new TransactionTemplate(txManager);
-        tx.setReadOnly(route.readOnlyTx());
+        tx.setReadOnly(route.readOnlyTx() && !scopedIdempotency);
 
         try {
             BufferingPluginHttpResponse buf = tx.execute(status -> {
-                // 2) Schema pre-validation (rolls back if it throws; nothing written yet).
+                // 1) The unique PROCESSING row is the transaction-held execution fence. A losing
+                // concurrent insert waits for this transaction and then replays its committed row.
+                if (scopedIdempotency) {
+                    phase[0] = "idempotency_claim";
+                    Map<String, Object> cached = idempotencyService.claimScopedIdempotency(
+                            idemKey, routeCode, requestIntent, tenantId);
+                    if (cached != null) {
+                        log.debug("Idempotent replay for {} key={} tenant={}", routeCode, idemKey, tenantId);
+                        BufferingPluginHttpResponse replay =
+                                BufferingPluginHttpResponse.fromOutcomeMap(cached);
+                        replay.header("X-Idempotent-Replay", "true");
+                        return replay;
+                    }
+                }
+
+                // 2) Schema pre-validation (the claim rolls back if validation fails).
                 phase[0] = "schema_validate";
                 schemaValidator.validate(req.body(), route.requestJsonSchema());
 
@@ -111,8 +119,9 @@ public class RestEndpointPipeline {
                 }
 
                 // 4) Record idempotency outcome inside the tx (rolled back if the tx later fails).
-                if (route.idempotent() && StringUtils.hasText(idemKey)) {
-                    idempotencyService.recordOutcome(idemKey, routeCode, bodyAsMap(req), b.toOutcomeMap(), tenantId);
+                if (scopedIdempotency) {
+                    idempotencyService.recordScopedOutcome(
+                            idemKey, routeCode, requestIntent, b.toOutcomeMap(), tenantId);
                 }
                 return b;
             });
@@ -156,6 +165,34 @@ public class RestEndpointPipeline {
         } catch (Exception e) {
             // Non-JSON or non-object body — keep the audit row but don't fail the request over it.
             return Map.of("_rawBytes", body.length);
+        }
+    }
+
+    /**
+     * Freeze every request component that can change the meaning of a matched REST operation.
+     * The concrete path (not just the route pattern) prevents a key used for one resource from
+     * replaying another resource's response; query and raw-body digest close the same gap for
+     * filters and non-object JSON bodies.
+     */
+    private Map<String, Object> requestIntent(PluginHttpRequest req) {
+        byte[] requestBody = req.body();
+        byte[] body = requestBody == null ? new byte[0] : requestBody;
+        Map<String, Object> intent = new LinkedHashMap<>();
+        intent.put("method", req.method());
+        intent.put("path", req.path());
+        intent.put("pathVars", req.pathVars() == null ? Map.of() : req.pathVars());
+        intent.put("query", req.query() == null ? Map.of() : req.query());
+        intent.put("bodyLength", body.length);
+        intent.put("bodySha256", sha256(body));
+        return intent;
+    }
+
+    private String sha256(byte[] value) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(value);
+            return java.util.HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            throw new IllegalStateException("SHA-256 is unavailable", e);
         }
     }
 }

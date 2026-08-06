@@ -1,5 +1,7 @@
 package com.auraboot.framework.meta.exception;
 
+import com.auraboot.framework.exception.ConflictException;
+
 /**
  * Exception thrown when a duplicate idempotent request is detected.
  *
@@ -12,7 +14,7 @@ package com.auraboot.framework.meta.exception;
  * @author AuraBoot Team
  * @since 2.4.0
  */
-public class IdempotentException extends RuntimeException {
+public class IdempotentException extends ConflictException {
 
     public IdempotentException(String message) {
         super(message);

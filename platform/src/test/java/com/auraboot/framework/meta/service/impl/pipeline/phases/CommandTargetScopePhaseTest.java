@@ -77,6 +77,44 @@ class CommandTargetScopePhaseTest {
     }
 
     @Test
+    void defersAStaleClientVersionUntilAfterEveryAuthorizationGate() {
+        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+        givenRecordIsReadable(true);
+        CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
+        ctx.getRequest().setExpectedVersion(12);
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getTargetRecordVersion()).isEqualTo(13L);
+    }
+
+    @Test
+    void acceptsAMatchingClientVersionAndRetainsTheAuthoritativeVersion() {
+        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+        givenRecordIsReadable(true);
+        CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
+        ctx.getRequest().setExpectedVersion(13);
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getTargetRecordVersion()).isEqualTo(13L);
+    }
+
+    @Test
+    void leavesAnUnversionedObservationForTheTransactionalLockToReject() {
+        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+        when(dynamicDataService.getById(anyString(), anyString()))
+                .thenReturn(Map.of("pid", "REC-1", "owner_id", 7L));
+        givenPermission(true);
+        CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
+        ctx.getRequest().setExpectedVersion(1);
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getTargetRecordVersion()).isNull();
+    }
+
+    @Test
     void enforceModeDeniesATargetTheCallerCannotSee() {
         CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_ENFORCE);
         givenRecordIsReadable(false);

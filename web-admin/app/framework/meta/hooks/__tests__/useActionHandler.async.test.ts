@@ -420,6 +420,78 @@ describe('useActionHandler - handlerParams.async polling', () => {
     expect(loadData).toHaveBeenCalled();
   });
 
+  it('sends the current target row version through the command concurrency boundary', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { released: true } });
+
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: vi.fn() as any,
+        tableName: 'crm_customer_request',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+      }),
+    );
+
+    const button = {
+      code: 'release_qdp',
+      label: 'Release QDP',
+      action: { type: 'command', command: 'crm:release_qdp' },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button, {
+        pid: 'REQUEST-1',
+        row_version: 8,
+      });
+    });
+
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/crm:release_qdp',
+      expect.objectContaining({
+        params: expect.objectContaining({
+          targetRecordPid: 'REQUEST-1',
+          expectedVersion: 8,
+        }),
+      }),
+    );
+  });
+
+  it('does not reuse a sidecar version for a command targeting another record', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { released: true } });
+    const runtime = makeRuntime({ form: { pid: 'REQUEST-1' } });
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime,
+        navigate: vi.fn() as any,
+        tableName: 'pcba_rfq',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+      }),
+    );
+
+    const button = {
+      code: 'release_parent_qdp',
+      label: 'Release Parent QDP',
+      action: {
+        type: 'command',
+        command: 'crm:release_qdp',
+        targetRecordPid: '${form.pid}',
+      },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button, {
+        pid: 'SIDECAR-1',
+        row_version: 3,
+      });
+    });
+
+    const commandBody = fetchResultMock.mock.calls[0][1].params;
+    expect(commandBody.targetRecordPid).toBe('REQUEST-1');
+    expect(commandBody).not.toHaveProperty('expectedVersion');
+  });
+
   it('reloads explicit data sources for nested toolbar commands instead of navigating away', async () => {
     fetchResultMock.mockResolvedValueOnce({ code: '0', data: { updated: 1 } });
 

@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.service.IdempotencyService;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandIdempotencyIntent;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +18,7 @@ import java.util.Map;
  */
 @Slf4j
 @Component
-@Order(300)
+@Order(525)
 @RequiredArgsConstructor
 public class IdempotencyPhase implements CommandPhase {
 
@@ -35,8 +36,13 @@ public class IdempotencyPhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
-        Map<String, Object> cachedResult = idempotencyService.checkIdempotency(
-                ctx.getRequest().getClientRequestId(), ctx.getTenantId());
+        Map<String, Object> intent = CommandIdempotencyIntent.snapshot(ctx);
+        ctx.setIdempotencyIntent(intent);
+        Map<String, Object> cachedResult = idempotencyService.claimScopedIdempotency(
+                ctx.getRequest().getClientRequestId(),
+                ctx.getCommandCode(),
+                intent,
+                ctx.getTenantId());
         if (cachedResult != null) {
             log.info("Idempotent replay for command {} with clientRequestId {}",
                     ctx.getCommandCode(), ctx.getRequest().getClientRequestId());

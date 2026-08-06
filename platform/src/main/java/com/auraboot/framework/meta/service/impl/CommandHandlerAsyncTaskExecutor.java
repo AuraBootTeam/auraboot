@@ -92,6 +92,7 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
         String modelCode = text(inputParams, "modelCode");
         String recordPid = text(inputParams, "recordPid");
         String clientRequestId = text(inputParams, "clientRequestId");
+        Long commandExpectedVersion = longValue(inputParams, "commandExpectedVersion");
         Map<String, Object> payload = mapValue(inputParams.get("payload"));
         Map<String, Object> handlerParams = mapValue(inputParams.get("handlerParams"));
 
@@ -116,6 +117,10 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             if (clientRequestId != null && !clientRequestId.isBlank()) {
                 pluginSettings.put(CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
                         clientRequestId.trim());
+            }
+            if (commandExpectedVersion != null) {
+                pluginSettings.put(CommandHandlerExtension.EXPECTED_VERSION_KEY,
+                        commandExpectedVersion);
             }
             pluginSettings.put("__dataAccessor", new DynamicDataAccessorImpl(dynamicDataService));
             final ProgressCallback cb = callback;
@@ -167,7 +172,6 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                 invocation = () -> MetaContext.runWithCommandAuthority(commandAuthority, delegate);
             }
             String commandPermitScope = text(inputParams, "commandPermitScope");
-            Long commandExpectedVersion = longValue(inputParams, "commandExpectedVersion");
             Object result = commandPermitScope == null
                     ? invocation.get()
                     : MetaContext.runWithCommandPermitPlan(

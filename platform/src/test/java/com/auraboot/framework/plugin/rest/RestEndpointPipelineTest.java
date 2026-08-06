@@ -11,6 +11,7 @@ import com.auraboot.framework.plugin.extension.RestRoute;
 import com.auraboot.framework.plugin.pf4j.RestEndpointRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
@@ -61,6 +62,9 @@ class RestEndpointPipelineTest {
     private PluginHttpRequest req(String method, byte[] body, String idemKey) {
         PluginHttpRequest r = mock(PluginHttpRequest.class);
         when(r.method()).thenReturn(method);
+        when(r.path()).thenReturn("/api/ext/probe/echo");
+        when(r.pathVars()).thenReturn(Map.of());
+        when(r.query()).thenReturn(Map.of());
         when(r.body()).thenReturn(body == null ? new byte[0] : body);
         when(r.header("Idempotency-Key")).thenReturn(idemKey);
         return r;
@@ -91,7 +95,9 @@ class RestEndpointPipelineTest {
         BufferingPluginHttpResponse prior = new BufferingPluginHttpResponse();
         prior.status(201).contentType("application/json").header("X-Gamma-Probe", "echo");
         prior.bodyBytes("{\"replayed\":true}".getBytes(StandardCharsets.UTF_8));
-        when(idempotency.checkIdempotency("key-1", 7L)).thenReturn(prior.toOutcomeMap());
+        when(idempotency.claimScopedIdempotency(
+                eq("key-1"), eq("ext:probe:POST /echo"), anyMap(), eq(7L)))
+                .thenReturn(prior.toOutcomeMap());
 
         BufferingPluginHttpResponse out =
                 pipeline.execute(match(route, ext), req("POST", "{}".getBytes(), "key-1"), ctx());
@@ -99,7 +105,8 @@ class RestEndpointPipelineTest {
         assertThat(ext.ran).as("handler must NOT run on idempotent replay").isFalse();
         assertThat(out.status()).isEqualTo(201);
         assertThat(new String(out.body(), StandardCharsets.UTF_8)).isEqualTo("{\"replayed\":true}");
-        verify(idempotency, never()).recordOutcome(anyString(), anyString(), anyMap(), anyMap(), anyLong());
+        verify(idempotency, never()).recordScopedOutcome(
+                anyString(), anyString(), anyMap(), anyMap(), anyLong());
     }
 
     @Test
@@ -120,14 +127,24 @@ class RestEndpointPipelineTest {
     void success_runsHandler_recordsIdempotency_andAuditsSuccess() {
         RecordingExt ext = new RecordingExt();
         RestRoute route = new RestRoute("POST", "/echo", "probe.echo.write", null, true, false, null);
-        when(idempotency.checkIdempotency("key-2", 7L)).thenReturn(null);
+        when(idempotency.claimScopedIdempotency(
+                eq("key-2"), eq("ext:probe:POST /echo"), anyMap(), eq(7L)))
+                .thenReturn(null);
 
         BufferingPluginHttpResponse out =
                 pipeline.execute(match(route, ext), req("POST", "{\"text\":\"hi\"}".getBytes(), "key-2"), ctx());
 
         assertThat(ext.ran).isTrue();
         assertThat(out.status()).isEqualTo(201);
-        verify(idempotency).recordOutcome(eq("key-2"), anyString(), anyMap(), anyMap(), eq(7L));
+        verify(idempotency).recordScopedOutcome(
+                eq("key-2"), anyString(), anyMap(), anyMap(), eq(7L));
+        ArgumentCaptor<Map<String, Object>> intent = ArgumentCaptor.forClass(Map.class);
+        verify(idempotency).claimScopedIdempotency(
+                eq("key-2"), eq("ext:probe:POST /echo"), intent.capture(), eq(7L));
+        assertThat(intent.getValue()).containsEntry("method", "POST")
+                .containsEntry("path", "/api/ext/probe/echo")
+                .containsEntry("bodyLength", 13);
+        assertThat(intent.getValue().get("bodySha256")).isInstanceOf(String.class);
         verify(effectExecutor).saveAuditLog(eq(7L), anyString(), any(), eq(42L), anyMap(), any(),
                 eq(true), any(), anyLong(), anyString(), anyMap());
     }
@@ -145,6 +162,7 @@ class RestEndpointPipelineTest {
         assertThat(ext.ran).isTrue();
         verify(effectExecutor).saveAuditLog(eq(7L), anyString(), any(), eq(42L), anyMap(), any(),
                 eq(false), anyString(), anyLong(), anyString(), anyMap());
-        verify(idempotency, never()).recordOutcome(anyString(), anyString(), anyMap(), anyMap(), anyLong());
+        verify(idempotency, never()).recordScopedOutcome(
+                anyString(), anyString(), anyMap(), anyMap(), anyLong());
     }
 }

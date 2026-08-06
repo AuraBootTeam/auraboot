@@ -3,6 +3,7 @@ package com.auraboot.framework.plugin.rest;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.service.ApiRateLimiter;
 import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.plugin.extension.AuthPolicy;
@@ -123,6 +124,22 @@ class PluginRestDispatcherTest {
 
         assertThat(res.getStatus()).isEqualTo(400);
         assertThat(res.getContentAsString()).contains("text");
+    }
+
+    @Test
+    void idempotencyOrVersionConflict_isMappedTo409() throws Exception {
+        permit();
+        RestEndpointExtension ext = mock(RestEndpointExtension.class);
+        when(registry.match("probe", "GET", "/whoami")).thenReturn(Optional.of(whoamiMatch(ext)));
+        when(pipeline.execute(any(), any(), any()))
+                .thenThrow(new ConflictException("Idempotency key has a different intent"));
+
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/ext/probe/whoami");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        dispatcher.dispatch("probe", req, res);
+
+        assertThat(res.getStatus()).isEqualTo(409);
+        assertThat(res.getContentAsString()).contains("different intent");
     }
 
     @Test

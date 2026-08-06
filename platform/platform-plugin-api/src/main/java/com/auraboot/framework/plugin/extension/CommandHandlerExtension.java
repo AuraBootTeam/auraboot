@@ -155,6 +155,9 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Well-known key for the command boundary's tenant-scoped idempotency identity. */
     String CLIENT_REQUEST_ID_KEY = "__clientRequestId";
 
+    /** Well-known key for the target version accepted by the command boundary. */
+    String EXPECTED_VERSION_KEY = "__expectedVersion";
+
     /**
      * Command execution context.
      */
@@ -241,6 +244,26 @@ public interface CommandHandlerExtension extends ExtensionPoint {
             }
             String text = String.valueOf(value).trim();
             return text.isEmpty() ? null : text;
+        }
+
+        /**
+         * Returns the target row version accepted by the command pipeline's
+         * optimistic-concurrency boundary, or {@code null} when the command did
+         * not name a versioned target.
+         */
+        public Long expectedVersion() {
+            Object value = settings != null ? settings.get(EXPECTED_VERSION_KEY) : null;
+            if (value instanceof Number number) {
+                return number.longValue();
+            }
+            if (value == null) {
+                return null;
+            }
+            try {
+                return Long.parseLong(String.valueOf(value).trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
         }
 
         public static Builder builder() {
