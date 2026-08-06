@@ -24,6 +24,7 @@ class CommandPipelinePermitContextTest {
     @DisplayName("PERMIT publishes scope and version to every downstream phase")
     void permitPublishesScopeAndVersionDownstream() {
         AtomicReference<String> scopeSeen = new AtomicReference<>();
+        AtomicReference<String> commandSeen = new AtomicReference<>();
         AtomicReference<Long> versionSeen = new AtomicReference<>();
         CommandPipelineContext ctx = context();
 
@@ -33,14 +34,17 @@ class CommandPipelinePermitContextTest {
                         CommandPermitPlan.ScopeGrade.SELF, 5L))),
                 phase("write", c -> {
                     scopeSeen.set(MetaContext.getCommandPermitScope());
+                    commandSeen.set(MetaContext.getAuthorizedCommandCode());
                     versionSeen.set(MetaContext.getCommandExpectedVersion("invoice", "r-1"));
                 })));
 
         pipeline.executeGuardedPhases(ctx);
 
         assertThat(scopeSeen).hasValue("SELF");
+        assertThat(commandSeen).hasValue("invoice:update");
         assertThat(versionSeen).hasValue(5L);
         assertThat(MetaContext.getCommandPermitScope()).isNull();
+        assertThat(MetaContext.getAuthorizedCommandCode()).isNull();
     }
 
     @Test
@@ -49,15 +53,22 @@ class CommandPipelinePermitContextTest {
         for (CommandPermitPlan.Decision decision : List.of(
                 CommandPermitPlan.Decision.ABSTAIN, CommandPermitPlan.Decision.DENY)) {
             AtomicReference<String> scopeSeen = new AtomicReference<>("not-run");
+            AtomicReference<String> commandSeen = new AtomicReference<>("not-run");
             CommandPipeline pipeline = new CommandPipeline(List.of(), List.of(
                     phase("assembly", c -> c.setPermitPlan(new CommandPermitPlan(
                             decision, "reason", "gate", "r-1",
                             CommandPermitPlan.ScopeGrade.ALL, 2L))),
-                    phase("write", c -> scopeSeen.set(MetaContext.getCommandPermitScope()))));
+                    phase("write", c -> {
+                        scopeSeen.set(MetaContext.getCommandPermitScope());
+                        commandSeen.set(MetaContext.getAuthorizedCommandCode());
+                    })));
 
             pipeline.executeGuardedPhases(context());
             assertThat(scopeSeen.get())
                     .as("%s must not publish ALL", decision)
+                    .isNull();
+            assertThat(commandSeen.get())
+                    .as("%s must not publish a trusted command writer identity", decision)
                     .isNull();
         }
     }

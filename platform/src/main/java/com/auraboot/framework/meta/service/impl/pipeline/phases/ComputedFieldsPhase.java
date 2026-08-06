@@ -11,6 +11,7 @@ import com.auraboot.framework.meta.service.ChangeTracker;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.CommandSpelEvaluator;
+import com.auraboot.framework.meta.service.impl.FieldWriterGuard;
 import com.auraboot.framework.meta.service.impl.ModelMutationGuard;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
@@ -104,6 +105,7 @@ public class ComputedFieldsPhase implements CommandPhase {
         if (!computedValues.isEmpty() && StringUtils.hasText(recordIdStr)) {
             ModelMutationGuard.assertMutableOrInsertedInThisCommand(
                     modelDef, "updated by computed fields", fieldMapResults, recordIdStr);
+            FieldWriterGuard.assertFieldsAllowed(modelDef, computedValues.keySet());
             String tableName = metaModelService.getTableName(command.getModelCode());
             CommandExecutorUtils.validateSqlIdentifier(tableName, "computed field tableName");
             String sql = "SELECT id FROM " + tableName

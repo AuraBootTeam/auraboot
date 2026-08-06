@@ -87,9 +87,9 @@ public class RelationSyncServiceImpl implements RelationSyncService {
             // The owning source was already guarded by its normal update path. Inverse and
             // junction writes mutate the target record's relationship state and must not bypass
             // an append-only target model.
-            ModelMutationGuard.assertMutable(
-                    metaModelService.getModelDefinition(targetModelCode).orElse(null),
-                    "updated by inverse relation synchronization");
+            var targetModel = metaModelService.getModelDefinition(targetModelCode).orElse(null);
+            ModelMutationGuard.assertMutable(targetModel, "updated by inverse relation synchronization");
+            FieldWriterGuard.assertFieldWriteAllowed(targetModel, inverseFieldCode);
         }
 
         log.debug("Relation sync diff: toAdd={}, toRemove={}", toAdd.size(), toRemove.size());

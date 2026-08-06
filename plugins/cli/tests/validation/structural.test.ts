@@ -178,6 +178,68 @@ describe('validateStructural plugin manifest schema', () => {
     expect(result.errorCount).toBeGreaterThan(0);
   });
 
+  it('accepts field immutability and exact command writer contracts', () => {
+    const result = validateStructural(
+      pluginWithManifest({
+        pluginId: 'field-writer-contract',
+        namespace: 'field_writer_contract',
+        version: '1.0.0',
+        fields: [{
+          code: 'qdp_revision',
+          dataType: 'string',
+          immutable: true,
+          immutableWhen: {
+            field: 'status',
+            in: ['released', 'superseded'],
+          },
+          allowedWriterCommands: ['crm:release_qdp', 'crm:supersede_qdp'],
+        }],
+      }),
+    );
+
+    expect(result.messages.filter((message) => message.code === 'L1-MANIFEST')).toEqual([]);
+    expect(result.errorCount).toBe(0);
+  });
+
+  it('rejects empty or malformed field writer contracts', () => {
+    const emptyWriters = validateStructural(
+      pluginWithManifest({
+        pluginId: 'empty-field-writer-contract',
+        namespace: 'empty_field_writer_contract',
+        version: '1.0.0',
+        fields: [{
+          code: 'qdp_revision',
+          dataType: 'string',
+          allowedWriterCommands: [],
+        }],
+      }),
+    );
+    const malformedStateLock = validateStructural(
+      pluginWithManifest({
+        pluginId: 'malformed-field-state-lock',
+        namespace: 'malformed_field_state_lock',
+        version: '1.0.0',
+        fields: [{
+          code: 'qdp_revision',
+          dataType: 'string',
+          immutableWhen: {
+            field: 'status',
+            in: [],
+          },
+        }],
+      }),
+    );
+
+    expect(emptyWriters.messages.filter((message) => message.code === 'L1-MANIFEST'))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ message: expect.stringContaining('must NOT have fewer than 1 items') }),
+      ]));
+    expect(malformedStateLock.messages.filter((message) => message.code === 'L1-MANIFEST'))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ message: expect.stringContaining('must NOT have fewer than 1 items') }),
+      ]));
+  });
+
   it.each(shippedPluginNames)(
     'validates shipped %s resource schemas without schema load warnings',
     (pluginName) => {

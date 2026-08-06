@@ -6,9 +6,10 @@ import com.auraboot.framework.agent.dto.PlatformAiScoreRequest;
 import com.auraboot.framework.agent.dto.PlatformAiScoreResult;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
-import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.exception.MetaServiceException;
+import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -156,6 +157,26 @@ class PlatformAiScoringServiceTest {
         assertThatThrownBy(() -> service.score(buildRequest(), TENANT_ID))
                 .isInstanceOf(MetaServiceException.class)
                 .hasMessageContaining("immutable");
+
+        verifyNoInteractions(llmProviderFactory, llmProvider, dynamicDataMapper);
+        verify(metaModelService, never()).getTableName(anyString());
+    }
+
+    @Test
+    void score_rejectsDirectWriteToCommandOwnedScoreField() {
+        when(metaModelService.getModelDefinition(MODEL_CODE)).thenReturn(Optional.of(
+                ModelDefinition.builder()
+                        .code(MODEL_CODE)
+                        .fields(List.of(FieldDefinition.builder()
+                                .code(SCORE_FIELD)
+                                .allowedWriterCommands(List.of("crm:recalculate_score"))
+                                .build()))
+                        .build()));
+
+        assertThatThrownBy(() -> service.score(buildRequest(), TENANT_ID))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("FIELD_WRITER_DENIED")
+                .hasMessageContaining(SCORE_FIELD);
 
         verifyNoInteractions(llmProviderFactory, llmProvider, dynamicDataMapper);
         verify(metaModelService, never()).getTableName(anyString());

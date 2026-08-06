@@ -172,14 +172,18 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                 invocation = () -> MetaContext.runWithCommandAuthority(commandAuthority, delegate);
             }
             String commandPermitScope = text(inputParams, "commandPermitScope");
+            java.util.function.Supplier<Object> permittedInvocation = invocation;
+            java.util.function.Supplier<Object> commandScopedInvocation = commandCode == null
+                    ? permittedInvocation
+                    : () -> MetaContext.runWithAuthorizedCommandCode(commandCode, permittedInvocation);
             Object result = commandPermitScope == null
-                    ? invocation.get()
+                    ? permittedInvocation.get()
                     : MetaContext.runWithCommandPermitPlan(
                             commandPermitScope,
                             commandExpectedVersion,
                             modelCode,
                             recordPid,
-                            invocation);
+                            commandScopedInvocation);
             callback.report(100, "Completed");
 
             JsonNode data = result == null

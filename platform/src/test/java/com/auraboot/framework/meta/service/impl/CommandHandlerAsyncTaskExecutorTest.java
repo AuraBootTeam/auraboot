@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.AsyncTaskExecutor.ProgressCallback;
 import com.auraboot.framework.meta.service.AsyncTaskResult;
 import com.auraboot.framework.meta.service.DynamicDataService;
@@ -8,6 +9,7 @@ import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -33,6 +35,11 @@ class CommandHandlerAsyncTaskExecutorTest {
         extensionRegistry = mock(ExtensionRegistry.class);
         DynamicDataService dynamicDataService = mock(DynamicDataService.class);
         executor = new CommandHandlerAsyncTaskExecutor(extensionRegistry, objectMapper, dynamicDataService);
+    }
+
+    @AfterEach
+    void clearContext() {
+        MetaContext.clear();
     }
 
     private ObjectNode params(String handlerCode) {
@@ -90,6 +97,63 @@ class CommandHandlerAsyncTaskExecutorTest {
         assertThat(captured.get().settings()).containsEntry("__currentUser", "45");
         assertThat(captured.get().clientRequestId()).isEqualTo("client-request-async-1");
         assertThat(captured.get().expectedVersion()).isEqualTo(7L);
+    }
+
+    @Test
+    void restoresExactCommandWriterIdentityOnlyFromPersistedPermitPlan() throws Exception {
+        AtomicReference<String> commandSeen = new AtomicReference<>();
+        CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
+            commandSeen.set(MetaContext.getAuthorizedCommandCode());
+            return Map.of("success", true);
+        });
+        when(extensionRegistry.getCommandHandler(eq("bom:import_material_library")))
+                .thenReturn(Optional.of(handler));
+        ObjectNode input = params("bom:import_material_library");
+        input.put("commandPermitScope", "ALL");
+
+        AsyncTaskResult result = executor.execute(input, noop);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(commandSeen).hasValue("bom:import_material_library");
+        assertThat(MetaContext.getAuthorizedCommandCode()).isNull();
+    }
+
+    @Test
+    void commandCodeWithoutPersistedPermitPlanDoesNotBecomeWriterAuthority() throws Exception {
+        AtomicReference<String> commandSeen = new AtomicReference<>("not-run");
+        CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
+            commandSeen.set(MetaContext.getAuthorizedCommandCode());
+            return Map.of("success", true);
+        });
+        when(extensionRegistry.getCommandHandler(eq("bom:import_material_library")))
+                .thenReturn(Optional.of(handler));
+
+        AsyncTaskResult result = executor.execute(params("bom:import_material_library"), noop);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(commandSeen.get()).isNull();
+    }
+
+    @Test
+    void persistedPermitPlanWithoutCommandCodeDoesNotTrustHandlerIdentity() throws Exception {
+        AtomicReference<String> commandSeen = new AtomicReference<>("not-run");
+        CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
+            commandSeen.set(MetaContext.getAuthorizedCommandCode());
+            return Map.of("success", true);
+        });
+        when(extensionRegistry.getCommandHandler(eq("bom:import_material_library")))
+                .thenReturn(Optional.of(handler));
+        ObjectNode input = params("bom:import_material_library");
+        input.remove("commandCode");
+        input.put("commandPermitScope", "ALL");
+
+        AsyncTaskResult result = executor.execute(input, noop);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(commandSeen.get()).isNull();
     }
 
     @Test

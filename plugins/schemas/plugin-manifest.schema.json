@@ -727,6 +727,33 @@
         "defaultValue": {
           "description": "Default value expression or JSON scalar"
         },
+        "immutable": {
+          "type": "boolean",
+          "description": "Whether the field may never change after record creation.",
+          "default": false
+        },
+        "immutableWhen": {
+          "type": "object",
+          "description": "Freeze the field while another stored field holds one of the declared states.",
+          "required": ["field", "in"],
+          "properties": {
+            "field": { "type": "string", "minLength": 1 },
+            "in": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          },
+          "additionalProperties": false
+        },
+        "allowedWriterCommands": {
+          "type": "array",
+          "description": "Exact authorized command codes allowed to create or change this field.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
         "extension": {
           "type": "object",
           "description": "Extension properties"

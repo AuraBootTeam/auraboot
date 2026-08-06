@@ -20,6 +20,8 @@ public class MetaContext {
     private static final ThreadLocal<Boolean> ENV_FILTER_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<Boolean> LOCK_GUARD_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<String> COMMAND_AUTHORITY = new ThreadLocal<>();
+    /** Exact command code whose permit plan authorized the current mutation stages. */
+    private static final ThreadLocal<String> AUTHORIZED_COMMAND_CODE = new ThreadLocal<>();
     /** Aggregate root (master document) the current command was authorized against. */
     private static final ThreadLocal<String> COMMAND_AGGREGATE = new ThreadLocal<>();
     /**
@@ -109,6 +111,7 @@ public class MetaContext {
         ENV_FILTER_BYPASSED.remove();
         LOCK_GUARD_BYPASSED.remove();
         COMMAND_AUTHORITY.remove();
+        AUTHORIZED_COMMAND_CODE.remove();
         COMMAND_AGGREGATE.remove();
         COMMAND_PERMIT.remove();
     }
@@ -294,6 +297,44 @@ public class MetaContext {
 
     public static boolean hasCommandAuthority() {
         return COMMAND_AUTHORITY.get() != null;
+    }
+
+    /**
+     * Run mutation work under the exact command identity attached to an already-published permit
+     * plan. A command code alone is not authority: callers must open this scope from inside
+     * {@link #runWithCommandPermitPlan}, and field-writer enforcement checks both scopes.
+     *
+     * <p>This value is deliberately excluded from {@link Snapshot}. Async command handlers restore
+     * it only from their persisted command code together with their persisted permit plan.</p>
+     */
+    public static <T> T runWithAuthorizedCommandCode(
+            String commandCode, java.util.function.Supplier<T> action) {
+        if (commandCode == null || commandCode.isBlank()) {
+            throw new IllegalArgumentException("An authorized command writer scope must name its command code");
+        }
+        if (!hasCommandPermitScope()) {
+            throw new IllegalStateException(
+                    "An authorized command writer scope requires a published command permit plan");
+        }
+        String prior = AUTHORIZED_COMMAND_CODE.get();
+        AUTHORIZED_COMMAND_CODE.set(commandCode);
+        try {
+            return action.get();
+        } finally {
+            AUTHORIZED_COMMAND_CODE.set(prior);
+        }
+    }
+
+    public static void runWithAuthorizedCommandCode(String commandCode, Runnable action) {
+        runWithAuthorizedCommandCode(commandCode, () -> {
+            action.run();
+            return null;
+        });
+    }
+
+    /** Exact command code trusted for current mutation stages, or null outside a permit plan. */
+    public static String getAuthorizedCommandCode() {
+        return AUTHORIZED_COMMAND_CODE.get();
     }
 
     /**

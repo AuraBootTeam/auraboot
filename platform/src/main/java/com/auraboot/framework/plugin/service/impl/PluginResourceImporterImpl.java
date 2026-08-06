@@ -636,6 +636,18 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         if (dto.getQuerySchema() != null) {
             extension.put("querySchema", dto.getQuerySchema());
         }
+        if (dto.getImmutable() != null) {
+            extension.put("immutable", dto.getImmutable());
+        }
+        if (dto.getImmutableWhen() != null) {
+            Map<String, Object> immutableWhen = new LinkedHashMap<>();
+            immutableWhen.put("field", dto.getImmutableWhen().getField());
+            immutableWhen.put("in", dto.getImmutableWhen().getIn());
+            extension.put("immutableWhen", immutableWhen);
+        }
+        if (dto.getAllowedWriterCommands() != null) {
+            extension.put("allowedWriterCommands", List.copyOf(dto.getAllowedWriterCommands()));
+        }
         return extension;
     }
 
