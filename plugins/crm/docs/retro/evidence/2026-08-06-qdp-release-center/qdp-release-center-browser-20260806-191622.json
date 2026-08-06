@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260806-191622",
+  "browserRunId": "20260806-191622-public-core-visual-rerun2",
+  "baseUrl": "http://127.0.0.1:5158",
+  "backendUrl": "http://127.0.0.1:6458",
+  "staleQdpPid": "01KZBCKT6GNJEEZ1RKHW03MCV4",
+  "releasedQdpPid": "01KZBCNBXR50HD9VZ22BR4V9MR",
+  "browserQdpPid": "01KZBD4S4B00SSZRPFGZ9GYBZP",
+  "browserFilePid": "01KZBD4S0P84HH6C6AF7AV4CYM",
+  "screenshots": [
+    "/Users/ghj/work/auraboot/auraboot/.worktrees/amos-qdp-release-center-public-crm/plugins/crm/docs/retro/evidence/2026-08-06-qdp-release-center/qdp-release-center-list.png",
+    "/Users/ghj/work/auraboot/auraboot/.worktrees/amos-qdp-release-center-public-crm/plugins/crm/docs/retro/evidence/2026-08-06-qdp-release-center/qdp-release-center-released-detail.png",
+    "/Users/ghj/work/auraboot/auraboot/.worktrees/amos-qdp-release-center-public-crm/plugins/crm/docs/retro/evidence/2026-08-06-qdp-release-center/qdp-release-center-released-impact.png",
+    "/Users/ghj/work/auraboot/auraboot/.worktrees/amos-qdp-release-center-public-crm/plugins/crm/docs/retro/evidence/2026-08-06-qdp-release-center/qdp-release-center-stale-feedback.png",
+    "/Users/ghj/work/auraboot/auraboot/.worktrees/amos-qdp-release-center-public-crm/plugins/crm/docs/retro/evidence/2026-08-06-qdp-release-center/qdp-release-center-external-failure-feedback.png",
+    "/Users/ghj/work/auraboot/auraboot/.worktrees/amos-qdp-release-center-public-crm/plugins/crm/docs/retro/evidence/2026-08-06-qdp-release-center/qdp-release-center-browser-released.png",
+    "/Users/ghj/work/auraboot/auraboot/.worktrees/amos-qdp-release-center-public-crm/plugins/crm/docs/retro/evidence/2026-08-06-qdp-release-center/qdp-release-center-no-permission.png"
+  ],
+  "completedScenarios": [
+    "external-failure-recovery-release",
+    "no-permission",
+    "release-center-list-and-detail",
+    "stale-visible-feedback"
+  ],
+  "verdict": "pass"
+}

@@ -1,0 +1,13 @@
+[
+  { "modelCode": "crm_customer_confirmation_common", "fieldCode": "crm_cc_code", "sequence": 1, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_confirmation_common", "fieldCode": "crm_cc_customer_request_id", "sequence": 2, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_confirmation_common", "fieldCode": "crm_cc_requirement_version_id", "sequence": 3, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_confirmation_common", "fieldCode": "crm_cc_requirement_version", "sequence": 4, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_confirmation_common", "fieldCode": "crm_cc_file_package_id", "sequence": 5, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_confirmation_common", "fieldCode": "crm_cc_file_package_hash", "sequence": 6, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_confirmation_common", "fieldCode": "crm_cc_confirmation_ref", "sequence": 7, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_confirmation_common", "fieldCode": "crm_cc_confirmed_by", "sequence": 8, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_confirmation_common", "fieldCode": "crm_cc_confirmed_at", "sequence": 9, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_confirmation_common", "fieldCode": "crm_cc_status", "sequence": 10, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_confirmation_common", "fieldCode": "crm_cc_recorded_by", "sequence": 11, "required": true, "visible": true, "editable": false }
+]

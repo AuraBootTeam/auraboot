@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260806-170710",
+  "backend": "http://127.0.0.1:6457",
+  "tenantId": "343666180239790080",
+  "actorId": "343681396545556480",
+  "customerRequestPid": "01KZB575VY9YB356SCCPVTTJSH",
+  "pcbaRfqPid": "01KZB575YFDVFTN6D3EVCXDTWC",
+  "filePids": [
+    "01KZB5760JR5ZM58QNRMGKR2X6",
+    "01KZB577BP2DYSPQAXXDJ5E9TK"
+  ],
+  "sourceSha256": [
+    "0e78d423156eae673fb816b01c6f63afbd90b94215ff8be94384e09118d36e2d",
+    "d0a5dddfd79a1b0a7c2344ce0444dcf116d833256187deb9b96573def6ec3712"
+  ],
+  "qdpRevisionPids": [
+    "01KZB576EWA52R0S00N73RC7AZ",
+    "01KZB5774PYW90WY01A41J9E4T",
+    "01KZB577E7TZGK3WJRV6CVHD6G"
+  ],
+  "staleReviewQdpPid": "01KZB5774PYW90WY01A41J9E4T",
+  "releasedQdpPid": "01KZB577E7TZGK3WJRV6CVHD6G",
+  "supersededQdpPid": "01KZB576EWA52R0S00N73RC7AZ",
+  "legacyQdpPid": "01KZB5780YVGPWKCTTKFGG71KV",
+  "checks": [
+    {
+      "id": "AUTH-EXPLICIT-RELEASE-DUTY",
+      "result": "pass",
+      "tenantId": "343666180239790080",
+      "actorId": "343681396545556480"
+    },
+    {
+      "id": "NEG-QUALIFICATION",
+      "result": "pass",
+      "httpStatus": 400
+    },
+    {
+      "id": "WRITER-DIRECT-CREATE",
+      "result": "pass",
+      "httpStatus": 400
+    },
+    {
+      "id": "NEG-MISSING-VERSION",
+      "result": "pass",
+      "httpStatus": 409
+    },
+    {
+      "id": "NEG-STALE-VERSION",
+      "result": "pass",
+      "httpStatus": 409
+    },
+    {
+      "id": "NEG-EXTERNAL-FILE",
+      "result": "pass",
+      "httpStatus": 400
+    },
+    {
+      "id": "NEG-TARGET-MISMATCH",
+      "result": "pass",
+      "httpStatus": 400
+    },
+    {
+      "id": "NEG-NO-PERMISSION",
+      "result": "pass",
+      "httpStatus": 403
+    },
+    {
+      "id": "CONCURRENCY-PREPARE-REPLAY",
+      "result": "pass",
+      "qdpPid": "01KZB576EWA52R0S00N73RC7AZ"
+    },
+    {
+      "id": "BINDING-REQUIREMENT-CONFIRMATION-HASH",
+      "result": "pass",
+      "hash": "7240c88f9e62a687733eb9dcff6409bd5334211a2564adfa36b83b5b6a55bb52"
+    },
+    {
+      "id": "WRITER-EXACT-UPDATE",
+      "result": "pass"
+    },
+    {
+      "id": "LIFECYCLE-DRAFT-REVIEW",
+      "result": "pass"
+    },
+    {
+      "id": "CONCURRENCY-RELEASE-CAS",
+      "result": "pass"
+    },
+    {
+      "id": "NEG-STALE-SOURCE",
+      "result": "pass",
+      "qdpPid": "01KZB5774PYW90WY01A41J9E4T"
+    },
+    {
+      "id": "EXTERNAL-FAIL-CLOSED-RECOVERY",
+      "result": "pass"
+    },
+    {
+      "id": "LIFECYCLE-RELEASE-SUPERSEDE",
+      "result": "pass",
+      "released": "01KZB577E7TZGK3WJRV6CVHD6G",
+      "superseded": "01KZB576EWA52R0S00N73RC7AZ"
+    },
+    {
+      "id": "LEGACY-DIRECT-RELEASE-COMPATIBILITY",
+      "result": "pass",
+      "qdpPid": "01KZB5780YVGPWKCTTKFGG71KV"
+    },
+    {
+      "id": "NEG-CROSS-TENANT",
+      "result": "pass",
+      "tenantB": "1786007232607024"
+    },
+    {
+      "id": "AUDIT-AND-METADATA",
+      "result": "pass",
+      "auditRows": 63,
+      "legacyWriterFields": 20
+    }
+  ],
+  "verdict": "pass"
+}

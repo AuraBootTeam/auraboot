@@ -1,0 +1,10 @@
+[
+  { "code": "crm_fp_code", "displayName:zh-CN": "文件包编号", "displayName:en": "File Package Code", "dataType": "string", "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "required": true, "maxLength": 64 }, "feature": { "searchable": true } },
+  { "code": "crm_fp_customer_request_id", "displayName:zh-CN": "客户需求", "displayName:en": "Customer Request", "dataType": "reference", "referenceModelCode": "crm_customer_request_common", "refTarget": { "targetModel": "crm_customer_request_common", "targetField": "crm_cr_code" }, "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "required": true }, "feature": { "searchable": true } },
+  { "code": "crm_fp_package_hash", "displayName:zh-CN": "文件包 Hash", "displayName:en": "File Package Hash", "dataType": "string", "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "required": true, "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$" }, "feature": { "searchable": true } },
+  { "code": "crm_fp_manifest", "displayName:zh-CN": "文件清单", "displayName:en": "File Manifest", "dataType": "json", "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "required": true } },
+  { "code": "crm_fp_file_count", "displayName:zh-CN": "文件数", "displayName:en": "File Count", "dataType": "integer", "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "required": true, "min": 1 } },
+  { "code": "crm_fp_status", "displayName:zh-CN": "状态", "displayName:en": "Status", "dataType": "string", "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "required": true, "maxLength": 32 } },
+  { "code": "crm_fp_created_at", "displayName:zh-CN": "形成时间", "displayName:en": "Created At", "dataType": "datetime", "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "required": true } },
+  { "code": "crm_fp_created_by", "displayName:zh-CN": "形成操作人", "displayName:en": "Created By", "dataType": "string", "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "required": true, "maxLength": 100 } }
+]

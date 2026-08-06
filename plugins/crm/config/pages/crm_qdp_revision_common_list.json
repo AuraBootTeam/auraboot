@@ -1,7 +1,7 @@
 {
   "pageKey": "crm_qdp_revision_common_list",
-  "name:zh-CN": "QDP 发布历史",
-  "name:en": "QDP Release History",
+  "name:zh-CN": "QDP 发布中心",
+  "name:en": "QDP Release Center",
   "modelCode": "crm_qdp_revision_common",
   "kind": "list",
   "schemaVersion": 4,
@@ -29,23 +29,38 @@
           "sortable": true
         },
         {
+          "field": "crm_qdp_status",
+          "width": 150,
+          "sortable": true,
+          "renderType": "tag",
+          "dictCode": "crm_qdp_lifecycle"
+        },
+        {
+          "field": "crm_qdp_requirement_version",
+          "width": 180
+        },
+        {
+          "field": "crm_qdp_file_package_hash",
+          "width": 260
+        },
+        {
           "field": "crm_qdp_qualification_verdict",
           "width": 140
         },
         {
-          "field": "crm_qdp_content_hash",
-          "width": 260
+          "field": "crm_qdp_version_diff_summary",
+          "width": 240
         },
         {
-          "field": "crm_qdp_file_names",
+          "field": "crm_qdp_pack_set_summary",
           "width": 220
         },
         {
-          "field": "crm_qdp_released_by",
-          "width": 140
+          "field": "crm_qdp_downstream_impact_summary",
+          "width": 240
         },
         {
-          "field": "crm_qdp_released_at",
+          "field": "crm_qdp_prepared_at",
           "width": 180,
           "sortable": true
         },
@@ -70,11 +85,12 @@
       "searchFields": [
         "crm_qdp_code",
         "crm_qdp_customer_request_id",
-        "crm_qdp_content_hash",
-        "crm_qdp_released_by"
+        "crm_qdp_requirement_version",
+        "crm_qdp_file_package_hash",
+        "crm_qdp_status"
       ],
       "defaultSort": {
-        "field": "crm_qdp_released_at",
+        "field": "crm_qdp_prepared_at",
         "order": "desc"
       }
     }

@@ -46,8 +46,14 @@ import java.util.regex.Pattern;
 public class ReleaseQdpHandler implements CommandHandlerExtension {
 
     public static final String COMMAND_TYPE = "crm:release_qdp";
+    static final String PREPARE_COMMAND = "crm:prepare_qdp_draft";
+    static final String REVIEW_COMMAND = "crm:submit_qdp_review";
+    static final String PUBLISH_COMMAND = "crm:publish_qdp_revision";
     static final String CUSTOMER_REQUEST_MODEL = "crm_customer_request_common";
     static final String QDP_REVISION_MODEL = "crm_qdp_revision_common";
+    static final String REQUIREMENT_VERSION_MODEL = "crm_requirement_version_common";
+    static final String FILE_PACKAGE_MODEL = "crm_file_package_common";
+    static final String CUSTOMER_CONFIRMATION_MODEL = "crm_customer_confirmation_common";
     static final String PCBA_RFQ_MODEL = "crm_customer_request_pcba_rfq";
     static final String PCBA_QDP_REFERENCE_FIELD = "crm_crq_qdp_revision_id";
     static final int QDP_SCHEMA_VERSION = 1;
@@ -58,6 +64,9 @@ public class ReleaseQdpHandler implements CommandHandlerExtension {
     private static final Set<String> READABLE_FILE_STATUSES = Set.of("success");
     private static final int MAX_CLIENT_REQUEST_ID_LENGTH = 128;
     private static final int MAX_RELEASE_NOTE_LENGTH = 2_000;
+    private static final int MAX_REQUIREMENT_VERSION_LENGTH = 64;
+    private static final int MAX_CONFIRMATION_REFERENCE_LENGTH = 128;
+    private static final int MAX_STRUCTURED_ITEMS = 100;
     private static final int MAX_MANIFEST_FILE_COUNT = 20;
     private static final int MAX_PURPOSE_LENGTH = 64;
     private static final int MAX_QUALIFICATION_EVIDENCE_COUNT = 100;
@@ -91,6 +100,23 @@ public class ReleaseQdpHandler implements CommandHandlerExtension {
 
     @Override
     public Object execute(CommandContext context) {
+        String commandCode = firstNonBlank(trimToNull(setting(context, "__commandCode")), COMMAND_TYPE);
+        if (PREPARE_COMMAND.equals(commandCode)) {
+            return prepareDraft(context);
+        }
+        if (REVIEW_COMMAND.equals(commandCode)) {
+            return submitForReview(context);
+        }
+        if (PUBLISH_COMMAND.equals(commandCode)) {
+            return releasePreparedRevision(context);
+        }
+        // Compatibility bridge for the already-published first slice. crm:release_qdp keeps its
+        // original Customer Request target and payload contract. The additive lifecycle command
+        // crm:publish_qdp_revision reuses this handler but targets one prepared QDP revision.
+        return executeLegacyRelease(context);
+    }
+
+    private Object executeLegacyRelease(CommandContext context) {
         DataAccessor db = context.dataAccessor();
         if (db == null) {
             throw new IllegalStateException("DataAccessor unavailable; cannot release QDP");
@@ -262,6 +288,643 @@ public class ReleaseQdpHandler implements CommandHandlerExtension {
         }
         linkPcbaSidecar(db, sidecar.pid(), revisionPid);
         return result(created, contentHash, false, customerRequestId);
+    }
+
+    private Object prepareDraft(CommandContext context) {
+        DataAccessor db = requireDataAccessor(context, "prepare QDP draft");
+        FileAccessor files = requireFileAccessor(context, "prepare QDP draft");
+        long tenantId = requireTenant(context, "prepare QDP draft");
+        String actor = requireActor(context, "prepare QDP draft");
+        Map<String, Object> payload = payload(context);
+
+        String customerRequestId = requireExactTarget(
+                context.recordId(), payload.get("crm_qdp_customer_request_id"), "Customer Request");
+        Map<String, Object> request = requiredRecord(db, CUSTOMER_REQUEST_MODEL, customerRequestId,
+                "Customer Request");
+        validateRequestIdentityAndState(request, customerRequestId);
+        Long requestVersion = requireExpectedVersion(context, request, "Customer Request");
+        SidecarContext sidecar = validateRequiredPcbaSidecar(db, payload, request, customerRequestId);
+
+        String clientRequestId = requireClientRequestId(context, "prepare QDP draft");
+        String ownerScope = "tenant:" + tenantId + "/customer-request:" + customerRequestId;
+        Map<String, Object> manifest = materializeFileManifest(files, payload, actor, ownerScope);
+        List<Map<String, Object>> manifestFiles = manifestFiles(manifest);
+        Map<String, Object> primaryFile = selectPrimaryFile(payload, manifestFiles);
+        String primaryFilePid = required(primaryFile.get("filePid"),
+                "Materialized primary QDP file pid is required");
+        String packageHash = canonicalHash(manifest, "QDP file package");
+
+        String requirementVersion = requiredLimited(payload.get("crm_qdp_requirement_version"),
+                MAX_REQUIREMENT_VERSION_LENGTH, "Requirement Version");
+        String confirmationReference = requiredLimited(payload.get("crm_qdp_customer_confirmation_ref"),
+                MAX_CONFIRMATION_REFERENCE_LENGTH, "Customer confirmation reference");
+        String customerConfirmedBy = requiredLimited(payload.get("crm_qdp_customer_confirmed_by"),
+                128, "Customer confirmation actor");
+        String customerConfirmedAt = requiredInstant(payload.get("crm_qdp_customer_confirmed_at"),
+                "Customer confirmation time");
+        List<Map<String, Object>> packSet = structuredObjectList(payload.get("crm_qdp_pack_set"),
+                "Pack Set", true);
+        validatePackSet(packSet);
+        List<Map<String, Object>> downstreamImpact = structuredObjectList(
+                payload.get("crm_qdp_downstream_impact"), "Downstream impact", true);
+        validateDownstreamImpact(downstreamImpact);
+        List<String> assumptions = structuredStringList(payload, "crm_qdp_assumptions", "Assumptions");
+        List<String> exceptions = structuredStringList(
+                payload, "crm_qdp_approved_exceptions", "Approved exceptions");
+        String releaseNote = limitedText(payload.get("crm_qdp_release_note"),
+                MAX_RELEASE_NOTE_LENGTH, "QDP release note");
+
+        Map<String, Object> snapshot = requestSnapshot(request, customerRequestId,
+                String.valueOf(requestVersion), String.valueOf(requestVersion), sidecar.snapshot());
+        Map<String, Object> canonicalContent = new LinkedHashMap<>();
+        canonicalContent.put("schemaVersion", QDP_SCHEMA_VERSION);
+        canonicalContent.put("customerRequestId", customerRequestId);
+        canonicalContent.put("requirementVersion", requirementVersion);
+        canonicalContent.put("filePackageHash", packageHash);
+        canonicalContent.put("customerConfirmationReference", confirmationReference);
+        canonicalContent.put("customerConfirmedBy", customerConfirmedBy);
+        canonicalContent.put("customerConfirmedAt", customerConfirmedAt);
+        canonicalContent.put("requestSnapshot", snapshot);
+        canonicalContent.put("fileManifest", manifest);
+        canonicalContent.put("primaryFilePid", primaryFilePid);
+        canonicalContent.put("packSet", packSet);
+        canonicalContent.put("downstreamImpact", downstreamImpact);
+        canonicalContent.put("assumptions", assumptions);
+        canonicalContent.put("approvedExceptions", exceptions);
+        putIfPresent(canonicalContent, "releaseNote", releaseNote);
+        String contentHash = canonicalHash(canonicalContent, "QDP draft content");
+
+        Map<String, Object> replay = exactIdempotencyMatch(db, customerRequestId, clientRequestId);
+        if (replay != null) {
+            if (!contentHash.equals(trimToNull(replay.get("crm_qdp_content_hash")))) {
+                throw new IllegalStateException("QDP idempotency conflict: client request identity '"
+                        + clientRequestId + "' was already used for different content");
+            }
+            if (!context.dryRun()) retainSourceFiles(files, manifestFiles);
+            return lifecycleResult(replay, true, null);
+        }
+
+        List<Map<String, Object>> revisions = safeList(db.query(QDP_REVISION_MODEL,
+                Map.of("crm_qdp_customer_request_id", customerRequestId)));
+        int revisionNo = nextRevision(revisions, "crm_qdp_revision_no");
+        int requirementVersionNo = nextRevision(safeList(db.query(REQUIREMENT_VERSION_MODEL,
+                Map.of("crm_reqv_customer_request_id", customerRequestId))), "crm_reqv_version_no");
+        String requestCode = firstNonBlank(trimToNull(request.get("crm_cr_code")), customerRequestId);
+        Map<String, Object> base = latestReleaseBaseline(revisions);
+        Map<String, Object> diff = versionDiff(base, requirementVersion, packageHash, packSet);
+        String now = Instant.now().toString();
+
+        Map<String, Object> filePackageRow = new LinkedHashMap<>();
+        filePackageRow.put("crm_fp_code", "FP-" + safeCode(requestCode) + "-V" + String.format("%04d", requirementVersionNo));
+        filePackageRow.put("crm_fp_customer_request_id", customerRequestId);
+        filePackageRow.put("crm_fp_package_hash", packageHash);
+        filePackageRow.put("crm_fp_manifest", manifest);
+        filePackageRow.put("crm_fp_file_count", manifestFiles.size());
+        filePackageRow.put("crm_fp_status", "confirmed");
+        filePackageRow.put("crm_fp_created_at", now);
+        filePackageRow.put("crm_fp_created_by", actor);
+
+        Map<String, Object> requirementRow = new LinkedHashMap<>();
+        requirementRow.put("crm_reqv_code", "RV-" + safeCode(requestCode) + "-V" + String.format("%04d", requirementVersionNo));
+        requirementRow.put("crm_reqv_customer_request_id", customerRequestId);
+        requirementRow.put("crm_reqv_version_no", requirementVersionNo);
+        requirementRow.put("crm_reqv_version_label", requirementVersion);
+        requirementRow.put("crm_reqv_request_row_version", String.valueOf(requestVersion));
+        requirementRow.put("crm_reqv_request_snapshot", snapshot);
+        requirementRow.put("crm_reqv_file_package_hash", packageHash);
+        requirementRow.put("crm_reqv_status", "customer_confirmed");
+        requirementRow.put("crm_reqv_created_at", now);
+        requirementRow.put("crm_reqv_created_by", actor);
+
+        if (context.dryRun()) {
+            return Map.of(
+                    "success", true,
+                    "dryRun", true,
+                    "status", "draft_validated",
+                    "customerRequestId", customerRequestId,
+                    "plannedRevision", revisionNo,
+                    "contentHash", contentHash,
+                    "filePackageHash", packageHash,
+                    "versionDiff", diff);
+        }
+
+        retainSourceFiles(files, manifestFiles);
+        Map<String, Object> filePackage = db.create(FILE_PACKAGE_MODEL, filePackageRow);
+        String filePackagePid = required(resolvePid(filePackage), "File Package was created without a pid");
+        requirementRow.put("crm_reqv_file_package_id", filePackagePid);
+        Map<String, Object> requirement = db.create(REQUIREMENT_VERSION_MODEL, requirementRow);
+        String requirementPid = required(resolvePid(requirement), "Requirement Version was created without a pid");
+
+        Map<String, Object> confirmationRow = new LinkedHashMap<>();
+        confirmationRow.put("crm_cc_code", "CC-" + safeCode(requestCode) + "-V" + String.format("%04d", requirementVersionNo));
+        confirmationRow.put("crm_cc_customer_request_id", customerRequestId);
+        confirmationRow.put("crm_cc_requirement_version_id", requirementPid);
+        confirmationRow.put("crm_cc_requirement_version", requirementVersion);
+        confirmationRow.put("crm_cc_file_package_id", filePackagePid);
+        confirmationRow.put("crm_cc_file_package_hash", packageHash);
+        confirmationRow.put("crm_cc_confirmation_ref", confirmationReference);
+        confirmationRow.put("crm_cc_confirmed_by", customerConfirmedBy);
+        confirmationRow.put("crm_cc_confirmed_at", customerConfirmedAt);
+        confirmationRow.put("crm_cc_status", "confirmed");
+        confirmationRow.put("crm_cc_recorded_by", actor);
+        Map<String, Object> confirmation = db.create(CUSTOMER_CONFIRMATION_MODEL, confirmationRow);
+        String confirmationPid = required(resolvePid(confirmation), "Customer Confirmation was created without a pid");
+
+        String fileNames = safeFileNames(manifestFiles);
+        Map<String, Object> qdpRow = new LinkedHashMap<>();
+        qdpRow.put("crm_qdp_code", revisionCode(requestCode, revisionNo));
+        qdpRow.put("crm_qdp_customer_request_id", customerRequestId);
+        qdpRow.put("crm_qdp_revision_no", revisionNo);
+        qdpRow.put("crm_qdp_schema_version", QDP_SCHEMA_VERSION);
+        qdpRow.put("crm_qdp_expected_request_version", String.valueOf(requestVersion));
+        qdpRow.put("crm_qdp_source_revision", String.valueOf(requestVersion));
+        qdpRow.put("crm_qdp_requirement_version_id", requirementPid);
+        qdpRow.put("crm_qdp_requirement_version", requirementVersion);
+        qdpRow.put("crm_qdp_file_package_id", filePackagePid);
+        qdpRow.put("crm_qdp_file_package_hash", packageHash);
+        qdpRow.put("crm_qdp_customer_confirmation_id", confirmationPid);
+        qdpRow.put("crm_qdp_customer_confirmation_ref", confirmationReference);
+        qdpRow.put("crm_qdp_customer_confirmed_hash", packageHash);
+        qdpRow.put("crm_qdp_customer_confirmed_at", customerConfirmedAt);
+        qdpRow.put("crm_qdp_customer_confirmed_by", customerConfirmedBy);
+        qdpRow.put("crm_qdp_qualification_verdict", sidecar.qualificationVerdict());
+        if (!sidecar.qualificationEvidenceRefs().isEmpty()) {
+            qdpRow.put("crm_qdp_qualification_evidence_refs", sidecar.qualificationEvidenceRefs());
+        }
+        qdpRow.put("crm_qdp_content_hash", contentHash);
+        qdpRow.put("crm_qdp_request_snapshot", snapshot);
+        qdpRow.put("crm_qdp_file_manifest", manifest);
+        qdpRow.put("crm_qdp_primary_file_id", primaryFilePid);
+        qdpRow.put("crm_qdp_primary_filename", primaryFile.get("fileName"));
+        qdpRow.put("crm_qdp_file_names", fileNames);
+        qdpRow.put("crm_qdp_pack_set", packSet);
+        qdpRow.put("crm_qdp_pack_set_summary", packSetSummary(packSet));
+        qdpRow.put("crm_qdp_downstream_impact", downstreamImpact);
+        qdpRow.put("crm_qdp_downstream_impact_summary", downstreamSummary(downstreamImpact));
+        qdpRow.put("crm_qdp_assumptions", assumptions);
+        qdpRow.put("crm_qdp_approved_exceptions", exceptions);
+        qdpRow.put("crm_qdp_version_diff", diff);
+        qdpRow.put("crm_qdp_version_diff_summary", diff.get("summary"));
+        qdpRow.put("crm_qdp_client_request_id", clientRequestId);
+        qdpRow.put("crm_qdp_owner_scope", ownerScope);
+        qdpRow.put("crm_qdp_status", "draft");
+        qdpRow.put("crm_qdp_gate_verdict", "pending_review");
+        if (releaseNote != null) qdpRow.put("crm_qdp_release_note", releaseNote);
+        qdpRow.put("crm_qdp_prepared_at", now);
+        qdpRow.put("crm_qdp_prepared_by", actor);
+        Map<String, Object> created = db.create(QDP_REVISION_MODEL, qdpRow);
+        return lifecycleResult(created, false, null);
+    }
+
+    private Object submitForReview(CommandContext context) {
+        DataAccessor db = requireDataAccessor(context, "submit QDP review");
+        requireTenant(context, "submit QDP review");
+        String actor = requireActor(context, "submit QDP review");
+        Map<String, Object> payload = payload(context);
+        String qdpPid = requireExactTarget(context.recordId(), payload.get("crm_qdp_revision_id"), "QDP revision");
+        Map<String, Object> qdp = requiredRecord(db, QDP_REVISION_MODEL, qdpPid, "QDP revision");
+        requireExactCustomerRequest(qdp, payload);
+        requireExpectedVersion(context, qdp, "QDP revision");
+        String state = trimToNull(qdp.get("crm_qdp_status"));
+        if (!Set.of("draft", "validation_failed").contains(state)) {
+            throw new IllegalArgumentException("QDP revision state '" + state
+                    + "' cannot enter review; expected draft or validation_failed");
+        }
+        validateConfirmationBinding(db, qdp);
+        validateGateCompleteness(qdp);
+        String verdict = structuredListIsEmpty(qdp.get("crm_qdp_approved_exceptions"))
+                ? "ready" : "ready_with_approved_exception";
+        Map<String, Object> patch = new LinkedHashMap<>();
+        patch.put("crm_qdp_status", "ready_for_review");
+        patch.put("crm_qdp_gate_verdict", verdict);
+        patch.put("crm_qdp_review_submitted_at", Instant.now().toString());
+        patch.put("crm_qdp_review_submitted_by", actor);
+        if (context.dryRun()) return lifecycleDryRun(qdp, "review_validated", patch);
+        Map<String, Object> updated = db.update(QDP_REVISION_MODEL, qdpPid, patch);
+        return lifecycleResult(updated, false, null);
+    }
+
+    private Object releasePreparedRevision(CommandContext context) {
+        DataAccessor db = requireDataAccessor(context, "release QDP revision");
+        FileAccessor files = requireFileAccessor(context, "release QDP revision");
+        requireTenant(context, "release QDP revision");
+        String actor = requireActor(context, "release QDP revision");
+        Map<String, Object> payload = payload(context);
+        String qdpPid = requireExactTarget(context.recordId(), payload.get("crm_qdp_revision_id"), "QDP revision");
+        Map<String, Object> qdp = requiredRecord(db, QDP_REVISION_MODEL, qdpPid, "QDP revision");
+        String customerRequestId = requireExactCustomerRequest(qdp, payload);
+        requireExpectedVersion(context, qdp, "QDP revision");
+        String state = trimToNull(qdp.get("crm_qdp_status"));
+        if (!"ready_for_review".equals(state)) {
+            throw new IllegalArgumentException("QDP revision state '" + state
+                    + "' cannot be released; expected ready_for_review");
+        }
+        Map<String, Object> request = requiredRecord(db, CUSTOMER_REQUEST_MODEL, customerRequestId,
+                "Customer Request");
+        validateRequestIdentityAndState(request, customerRequestId);
+        Long currentRequestVersion = positiveLong(request.get("row_version"));
+        String frozenRequestVersion = trimToNull(qdp.get("crm_qdp_expected_request_version"));
+        if (currentRequestVersion == null || !String.valueOf(currentRequestVersion).equals(frozenRequestVersion)) {
+            throw new IllegalStateException("QDP source Customer Request is stale; prepare a new revision");
+        }
+        SidecarContext sidecar = validateRequiredPcbaSidecar(db, payload, request, customerRequestId);
+        if (!sidecar.qualificationVerdict().equals(trimToNull(qdp.get("crm_qdp_qualification_verdict")))) {
+            throw new IllegalStateException("QDP qualification facts changed after draft preparation; prepare a new revision");
+        }
+        validateConfirmationBinding(db, qdp);
+        validateGateCompleteness(qdp);
+        List<Map<String, Object>> frozenFiles = manifestFiles(requiredMap(
+                qdp.get("crm_qdp_file_manifest"), "QDP file manifest"));
+        String releaseNote = firstNonBlank(limitedText(payload.get("crm_qdp_release_note"),
+                MAX_RELEASE_NOTE_LENGTH, "QDP release note"), trimToNull(qdp.get("crm_qdp_release_note")));
+        if (context.dryRun()) {
+            return lifecycleDryRun(qdp, "release_validated", Map.of("crm_qdp_status", "released"));
+        }
+        // Reassert retained-source availability immediately before the formal release. Any host
+        // retention failure aborts the command transaction and leaves the revision in review.
+        retainSourceFiles(files, frozenFiles);
+        String now = Instant.now().toString();
+        Map<String, Object> releasePatch = new LinkedHashMap<>();
+        releasePatch.put("crm_qdp_status", "released");
+        releasePatch.put("crm_qdp_gate_verdict", trimToNull(qdp.get("crm_qdp_gate_verdict")));
+        releasePatch.put("crm_qdp_released_at", now);
+        releasePatch.put("crm_qdp_released_by", actor);
+        if (releaseNote != null) releasePatch.put("crm_qdp_release_note", releaseNote);
+        Map<String, Object> released = db.update(QDP_REVISION_MODEL, qdpPid, releasePatch);
+
+        Map<String, Object> previous = latestOtherReleased(db, customerRequestId, qdpPid);
+        String supersededPid = null;
+        if (previous != null) {
+            supersededPid = resolvePid(previous);
+            Map<String, Object> supersedePatch = new LinkedHashMap<>();
+            supersedePatch.put("crm_qdp_status", "superseded");
+            supersedePatch.put("crm_qdp_superseded_at", now);
+            supersedePatch.put("crm_qdp_superseded_by", actor);
+            supersedePatch.put("crm_qdp_superseded_by_revision_id", qdpPid);
+            Long previousVersion = positiveLong(previous.get("row_version"));
+            if (previousVersion != null) supersedePatch.put("_expectedVersion", previousVersion);
+            db.update(QDP_REVISION_MODEL, supersededPid, supersedePatch);
+        }
+        linkPcbaSidecar(db, sidecar.pid(), qdpPid);
+        return lifecycleResult(released, false, supersededPid);
+    }
+
+    private static DataAccessor requireDataAccessor(CommandContext context, String action) {
+        DataAccessor db = context.dataAccessor();
+        if (db == null) throw new IllegalStateException("DataAccessor unavailable; cannot " + action);
+        return db;
+    }
+
+    private static FileAccessor requireFileAccessor(CommandContext context, String action) {
+        FileAccessor files = context.fileAccessor();
+        if (files == null) throw new IllegalStateException("FileAccessor unavailable; cannot " + action);
+        return files;
+    }
+
+    private static long requireTenant(CommandContext context, String action) {
+        Long tenantId = context.tenantId();
+        if (tenantId == null || tenantId <= 0) {
+            throw new IllegalStateException("Authenticated tenant context is required to " + action);
+        }
+        return tenantId;
+    }
+
+    private static String requireActor(CommandContext context, String action) {
+        return required(setting(context, "__currentUser"),
+                "Authenticated actor context is required to " + action);
+    }
+
+    private static Map<String, Object> payload(CommandContext context) {
+        return context.payload() == null ? Map.of() : context.payload();
+    }
+
+    private static String requireExactTarget(Object target, Object payloadPid, String label) {
+        String targetPid = canonicalPid(target, "Command target " + label + " pid");
+        String suppliedPid = canonicalPid(payloadPid, "Payload " + label + " pid");
+        if (targetPid == null || suppliedPid == null) {
+            throw new IllegalArgumentException(label + " pid is required in both command target and payload");
+        }
+        if (!targetPid.equals(suppliedPid)) {
+            throw new IllegalArgumentException(label + " does not match the command target");
+        }
+        return targetPid;
+    }
+
+    private static Map<String, Object> requiredRecord(DataAccessor db, String model, String pid, String label) {
+        Map<String, Object> record = db.getById(model, pid);
+        if (record == null) throw new IllegalArgumentException(label + " not found: " + pid);
+        if (!pid.equals(resolvePid(record))) throw new IllegalStateException(label + " identity mismatch: " + pid);
+        return record;
+    }
+
+    private static void validateRequestIdentityAndState(Map<String, Object> request, String requestPid) {
+        if (!requestPid.equals(firstNonBlank(trimToNull(request.get("pid")), requestPid))) {
+            throw new IllegalStateException("Customer Request identity mismatch: " + requestPid);
+        }
+        String state = trimToNull(request.get("crm_cr_status"));
+        if (!RELEASABLE_REQUEST_STATES.contains(state)) {
+            throw new IllegalArgumentException("Customer Request state '" + state
+                    + "' cannot prepare or release QDP; expected one of " + RELEASABLE_REQUEST_STATES);
+        }
+    }
+
+    private static Long requireExpectedVersion(CommandContext context, Map<String, Object> record, String label) {
+        Long current = positiveLong(record.get("row_version"));
+        if (current == null) throw new IllegalStateException(label + " row version is unavailable; fail-closed");
+        Long expected = context.expectedVersion();
+        if (expected == null || expected <= 0) {
+            throw new IllegalStateException("Trusted expected " + label + " version is required");
+        }
+        if (!expected.equals(current)) {
+            throw new IllegalStateException(label + " version is stale: expected " + expected + " but current is " + current);
+        }
+        return current;
+    }
+
+    private static String requireClientRequestId(CommandContext context, String action) {
+        String value = required(context.clientRequestId(),
+                "Trusted client request identity is required to " + action);
+        if (value.length() > MAX_CLIENT_REQUEST_ID_LENGTH) {
+            throw new IllegalArgumentException("Client request identity must not exceed "
+                    + MAX_CLIENT_REQUEST_ID_LENGTH + " characters");
+        }
+        return value;
+    }
+
+    private static Map<String, Object> exactIdempotencyMatch(
+            DataAccessor db, String customerRequestId, String clientRequestId) {
+        List<Map<String, Object>> matches = safeList(db.query(QDP_REVISION_MODEL, Map.of(
+                "crm_qdp_customer_request_id", customerRequestId,
+                "crm_qdp_client_request_id", clientRequestId)));
+        if (matches.size() > 1) {
+            throw new IllegalStateException("QDP idempotency invariant is broken for client request identity '"
+                    + clientRequestId + "'");
+        }
+        return matches.isEmpty() ? null : matches.getFirst();
+    }
+
+    private static int nextRevision(List<Map<String, Object>> rows, String field) {
+        return rows.stream().mapToInt(row -> positiveInt(row.get(field))).max().orElse(0) + 1;
+    }
+
+    private static String safeCode(String source) {
+        String normalized = source.replaceAll("[^A-Za-z0-9-]", "-");
+        return normalized.length() > 48 ? normalized.substring(0, 48) : normalized;
+    }
+
+    private static String safeFileNames(List<Map<String, Object>> files) {
+        String value = String.join(", ", files.stream()
+                .map(file -> required(file.get("fileName"), "Materialized QDP file name is required"))
+                .sorted().toList());
+        if (value.length() > 2_000) {
+            throw new IllegalArgumentException("Materialized QDP file names must not exceed 2000 characters");
+        }
+        return value;
+    }
+
+    private static String canonicalHash(Object value, String label) {
+        try {
+            return hex(sha256Digest().digest(MAPPER.writeValueAsBytes(value)));
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Unable to canonicalize " + label, e);
+        }
+    }
+
+    private static String requiredLimited(Object value, int max, String label) {
+        String result = required(value, label + " is required");
+        if (result.length() > max) {
+            throw new IllegalArgumentException(label + " must not exceed " + max + " characters");
+        }
+        return result;
+    }
+
+    private static String requiredInstant(Object value, String label) {
+        String raw = requiredLimited(value, 64, label);
+        try {
+            return Instant.parse(raw).toString();
+        } catch (java.time.format.DateTimeParseException e) {
+            try {
+                return java.time.OffsetDateTime.parse(raw).toInstant().toString();
+            } catch (java.time.format.DateTimeParseException offsetFailure) {
+                throw new IllegalArgumentException(label + " must be an ISO-8601 instant with timezone", offsetFailure);
+            }
+        }
+    }
+
+    private static Object parseJsonValue(Object raw, String label) {
+        if (!(raw instanceof String text)) return raw;
+        if (text.isBlank()) return null;
+        try {
+            return MAPPER.readValue(text, Object.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException(label + " must be valid JSON", e);
+        }
+    }
+
+    private static List<Map<String, Object>> structuredObjectList(Object raw, String label, boolean required) {
+        Object parsed = parseJsonValue(raw, label);
+        if (parsed == null) {
+            if (required) throw new IllegalArgumentException(label + " is required");
+            return List.of();
+        }
+        if (!(parsed instanceof List<?> values)) throw new IllegalArgumentException(label + " must be a JSON array");
+        if (values.size() > MAX_STRUCTURED_ITEMS) {
+            throw new IllegalArgumentException(label + " must not contain more than " + MAX_STRUCTURED_ITEMS + " items");
+        }
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Object value : values) {
+            if (!(value instanceof Map<?, ?> map)) throw new IllegalArgumentException(label + " items must be objects");
+            Map<String, Object> item = new LinkedHashMap<>();
+            map.forEach((key, itemValue) -> {
+                if (key != null) item.put(String.valueOf(key), itemValue);
+            });
+            result.add(Map.copyOf(item));
+        }
+        if (required && result.isEmpty()) throw new IllegalArgumentException(label + " must contain at least one item");
+        return List.copyOf(result);
+    }
+
+    private static List<String> structuredStringList(Map<String, Object> payload, String key, String label) {
+        if (!payload.containsKey(key)) throw new IllegalArgumentException(label + " must be explicitly supplied");
+        Object parsed = parseJsonValue(payload.get(key), label);
+        if (!(parsed instanceof List<?> values)) throw new IllegalArgumentException(label + " must be a JSON array");
+        if (values.size() > MAX_STRUCTURED_ITEMS) {
+            throw new IllegalArgumentException(label + " must not contain more than " + MAX_STRUCTURED_ITEMS + " items");
+        }
+        List<String> result = new ArrayList<>();
+        for (Object value : values) {
+            String item = requiredLimited(value, 500, label + " item");
+            result.add(item);
+        }
+        return List.copyOf(result);
+    }
+
+    private static void validatePackSet(List<Map<String, Object>> packSet) {
+        Set<String> identities = new HashSet<>();
+        for (Map<String, Object> pack : packSet) {
+            String code = requiredLimited(pack.get("packCode"), 64, "Pack code");
+            String version = requiredLimited(pack.get("version"), 64, "Pack version");
+            String hash = requiredLimited(pack.get("contentHash"), 64, "Pack content hash");
+            if (!hash.matches("^[a-f0-9]{64}$")) throw new IllegalArgumentException("Pack content hash must be SHA-256 hex");
+            if (!identities.add(code + "@" + version)) throw new IllegalArgumentException("Duplicate Pack Set identity: " + code + "@" + version);
+        }
+    }
+
+    private static void validateDownstreamImpact(List<Map<String, Object>> impacts) {
+        Set<String> identities = new HashSet<>();
+        for (Map<String, Object> impact : impacts) {
+            String objectType = requiredLimited(impact.get("objectType"), 64, "Downstream object type");
+            String objectPid = requiredLimited(impact.get("objectPid"), 128, "Downstream object pid");
+            requiredLimited(impact.get("impact"), 500, "Downstream impact");
+            requiredLimited(impact.get("owner"), 128, "Downstream owner");
+            requiredLimited(impact.get("disposition"), 128, "Downstream disposition");
+            if (!identities.add(objectType + ":" + objectPid)) {
+                throw new IllegalArgumentException("Duplicate downstream object: " + objectType + ":" + objectPid);
+            }
+        }
+    }
+
+    private static Map<String, Object> latestReleaseBaseline(List<Map<String, Object>> revisions) {
+        return revisions.stream()
+                .filter(row -> Set.of("released", "superseded").contains(trimToNull(row.get("crm_qdp_status"))))
+                .max(Comparator.comparingInt(row -> positiveInt(row.get("crm_qdp_revision_no"))))
+                .orElse(null);
+    }
+
+    private static Map<String, Object> versionDiff(Map<String, Object> base, String requirementVersion,
+                                                   String packageHash, List<Map<String, Object>> packSet) {
+        Map<String, Object> diff = new LinkedHashMap<>();
+        if (base == null) {
+            diff.put("baseRevisionId", null);
+            diff.put("requirementVersionChanged", true);
+            diff.put("filePackageChanged", true);
+            diff.put("packSetChanged", true);
+            diff.put("summary", "Initial QDP revision; no released baseline");
+            return diff;
+        }
+        boolean requirementChanged = !java.util.Objects.equals(
+                requirementVersion, trimToNull(base.get("crm_qdp_requirement_version")));
+        boolean packageChanged = !java.util.Objects.equals(
+                packageHash, trimToNull(base.get("crm_qdp_file_package_hash")));
+        boolean packChanged = !canonicalHash(packSet, "Pack Set").equals(
+                canonicalHash(parseJsonValue(base.get("crm_qdp_pack_set"), "baseline Pack Set"), "baseline Pack Set"));
+        diff.put("baseRevisionId", resolvePid(base));
+        diff.put("baseRevision", positiveInt(base.get("crm_qdp_revision_no")));
+        diff.put("requirementVersionChanged", requirementChanged);
+        diff.put("filePackageChanged", packageChanged);
+        diff.put("packSetChanged", packChanged);
+        List<String> changes = new ArrayList<>();
+        if (requirementChanged) changes.add("Requirement Version");
+        if (packageChanged) changes.add("File Package Hash");
+        if (packChanged) changes.add("Pack Set");
+        diff.put("summary", changes.isEmpty() ? "No baseline content changes" : "Changed: " + String.join(", ", changes));
+        return diff;
+    }
+
+    private static String packSetSummary(List<Map<String, Object>> packSet) {
+        return String.join(", ", packSet.stream()
+                .map(pack -> trimToNull(pack.get("packCode")) + "@" + trimToNull(pack.get("version")))
+                .toList());
+    }
+
+    private static String downstreamSummary(List<Map<String, Object>> impacts) {
+        long blocked = impacts.stream().filter(impact -> "blocked".equalsIgnoreCase(trimToNull(impact.get("disposition")))).count();
+        return impacts.size() + " downstream object(s), " + blocked + " blocked";
+    }
+
+    private static String requireExactCustomerRequest(Map<String, Object> qdp, Map<String, Object> payload) {
+        String stored = required(qdp.get("crm_qdp_customer_request_id"), "QDP Customer Request is required");
+        String supplied = canonicalPid(payload.get("crm_qdp_customer_request_id"), "Payload Customer Request pid");
+        if (supplied == null || !stored.equals(supplied)) {
+            throw new IllegalArgumentException("QDP Customer Request does not match the stored revision");
+        }
+        return stored;
+    }
+
+    private static void validateConfirmationBinding(DataAccessor db, Map<String, Object> qdp) {
+        String requirementPid = required(qdp.get("crm_qdp_requirement_version_id"), "QDP Requirement Version is required");
+        String filePackagePid = required(qdp.get("crm_qdp_file_package_id"), "QDP File Package is required");
+        String confirmationPid = required(qdp.get("crm_qdp_customer_confirmation_id"), "QDP Customer Confirmation is required");
+        String requirementVersion = required(qdp.get("crm_qdp_requirement_version"), "QDP Requirement Version label is required");
+        String packageHash = required(qdp.get("crm_qdp_file_package_hash"), "QDP File Package Hash is required");
+        if (!packageHash.equals(required(qdp.get("crm_qdp_customer_confirmed_hash"), "Customer-confirmed hash is required"))) {
+            throw new IllegalStateException("Customer Confirmation is not bound to the QDP File Package Hash");
+        }
+        Map<String, Object> requirement = requiredRecord(db, REQUIREMENT_VERSION_MODEL, requirementPid, "Requirement Version");
+        Map<String, Object> filePackage = requiredRecord(db, FILE_PACKAGE_MODEL, filePackagePid, "File Package");
+        Map<String, Object> confirmation = requiredRecord(db, CUSTOMER_CONFIRMATION_MODEL, confirmationPid, "Customer Confirmation");
+        if (!requirementVersion.equals(trimToNull(requirement.get("crm_reqv_version_label")))
+                || !filePackagePid.equals(trimToNull(requirement.get("crm_reqv_file_package_id")))
+                || !packageHash.equals(trimToNull(requirement.get("crm_reqv_file_package_hash")))
+                || !packageHash.equals(trimToNull(filePackage.get("crm_fp_package_hash")))
+                || !requirementPid.equals(trimToNull(confirmation.get("crm_cc_requirement_version_id")))
+                || !filePackagePid.equals(trimToNull(confirmation.get("crm_cc_file_package_id")))
+                || !packageHash.equals(trimToNull(confirmation.get("crm_cc_file_package_hash")))
+                || !"confirmed".equals(trimToNull(confirmation.get("crm_cc_status")))) {
+            throw new IllegalStateException("Customer Confirmation binding is stale or inconsistent");
+        }
+    }
+
+    private static void validateGateCompleteness(Map<String, Object> qdp) {
+        required(qdp.get("crm_qdp_content_hash"), "QDP content hash is required");
+        required(qdp.get("crm_qdp_customer_confirmation_ref"), "Customer Confirmation reference is required");
+        required(qdp.get("crm_qdp_downstream_impact_summary"), "Downstream responsibility is required");
+        if (structuredListIsEmpty(qdp.get("crm_qdp_pack_set"))) throw new IllegalStateException("Pack Set is required");
+        if (structuredListIsEmpty(qdp.get("crm_qdp_downstream_impact"))) throw new IllegalStateException("Downstream impact is required");
+        if (parseJsonValue(qdp.get("crm_qdp_assumptions"), "Assumptions") == null) throw new IllegalStateException("Assumptions are required");
+        if (parseJsonValue(qdp.get("crm_qdp_approved_exceptions"), "Approved exceptions") == null) throw new IllegalStateException("Approved exceptions are required");
+    }
+
+    private static boolean structuredListIsEmpty(Object raw) {
+        Object parsed = parseJsonValue(raw, "structured list");
+        return !(parsed instanceof List<?> list) || list.isEmpty();
+    }
+
+    private static Map<String, Object> requiredMap(Object raw, String label) {
+        Object parsed = parseJsonValue(raw, label);
+        if (!(parsed instanceof Map<?, ?> map)) throw new IllegalStateException(label + " is not an object");
+        Map<String, Object> result = new LinkedHashMap<>();
+        map.forEach((key, value) -> {
+            if (key != null) result.put(String.valueOf(key), value);
+        });
+        return result;
+    }
+
+    private static Map<String, Object> latestOtherReleased(DataAccessor db, String customerRequestId, String currentPid) {
+        return safeList(db.query(QDP_REVISION_MODEL, Map.of(
+                        "crm_qdp_customer_request_id", customerRequestId,
+                        "crm_qdp_status", "released"))).stream()
+                .filter(row -> !currentPid.equals(resolvePid(row)))
+                .max(Comparator.comparingInt(row -> positiveInt(row.get("crm_qdp_revision_no"))))
+                .orElse(null);
+    }
+
+    private static Map<String, Object> lifecycleDryRun(
+            Map<String, Object> qdp, String status, Map<String, Object> plannedPatch) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", true);
+        result.put("dryRun", true);
+        result.put("status", status);
+        result.put("qdpRevisionId", resolvePid(qdp));
+        result.put("plannedPatch", Map.copyOf(plannedPatch));
+        return result;
+    }
+
+    private static Map<String, Object> lifecycleResult(
+            Map<String, Object> qdp, boolean idempotent, String supersededPid) {
+        String pid = resolvePid(qdp);
+        if (pid == null) throw new IllegalStateException("QDP revision has no pid");
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", true);
+        result.put("qdpRevisionId", pid);
+        result.put("customerRequestId", qdp.get("crm_qdp_customer_request_id"));
+        result.put("revision", positiveInt(qdp.get("crm_qdp_revision_no")));
+        result.put("contentHash", qdp.get("crm_qdp_content_hash"));
+        result.put("filePackageHash", qdp.get("crm_qdp_file_package_hash"));
+        result.put("status", qdp.get("crm_qdp_status"));
+        result.put("idempotent", idempotent);
+        if (supersededPid != null) result.put("supersededRevisionId", supersededPid);
+        return result;
     }
 
     private static SidecarContext validateRequiredPcbaSidecar(DataAccessor db,

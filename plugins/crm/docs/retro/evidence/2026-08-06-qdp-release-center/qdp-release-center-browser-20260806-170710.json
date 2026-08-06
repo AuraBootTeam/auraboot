@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260806-170710",
+  "browserRunId": "20260806-171200",
+  "baseUrl": "http://127.0.0.1:5157",
+  "backendUrl": "http://127.0.0.1:6457",
+  "staleQdpPid": "01KZB5774PYW90WY01A41J9E4T",
+  "releasedQdpPid": "01KZB577E7TZGK3WJRV6CVHD6G",
+  "browserQdpPid": "01KZB5859VGV4GCC86H7MCZ1F1",
+  "browserFilePid": "01KZB5855TX1ETDKZ3M0W3ZNBD",
+  "screenshots": [
+    "/Users/ghj/work/auraboot/plugins/.worktrees/amos-qdp-release-center/crm/docs/retro/evidence/2026-08-06-qdp-release-center/qdp-release-center-list.png",
+    "/Users/ghj/work/auraboot/plugins/.worktrees/amos-qdp-release-center/crm/docs/retro/evidence/2026-08-06-qdp-release-center/qdp-release-center-released-detail.png",
+    "/Users/ghj/work/auraboot/plugins/.worktrees/amos-qdp-release-center/crm/docs/retro/evidence/2026-08-06-qdp-release-center/qdp-release-center-stale-feedback.png",
+    "/Users/ghj/work/auraboot/plugins/.worktrees/amos-qdp-release-center/crm/docs/retro/evidence/2026-08-06-qdp-release-center/qdp-release-center-external-failure-feedback.png",
+    "/Users/ghj/work/auraboot/plugins/.worktrees/amos-qdp-release-center/crm/docs/retro/evidence/2026-08-06-qdp-release-center/qdp-release-center-browser-released.png",
+    "/Users/ghj/work/auraboot/plugins/.worktrees/amos-qdp-release-center/crm/docs/retro/evidence/2026-08-06-qdp-release-center/qdp-release-center-no-permission.png"
+  ],
+  "completedScenarios": [
+    "external-failure-recovery-release",
+    "no-permission",
+    "release-center-list-and-detail",
+    "stale-visible-feedback"
+  ],
+  "verdict": "pass"
+}

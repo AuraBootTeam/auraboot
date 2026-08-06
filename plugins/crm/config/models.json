@@ -673,13 +673,76 @@
     "lifecycle_description": "pending -> awaiting_customer -> customer_replied -> resolved / cancelled"
   },
   {
-    "code": "crm_qdp_revision_common",
-    "displayName:zh-CN": "QDP 发布版本",
-    "displayName:en": "QDP Release Revision",
-    "description": "Immutable QDP release revision owned by the CRM Customer Request aggregate",
+    "code": "crm_file_package_common",
+    "displayName:zh-CN": "客户文件包",
+    "displayName:en": "Customer File Package",
+    "description": "Command-owned immutable file package whose SHA-256 binds customer confirmation to exact platform file bytes.",
     "modelType": "entity",
     "modelCategory": "document",
     "immutable": true,
+    "commandOnlyCreate": true,
+    "extension": {
+      "icon": "FileArchive",
+      "category": "crm",
+      "titleField": "crm_fp_code",
+      "subtitleField": "crm_fp_package_hash",
+      "dataScope": { "ownerField": "created_by", "departmentField": null }
+    },
+    "semantic_description": "Immutable File Package evidence created by the QDP writer from verified platform file bytes and server metadata.",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "Created as confirmed evidence; replacement creates a new File Package record."
+  },
+  {
+    "code": "crm_requirement_version_common",
+    "displayName:zh-CN": "需求版本",
+    "displayName:en": "Requirement Version",
+    "description": "Command-owned immutable Requirement Version bound to one Customer Request snapshot and File Package Hash.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "immutable": true,
+    "commandOnlyCreate": true,
+    "extension": {
+      "icon": "FileCheck",
+      "category": "crm",
+      "titleField": "crm_reqv_code",
+      "subtitleField": "crm_reqv_version_label",
+      "dataScope": { "ownerField": "created_by", "departmentField": null }
+    },
+    "semantic_description": "Immutable Requirement Version evidence used by QDP release; it freezes the accepted Customer Request row version, request snapshot and exact File Package Hash.",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "This slice records Customer Confirmed versions; later changes create a new version and supersede through QDP release lineage."
+  },
+  {
+    "code": "crm_customer_confirmation_common",
+    "displayName:zh-CN": "客户确认",
+    "displayName:en": "Customer Confirmation",
+    "description": "Immutable customer confirmation evidence binding an exact Requirement Version to an exact File Package Hash.",
+    "modelType": "entity",
+    "modelCategory": "activity",
+    "immutable": true,
+    "commandOnlyCreate": true,
+    "extension": {
+      "icon": "BadgeCheck",
+      "category": "crm",
+      "titleField": "crm_cc_code",
+      "subtitleField": "crm_cc_confirmation_ref",
+      "dataScope": { "ownerField": "created_by", "departmentField": null }
+    },
+    "semantic_description": "Immutable confirmation chain with customer actor, instant and external evidence reference; both Requirement Version pid and File Package Hash must match the QDP snapshot.",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "Confirmed evidence is immutable; withdrawal or new customer facts require a new Requirement Version and confirmation."
+  },
+  {
+    "code": "crm_qdp_revision_common",
+    "displayName:zh-CN": "QDP 版本",
+    "displayName:en": "QDP Revision",
+    "description": "Command-owned QDP revision with controlled Draft, Review, Released and Superseded lifecycle",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "immutable": false,
     "commandOnlyCreate": true,
     "extension": {
       "icon": "FileArchive",
@@ -691,9 +754,9 @@
         "departmentField": null
       }
     },
-    "semantic_description": "An immutable released QDP revision under a stable CRM Customer Request. The record freezes a deterministic content hash, a request snapshot and platform file references; industry plugins may retain only this revision pid plus their own sidecar facts.",
+    "semantic_description": "A command-owned QDP revision under a stable CRM Customer Request. Content and source fields are sole-writer facts and remain frozen; only exact lifecycle commands may advance status evidence. Industry plugins retain only this revision pid plus their own sidecar facts.",
     "domain_category": "crm",
     "data_sensitivity": "confidential",
-    "lifecycle_description": "Append-only immutable release history. Each successful content change creates a new numbered revision; an existing revision is never updated or deleted."
+    "lifecycle_description": "Draft -> Ready for Review -> Released -> Superseded. Published content changes always create a new numbered QDP revision; only status and lifecycle evidence may change on an existing record."
   }
 ]

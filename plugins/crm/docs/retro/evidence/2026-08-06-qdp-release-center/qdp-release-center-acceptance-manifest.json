@@ -1,0 +1,246 @@
+{
+  "run": {
+    "id": "20260806-191622",
+    "target": "APP-01 M10 / GT-D04 / UX-D08 QDP Release Center vertical slice",
+    "sot": "/Users/ghj/work/auraboot/amos/docs/product-docs/amos/modular/05-AMOS-APP-01-Customer-Demand.md; governance ledger: /Users/ghj/work/auraboot/amos/docs/plans/2026-08-05-amos-dq-fo-current-state-program-ledger.md@7f3ee830ec9b3290cdd26c9486f6fecce544a5a6",
+    "runtime": "amos-qdp-release-center-public-s58; backend/web/BFF 6458/5158/6158; PostgreSQL auraboot_58; Redis DB 9",
+    "commit": "Core stacked base 132c619913d2a7de9c18367c614a3747a308d6df; Plugin adapter base aed2b6356bb7abccab6c8276db43d59e6e19f418; branch codex/amos-qdp-release-center-public-crm",
+    "fix_rounds": 10
+  },
+  "groups": [
+    {
+      "id": "contracts",
+      "title": "Owning-repository contracts and compatibility",
+      "requirement_ref": "APP-01 ownership; DQ-C01; AC-APP01-004",
+      "rows": [
+        {
+          "id": "CFG-QDP-LEGACY",
+          "action": "Validate the ce55 QDP field/command target contract, additive publish command, PCBA sidecar exact-writer allowlist, lifecycle locks, composite-duty permissions, UI references, dictionaries, layout and global field-code uniqueness.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "authority": "blocking-commit",
+          "driver": "unit",
+          "evidence": [
+            "../../../../tests/crm-qdp-release-config.test.mjs",
+            "qdp-test-run-evidence.md"
+          ],
+          "assertion": "All 20 ce55 QDP fields and the legacy Customer Request release target remain addressable; lifecycle publish reuses the same handler, and the sidecar accepts only the two exact CRM QDP release commands.",
+          "verdict": "pass",
+          "verdict_by": "exit-signal"
+        },
+        {
+          "id": "UT-QDP-HANDLER",
+          "action": "Exercise prepare, review, release, replay, stale, tamper, external-file failure and supersede branches directly against the existing QDP writer.",
+          "surface": "service",
+          "dependencies": "hermetic",
+          "authority": "blocking-commit",
+          "driver": "unit",
+          "evidence": [
+            "../../../../backend/src/test/java/com/auraboot/plugins/crm/handler/ReleaseQdpHandlerTest.java",
+            "qdp-test-run-evidence.md"
+          ],
+          "assertion": "The writer fails closed on invalid bindings and preserves lifecycle, idempotency and compare-and-set invariants.",
+          "verdict": "pass",
+          "verdict_by": "exit-signal"
+        },
+        {
+          "id": "CFG-OLD-CLI",
+          "action": "Compare aura plugin validate output at ce55 and the current branch.",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "authority": "recorded",
+          "driver": "unit",
+          "evidence": [
+            "qdp-test-run-evidence.md"
+          ],
+          "assertion": "The current CLI rejects three host-supported command properties per command: ce55 has 3 diagnostics and this branch has 12, a net +9 for three additive commands; fresh host import and execution pass.",
+          "verdict": "partial",
+          "verdict_by": "spec-assert"
+        }
+      ]
+    },
+    {
+      "id": "binding-lifecycle",
+      "title": "Requirement/file confirmation binding and lifecycle",
+      "requirement_ref": "GT-D04; UX-D08; AC-APP01-003; AC-APP01-004",
+      "rows": [
+        {
+          "id": "IT-BINDING",
+          "action": "Prepare a QDP from a qualified PCBA sidecar, completed retained file bytes, immutable Requirement Version, File Package and Customer Confirmation records.",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "http",
+          "evidence": [
+            "qdp-release-center-true-stack-20260806-191622.json",
+            "qdp-test-run-evidence.md"
+          ],
+          "assertion": "Customer Confirmation binds the exact Requirement Version and canonical SHA-256 file-package hash; tamper and missing-retention attempts fail closed.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "IT-LIFECYCLE",
+          "action": "Drive Draft to Ready for Review to Released and release a later revision that supersedes the prior release.",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "http",
+          "evidence": [
+            "qdp-release-center-true-stack-20260806-191622.json"
+          ],
+          "assertion": "Released content is never edited in place; a new release supersedes the previous Released record with a compare-and-set transition.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "IT-DIFF-PACK-IMPACT",
+          "action": "Persist and read version-diff, Pack Set, downstream-impact, assumptions and approved-exception snapshots through prepare/review/release.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "http",
+          "evidence": [
+            "qdp-release-center-true-stack-20260806-191622.json",
+            "qdp-release-center-released-detail.png",
+            "qdp-release-center-released-impact.png"
+          ],
+          "assertion": "GT-D04 inputs remain bound to the immutable QDP content and are visible as human-readable summaries in Release Center.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "GAP-AUTO-COMPILATION",
+          "action": "Inventory the full target QDP lifecycle against implemented orchestration.",
+          "surface": "service",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "http",
+          "evidence": [
+            "qdp-test-run-evidence.md"
+          ],
+          "assertion": "Draft, Ready for Review, Released and Superseded execute; Compiling and Validation Failed are reserved dictionary states without an asynchronous compiler in this slice.",
+          "verdict": "gap",
+          "verdict_by": "spec-assert"
+        }
+      ]
+    },
+    {
+      "id": "security-resilience",
+      "title": "Permissions, tenancy, concurrency, replay, audit and external failure",
+      "requirement_ref": "AC-APP01-006; AC-APP01-008",
+      "rows": [
+        {
+          "id": "IT-CONCURRENCY-REPLAY",
+          "action": "Send missing/stale expected versions, identical replay identities and changed-intent replays at prepare/review/release boundaries.",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "http",
+          "evidence": [
+            "qdp-release-center-true-stack-20260806-191622.json"
+          ],
+          "assertion": "The target aggregate and QDP transitions enforce optimistic concurrency, stable replay and conflict rejection.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "IT-PERMISSION-TENANT-AUDIT",
+          "action": "Attempt lifecycle commands without permission, across tenant boundaries and through direct model writes, then inspect audit and field metadata.",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "http",
+          "evidence": [
+            "qdp-release-center-true-stack-20260806-191622.json"
+          ],
+          "assertion": "No-permission returns 403, cross-tenant access is denied, direct writes cannot bypass exact command writers, release requires an explicitly assigned cross-owner duty role, and 9 audit rows capture the fresh-host probes.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "IT-EXTERNAL-FAILURE",
+          "action": "Delete or invalidate the referenced file after draft creation, observe release failure, restore a valid retained file and retry with a valid transition identity.",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "http",
+          "evidence": [
+            "qdp-release-center-true-stack-20260806-191622.json",
+            "qdp-release-center-external-failure-feedback.png",
+            "qdp-release-center-browser-released.png"
+          ],
+          "assertion": "External file-retention failure is explicit and fail-closed; recovery does not corrupt lifecycle state and can subsequently release.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert"
+        }
+      ]
+    },
+    {
+      "id": "browser",
+      "title": "Browser-visible Release Center",
+      "requirement_ref": "UX-D08; AC-APP01-006; AC-APP01-008",
+      "rows": [
+        {
+          "id": "E2E-LIST-DETAIL",
+          "action": "Open the Release Center list and released detail in a freshly assembled browser runtime.",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "qdp-release-center-browser-20260806-191622.json",
+            "qdp-release-center-list.png",
+            "qdp-release-center-released-detail.png",
+            "qdp-release-center-released-impact.png"
+          ],
+          "assertion": "Lifecycle, GT-D04, hashes, confirmation, diff, Pack Set, impacts and audit are localized and readable without raw JSON or pid leakage.",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "Current-source original-resolution screenshots show localized lifecycle states, separated full-width hashes/diff, customer confirmation, PCBA-MFG@browser and 1 downstream object(s), 0 blocked; no raw field code or JSON is visible."
+        },
+        {
+          "id": "E2E-STALE-NO-PERMISSION",
+          "action": "Trigger a stale source release and open Release Center as a role without access.",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-commit",
+          "driver": "browser",
+          "evidence": [
+            "qdp-release-center-browser-20260806-191622.json",
+            "qdp-release-center-stale-feedback.png",
+            "qdp-release-center-no-permission.png"
+          ],
+          "assertion": "Stale feedback tells the user to prepare a new revision; the denied role sees Page Unavailable/Access denied and no QDP menu, data or actions.",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "Original screenshots visibly contain the stale error and no-permission boundary."
+        },
+        {
+          "id": "GAP-CALLER-PARITY",
+          "action": "Inventory formal action callers required by AC-APP01-006.",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "Interactive UI and HTTP API are verified; batch operation, direct deep-link command invocation and Agent Tool parity are not verified in this slice.",
+          "verdict": "untested",
+          "verdict_by": "spec-assert"
+        },
+        {
+          "id": "GAP-PAGE-STATE-DENOMINATOR",
+          "action": "Compare browser scenarios with the complete AC-APP01-008 page-state denominator.",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "recorded",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "Happy, Read-only/No Permission, Conflict/Stale and External Failure are verified; explicit Loading, Empty and Partial Success UX are not verified.",
+          "verdict": "untested",
+          "verdict_by": "spec-assert"
+        }
+      ]
+    }
+  ]
+}
