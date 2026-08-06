@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -101,6 +102,15 @@ public class FieldDefinitionDTO {
      */
     private Map<String, Object> ruleSchema;
 
+    /** Whether the field may never change after record creation. */
+    private Boolean immutable;
+
+    /** Conditional field immutability based on the stored value of another field. */
+    private ImmutableWhen immutableWhen;
+
+    /** Exact authorized command codes allowed to create or change this field. */
+    private List<String> allowedWriterCommands;
+
     /**
      * Extension properties.
      */
@@ -152,5 +162,14 @@ public class FieldDefinitionDTO {
         private Integer precision;
         private Integer scale;
         private Boolean unique;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ImmutableWhen {
+        private String field;
+        private List<String> in;
     }
 }

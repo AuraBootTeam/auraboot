@@ -48,9 +48,9 @@ public class RollUpSummaryService {
                             String childModelCode, String childFieldCode, String childFkCode,
                             String function, String childFilter, Long tenantId) {
 
-        ModelMutationGuard.assertMutable(
-                metaModelService.getModelDefinition(parentModelCode).orElse(null),
-                "updated by roll-up recalculation");
+        var parentModel = metaModelService.getModelDefinition(parentModelCode).orElse(null);
+        ModelMutationGuard.assertMutable(parentModel, "updated by roll-up recalculation");
+        FieldWriterGuard.assertFieldWriteAllowed(parentModel, parentFieldCode);
 
         String childTable = metaModelService.getTableName(childModelCode);
         String parentTable = metaModelService.getTableName(parentModelCode);
@@ -137,9 +137,9 @@ public class RollUpSummaryService {
     public int batchRecalculate(String parentModelCode, String parentFieldCode,
                                 String childModelCode, String childFieldCode, String childFkCode,
                                 String function, String childFilter, Long tenantId) {
-        ModelMutationGuard.assertMutable(
-                metaModelService.getModelDefinition(parentModelCode).orElse(null),
-                "batch updated by roll-up recalculation");
+        var parentModel = metaModelService.getModelDefinition(parentModelCode).orElse(null);
+        ModelMutationGuard.assertMutable(parentModel, "batch updated by roll-up recalculation");
+        FieldWriterGuard.assertFieldWriteAllowed(parentModel, parentFieldCode);
         String parentTable = metaModelService.getTableName(parentModelCode);
 
         // Query all parent record IDs

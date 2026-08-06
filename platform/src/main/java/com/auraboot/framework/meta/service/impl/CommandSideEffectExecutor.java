@@ -315,6 +315,7 @@ public class CommandSideEffectExecutor {
                 evaluationContext.putAll(currentRecord);
             }
             Map<String, Object> data = resolveFieldMapping(fieldMapping, evaluationContext);
+            assertFieldWriters(targetModel, data.keySet());
             Map<String, Object> conditions = Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue());
             // Route through jsonb-aware update to prevent PSQLException when any updated
             // column is of PostgreSQL type jsonb (BUG-2: side-effect path was the only
@@ -602,6 +603,7 @@ public class CommandSideEffectExecutor {
 
         // Update parent record
         assertMutableTarget(targetModel, "updated by an aggregate side effect");
+        assertFieldWriters(targetModel, Set.of(parentField));
         String parentTable = metaModelService.getTableName(targetModel);
         var idEntry = CommandExecutorUtils.resolveRecordIdColumn(parentId);
         executeScopedUpdate(parentTable, targetModel, idEntry, Map.of(parentField, result),
@@ -715,6 +717,7 @@ public class CommandSideEffectExecutor {
             }
 
             Map<String, Object> data = resolveItemFieldMapping(fieldMapping, currentRecord, item);
+            assertFieldWriters(targetModel, data.keySet());
 
             try {
                 String recordIdVal = targetRecordIdObj.toString();
@@ -741,6 +744,11 @@ public class CommandSideEffectExecutor {
     private void assertMutableTarget(String modelCode, String operation) {
         ModelDefinition model = metaModelService.getModelDefinition(modelCode).orElse(null);
         ModelMutationGuard.assertMutable(model, operation);
+    }
+
+    private void assertFieldWriters(String modelCode, Set<String> fieldCodes) {
+        ModelDefinition model = metaModelService.getModelDefinition(modelCode).orElse(null);
+        FieldWriterGuard.assertFieldsAllowed(model, fieldCodes);
     }
 
     /**

@@ -451,6 +451,21 @@ public class PluginManifestExtended extends PluginManifest {
                 if (field.getDataType() == null || field.getDataType().isBlank()) {
                     errors.add("fields[" + i + "]: dataType is required");
                 }
+                if (field.getAllowedWriterCommands() != null) {
+                    if (field.getAllowedWriterCommands().isEmpty()) {
+                        errors.add("fields[" + i + "]: allowedWriterCommands must not be empty");
+                    } else if (field.getAllowedWriterCommands().stream()
+                            .anyMatch(code -> code == null || code.isBlank())) {
+                        errors.add("fields[" + i + "]: allowedWriterCommands must contain non-blank command codes");
+                    }
+                }
+                if (field.getImmutableWhen() != null
+                        && (field.getImmutableWhen().getField() == null
+                        || field.getImmutableWhen().getField().isBlank()
+                        || field.getImmutableWhen().getIn() == null
+                        || field.getImmutableWhen().getIn().isEmpty())) {
+                    errors.add("fields[" + i + "]: immutableWhen requires field and non-empty in states");
+                }
             }
         }
 

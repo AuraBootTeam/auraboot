@@ -98,6 +98,7 @@ public class CommandFieldMapExecutor {
             enforceEditableFields(targetModel, modelDef, userMappedFields);
             applyReferencePidCompanions(modelDef, data);
             convertModelFieldTypes(modelDef, data);
+            FieldWriterGuard.assertFieldsAllowed(modelDef, data.keySet());
 
             // Merge JSONB virtual fields and map field codes to column names
             Set<String> jsonbCols = resolveJsonbColumns(modelDef, tableName);
@@ -271,6 +272,8 @@ public class CommandFieldMapExecutor {
                 log.info("STATE_TRANSITION: setting {} = {} (command={})", stateField, toState, command.getCode());
             }
         }
+
+        FieldWriterGuard.assertFieldsAllowed(modelDef, data.keySet());
 
         // Merge JSONB virtual fields and map field codes to column names
         Set<String> jsonbColumns = resolveJsonbColumns(modelDef, tableName);

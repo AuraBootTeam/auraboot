@@ -153,6 +153,55 @@ class CommandFieldMapExecutorFieldPermissionTest {
                 org.mockito.ArgumentMatchers.anyMap());
     }
 
+    @Test
+    void explicitFieldMapCannotForgeCommandOwnedField() {
+        when(metaModelService.getModelDefinition(MODEL)).thenReturn(Optional.of(protectedModelDefinition()));
+        when(fieldPermissionService.getFieldPermissions(MEMBER_ID, MODEL))
+                .thenReturn(FieldPermissionSet.allAllowed(Set.of("name", "gross_margin")));
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setOperationType("create");
+
+        assertThatThrownBy(() -> executor.executeFieldMapPhase(
+                List.of(bindingRule("margin", "gross_margin")),
+                Map.of("margin", "9.5"),
+                TENANT_ID,
+                request))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("FIELD_WRITER_DENIED")
+                .hasMessageContaining("gross_margin");
+
+        verify(dynamicDataMapper, never()).insert(
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void explicitFieldMapAllowsExactAuthorizedCommandOwner() {
+        when(metaModelService.getModelDefinition(MODEL)).thenReturn(Optional.of(protectedModelDefinition()));
+        when(fieldPermissionService.getFieldPermissions(MEMBER_ID, MODEL))
+                .thenReturn(FieldPermissionSet.allAllowed(Set.of("name", "gross_margin")));
+        when(dynamicDataMapper.insert(
+                org.mockito.ArgumentMatchers.eq("crm_quote"),
+                org.mockito.ArgumentMatchers.anyMap()))
+                .thenReturn(1);
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setOperationType("create");
+
+        Map<String, Object> result = MetaContext.runWithCommandPermitPlan(
+                "ALL", null, MODEL, null,
+                () -> MetaContext.runWithAuthorizedCommandCode(
+                        "crm.quote:create",
+                        () -> executor.executeFieldMapPhase(
+                                List.of(bindingRule("margin", "gross_margin")),
+                                Map.of("margin", "9.5"),
+                                TENANT_ID,
+                                request)));
+
+        assertThat(result).containsEntry(MODEL + "_inserted", 1);
+        verify(dynamicDataMapper).insert(
+                org.mockito.ArgumentMatchers.eq("crm_quote"),
+                org.mockito.ArgumentMatchers.anyMap());
+    }
+
     private BindingRule bindingRule(String sourceField, String targetField) {
         BindingRule rule = new BindingRule();
         rule.setRuleType("FIELD_MAP");
@@ -169,6 +218,16 @@ class CommandFieldMapExecutorFieldPermissionTest {
                 .fields(List.of(
                         field("name", "name"),
                         field("gross_margin", "gross_margin")))
+                .build();
+    }
+
+    private ModelDefinition protectedModelDefinition() {
+        FieldDefinition grossMargin = field("gross_margin", "gross_margin");
+        grossMargin.setAllowedWriterCommands(List.of("crm.quote:create"));
+        return ModelDefinition.builder()
+                .code(MODEL)
+                .tableName("crm_quote")
+                .fields(List.of(field("name", "name"), grossMargin))
                 .build();
     }
 

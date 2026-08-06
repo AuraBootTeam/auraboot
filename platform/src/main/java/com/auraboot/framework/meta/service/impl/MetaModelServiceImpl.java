@@ -1659,8 +1659,44 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 .jsonbColumn((String) extensionMap.get("jsonbColumn"))
                 .jsonbPath((String) extensionMap.get("jsonbPath"))
                 .refTarget(convertRefTargetBeanToDto(field.getRefTarget()))
+                .immutable(Boolean.TRUE.equals(extensionMap.get("immutable")))
+                .immutableWhen(readImmutableWhen(extensionMap.get("immutableWhen")))
+                .allowedWriterCommands(readAllowedWriterCommands(extensionMap))
                 .extraProps(extensionMap)
                 .build();
+    }
+
+    private FieldDefinition.ImmutableWhen readImmutableWhen(Object raw) {
+        if (!(raw instanceof Map<?, ?> map)) {
+            return null;
+        }
+        Object field = map.get("field");
+        Object states = map.get("in");
+        List<String> in = states instanceof Collection<?> collection
+                ? collection.stream()
+                .filter(Objects::nonNull)
+                .map(String::valueOf)
+                .toList()
+                : null;
+        return FieldDefinition.ImmutableWhen.builder()
+                .field(field == null ? null : String.valueOf(field))
+                .in(in)
+                .build();
+    }
+
+    /** Missing declaration is unrestricted; malformed persisted metadata denies every writer. */
+    private List<String> readAllowedWriterCommands(Map<String, Object> extensionMap) {
+        if (!extensionMap.containsKey("allowedWriterCommands")) {
+            return null;
+        }
+        Object raw = extensionMap.get("allowedWriterCommands");
+        if (!(raw instanceof Collection<?> collection)) {
+            return List.of();
+        }
+        if (collection.stream().anyMatch(value -> !(value instanceof String code) || code.isBlank())) {
+            return List.of();
+        }
+        return collection.stream().map(String.class::cast).toList();
     }
 
     @SuppressWarnings("unchecked")

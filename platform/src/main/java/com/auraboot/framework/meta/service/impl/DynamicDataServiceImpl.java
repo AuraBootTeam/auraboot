@@ -861,6 +861,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         assertWritable(modelCode);
         ModelDefinition model = getModelDefinition(modelCode);
         ModelMutationGuard.assertMutable(model, "incremented");
+        FieldWriterGuard.assertFieldWriteAllowed(model, counterCode);
         String counterCol = resolveNumericColumn(model, counterCode);
         String capCol = null;
         if (capCode != null) {
@@ -1224,6 +1225,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
         ModelDefinition model = getModelDefinition(modelCode);
         ModelMutationGuard.assertCreateAllowed(model);
+        FieldWriterGuard.assertCreateAllowed(model, data);
 
         // Field-level write permission (gap #1): strip fields the current user may not write
         stripNonWritableFields(modelCode, data);
@@ -1589,6 +1591,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             if (existingRecord == null) {
                 throw new MetaServiceException("Record not found with ID: " + recordId);
             }
+            FieldWriterGuard.assertUpdateAllowed(model, inputData, existingRecord);
 
             // A field the caller may not write was dropped above. Now that the stored row is in
             // hand we can tell whether that was harmless (they sent back the value already there)
@@ -2093,6 +2096,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // Per-row prefix identical to create(): strip → normalize → validate → enrich → PK →
             // convert types → filter virtual → toColumnData. Work on a copy so caller maps stay intact.
             Map<String, Object> data = new HashMap<>(input);
+            FieldWriterGuard.assertCreateAllowed(model, data);
             stripNonWritableFields(modelCode, data);
             payloadTemporalNormalizer.normalize(data, model);
             validationService.validateAndThrow(model, data, ValidationContext.CREATE);
@@ -3107,6 +3111,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     int rowIndex = i + j;
                     try {
                         Map<String, Object> record = batch.get(j);
+                        FieldWriterGuard.assertCreateAllowed(model, record);
                         // Add system columns
                         Map<String, Object> columnData = toColumnData(model, record);
                         columnData.put("tenant_id", tenantId);

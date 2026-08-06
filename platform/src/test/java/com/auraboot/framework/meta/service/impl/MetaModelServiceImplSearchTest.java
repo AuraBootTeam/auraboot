@@ -193,6 +193,64 @@ class MetaModelServiceImplSearchTest {
     }
 
     @Test
+    void convertToFieldDefinitionHydratesFieldMutationContracts() {
+        MetaModelServiceImpl service = new MetaModelServiceImpl(
+                metaModelMapper,
+                metaFieldMapper,
+                queryBuilderService,
+                fieldBindingMapper,
+                autoPermissionAssignmentService,
+                metaDefinitionCacheService
+        );
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("immutable", true);
+        extension.setDynamicProperty("immutableWhen", Map.of(
+                "field", "status",
+                "in", List.of("released", "superseded")));
+        extension.setDynamicProperty("allowedWriterCommands", List.of(
+                "crm:release_qdp", "crm:supersede_qdp"));
+        Field field = new Field();
+        field.setCode("qdp_revision");
+        field.setDataType("string");
+        field.setExtension(extension);
+
+        FieldDefinition definition = ReflectionTestUtils.invokeMethod(
+                service, "convertToFieldDefinition", field, 20);
+
+        assertThat(definition).isNotNull();
+        assertThat(definition.isImmutable()).isTrue();
+        assertThat(definition.getImmutableWhen().getField()).isEqualTo("status");
+        assertThat(definition.getImmutableWhen().getIn())
+                .containsExactly("released", "superseded");
+        assertThat(definition.getAllowedWriterCommands())
+                .containsExactly("crm:release_qdp", "crm:supersede_qdp");
+    }
+
+    @Test
+    void malformedPersistedWriterContractFailsClosed() {
+        MetaModelServiceImpl service = new MetaModelServiceImpl(
+                metaModelMapper,
+                metaFieldMapper,
+                queryBuilderService,
+                fieldBindingMapper,
+                autoPermissionAssignmentService,
+                metaDefinitionCacheService
+        );
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("allowedWriterCommands", List.of(42));
+        Field field = new Field();
+        field.setCode("qdp_revision");
+        field.setDataType("string");
+        field.setExtension(extension);
+
+        FieldDefinition definition = ReflectionTestUtils.invokeMethod(
+                service, "convertToFieldDefinition", field, 20);
+
+        assertThat(definition).isNotNull();
+        assertThat(definition.getAllowedWriterCommands()).isEmpty();
+    }
+
+    @Test
     void previewPublishDDLAttachesRuleCenterGovernance() {
         Model draft = draftModel("model_governance_case");
         when(metaModelMapper.findByPid(draft.getPid())).thenReturn(draft);

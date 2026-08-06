@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,6 +60,30 @@ class PluginResourceImporterRefTargetNormalizationTest {
                 .isInstanceOfSatisfying(Map.class, map -> assertThat(map)
                         .containsEntry("precision", 18)
                         .containsEntry("scale", 6));
+    }
+
+    @Test
+    @DisplayName("field authorization metadata is persisted in the runtime extension")
+    void preservesFieldAuthorizationMetadata() {
+        FieldDefinitionDTO dto = new FieldDefinitionDTO();
+        dto.setCode("route_package");
+        dto.setDataType("string");
+        dto.setImmutable(true);
+        dto.setImmutableWhen(FieldDefinitionDTO.ImmutableWhen.builder()
+                .field("status")
+                .in(List.of("released"))
+                .build());
+        dto.setAllowedWriterCommands(List.of("crm:release_qdp"));
+
+        Map<String, Object> extension = buildFieldExtension(dto);
+
+        assertThat(extension)
+                .containsEntry("immutable", true)
+                .containsEntry("allowedWriterCommands", List.of("crm:release_qdp"));
+        assertThat(extension.get("immutableWhen"))
+                .isInstanceOfSatisfying(Map.class, lock -> assertThat(lock)
+                        .containsEntry("field", "status")
+                        .containsEntry("in", List.of("released")));
     }
 
     @Test

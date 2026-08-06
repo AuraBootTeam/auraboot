@@ -204,6 +204,16 @@ public class FieldDefinition {
     private ImmutableWhen immutableWhen;
 
     /**
+     * Exact command codes allowed to create or change this field.
+     *
+     * <p>{@code null} retains the legacy unrestricted behavior. A declared list is a domain
+     * provenance invariant, not RBAC: the write must execute inside a permitted command plan and
+     * its exact command code must match one entry. An explicitly empty list therefore denies every
+     * writer (fail closed).</p>
+     */
+    private List<String> allowedWriterCommands;
+
+    /**
      * Locking condition for {@link FieldDefinition#immutableWhen}: the guarded field is
      * frozen while {@code field}'s <em>current</em> (pre-update) value is one of {@code in}.
      */

@@ -91,7 +91,9 @@ public class CommandPipeline {
                 plan.expectedVersion(),
                 targetModel,
                 targetRecordId,
-                () -> executeRemainingGuardedPhases(ctx, startIndex));
+                () -> MetaContext.runWithAuthorizedCommandCode(
+                        ctx.getCommandCode(),
+                        () -> executeRemainingGuardedPhases(ctx, startIndex)));
     }
 
     private CommandExecuteResult executeRemainingGuardedPhases(

@@ -114,6 +114,46 @@ class DynamicDataServiceAtomicIncrementGuardTest {
     }
 
     @Test
+    void command_owned_counter_rejects_direct_atomic_increment() {
+        ModelDefinition protectedModel = protectedCounterModel();
+        when(metadataService.getDefinitionByCode("cr_cj_profile")).thenReturn(protectedModel);
+        when(metadataService.getModelDefinition("cr_cj_profile"))
+                .thenReturn(Optional.of(protectedModel));
+
+        MetaServiceException error = assertThrows(MetaServiceException.class,
+                () -> service.incrementWithinCap(
+                        "cr_cj_profile", "rec-1", "cr_cj_followed_count", 1L, null));
+
+        assertTrue(error.getMessage().contains("FIELD_WRITER_DENIED"));
+        verify(metadataService, never()).getPrimaryKeyField(anyString());
+        verifyNoInteractions(mapper);
+    }
+
+    @Test
+    void exact_authorized_command_may_increment_its_owned_counter() {
+        ModelDefinition protectedModel = protectedCounterModel();
+        when(metadataService.getDefinitionByCode("cr_cj_profile")).thenReturn(protectedModel);
+        when(metadataService.getModelDefinition("cr_cj_profile"))
+                .thenReturn(Optional.of(protectedModel));
+        when(metadataService.getPrimaryKeyField("cr_cj_profile")).thenReturn(pidField);
+        when(mapper.atomicIncrementReturning(anyString(), anyString(), isNull(), anyString(),
+                anyString(), anyLong(), anyString(), anyLong(), any()))
+                .thenReturn(List.of(Map.of("new_value", 8L)));
+
+        Optional<Long> result = MetaContext.runWithCommandPermitPlan(
+                "ALL", null, "cr_cj_profile", "rec-1",
+                () -> MetaContext.runWithAuthorizedCommandCode(
+                        "crm:follow_customer",
+                        () -> service.incrementWithinCap(
+                                "cr_cj_profile", "rec-1", "cr_cj_followed_count", 1L, null)));
+
+        assertEquals(Optional.of(8L), result);
+        verify(mapper).atomicIncrementReturning(
+                eq("cr_cj_profile"), eq("cr_cj_followed_count"), isNull(),
+                eq("pid"), anyString(), eq(1L), eq("rec-1"), eq(1L), eq(7L));
+    }
+
+    @Test
     void command_only_model_rejects_direct_create_before_permissions_or_mapper() {
         ModelDefinition protectedModel = ModelDefinition.builder()
                 .code("cr_cj_profile")
@@ -178,5 +218,20 @@ class DynamicDataServiceAtomicIncrementGuardTest {
                 "cr_cj_view_count", 1L, "cr_cj_followed_count");
 
         assertTrue(result.isEmpty());
+    }
+
+    private ModelDefinition protectedCounterModel() {
+        return ModelDefinition.builder()
+                .code("cr_cj_profile")
+                .tableName("cr_cj_profile")
+                .softDelete(false)
+                .fields(List.of(
+                        FieldDefinition.builder()
+                                .code("cr_cj_followed_count")
+                                .columnName("cr_cj_followed_count")
+                                .dataType("integer")
+                                .allowedWriterCommands(List.of("crm:follow_customer"))
+                                .build()))
+                .build();
     }
 }
