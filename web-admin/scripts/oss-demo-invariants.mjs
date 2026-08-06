@@ -112,11 +112,11 @@ export async function main(argv = process.argv.slice(2)) {
     const pluginBody = await getJson(api, '/api/plugins?current=1&size=500');
     const pluginRecords = pluginBody?.data?.records ?? pluginBody?.data?.data ?? pluginBody?.data ?? [];
     assertAtLeast(results, 'installed OSS plugins', pluginRecords.length, expectedPlugins);
-    assertAtLeast(results, 'crm_account rows', await dynamicTotal(api, 'crm_account'), 20);
-    assertAtLeast(results, 'crm_contact rows', await dynamicTotal(api, 'crm_contact'), 80);
-    assertAtLeast(results, 'crm_lead rows', await dynamicTotal(api, 'crm_lead'), 100);
-    assertAtLeast(results, 'crm_opportunity rows', await dynamicTotal(api, 'crm_opportunity'), 40);
-    assertAtLeast(results, 'crm_activity rows', await dynamicTotal(api, 'crm_activity'), 300);
+    assertAtLeast(results, 'crm_account_common rows', await dynamicTotal(api, 'crm_account_common'), 20);
+    assertAtLeast(results, 'crm_contact_common rows', await dynamicTotal(api, 'crm_contact_common'), 80);
+    assertAtLeast(results, 'crm_lead_common rows', await dynamicTotal(api, 'crm_lead_common'), 100);
+    assertAtLeast(results, 'crm_opportunity_common rows', await dynamicTotal(api, 'crm_opportunity_common'), 40);
+    assertAtLeast(results, 'crm_activity_common rows', await dynamicTotal(api, 'crm_activity_common'), 300);
     assertAtLeast(results, 'bpm_process_management rows', await dynamicTotal(api, 'bpm_process_management'), 1);
     assertAtLeast(results, 'wd_leave_request rows', await dynamicTotal(api, 'wd_leave_request'), 8);
     assertAtLeast(results, 'wd_leave_balance rows', await dynamicTotal(api, 'wd_leave_balance'), 1);

@@ -45,15 +45,19 @@ RUN --mount=type=cache,target=/root/.gradle/wrapper \
 # Copy source code
 COPY platform/src ./src
 COPY platform/platform-plugin-api/src platform-plugin-api/src
+COPY plugins/crm/backend plugins/crm/backend
 
 # Copy vendor dependencies if present (use glob pattern to make optional)
 COPY platform/vendor* ./vendor/
 
-# Build the application (skip tests for faster builds)
+# Build the application and the official CRM command-handler JAR. The CRM
+# configuration is imported from /app/plugins, while PF4J must load its handler
+# extensions from /app/pf4j-plugins before import-time command validation runs.
 RUN --mount=type=cache,target=/root/.gradle/wrapper \
     --mount=type=cache,target=/root/.gradle/caches \
     --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
-    ./gradlew bootJar --no-daemon -x test
+    ./gradlew :platform-plugin-api:publishToMavenLocal bootJar --no-daemon -x test && \
+    ./gradlew -p plugins/crm/backend jar --no-daemon -x test
 
 # ── Stage 2: Runtime ────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine
@@ -68,14 +72,15 @@ RUN addgroup -g 1000 appuser && \
     adduser -D -u 1000 -G appuser appuser
 
 # Create data directories
-RUN mkdir -p /app/data/files /app/data/git-repos /app/data/artifacts && \
+RUN mkdir -p /app/data/files /app/data/git-repos /app/data/artifacts /app/pf4j-plugins && \
     chown -R appuser:appuser /app
 
 # Copy built executable boot JAR from builder (bootJar carries the 'boot' classifier;
 # the plain library jar also lands in build/libs, so glob the boot jar explicitly)
 COPY --from=builder --chown=appuser:appuser /app/build/libs/*-boot.jar app.jar
+COPY --from=builder --chown=appuser:appuser /app/plugins/crm/backend/build/libs/crm-plugin-*.jar /app/pf4j-plugins/
 
-# Bake the OSS config plugins into the image so a pure `docker pull` needs no repo
+# Bake the public plugins into the image so a pure `docker pull` needs no repo
 # checkout. quickstart.sh imports them from /app/plugins (AURA_BUILTIN_PLUGINS_DIR).
 # The OSS repo contains no enterprise code (enforced by check-oss-boundary.sh), so
 # this image stays free of report/BOM plugins by construction. The compose dev flow

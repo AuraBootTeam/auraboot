@@ -1,0 +1,60 @@
+{
+  "pageKey": "crm_forecast_submission_detail",
+  "name:zh-CN": "预测提交详情",
+  "name:en": "Forecast Submission Detail",
+  "modelCode": "crm_forecast_submission",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "info",
+      "blockType": "detail-section",
+      "title": {
+        "zh-CN": "预测信息",
+        "en": "Forecast Info"
+      },
+      "fields": [
+        {
+          "field": "crm_fcst_code",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_fcst_period",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_fcst_owner",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_fcst_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_fcst_commit_amount",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_fcst_best_case_amount",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_fcst_pipeline_amount",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_fcst_submitted_at",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_fcst_notes",
+          "colSpan": 12
+        }
+      ]
+    }
+  ]
+}

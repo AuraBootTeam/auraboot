@@ -1,0 +1,95 @@
+{
+  "pageKey": "crm_forecast_submission_list",
+  "name:zh-CN": "预测提交",
+  "name:en": "Forecast Submissions",
+  "modelCode": "crm_forecast_submission",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "filters",
+      "blockType": "filters",
+      "fields": [
+        {
+          "field": "crm_fcst_period"
+        },
+        {
+          "field": "crm_fcst_status"
+        },
+        {
+          "field": "crm_fcst_owner"
+        }
+      ]
+    },
+    {
+      "id": "toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_forecast_submission_form"
+          },
+          "permissionCode": "crm.forecast.manage"
+        }
+      ]
+    },
+    {
+      "id": "table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_fcst_code"
+        },
+        {
+          "field": "crm_fcst_period"
+        },
+        {
+          "field": "crm_fcst_owner"
+        },
+        {
+          "field": "crm_fcst_commit_amount"
+        },
+        {
+          "field": "crm_fcst_best_case_amount"
+        },
+        {
+          "field": "crm_fcst_pipeline_amount"
+        },
+        {
+          "field": "crm_fcst_status",
+          "renderType": "tag",
+          "dictCode": "crm_fcst_status"
+        },
+        {
+          "field": "crm_fcst_submitted_at"
+        }
+      ],
+      "rowActions": [
+        {
+          "code": "edit",
+          "label": "$i18n:common.button.edit",
+          "action": {
+            "type": "command"
+          },
+          "permissionCode": "crm.forecast.manage"
+        },
+        {
+          "code": "submit",
+          "label": "$i18n:crm.forecast.submit",
+          "action": {
+            "type": "command",
+            "command": "crm:submit_forecast"
+          },
+          "permissionCode": "crm.forecast.manage"
+        }
+      ]
+    }
+  ]
+}

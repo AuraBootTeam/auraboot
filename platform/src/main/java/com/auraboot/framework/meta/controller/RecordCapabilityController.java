@@ -48,7 +48,7 @@ public class RecordCapabilityController {
      *   <li>ETag for conditional caching</li>
      * </ul>
      *
-     * @param modelCode model code, e.g. "crm_opportunity"
+     * @param modelCode model code, e.g. "crm_opportunity_common"
      * @param recordPid public pid of the record
      * @param platform  "web" or "mobile" (from X-Platform header or query param, default "web")
      * @param context   usage context: "detail" (default), "list", "inbox"
@@ -62,7 +62,7 @@ public class RecordCapabilityController {
                     + "record state, platform, and context. Supports ETag-based conditional requests."
     )
     public ResponseEntity<ApiResponse<RecordCapabilities>> getRecordCapabilities(
-            @Parameter(description = "Model code, e.g. crm_opportunity")
+            @Parameter(description = "Model code, e.g. crm_opportunity_common")
             @PathVariable String modelCode,
 
             @Parameter(description = "Record public pid")

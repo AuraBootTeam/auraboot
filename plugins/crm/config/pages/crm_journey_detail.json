@@ -1,0 +1,44 @@
+{
+  "pageKey": "crm_journey_detail",
+  "name:zh-CN": "旅程详情",
+  "name:en": "旅程详情",
+  "modelCode": "crm_journey",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "info",
+      "blockType": "detail-section",
+      "title": {
+        "zh-CN": "旅程信息",
+        "en": "Journey"
+      },
+      "fields": [
+        {
+          "field": "crm_jny_code",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_jny_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_jny_name",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_jny_total_steps",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_jny_description",
+          "colSpan": 12
+        }
+      ]
+    }
+  ]
+}

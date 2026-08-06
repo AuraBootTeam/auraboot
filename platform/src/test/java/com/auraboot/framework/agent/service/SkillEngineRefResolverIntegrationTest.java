@@ -90,7 +90,7 @@ class SkillEngineRefResolverIntegrationTest extends BaseIntegrationTest {
     void ref_bif() {
         BusinessIntentFrame bif = BusinessIntentFrame.builder()
                 .intent("query")
-                .object("crm_account")
+                .object("crm_account_common")
                 .riskLevel("L1")
                 .actionability("read_only")
                 .candidateSkillsMode("hint")
@@ -99,7 +99,7 @@ class SkillEngineRefResolverIntegrationTest extends BaseIntegrationTest {
         BifContext.setCurrentBif(bif);
 
         assertThat(skillEngine.resolveRefPath("bif.intent", Map.of(), List.of())).isEqualTo("query");
-        assertThat(skillEngine.resolveRefPath("bif.object", Map.of(), List.of())).isEqualTo("crm_account");
+        assertThat(skillEngine.resolveRefPath("bif.object", Map.of(), List.of())).isEqualTo("crm_account_common");
         assertThat(skillEngine.resolveRefPath("bif.riskLevel", Map.of(), List.of())).isEqualTo("L1");
         assertThat(skillEngine.resolveRefPath("bif.candidateSkillsMode", Map.of(), List.of())).isEqualTo("hint");
     }

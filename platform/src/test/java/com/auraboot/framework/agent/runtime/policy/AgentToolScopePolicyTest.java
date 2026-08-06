@@ -46,7 +46,7 @@ class AgentToolScopePolicyTest {
 
     @Test
     void nullStarAndEmptyAllowedModelsMeanUnrestricted() {
-        List<ToolDefinition> tools = List.of(dslQuery("list:crm_lead", "crm_lead"));
+        List<ToolDefinition> tools = List.of(dslQuery("list:crm_lead_common", "crm_lead_common"));
         for (Object models : new Object[]{null, "*", List.of()}) {
             AgentToolScopePolicy.Scope scope = policy.scopeOf(agentDef(models, null));
             assertThat(policy.filterDefinitions(scope, tools, "a")).hasSize(1);
@@ -55,30 +55,30 @@ class AgentToolScopePolicyTest {
 
     @Test
     void stampedModelCodeIsMatchedExactly() {
-        AgentToolScopePolicy.Scope scope = policy.scopeOf(agentDef(List.of("crm_account"), null));
+        AgentToolScopePolicy.Scope scope = policy.scopeOf(agentDef(List.of("crm_account_common"), null));
         List<ToolDefinition> tools = List.of(
-                dslQuery("list:crm_account", "crm_account"),
-                dslQuery("list:crm_lead", "crm_lead"),
-                dslCommand("cmd:crm:create_lead", "crm:create_lead", "crm_lead", "create"));
+                dslQuery("list:crm_account_common", "crm_account_common"),
+                dslQuery("list:crm_lead_common", "crm_lead_common"),
+                dslCommand("cmd:crm:create_lead", "crm:create_lead", "crm_lead_common", "create"));
         assertThat(policy.filterDefinitions(scope, tools, "a"))
                 .extracting(ToolDefinition::getToolCode)
-                .containsExactly("list:crm_account");
+                .containsExactly("list:crm_account_common");
     }
 
     @Test
     void allowedModelsAcceptsJsonStringColumnValue() {
-        AgentToolScopePolicy.Scope scope = policy.scopeOf(agentDef("[\"crm_account\"]", null));
+        AgentToolScopePolicy.Scope scope = policy.scopeOf(agentDef("[\"crm_account_common\"]", null));
         List<ToolDefinition> tools = List.of(
-                dslQuery("list:crm_account", "crm_account"),
-                dslQuery("list:crm_lead", "crm_lead"));
+                dslQuery("list:crm_account_common", "crm_account_common"),
+                dslQuery("list:crm_lead_common", "crm_lead_common"));
         assertThat(policy.filterDefinitions(scope, tools, "a"))
                 .extracting(ToolDefinition::getToolCode)
-                .containsExactly("list:crm_account");
+                .containsExactly("list:crm_account_common");
     }
 
     @Test
     void nonModelToolsPassBothAxes() {
-        AgentToolScopePolicy.Scope scope = policy.scopeOf(agentDef(List.of("crm_account"), List.of("query")));
+        AgentToolScopePolicy.Scope scope = policy.scopeOf(agentDef(List.of("crm_account_common"), List.of("query")));
         List<ToolDefinition> tools = List.of(
                 ToolDefinition.builder().toolCode("escalate_to_human").toolType("custom").build(),
                 ToolDefinition.builder().toolCode("platform.delegate_task").toolType("platform").build(),
@@ -88,7 +88,7 @@ class AgentToolScopePolicyTest {
 
     @Test
     void unstampedDslToolFallsBackToLegacyPrefixMatch() {
-        AgentToolScopePolicy.Scope scope = policy.scopeOf(agentDef(List.of("crm_account"), null));
+        AgentToolScopePolicy.Scope scope = policy.scopeOf(agentDef(List.of("crm_account_common"), null));
         // skill-resolved tools carry no modelCode; the legacy heuristic keeps
         // same-plugin tools (prefix match in either direction) and drops others
         List<AgentToolDefinition> tools = List.of(
@@ -107,12 +107,12 @@ class AgentToolScopePolicyTest {
     void queryOnlyAgentLosesEveryWriteTool() {
         AgentToolScopePolicy.Scope scope = policy.scopeOf(agentDef(null, List.of("query")));
         List<ToolDefinition> tools = List.of(
-                dslQuery("list:crm_lead", "crm_lead"),
-                dslCommand("cmd:crm:create_lead", "crm:create_lead", "crm_lead", "create"),
-                dslCommand("cmd:crm:delete_lead", "crm:delete_lead", "crm_lead", "delete"));
+                dslQuery("list:crm_lead_common", "crm_lead_common"),
+                dslCommand("cmd:crm:create_lead", "crm:create_lead", "crm_lead_common", "create"),
+                dslCommand("cmd:crm:delete_lead", "crm:delete_lead", "crm_lead_common", "delete"));
         assertThat(policy.filterDefinitions(scope, tools, "a"))
                 .extracting(ToolDefinition::getToolCode)
-                .containsExactly("list:crm_lead");
+                .containsExactly("list:crm_lead_common");
     }
 
     @Test
@@ -121,9 +121,9 @@ class AgentToolScopePolicyTest {
         AgentToolScopePolicy.Scope scope = policy.scopeOf(
                 agentDef(null, List.of("query", "create", "update", "transition")));
         List<ToolDefinition> tools = List.of(
-                dslCommand("cmd:crm:create_lead", "crm:create_lead", "crm_lead", "create"),
-                dslCommand("cmd:crm:delete_lead", "crm:delete_lead", "crm_lead", "delete"),
-                dslCommand("cmd:crm:close_lead", "crm:close_lead", "crm_lead", "state_transition"));
+                dslCommand("cmd:crm:create_lead", "crm:create_lead", "crm_lead_common", "create"),
+                dslCommand("cmd:crm:delete_lead", "crm:delete_lead", "crm_lead_common", "delete"),
+                dslCommand("cmd:crm:close_lead", "crm:close_lead", "crm_lead_common", "state_transition"));
         assertThat(policy.filterDefinitions(scope, tools, "a"))
                 .extracting(ToolDefinition::getToolCode)
                 .containsExactly("cmd:crm:create_lead", "cmd:crm:close_lead");
@@ -145,7 +145,7 @@ class AgentToolScopePolicyTest {
 
     @Test
     void unclassifiableWriteKindNeedsSomeWriteVerb() {
-        ToolDefinition odd = dslCommand("cmd:crm:reconcile", "crm:reconcile", "crm_lead", "automate");
+        ToolDefinition odd = dslCommand("cmd:crm:reconcile", "crm:reconcile", "crm_lead_common", "automate");
         AgentToolScopePolicy.Scope readOnly = policy.scopeOf(agentDef(null, List.of("query")));
         AgentToolScopePolicy.Scope writer = policy.scopeOf(agentDef(null, List.of("query", "update")));
         assertThat(policy.filterDefinitions(readOnly, List.of(odd), "a")).isEmpty();
@@ -155,20 +155,20 @@ class AgentToolScopePolicyTest {
     @Test
     void bothAxesMustAgree() {
         AgentToolScopePolicy.Scope scope = policy.scopeOf(
-                agentDef(List.of("crm_account"), List.of("query")));
+                agentDef(List.of("crm_account_common"), List.of("query")));
         List<ToolDefinition> tools = List.of(
-                dslQuery("list:crm_account", "crm_account"),
-                dslCommand("cmd:crm:create_account", "crm:create_account", "crm_account", "create"),
-                dslQuery("list:crm_lead", "crm_lead"));
+                dslQuery("list:crm_account_common", "crm_account_common"),
+                dslCommand("cmd:crm:create_account", "crm:create_account", "crm_account_common", "create"),
+                dslQuery("list:crm_lead_common", "crm_lead_common"));
         assertThat(policy.filterDefinitions(scope, tools, "a"))
                 .extracting(ToolDefinition::getToolCode)
-                .containsExactly("list:crm_account");
+                .containsExactly("list:crm_account_common");
     }
 
     @Test
     void unparseableColumnIsTreatedAsUnrestrictedNotAsDenyAll() {
         AgentToolScopePolicy.Scope scope = policy.scopeOf(agentDef("not-json", null));
         assertThat(policy.filterDefinitions(scope,
-                List.of(dslQuery("list:crm_lead", "crm_lead")), "a")).hasSize(1);
+                List.of(dslQuery("list:crm_lead_common", "crm_lead_common")), "a")).hasSize(1);
     }
 }

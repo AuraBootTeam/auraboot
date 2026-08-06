@@ -1,0 +1,51 @@
+{
+  "pageKey": "crm_journey_enrollment_form",
+  "name:zh-CN": "加入旅程",
+  "name:en": "加入旅程",
+  "modelCode": "crm_journey_enrollment",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "参与信息",
+        "en": "Enrollment"
+      },
+      "fields": [
+        {
+          "field": "crm_jne_journey_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_jne_contact_id",
+          "colSpan": 6
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:crm.journey.enroll",
+          "action": {
+            "type": "command",
+            "command": "crm:enroll_journey"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

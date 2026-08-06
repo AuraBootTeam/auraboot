@@ -1,0 +1,114 @@
+[
+  {
+    "code": "crm:create_approval_case",
+    "displayName:zh-CN": "新建审批事项",
+    "displayName:en": "Create Approval Case",
+    "type": "create",
+    "modelCode": "crm_approval_case_common",
+    "inputFields": [
+      "crm_apc_subject",
+      "crm_apc_domain",
+      "crm_apc_case_type",
+      "crm_apc_status",
+      "crm_apc_priority",
+      "crm_apc_source_model",
+      "crm_apc_source_id",
+      "crm_apc_source_code",
+      "crm_apc_account_id",
+      "crm_apc_customer_request_id",
+      "crm_apc_amount",
+      "crm_apc_margin_pct",
+      "crm_apc_discount_pct",
+      "crm_apc_reason",
+      "crm_apc_policy_snapshot",
+      "crm_apc_submitted_at",
+      "crm_apc_decided_at",
+      "crm_apc_decision",
+      "crm_apc_decision_note"
+    ],
+    "autoSetFields": {
+      "crm_apc_code": {
+        "strategy": "auto_generate",
+        "pattern": "APC-{yyyyMMdd}-{seq}"
+      }
+    },
+    "permissions": [
+      "crm.approval_case.manage"
+    ],
+    "agent_hint": "Create a cross-domain approval case. Domain packages should keep source object facts in their own models and only synchronize approval facts here.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_approval_case",
+    "displayName:zh-CN": "编辑审批事项",
+    "displayName:en": "Update Approval Case",
+    "type": "update",
+    "modelCode": "crm_approval_case_common",
+    "inputFields": [
+      "crm_apc_subject",
+      "crm_apc_domain",
+      "crm_apc_case_type",
+      "crm_apc_status",
+      "crm_apc_priority",
+      "crm_apc_source_model",
+      "crm_apc_source_id",
+      "crm_apc_source_code",
+      "crm_apc_account_id",
+      "crm_apc_customer_request_id",
+      "crm_apc_amount",
+      "crm_apc_margin_pct",
+      "crm_apc_discount_pct",
+      "crm_apc_reason",
+      "crm_apc_policy_snapshot",
+      "crm_apc_submitted_at",
+      "crm_apc_decided_at",
+      "crm_apc_decision",
+      "crm_apc_decision_note"
+    ],
+    "permissions": [
+      "crm.approval_case.manage"
+    ],
+    "agent_hint": "Update a cross-domain approval case after the source object changes.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_approval_case",
+    "displayName:zh-CN": "删除审批事项",
+    "displayName:en": "Delete Approval Case",
+    "type": "delete",
+    "modelCode": "crm_approval_case_common",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此审批事项？",
+      "confirmMessage:en": "Delete this approval case?"
+    },
+    "permissions": [
+      "crm.approval_case.manage"
+    ],
+    "agent_hint": "Delete a manually created approval case. Source-synchronized cases should normally be closed by the source domain command instead.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:detail_approval_case",
+    "displayName:zh-CN": "查看审批事项",
+    "displayName:en": "View Approval Case",
+    "type": "query",
+    "modelCode": "crm_approval_case_common",
+    "permissions": [
+      "crm.approval_case.read"
+    ],
+    "agent_hint": "Query approval case records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:list_approval_cases",
+    "displayName:zh-CN": "审批事项列表",
+    "displayName:en": "List Approval Cases",
+    "type": "query",
+    "modelCode": "crm_approval_case_common",
+    "permissions": [
+      "crm.approval_case.read"
+    ],
+    "agent_hint": "List approval case records.",
+    "cmd_risk_level": "L0"
+  }
+]

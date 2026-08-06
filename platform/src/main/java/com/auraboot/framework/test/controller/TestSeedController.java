@@ -314,7 +314,7 @@ public class TestSeedController {
                         "../../auraboot/plugins/test-fixtures",
                         "../plugins/test-fixtures"
                 );
-                // Mobile E2E (Android/iOS) targets crm_account as the canonical "real" model
+                // Mobile E2E (Android/iOS) targets crm_account_common as the canonical "real" model
                 // (see EndpointRegistryTest in apps/android and EndpointRegistryTests.swift in
                 // apps/ios). The CRM plugin lives in the enterprise overlay; importTestPlugin
                 // safely skips when the directory is absent (OSS-only checkouts).
@@ -639,10 +639,10 @@ public class TestSeedController {
     }
 
     /**
-     * Seed a small set of demo {@code crm_account} records for mobile E2E smoke tests.
+     * Seed a small set of demo {@code crm_account_common} records for mobile E2E smoke tests.
      * <p>
-     * Mobile EndpointRegistry tests assert that {@code /api/dynamic/crm_account/list}
-     * and {@code /api/dynamic/crm_account/{id}} return at least one record. The CRM
+     * Mobile EndpointRegistry tests assert that {@code /api/dynamic/crm_account_common/list}
+     * and {@code /api/dynamic/crm_account_common/{id}} return at least one record. The CRM
      * plugin import only registers the model definition; without explicit seeding the
      * table is empty in the freshly-bootstrapped test tenant.
      * <p>
@@ -652,7 +652,7 @@ public class TestSeedController {
      * primary-key generation match production paths (no manual SQL INSERTs).
      */
     private void seedCrmDemoRecords(Tenant tenant, User user) {
-        String modelCode = "crm_account";
+        String modelCode = "crm_account_common";
 
         Integer modelExists = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
@@ -662,15 +662,15 @@ public class TestSeedController {
                   AND deleted_flag = FALSE
                 """, Integer.class, tenant.getId(), modelCode);
         if (modelExists == null || modelExists == 0) {
-            log.info("Skipping crm_account demo seed; model not imported for tenant {}", tenant.getId());
+            log.info("Skipping crm_account_common demo seed; model not imported for tenant {}", tenant.getId());
             return;
         }
 
         Integer existingRows = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM mt_crm_account WHERE tenant_id = ?",
+                "SELECT COUNT(*) FROM mt_crm_account_common WHERE tenant_id = ?",
                 Integer.class, tenant.getId());
         if (existingRows != null && existingRows >= 3) {
-            log.info("Skipping crm_account demo seed; tenant {} already has {} record(s)",
+            log.info("Skipping crm_account_common demo seed; tenant {} already has {} record(s)",
                     tenant.getId(), existingRows);
             return;
         }
@@ -693,7 +693,7 @@ public class TestSeedController {
                 created++;
             }
         }
-        log.info("Seeded {} crm_account demo record(s) for E2E tenant {}", created, tenant.getId());
+        log.info("Seeded {} crm_account_common demo record(s) for E2E tenant {}", created, tenant.getId());
     }
 
     private Map<String, Object> buildCrmAccountPayload(String code, String name,

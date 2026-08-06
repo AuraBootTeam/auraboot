@@ -1,0 +1,89 @@
+{
+  "pageKey": "crm_sla_policy_list",
+  "name:zh-CN": "SLA策略列表",
+  "name:en": "SLA Policy List",
+  "modelCode": "crm_sla_policy",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_sla_policy_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_sla_policy_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_sla_policy_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_sla_name",
+          "width": 200
+        },
+        {
+          "field": "crm_sla_priority_level",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_severity"
+        },
+        {
+          "field": "crm_sla_response_time_hours",
+          "width": 150
+        },
+        {
+          "field": "crm_sla_resolution_time_hours",
+          "width": 150
+        },
+        {
+          "field": "crm_sla_escalation_after_hours",
+          "width": 150
+        },
+        {
+          "field": "crm_sla_is_active",
+          "width": 100
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "edit",
+              "label": "$i18n:common.button.edit",
+              "action": {
+                "type": "navigate",
+                "to": "crm_sla_policy_form"
+              }
+            },
+            {
+              "code": "delete",
+              "label": "$i18n:common.button.delete",
+              "danger": true,
+              "confirm": true,
+              "action": {
+                "type": "command"
+              }
+            }
+          ],
+          "label": "$i18n:common.actions"
+        }
+      ],
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
+      }
+    }
+  ]
+}

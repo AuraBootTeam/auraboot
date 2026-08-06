@@ -1,0 +1,48 @@
+[
+  {
+    "code": "crm:add_opp_contact",
+    "displayName:zh-CN": "添加商机联系人",
+    "displayName:en": "Add Opportunity Contact",
+    "type": "create",
+    "modelCode": "crm_opportunity_contact_common",
+    "inputFields": [
+      "crm_oc_opportunity_id",
+      "crm_oc_contact_id",
+      "crm_oc_role",
+      "crm_oc_is_primary"
+    ],
+    "permissions": [
+      "crm.opportunity.manage"
+    ],
+    "agent_hint": "Create a new crm opp contact record. Key inputs: opportunity_id, contact_id, role, is_primary.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:remove_opp_contact",
+    "displayName:zh-CN": "移除商机联系人",
+    "displayName:en": "Remove Opportunity Contact",
+    "type": "delete",
+    "modelCode": "crm_opportunity_contact_common",
+    "extension": {
+      "confirmMessage:zh-CN": "确认移除此联系人关联？",
+      "confirmMessage:en": "Confirm remove this contact association?"
+    },
+    "permissions": [
+      "crm.opportunity.manage"
+    ],
+    "agent_hint": "Delete crm opp contact record(s). This is irreversible.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:list_opp_contacts",
+    "displayName:zh-CN": "商机联系人列表",
+    "displayName:en": "List Opportunity Contacts",
+    "type": "query",
+    "modelCode": "crm_opportunity_contact_common",
+    "permissions": [
+      "crm.opportunity.read"
+    ],
+    "agent_hint": "Query crm opp contact records.",
+    "cmd_risk_level": "L0"
+  }
+]

@@ -1,0 +1,6 @@
+[
+  { "modelCode": "crm_activity_relation_common", "fieldCode": "crm_ar_activity_id", "sequence": 1, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_activity_relation_common", "fieldCode": "crm_ar_object_type", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_activity_relation_common", "fieldCode": "crm_ar_object_id", "sequence": 3, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_activity_relation_common", "fieldCode": "crm_ar_role", "sequence": 4, "required": false, "visible": true, "editable": true }
+]

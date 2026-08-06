@@ -1,0 +1,77 @@
+{
+  "pageKey": "crm_contact_common_form",
+  "name:zh-CN": "联系人表单",
+  "name:en": "Contact Form",
+  "modelCode": "crm_contact_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "基本信息",
+        "en-US": "Basic Information"
+      },
+      "fields": [
+        {
+          "field": "crm_ct_account_id",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_ct_name",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_ct_title",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_ct_email",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_ct_phone",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_ct_mobile",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_ct_is_primary",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_ct_remark",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

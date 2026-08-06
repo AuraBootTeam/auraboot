@@ -58,7 +58,7 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
         tenantId = getTestTenant().getId();
 
         // Seed command definition for crm:create_lead
-        insertCommandDef(tenantId, "crm:create_lead", "crm_lead",
+        insertCommandDef(tenantId, "crm:create_lead", "crm_lead_common",
                 objectMapper.writeValueAsString(Map.of("type", "create")));
     }
 
@@ -142,14 +142,14 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
     void testCapabilityRouter_crmQueryMatch() {
         // Seed capability
         insertCapability(tenantId, "test_crm.query", "CRM Query",
-                "[\"query\",\"analyze\"]", "[\"crm_*\"]", "[\"crm_lead.query\"]");
+                "[\"query\",\"analyze\"]", "[\"crm_*\"]", "[\"crm_lead_common.query\"]");
 
         // Seed skill so loadSkill returns non-null
-        insertSkill(tenantId, "crm_lead.query", "CRM Lead Query", "atomic");
+        insertSkill(tenantId, "crm_lead_common.query", "CRM Lead Query", "atomic");
 
-        List<String> skills = capabilityRouter.route(tenantId, "query", "crm_lead");
+        List<String> skills = capabilityRouter.route(tenantId, "query", "crm_lead_common");
         assertThat(skills).isNotEmpty();
-        assertThat(skills).contains("crm_lead.query");
+        assertThat(skills).contains("crm_lead_common.query");
     }
 
     @Test
@@ -180,40 +180,40 @@ class AcpP1FeaturesIntegrationTest extends BaseIntegrationTest {
 
         // Seed capability with create intent only
         insertCapability(tenantId, "test_crm.create_only", "CRM Create Only",
-                "[\"create\"]", "[\"crm_*\"]", "[\"crm_lead.create\"]");
+                "[\"create\"]", "[\"crm_*\"]", "[\"crm_lead_common.create\"]");
 
-        insertSkill(tenantId, "crm_lead.create", "CRM Lead Create", "atomic");
+        insertSkill(tenantId, "crm_lead_common.create", "CRM Lead Create", "atomic");
 
         // Route with "query" intent — does NOT match the seeded "create" capability,
         // but DOES match the platform-default CAP_GENERIC_QUERY which routes any
         // "query" intent to "dsl.query".
-        List<String> skills = capabilityRouter.route(tenantId, "query", "crm_lead");
+        List<String> skills = capabilityRouter.route(tenantId, "query", "crm_lead_common");
         // Hermetic: the actual intent of this test is (a) the generic query fallback
         // is wired AND (b) the create-only capability does NOT contribute on a "query"
         // intent. Assert exactly that. containsExactly was non-hermetic: a sibling
         // test (testCapabilityRouter_crmQueryMatch) commits a crm_* "query" capability
-        // (NOT_SUPPORTED → persists), so crm_lead can legitimately match additional
+        // (NOT_SUPPORTED → persists), so crm_lead_common can legitimately match additional
         // crm query skills — which must not fail this test.
         assertThat(skills).contains("dsl.query");
-        assertThat(skills).doesNotContain("crm_lead.create");
+        assertThat(skills).doesNotContain("crm_lead_common.create");
     }
 
     @Test
     void testGroundingWithCapability_routesViaCapability() {
         // Seed capability + skill for CRM query
         insertCapability(tenantId, "test_crm.ground_query", "CRM Ground Query",
-                "[\"query\",\"analyze\"]", "[\"crm_*\"]", "[\"crm_lead.query\"]");
+                "[\"query\",\"analyze\"]", "[\"crm_*\"]", "[\"crm_lead_common.query\"]");
 
-        insertSkill(tenantId, "crm_lead.query", "CRM Lead Query", "atomic");
+        insertSkill(tenantId, "crm_lead_common.query", "CRM Lead Query", "atomic");
 
         GroundingService.GroundingContext ctx = GroundingService.GroundingContext.builder().build();
         BusinessIntentFrame bif = groundingService.ground(tenantId, "查一下CRM线索", ctx);
 
         assertThat(bif).isNotNull();
         assertThat(bif.getIntent()).isEqualTo("query");
-        assertThat(bif.getObject()).isEqualTo("crm_lead");
+        assertThat(bif.getObject()).isEqualTo("crm_lead_common");
         assertThat(bif.getCandidateSkills()).isNotEmpty();
-        assertThat(bif.getCandidateSkills()).contains("crm_lead.query");
+        assertThat(bif.getCandidateSkills()).contains("crm_lead_common.query");
     }
 
     // ========== Seed Helpers ==========

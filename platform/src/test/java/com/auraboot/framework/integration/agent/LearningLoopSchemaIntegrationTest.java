@@ -72,7 +72,7 @@ class LearningLoopSchemaIntegrationTest extends BaseIntegrationTest {
         jdbc.update("INSERT INTO ab_agent_learning_pattern " +
                         "(pid, tenant_id, pattern_hash, pattern_signature) " +
                         "VALUES (?, ?, ?, ?::jsonb)",
-                patternPid, 1L, "hash_" + patternPid, "{\"cmd\":\"crm_lead.create\"}");
+                patternPid, 1L, "hash_" + patternPid, "{\"cmd\":\"crm_lead_common.create\"}");
 
         Map<String, Object> row = jdbc.queryForMap(
                 "SELECT status, invocation_count, first_seen_at, last_observed_at " +
@@ -101,8 +101,8 @@ class LearningLoopSchemaIntegrationTest extends BaseIntegrationTest {
     void pattern_signature_jsonb() {
         String patternPid = pid("p_sig");
         String signatureJson = "{" +
-                "\"cmd\":\"crm_lead.update\"," +
-                "\"target_model\":\"crm_lead\"," +
+                "\"cmd\":\"crm_lead_common.update\"," +
+                "\"target_model\":\"crm_lead_common\"," +
                 "\"action_type\":\"update\"," +
                 "\"fields\":[\"status\",\"owner_id\"]," +
                 "\"nested\":{\"k\":1}" +
@@ -117,8 +117,8 @@ class LearningLoopSchemaIntegrationTest extends BaseIntegrationTest {
                 "SELECT pattern_signature::text FROM ab_agent_learning_pattern WHERE pid = ?",
                 String.class, patternPid);
         // PostgreSQL normalises whitespace but preserves structure/keys.
-        assertThat(stored).contains("\"cmd\": \"crm_lead.update\"")
-                .contains("\"target_model\": \"crm_lead\"")
+        assertThat(stored).contains("\"cmd\": \"crm_lead_common.update\"")
+                .contains("\"target_model\": \"crm_lead_common\"")
                 .contains("\"fields\": [\"status\", \"owner_id\"]")
                 .contains("\"nested\": {\"k\": 1}");
     }

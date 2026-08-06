@@ -297,7 +297,7 @@ class AgentChatToolDiscoveryAdapter {
      * already applies the #1440 permission envelope (a bound skill cannot hand a user a
      * governed tool they could not reach directly); the resulting codes then flow
      * through the exact same registry resolution as explicit tools, so a skill-supplied
-     * {@code list:crm_account} gets identical metadata (read-only, model hint, gating).
+     * {@code list:crm_account_common} gets identical metadata (read-only, model hint, gating).
      */
     private List<String> combinedAgentToolCodes(Long tenantId, Map<String, Object> agentDef) {
         Set<String> codes = new LinkedHashSet<>(explicitToolCodes(agentDef));

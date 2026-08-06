@@ -971,14 +971,14 @@ class PluginImportServiceImplCoreTest {
     void validateManifest_commandModelSatisfied_noErrorWhenDeferred() {
         PluginManifestExtended m = baseManifest();
         ModelDefinitionDTO local = new ModelDefinitionDTO();
-        local.setCode("crm_lead");
+        local.setCode("crm_lead_common");
         local.setModelType("entity");
         m.setModels(List.of(local));
 
         com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO localCmd =
                 new com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO();
         localCmd.setCode("crm:create_lead");
-        localCmd.setModelCode("crm_lead");
+        localCmd.setModelCode("crm_lead_common");
         localCmd.setType("custom");
         com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO installedCmd =
                 new com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO();
@@ -992,10 +992,10 @@ class PluginImportServiceImplCoreTest {
         List<String> messages = service.validateManifest(m, true);
 
         // Scope to the command->model reference check (the deferral feature's concern). A bare
-        // contains("crm_lead") would also catch the orthogonal "entity model requires a field
+        // contains("crm_lead_common") would also catch the orthogonal "entity model requires a field
         // binding" structural rule, which legitimately fires for this minimal fixture and is not
         // what deferral governs.
-        assertThat(messages).noneMatch(e -> e.contains("references missing model") && e.contains("crm_lead"));
+        assertThat(messages).noneMatch(e -> e.contains("references missing model") && e.contains("crm_lead_common"));
         assertThat(messages).noneMatch(e ->
                 e.contains("references missing model") && e.contains("crm_account_installed"));
     }
@@ -1019,7 +1019,7 @@ class PluginImportServiceImplCoreTest {
 
         List<String> danglingMsgs = service.findDanglingCommandModelRefs(
                 List.of(ok, dangling),
-                java.util.Set.of("sl_sales_quotation", "sl_sales_order", "crm_lead"));
+                java.util.Set.of("sl_sales_quotation", "sl_sales_order", "crm_lead_common"));
 
         assertThat(danglingMsgs).anyMatch(s ->
                 s.contains("crm:typo_command") && s.contains("sl_sales_quotaton"));
@@ -1032,7 +1032,7 @@ class PluginImportServiceImplCoreTest {
         com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO a =
                 new com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO();
         a.setCode("crm:c1");
-        a.setModelCode("crm_lead");
+        a.setModelCode("crm_lead_common");
         com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO b =
                 new com.auraboot.framework.plugin.dto.imports.CommandDefinitionDTO();
         b.setCode("sl:c2");
@@ -1040,7 +1040,7 @@ class PluginImportServiceImplCoreTest {
 
         List<String> danglingMsgs = service.findDanglingCommandModelRefs(
                 List.of(a, b),
-                java.util.Set.of("crm_lead", "sl_sales_order"));
+                java.util.Set.of("crm_lead_common", "sl_sales_order"));
 
         assertThat(danglingMsgs).isEmpty();
     }
@@ -1335,12 +1335,12 @@ class PluginImportServiceImplCoreTest {
     void checkConflicts_differentPluginOwner() {
         PluginManifestExtended m = baseManifest();
         ModelDefinitionDTO model = new ModelDefinitionDTO();
-        model.setCode("crm_lead");
+        model.setCode("crm_lead_common");
         m.setModels(List.of(model));
 
         PluginResource existing = new PluginResource();
         existing.setPluginPid("pp-foreign");
-        when(pluginResourceMapper.findByTypeAndCode(eq(1L), eq("MODEL"), eq("crm_lead")))
+        when(pluginResourceMapper.findByTypeAndCode(eq(1L), eq("MODEL"), eq("crm_lead_common")))
                 .thenReturn(existing);
 
         PluginRecord owner = new PluginRecord();
@@ -1352,7 +1352,7 @@ class PluginImportServiceImplCoreTest {
         assertThat(conflicts).hasSize(1);
         ImportPreviewResult.ResourceConflict c = conflicts.get(0);
         assertThat(c.getResourceType()).isEqualTo(ResourceType.MODEL);
-        assertThat(c.getResourceCode()).isEqualTo("crm_lead");
+        assertThat(c.getResourceCode()).isEqualTo("crm_lead_common");
         assertThat(c.getConflictType()).isEqualTo("different_plugin");
         assertThat(c.getOwnerPluginId()).isEqualTo("com.other");
     }
@@ -1362,12 +1362,12 @@ class PluginImportServiceImplCoreTest {
     void checkConflicts_sameOwnerSkipped() {
         PluginManifestExtended m = baseManifest();
         ModelDefinitionDTO model = new ModelDefinitionDTO();
-        model.setCode("crm_lead");
+        model.setCode("crm_lead_common");
         m.setModels(List.of(model));
 
         PluginResource existing = new PluginResource();
         existing.setPluginPid("pp-same");
-        when(pluginResourceMapper.findByTypeAndCode(eq(1L), eq("MODEL"), eq("crm_lead")))
+        when(pluginResourceMapper.findByTypeAndCode(eq(1L), eq("MODEL"), eq("crm_lead_common")))
                 .thenReturn(existing);
 
         PluginRecord owner = new PluginRecord();
@@ -1384,10 +1384,10 @@ class PluginImportServiceImplCoreTest {
     void checkConflicts_lookupErrorIsBestEffort() {
         PluginManifestExtended m = baseManifest();
         ModelDefinitionDTO model = new ModelDefinitionDTO();
-        model.setCode("crm_lead");
+        model.setCode("crm_lead_common");
         m.setModels(List.of(model));
 
-        when(pluginResourceMapper.findByTypeAndCode(eq(1L), eq("MODEL"), eq("crm_lead")))
+        when(pluginResourceMapper.findByTypeAndCode(eq(1L), eq("MODEL"), eq("crm_lead_common")))
                 .thenThrow(new RuntimeException("duplicate row"));
 
         List<ImportPreviewResult.ResourceConflict> conflicts = service.checkConflicts(m);
@@ -1821,14 +1821,14 @@ class PluginImportServiceImplCoreTest {
                 .name("Pipeline Board")
                 .description("Plugin baseline board")
                 .modelCode("crm.opportunity")
-                .pageKey("crm_opportunity_list")
+                .pageKey("crm_opportunity_common_list")
                 .viewType("table")
                 .viewKey("crm.opportunity.pipeline")
                 .viewConfig(Map.of("rowHeight", "medium"))
                 .build();
         manifest.setSavedViews(List.of(dto));
 
-        when(pageSchemaMapper.selectAnyByPageKey("crm_opportunity_list")).thenReturn(new PageSchema());
+        when(pageSchemaMapper.selectAnyByPageKey("crm_opportunity_common_list")).thenReturn(new PageSchema());
         ViewConfig existingConfig = new ViewConfig();
         existingConfig.setMeta(ViewConfig.Meta.builder()
                 .viewKey("crm.opportunity.pipeline")
@@ -1841,7 +1841,7 @@ class PluginImportServiceImplCoreTest {
         existing.setName("Old Plugin Board");
         existing.setViewType("table");
         existing.setViewConfig(existingConfig);
-        when(savedViewMapper.findGlobalViews("crm.opportunity", "crm_opportunity_list"))
+        when(savedViewMapper.findGlobalViews("crm.opportunity", "crm_opportunity_common_list"))
                 .thenReturn(List.of(existing));
 
         invokeImportSavedViews(manifest, new ImportExecuteResult(), 1L);
@@ -1865,7 +1865,7 @@ class PluginImportServiceImplCoreTest {
         SavedViewDefinitionDTO dto = SavedViewDefinitionDTO.builder()
                 .name("Pipeline Board")
                 .modelCode("crm.opportunity")
-                .pageKey("crm_opportunity_list")
+                .pageKey("crm_opportunity_common_list")
                 .viewType("table")
                 .viewKey("crm.opportunity.pipeline")
                 .pinAsQuickFilter(true)
@@ -1875,7 +1875,7 @@ class PluginImportServiceImplCoreTest {
                 .build();
         manifest.setSavedViews(List.of(dto));
 
-        when(pageSchemaMapper.selectAnyByPageKey("crm_opportunity_list")).thenReturn(new PageSchema());
+        when(pageSchemaMapper.selectAnyByPageKey("crm_opportunity_common_list")).thenReturn(new PageSchema());
         ViewConfig existingConfig = new ViewConfig();
         existingConfig.setMeta(ViewConfig.Meta.builder()
                 .viewKey("crm.opportunity.pipeline")
@@ -1887,7 +1887,7 @@ class PluginImportServiceImplCoreTest {
         existing.setName("Old Plugin Board");
         existing.setViewType("table");
         existing.setViewConfig(existingConfig);
-        when(savedViewMapper.findGlobalViews("crm.opportunity", "crm_opportunity_list"))
+        when(savedViewMapper.findGlobalViews("crm.opportunity", "crm_opportunity_common_list"))
                 .thenReturn(List.of(existing));
 
         invokeImportSavedViews(manifest, new ImportExecuteResult(), 1L);

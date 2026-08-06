@@ -1,0 +1,245 @@
+[
+  {
+    "code": "crm:create_customer_request",
+    "displayName:zh-CN": "新建客户需求",
+    "displayName:en": "Create Customer Request",
+    "type": "create",
+    "modelCode": "crm_customer_request_common",
+    "inputFields": [
+      "crm_cr_title",
+      "crm_cr_account_id",
+      "crm_cr_contact_id",
+      "crm_cr_lead_id",
+      "crm_cr_opportunity_id",
+      "crm_cr_type",
+      "crm_cr_priority",
+      "crm_cr_expected_date",
+      "crm_cr_owner",
+      "crm_cr_source_channel",
+      "crm_cr_summary",
+      "crm_cr_submitted_at",
+      "crm_cr_due_at"
+    ],
+    "autoSetFields": {
+      "crm_cr_code": {
+        "strategy": "auto_generate",
+        "pattern": "CR-{yyyyMMdd}-{seq}"
+      },
+      "crm_cr_status": {
+        "strategy": "fixed_value",
+        "value": "draft"
+      },
+      "crm_cr_route_status": {
+        "strategy": "fixed_value",
+        "value": "unrouted"
+      },
+      "crm_cr_owner": {
+        "strategy": "current_username"
+      }
+    },
+    "permissions": [
+      "crm.customer_request.manage"
+    ],
+    "agent_hint": "Create a generic customer request. Keep industry-specific facts outside CRM; use route fields only after an industry package creates its object.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_customer_request",
+    "displayName:zh-CN": "编辑客户需求",
+    "displayName:en": "Update Customer Request",
+    "type": "update",
+    "modelCode": "crm_customer_request_common",
+    "inputFields": [
+      "crm_cr_title",
+      "crm_cr_account_id",
+      "crm_cr_contact_id",
+      "crm_cr_lead_id",
+      "crm_cr_opportunity_id",
+      "crm_cr_type",
+      "crm_cr_priority",
+      "crm_cr_expected_date",
+      "crm_cr_owner",
+      "crm_cr_source_channel",
+      "crm_cr_summary",
+      "crm_cr_submitted_at",
+      "crm_cr_due_at"
+    ],
+    "preconditions": [
+      {
+        "field": "crm_cr_status",
+        "operator": "IN",
+        "value": [
+          "draft",
+          "submitted"
+        ]
+      }
+    ],
+    "permissions": [
+      "crm.customer_request.manage"
+    ],
+    "agent_hint": "Update a customer request before it is in industry execution.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:submit_customer_request",
+    "displayName:zh-CN": "提交客户需求",
+    "displayName:en": "Submit Customer Request",
+    "type": "state_transition",
+    "modelCode": "crm_customer_request_common",
+    "stateField": "crm_cr_status",
+    "fromStates": [
+      "draft"
+    ],
+    "toState": "submitted",
+    "permissions": [
+      "crm.customer_request.manage"
+    ],
+    "agent_hint": "Submit a draft customer request so an industry package can route it.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:start_customer_request",
+    "displayName:zh-CN": "开始处理客户需求",
+    "displayName:en": "Start Customer Request",
+    "type": "state_transition",
+    "modelCode": "crm_customer_request_common",
+    "stateField": "crm_cr_status",
+    "fromStates": [
+      "submitted",
+      "routed"
+    ],
+    "toState": "in_progress",
+    "permissions": [
+      "crm.customer_request.manage"
+    ],
+    "agent_hint": "Move a routed/submitted customer request into execution.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:mark_customer_request_quoted",
+    "displayName:zh-CN": "标记已报价",
+    "displayName:en": "Mark Quoted",
+    "type": "state_transition",
+    "modelCode": "crm_customer_request_common",
+    "stateField": "crm_cr_status",
+    "fromStates": [
+      "in_progress",
+      "routed"
+    ],
+    "toState": "quoted",
+    "permissions": [
+      "crm.customer_request.manage"
+    ],
+    "agent_hint": "Mark a customer request as quoted after a quote summary has been synchronized.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:win_customer_request",
+    "displayName:zh-CN": "客户需求赢单",
+    "displayName:en": "Win Customer Request",
+    "type": "state_transition",
+    "modelCode": "crm_customer_request_common",
+    "stateField": "crm_cr_status",
+    "fromStates": [
+      "quoted"
+    ],
+    "toState": "won",
+    "permissions": [
+      "crm.customer_request.manage"
+    ],
+    "agent_hint": "Mark a quoted request as won.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:lose_customer_request",
+    "displayName:zh-CN": "客户需求丢单",
+    "displayName:en": "Lose Customer Request",
+    "type": "state_transition",
+    "modelCode": "crm_customer_request_common",
+    "stateField": "crm_cr_status",
+    "fromStates": [
+      "submitted",
+      "routed",
+      "in_progress",
+      "quoted"
+    ],
+    "toState": "lost",
+    "permissions": [
+      "crm.customer_request.manage"
+    ],
+    "agent_hint": "Mark an open customer request as lost.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:cancel_customer_request",
+    "displayName:zh-CN": "取消客户需求",
+    "displayName:en": "Cancel Customer Request",
+    "type": "state_transition",
+    "modelCode": "crm_customer_request_common",
+    "stateField": "crm_cr_status",
+    "fromStates": [
+      "draft",
+      "submitted"
+    ],
+    "toState": "cancelled",
+    "permissions": [
+      "crm.customer_request.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认取消此客户需求？",
+      "confirmMessage:en": "Cancel this customer request?"
+    },
+    "agent_hint": "Cancel a request before industry execution starts.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_customer_request",
+    "displayName:zh-CN": "删除客户需求",
+    "displayName:en": "Delete Customer Request",
+    "type": "delete",
+    "modelCode": "crm_customer_request_common",
+    "preconditions": [
+      {
+        "field": "crm_cr_status",
+        "operator": "IN",
+        "value": [
+          "draft",
+          "cancelled"
+        ]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此客户需求？",
+      "confirmMessage:en": "Delete this customer request?"
+    },
+    "permissions": [
+      "crm.customer_request.manage"
+    ],
+    "agent_hint": "Delete a draft/cancelled customer request. Routed requests must not be deleted from generic CRM.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:detail_customer_request",
+    "displayName:zh-CN": "查看客户需求",
+    "displayName:en": "View Customer Request",
+    "type": "query",
+    "modelCode": "crm_customer_request_common",
+    "permissions": [
+      "crm.customer_request.read"
+    ],
+    "agent_hint": "Query customer request records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:list_customer_requests",
+    "displayName:zh-CN": "客户需求列表",
+    "displayName:en": "List Customer Requests",
+    "type": "query",
+    "modelCode": "crm_customer_request_common",
+    "permissions": [
+      "crm.customer_request.read"
+    ],
+    "agent_hint": "List customer requests.",
+    "cmd_risk_level": "L0"
+  }
+]

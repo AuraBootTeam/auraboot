@@ -1,0 +1,125 @@
+{
+  "pageKey": "crm_contact_common_list",
+  "name:zh-CN": "联系人列表",
+  "name:en": "Contacts",
+  "modelCode": "crm_contact_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_contact_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "crm.contact.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_contact_common_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_contact_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_ct_name",
+          "width": 150,
+          "sortable": true
+        },
+        {
+          "field": "crm_ct_account_id",
+          "width": 200
+        },
+        {
+          "field": "crm_ct_title",
+          "width": 140
+        },
+        {
+          "field": "crm_ct_email",
+          "width": 200
+        },
+        {
+          "field": "crm_ct_phone",
+          "width": 140
+        },
+        {
+          "field": "crm_ct_mobile",
+          "width": 140
+        },
+        {
+          "field": "crm_ct_is_primary",
+          "width": 100
+        },
+        {
+          "field": "crm_ct_dup_of"
+        },
+        {
+          "field": "crm_ct_dup_score"
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "view",
+              "permissionCode": "crm.contact.read",
+              "label": "$i18n:common.button.view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_contact_common_detail"
+              }
+            },
+            {
+              "code": "edit",
+              "permissionCode": "crm.contact.manage",
+              "label": "$i18n:common.button.edit",
+              "action": {
+                "type": "navigate",
+                "to": "crm_contact_common_form"
+              }
+            },
+            {
+              "code": "delete",
+              "danger": true,
+              "permissionCode": "crm.contact.manage",
+              "label": "$i18n:common.button.delete",
+              "confirm": "delete.confirm",
+              "action": {
+                "type": "command"
+              }
+            }
+          ],
+          "label": "$i18n:common.actions"
+        }
+      ],
+      "searchFields": [
+        "crm_ct_name",
+        "crm_ct_email"
+      ],
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
+      },
+      "rowActions": [
+        {
+          "code": "scan_dup",
+          "label": "$i18n:crm.contact.scan_dup",
+          "permissionCode": "crm.contact.manage",
+          "action": {
+            "type": "command",
+            "command": "crm:scan_duplicates"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -46,7 +46,7 @@
     "description": "Monthly opportunity value against won value, bucketed by expected close date. Exists because the aggregate data source cannot bucket time (dimensions must be bare identifiers, so date_trunc is unreachable).",
     "purpose": "Drives the arsenal dashboard's monthly bar chart with real opportunity data.",
     "status": "published",
-    "fromSql": "SELECT to_char(date_trunc('month', crm_opp_expected_close_date), 'YYYY-MM') AS month, COALESCE(SUM(crm_opp_expected_amount), 0) AS pipeline_amount, COALESCE(SUM(CASE WHEN crm_opp_stage = 'closed_won' THEN crm_opp_expected_amount ELSE 0 END), 0) AS won_amount FROM mt_crm_opportunity WHERE tenant_id = #{params.tenantId} AND crm_opp_expected_close_date IS NOT NULL GROUP BY 1 ORDER BY 1",
+    "fromSql": "SELECT to_char(date_trunc('month', crm_opp_expected_close_date), 'YYYY-MM') AS month, COALESCE(SUM(crm_opp_expected_amount), 0) AS pipeline_amount, COALESCE(SUM(CASE WHEN crm_opp_stage = 'closed_won' THEN crm_opp_expected_amount ELSE 0 END), 0) AS won_amount FROM mt_crm_opportunity_common WHERE tenant_id = #{params.tenantId} AND crm_opp_expected_close_date IS NOT NULL GROUP BY 1 ORDER BY 1",
     "outputFields": [
       {
         "fieldCode": "month",
@@ -75,7 +75,7 @@
     "description": "Opportunity count vs won count per month. Same time-bucketing constraint as sc_arsenal_monthly_pipeline.",
     "purpose": "Drives the arsenal dashboard's trend line chart.",
     "status": "published",
-    "fromSql": "SELECT to_char(date_trunc('month', crm_opp_expected_close_date), 'YYYY-MM') AS month, COUNT(*) AS opp_count, COUNT(*) FILTER (WHERE crm_opp_stage = 'closed_won') AS won_count FROM mt_crm_opportunity WHERE tenant_id = #{params.tenantId} AND crm_opp_expected_close_date IS NOT NULL GROUP BY 1 ORDER BY 1",
+    "fromSql": "SELECT to_char(date_trunc('month', crm_opp_expected_close_date), 'YYYY-MM') AS month, COUNT(*) AS opp_count, COUNT(*) FILTER (WHERE crm_opp_stage = 'closed_won') AS won_count FROM mt_crm_opportunity_common WHERE tenant_id = #{params.tenantId} AND crm_opp_expected_close_date IS NOT NULL GROUP BY 1 ORDER BY 1",
     "outputFields": [
       {
         "fieldCode": "month",
@@ -104,7 +104,7 @@
     "description": "Running total of won amount by month, via a window function. Unreachable from the aggregate data source, which has no window/cumulative support.",
     "purpose": "Drives the arsenal dashboard's cumulative area chart.",
     "status": "published",
-    "fromSql": "SELECT month, SUM(won_amount) OVER (ORDER BY month) AS cumulative_amount FROM (SELECT to_char(date_trunc('month', crm_opp_expected_close_date), 'YYYY-MM') AS month, COALESCE(SUM(CASE WHEN crm_opp_stage = 'closed_won' THEN crm_opp_expected_amount ELSE 0 END), 0) AS won_amount FROM mt_crm_opportunity WHERE tenant_id = #{params.tenantId} AND crm_opp_expected_close_date IS NOT NULL GROUP BY 1) monthly ORDER BY month",
+    "fromSql": "SELECT month, SUM(won_amount) OVER (ORDER BY month) AS cumulative_amount FROM (SELECT to_char(date_trunc('month', crm_opp_expected_close_date), 'YYYY-MM') AS month, COALESCE(SUM(CASE WHEN crm_opp_stage = 'closed_won' THEN crm_opp_expected_amount ELSE 0 END), 0) AS won_amount FROM mt_crm_opportunity_common WHERE tenant_id = #{params.tenantId} AND crm_opp_expected_close_date IS NOT NULL GROUP BY 1) monthly ORDER BY month",
     "outputFields": [
       {
         "fieldCode": "month",
@@ -127,7 +127,7 @@
     "description": "Won deals as a percentage of closed deals. A ratio metric (a/b), which the aggregate data source cannot express — its aggregation set is closed at count/count_distinct/sum/avg/max/min.",
     "purpose": "Drives the arsenal dashboard's win-rate KPI card.",
     "status": "published",
-    "fromSql": "SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE crm_opp_stage = 'closed_won') / NULLIF(COUNT(*) FILTER (WHERE crm_opp_stage IN ('closed_won', 'closed_lost')), 0), 1) AS win_rate FROM mt_crm_opportunity WHERE tenant_id = #{params.tenantId}",
+    "fromSql": "SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE crm_opp_stage = 'closed_won') / NULLIF(COUNT(*) FILTER (WHERE crm_opp_stage IN ('closed_won', 'closed_lost')), 0), 1) AS win_rate FROM mt_crm_opportunity_common WHERE tenant_id = #{params.tenantId}",
     "outputFields": [
       {
         "fieldCode": "win_rate",
@@ -143,7 +143,7 @@
     "description": "Per-opportunity detail rows for the kanban widget. The aggregate data source always GROUP BYs and rejects a request with no metric or dimension, so it cannot return detail rows.",
     "purpose": "Drives the arsenal dashboard's kanban board (one card per opportunity, grouped by stage).",
     "status": "published",
-    "fromSql": "SELECT crm_opp_name AS opp_name, crm_opp_stage AS opp_stage, COALESCE(crm_opp_expected_amount, 0) AS opp_amount, COALESCE(crm_opp_owner, '') AS opp_owner FROM mt_crm_opportunity WHERE tenant_id = #{params.tenantId} ORDER BY crm_opp_expected_amount DESC NULLS LAST LIMIT 60",
+    "fromSql": "SELECT crm_opp_name AS opp_name, crm_opp_stage AS opp_stage, COALESCE(crm_opp_expected_amount, 0) AS opp_amount, COALESCE(crm_opp_owner, '') AS opp_owner FROM mt_crm_opportunity_common WHERE tenant_id = #{params.tenantId} ORDER BY crm_opp_expected_amount DESC NULLS LAST LIMIT 60",
     "outputFields": [
       {
         "fieldCode": "opp_name",

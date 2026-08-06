@@ -1,0 +1,11 @@
+[
+  { "modelCode": "crm_campaign_member", "fieldCode": "crm_cm_campaign_id", "sequence": 1, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_campaign_member", "fieldCode": "crm_cm_member_type", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_campaign_member", "fieldCode": "crm_cm_lead_id", "sequence": 3, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_campaign_member", "fieldCode": "crm_cm_contact_id", "sequence": 4, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_campaign_member", "fieldCode": "crm_cm_member_name", "sequence": 5, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_campaign_member", "fieldCode": "crm_cm_email", "sequence": 6, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_campaign_member", "fieldCode": "crm_cm_status", "sequence": 7, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_campaign_member", "fieldCode": "crm_cm_added_date", "sequence": 8, "required": false, "visible": true, "editable": false, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_campaign_member", "fieldCode": "crm_cm_responded_date", "sequence": 9, "required": false, "visible": true, "editable": false, "displayConfig": { "sortable": true } }
+]

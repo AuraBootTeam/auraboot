@@ -68,7 +68,7 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void ground_queryMessage_returnsReadOnlyIntent() {
-        var result = groundingPort.ground(tenantId, "帮我查看线索状态分布", "crm_lead", null);
+        var result = groundingPort.ground(tenantId, "帮我查看线索状态分布", "crm_lead_common", null);
 
         assertThat(result).isNotNull();
         assertThat(result.intent()).isIn("query", "analyze", "summarize", "list");
@@ -78,7 +78,7 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void ground_analyzeMessage_returnsReadOnlyIntent() {
-        var result = groundingPort.ground(tenantId, "分析一下最近的线索趋势", "crm_lead", null);
+        var result = groundingPort.ground(tenantId, "分析一下最近的线索趋势", "crm_lead_common", null);
 
         assertThat(result).isNotNull();
         assertThat(result.intent()).isEqualTo("analyze");
@@ -88,7 +88,7 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void ground_updateMessage_returnsWriteIntent() {
-        var result = groundingPort.ground(tenantId, "把这个线索的评分改成85", "crm_lead", null);
+        var result = groundingPort.ground(tenantId, "把这个线索的评分改成85", "crm_lead_common", null);
 
         assertThat(result).isNotNull();
         assertThat(result.intent()).isIn("update", "transition", "create");
@@ -97,7 +97,7 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void ground_createMessage_returnsWriteIntent() {
-        var result = groundingPort.ground(tenantId, "新建一个客户记录", "crm_account", null);
+        var result = groundingPort.ground(tenantId, "新建一个客户记录", "crm_account_common", null);
 
         assertThat(result).isNotNull();
         assertThat(result.intent()).isEqualTo("create");
@@ -106,7 +106,7 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void ground_deleteMessage_returnsWriteIntent() {
-        var result = groundingPort.ground(tenantId, "删除这条记录", "crm_lead", null);
+        var result = groundingPort.ground(tenantId, "删除这条记录", "crm_lead_common", null);
 
         assertThat(result).isNotNull();
         assertThat(result.intent()).isEqualTo("delete");
@@ -117,13 +117,13 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void ground_withPageModel_resolvesObject() {
-        var result = groundingPort.ground(tenantId, "统计数据", "crm_lead", null);
+        var result = groundingPort.ground(tenantId, "统计数据", "crm_lead_common", null);
 
         // When the message alone is ambiguous, pageModel provides context for object resolution
         assertThat(result).isNotNull();
         assertThat(result.object()).isNotNull();
         // The object should be resolved — either from message content or from pageModel fallback
-        // If the alias index has "线索" / "lead" entries, it resolves to crm_lead;
+        // If the alias index has "线索" / "lead" entries, it resolves to crm_lead_common;
         // otherwise the ObjectResolver may still use pageModel as context
     }
 
@@ -133,9 +133,9 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
 
         assertThat(result).isNotNull();
         assertThat(result.intent()).isEqualTo("query");
-        // If ab_object_alias has "客户" -> "crm_account" mapping, object is resolved
+        // If ab_object_alias has "客户" -> "crm_account_common" mapping, object is resolved
         if (result.object() != null) {
-            assertThat(result.object()).isEqualTo("crm_account");
+            assertThat(result.object()).isEqualTo("crm_account_common");
         }
     }
 
@@ -152,7 +152,7 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void discoverTools_withModelHint_returnsRelevantTools() {
-        var tools = toolDiscoveryPort.discoverTools(tenantId, List.of(), "crm_lead", "query", 10, null);
+        var tools = toolDiscoveryPort.discoverTools(tenantId, List.of(), "crm_lead_common", "query", 10, null);
 
         assertThat(tools).isNotNull();
         // With a model hint, DSL provider should discover list/nq tools if CRM models are published

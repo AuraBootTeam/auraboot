@@ -1,0 +1,127 @@
+[
+  {
+    "code": "crm:create_email_template",
+    "displayName:zh-CN": "新建邮件模板",
+    "displayName:en": "Create Email Template",
+    "type": "create",
+    "modelCode": "crm_email_template",
+    "inputFields": [
+      "crm_et_name",
+      "crm_et_subject",
+      "crm_et_category",
+      "crm_et_description",
+      "crm_et_body"
+    ],
+    "autoSetFields": {
+      "crm_et_status": {
+        "strategy": "fixed_value",
+        "value": "draft"
+      }
+    },
+    "permissions": [
+      "crm.email_template.manage"
+    ],
+    "agent_hint": "Create a new CRM email template. Key inputs: name, subject, category, body. Status defaults to draft.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_email_template",
+    "displayName:zh-CN": "编辑邮件模板",
+    "displayName:en": "Update Email Template",
+    "type": "update",
+    "modelCode": "crm_email_template",
+    "inputFields": [
+      "crm_et_name",
+      "crm_et_subject",
+      "crm_et_category",
+      "crm_et_description",
+      "crm_et_body"
+    ],
+    "permissions": [
+      "crm.email_template.manage"
+    ],
+    "agent_hint": "Update an existing CRM email template. Editable fields: name, subject, category, description, body.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:activate_email_template",
+    "displayName:zh-CN": "启用模板",
+    "displayName:en": "Activate Template",
+    "type": "state_transition",
+    "modelCode": "crm_email_template",
+    "stateField": "crm_et_status",
+    "fromStates": ["draft"],
+    "toState": "active",
+    "permissions": [
+      "crm.email_template.manage"
+    ],
+    "agent_hint": "Transition CRM email template status from draft to active.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:archive_email_template",
+    "displayName:zh-CN": "归档模板",
+    "displayName:en": "Archive Template",
+    "type": "state_transition",
+    "modelCode": "crm_email_template",
+    "stateField": "crm_et_status",
+    "fromStates": ["active"],
+    "toState": "archived",
+    "extension": {
+      "confirmMessage:zh-CN": "确认归档此邮件模板？",
+      "confirmMessage:en": "Confirm archive this email template?"
+    },
+    "permissions": [
+      "crm.email_template.manage"
+    ],
+    "agent_hint": "Transition CRM email template status from active to archived.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:delete_email_template",
+    "displayName:zh-CN": "删除邮件模板",
+    "displayName:en": "Delete Email Template",
+    "type": "delete",
+    "modelCode": "crm_email_template",
+    "preconditions": [
+      {
+        "field": "crm_et_status",
+        "operator": "IN",
+        "value": ["draft"]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此邮件模板？",
+      "confirmMessage:en": "Confirm delete this email template?"
+    },
+    "permissions": [
+      "crm.email_template.manage"
+    ],
+    "agent_hint": "Delete CRM email template record(s). Irreversible. Preconditions: status IN [\"draft\"].",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:detail_email_template",
+    "displayName:zh-CN": "查看邮件模板",
+    "displayName:en": "View Email Template",
+    "type": "query",
+    "modelCode": "crm_email_template",
+    "permissions": [
+      "crm.email_template.read"
+    ],
+    "agent_hint": "Query CRM email template records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:list_email_templates",
+    "displayName:zh-CN": "邮件模板列表",
+    "displayName:en": "List Email Templates",
+    "type": "query",
+    "modelCode": "crm_email_template",
+    "permissions": [
+      "crm.email_template.read"
+    ],
+    "agent_hint": "Query CRM email template records.",
+    "cmd_risk_level": "L0"
+  }
+]

@@ -1,0 +1,73 @@
+[
+  {
+    "code": "crm_lsr_code",
+    "displayName:zh-CN": "规则编号",
+    "displayName:en": "Rule Code",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_lsr_name",
+    "displayName:zh-CN": "规则名称",
+    "displayName:en": "Rule Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_lsr_dimension",
+    "displayName:zh-CN": "评分维度",
+    "displayName:en": "Dimension",
+    "dataType": "enum",
+    "dictCode": "crm_lead_score_dimension",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_lsr_operator",
+    "displayName:zh-CN": "匹配条件",
+    "displayName:en": "Operator",
+    "dataType": "enum",
+    "dictCode": "crm_lead_score_operator",
+    "constraints": { "required": true }
+  },
+  {
+    "code": "crm_lsr_match_value",
+    "displayName:zh-CN": "匹配值",
+    "displayName:en": "Match Value",
+    "dataType": "string",
+    "constraints": { "maxLength": 200 }
+  },
+  {
+    "code": "crm_lsr_points",
+    "displayName:zh-CN": "分值",
+    "displayName:en": "Points",
+    "dataType": "integer",
+    "constraints": { "required": true },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_lsr_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_lead_score_rule_status",
+    "defaultValue": "active",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_lsr_sort_order",
+    "displayName:zh-CN": "排序",
+    "displayName:en": "Sort Order",
+    "dataType": "integer",
+    "defaultValue": 100,
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_lsr_remark",
+    "displayName:zh-CN": "说明",
+    "displayName:en": "Remark",
+    "dataType": "text"
+  }
+]

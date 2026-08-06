@@ -1,0 +1,67 @@
+{
+  "pageKey": "crm_segment_list",
+  "name:zh-CN": "细分人群",
+  "name:en": "Segments",
+  "modelCode": "crm_segment",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "filters",
+      "blockType": "filters",
+      "fields": [
+        {
+          "field": "crm_seg_name"
+        }
+      ]
+    },
+    {
+      "id": "toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "crm.segment.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_segment_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_seg_code"
+        },
+        {
+          "field": "crm_seg_name"
+        },
+        {
+          "field": "crm_seg_member_count"
+        },
+        {
+          "field": "crm_seg_last_computed"
+        }
+      ],
+      "rowActions": [
+        {
+          "code": "recompute",
+          "label": "$i18n:crm.segment.recompute",
+          "permissionCode": "crm.segment.manage",
+          "action": {
+            "type": "command",
+            "command": "crm:recompute_segment"
+          }
+        }
+      ]
+    }
+  ]
+}

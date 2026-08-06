@@ -25,7 +25,7 @@ class GroundingQualityGateIntegrationTest extends BaseIntegrationTest {
     private BusinessIntentFrame baselineOk() {
         return BusinessIntentFrame.builder()
                 .intent("query")
-                .object("crm_account")
+                .object("crm_account_common")
                 .riskLevel("L0")
                 .actionability("read_only")
                 .confidence(ConfidenceScore.of(0.85, 0.85))

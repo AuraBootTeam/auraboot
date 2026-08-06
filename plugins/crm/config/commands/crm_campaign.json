@@ -1,0 +1,164 @@
+[
+  {
+    "code": "crm:create_campaign",
+    "displayName:zh-CN": "新建营销活动",
+    "displayName:en": "Create Campaign",
+    "type": "create",
+    "modelCode": "crm_campaign",
+    "inputFields": [
+      "crm_cpn_name",
+      "crm_cpn_type",
+      "crm_cpn_start_date",
+      "crm_cpn_end_date",
+      "crm_cpn_budget",
+      "crm_cpn_description",
+      "crm_cpn_owner"
+    ],
+    "autoSetFields": {
+      "crm_cpn_code": {
+        "strategy": "auto_generate",
+        "pattern": "CPN-{yyyyMMdd}-{seq}"
+      },
+      "crm_cpn_status": {
+        "strategy": "fixed_value",
+        "value": "planned"
+      }
+    },
+    "permissions": [
+      "crm.campaign.manage"
+    ],
+    "agent_hint": "Create a new crm campaign record. Key inputs: name, type, start_date, end_date, budget. Auto-generated: code, status.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_campaign",
+    "displayName:zh-CN": "编辑营销活动",
+    "displayName:en": "Update Campaign",
+    "type": "update",
+    "modelCode": "crm_campaign",
+    "inputFields": [
+      "crm_cpn_name",
+      "crm_cpn_type",
+      "crm_cpn_start_date",
+      "crm_cpn_end_date",
+      "crm_cpn_budget",
+      "crm_cpn_description",
+      "crm_cpn_owner"
+    ],
+    "permissions": [
+      "crm.campaign.manage"
+    ],
+    "agent_hint": "Update an existing crm campaign record. Editable fields: name, type, start_date, end_date, budget.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:activate_campaign",
+    "displayName:zh-CN": "启动活动",
+    "displayName:en": "Activate Campaign",
+    "type": "state_transition",
+    "modelCode": "crm_campaign",
+    "stateField": "crm_cpn_status",
+    "fromStates": [
+      "planned"
+    ],
+    "toState": "active",
+    "permissions": [
+      "crm.campaign.manage"
+    ],
+    "agent_hint": "Transition crm campaign status from PLANNED to active.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:complete_campaign",
+    "displayName:zh-CN": "完成活动",
+    "displayName:en": "Complete Campaign",
+    "type": "state_transition",
+    "modelCode": "crm_campaign",
+    "stateField": "crm_cpn_status",
+    "fromStates": [
+      "active"
+    ],
+    "toState": "completed",
+    "extension": {
+      "confirmMessage:zh-CN": "确认完成此营销活动？",
+      "confirmMessage:en": "Confirm complete this campaign?"
+    },
+    "permissions": [
+      "crm.campaign.manage"
+    ],
+    "agent_hint": "Transition crm campaign status from active to completed.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:cancel_campaign",
+    "displayName:zh-CN": "取消活动",
+    "displayName:en": "Cancel Campaign",
+    "type": "state_transition",
+    "modelCode": "crm_campaign",
+    "stateField": "crm_cpn_status",
+    "fromStates": [
+      "planned",
+      "active"
+    ],
+    "toState": "cancelled",
+    "extension": {
+      "confirmMessage:zh-CN": "确认取消此营销活动？",
+      "confirmMessage:en": "Confirm cancel this campaign?"
+    },
+    "permissions": [
+      "crm.campaign.manage"
+    ],
+    "agent_hint": "Transition crm campaign status from PLANNED/active to cancelled.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_campaign",
+    "displayName:zh-CN": "删除营销活动",
+    "displayName:en": "Delete Campaign",
+    "type": "delete",
+    "modelCode": "crm_campaign",
+    "preconditions": [
+      {
+        "field": "crm_cpn_status",
+        "operator": "IN",
+        "value": [
+          "planned"
+        ]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此营销活动？",
+      "confirmMessage:en": "Confirm delete this campaign?"
+    },
+    "permissions": [
+      "crm.campaign.manage"
+    ],
+    "agent_hint": "Delete crm campaign record(s). This is irreversible. Preconditions: status IN [\"PLANNED\"].",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:list_campaigns",
+    "displayName:zh-CN": "营销活动列表",
+    "displayName:en": "List Campaigns",
+    "type": "query",
+    "modelCode": "crm_campaign",
+    "permissions": [
+      "crm.campaign.read"
+    ],
+    "agent_hint": "Query crm campaign records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:recompute_campaign_metrics",
+    "displayName:zh-CN": "重算指标",
+    "displayName:en": "Recompute Metrics",
+    "type": "custom",
+    "handler": "crm:recompute_campaign_metrics",
+    "modelCode": "crm_campaign",
+    "permissions": [
+      "crm.campaign.manage"
+    ],
+    "agent_hint": "Recompute campaign member count + response/conversion rate + cost per member.",
+    "cmd_risk_level": "L1"
+  }
+]

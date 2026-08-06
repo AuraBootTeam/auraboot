@@ -29,7 +29,7 @@ class AutomationFlowCompilerTest {
                 "nodes", List.of(
                         Map.of("id", "t1", "type", "trigger-record-create",
                                 "data", Map.of("label", "On create",
-                                        "config", Map.of("modelCode", "crm_lead"))),
+                                        "config", Map.of("modelCode", "crm_lead_common"))),
                         Map.of("id", "a1", "type", "action-send-notification",
                                 "data", Map.of("label", "Notify",
                                         "config", Map.of("actionType", "send_notification",

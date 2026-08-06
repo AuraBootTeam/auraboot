@@ -1,0 +1,73 @@
+[
+  {
+    "code": "crm:create_opp_line",
+    "displayName:zh-CN": "新建行项",
+    "displayName:en": "Create Line Item",
+    "type": "create",
+    "modelCode": "crm_opportunity_line_common",
+    "inputFields": [
+      "crm_ol_opportunity_id",
+      "crm_ol_product_name",
+      "crm_ol_quantity",
+      "crm_ol_unit_price",
+      "crm_ol_unit_cost",
+      "crm_ol_discount",
+      "crm_ol_amount",
+      "crm_ol_notes"
+    ],
+    "permissions": [
+      "crm.opportunity.manage"
+    ],
+    "agent_hint": "Create a new crm opportunity line record. Key inputs: opportunity_id, product_name, quantity, unit_price, unit_cost.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_opp_line",
+    "displayName:zh-CN": "编辑行项",
+    "displayName:en": "Update Line Item",
+    "type": "update",
+    "modelCode": "crm_opportunity_line_common",
+    "inputFields": [
+      "crm_ol_product_name",
+      "crm_ol_quantity",
+      "crm_ol_unit_price",
+      "crm_ol_unit_cost",
+      "crm_ol_discount",
+      "crm_ol_amount",
+      "crm_ol_notes"
+    ],
+    "permissions": [
+      "crm.opportunity.manage"
+    ],
+    "agent_hint": "Update an existing crm opportunity line record. Editable fields: product_name, quantity, unit_price, unit_cost, discount.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_opp_line",
+    "displayName:zh-CN": "删除行项",
+    "displayName:en": "Delete Line Item",
+    "type": "delete",
+    "modelCode": "crm_opportunity_line_common",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此行项？",
+      "confirmMessage:en": "Confirm delete this line item?"
+    },
+    "permissions": [
+      "crm.opportunity.manage"
+    ],
+    "agent_hint": "Delete crm opportunity line record(s). This is irreversible.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:list_opp_lines",
+    "displayName:zh-CN": "行项列表",
+    "displayName:en": "List Line Items",
+    "type": "query",
+    "modelCode": "crm_opportunity_line_common",
+    "permissions": [
+      "crm.opportunity.read"
+    ],
+    "agent_hint": "Query crm opportunity line records.",
+    "cmd_risk_level": "L0"
+  }
+]

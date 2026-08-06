@@ -1,0 +1,59 @@
+{
+  "pageKey": "crm_omni_session_form",
+  "name:zh-CN": "会话表单",
+  "name:en": "Session Form",
+  "modelCode": "crm_omni_session",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "会话信息",
+        "en": "Session Info"
+      },
+      "fields": [
+        {
+          "field": "crm_oss_channel",
+          "colSpan": 4,
+          "required": true
+        },
+        {
+          "field": "crm_oss_customer",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_oss_vip",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_oss_subject",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

@@ -145,11 +145,11 @@ test.describe('Inventory — Warehouse', () => {
 test.describe('CRM — Customer Relationship', () => {
   test.setTimeout(30000);
 
-  test('CRM-01: crm_lead list loads', async ({ page }) => {
+  test('CRM-01: crm_lead_common list loads', async ({ page }) => {
     await assertListPageLoads(page, 'crm-lead');
   });
 
-  test('CRM-02: crm_opportunity list loads', async ({ page }) => {
+  test('CRM-02: crm_opportunity_common list loads', async ({ page }) => {
     await assertListPageLoads(page, 'crm-opportunity');
   });
 });

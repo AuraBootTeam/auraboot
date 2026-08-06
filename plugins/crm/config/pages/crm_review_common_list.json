@@ -1,0 +1,263 @@
+{
+  "pageKey": "crm_review_common_list",
+  "name:zh-CN": "评审",
+  "name:en": "Reviews",
+  "modelCode": "crm_review_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_rv_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "zh-CN": "全部",
+            "en": "All"
+          }
+        },
+        {
+          "key": "pending",
+          "label": {
+            "zh-CN": "待评审",
+            "en": "Pending"
+          },
+          "filter": {
+            "field": "crm_rv_status",
+            "operator": "EQ",
+            "value": "pending"
+          }
+        },
+        {
+          "key": "in_review",
+          "label": {
+            "zh-CN": "评审中",
+            "en": "In Review"
+          },
+          "filter": {
+            "field": "crm_rv_status",
+            "operator": "EQ",
+            "value": "in_review"
+          }
+        },
+        {
+          "key": "passed",
+          "label": {
+            "zh-CN": "通过",
+            "en": "Passed"
+          },
+          "filter": {
+            "field": "crm_rv_status",
+            "operator": "EQ",
+            "value": "passed"
+          }
+        },
+        {
+          "key": "conditional",
+          "label": {
+            "zh-CN": "有条件通过",
+            "en": "Conditional"
+          },
+          "filter": {
+            "field": "crm_rv_status",
+            "operator": "EQ",
+            "value": "conditional"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_rv_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "icon": "Plus",
+          "permissionCode": "crm.review.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_review_common_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_rv_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_rv_code",
+          "sortable": true
+        },
+        {
+          "field": "crm_rv_title",
+          "sortable": true
+        },
+        {
+          "field": "crm_rv_review_type",
+          "renderType": "tag",
+          "dictCode": "crm_review_type"
+        },
+        {
+          "field": "crm_rv_status",
+          "renderType": "tag",
+          "dictCode": "crm_review_status",
+          "sortable": true
+        },
+        {
+          "field": "crm_rv_priority",
+          "renderType": "tag",
+          "dictCode": "crm_review_priority",
+          "sortable": true
+        },
+        {
+          "field": "crm_rv_account_id"
+        },
+        {
+          "field": "crm_rv_customer_request_id"
+        },
+        {
+          "field": "crm_rv_reviewer_id"
+        },
+        {
+          "field": "crm_rv_conclusion"
+        },
+        {
+          "field": "crm_rv_recommendation"
+        },
+        {
+          "field": "crm_rv_source_model"
+        },
+        {
+          "field": "crm_rv_source_id"
+        },
+        {
+          "field": "crm_rv_submitted_at",
+          "sortable": true
+        },
+        {
+          "field": "crm_rv_decided_at",
+          "sortable": true
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "label": "$i18n:common.actions",
+          "buttons": [
+            {
+              "code": "view",
+              "icon": "Eye",
+              "permissionCode": "crm.review.read",
+              "label": "$i18n:common.button.view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_review_common_detail"
+              }
+            },
+            {
+              "code": "start_review",
+              "icon": "Play",
+              "permissionCode": "crm.review.manage",
+              "label": {
+                "zh-CN": "开始评审",
+                "en-US": "Start Review"
+              },
+              "action": {
+                "type": "state_transition",
+                "command": "crm:start_review"
+              },
+              "visibleWhen": "record.crm_rv_status === 'pending'"
+            },
+            {
+              "code": "pass_review",
+              "icon": "CheckCircle2",
+              "permissionCode": "crm.review.manage",
+              "label": {
+                "zh-CN": "评审通过",
+                "en-US": "Pass"
+              },
+              "action": {
+                "type": "state_transition",
+                "command": "crm:pass_review"
+              },
+              "visibleWhen": "record.crm_rv_status === 'in_review'"
+            },
+            {
+              "code": "conditional_review",
+              "icon": "AlertTriangle",
+              "permissionCode": "crm.review.manage",
+              "label": {
+                "zh-CN": "条件通过",
+                "en-US": "Conditional"
+              },
+              "action": {
+                "type": "state_transition",
+                "command": "crm:flag_review_conditional"
+              },
+              "visibleWhen": "record.crm_rv_status === 'in_review'"
+            },
+            {
+              "code": "fail_review",
+              "icon": "XCircle",
+              "permissionCode": "crm.review.manage",
+              "label": {
+                "zh-CN": "评审不通过",
+                "en-US": "Fail"
+              },
+              "action": {
+                "type": "state_transition",
+                "command": "crm:fail_review"
+              },
+              "visibleWhen": "record.crm_rv_status === 'in_review'"
+            },
+            {
+              "code": "delete",
+              "icon": "Trash2",
+              "permissionCode": "crm.review.manage",
+              "label": {
+                "zh-CN": "删除",
+                "en-US": "Delete"
+              },
+              "action": {
+                "type": "command"
+              },
+              "danger": true
+            },
+            {
+              "code": "edit",
+              "icon": "Edit",
+              "permissionCode": "crm.review.manage",
+              "label": "$i18n:common.button.edit",
+              "action": {
+                "type": "navigate",
+                "to": "crm_review_common_form"
+              }
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "crm_rv_code",
+        "crm_rv_title",
+        "crm_rv_reviewer_id",
+        "crm_rv_conclusion",
+        "crm_rv_source_model",
+        "crm_rv_source_id"
+      ],
+      "defaultSort": {
+        "field": "crm_rv_code",
+        "order": "desc"
+      },
+      "selection": {
+        "mode": "multiple"
+      }
+    }
+  ]
+}

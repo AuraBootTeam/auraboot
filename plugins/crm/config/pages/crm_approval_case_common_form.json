@@ -1,0 +1,199 @@
+{
+  "pageKey": "crm_approval_case_common_form",
+  "name:zh-CN": "审批事项表单",
+  "name:en": "Approval Case Form",
+  "modelCode": "crm_approval_case_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "crm_apc_context",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "来源上下文",
+        "en": "Source Context"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 2,
+      "fields": [
+        {
+          "field": "crm_apc_subject",
+          "layout": {
+            "colSpan": 12
+          },
+          "required": true
+        },
+        {
+          "field": "crm_apc_domain",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_apc_case_type",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_apc_source_model",
+          "layout": {
+            "colSpan": 6
+          },
+          "required": true
+        },
+        {
+          "field": "crm_apc_source_id",
+          "layout": {
+            "colSpan": 6
+          },
+          "required": true
+        },
+        {
+          "field": "crm_apc_source_code",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_apc_account_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_apc_customer_request_id",
+          "layout": {
+            "colSpan": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_apc_decision",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "审批状态",
+        "en": "Approval Status"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 3,
+      "fields": [
+        {
+          "field": "crm_apc_status",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_apc_priority",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_apc_decision",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_apc_amount",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_apc_margin_pct",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_apc_discount_pct",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_apc_submitted_at",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_apc_decided_at",
+          "layout": {
+            "colSpan": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_apc_notes",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "原因与快照",
+        "en": "Reason and Snapshot"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 1,
+      "fields": [
+        {
+          "field": "crm_apc_reason",
+          "layout": {
+            "colSpan": 12
+          }
+        },
+        {
+          "field": "crm_apc_policy_snapshot",
+          "layout": {
+            "colSpan": 12
+          }
+        },
+        {
+          "field": "crm_apc_decision_note",
+          "layout": {
+            "colSpan": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_apc_form_buttons",
+      "blockType": "form-buttons",
+      "layout": {
+        "colSpan": 12
+      },
+      "buttons": [
+        {
+          "code": "save",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel",
+          "action": {
+            "type": "builtin",
+            "name": "back"
+          }
+        }
+      ]
+    }
+  ]
+}

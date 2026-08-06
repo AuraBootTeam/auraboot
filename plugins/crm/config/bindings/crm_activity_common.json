@@ -1,0 +1,22 @@
+[
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_type", "sequence": 1, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_subject", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_content", "sequence": 3, "required": false, "visible": false, "editable": true },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_date", "sequence": 4, "required": true, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_owner", "sequence": 5, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_source", "sequence": 6, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_ext", "sequence": 7, "required": false, "visible": false, "editable": false },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_parent_id", "sequence": 8, "required": false, "visible": false, "editable": true },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_files", "sequence": 9, "required": false, "visible": false, "editable": true },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_status", "sequence": 10, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_priority", "sequence": 11, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_due_date", "sequence": 12, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_assignee", "sequence": 13, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_duration", "sequence": 14, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_direction", "sequence": 15, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_location", "sequence": 16, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_start_time", "sequence": 17, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_end_time", "sequence": 18, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_related_model", "sequence": 19, "required": false, "visible": false, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_activity_common", "fieldCode": "crm_act_related_id", "sequence": 20, "required": false, "visible": false, "editable": true, "displayConfig": { "searchable": true } }
+]

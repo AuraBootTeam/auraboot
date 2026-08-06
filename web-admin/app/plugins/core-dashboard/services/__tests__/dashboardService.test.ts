@@ -26,7 +26,7 @@ describe('dashboardService.normalizeDashboard', () => {
           h: 4,
           config: {
             title: { 'zh-CN': '最新商机', en: 'Recent Opportunities' },
-            modelCode: 'crm_opportunity',
+            modelCode: 'crm_opportunity_common',
             table: {
               columns: [{ field: 'crm_opp_name', label: { 'zh-CN': '商机名称' } }],
             },
@@ -35,7 +35,7 @@ describe('dashboardService.normalizeDashboard', () => {
       ]),
     );
 
-    expect(dashboard.widgets[0].config.modelCode).toBe('crm_opportunity');
+    expect(dashboard.widgets[0].config.modelCode).toBe('crm_opportunity_common');
     expect(dashboard.widgets[0].config.title).toEqual({
       'zh-CN': '最新商机',
       en: 'Recent Opportunities',

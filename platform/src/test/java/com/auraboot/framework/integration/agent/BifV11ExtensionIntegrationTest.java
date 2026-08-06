@@ -45,7 +45,7 @@ class BifV11ExtensionIntegrationTest extends BaseIntegrationTest {
     @DisplayName("BifRecorder persists profile_id + channel when present")
     void persists_profile_and_channel() {
         BusinessIntentFrame bif = BusinessIntentFrame.builder()
-                .intent("query").object("crm_lead").riskLevel("L0")
+                .intent("query").object("crm_lead_common").riskLevel("L0")
                 .actionability("read_only")
                 .confidence(ConfidenceScore.of(0.9, 0.85))
                 .candidateSkillsMode("hint")
@@ -64,7 +64,7 @@ class BifV11ExtensionIntegrationTest extends BaseIntegrationTest {
     @DisplayName("BifRecorder tolerates null profile_id + null channel (built-in AuraBot)")
     void tolerates_null_extensions() {
         BusinessIntentFrame bif = BusinessIntentFrame.builder()
-                .intent("query").object("crm_lead").riskLevel("L0")
+                .intent("query").object("crm_lead_common").riskLevel("L0")
                 .confidence(ConfidenceScore.of(0.9, 0.85))
                 .candidateSkillsMode("hint")
                 .build();

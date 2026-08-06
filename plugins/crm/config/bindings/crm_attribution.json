@@ -1,0 +1,87 @@
+[
+  {
+    "modelCode": "crm_attribution",
+    "fieldCode": "crm_attr_code",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_attribution",
+    "fieldCode": "crm_attr_deal_name",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_attribution",
+    "fieldCode": "crm_attr_revenue",
+    "sequence": 3,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_attribution",
+    "fieldCode": "crm_attr_model",
+    "sequence": 4,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_attribution",
+    "fieldCode": "crm_attr_touchpoints",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {}
+  },
+  {
+    "modelCode": "crm_attribution",
+    "fieldCode": "crm_attr_result",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {}
+  },
+  {
+    "modelCode": "crm_attribution",
+    "fieldCode": "crm_attr_top_campaign",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_attribution",
+    "fieldCode": "crm_attr_top_amount",
+    "sequence": 8,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  }
+]

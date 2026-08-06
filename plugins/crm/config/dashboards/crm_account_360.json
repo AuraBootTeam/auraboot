@@ -1,0 +1,272 @@
+{
+  "code": "crm_account_360",
+  "title": "crm_account_360",
+  "description": "Account 360-degree dashboard with key metrics, recent opportunities, and activity timeline",
+  "scope": "global",
+  "status": "published",
+  "sortOrder": 0,
+  "layoutConfig": {
+    "columns": 12,
+    "rowHeight": 100,
+    "gap": 16,
+    "compactType": "vertical"
+  },
+  "widgets": [
+    {
+      "id": "stats_contacts",
+      "type": "smart-number-card",
+      "x": 0,
+      "y": 0,
+      "w": 2,
+      "h": 1,
+      "title": {
+        "zh-CN": "联系人",
+        "en": "Contacts"
+      },
+      "config": {
+        "title": {
+          "zh-CN": "联系人",
+          "en-US": "Contacts"
+        },
+        "icon": "Users",
+        "dataSource": {
+          "type": "namedQuery",
+          "queryCode": "crm_account_stats",
+          "params": {
+            "accountId": "${recordPid}"
+          }
+        },
+        "valueField": "total_contacts",
+        "color": "#1890ff"
+      }
+    },
+    {
+      "id": "stats_opportunities",
+      "type": "smart-number-card",
+      "x": 0,
+      "y": 1,
+      "w": 2,
+      "h": 1,
+      "title": {
+        "zh-CN": "商机",
+        "en": "Opportunities"
+      },
+      "config": {
+        "title": {
+          "zh-CN": "商机",
+          "en-US": "Opportunities"
+        },
+        "icon": "TrendingUp",
+        "dataSource": {
+          "type": "namedQuery",
+          "queryCode": "crm_account_stats",
+          "params": {
+            "accountId": "${recordPid}"
+          }
+        },
+        "valueField": "open_opportunities",
+        "color": "#52c41a"
+      }
+    },
+    {
+      "id": "stats_revenue",
+      "type": "smart-number-card",
+      "x": 0,
+      "y": 2,
+      "w": 3,
+      "h": 1,
+      "title": {
+        "zh-CN": "赢单金额",
+        "en": "Won Amount"
+      },
+      "config": {
+        "title": {
+          "zh-CN": "赢单金额",
+          "en-US": "Won Revenue"
+        },
+        "icon": "DollarSign",
+        "dataSource": {
+          "type": "namedQuery",
+          "queryCode": "crm_account_stats",
+          "params": {
+            "accountId": "${recordPid}"
+          }
+        },
+        "valueField": "won_revenue",
+        "prefix": "¥",
+        "color": "#faad14"
+      }
+    },
+    {
+      "id": "stats_quotes",
+      "type": "smart-number-card",
+      "x": 0,
+      "y": 3,
+      "w": 2,
+      "h": 1,
+      "title": {
+        "zh-CN": "报价单",
+        "en": "Quotes"
+      },
+      "config": {
+        "title": {
+          "zh-CN": "报价单",
+          "en-US": "Quotes"
+        },
+        "icon": "FileText",
+        "dataSource": {
+          "type": "namedQuery",
+          "queryCode": "crm_account_stats",
+          "params": {
+            "accountId": "${recordPid}"
+          }
+        },
+        "valueField": "total_quotes",
+        "color": "#722ed1"
+      }
+    },
+    {
+      "id": "stats_complaints",
+      "type": "smart-number-card",
+      "x": 0,
+      "y": 4,
+      "w": 3,
+      "h": 1,
+      "title": {
+        "zh-CN": "投诉",
+        "en": "Complaints"
+      },
+      "config": {
+        "title": {
+          "zh-CN": "投诉",
+          "en-US": "Complaints"
+        },
+        "icon": "AlertTriangle",
+        "dataSource": {
+          "type": "namedQuery",
+          "queryCode": "crm_account_stats",
+          "params": {
+            "accountId": "${recordPid}"
+          }
+        },
+        "valueField": "total_complaints",
+        "color": "#ff4d4f"
+      }
+    },
+    {
+      "id": "recent_opportunities",
+      "type": "smart-table-chart",
+      "x": 0,
+      "y": 5,
+      "w": 12,
+      "h": 1,
+      "title": {
+        "zh-CN": "近期商机",
+        "en": "Recent Opportunities"
+      },
+      "config": {
+        "title": {
+          "zh-CN": "近期商机",
+          "en-US": "Recent Opportunities"
+        },
+        "modelCode": "crm_opportunity_common",
+        "filters": [
+          {
+            "fieldName": "crm_opp_account_id",
+            "operator": "EQ",
+            "value": "${recordPid}"
+          }
+        ],
+        "columns": [
+          {
+            "field": "crm_opp_code",
+            "width": 140
+          },
+          {
+            "field": "crm_opp_name",
+            "width": 200
+          },
+          {
+            "field": "crm_opp_stage",
+            "width": 120,
+            "renderType": "tag"
+          },
+          {
+            "field": "crm_opp_expected_amount",
+            "width": 140,
+            "align": "right"
+          },
+          {
+            "field": "crm_opp_expected_close_date",
+            "width": 140
+          },
+          {
+            "field": "crm_opp_probability",
+            "width": 100,
+            "align": "right"
+          },
+          {
+            "field": "crm_opp_owner",
+            "width": 120
+          }
+        ],
+        "sortField": "created_at",
+        "sortOrder": "desc",
+        "pageSize": 5
+      }
+    },
+    {
+      "id": "recent_activities",
+      "type": "smart-table-chart",
+      "x": 0,
+      "y": 6,
+      "w": 12,
+      "h": 1,
+      "title": {
+        "zh-CN": "近期活动",
+        "en": "Recent Activities"
+      },
+      "config": {
+        "title": {
+          "zh-CN": "近期活动",
+          "en-US": "Recent Activities"
+        },
+        "dataSource": {
+          "type": "api",
+          "url": "/api/datasource/list",
+          "params": {
+            "datasourceId": "nq:crm_account_timeline",
+            "objectId": "${recordPid}",
+            "format": "records",
+            "maxItems": "10"
+          }
+        },
+        "columns": [
+          {
+            "field": "crm_act_type",
+            "width": 100,
+            "renderType": "tag"
+          },
+          {
+            "field": "crm_act_subject",
+            "width": 250
+          },
+          {
+            "field": "crm_act_date",
+            "width": 160,
+            "format": "YYYY-MM-DD HH:mm"
+          },
+          {
+            "field": "crm_act_owner",
+            "width": 120
+          },
+          {
+            "field": "crm_ar_object_type",
+            "width": 100,
+            "renderType": "tag"
+          }
+        ]
+      }
+    }
+  ]
+}

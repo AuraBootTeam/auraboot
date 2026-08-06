@@ -30,7 +30,7 @@ public class EmailSequenceEnrollment {
     @TableField("contact_email")
     private String contactEmail;
 
-    /** DSL model code of the associated CRM record (e.g. 'crm_contact'). */
+    /** DSL model code of the associated CRM record (e.g. 'crm_contact_common'). */
     @TableField("model_code")
     private String modelCode;
 

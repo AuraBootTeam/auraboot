@@ -209,7 +209,7 @@ class BuiltinPluginImportServiceImplTest {
                 "page-manager",
                 "org-management",
                 "platform-admin",
-                "crm-starter",
+                "crm",
                 "showcase",
                 "agent-control-plane",
                 "workflow-demo",

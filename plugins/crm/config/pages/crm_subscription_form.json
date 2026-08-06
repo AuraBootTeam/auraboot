@@ -1,0 +1,63 @@
+{
+  "pageKey": "crm_subscription_form",
+  "name:zh-CN": "订阅表单",
+  "name:en": "Subscription Form",
+  "modelCode": "crm_subscription",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "订阅信息",
+        "en": "Subscription Info"
+      },
+      "fields": [
+        {
+          "field": "crm_sub_account_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_sub_plan",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_sub_start_date",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_sub_end_date",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_sub_monthly_amount",
+          "colSpan": 6,
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

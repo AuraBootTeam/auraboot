@@ -1,0 +1,229 @@
+[
+  {
+    "code": "crm:create_review",
+    "displayName:zh-CN": "新建评审",
+    "displayName:en": "Create Review",
+    "type": "create",
+    "modelCode": "crm_review_common",
+    "inputFields": [
+      "crm_rv_title",
+      "crm_rv_review_type",
+      "crm_rv_status",
+      "crm_rv_priority",
+      "crm_rv_account_id",
+      "crm_rv_customer_request_id",
+      "crm_rv_reviewer_id",
+      "crm_rv_conclusion",
+      "crm_rv_recommendation",
+      "crm_rv_source_model",
+      "crm_rv_source_id",
+      "crm_rv_submitted_at",
+      "crm_rv_decided_at",
+      "crm_rv_common_payload"
+    ],
+    "autoSetFields": {
+      "crm_rv_code": {
+        "strategy": "auto_generate",
+        "pattern": "RV-{yyyyMMdd}-{seq}"
+      }
+    },
+    "permissions": [
+      "crm.review.manage"
+    ],
+    "agent_hint": "Create a generic Review fact. Industry packages keep industry-specific fields in their own 1:1 sidecar model.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_review",
+    "displayName:zh-CN": "编辑评审",
+    "displayName:en": "Update Review",
+    "type": "update",
+    "modelCode": "crm_review_common",
+    "inputFields": [
+      "crm_rv_title",
+      "crm_rv_review_type",
+      "crm_rv_status",
+      "crm_rv_priority",
+      "crm_rv_account_id",
+      "crm_rv_customer_request_id",
+      "crm_rv_reviewer_id",
+      "crm_rv_conclusion",
+      "crm_rv_recommendation",
+      "crm_rv_source_model",
+      "crm_rv_source_id",
+      "crm_rv_submitted_at",
+      "crm_rv_decided_at",
+      "crm_rv_common_payload"
+    ],
+    "permissions": [
+      "crm.review.manage"
+    ],
+    "agent_hint": "Update a generic Review fact.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_review",
+    "displayName:zh-CN": "删除评审",
+    "displayName:en": "Delete Review",
+    "type": "delete",
+    "modelCode": "crm_review_common",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此评审？",
+      "confirmMessage:en": "Delete this review?"
+    },
+    "permissions": [
+      "crm.review.manage"
+    ],
+    "agent_hint": "Delete a Review record.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:detail_review",
+    "displayName:zh-CN": "查看评审",
+    "displayName:en": "View Review",
+    "type": "query",
+    "modelCode": "crm_review_common",
+    "permissions": [
+      "crm.review.read"
+    ],
+    "agent_hint": "Query Review records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:list_reviews",
+    "displayName:zh-CN": "评审列表",
+    "displayName:en": "List Review",
+    "type": "query",
+    "modelCode": "crm_review_common",
+    "permissions": [
+      "crm.review.read"
+    ],
+    "agent_hint": "List Review records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:start_review",
+    "displayName:zh-CN": "开始评审",
+    "displayName:en": "Start Review",
+    "description": "Move a pending review into in_review.",
+    "type": "state_transition",
+    "modelCode": "crm_review_common",
+    "stateField": "crm_rv_status",
+    "fromStates": [
+      "pending"
+    ],
+    "toState": "in_review",
+    "permissions": [
+      "crm.review.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认开始此评审？",
+      "confirmMessage:en": "Start this review?"
+    }
+  },
+  {
+    "code": "crm:pass_review",
+    "displayName:zh-CN": "评审通过",
+    "displayName:en": "Pass Review",
+    "description": "Conclude an in-review item as passed (conclusion required).",
+    "type": "state_transition",
+    "modelCode": "crm_review_common",
+    "stateField": "crm_rv_status",
+    "fromStates": [
+      "in_review"
+    ],
+    "toState": "passed",
+    "preconditions": [
+      {
+        "field": "crm_rv_conclusion",
+        "operator": "is_not_null",
+        "message:zh-CN": "请先填写评审结论",
+        "message:en": "A conclusion must be set before concluding the review"
+      }
+    ],
+    "permissions": [
+      "crm.review.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认评审通过？",
+      "confirmMessage:en": "Mark this review as passed?"
+    }
+  },
+  {
+    "code": "crm:flag_review_conditional",
+    "displayName:zh-CN": "条件通过",
+    "displayName:en": "Conditional Pass",
+    "description": "Conclude an in-review item as conditional (conclusion required).",
+    "type": "state_transition",
+    "modelCode": "crm_review_common",
+    "stateField": "crm_rv_status",
+    "fromStates": [
+      "in_review"
+    ],
+    "toState": "conditional",
+    "preconditions": [
+      {
+        "field": "crm_rv_conclusion",
+        "operator": "is_not_null",
+        "message:zh-CN": "请先填写评审结论",
+        "message:en": "A conclusion must be set before concluding the review"
+      }
+    ],
+    "permissions": [
+      "crm.review.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认条件通过？",
+      "confirmMessage:en": "Mark this review as conditional?"
+    }
+  },
+  {
+    "code": "crm:fail_review",
+    "displayName:zh-CN": "评审不通过",
+    "displayName:en": "Fail Review",
+    "description": "Conclude an in-review item as failed (conclusion required).",
+    "type": "state_transition",
+    "modelCode": "crm_review_common",
+    "stateField": "crm_rv_status",
+    "fromStates": [
+      "in_review"
+    ],
+    "toState": "failed",
+    "preconditions": [
+      {
+        "field": "crm_rv_conclusion",
+        "operator": "is_not_null",
+        "message:zh-CN": "请先填写评审结论",
+        "message:en": "A conclusion must be set before concluding the review"
+      }
+    ],
+    "permissions": [
+      "crm.review.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认评审不通过？",
+      "confirmMessage:en": "Mark this review as failed?"
+    }
+  },
+  {
+    "code": "crm:cancel_review",
+    "displayName:zh-CN": "取消评审",
+    "displayName:en": "Cancel Review",
+    "description": "Cancel a review that has not concluded.",
+    "type": "state_transition",
+    "modelCode": "crm_review_common",
+    "stateField": "crm_rv_status",
+    "fromStates": [
+      "pending",
+      "in_review"
+    ],
+    "toState": "cancelled",
+    "permissions": [
+      "crm.review.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认取消此评审？",
+      "confirmMessage:en": "Cancel this review?"
+    }
+  }
+]

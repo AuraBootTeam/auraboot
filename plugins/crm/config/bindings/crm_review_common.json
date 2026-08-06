@@ -1,0 +1,165 @@
+[
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_code",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_title",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_review_type",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_status",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_priority",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_account_id",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_customer_request_id",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_reviewer_id",
+    "sequence": 8,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_conclusion",
+    "sequence": 9,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_recommendation",
+    "sequence": 10,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_source_model",
+    "sequence": 11,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_source_id",
+    "sequence": 12,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_submitted_at",
+    "sequence": 13,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_decided_at",
+    "sequence": 14,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_review_common",
+    "fieldCode": "crm_rv_common_payload",
+    "sequence": 15,
+    "required": false,
+    "visible": true,
+    "editable": true
+  }
+]

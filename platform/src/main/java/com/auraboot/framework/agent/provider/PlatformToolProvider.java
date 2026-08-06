@@ -349,7 +349,7 @@ public class PlatformToolProvider implements ToolProvider {
         output.put("success", true);
         output.put("total", models.size());
         output.put("models", models);
-        output.put("hint", "IMPORTANT: Table names use mt_ prefix. For example, model 'crm_lead' → table 'mt_crm_lead'. "
+        output.put("hint", "IMPORTANT: Table names use mt_ prefix. For example, model 'crm_lead_common' → table 'mt_crm_lead_common'. "
                 + "All mt_* tables have: id, pid, tenant_id, created_at, updated_at, created_by, updated_by. "
                 + "ALWAYS include 'WHERE tenant_id = #{params.tenantId}' for data isolation.");
         output.put("instruction", "Schema loaded. Now use platform.execute_sql to query the data. Do NOT call platform.list_models again.");

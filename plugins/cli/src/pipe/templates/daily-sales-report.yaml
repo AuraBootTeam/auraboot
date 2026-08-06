@@ -4,7 +4,7 @@ version: "1.0"
 
 steps:
   - type: query
-    source: crm_opportunity
+    source: crm_opportunity_common
     filters:
       - field: crm_opp_stage
         operator: EQ

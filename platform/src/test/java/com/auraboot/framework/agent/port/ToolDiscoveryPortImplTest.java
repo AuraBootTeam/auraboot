@@ -34,28 +34,28 @@ class ToolDiscoveryPortImplTest {
         when(toolProviderRegistry.discoverAll(any(ToolDiscoveryContext.class)))
                 .thenReturn(List.of(
                         ToolDefinition.builder()
-                                .toolCode("list:crm_lead")
+                                .toolCode("list:crm_lead_common")
                                 .toolName("List CRM leads")
-                                .description("Paginated list of crm_lead records")
+                                .description("Paginated list of crm_lead_common records")
                                 .toolType("dsl_query")
                                 .build(),
                         ToolDefinition.builder()
-                                .toolCode("get:crm_lead")
+                                .toolCode("get:crm_lead_common")
                                 .toolName("Get CRM lead")
-                                .description("Get one crm_lead record")
+                                .description("Get one crm_lead_common record")
                                 .toolType("dsl_query")
                                 .build()));
 
         List<ToolDiscoveryPort.ToolDef> tools = port.discoverTools(
                 1L,
                 List.of("crm_contact_query"),
-                "crm_lead",
+                "crm_lead_common",
                 "query",
                 5,
                 null);
 
         assertThat(tools).extracting(ToolDiscoveryPort.ToolDef::code)
-                .contains("list:crm_lead", "get:crm_lead", "list_crm_contact");
+                .contains("list:crm_lead_common", "get:crm_lead_common", "list_crm_contact");
         org.mockito.Mockito.verify(toolProviderRegistry).discoverAll(any(ToolDiscoveryContext.class));
         org.mockito.Mockito.verify(agentSkillService).resolveSkillTools(eq(1L), eq("crm_contact_query"));
     }
@@ -92,7 +92,7 @@ class ToolDiscoveryPortImplTest {
 
         when(registry.discoverAll(any(ToolDiscoveryContext.class)))
                 .thenReturn(List.of(ToolDefinition.builder()
-                        .toolCode("create:crm_lead")     // mutating: must be dropped by queryOnly
+                        .toolCode("create:crm_lead_common")     // mutating: must be dropped by queryOnly
                         .toolName("Create lead")
                         .toolType("dsl_command")
                         .build()));
@@ -102,7 +102,7 @@ class ToolDiscoveryPortImplTest {
 
         assertThat(tools).extracting(ToolDiscoveryPort.ToolDef::code)
                 .contains("escalate_to_human")
-                .doesNotContain("create:crm_lead");
+                .doesNotContain("create:crm_lead_common");
     }
 
     @Test

@@ -1,0 +1,22 @@
+[
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_code", "sequence": 1, "required": true, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_subject", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_domain", "sequence": 3, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_case_type", "sequence": 4, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_status", "sequence": 5, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_priority", "sequence": 6, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_source_model", "sequence": 7, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_source_id", "sequence": 8, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_source_code", "sequence": 9, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_account_id", "sequence": 10, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_customer_request_id", "sequence": 11, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_amount", "sequence": 12, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_margin_pct", "sequence": 13, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_discount_pct", "sequence": 14, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_reason", "sequence": 15, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_policy_snapshot", "sequence": 16, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_submitted_at", "sequence": 17, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_decided_at", "sequence": 18, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_decision", "sequence": 19, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_approval_case_common", "fieldCode": "crm_apc_decision_note", "sequence": 20, "required": false, "visible": true, "editable": true }
+]

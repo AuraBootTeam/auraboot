@@ -1,0 +1,159 @@
+{
+  "pageKey": "crm_clarification_common_detail",
+  "name:zh-CN": "澄清项详情",
+  "name:en": "Clarification Detail",
+  "modelCode": "crm_clarification_common",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "crm_cl_facts",
+      "blockType": "detail-section",
+      "title": {
+        "zh-CN": "澄清项事实",
+        "en": "Clarification Facts"
+      },
+      "fields": [
+        {
+          "field": "crm_cl_code",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cl_title",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cl_clarification_type",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cl_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cl_priority",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cl_review_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cl_customer_request_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cl_account_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cl_owner_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cl_question",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_cl_answer",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_cl_raised_at",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cl_resolved_at",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cl_source_model",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cl_source_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cl_common_payload",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "crm_cl_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "send_to_customer",
+          "icon": "Send",
+          "permissionCode": "crm.clarification.manage",
+          "label": {
+            "zh-CN": "发给客户",
+            "en-US": "Send to Customer"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:send_clarification"
+          },
+          "visibleWhen": "record.crm_cl_status === 'pending'"
+        },
+        {
+          "code": "mark_replied",
+          "icon": "MessageSquareReply",
+          "permissionCode": "crm.clarification.manage",
+          "label": {
+            "zh-CN": "客户已回复",
+            "en-US": "Customer Replied"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:mark_clarification_replied"
+          },
+          "visibleWhen": "['pending','awaiting_customer'].includes(record.crm_cl_status)"
+        },
+        {
+          "code": "resolve",
+          "icon": "BadgeCheck",
+          "permissionCode": "crm.clarification.manage",
+          "label": {
+            "zh-CN": "已解决",
+            "en-US": "Resolve"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:resolve_clarification"
+          },
+          "visibleWhen": "record.crm_cl_status === 'customer_replied'"
+        },
+        {
+          "code": "cancel",
+          "icon": "XCircle",
+          "permissionCode": "crm.clarification.manage",
+          "label": {
+            "zh-CN": "取消澄清",
+            "en-US": "Cancel"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:cancel_clarification"
+          },
+          "visibleWhen": "['pending','awaiting_customer'].includes(record.crm_cl_status)"
+        },
+        {
+          "code": "edit",
+          "icon": "Edit",
+          "permissionCode": "crm.clarification.manage",
+          "label": "$i18n:common.button.edit",
+          "action": {
+            "type": "navigate",
+            "to": "crm_clarification_common_form"
+          }
+        }
+      ]
+    }
+  ]
+}

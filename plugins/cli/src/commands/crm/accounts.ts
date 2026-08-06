@@ -35,7 +35,7 @@ export async function crmAccountsCommand(options: AccountOptions): Promise<void>
     filters.push({ fieldName: 'crm_acc_status', operator: 'EQ', value: options.status.toLowerCase() });
   }
 
-  const records = await queryDynamicList(client, 'crm_account', {
+  const records = await queryDynamicList(client, 'crm_account_common', {
     pageSize: Number(options.limit) || 50,
     keyword: options.keyword,
     filters,

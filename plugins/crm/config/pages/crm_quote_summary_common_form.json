@@ -1,0 +1,178 @@
+{
+  "pageKey": "crm_quote_summary_common_form",
+  "name:zh-CN": "报价摘要表单",
+  "name:en": "Quote Summary Form",
+  "modelCode": "crm_quote_summary_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "crm_qs_context",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "上下文",
+        "en-US": "Context"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 2,
+      "fields": [
+        {
+          "field": "crm_qs_account_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_qs_opportunity_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_qs_customer_request_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_qs_owner",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_qs_source_quote_type",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_qs_source_quote_id",
+          "layout": {
+            "colSpan": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_qs_status_amount",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "报价状态与金额",
+        "en-US": "Status and Amount"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 3,
+      "fields": [
+        {
+          "field": "crm_qs_status",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_qs_approval_status",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_qs_won_lost_result",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_qs_quote_amount",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_qs_currency",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_qs_valid_until",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_qs_sent_at",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_qs_customer_feedback_status",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_qs_source_updated_at",
+          "layout": {
+            "colSpan": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_qs_notes",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "摘要",
+        "en-US": "Summary"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 1,
+      "fields": [
+        {
+          "field": "crm_qs_summary",
+          "layout": {
+            "colSpan": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_qs_form_buttons",
+      "blockType": "form-buttons",
+      "layout": {
+        "colSpan": 12
+      },
+      "buttons": [
+        {
+          "code": "save",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel",
+          "action": {
+            "type": "builtin",
+            "name": "back"
+          }
+        }
+      ]
+    }
+  ]
+}

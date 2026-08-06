@@ -16,8 +16,8 @@ interface AnalyzeOptions {
  * outputs result to stdout (for further piping).
  *
  * Examples:
- *   aura query crm_lead | aura analyze churn-risk
- *   aura query crm_opportunity | aura analyze "which deals are at risk"
+ *   aura query crm_lead_common | aura analyze churn-risk
+ *   aura query crm_opportunity_common | aura analyze "which deals are at risk"
  *   cat data.json | aura analyze "summarize trends"
  */
 export async function analyzeCommand(analysis: string, options: AnalyzeOptions): Promise<void> {

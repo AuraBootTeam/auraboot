@@ -1,0 +1,64 @@
+[
+  {
+    "code": "crm:record_campaign_metric",
+    "displayName:zh-CN": "记录活动指标",
+    "displayName:en": "Record Campaign Metric",
+    "type": "create",
+    "modelCode": "crm_campaign_metric",
+    "inputFields": [
+      "crm_cmet_campaign_id",
+      "crm_cmet_metric_date",
+      "crm_cmet_leads_generated",
+      "crm_cmet_emails_sent",
+      "crm_cmet_open_rate",
+      "crm_cmet_click_rate",
+      "crm_cmet_conversion_rate",
+      "crm_cmet_cost",
+      "crm_cmet_revenue",
+      "crm_cmet_roi"
+    ],
+    "permissions": [
+      "crm.campaign.manage"
+    ],
+    "agent_hint": "Record campaign performance metrics for a given date. Key inputs: campaign_id, date, leads, emails, rates.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_campaign_metric",
+    "displayName:zh-CN": "更新活动指标",
+    "displayName:en": "Update Campaign Metric",
+    "type": "update",
+    "modelCode": "crm_campaign_metric",
+    "inputFields": [
+      "crm_cmet_leads_generated",
+      "crm_cmet_emails_sent",
+      "crm_cmet_open_rate",
+      "crm_cmet_click_rate",
+      "crm_cmet_conversion_rate",
+      "crm_cmet_cost",
+      "crm_cmet_revenue",
+      "crm_cmet_roi"
+    ],
+    "permissions": [
+      "crm.campaign.manage"
+    ],
+    "agent_hint": "Update campaign performance metrics.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_campaign_metric",
+    "displayName:zh-CN": "删除活动指标",
+    "displayName:en": "Delete Campaign Metric",
+    "type": "delete",
+    "modelCode": "crm_campaign_metric",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此指标记录？",
+      "confirmMessage:en": "Confirm delete this metric record?"
+    },
+    "permissions": [
+      "crm.campaign.manage"
+    ],
+    "agent_hint": "Delete a campaign metric record.",
+    "cmd_risk_level": "L4"
+  }
+]

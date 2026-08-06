@@ -571,7 +571,7 @@ public class SavedViewServiceImpl implements SavedViewService {
      * permanently invisible — so we reject at write time instead.
      *
      * <p>pageKey format: {@code <modelCode>_<list|form|detail>}
-     * (e.g. {@code crm_lead_list}); the JSON filename under
+     * (e.g. {@code crm_lead_common_list}); the JSON filename under
      * {@code config/pages/<pageKey>.json} in the plugin.
      */
     private void validatePageKeyExists(String pageKey) {

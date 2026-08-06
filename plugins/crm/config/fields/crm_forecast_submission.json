@@ -1,0 +1,106 @@
+[
+  {
+    "code": "crm_fcst_code",
+    "displayName:zh-CN": "提交编号",
+    "displayName:en": "Code",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 50
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_fcst_period",
+    "displayName:zh-CN": "预测周期",
+    "displayName:en": "Period",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 20
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_fcst_owner",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Owner",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 100
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_fcst_commit_amount",
+    "displayName:zh-CN": "Commit 金额",
+    "displayName:en": "Commit Amount",
+    "dataType": "money",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_fcst_best_case_amount",
+    "displayName:zh-CN": "Best Case 金额",
+    "displayName:en": "Best Case Amount",
+    "dataType": "money",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_fcst_pipeline_amount",
+    "displayName:zh-CN": "Pipeline 金额",
+    "displayName:en": "Pipeline Amount",
+    "dataType": "money",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_fcst_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_fcst_status",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_fcst_submitted_at",
+    "displayName:zh-CN": "提交时间",
+    "displayName:en": "Submitted At",
+    "dataType": "datetime",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_fcst_notes",
+    "displayName:zh-CN": "备注",
+    "displayName:en": "Notes",
+    "dataType": "text"
+  }
+]

@@ -270,7 +270,7 @@ public class AgentTemplateSeeder {
         String reviewPlaybook = """
                 你是「客户运营复盘专员」。这是一个固定的季度客户结构复盘 playbook,严格按步骤执行,不要跳步、不要即兴发挥:
 
-                1. 调用 list:crm_account 拉取全部客户。只使用查询返回的真实记录,严禁编造客户名、数字或评级。
+                1. 调用 list:crm_account_common 拉取全部客户。只使用查询返回的真实记录,严禁编造客户名、数字或评级。
                 2. 先输出【事实样本】:逐条列出查询返回的真实客户名称(最多 10 家),作为本次复盘的可核验证据;即使行业或评级字段缺失也不得省略客户名称。
                 3. 按行业分组统计:每个行业的客户数与占比;字段缺失时明确写“数据缺失”,不得猜测。
                 4. 按评级分组统计:A/B/C 各级客户数与占比,并算出 A 级客户占比;字段缺失时明确写“数据缺失”,不得猜测。
@@ -283,7 +283,7 @@ public class AgentTemplateSeeder {
 
                 边界(必须遵守):
                 - 你只做分析与「提议」。禁止调用任何写入/创建/修改类工具;所有拓客动作以文字建议给出,由人决定是否执行。
-                - 所有结论必须基于 list:crm_account 返回的真实数据,数字精确到实际值。
+                - 所有结论必须基于 list:crm_account_common 返回的真实数据,数字精确到实际值。
                 - 用简体中文回复。
                 """;
 
@@ -292,7 +292,7 @@ public class AgentTemplateSeeder {
                 "crm_quarterly_review", "季度客户结构复盘",
                 "拉取全部客户,按行业与评级分析结构集中度与风险,产出结构化复盘并提议拓客动作(只读,不自动执行)",
                 "workflow", "crm", "IconReportAnalytics",
-                "[\"list:crm_account\"]",
+                "[\"list:crm_account_common\"]",
                 reviewPlaybook,
                 6,
                 "[\"READ_PLATFORM_DATA\"]");

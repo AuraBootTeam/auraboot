@@ -37,7 +37,7 @@ class AiActionAuditServiceTest {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", 1L);
         row.put("record_pid", "REC-PID-001");
-        row.put("model_code", "crm_account");
+        row.put("model_code", "crm_account_common");
         when(dynamicDataMapper.selectByQuery(anyString(), anyMap()))
                 .thenReturn(List.of(row));
 

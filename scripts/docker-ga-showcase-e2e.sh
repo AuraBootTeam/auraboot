@@ -101,7 +101,7 @@ runner_command() {
           seeds+=(commercial);
           ;;
         auto|"")
-          echo "[ga-showcase-docker] seed-showcase-commercial SKIP (OSS crm-starter lacks full CRM quote/complaint commands)";
+          echo "[ga-showcase-docker] seed-showcase-commercial SKIP (Sales quote commands are not installed)";
           ;;
         *)
           echo "[ga-showcase-docker] SHOWCASE_COMMERCIAL_SEED must be auto|required|skip" >&2;
@@ -109,7 +109,7 @@ runner_command() {
           ;;
       esac;
       seeds+=(dashboard-default invariants);
-      SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_overview}" \
+      SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_dashboard}" \
         NO_PROXY="${NO_PROXY:-localhost,127.0.0.1}" \
         node scripts/run-showcase-seed-sequence.mjs \
           --output-prefix=test-results/ga-docker-seed "${seeds[@]}";

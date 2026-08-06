@@ -25,13 +25,13 @@ test.describe('Showcase Smoke Tests', () => {
     // Set up response listener BEFORE navigation to avoid race condition
     const listResponsePromise = page.waitForResponse(
       (resp) =>
-        resp.url().includes('/api/dynamic/crm_account') &&
+        resp.url().includes('/api/dynamic/crm_account_common') &&
         resp.url().includes('/list') &&
         resp.status() === 200,
       { timeout: 20000 },
     );
 
-    await page.goto('/p/crm_account', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/crm_account_common', { waitUntil: 'domcontentloaded' });
 
     // Wait for list to load
     const listResponse = await listResponsePromise;
@@ -48,12 +48,12 @@ test.describe('Showcase Smoke Tests', () => {
   test('CRM Lead list shows multiple statuses', async ({ page }) => {
     const listResponsePromise = page.waitForResponse(
       (resp) =>
-        resp.url().includes('/api/dynamic/crm_lead') &&
+        resp.url().includes('/api/dynamic/crm_lead_common') &&
         resp.url().includes('/list') &&
         resp.status() === 200,
       { timeout: 20000 },
     );
-    await page.goto('/p/crm_lead', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/crm_lead_common', { waitUntil: 'domcontentloaded' });
     const listResponse = await listResponsePromise;
     const body = await listResponse.json();
 
@@ -63,10 +63,10 @@ test.describe('Showcase Smoke Tests', () => {
 
   test('CRM Opportunity pipeline has all stages', async ({ page }) => {
     const listResponsePromise = page.waitForResponse(
-      (resp) => resp.url().includes('/crm_opportunity/list') && resp.status() === 200,
+      (resp) => resp.url().includes('/crm_opportunity_common/list') && resp.status() === 200,
       { timeout: 20000 },
     );
-    await page.goto('/p/crm_opportunity', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/crm_opportunity_common', { waitUntil: 'domcontentloaded' });
     const listResponse = await listResponsePromise;
     const body = await listResponse.json();
 
@@ -198,10 +198,10 @@ test.describe('Showcase Smoke Tests', () => {
 
   test('CRM Activities have real content', async ({ page }) => {
     const respPromise = page.waitForResponse(
-      (r) => r.url().includes('/crm_activity/list') && r.status() === 200,
+      (r) => r.url().includes('/crm_activity_common/list') && r.status() === 200,
       { timeout: 20000 },
     );
-    await page.goto('/p/crm_activity', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/crm_activity_common', { waitUntil: 'domcontentloaded' });
     const resp = await respPromise;
     const body = await resp.json();
 

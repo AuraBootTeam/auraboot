@@ -1,0 +1,44 @@
+{
+  "pageKey": "crm_journey_enrollment_detail",
+  "name:zh-CN": "参与详情",
+  "name:en": "参与详情",
+  "modelCode": "crm_journey_enrollment",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "info",
+      "blockType": "detail-section",
+      "title": {
+        "zh-CN": "参与信息",
+        "en": "Enrollment"
+      },
+      "fields": [
+        {
+          "field": "crm_jne_code",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_jne_journey_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_jne_contact_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_jne_current_step",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_jne_status",
+          "colSpan": 6
+        }
+      ]
+    }
+  ]
+}

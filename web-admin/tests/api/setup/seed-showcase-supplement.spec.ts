@@ -72,7 +72,7 @@ test.describe.serial('Showcase Seed — Supplement', () => {
 
   test('Supplement 1: Additional Contacts (40+)', async ({ page }) => {
     // Get B-tier accounts that only have 1 contact
-    const accResp = await page.request.get('/api/dynamic/crm_account/list?pageSize=200');
+    const accResp = await page.request.get('/api/dynamic/crm_account_common/list?pageSize=200');
     const accBody = await accResp.json();
     const accounts = accBody?.data?.records || [];
     const bAccounts = accounts.filter((a: any) => a.crm_acc_rating === 'B');
@@ -389,11 +389,11 @@ test.describe.serial('Showcase Seed — Supplement', () => {
     console.log('═══════════════════════════════════════');
 
     const models = [
-      'crm_account',
-      'crm_contact',
-      'crm_lead',
-      'crm_opportunity',
-      'crm_activity',
+      'crm_account_common',
+      'crm_contact_common',
+      'crm_lead_common',
+      'crm_opportunity_common',
+      'crm_activity_common',
       'crm_campaign',
     ];
     for (const model of models) {

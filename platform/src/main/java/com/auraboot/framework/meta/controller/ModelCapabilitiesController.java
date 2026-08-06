@@ -69,7 +69,7 @@ public class ModelCapabilitiesController {
     )
     @RequirePermission(MetaPermission.MODEL_READ)
     public ApiResponse<ModelCapabilities> getCapabilities(
-            @Parameter(description = "Model code, e.g. crm_opportunity")
+            @Parameter(description = "Model code, e.g. crm_opportunity_common")
             @PathVariable String code) {
 
         log.debug("Model capabilities request: code={}", logSafe(code));

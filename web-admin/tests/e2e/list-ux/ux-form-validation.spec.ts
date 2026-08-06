@@ -38,11 +38,11 @@ async function openCrmLeadCreateForm(page: Page): Promise<void> {
   await crmBtn.evaluate((el: HTMLElement) => el.click());
   await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
 
-  const leafLink = nav.locator('a[href="/p/crm_lead"]').first();
+  const leafLink = nav.locator('a[href="/p/crm_lead_common"]').first();
   await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
 
   const listResponsePromise = page
-    .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead') && r.status() === 200, {
+    .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead_common') && r.status() === 200, {
       timeout: 15_000,
     })
     .catch(() => null);

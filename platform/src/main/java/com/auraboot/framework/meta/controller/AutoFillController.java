@@ -47,7 +47,7 @@ public class AutoFillController {
      * <p>If the record is not found or the caller lacks permission, an empty map is
      * returned rather than an error, so the form gracefully handles missing data.</p>
      *
-     * @param modelCode target model code (e.g. "crm_account")
+     * @param modelCode target model code (e.g. "crm_account_common")
      * @param recordPid public pid value of the record to look up
      * @param fields    comma-separated list of field codes to return
      * @return map of fieldCode → value for the requested fields
@@ -59,7 +59,7 @@ public class AutoFillController {
     )
     @GetMapping
     public ApiResponse<Map<String, Object>> getAutoFillValues(
-            @Parameter(description = "模型编码，例如 crm_account")
+            @Parameter(description = "模型编码，例如 crm_account_common")
             @RequestParam String modelCode,
 
             @Parameter(description = "记录 PID")

@@ -1,0 +1,97 @@
+{
+  "pageKey": "crm_complaint_form",
+  "name:zh-CN": "投诉表单",
+  "name:en": "Complaint Form",
+  "modelCode": "crm_complaint",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "投诉信息",
+        "en-US": "Complaint Information"
+      },
+      "fields": [
+        {
+          "field": "crm_cmp_account_id",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_cmp_contact_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cmp_date",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_cmp_type",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_cmp_severity",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cmp_sla_policy_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cmp_description",
+          "colSpan": 12,
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "resolution",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "解决方案",
+        "en-US": "Resolution"
+      },
+      "fields": [
+        {
+          "field": "crm_cmp_root_cause",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_cmp_corrective_action",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_cmp_resolution_date",
+          "colSpan": 6
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

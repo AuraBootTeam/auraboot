@@ -1,0 +1,12 @@
+[
+  {
+    "modelCode": "crm_account_common",
+    "fieldCode": "crm_acc_phone",
+    "maskType": "PHONE",
+    "applyToList": true,
+    "applyToDetail": true,
+    "applyToExport": true,
+    "enabled": true,
+    "exemptPermissionCodes": "crm.account.contact_unmask"
+  }
+]

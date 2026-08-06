@@ -1,0 +1,78 @@
+{
+  "pageKey": "crm_attribution_list",
+  "name:zh-CN": "营销归因",
+  "name:en": "Attribution",
+  "modelCode": "crm_attribution",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "filters",
+      "blockType": "filters",
+      "fields": [
+        {
+          "field": "crm_attr_model"
+        },
+        {
+          "field": "crm_attr_deal_name"
+        }
+      ]
+    },
+    {
+      "id": "toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "crm.attribution.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_attribution_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_attr_code"
+        },
+        {
+          "field": "crm_attr_deal_name"
+        },
+        {
+          "field": "crm_attr_revenue"
+        },
+        {
+          "field": "crm_attr_model",
+          "renderType": "tag",
+          "dictCode": "crm_attribution_model"
+        },
+        {
+          "field": "crm_attr_top_campaign"
+        },
+        {
+          "field": "crm_attr_top_amount"
+        }
+      ],
+      "rowActions": [
+        {
+          "code": "recompute",
+          "label": "$i18n:crm.attribution.recompute",
+          "permissionCode": "crm.attribution.manage",
+          "action": {
+            "type": "command",
+            "command": "crm:recompute_attribution"
+          }
+        }
+      ]
+    }
+  ]
+}

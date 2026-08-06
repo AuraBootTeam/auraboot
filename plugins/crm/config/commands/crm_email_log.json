@@ -1,0 +1,208 @@
+[
+  {
+    "code": "crm:create_email_log",
+    "displayName:zh-CN": "新建邮件记录",
+    "displayName:en": "Create Email Log",
+    "type": "create",
+    "modelCode": "crm_email_log",
+    "inputFields": [
+      "crm_el_direction",
+      "crm_el_from_address",
+      "crm_el_to_address",
+      "crm_el_cc_address",
+      "crm_el_subject",
+      "crm_el_body",
+      "crm_el_template_id",
+      "crm_el_related_type",
+      "crm_el_related_id",
+      "crm_el_remark"
+    ],
+    "autoSetFields": {
+      "crm_el_status": {
+        "strategy": "fixed_value",
+        "value": "draft"
+      }
+    },
+    "permissions": [
+      "crm.email_log.manage"
+    ],
+    "agent_hint": "Create a new CRM email log entry. Key inputs: direction, to_address, subject, body. Status defaults to draft.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_email_log",
+    "displayName:zh-CN": "编辑邮件记录",
+    "displayName:en": "Update Email Log",
+    "type": "update",
+    "modelCode": "crm_email_log",
+    "inputFields": [
+      "crm_el_from_address",
+      "crm_el_to_address",
+      "crm_el_cc_address",
+      "crm_el_subject",
+      "crm_el_body",
+      "crm_el_template_id",
+      "crm_el_related_type",
+      "crm_el_related_id",
+      "crm_el_remark"
+    ],
+    "permissions": [
+      "crm.email_log.manage"
+    ],
+    "agent_hint": "Update an existing CRM email log entry. Only draft emails can be edited.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:send_email_log",
+    "displayName:zh-CN": "发送",
+    "displayName:en": "Send",
+    "type": "state_transition",
+    "modelCode": "crm_email_log",
+    "stateField": "crm_el_status",
+    "fromStates": [
+      "draft"
+    ],
+    "toState": "sent",
+    "autoSetFields": {
+      "crm_el_sent_at": {
+        "strategy": "current_datetime"
+      }
+    },
+    "extension": {
+      "confirmMessage:zh-CN": "确认发送此邮件？",
+      "confirmMessage:en": "Confirm send this email?"
+    },
+    "permissions": [
+      "crm.email_log.manage"
+    ],
+    "agent_hint": "Transition CRM email log status from draft to SENT. Records sent_at timestamp.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:deliver_email_log",
+    "displayName:zh-CN": "标记已送达",
+    "displayName:en": "Mark Delivered",
+    "type": "state_transition",
+    "modelCode": "crm_email_log",
+    "stateField": "crm_el_status",
+    "fromStates": [
+      "sent"
+    ],
+    "toState": "delivered",
+    "permissions": [
+      "crm.email_log.manage"
+    ],
+    "agent_hint": "Transition CRM email log status from SENT to DELIVERED.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:open_email_log",
+    "displayName:zh-CN": "标记已打开",
+    "displayName:en": "Mark Opened",
+    "type": "state_transition",
+    "modelCode": "crm_email_log",
+    "stateField": "crm_el_status",
+    "fromStates": [
+      "delivered"
+    ],
+    "toState": "opened",
+    "autoSetFields": {
+      "crm_el_opened_at": {
+        "strategy": "current_datetime"
+      }
+    },
+    "permissions": [
+      "crm.email_log.manage"
+    ],
+    "agent_hint": "Transition CRM email log status from DELIVERED to OPENED. Records opened_at timestamp.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:bounce_email_log",
+    "displayName:zh-CN": "标记退信",
+    "displayName:en": "Mark Bounced",
+    "type": "state_transition",
+    "modelCode": "crm_email_log",
+    "stateField": "crm_el_status",
+    "fromStates": [
+      "sent"
+    ],
+    "toState": "bounced",
+    "permissions": [
+      "crm.email_log.manage"
+    ],
+    "agent_hint": "Transition CRM email log status from SENT to BOUNCED.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:fail_email_log",
+    "displayName:zh-CN": "标记失败",
+    "displayName:en": "Mark Failed",
+    "type": "state_transition",
+    "modelCode": "crm_email_log",
+    "stateField": "crm_el_status",
+    "fromStates": [
+      "draft",
+      "sent"
+    ],
+    "toState": "failed",
+    "inputFields": [
+      "crm_el_remark"
+    ],
+    "permissions": [
+      "crm.email_log.manage"
+    ],
+    "agent_hint": "Transition CRM email log status to failed. Remark field for failure reason.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:delete_email_log",
+    "displayName:zh-CN": "删除邮件记录",
+    "displayName:en": "Delete Email Log",
+    "type": "delete",
+    "modelCode": "crm_email_log",
+    "preconditions": [
+      {
+        "field": "crm_el_status",
+        "operator": "IN",
+        "value": [
+          "draft",
+          "failed"
+        ]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此邮件记录？",
+      "confirmMessage:en": "Confirm delete this email log?"
+    },
+    "permissions": [
+      "crm.email_log.manage"
+    ],
+    "agent_hint": "Delete CRM email log record(s). Irreversible. Preconditions: status IN [\"draft\", \"failed\"].",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:detail_email_log",
+    "displayName:zh-CN": "查看邮件记录",
+    "displayName:en": "View Email Log",
+    "type": "query",
+    "modelCode": "crm_email_log",
+    "permissions": [
+      "crm.email_log.read"
+    ],
+    "agent_hint": "Query CRM email log records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:list_email_logs",
+    "displayName:zh-CN": "邮件记录列表",
+    "displayName:en": "List Email Logs",
+    "type": "query",
+    "modelCode": "crm_email_log",
+    "permissions": [
+      "crm.email_log.read"
+    ],
+    "agent_hint": "Query CRM email log records.",
+    "cmd_risk_level": "L0"
+  }
+]

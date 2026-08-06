@@ -1,0 +1,67 @@
+[
+  {
+    "modelCode": "crm_journey",
+    "fieldCode": "crm_jny_code",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_journey",
+    "fieldCode": "crm_jny_name",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_journey",
+    "fieldCode": "crm_jny_total_steps",
+    "sequence": 3,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_journey",
+    "fieldCode": "crm_jny_description",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {}
+  },
+  {
+    "modelCode": "crm_journey",
+    "fieldCode": "crm_jny_status",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_journey",
+    "fieldCode": "crm_jny_step_delay_minutes",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "sortable": true
+    }
+  }
+]

@@ -46,7 +46,7 @@ class LlmMessageTapeSupportTest {
         messages.add(LlmChatRequest.Message.text("user", "list and delete"));
         messages.add(LlmMessageTapeSupport.buildAssistantMessage(List.of(
                 LlmChatResponse.ContentBlock.builder()
-                        .type("tool_use").id("tool-list").name("list:crm_lead").input(Map.of()).build(),
+                        .type("tool_use").id("tool-list").name("list:crm_lead_common").input(Map.of()).build(),
                 LlmChatResponse.ContentBlock.builder()
                         .type("tool_use").id("tool-delete").name("cmd:crm:delete_lead").input(Map.of()).build())));
         messages.add(LlmMessageTapeSupport.buildToolResultMessage(List.of(
@@ -69,7 +69,7 @@ class LlmMessageTapeSupportTest {
         List<LlmChatRequest.Message> messages = new ArrayList<>();
         messages.add(LlmMessageTapeSupport.buildAssistantMessage(List.of(
                 LlmChatResponse.ContentBlock.builder()
-                        .type("tool_use").id("tool-only").name("list:crm_lead").input(Map.of()).build())));
+                        .type("tool_use").id("tool-only").name("list:crm_lead_common").input(Map.of()).build())));
         messages.add(LlmMessageTapeSupport.buildToolResultMessage(List.of(
                 LlmMessageTapeSupport.buildToolResultBlock(objectMapper, "tool-only",
                         Map.of("success", true)))));

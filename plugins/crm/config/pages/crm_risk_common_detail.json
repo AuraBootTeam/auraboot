@@ -1,0 +1,173 @@
+{
+  "pageKey": "crm_risk_common_detail",
+  "name:zh-CN": "风险项详情",
+  "name:en": "Risk Detail",
+  "modelCode": "crm_risk_common",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "crm_rk_facts",
+      "blockType": "detail-section",
+      "title": {
+        "zh-CN": "风险项事实",
+        "en": "Risk Facts"
+      },
+      "fields": [
+        {
+          "field": "crm_rk_code",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_rk_title",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_rk_risk_type",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_rk_severity",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_rk_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_rk_review_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_rk_customer_request_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_rk_account_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_rk_owner_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_rk_description",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_rk_mitigation",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_rk_due_at",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_rk_resolved_at",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_rk_source_model",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_rk_source_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_rk_common_payload",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "crm_rk_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "start_mitigation",
+          "icon": "ShieldHalf",
+          "permissionCode": "crm.risk.manage",
+          "label": {
+            "zh-CN": "开始缓解",
+            "en-US": "Start Mitigation"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:start_risk_mitigation"
+          },
+          "visibleWhen": "record.crm_rk_status === 'open'"
+        },
+        {
+          "code": "mitigate",
+          "icon": "ShieldCheck",
+          "permissionCode": "crm.risk.manage",
+          "label": {
+            "zh-CN": "已缓解",
+            "en-US": "Mitigate"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:mitigate_risk"
+          },
+          "visibleWhen": "['open','mitigating'].includes(record.crm_rk_status)"
+        },
+        {
+          "code": "accept_risk",
+          "icon": "CheckCircle2",
+          "permissionCode": "crm.risk.manage",
+          "label": {
+            "zh-CN": "接受风险",
+            "en-US": "Accept Risk"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:accept_risk"
+          },
+          "visibleWhen": "['open','mitigating'].includes(record.crm_rk_status)"
+        },
+        {
+          "code": "resolve_risk",
+          "icon": "BadgeCheck",
+          "permissionCode": "crm.risk.manage",
+          "label": {
+            "zh-CN": "已解决",
+            "en-US": "Resolve"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:resolve_risk"
+          },
+          "visibleWhen": "['mitigated','accepted'].includes(record.crm_rk_status)"
+        },
+        {
+          "code": "close_risk",
+          "icon": "Archive",
+          "permissionCode": "crm.risk.manage",
+          "label": {
+            "zh-CN": "关闭风险",
+            "en-US": "Close Risk"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:close_risk"
+          },
+          "visibleWhen": "record.crm_rk_status === 'resolved'"
+        },
+        {
+          "code": "edit",
+          "icon": "Edit",
+          "permissionCode": "crm.risk.manage",
+          "label": "$i18n:common.button.edit",
+          "action": {
+            "type": "navigate",
+            "to": "crm_risk_common_form"
+          }
+        }
+      ]
+    }
+  ]
+}

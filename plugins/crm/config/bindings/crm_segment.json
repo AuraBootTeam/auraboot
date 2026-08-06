@@ -1,0 +1,66 @@
+[
+  {
+    "modelCode": "crm_segment",
+    "fieldCode": "crm_seg_code",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_segment",
+    "fieldCode": "crm_seg_name",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_segment",
+    "fieldCode": "crm_seg_description",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {}
+  },
+  {
+    "modelCode": "crm_segment",
+    "fieldCode": "crm_seg_criteria",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {}
+  },
+  {
+    "modelCode": "crm_segment",
+    "fieldCode": "crm_seg_member_count",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_segment",
+    "fieldCode": "crm_seg_last_computed",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  }
+]

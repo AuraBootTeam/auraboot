@@ -1,0 +1,46 @@
+{
+  "pageKey": "crm_sla_breach_list",
+  "name:zh-CN": "SLA违规列表",
+  "name:en": "SLA Breach List",
+  "modelCode": "crm_sla_breach",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_sla_breach_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_sb_complaint_id",
+          "width": 200
+        },
+        {
+          "field": "crm_sb_policy_id",
+          "width": 200
+        },
+        {
+          "field": "crm_sb_breach_type",
+          "width": 140,
+          "renderType": "tag",
+          "dictCode": "crm_sla_breach_type"
+        },
+        {
+          "field": "crm_sb_breached_at",
+          "width": 180
+        },
+        {
+          "field": "crm_sb_notified",
+          "width": 100
+        }
+      ],
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
+      }
+    }
+  ]
+}

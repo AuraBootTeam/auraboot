@@ -1,0 +1,38 @@
+[
+  {
+    "code": "crm:create_segment",
+    "displayName:zh-CN": "新建细分",
+    "displayName:en": "Create Segment",
+    "type": "create",
+    "modelCode": "crm_segment",
+    "inputFields": [
+      "crm_seg_name",
+      "crm_seg_description",
+      "crm_seg_criteria"
+    ],
+    "autoSetFields": {
+      "crm_seg_code": {
+        "strategy": "auto_generate",
+        "pattern": "SEG-{yyyyMMdd}-{seq}"
+      }
+    },
+    "permissions": [
+      "crm.segment.manage"
+    ],
+    "agent_hint": "Create a dynamic segment. criteria is a JSON array of {field,op,value}.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:recompute_segment",
+    "displayName:zh-CN": "重算人群",
+    "displayName:en": "Recompute Segment",
+    "type": "custom",
+    "handler": "crm:recompute_segment",
+    "modelCode": "crm_segment",
+    "permissions": [
+      "crm.segment.manage"
+    ],
+    "agent_hint": "Recompute the segment member count by evaluating criteria over contacts.",
+    "cmd_risk_level": "L1"
+  }
+]

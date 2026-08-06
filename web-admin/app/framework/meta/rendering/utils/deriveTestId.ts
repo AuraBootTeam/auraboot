@@ -8,14 +8,14 @@
  * (see docs/e2e/06-Selector-TestId-迁移计划.md).
  *
  * Examples:
- *   deriveTestId('list', 'crm_account', 'container')
- *     -> "ab:list:crm_account:container"
+ *   deriveTestId('list', 'crm_account_common', 'container')
+ *     -> "ab:list:crm_account_common:container"
  *
- *   deriveTestId('form', 'crm_account', 'field', 'company_name')
- *     -> "ab:form:crm_account:field:company_name"
+ *   deriveTestId('form', 'crm_account_common', 'field', 'company_name')
+ *     -> "ab:form:crm_account_common:field:company_name"
  *
- *   deriveTestId('detail', 'crm_account', 'tab', 'overview')
- *     -> "ab:detail:crm_account:tab:overview"
+ *   deriveTestId('detail', 'crm_account_common', 'tab', 'overview')
+ *     -> "ab:detail:crm_account_common:tab:overview"
  *
  *   deriveTestId('dashboard', 'crm_dashboard', 'block', 'chart_pipeline')
  *     -> "ab:dashboard:crm_dashboard:block:chart_pipeline"

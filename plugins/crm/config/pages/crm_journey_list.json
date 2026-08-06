@@ -1,0 +1,61 @@
+{
+  "pageKey": "crm_journey_list",
+  "name:zh-CN": "客户旅程",
+  "name:en": "客户旅程",
+  "modelCode": "crm_journey",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "filters",
+      "blockType": "filters",
+      "fields": [
+        {
+          "field": "crm_jny_status"
+        },
+        {
+          "field": "crm_jny_name"
+        }
+      ]
+    },
+    {
+      "id": "toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "crm.journey.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_journey_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_jny_code"
+        },
+        {
+          "field": "crm_jny_name"
+        },
+        {
+          "field": "crm_jny_total_steps"
+        },
+        {
+          "field": "crm_jny_status",
+          "renderType": "tag",
+          "dictCode": "crm_journey_status"
+        }
+      ]
+    }
+  ]
+}

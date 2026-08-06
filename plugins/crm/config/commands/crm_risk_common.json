@@ -1,0 +1,217 @@
+[
+  {
+    "code": "crm:create_risk",
+    "displayName:zh-CN": "新建风险项",
+    "displayName:en": "Create Risk",
+    "type": "create",
+    "modelCode": "crm_risk_common",
+    "inputFields": [
+      "crm_rk_title",
+      "crm_rk_risk_type",
+      "crm_rk_severity",
+      "crm_rk_status",
+      "crm_rk_review_id",
+      "crm_rk_customer_request_id",
+      "crm_rk_account_id",
+      "crm_rk_owner_id",
+      "crm_rk_description",
+      "crm_rk_mitigation",
+      "crm_rk_due_at",
+      "crm_rk_resolved_at",
+      "crm_rk_source_model",
+      "crm_rk_source_id",
+      "crm_rk_common_payload"
+    ],
+    "autoSetFields": {
+      "crm_rk_code": {
+        "strategy": "auto_generate",
+        "pattern": "RK-{yyyyMMdd}-{seq}"
+      }
+    },
+    "permissions": [
+      "crm.risk.manage"
+    ],
+    "agent_hint": "Create a generic Risk fact. Industry packages keep industry-specific fields in their own 1:1 sidecar model.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_risk",
+    "displayName:zh-CN": "编辑风险项",
+    "displayName:en": "Update Risk",
+    "type": "update",
+    "modelCode": "crm_risk_common",
+    "inputFields": [
+      "crm_rk_title",
+      "crm_rk_risk_type",
+      "crm_rk_severity",
+      "crm_rk_status",
+      "crm_rk_review_id",
+      "crm_rk_customer_request_id",
+      "crm_rk_account_id",
+      "crm_rk_owner_id",
+      "crm_rk_description",
+      "crm_rk_mitigation",
+      "crm_rk_due_at",
+      "crm_rk_resolved_at",
+      "crm_rk_source_model",
+      "crm_rk_source_id",
+      "crm_rk_common_payload"
+    ],
+    "permissions": [
+      "crm.risk.manage"
+    ],
+    "agent_hint": "Update a generic Risk fact.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_risk",
+    "displayName:zh-CN": "删除风险项",
+    "displayName:en": "Delete Risk",
+    "type": "delete",
+    "modelCode": "crm_risk_common",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此风险项？",
+      "confirmMessage:en": "Delete this risk?"
+    },
+    "permissions": [
+      "crm.risk.manage"
+    ],
+    "agent_hint": "Delete a Risk record.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:detail_risk",
+    "displayName:zh-CN": "查看风险项",
+    "displayName:en": "View Risk",
+    "type": "query",
+    "modelCode": "crm_risk_common",
+    "permissions": [
+      "crm.risk.read"
+    ],
+    "agent_hint": "Query Risk records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:list_risks",
+    "displayName:zh-CN": "风险项列表",
+    "displayName:en": "List Risk",
+    "type": "query",
+    "modelCode": "crm_risk_common",
+    "permissions": [
+      "crm.risk.read"
+    ],
+    "agent_hint": "List Risk records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:start_risk_mitigation",
+    "displayName:zh-CN": "开始缓解",
+    "displayName:en": "Start Mitigation",
+    "description": "Move an open risk into mitigating.",
+    "type": "state_transition",
+    "modelCode": "crm_risk_common",
+    "stateField": "crm_rk_status",
+    "fromStates": [
+      "open"
+    ],
+    "toState": "mitigating",
+    "permissions": [
+      "crm.risk.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认开始缓解此风险？",
+      "confirmMessage:en": "Start mitigating this risk?"
+    }
+  },
+  {
+    "code": "crm:mitigate_risk",
+    "displayName:zh-CN": "标记已缓解",
+    "displayName:en": "Mark Risk Mitigated",
+    "description": "Mark a risk as mitigated after mitigation has been recorded.",
+    "type": "state_transition",
+    "modelCode": "crm_risk_common",
+    "stateField": "crm_rk_status",
+    "fromStates": [
+      "open",
+      "mitigating"
+    ],
+    "toState": "mitigated",
+    "preconditions": [
+      {
+        "field": "crm_rk_mitigation",
+        "operator": "is_not_null",
+        "message:zh-CN": "请先填写风险缓解措施",
+        "message:en": "Mitigation must be set before marking the risk as mitigated"
+      }
+    ],
+    "permissions": [
+      "crm.risk.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认将此风险标记为已缓解？",
+      "confirmMessage:en": "Mark this risk as mitigated?"
+    }
+  },
+  {
+    "code": "crm:accept_risk",
+    "displayName:zh-CN": "接受风险",
+    "displayName:en": "Accept Risk",
+    "description": "Accept a risk without mitigation.",
+    "type": "state_transition",
+    "modelCode": "crm_risk_common",
+    "stateField": "crm_rk_status",
+    "fromStates": [
+      "open",
+      "mitigating"
+    ],
+    "toState": "accepted",
+    "permissions": [
+      "crm.risk.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认接受此风险？",
+      "confirmMessage:en": "Accept this risk?"
+    }
+  },
+  {
+    "code": "crm:resolve_risk",
+    "displayName:zh-CN": "标记已解决",
+    "displayName:en": "Resolve Risk",
+    "description": "Resolve a mitigated or accepted risk.",
+    "type": "state_transition",
+    "modelCode": "crm_risk_common",
+    "stateField": "crm_rk_status",
+    "fromStates": [
+      "mitigated",
+      "accepted"
+    ],
+    "toState": "resolved",
+    "permissions": [
+      "crm.risk.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认此风险已解决？",
+      "confirmMessage:en": "Resolve this risk?"
+    }
+  },
+  {
+    "code": "crm:close_risk",
+    "displayName:zh-CN": "关闭风险",
+    "displayName:en": "Close Risk",
+    "description": "Close a resolved risk.",
+    "type": "state_transition",
+    "modelCode": "crm_risk_common",
+    "stateField": "crm_rk_status",
+    "fromStates": [
+      "resolved"
+    ],
+    "toState": "closed",
+    "permissions": [
+      "crm.risk.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认关闭此风险？",
+      "confirmMessage:en": "Close this risk?"
+    }
+  }
+]

@@ -1,0 +1,91 @@
+{
+  "pageKey": "crm_journey_enrollment_list",
+  "name:zh-CN": "旅程参与",
+  "name:en": "旅程参与",
+  "modelCode": "crm_journey_enrollment",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "filters",
+      "blockType": "filters",
+      "fields": [
+        {
+          "field": "crm_jne_status"
+        },
+        {
+          "field": "crm_jne_journey_id"
+        }
+      ]
+    },
+    {
+      "id": "toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "crm.journey.manage",
+          "label": "$i18n:crm.journey.enroll",
+          "action": {
+            "type": "navigate",
+            "to": "crm_journey_enrollment_form",
+            "command": "crm:enroll_journey"
+          }
+        },
+        {
+          "code": "run_scheduler",
+          "permissionCode": "crm.journey.manage",
+          "label": "$i18n:crm.journey.run_scheduler",
+          "action": {
+            "type": "command",
+            "command": "crm:run_journey_scheduler"
+          }
+        }
+      ]
+    },
+    {
+      "id": "table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_jne_journey_id"
+        },
+        {
+          "field": "crm_jne_contact_id"
+        },
+        {
+          "field": "crm_jne_current_step"
+        },
+        {
+          "field": "crm_jne_status",
+          "renderType": "tag",
+          "dictCode": "crm_enrollment_status"
+        }
+      ],
+      "rowActions": [
+        {
+          "code": "advance",
+          "label": "$i18n:crm.journey.advance",
+          "permissionCode": "crm.journey.manage",
+          "action": {
+            "type": "command",
+            "command": "crm:advance_enrollment"
+          }
+        },
+        {
+          "code": "exit",
+          "label": "$i18n:crm.journey.exit",
+          "permissionCode": "crm.journey.manage",
+          "action": {
+            "type": "command",
+            "command": "crm:exit_enrollment"
+          }
+        }
+      ]
+    }
+  ]
+}

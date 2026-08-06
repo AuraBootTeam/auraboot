@@ -1,0 +1,107 @@
+[
+  {
+    "code": "crm_cmp_code",
+    "displayName:zh-CN": "投诉编号",
+    "displayName:en": "Complaint Code",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_cmp_account_id",
+    "displayName:zh-CN": "客户",
+    "displayName:en": "Account",
+    "dataType": "reference",
+    "referenceModelCode": "crm_account_common",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_cmp_contact_id",
+    "displayName:zh-CN": "联系人",
+    "displayName:en": "Contact",
+    "dataType": "reference",
+    "referenceModelCode": "crm_contact_common"
+  },
+  {
+    "code": "crm_cmp_date",
+    "displayName:zh-CN": "投诉日期",
+    "displayName:en": "Complaint Date",
+    "dataType": "datetime",
+    "constraints": { "required": true },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_cmp_type",
+    "displayName:zh-CN": "投诉类型",
+    "displayName:en": "Complaint Type",
+    "dataType": "enum",
+    "dictCode": "crm_complaint_type",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_cmp_severity",
+    "displayName:zh-CN": "严重程度",
+    "displayName:en": "Severity",
+    "dataType": "enum",
+    "dictCode": "crm_severity",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_cmp_description",
+    "displayName:zh-CN": "问题描述",
+    "displayName:en": "Description",
+    "dataType": "text",
+    "constraints": { "required": true }
+  },
+  {
+    "code": "crm_cmp_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_complaint_status",
+    "defaultValue": "open",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_cmp_root_cause",
+    "displayName:zh-CN": "根本原因",
+    "displayName:en": "Root Cause",
+    "dataType": "text"
+  },
+  {
+    "code": "crm_cmp_corrective_action",
+    "displayName:zh-CN": "纠正措施",
+    "displayName:en": "Corrective Action",
+    "dataType": "text"
+  },
+  {
+    "code": "crm_cmp_resolution_date",
+    "displayName:zh-CN": "解决日期",
+    "displayName:en": "Resolution Date",
+    "dataType": "datetime"
+  },
+  {
+    "code": "crm_cmp_sla_policy_id",
+    "displayName:zh-CN": "SLA策略",
+    "displayName:en": "SLA Policy",
+    "dataType": "reference",
+    "referenceModelCode": "crm_sla_policy"
+  },
+  {
+    "code": "crm_cmp_first_response_at",
+    "displayName:zh-CN": "首次响应时间",
+    "displayName:en": "First Response At",
+    "dataType": "datetime",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_cmp_sla_status",
+    "displayName:zh-CN": "SLA状态",
+    "displayName:en": "SLA Status",
+    "dataType": "enum",
+    "dictCode": "crm_sla_status",
+    "feature": { "searchable": true }
+  }
+]

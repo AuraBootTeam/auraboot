@@ -69,7 +69,7 @@ interface AgentDetail {
   max_tools: number;
   max_concurrent_runs: number;
   execution_timeout_seconds: number;
-  allowed_models: string[] | string | null; // null or "*" = all, or ["crm_account","crm_lead"]
+  allowed_models: string[] | string | null; // null or "*" = all, or ["crm_account_common","crm_lead_common"]
   allowed_operations: string[] | null; // ["query","create","update","delete","transition"]
   knowledge_base_ids: string[] | string | null;
   visibility: 'private' | 'team' | 'tenant';

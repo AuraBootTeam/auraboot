@@ -1,0 +1,59 @@
+{
+  "pageKey": "crm_consent_form",
+  "name:zh-CN": "同意表单",
+  "name:en": "Consent Form",
+  "modelCode": "crm_consent",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "同意信息",
+        "en": "Consent Info"
+      },
+      "fields": [
+        {
+          "field": "crm_cns_contact_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cns_channel",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_cns_source",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cns_legal_basis",
+          "colSpan": 6
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

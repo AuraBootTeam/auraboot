@@ -72,9 +72,9 @@ test.describe('Showcase demo seed invariants', () => {
   test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 
   test('CRM core seed data is queryable', async ({ request }) => {
-    await expectDynamicListHasRecords(request, 'crm_account');
-    await expectDynamicListHasRecords(request, 'crm_lead');
-    await expectDynamicListHasRecords(request, 'crm_opportunity');
+    await expectDynamicListHasRecords(request, 'crm_account_common');
+    await expectDynamicListHasRecords(request, 'crm_lead_common');
+    await expectDynamicListHasRecords(request, 'crm_opportunity_common');
   });
 
   test('arsenal showcase data and dashboard are queryable', async ({ request }) => {

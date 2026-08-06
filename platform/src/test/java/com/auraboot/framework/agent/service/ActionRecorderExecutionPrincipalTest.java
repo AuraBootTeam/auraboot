@@ -67,7 +67,7 @@ class ActionRecorderExecutionPrincipalTest {
                         "RUN_1",
                         "crm.list",
                         null,
-                        Map.of("modelCode", "crm_account"),
+                        Map.of("modelCode", "crm_account_common"),
                         Map.of("records", java.util.List.of()),
                         null,
                         Set.of(EffectClass.READ_PLATFORM_DATA)));

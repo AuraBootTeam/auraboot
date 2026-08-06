@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "d012c3fe1",
+    "commit": "e052c741c",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -723,7 +723,9 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/agent-control-plane/acp-approval-closeloop.spec.ts"
+            "web-admin/tests/e2e/agent-control-plane/acp-approval-closeloop.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts",
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -746,9 +748,14 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-agent-scenario.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=agent_artifact"
         },
         {
@@ -779,9 +786,13 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=agent_definition"
         },
         {
@@ -801,9 +812,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=agent_memory"
         },
         {
@@ -845,9 +859,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=agent_run"
         },
         {
@@ -856,9 +872,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=form model=agent_schedule"
         },
         {
@@ -867,9 +885,13 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=agent_schedule"
         },
         {
@@ -889,9 +911,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=agent_skill"
         },
         {
@@ -911,9 +935,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=agent_task"
         },
         {
@@ -922,9 +949,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=form model=agent_tool"
         },
         {
@@ -933,9 +962,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=agent_tool"
         },
         {
@@ -958,7 +989,6 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/agent-control-plane/ai-colleague-detail-dsl-page.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/ai-colleagues.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
@@ -972,6 +1002,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/ai-colleague-can-talk.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/ai-colleague-create-enroll.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/ai-colleague-new-dsl-page.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/ai-colleague-operation-scope.spec.ts",
@@ -989,10 +1020,13 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/agent-control-plane/ai-center-menu-reachability.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/ai-colleague-can-talk.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/ai-colleague-operation-scope.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/ai-colleague-suspend.spec.ts",
             "web-admin/tests/e2e/agent-control-plane/ai-colleagues-dsl-page.spec.ts",
-            "web-admin/tests/e2e/agent-control-plane/ai-colleagues.spec.ts"
+            "web-admin/tests/e2e/agent-control-plane/ai-colleagues.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/digital-employee-skill-review.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/digital-employee-write-approval.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -1017,9 +1051,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=form model=approval_policy"
         },
         {
@@ -1028,9 +1064,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=approval_policy"
         },
         {
@@ -1072,9 +1111,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=form model=mission"
         },
         {
@@ -1083,9 +1124,13 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts",
+            "web-admin/tests/e2e/designer/unified-designer-workbench.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=mission"
         },
         {
@@ -1882,9 +1927,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/faq-loop-pages-and-menu.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=detail model=faq_candidate"
         },
         {
@@ -1904,9 +1951,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/faq-loop-pages-and-menu.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=faq_candidate"
         },
         {
@@ -1981,8 +2030,7 @@
           "driver": "browser",
           "evidence": [],
           "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "untested"
         },
         {
           "id": "behavior_site_key:disable",
@@ -2022,20 +2070,22 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/behavior/site-key-registry.golden.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=behavior_site_key"
         }
       ]
     },
     {
-      "id": "crm-quick-start",
-      "title": "crm-quick-start",
+      "id": "crm",
+      "title": "crm",
       "rows": [
         {
-          "id": "tcrm:advance_to_negotiation",
-          "action": "tcrm:advance_to_negotiation",
+          "id": "crm:accept_risk",
+          "action": "crm:accept_risk",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
@@ -2043,418 +2093,6 @@
           "assertion": "no test references this command",
           "verdict": "untested"
         },
-        {
-          "id": "tcrm:advance_to_proposal",
-          "action": "tcrm:advance_to_proposal",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "tcrm:contact_lead",
-          "action": "tcrm:contact_lead",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "tcrm:create_account",
-          "action": "tcrm:create_account",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "tcrm:create_contact",
-          "action": "tcrm:create_contact",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "tcrm:create_lead",
-          "action": "tcrm:create_lead",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [
-            "web-admin/tests/e2e/templates/templates-smoke.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
-        },
-        {
-          "id": "tcrm:create_opportunity",
-          "action": "tcrm:create_opportunity",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "tcrm:delete_account",
-          "action": "tcrm:delete_account",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "tcrm:delete_contact",
-          "action": "tcrm:delete_contact",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "tcrm:delete_lead",
-          "action": "tcrm:delete_lead",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "tcrm:delete_opportunity",
-          "action": "tcrm:delete_opportunity",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "tcrm:detail_account",
-          "action": "tcrm:detail_account",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
-        },
-        {
-          "id": "tcrm:detail_contact",
-          "action": "tcrm:detail_contact",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
-        },
-        {
-          "id": "tcrm:detail_lead",
-          "action": "tcrm:detail_lead",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
-        },
-        {
-          "id": "tcrm:detail_opportunity",
-          "action": "tcrm:detail_opportunity",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
-        },
-        {
-          "id": "tcrm:list_accounts",
-          "action": "tcrm:list_accounts",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
-        },
-        {
-          "id": "tcrm:list_contacts",
-          "action": "tcrm:list_contacts",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
-        },
-        {
-          "id": "tcrm:list_leads",
-          "action": "tcrm:list_leads",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
-        },
-        {
-          "id": "tcrm:list_opportunities",
-          "action": "tcrm:list_opportunities",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
-        },
-        {
-          "id": "tcrm:lose_lead",
-          "action": "tcrm:lose_lead",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "tcrm:lose_opportunity",
-          "action": "tcrm:lose_opportunity",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "tcrm:qualify_lead",
-          "action": "tcrm:qualify_lead",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "tcrm:update_account",
-          "action": "tcrm:update_account",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
-        },
-        {
-          "id": "tcrm:update_contact",
-          "action": "tcrm:update_contact",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
-        },
-        {
-          "id": "tcrm:update_lead",
-          "action": "tcrm:update_lead",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
-        },
-        {
-          "id": "tcrm:update_opportunity",
-          "action": "tcrm:update_opportunity",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
-        },
-        {
-          "id": "tcrm:win_opportunity",
-          "action": "tcrm:win_opportunity",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
-        },
-        {
-          "id": "page:tcrm_account_detail",
-          "action": "tcrm_account_detail",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=detail model=tcrm_account"
-        },
-        {
-          "id": "page:tcrm_account_form",
-          "action": "tcrm_account_form",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=form model=tcrm_account"
-        },
-        {
-          "id": "page:tcrm_account_list",
-          "action": "tcrm_account_list",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=list model=tcrm_account"
-        },
-        {
-          "id": "page:tcrm_contact_detail",
-          "action": "tcrm_contact_detail",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=detail model=tcrm_contact"
-        },
-        {
-          "id": "page:tcrm_contact_form",
-          "action": "tcrm_contact_form",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=form model=tcrm_contact"
-        },
-        {
-          "id": "page:tcrm_contact_list",
-          "action": "tcrm_contact_list",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=list model=tcrm_contact"
-        },
-        {
-          "id": "page:tcrm_lead_detail",
-          "action": "tcrm_lead_detail",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=detail model=tcrm_lead"
-        },
-        {
-          "id": "page:tcrm_lead_form",
-          "action": "tcrm_lead_form",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=form model=tcrm_lead"
-        },
-        {
-          "id": "page:tcrm_lead_list",
-          "action": "tcrm_lead_list",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=list model=tcrm_lead"
-        },
-        {
-          "id": "page:tcrm_opportunity_detail",
-          "action": "tcrm_opportunity_detail",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=detail model=tcrm_opportunity"
-        },
-        {
-          "id": "page:tcrm_opportunity_form",
-          "action": "tcrm_opportunity_form",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=form model=tcrm_opportunity"
-        },
-        {
-          "id": "page:tcrm_opportunity_list",
-          "action": "tcrm_opportunity_list",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=list model=tcrm_opportunity"
-        }
-      ]
-    },
-    {
-      "id": "crm-starter",
-      "title": "crm-starter",
-      "rows": [
         {
           "id": "crm:activate_campaign",
           "action": "crm:activate_campaign",
@@ -2469,8 +2107,20 @@
           "verdict": "pass"
         },
         {
-          "id": "crm:advance_opp_to_negotiation",
-          "action": "crm:advance_opp_to_negotiation",
+          "id": "crm:activate_email_template",
+          "action": "crm:activate_email_template",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-email-features.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:add_campaign_member",
+          "action": "crm:add_campaign_member",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
@@ -2479,8 +2129,78 @@
           "verdict": "untested"
         },
         {
+          "id": "crm:add_opp_contact",
+          "action": "crm:add_opp_contact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:advance_enrollment",
+          "action": "crm:advance_enrollment",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:advance_opp_to_negotiation",
+          "action": "crm:advance_opp_to_negotiation",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
+            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
           "id": "crm:advance_opp_to_proposal",
           "action": "crm:advance_opp_to_proposal",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
+            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:archive_email_template",
+          "action": "crm:archive_email_template",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-email-features.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:auto_assign_lead",
+          "action": "crm:auto_assign_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:bounce_email_log",
+          "action": "crm:bounce_email_log",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
@@ -2501,6 +2221,69 @@
           "verdict": "pass"
         },
         {
+          "id": "crm:cancel_clarification",
+          "action": "crm:cancel_clarification",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:cancel_customer_request",
+          "action": "crm:cancel_customer_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:cancel_review",
+          "action": "crm:cancel_review",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:cancel_task",
+          "action": "crm:cancel_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:close_complaint",
+          "action": "crm:close_complaint",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:close_risk",
+          "action": "crm:close_risk",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
           "id": "crm:complete_campaign",
           "action": "crm:complete_campaign",
           "surface": "ui",
@@ -2512,6 +2295,18 @@
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
+        },
+        {
+          "id": "crm:complete_task",
+          "action": "crm:complete_task",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-approval-case-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
         },
         {
           "id": "crm:contact_lead",
@@ -2532,6 +2327,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "backend/src/test/java/com/auraboot/plugins/crm/handler/ConvertLeadHandlerTest.java",
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
           ],
           "assertion": "driven through the UI",
@@ -2544,6 +2340,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "tests/crm-account-common-form-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
             "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
@@ -2551,6 +2348,7 @@
             "web-admin/tests/e2e/crm/crm-m4-cpq.spec.ts",
             "web-admin/tests/e2e/crm/crm-m4-quote-to-order.spec.ts",
             "web-admin/tests/e2e/crm/crm-m5-pcba.spec.ts",
+            "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
             "web-admin/tests/e2e/crm/crm-opportunity-currency.spec.ts",
             "web-admin/tests/e2e/crm/crm-opportunity-kanban.spec.ts",
             "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
@@ -2559,12 +2357,14 @@
             "web-admin/tests/e2e/finance-accounting/fac-ar-ap-payment.spec.ts",
             "web-admin/tests/e2e/pcba/pcba-main-flow-permissions.spec.ts",
             "web-admin/tests/e2e/pcba/pcba-main-flow.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/bom-workbench-self-scope-golden.spec.ts",
             "web-admin/tests/e2e/pcba-solution/form-and-overlay-golden.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-minimal-create-regression.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-role-sales-golden.spec.ts",
             "web-admin/tests/e2e/pcba-solution/role-capability-closed-loop.spec.ts",
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
             "web-admin/tests/e2e/platform/multi-tenant-isolation.spec.ts",
+            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts",
             "web-admin/tests/e2e/sales/sales-dashboard.spec.ts",
             "web-admin/tests/e2e/sales/sales-order-lifecycle.spec.ts",
             "web-admin/tests/e2e/sales/sales-quotation-lifecycle.spec.ts",
@@ -2572,8 +2372,17 @@
             "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_account_task",
+          "action": "crm:create_account_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:create_activity",
@@ -2582,13 +2391,58 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "tests/crm-approval-case-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_activity_relation",
+          "action": "crm:create_activity_relation",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
           "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:create_approval_case",
+          "action": "crm:create_approval_case",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-approval-case-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
+          "id": "crm:create_assignment_rule",
+          "action": "crm:create_assignment_rule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_attribution",
+          "action": "crm:create_attribution",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:create_campaign",
@@ -2602,8 +2456,51 @@
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_campaign_task",
+          "action": "crm:create_campaign_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:create_clarification",
+          "action": "crm:create_clarification",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:create_complaint",
+          "action": "crm:create_complaint",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
+            "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_consent",
+          "action": "crm:create_consent",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:create_contact",
@@ -2621,12 +2518,81 @@
           "verdict": "pass"
         },
         {
+          "id": "crm:create_contact_task",
+          "action": "crm:create_contact_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:create_customer_request",
+          "action": "crm:create_customer_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m5-pcba.spec.ts",
+            "web-admin/tests/e2e/pcba/pcba-main-flow-permissions.spec.ts",
+            "web-admin/tests/e2e/pcba/pcba-main-flow.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_email_log",
+          "action": "crm:create_email_log",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-email-features.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_email_template",
+          "action": "crm:create_email_template",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-email-features.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_forecast",
+          "action": "crm:create_forecast",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:create_journey",
+          "action": "crm:create_journey",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
           "id": "crm:create_lead",
           "action": "crm:create_lead",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "tests/crm-lead-assignment-ref-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
             "web-admin/tests/e2e/crm/crm-batch-ops.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
@@ -2639,8 +2605,39 @@
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_lead_task",
+          "action": "crm:create_lead_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:create_opp_line",
+          "action": "crm:create_opp_line",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_opp_task",
+          "action": "crm:create_opp_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:create_opportunity",
@@ -2651,14 +2648,112 @@
           "evidence": [
             "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard.spec.ts",
+            "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
             "web-admin/tests/e2e/crm/crm-opportunity-currency.spec.ts",
             "web-admin/tests/e2e/crm/crm-opportunity-kanban.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
-            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
+            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_quote_summary",
+          "action": "crm:create_quote_summary",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:create_review",
+          "action": "crm:create_review",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m5-pcba.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_risk",
+          "action": "crm:create_risk",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:create_score_rule",
+          "action": "crm:create_score_rule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_segment",
+          "action": "crm:create_segment",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:create_session",
+          "action": "crm:create_session",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:create_sla_breach",
+          "action": "crm:create_sla_breach",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
           "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:create_sla_policy",
+          "action": "crm:create_sla_policy",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-campaign-sla.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_subscription",
+          "action": "crm:create_subscription",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:delete_account",
@@ -2673,8 +2768,7 @@
             "web-admin/tests/e2e/platform/multi-tenant-isolation.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "crm:delete_activity",
@@ -2686,12 +2780,11 @@
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
-          "id": "crm:delete_campaign",
-          "action": "crm:delete_campaign",
+          "id": "crm:delete_activity_relation",
+          "action": "crm:delete_activity_relation",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
@@ -2701,8 +2794,100 @@
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
+          "id": "crm:delete_approval_case",
+          "action": "crm:delete_approval_case",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-approval-case-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
+          "id": "crm:delete_assignment_rule",
+          "action": "crm:delete_assignment_rule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_campaign",
+          "action": "crm:delete_campaign",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_campaign_metric",
+          "action": "crm:delete_campaign_metric",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_clarification",
+          "action": "crm:delete_clarification",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_complaint",
+          "action": "crm:delete_complaint",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
           "id": "crm:delete_contact",
           "action": "crm:delete_contact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_customer_request",
+          "action": "crm:delete_customer_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_email_log",
+          "action": "crm:delete_email_log",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_email_template",
+          "action": "crm:delete_email_template",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
@@ -2720,8 +2905,17 @@
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:delete_opp_line",
+          "action": "crm:delete_opp_line",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:delete_opportunity",
@@ -2734,8 +2928,69 @@
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:delete_quote_summary",
+          "action": "crm:delete_quote_summary",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_review",
+          "action": "crm:delete_review",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_risk",
+          "action": "crm:delete_risk",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_score_rule",
+          "action": "crm:delete_score_rule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_sla_policy",
+          "action": "crm:delete_sla_policy",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:deliver_email_log",
+          "action": "crm:deliver_email_log",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-email-features.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:detail_account",
@@ -2760,8 +3015,85 @@
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
+          "id": "crm:detail_approval_case",
+          "action": "crm:detail_approval_case",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_assignment_rule",
+          "action": "crm:detail_assignment_rule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_clarification",
+          "action": "crm:detail_clarification",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_complaint",
+          "action": "crm:detail_complaint",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
           "id": "crm:detail_contact",
           "action": "crm:detail_contact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_customer_request",
+          "action": "crm:detail_customer_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_email_log",
+          "action": "crm:detail_email_log",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_email_template",
+          "action": "crm:detail_email_template",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
@@ -2793,6 +3125,123 @@
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
+          "id": "crm:detail_quote_summary",
+          "action": "crm:detail_quote_summary",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_review",
+          "action": "crm:detail_review",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_risk",
+          "action": "crm:detail_risk",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_score_rule",
+          "action": "crm:detail_score_rule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:enroll_journey",
+          "action": "crm:enroll_journey",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:exit_enrollment",
+          "action": "crm:exit_enrollment",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:fail_email_log",
+          "action": "crm:fail_email_log",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:fail_review",
+          "action": "crm:fail_review",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:flag_review_conditional",
+          "action": "crm:flag_review_conditional",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:grant_consent",
+          "action": "crm:grant_consent",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:investigate_complaint",
+          "action": "crm:investigate_complaint",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
           "id": "crm:list_accounts",
           "action": "crm:list_accounts",
           "surface": "ui",
@@ -2815,8 +3264,76 @@
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
+          "id": "crm:list_activity_relations",
+          "action": "crm:list_activity_relations",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_approval_cases",
+          "action": "crm:list_approval_cases",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-approval-case-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_assignment_rules",
+          "action": "crm:list_assignment_rules",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_campaign_members",
+          "action": "crm:list_campaign_members",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
           "id": "crm:list_campaigns",
           "action": "crm:list_campaigns",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_clarifications",
+          "action": "crm:list_clarifications",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_complaints",
+          "action": "crm:list_complaints",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
@@ -2837,8 +3354,63 @@
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
+          "id": "crm:list_customer_requests",
+          "action": "crm:list_customer_requests",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_email_logs",
+          "action": "crm:list_email_logs",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_email_templates",
+          "action": "crm:list_email_templates",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
           "id": "crm:list_leads",
           "action": "crm:list_leads",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_opp_contacts",
+          "action": "crm:list_opp_contacts",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_opp_lines",
+          "action": "crm:list_opp_lines",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
@@ -2859,6 +3431,142 @@
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
+          "id": "crm:list_quote_summaries",
+          "action": "crm:list_quote_summaries",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_reviews",
+          "action": "crm:list_reviews",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_risks",
+          "action": "crm:list_risks",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_score_rules",
+          "action": "crm:list_score_rules",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_sla_breaches",
+          "action": "crm:list_sla_breaches",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_sla_policies",
+          "action": "crm:list_sla_policies",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:log_account_activity",
+          "action": "crm:log_account_activity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:log_campaign_activity",
+          "action": "crm:log_campaign_activity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:log_complaint_activity",
+          "action": "crm:log_complaint_activity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:log_contact_activity",
+          "action": "crm:log_contact_activity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:log_lead_activity",
+          "action": "crm:log_lead_activity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:log_opp_activity",
+          "action": "crm:log_opp_activity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:lose_customer_request",
+          "action": "crm:lose_customer_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
           "id": "crm:lose_lead",
           "action": "crm:lose_lead",
           "surface": "ui",
@@ -2871,6 +3579,56 @@
         {
           "id": "crm:lose_opportunity",
           "action": "crm:lose_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:mark_clarification_replied",
+          "action": "crm:mark_clarification_replied",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:mark_customer_request_quoted",
+          "action": "crm:mark_customer_request_quoted",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:mitigate_risk",
+          "action": "crm:mitigate_risk",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:open_email_log",
+          "action": "crm:open_email_log",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:pass_review",
+          "action": "crm:pass_review",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
@@ -2897,11 +3655,266 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
-            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
+            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
+        },
+        {
+          "id": "crm:recompute_attribution",
+          "action": "crm:recompute_attribution",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:recompute_campaign_metrics",
+          "action": "crm:recompute_campaign_metrics",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:recompute_health",
+          "action": "crm:recompute_health",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:recompute_segment",
+          "action": "crm:recompute_segment",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:recompute_subscription",
+          "action": "crm:recompute_subscription",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:record_campaign_metric",
+          "action": "crm:record_campaign_metric",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:refresh_sales_snapshot",
+          "action": "crm:refresh_sales_snapshot",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:remove_campaign_member",
+          "action": "crm:remove_campaign_member",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:remove_opp_contact",
+          "action": "crm:remove_opp_contact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:rescore_lead",
+          "action": "crm:rescore_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:resolve_clarification",
+          "action": "crm:resolve_clarification",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:resolve_complaint",
+          "action": "crm:resolve_complaint",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:resolve_risk",
+          "action": "crm:resolve_risk",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:route_session",
+          "action": "crm:route_session",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:run_journey_scheduler",
+          "action": "crm:run_journey_scheduler",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:scan_duplicates",
+          "action": "crm:scan_duplicates",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:send_clarification",
+          "action": "crm:send_clarification",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:send_email_log",
+          "action": "crm:send_email_log",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-email-features.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:start_customer_request",
+          "action": "crm:start_customer_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:start_review",
+          "action": "crm:start_review",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:start_risk_mitigation",
+          "action": "crm:start_risk_mitigation",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:start_task",
+          "action": "crm:start_task",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-approval-case-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
+          "id": "crm:submit_customer_request",
+          "action": "crm:submit_customer_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m5-pcba.spec.ts",
+            "web-admin/tests/e2e/pcba/pcba-main-flow-permissions.spec.ts",
+            "web-admin/tests/e2e/pcba/pcba-main-flow.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:submit_forecast",
+          "action": "crm:submit_forecast",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:update_account",
@@ -2911,19 +3924,43 @@
           "driver": "browser",
           "evidence": [],
           "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "untested"
         },
         {
           "id": "crm:update_activity",
           "action": "crm:update_activity",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-approval-case-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
+          "id": "crm:update_approval_case",
+          "action": "crm:update_approval_case",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-approval-case-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
+          "id": "crm:update_assignment_rule",
+          "action": "crm:update_assignment_rule",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:update_campaign",
@@ -2933,8 +3970,49 @@
           "driver": "browser",
           "evidence": [],
           "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:update_campaign_member",
+          "action": "crm:update_campaign_member",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
           "verdict": "untested",
           "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:update_campaign_metric",
+          "action": "crm:update_campaign_metric",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:update_clarification",
+          "action": "crm:update_clarification",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:update_complaint",
+          "action": "crm:update_complaint",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:update_contact",
@@ -2947,15 +4025,66 @@
           "verdict": "untested"
         },
         {
-          "id": "crm:update_lead",
-          "action": "crm:update_lead",
+          "id": "crm:update_customer_request",
+          "action": "crm:update_customer_request",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [],
           "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:update_email_log",
+          "action": "crm:update_email_log",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:update_email_template",
+          "action": "crm:update_email_template",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:update_forecast",
+          "action": "crm:update_forecast",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:update_lead",
+          "action": "crm:update_lead",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-lead-assignment-ref-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
+          "id": "crm:update_opp_line",
+          "action": "crm:update_opp_line",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:update_opportunity",
@@ -2965,8 +4094,69 @@
           "driver": "browser",
           "evidence": [],
           "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:update_quote_summary",
+          "action": "crm:update_quote_summary",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:update_review",
+          "action": "crm:update_review",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:update_risk",
+          "action": "crm:update_risk",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:update_score_rule",
+          "action": "crm:update_score_rule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:update_sla_policy",
+          "action": "crm:update_sla_policy",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:win_customer_request",
+          "action": "crm:win_customer_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:win_opportunity",
@@ -2981,70 +4171,201 @@
           "verdict": "pass"
         },
         {
-          "id": "page:crm_account_detail",
-          "action": "crm_account_detail",
+          "id": "crm:withdraw_consent",
+          "action": "crm:withdraw_consent",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=detail model=crm_account"
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
-          "id": "page:crm_account_form",
-          "action": "crm_account_form",
+          "id": "page:crm_account_common_detail",
+          "action": "crm_account_common_detail",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=form model=crm_account"
+          "evidence": [
+            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=crm_account_common"
         },
         {
-          "id": "page:crm_account_list",
-          "action": "crm_account_list",
+          "id": "page:crm_account_common_form",
+          "action": "crm_account_common_form",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=list model=crm_account"
+          "evidence": [
+            "web-admin/tests/e2e/pcba-solution/quote-bom-customer-crud-isolation.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/quote-bom-forms-search-datascope.spec.ts",
+            "web-admin/tests/e2e/platform/form-redirect-regression.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=form model=crm_account_common"
         },
         {
-          "id": "page:crm_activity_detail",
-          "action": "crm_activity_detail",
+          "id": "page:crm_account_common_list",
+          "action": "crm_account_common_list",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=detail model=crm_activity"
+          "evidence": [
+            "web-admin/tests/e2e/list-ux/list-ux-enhancements.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/quote-bom-customer-crud-isolation.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/quote-bom-forms-search-datascope.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/role-capability-closed-loop.spec.ts",
+            "web-admin/tests/e2e/pcba/pcba-main-flow.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=crm_account_common"
         },
         {
-          "id": "page:crm_activity_form",
-          "action": "crm_activity_form",
+          "id": "page:crm_activity_common_detail",
+          "action": "crm_activity_common_detail",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=form model=crm_activity"
+          "evidence": [
+            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=crm_activity_common"
         },
         {
-          "id": "page:crm_activity_list",
-          "action": "crm_activity_list",
+          "id": "page:crm_activity_common_form",
+          "action": "crm_activity_common_form",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=list model=crm_activity"
+          "note": "kind=form model=crm_activity_common"
+        },
+        {
+          "id": "page:crm_activity_common_list",
+          "action": "crm_activity_common_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=crm_activity_common"
+        },
+        {
+          "id": "page:crm_approval_case_common_detail",
+          "action": "crm_approval_case_common_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_approval_case_common"
+        },
+        {
+          "id": "page:crm_approval_case_common_form",
+          "action": "crm_approval_case_common_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_approval_case_common"
+        },
+        {
+          "id": "page:crm_approval_case_common_list",
+          "action": "crm_approval_case_common_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_approval_case_common"
+        },
+        {
+          "id": "page:crm_assignment_rule_detail",
+          "action": "crm_assignment_rule_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=crm_assignment_rule"
+        },
+        {
+          "id": "page:crm_assignment_rule_form",
+          "action": "crm_assignment_rule_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_assignment_rule"
+        },
+        {
+          "id": "page:crm_assignment_rule_list",
+          "action": "crm_assignment_rule_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=crm_assignment_rule"
+        },
+        {
+          "id": "page:crm_attribution_detail",
+          "action": "crm_attribution_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_attribution"
+        },
+        {
+          "id": "page:crm_attribution_form",
+          "action": "crm_attribution_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_attribution"
+        },
+        {
+          "id": "page:crm_attribution_list",
+          "action": "crm_attribution_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_attribution"
         },
         {
           "id": "page:crm_campaign_detail",
@@ -3052,9 +4373,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-campaign-sla.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=detail model=crm_campaign"
         },
         {
@@ -3080,116 +4403,814 @@
           "note": "kind=list model=crm_campaign"
         },
         {
-          "id": "page:crm_contact_detail",
-          "action": "crm_contact_detail",
+          "id": "page:crm_clarification_common_detail",
+          "action": "crm_clarification_common_detail",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=detail model=crm_contact"
+          "note": "kind=detail model=crm_clarification_common"
         },
         {
-          "id": "page:crm_contact_form",
-          "action": "crm_contact_form",
+          "id": "page:crm_clarification_common_form",
+          "action": "crm_clarification_common_form",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=form model=crm_contact"
+          "note": "kind=form model=crm_clarification_common"
         },
         {
-          "id": "page:crm_contact_list",
-          "action": "crm_contact_list",
+          "id": "page:crm_clarification_common_list",
+          "action": "crm_clarification_common_list",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=list model=crm_contact"
+          "note": "kind=list model=crm_clarification_common"
         },
         {
-          "id": "page:crm_lead_detail",
-          "action": "crm_lead_detail",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=detail model=crm_lead"
-        },
-        {
-          "id": "page:crm_lead_form",
-          "action": "crm_lead_form",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=form model=crm_lead"
-        },
-        {
-          "id": "page:crm_lead_list",
-          "action": "crm_lead_list",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
-          "note": "kind=list model=crm_lead"
-        },
-        {
-          "id": "page:crm_lead_workbench",
-          "action": "crm_lead_workbench",
+          "id": "page:crm_complaint_detail",
+          "action": "crm_complaint_detail",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/crm-starter-lead-workbench.spec.ts"
+            "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
-          "note": "kind=detail model=crm_lead"
+          "note": "kind=detail model=crm_complaint"
         },
         {
-          "id": "page:crm_opportunity_detail",
-          "action": "crm_opportunity_detail",
+          "id": "page:crm_complaint_form",
+          "action": "crm_complaint_form",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=detail model=crm_opportunity"
+          "note": "kind=form model=crm_complaint"
         },
         {
-          "id": "page:crm_opportunity_form",
-          "action": "crm_opportunity_form",
+          "id": "page:crm_complaint_list",
+          "action": "crm_complaint_list",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=form model=crm_opportunity"
+          "note": "kind=list model=crm_complaint"
         },
         {
-          "id": "page:crm_opportunity_list",
-          "action": "crm_opportunity_list",
+          "id": "page:crm_consent_detail",
+          "action": "crm_consent_detail",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [],
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
-          "note": "kind=list model=crm_opportunity"
+          "note": "kind=detail model=crm_consent"
+        },
+        {
+          "id": "page:crm_consent_form",
+          "action": "crm_consent_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_consent"
+        },
+        {
+          "id": "page:crm_consent_list",
+          "action": "crm_consent_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_consent"
+        },
+        {
+          "id": "page:crm_contact_common_detail",
+          "action": "crm_contact_common_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/email/email-crm-timeline.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=crm_contact_common"
+        },
+        {
+          "id": "page:crm_contact_common_form",
+          "action": "crm_contact_common_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_contact_common"
+        },
+        {
+          "id": "page:crm_contact_common_list",
+          "action": "crm_contact_common_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/email/email-crm-timeline.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=crm_contact_common"
+        },
+        {
+          "id": "page:crm_customer_request_common_detail",
+          "action": "crm_customer_request_common_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_customer_request_common"
+        },
+        {
+          "id": "page:crm_customer_request_common_form",
+          "action": "crm_customer_request_common_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_customer_request_common"
+        },
+        {
+          "id": "page:crm_customer_request_common_list",
+          "action": "crm_customer_request_common_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_customer_request_common"
+        },
+        {
+          "id": "page:crm_email_log_detail",
+          "action": "crm_email_log_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_email_log"
+        },
+        {
+          "id": "page:crm_email_log_form",
+          "action": "crm_email_log_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_email_log"
+        },
+        {
+          "id": "page:crm_email_log_list",
+          "action": "crm_email_log_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-email-features.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=crm_email_log"
+        },
+        {
+          "id": "page:crm_email_template_detail",
+          "action": "crm_email_template_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_email_template"
+        },
+        {
+          "id": "page:crm_email_template_form",
+          "action": "crm_email_template_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_email_template"
+        },
+        {
+          "id": "page:crm_email_template_list",
+          "action": "crm_email_template_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-email-features.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=crm_email_template"
+        },
+        {
+          "id": "page:crm_forecast_submission_detail",
+          "action": "crm_forecast_submission_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_forecast_submission"
+        },
+        {
+          "id": "page:crm_forecast_submission_form",
+          "action": "crm_forecast_submission_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_forecast_submission"
+        },
+        {
+          "id": "page:crm_forecast_submission_list",
+          "action": "crm_forecast_submission_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_forecast_submission"
+        },
+        {
+          "id": "page:crm_journey_detail",
+          "action": "crm_journey_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_journey"
+        },
+        {
+          "id": "page:crm_journey_enrollment_detail",
+          "action": "crm_journey_enrollment_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_journey_enrollment"
+        },
+        {
+          "id": "page:crm_journey_enrollment_form",
+          "action": "crm_journey_enrollment_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_journey_enrollment"
+        },
+        {
+          "id": "page:crm_journey_enrollment_list",
+          "action": "crm_journey_enrollment_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_journey_enrollment"
+        },
+        {
+          "id": "page:crm_journey_form",
+          "action": "crm_journey_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_journey"
+        },
+        {
+          "id": "page:crm_journey_list",
+          "action": "crm_journey_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_journey"
+        },
+        {
+          "id": "page:crm_lead_common_detail",
+          "action": "crm_lead_common_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
+            "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts",
+            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=crm_lead_common"
+        },
+        {
+          "id": "page:crm_lead_common_form",
+          "action": "crm_lead_common_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_lead_common"
+        },
+        {
+          "id": "page:crm_lead_common_list",
+          "action": "crm_lead_common_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/aurabot/ai-panel.spec.ts",
+            "web-admin/tests/e2e/crm/crm-inbound-lifecycle.spec.ts",
+            "web-admin/tests/e2e/crm/crm-inline-edit.spec.ts",
+            "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts",
+            "web-admin/tests/e2e/list-ux/ux-form-validation.spec.ts",
+            "web-admin/tests/e2e/list-ux/ux-loading-states.spec.ts",
+            "web-admin/tests/e2e/list-ux/ux-operation-feedback.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=crm_lead_common"
+        },
+        {
+          "id": "page:crm_lead_conversion",
+          "action": "crm_lead_conversion",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_lead_common"
+        },
+        {
+          "id": "page:crm_lead_score_rule_detail",
+          "action": "crm_lead_score_rule_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=crm_lead_score_rule"
+        },
+        {
+          "id": "page:crm_lead_score_rule_form",
+          "action": "crm_lead_score_rule_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_lead_score_rule"
+        },
+        {
+          "id": "page:crm_lead_score_rule_list",
+          "action": "crm_lead_score_rule_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=crm_lead_score_rule"
+        },
+        {
+          "id": "page:crm_manager_workbench_detail",
+          "action": "crm_manager_workbench_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_customer_request_common"
+        },
+        {
+          "id": "page:crm_manager_workbench_list",
+          "action": "crm_manager_workbench_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_customer_request_common"
+        },
+        {
+          "id": "page:crm_my_tasks_list",
+          "action": "crm_my_tasks_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_activity_common"
+        },
+        {
+          "id": "page:crm_omni_session_detail",
+          "action": "crm_omni_session_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_omni_session"
+        },
+        {
+          "id": "page:crm_omni_session_form",
+          "action": "crm_omni_session_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_omni_session"
+        },
+        {
+          "id": "page:crm_omni_session_list",
+          "action": "crm_omni_session_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_omni_session"
+        },
+        {
+          "id": "page:crm_opportunity_common_detail",
+          "action": "crm_opportunity_common_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
+            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=crm_opportunity_common"
+        },
+        {
+          "id": "page:crm_opportunity_common_form",
+          "action": "crm_opportunity_common_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_opportunity_common"
+        },
+        {
+          "id": "page:crm_opportunity_common_list",
+          "action": "crm_opportunity_common_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m4-forecast.spec.ts",
+            "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
+            "web-admin/tests/e2e/crm/crm-opportunity-currency.spec.ts",
+            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=crm_opportunity_common"
+        },
+        {
+          "id": "page:crm_quote_summary_common_detail",
+          "action": "crm_quote_summary_common_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_quote_summary_common"
+        },
+        {
+          "id": "page:crm_quote_summary_common_form",
+          "action": "crm_quote_summary_common_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_quote_summary_common"
+        },
+        {
+          "id": "page:crm_quote_summary_common_list",
+          "action": "crm_quote_summary_common_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_quote_summary_common"
+        },
+        {
+          "id": "page:crm_review_common_detail",
+          "action": "crm_review_common_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m5-pcba.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=crm_review_common"
+        },
+        {
+          "id": "page:crm_review_common_form",
+          "action": "crm_review_common_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_review_common"
+        },
+        {
+          "id": "page:crm_review_common_list",
+          "action": "crm_review_common_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-m5-pcba.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=crm_review_common"
+        },
+        {
+          "id": "page:crm_risk_common_detail",
+          "action": "crm_risk_common_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_risk_common"
+        },
+        {
+          "id": "page:crm_risk_common_form",
+          "action": "crm_risk_common_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_risk_common"
+        },
+        {
+          "id": "page:crm_risk_common_list",
+          "action": "crm_risk_common_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_risk_common"
+        },
+        {
+          "id": "page:crm_sales_snapshot_detail",
+          "action": "crm_sales_snapshot_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_sales_snapshot"
+        },
+        {
+          "id": "page:crm_sales_snapshot_list",
+          "action": "crm_sales_snapshot_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_sales_snapshot"
+        },
+        {
+          "id": "page:crm_sales_workbench_detail",
+          "action": "crm_sales_workbench_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_customer_request_common"
+        },
+        {
+          "id": "page:crm_sales_workbench_list",
+          "action": "crm_sales_workbench_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_customer_request_common"
+        },
+        {
+          "id": "page:crm_segment_detail",
+          "action": "crm_segment_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_segment"
+        },
+        {
+          "id": "page:crm_segment_form",
+          "action": "crm_segment_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_segment"
+        },
+        {
+          "id": "page:crm_segment_list",
+          "action": "crm_segment_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_segment"
+        },
+        {
+          "id": "page:crm_sla_breach_detail",
+          "action": "crm_sla_breach_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_sla_breach"
+        },
+        {
+          "id": "page:crm_sla_breach_list",
+          "action": "crm_sla_breach_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_sla_breach"
+        },
+        {
+          "id": "page:crm_sla_policy_detail",
+          "action": "crm_sla_policy_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_sla_policy"
+        },
+        {
+          "id": "page:crm_sla_policy_form",
+          "action": "crm_sla_policy_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_sla_policy"
+        },
+        {
+          "id": "page:crm_sla_policy_list",
+          "action": "crm_sla_policy_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_sla_policy"
+        },
+        {
+          "id": "page:crm_subscription_detail",
+          "action": "crm_subscription_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_subscription"
+        },
+        {
+          "id": "page:crm_subscription_form",
+          "action": "crm_subscription_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_subscription"
+        },
+        {
+          "id": "page:crm_subscription_list",
+          "action": "crm_subscription_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_subscription"
         }
       ]
     },
@@ -3727,9 +5748,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/templates/thr-leave-request-lifecycle.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=detail model=thr_leave_request"
         },
         {
@@ -3739,7 +5762,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/bpm/bpm-form-integration.spec.ts"
+            "web-admin/tests/e2e/bpm/bpm-form-integration.spec.ts",
+            "web-admin/tests/e2e/templates/thr-leave-request-lifecycle.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -3751,9 +5775,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/bpm/bpm-form-integration.spec.ts",
+            "web-admin/tests/e2e/templates/thr-leave-request-lifecycle.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=thr_leave_request"
         }
       ]
@@ -3776,8 +5803,7 @@
             "web-admin/tests/e2e/organization/org-position.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "org:create_employee",
@@ -3791,8 +5817,7 @@
             "web-admin/tests/e2e/organization/org-enhanced.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "org:create_position",
@@ -3807,8 +5832,7 @@
             "web-admin/tests/e2e/organization/org-position.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "org:create_team",
@@ -3821,8 +5845,7 @@
             "web-admin/tests/e2e/organization/team-management.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "org:delete_department",
@@ -3835,8 +5858,7 @@
             "web-admin/tests/e2e/organization/org-enhanced.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "org:delete_employee",
@@ -3848,8 +5870,7 @@
             "web-admin/tests/e2e/organization/org-enhanced.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "org:delete_position",
@@ -3862,8 +5883,7 @@
             "web-admin/tests/e2e/organization/org-position.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "org:delete_team",
@@ -3875,8 +5895,7 @@
             "web-admin/tests/e2e/organization/team-management.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "org:open_employee_account",
@@ -3898,8 +5917,7 @@
           "driver": "browser",
           "evidence": [],
           "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "untested"
         },
         {
           "id": "org:update_employee",
@@ -3911,8 +5929,7 @@
             "web-admin/tests/e2e/organization/org-employee.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "org:update_position",
@@ -3922,8 +5939,7 @@
           "driver": "browser",
           "evidence": [],
           "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "untested"
         },
         {
           "id": "org:update_team",
@@ -3935,8 +5951,7 @@
             "web-admin/tests/e2e/organization/team-management.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "page:ab_team_detail",
@@ -3994,9 +6009,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/pcba-solution/quote-bom-org-admin.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=form model=org_department"
         },
         {
@@ -4005,9 +6022,14 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/organization/member-detail.spec.ts",
+            "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/quote-bom-org-admin.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=org_department"
         },
         {
@@ -4038,9 +6060,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=org_employee"
         },
         {
@@ -4071,9 +6096,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/organization/member-detail.spec.ts",
+            "web-admin/tests/e2e/organization/org-enhanced.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=org_position"
         }
       ]
@@ -4152,8 +6180,7 @@
             "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "page:page_schema_form",
@@ -4162,7 +6189,9 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/admin/page-schema-list.spec.ts"
+            "web-admin/tests/e2e/admin/page-schema-list.spec.ts",
+            "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts",
+            "web-admin/tests/e2e/showcase/page-creation-dispatch-e2e.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -4174,9 +6203,26 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/admin/page-schema-list.spec.ts",
+            "web-admin/tests/e2e/list-renderer/list-action-column.golden.spec.ts",
+            "web-admin/tests/e2e/page-designer/page-designer-full-lifecycle.spec.ts",
+            "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts",
+            "web-admin/tests/e2e/showcase/detail-configpanel-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/form-blocksdesigner-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/list-configpanel-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/page-creation-dispatch-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/page-rebuild-from-designer-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts",
+            "web-admin/tests/e2e/showcase/widgets-choice-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/widgets-date-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/widgets-misc-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/widgets-numeric-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/widgets-text-e2e.spec.ts",
+            "web-admin/tests/e2e/studio/page-templates.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=page_schema"
         }
       ]
@@ -4520,9 +6566,13 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/admin/api-connector-lifecycle.spec.ts",
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts",
+            "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=api_connector"
         },
         {
@@ -4542,9 +6592,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=bpm_domain_config"
         },
         {
@@ -4553,9 +6605,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/decisionops/condition-fragment-library-golden.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=form model=bpm_process_management"
         },
         {
@@ -4564,9 +6618,30 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/bpm-designer/designer-gateway-condition.spec.ts",
+            "web-admin/tests/e2e/bpm-designer/designer-ruletask-drools.spec.ts",
+            "web-admin/tests/e2e/bpm/aura-policy-roundtrip.spec.ts",
+            "web-admin/tests/e2e/bpm/bpm-definition-lifecycle.spec.ts",
+            "web-admin/tests/e2e/bpm/bpm-designer-interaction.spec.ts",
+            "web-admin/tests/e2e/bpm/bpm-lifecycle.spec.ts",
+            "web-admin/tests/e2e/bpm/designer-callactivity.spec.ts",
+            "web-admin/tests/e2e/bpm/designer-gateway-lifecycle.spec.ts",
+            "web-admin/tests/e2e/bpm/designer-roundtrip.spec.ts",
+            "web-admin/tests/e2e/bpm/designer-servicetask-command.spec.ts",
+            "web-admin/tests/e2e/bpm/designer-servicetask-http.spec.ts",
+            "web-admin/tests/e2e/bpm/designer-servicetask-java.spec.ts",
+            "web-admin/tests/e2e/bpm/designer-usertask-form.spec.ts",
+            "web-admin/tests/e2e/bpm/designer-usertask-hooks.spec.ts",
+            "web-admin/tests/e2e/bpm/designer-usertask-multiinstance.spec.ts",
+            "web-admin/tests/e2e/bpm/plugin-roundtrip.spec.ts",
+            "web-admin/tests/e2e/bpm/rule-binding-designer-host.spec.ts",
+            "web-admin/tests/e2e/bpm/tenant-isolation-ui.spec.ts",
+            "web-admin/tests/e2e/bpm/ui-full-stack-lifecycle.spec.ts",
+            "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=bpm_process_management"
         },
         {
@@ -4575,9 +6650,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/dashboard/dashboard-management.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=dashboard_management"
         },
         {
@@ -4586,9 +6663,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=form model=data_permission"
         },
         {
@@ -4597,9 +6676,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=data_permission"
         },
         {
@@ -4636,9 +6717,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/admin/scheduled-task-lifecycle.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=detail model=scheduled_task"
         },
         {
@@ -4647,9 +6730,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/admin/scheduled-task-lifecycle.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=form model=scheduled_task"
         },
         {
@@ -4658,9 +6743,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/admin/scheduled-task-lifecycle.spec.ts",
+            "web-admin/tests/e2e/platform-admin/scheduled-task-dsl.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=scheduled_task"
         },
         {
@@ -4669,9 +6757,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/bpm/sla-rule-center-binding.spec.ts",
+            "web-admin/tests/e2e/decisionops/condition-fragment-library-golden.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=detail model=sla_config"
         },
         {
@@ -4691,9 +6782,13 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts",
+            "web-admin/tests/e2e/bpm/sla-rule-center-binding.spec.ts",
+            "web-admin/tests/e2e/decisionops/rule-center-main-entry-ux-smoke.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=sla_config"
         },
         {
@@ -4730,9 +6825,15 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts",
+            "web-admin/tests/e2e/enterprise/member-invite.spec.ts",
+            "web-admin/tests/e2e/organization/member-detail.spec.ts",
+            "web-admin/tests/e2e/organization/tenant-member-password-reset.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/quote-bom-focused-menu-and-permissions.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=tenant_member"
         },
         {
@@ -4763,9 +6864,13 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts",
+            "web-admin/tests/e2e/admin/webhook-lifecycle.spec.ts",
+            "web-admin/tests/e2e/decisionops/decisionops-full-golden.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=webhook"
         }
       ]
@@ -5175,8 +7280,7 @@
             "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "sc:delete_monthly_metric",
@@ -5199,8 +7303,7 @@
             "web-admin/tests/e2e/bpm/picker-fill-roundtrip.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "sc:detail_showcase",
@@ -5245,8 +7348,7 @@
             "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "page:showcase_all_fields_detail",
@@ -5254,9 +7356,14 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/platform/showcase-all-fields-lifecycle.spec.ts",
+            "web-admin/tests/e2e/platform/showcase-smart-components.spec.ts",
+            "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=detail model=showcase_all_fields"
         },
         {
@@ -5265,9 +7372,17 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/bpm/picker-fill-roundtrip.spec.ts",
+            "web-admin/tests/e2e/platform/form-redirect-regression.spec.ts",
+            "web-admin/tests/e2e/platform/showcase-smart-components.spec.ts",
+            "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/validation-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/widgets-date-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/widgets-text-e2e.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=form model=showcase_all_fields"
         },
         {
@@ -5277,13 +7392,17 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/platform/form-redirect-regression.spec.ts",
             "web-admin/tests/e2e/platform/showcase-all-fields-lifecycle.spec.ts",
+            "web-admin/tests/e2e/platform/showcase-form-validation.spec.ts",
+            "web-admin/tests/e2e/showcase/ga-showcase-saved-view-deep.spec.ts",
             "web-admin/tests/e2e/showcase/list-ux-features.spec.ts",
             "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
             "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts",
             "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts",
             "web-admin/tests/e2e/showcase/subtable-modes-e2e.spec.ts",
-            "web-admin/tests/e2e/showcase/validation-e2e.spec.ts"
+            "web-admin/tests/e2e/showcase/validation-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/widgets-date-e2e.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -5985,9 +8104,21 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/activity/activity-timeline.spec.ts",
+            "web-admin/tests/e2e/block-renderer/block-types.spec.ts",
+            "web-admin/tests/e2e/dsl-productization/dsl-productization.spec.ts",
+            "web-admin/tests/e2e/e2et-order/e2et-detail-visibility.spec.ts",
+            "web-admin/tests/e2e/e2et-order/e2et-formatting.spec.ts",
+            "web-admin/tests/e2e/e2et-order/e2et-order-commands.spec.ts",
+            "web-admin/tests/e2e/e2et-order/e2et-order-row-click-navigation.spec.ts",
+            "web-admin/tests/e2e/e2et-order/e2et-order-subtable.spec.ts",
+            "web-admin/tests/e2e/e2et-order/e2et-reference-field.spec.ts",
+            "web-admin/tests/e2e/smart-components/smart-display-components.spec.ts",
+            "web-admin/tests/e2e/smart-components/smart-interaction-components.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=detail model=e2et_order"
         },
         {
@@ -5996,9 +8127,12 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/dsl-productization/dsl-productization.spec.ts",
+            "web-admin/tests/e2e/i18n/i18n-deep.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=form model=e2et_order"
         },
         {
@@ -6008,6 +8142,14 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/action-system/action-types.spec.ts",
+            "web-admin/tests/e2e/community/community-smoke.spec.ts",
+            "web-admin/tests/e2e/dataplane-review/dataplane-ui-audit.spec.ts",
+            "web-admin/tests/e2e/dataplane-review/list-page-actions-golden.spec.ts",
+            "web-admin/tests/e2e/dsl-productization/dsl-productization.spec.ts",
+            "web-admin/tests/e2e/mobile-seed/cross-platform-seed.spec.ts",
+            "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts",
+            "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts",
             "web-admin/tests/e2e/saved-view/quick-filter-team-pin-golden.spec.ts",
             "web-admin/tests/e2e/saved-view/quick-filter-user-pin-golden.spec.ts",
             "web-admin/tests/e2e/saved-view/quick-filter-view-chip-golden.spec.ts",
@@ -6030,7 +8172,8 @@
             "web-admin/tests/e2e/saved-view/saved-view-timeline.spec.ts",
             "web-admin/tests/e2e/saved-view/saved-view-tree.spec.ts",
             "web-admin/tests/e2e/saved-view/saved-view-ux-optimization.spec.ts",
-            "web-admin/tests/e2e/showcase/view-management.spec.ts"
+            "web-admin/tests/e2e/showcase/view-management.spec.ts",
+            "web-admin/tests/e2e/smart-components/smart-display-components.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -6075,9 +8218,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/report-template/report-generate-button.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=detail model=e2et_record"
         },
         {
@@ -6086,9 +8231,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/report-template/report-generate-button.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=e2et_record"
         }
       ]
@@ -6131,8 +8278,7 @@
             "web-admin/tests/e2e/workflow-demo/wd-leave-diagram-first-open.spec.ts"
           ],
           "assertion": "driven through the UI",
-          "verdict": "pass",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "pass"
         },
         {
           "id": "wd:create_leave_request",
@@ -6155,8 +8301,7 @@
           "driver": "browser",
           "evidence": [],
           "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "untested"
         },
         {
           "id": "wd:submit_leave_request",
@@ -6182,8 +8327,7 @@
           "driver": "browser",
           "evidence": [],
           "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "untested"
         },
         {
           "id": "wd:update_leave_request",
@@ -6193,8 +8337,7 @@
           "driver": "browser",
           "evidence": [],
           "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "untested"
         },
         {
           "id": "page:wd_leave_balance_list",
@@ -6214,9 +8357,17 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/bpm/ui-full-stack-lifecycle.spec.ts",
             "web-admin/tests/e2e/bpm-designer/designer-usertask-form.spec.ts",
-            "web-admin/tests/e2e/bpm-smoke/wf-end-to-end-smoke.spec.ts"
+            "web-admin/tests/e2e/bpm-smoke/wf-end-to-end-smoke.spec.ts",
+            "web-admin/tests/e2e/bpm/ui-full-stack-lifecycle.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-cancel.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-detail-tabs.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-diagram-first-open.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-form-page.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-long-hr.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-reject.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-short-manager.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-sla-escalation.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -6229,7 +8380,9 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/bpm/designer-usertask-form.spec.ts"
+            "web-admin/tests/e2e/bpm/designer-usertask-form.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-form-page.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-no-balance-error.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
@@ -6241,9 +8394,15 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/bpm/ui-full-stack-lifecycle.spec.ts",
+            "web-admin/tests/e2e/bpm/workflow-demo-leave-flow.spec.ts",
+            "web-admin/tests/e2e/p1demo/wd-leave-request-ai-lifecycle.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-diagram-first-open.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-form-page.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=list model=wd_leave_request"
         }
       ]
@@ -6765,10 +8924,9 @@
             "web-admin/tests/e2e/crm/crm-inbound-lifecycle.spec.ts",
             "web-admin/tests/e2e/crm/crm-inbound-smoke.spec.ts",
             "web-admin/tests/e2e/crm/crm-merge-queue.spec.ts",
+            "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
             "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
             "web-admin/tests/e2e/crm/crm-web-form.spec.ts",
-            "web-admin/tests/e2e/crm-starter-demo-dashboard.spec.ts",
-            "web-admin/tests/e2e/crm-starter-demo-pipeline.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
             "web-admin/tests/e2e/dashboard/aggregate-grain-orderby-golden.spec.ts",
             "web-admin/tests/e2e/dashboard/arsenal-live-datasource-golden.spec.ts",
@@ -6864,6 +9022,7 @@
             "web-admin/tests/e2e/quality/quality-pqc-fqc-crud.spec.ts",
             "web-admin/tests/e2e/realtime-data-push.spec.ts",
             "web-admin/tests/e2e/report-template/report-template-crud.spec.ts",
+            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts",
             "web-admin/tests/e2e/sales/sales-dashboard.spec.ts",
             "web-admin/tests/e2e/sales/sales-order-lifecycle.spec.ts",
             "web-admin/tests/e2e/sales/sales-pricing.spec.ts",
@@ -7893,10 +10052,10 @@
     }
   ],
   "stats": {
-    "commands": 332,
-    "untested": 228,
-    "pages": 201,
-    "pagesUntested": 175,
+    "commands": 452,
+    "untested": 318,
+    "pages": 258,
+    "pagesUntested": 167,
     "platformPages": 99,
     "platformPagesUntested": 41
   }

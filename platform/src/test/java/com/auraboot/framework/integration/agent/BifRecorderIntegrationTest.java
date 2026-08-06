@@ -51,8 +51,8 @@ class BifRecorderIntegrationTest extends BaseIntegrationTest {
     void record_persists_core_fields() {
         BusinessIntentFrame bif = BusinessIntentFrame.builder()
                 .intent("query")
-                .object("crm_account")
-                .primaryObject("crm_account")
+                .object("crm_account_common")
+                .primaryObject("crm_account_common")
                 .riskLevel("L0")
                 .actionability("read_only")
                 .matchType("alias")
@@ -73,7 +73,7 @@ class BifRecorderIntegrationTest extends BaseIntegrationTest {
                         "FROM ab_agent_bif WHERE pid = ?", pid);
 
         assertThat(row.get("intent")).isEqualTo("query");
-        assertThat(row.get("object")).isEqualTo("crm_account");
+        assertThat(row.get("object")).isEqualTo("crm_account_common");
         assertThat(row.get("risk_level")).isEqualTo("L0");
         assertThat(row.get("actionability")).isEqualTo("read_only");
         assertThat(row.get("match_type")).isEqualTo("alias");
@@ -88,7 +88,7 @@ class BifRecorderIntegrationTest extends BaseIntegrationTest {
     void record_persists_jsonb_columns() {
         BusinessIntentFrame bif = BusinessIntentFrame.builder()
                 .intent("analyze")
-                .object("crm_lead")
+                .object("crm_lead_common")
                 .riskLevel("L0")
                 .actionability("read_only")
                 .confidence(ConfidenceScore.of(0.8, 0.7))
@@ -116,7 +116,7 @@ class BifRecorderIntegrationTest extends BaseIntegrationTest {
     @DisplayName("attachRun() backfills run_id / step_index / dispatched_skill")
     void attachRun_backfills_run_fields() {
         BusinessIntentFrame bif = BusinessIntentFrame.builder()
-                .intent("query").object("crm_account").riskLevel("L0")
+                .intent("query").object("crm_account_common").riskLevel("L0")
                 .confidence(ConfidenceScore.of(0.9, 0.8))
                 .candidateSkillsMode("hint")
                 .build();
@@ -135,9 +135,9 @@ class BifRecorderIntegrationTest extends BaseIntegrationTest {
     @DisplayName("GroundingService.ground() output round-trips through BifRecorder")
     void grounding_output_round_trips() {
         // IntentParser's built-in patterns recognize "查询" / "查看" / "show" as query intent;
-        // ObjectResolver recognizes "客户" as crm_account via ab_object_alias seed.
+        // ObjectResolver recognizes "客户" as crm_account_common via ab_object_alias seed.
         var ctx = GroundingService.GroundingContext.builder()
-                .pageModel("crm_account")
+                .pageModel("crm_account_common")
                 .sessionId("sess-grd-01")
                 .build();
         BusinessIntentFrame bif = groundingService.ground(tenantId, "查看客户", ctx);

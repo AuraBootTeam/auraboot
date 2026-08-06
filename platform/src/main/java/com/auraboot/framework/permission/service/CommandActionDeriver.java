@@ -91,7 +91,7 @@ public class CommandActionDeriver {
 
     /**
      * Extract verb from command code.
-     * E.g., "crm:qualify_lead" with modelCode "crm_lead" → "qualify"
+     * E.g., "crm:qualify_lead" with modelCode "crm_lead_common" → "qualify"
      */
     private String extractVerb(String commandCode, String modelCode) {
         if (commandCode == null) {

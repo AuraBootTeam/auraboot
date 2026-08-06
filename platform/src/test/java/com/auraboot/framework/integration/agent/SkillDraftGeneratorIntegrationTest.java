@@ -78,8 +78,8 @@ class SkillDraftGeneratorIntegrationTest extends BaseIntegrationTest {
     void generates_drafts_for_observed_patterns() {
         String sigA = "sig_A_" + tenantId;
         String sigB = "sig_B_" + tenantId;
-        seedPattern(sigA, "crm_lead",        "update", "full",     "cmd_update_lead", 10);
-        seedPattern(sigB, "crm_opportunity", "create", "semantic", "api.create_opp",  10);
+        seedPattern(sigA, "crm_lead_common",        "update", "full",     "cmd_update_lead", 10);
+        seedPattern(sigB, "crm_opportunity_common", "create", "semantic", "api.create_opp",  10);
 
         int created = generator.generateDrafts();
         assertThat(created).isEqualTo(2);
@@ -101,7 +101,7 @@ class SkillDraftGeneratorIntegrationTest extends BaseIntegrationTest {
     @DisplayName("substrate chosen from dominant Action fidelity")
     void substrate_inferred_from_fidelity() {
         String sig = "sig_dsl_" + tenantId;
-        seedPattern(sig, "crm_lead", "update", "full", "cmd_X", 10);
+        seedPattern(sig, "crm_lead_common", "update", "full", "cmd_X", 10);
         generator.generateDrafts();
 
         String yaml = jdbc.queryForObject(
@@ -112,7 +112,7 @@ class SkillDraftGeneratorIntegrationTest extends BaseIntegrationTest {
                 String.class, tenantId, sig);
         assertThat(yaml).contains("substrate: dsl");
         assertThat(yaml).contains("tool_refs:").contains("- cmd_X");
-        assertThat(yaml).contains("target_model: crm_lead");
+        assertThat(yaml).contains("target_model: crm_lead_common");
         assertThat(yaml).contains("action_type: update");
     }
 
@@ -121,8 +121,8 @@ class SkillDraftGeneratorIntegrationTest extends BaseIntegrationTest {
     void substrate_mapping() {
         String sigApi = "sig_api_" + tenantId;
         String sigCode = "sig_code_" + tenantId;
-        seedPattern(sigApi,  "crm_lead", "query",  "semantic", "api.x", 10);
-        seedPattern(sigCode, "crm_lead", "export", "blackbox", "code.y", 10);
+        seedPattern(sigApi,  "crm_lead_common", "query",  "semantic", "api.x", 10);
+        seedPattern(sigCode, "crm_lead_common", "export", "blackbox", "code.y", 10);
         generator.generateDrafts();
 
         String yamlApi = jdbc.queryForObject(
@@ -144,7 +144,7 @@ class SkillDraftGeneratorIntegrationTest extends BaseIntegrationTest {
     @DisplayName("draft insertion is idempotent — second run does not create duplicates")
     void idempotent_second_run() {
         String sig = "sig_idem_" + tenantId;
-        seedPattern(sig, "crm_lead", "update", "full", "cmd_X", 10);
+        seedPattern(sig, "crm_lead_common", "update", "full", "cmd_X", 10);
 
         generator.generateDrafts();
         int afterFirst = jdbc.queryForObject(
@@ -161,7 +161,7 @@ class SkillDraftGeneratorIntegrationTest extends BaseIntegrationTest {
     @DisplayName("generateDraftFor(pid) targets a single pattern and returns draft pid")
     void single_pattern_trigger() {
         String sig = "sig_single_" + tenantId;
-        String patternPid = seedPattern(sig, "crm_lead", "update", "full", "cmd_X", 10);
+        String patternPid = seedPattern(sig, "crm_lead_common", "update", "full", "cmd_X", 10);
 
         String draftPid = generator.generateDraftFor(patternPid);
         assertThat(draftPid).isNotNull();
@@ -169,7 +169,7 @@ class SkillDraftGeneratorIntegrationTest extends BaseIntegrationTest {
         Map<String, Object> draft = jdbc.queryForMap(
                 "SELECT draft_skill_code, status, contract_hash, source_pattern_hash " +
                         "FROM ab_agent_skill_draft WHERE pid = ?", draftPid);
-        assertThat((String) draft.get("draft_skill_code")).startsWith("auto.crm_lead_update.");
+        assertThat((String) draft.get("draft_skill_code")).startsWith("auto.crm_lead_common_update.");
         assertThat(draft.get("status")).isEqualTo("DRAFT_PENDING_REVIEW");
         assertThat((String) draft.get("contract_hash")).hasSize(64);
     }
@@ -178,7 +178,7 @@ class SkillDraftGeneratorIntegrationTest extends BaseIntegrationTest {
     @DisplayName("derived_from_runs captures up to 5 distinct run_ids from the pattern")
     void derived_from_runs_captured() {
         String sig = "sig_runs_" + tenantId;
-        seedPattern(sig, "crm_lead", "update", "full", "cmd_X", 10); // 10 distinct run_ids
+        seedPattern(sig, "crm_lead_common", "update", "full", "cmd_X", 10); // 10 distinct run_ids
         generator.generateDrafts();
 
         String json = jdbc.queryForObject(
@@ -196,7 +196,7 @@ class SkillDraftGeneratorIntegrationTest extends BaseIntegrationTest {
     @DisplayName("already-drafted pattern is skipped (generateDraftFor returns existing draft pid)")
     void already_drafted_skipped() {
         String sig = "sig_skip_" + tenantId;
-        String patternPid = seedPattern(sig, "crm_lead", "update", "full", "cmd_X", 10);
+        String patternPid = seedPattern(sig, "crm_lead_common", "update", "full", "cmd_X", 10);
 
         String first = generator.generateDraftFor(patternPid);
         String second = generator.generateDraftFor(patternPid);

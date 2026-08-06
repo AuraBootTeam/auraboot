@@ -83,16 +83,16 @@ class EmployeeAccountProvisioningServiceTest {
     void provision_multipleRolesPerRowAreAllAssigned() {
         when(roleService.findByTenantId(7L)).thenReturn(List.of(
                 role(2L, "qo_sales"),
-                role(5L, "crm_account")
+                role(5L, "crm_account_common")
         ));
         when(userProvisioningService.provision(any(), eq(7L), eq(100L)))
                 .thenAnswer(invocation -> response(invocation.getArgument(0)));
 
-        service.provision(request(List.of(row("袁称磊", "销售", "qo_sales", "crm_account"))), 7L, 100L);
+        service.provision(request(List.of(row("袁称磊", "销售", "qo_sales", "crm_account_common"))), 7L, 100L);
 
         ArgumentCaptor<UserProvisionRequest> captor = ArgumentCaptor.forClass(UserProvisionRequest.class);
         verify(userProvisioningService).provision(captor.capture(), eq(7L), eq(100L));
-        assertThat(captor.getValue().getRoleCodes()).containsExactly("qo_sales", "crm_account");
+        assertThat(captor.getValue().getRoleCodes()).containsExactly("qo_sales", "crm_account_common");
     }
 
     @Test

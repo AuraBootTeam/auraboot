@@ -1,0 +1,168 @@
+[
+  {
+    "code": "crm_opp_code",
+    "displayName:zh-CN": "商机编号",
+    "displayName:en": "Opportunity Code",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_opp_name",
+    "displayName:zh-CN": "商机名称",
+    "displayName:en": "Opportunity Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_opp_account_id",
+    "displayName:zh-CN": "关联客户",
+    "displayName:en": "Account",
+    "dataType": "reference",
+    "referenceModelCode": "crm_account_common",
+    "refTarget": {
+      "targetModel": "crm_account_common",
+      "targetField": "id",
+      "relationship": "many_to_one",
+      "displayField": "crm_acc_name"
+    },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_opp_lead_id",
+    "displayName:zh-CN": "来源线索",
+    "displayName:en": "Source Lead",
+    "dataType": "reference",
+    "referenceModelCode": "crm_lead_common"
+  },
+  {
+    "code": "crm_opp_stage",
+    "displayName:zh-CN": "商机阶段",
+    "displayName:en": "Stage",
+    "dataType": "enum",
+    "dictCode": "crm_opp_stage",
+    "defaultValue": "qualification",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_opp_currency_code",
+    "displayName:zh-CN": "货币",
+    "displayName:en": "Currency",
+    "dataType": "string",
+    "constraints": { "maxLength": 3 },
+    "feature": { "searchable": true, "sortable": false }
+  },
+  {
+    "code": "crm_opp_exchange_rate",
+    "displayName:zh-CN": "汇率",
+    "displayName:en": "Exchange Rate",
+    "dataType": "decimal",
+    "defaultValue": "1.000000",
+    "feature": { "sortable": false, "readonly": true },
+    "extension": { "precision": 18, "scale": 8 }
+  },
+  {
+    "code": "crm_opp_base_currency_code",
+    "displayName:zh-CN": "本位币",
+    "displayName:en": "Base Currency",
+    "dataType": "string",
+    "constraints": { "maxLength": 3 },
+    "feature": { "sortable": false, "readonly": true }
+  },
+  {
+    "code": "crm_opp_expected_amount",
+    "displayName:zh-CN": "预期金额",
+    "displayName:en": "Expected Amount",
+    "dataType": "money",
+    "feature": { "sortable": true },
+    "extraProps": {
+      "fieldPermission": {
+        "view": ["TENANT_ADMIN", "crm_sales_manager", "crm_sales"],
+        "edit": ["TENANT_ADMIN", "crm_sales_manager"]
+      }
+    }
+  },
+  {
+    "code": "crm_opp_expected_amount_base",
+    "displayName:zh-CN": "预期金额(本位币)",
+    "displayName:en": "Expected Amount (Base)",
+    "dataType": "decimal",
+    "defaultValue": 0,
+    "constraints": {
+      "precision": 14,
+      "scale": 2,
+      "min": 0
+    },
+    "feature": {
+      "sortable": true,
+      "readonly": true
+    },
+    "extension": {
+      "unit": "元"
+    },
+    "extraProps": {
+      "fieldPermission": {
+        "view": ["TENANT_ADMIN", "crm_sales_manager", "crm_sales"],
+        "edit": ["TENANT_ADMIN", "crm_sales_manager"]
+      }
+    }
+  },
+  {
+    "code": "crm_opp_expected_close_date",
+    "displayName:zh-CN": "预计成交日期",
+    "displayName:en": "Expected Close Date",
+    "dataType": "datetime",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_opp_probability",
+    "displayName:zh-CN": "成功概率(%)",
+    "displayName:en": "Probability (%)",
+    "dataType": "decimal"
+  },
+  {
+    "code": "crm_opp_notes",
+    "displayName:zh-CN": "备注",
+    "displayName:en": "Notes",
+    "dataType": "text"
+  },
+  {
+    "code": "crm_opp_lost_reason",
+    "displayName:zh-CN": "丢单原因(备注)",
+    "displayName:en": "Lost Reason (Note)",
+    "dataType": "text"
+  },
+  {
+    "code": "crm_opp_lost_reason_code",
+    "displayName:zh-CN": "丢单原因",
+    "displayName:en": "Lost Reason",
+    "dataType": "enum",
+    "dictCode": "crm_opp_lost_reason",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_opp_competitor",
+    "displayName:zh-CN": "竞争对手",
+    "displayName:en": "Competitor",
+    "dataType": "string",
+    "constraints": { "maxLength": 200 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_opp_forecast_category",
+    "displayName:zh-CN": "预测类别",
+    "displayName:en": "Forecast Category",
+    "dataType": "enum",
+    "dictCode": "crm_forecast_category",
+    "defaultValue": "pipeline",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_opp_owner",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Owner",
+    "dataType": "string",
+    "constraints": { "maxLength": 100 }
+  }
+]

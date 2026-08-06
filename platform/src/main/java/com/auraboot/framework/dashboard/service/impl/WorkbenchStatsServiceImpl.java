@@ -153,7 +153,7 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
         // CATCH: non-transactional query, CRM plugin may not be installed so table may not exist
         return safeQuery(() -> {
             Double amount = jdbcTemplate.queryForObject(
-                    "SELECT COALESCE(SUM(CAST(crm_opp_expected_amount AS NUMERIC)), 0) FROM mt_crm_opportunity " +
+                    "SELECT COALESCE(SUM(CAST(crm_opp_expected_amount AS NUMERIC)), 0) FROM mt_crm_opportunity_common " +
                             "WHERE tenant_id = ? AND crm_opp_stage NOT IN ('closed_lost', 'closed_won')",
                     Double.class, tenantId
             );
@@ -171,7 +171,7 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
         // CATCH: non-transactional query, CRM plugin may not be installed so table may not exist
         return safeQuery(() -> {
             Long count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM mt_crm_account WHERE tenant_id = ?",
+                    "SELECT COUNT(*) FROM mt_crm_account_common WHERE tenant_id = ?",
                     Long.class, tenantId
             );
             WorkbenchStatsDTO.Series series = computeCrmAccountActiveSeries(tenantId);
@@ -223,7 +223,7 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
                     "FROM generate_series(current_date - interval '6 day', current_date, interval '1 day') AS d " +
                     "LEFT JOIN (" +
                     "  SELECT DATE(created_at) AS day, SUM(CAST(crm_opp_expected_amount AS NUMERIC)) AS amount " +
-                    "  FROM mt_crm_opportunity " +
+                    "  FROM mt_crm_opportunity_common " +
                     "  WHERE tenant_id = ? AND crm_opp_stage NOT IN ('closed_lost', 'closed_won') " +
                     "    AND created_at >= current_date - interval '6 day' " +
                     "  GROUP BY DATE(created_at)" +
@@ -253,7 +253,7 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
                     "FROM generate_series(current_date - interval '6 day', current_date, interval '1 day') AS d " +
                     "LEFT JOIN (" +
                     "  SELECT DATE(created_at) AS day, COUNT(*) AS cnt " +
-                    "  FROM mt_crm_account " +
+                    "  FROM mt_crm_account_common " +
                     "  WHERE tenant_id = ? " +
                     "    AND created_at >= current_date - interval '6 day' " +
                     "  GROUP BY DATE(created_at)" +
@@ -360,7 +360,7 @@ public class WorkbenchStatsServiceImpl implements WorkbenchStatsService {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                     "SELECT crm_opp_stage AS stage, COUNT(*) AS cnt, " +
                             "COALESCE(SUM(CAST(crm_opp_expected_amount AS NUMERIC)), 0) AS total_amount " +
-                            "FROM mt_crm_opportunity " +
+                            "FROM mt_crm_opportunity_common " +
                             "WHERE tenant_id = ? AND crm_opp_stage != ? " +
                             "GROUP BY crm_opp_stage",
                     new Object[]{tenantId, STAGE_CLOSED_LOST}

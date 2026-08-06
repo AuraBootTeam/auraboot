@@ -1,0 +1,88 @@
+{
+  "pageKey": "crm_opportunity_common_form",
+  "name:zh-CN": "商机表单",
+  "name:en": "Opportunity Form",
+  "modelCode": "crm_opportunity_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "商机信息",
+        "en-US": "Opportunity Information"
+      },
+      "fields": [
+        {
+          "field": "crm_opp_name",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_opp_account_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_opp_lead_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_opp_expected_amount",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_opp_currency_code",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_opp_expected_close_date",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_opp_probability",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_opp_owner",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_opp_forecast_category",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_opp_competitor",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_opp_notes",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

@@ -256,7 +256,7 @@
       "softDelete": false,
       "skipDetailPage": true
     },
-    "semantic_description": "D1 Grounding alias mapping: natural language synonyms/abbreviations to canonical model codes (e.g., 'customer' → 'tcrm_account', 'PO' → 'pr_purchase_order'). Enables LLM to understand user intent from synonyms. Grounds: when the user says X, which data model do they mean?",
+    "semantic_description": "D1 Grounding alias mapping: natural language synonyms/abbreviations to canonical model codes (e.g., 'customer' → 'crm_account_common', 'PO' → 'pr_purchase_order'). Enables LLM to understand user intent from synonyms. Grounds: when the user says X, which data model do they mean?",
     "domain_category": "platform",
     "data_sensitivity": "internal",
     "lifecycle_description": "DRAFT → ACTIVE → DEPRECATED → REMOVED (alias availability; deprecation allows smooth transition when models renamed)"

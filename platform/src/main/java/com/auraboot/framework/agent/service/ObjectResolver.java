@@ -168,7 +168,7 @@ public class ObjectResolver {
                 }
             }
 
-            // Also check model codes for partial match (e.g., "account" matches "crm_account")
+            // Also check model codes for partial match (e.g., "account" matches "crm_account_common")
             for (Map.Entry<String, String> entry : searchIndex.entrySet()) {
                 String alias = entry.getKey();
                 String modelCode = entry.getValue();
@@ -235,7 +235,7 @@ public class ObjectResolver {
     /**
      * Fuzzy contains check: returns true if query and target share a common substring
      * of length >= 2. Handles CJK (no whitespace separation) and Latin text.
-     * For Latin text, also checks underscore-split segments (e.g., "account" in "crm_account").
+     * For Latin text, also checks underscore-split segments (e.g., "account" in "crm_account_common").
      */
     private boolean fuzzyContains(String query, String target) {
         int latinMinLen = 3; // Minimum segment length for Latin text to avoid false positives

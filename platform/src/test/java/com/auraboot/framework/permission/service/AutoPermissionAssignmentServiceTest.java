@@ -51,7 +51,7 @@ class AutoPermissionAssignmentServiceTest {
                 commandActionDeriver
         );
 
-        when(commandActionDeriver.deriveActions("tcrm_lead")).thenReturn(List.of("read", "create"));
+        when(commandActionDeriver.deriveActions("crm_lead_common")).thenReturn(List.of("read", "create"));
         when(permissionMapper.findByCode(any())).thenReturn(null);
 
         AtomicLong nextId = new AtomicLong(100);
@@ -69,7 +69,7 @@ class AutoPermissionAssignmentServiceTest {
 
         when(rolePermissionMapper.findByRoleAndPermission(anyLong(), anyLong())).thenReturn(null);
 
-        service.autoAssignPermissions("tcrm_lead", "tcrm", 123L);
+        service.autoAssignPermissions("crm_lead_common", "crm", 123L);
 
         ArgumentCaptor<Permission> permissionCaptor = ArgumentCaptor.forClass(Permission.class);
         verify(permissionMapper, org.mockito.Mockito.times(4)).insert(permissionCaptor.capture());
@@ -94,9 +94,9 @@ class AutoPermissionAssignmentServiceTest {
                 .extracting(RolePermission::getPermissionId)
                 .doesNotContainNull();
 
-        verify(permissionMapper).findByCode(eq("module.tcrm"));
-        verify(permissionMapper).findByCode(eq("model.tcrm_lead"));
-        verify(permissionMapper).findByCode(eq("model.tcrm_lead.read"));
-        verify(permissionMapper).findByCode(eq("model.tcrm_lead.create"));
+        verify(permissionMapper).findByCode(eq("module.crm"));
+        verify(permissionMapper).findByCode(eq("model.crm_lead_common"));
+        verify(permissionMapper).findByCode(eq("model.crm_lead_common.read"));
+        verify(permissionMapper).findByCode(eq("model.crm_lead_common.create"));
     }
 }

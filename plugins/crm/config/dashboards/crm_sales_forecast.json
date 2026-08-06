@@ -1,0 +1,533 @@
+{
+  "code": "crm_sales_forecast",
+  "title": {
+    "zh-CN": "销售预测",
+    "en": "Sales Forecast"
+  },
+  "description": "Sales forecasting dashboard with pipeline analysis, weighted forecast by stage/month/owner",
+  "scope": "global",
+  "status": "published",
+  "sortOrder": 0,
+  "layoutConfig": {
+    "columns": 12,
+    "rowHeight": 100,
+    "gap": 16,
+    "compactType": "vertical"
+  },
+  "widgets": [
+    {
+      "id": "block_forecast_kpi",
+      "type": "smart-number-card",
+      "x": 0,
+      "y": 0,
+      "w": 12,
+      "h": 1,
+      "title": {
+        "zh-CN": "预测概览",
+        "en": "Forecast Overview"
+      },
+      "config": {
+        "title": {
+          "zh-CN": "预测概览",
+          "en": "Forecast Overview"
+        },
+        "dataSource": {
+          "type": "api",
+          "url": "/api/datasource/list",
+          "params": {
+            "datasourceId": "nq:crm_sales_forecast_kpi",
+            "format": "records",
+            "maxItems": "1"
+          }
+        },
+        "cards": [
+          {
+            "field": "total_pipeline",
+            "label": {
+              "zh-CN": "管道总额",
+              "en": "Total Pipeline"
+            },
+            "icon": "IconCurrencyDollar",
+            "color": "#3b82f6",
+            "format": "currency"
+          },
+          {
+            "field": "weighted_forecast",
+            "label": {
+              "zh-CN": "加权预测",
+              "en": "Weighted Forecast"
+            },
+            "icon": "IconTrendingUp",
+            "color": "#10b981",
+            "format": "currency"
+          },
+          {
+            "field": "won_revenue",
+            "label": {
+              "zh-CN": "已赢单金额",
+              "en": "Won Revenue"
+            },
+            "icon": "IconTrophy",
+            "color": "#8b5cf6",
+            "format": "currency"
+          },
+          {
+            "field": "win_rate",
+            "label": {
+              "zh-CN": "赢单率",
+              "en": "Win Rate"
+            },
+            "icon": "IconChartPie",
+            "color": "#f59e0b",
+            "format": "percent"
+          },
+          {
+            "field": "avg_deal_size",
+            "label": {
+              "zh-CN": "平均单额",
+              "en": "Avg Deal Size"
+            },
+            "icon": "IconReceipt",
+            "color": "#06b6d4",
+            "format": "currency"
+          },
+          {
+            "field": "open_deals",
+            "label": {
+              "zh-CN": "进行中商机",
+              "en": "Open Deals"
+            },
+            "icon": "IconTargetArrow",
+            "color": "#ec4899"
+          }
+        ]
+      }
+    },
+    {
+      "id": "chart_forecast_by_stage",
+      "type": "smart-bar-chart",
+      "x": 0,
+      "y": 1,
+      "w": 6,
+      "h": 1,
+      "title": {
+        "zh-CN": "按阶段预测",
+        "en": "Forecast by Stage"
+      },
+      "config": {
+        "orientation": "horizontal",
+        "showLabel": true,
+        "visualization": {
+          "metricLabels": {
+            "total_amount": { "zh-CN": "总金额", "en": "Total Amount" },
+            "weighted_forecast": { "zh-CN": "加权预测", "en": "Weighted Forecast" }
+          }
+        },
+        "dataSource": {
+          "type": "namedQuery",
+          "queryCode": "crm_sales_forecast_by_stage",
+          "dimensionDicts": {
+            "stage": "crm_opp_stage"
+          },
+          "dimensions": [
+            "stage"
+          ],
+          "metrics": [
+            {
+              "field": "total_amount",
+              "aggregation": "sum",
+              "alias": "total_amount"
+            },
+            {
+              "field": "weighted_forecast",
+              "aggregation": "sum",
+              "alias": "weighted_forecast"
+            }
+          ]
+        },
+        "title": {
+          "zh-CN": "按阶段预测",
+          "en": "Forecast by Stage"
+        }
+      }
+    },
+    {
+      "id": "chart_forecast_by_month",
+      "type": "smart-line-chart",
+      "x": 0,
+      "y": 2,
+      "w": 6,
+      "h": 1,
+      "title": {
+        "zh-CN": "按月预测趋势",
+        "en": "Monthly Forecast Trend"
+      },
+      "config": {
+        "smooth": true,
+        "areaStyle": true,
+        "showLabel": false,
+        "visualization": {
+          "metricLabels": {
+            "total_amount": { "zh-CN": "总金额", "en": "Total Amount" },
+            "weighted_forecast": { "zh-CN": "加权预测", "en": "Weighted Forecast" }
+          }
+        },
+        "dataSource": {
+          "type": "namedQuery",
+          "queryCode": "crm_sales_forecast_by_close_date",
+          "dimensions": [
+            "month"
+          ],
+          "metrics": [
+            {
+              "field": "total_amount",
+              "aggregation": "sum",
+              "alias": "total_amount"
+            },
+            {
+              "field": "weighted_forecast",
+              "aggregation": "sum",
+              "alias": "weighted_forecast"
+            }
+          ]
+        },
+        "title": {
+          "zh-CN": "按月预测趋势",
+          "en": "Monthly Forecast Trend"
+        }
+      }
+    },
+    {
+      "id": "chart_forecast_by_owner",
+      "type": "smart-bar-chart",
+      "x": 0,
+      "y": 3,
+      "w": 6,
+      "h": 1,
+      "title": {
+        "zh-CN": "按销售人员预测",
+        "en": "Forecast by Sales Rep"
+      },
+      "config": {
+        "orientation": "vertical",
+        "showLabel": true,
+        "visualization": {
+          "metricLabels": {
+            "weighted_forecast": { "zh-CN": "加权预测", "en": "Weighted Forecast" }
+          }
+        },
+        "dataSource": {
+          "type": "namedQuery",
+          "queryCode": "crm_sales_forecast_by_owner",
+          "dimensions": [
+            "owner_name"
+          ],
+          "metrics": [
+            {
+              "field": "weighted_forecast",
+              "aggregation": "sum",
+              "alias": "weighted_forecast"
+            }
+          ]
+        },
+        "title": {
+          "zh-CN": "按销售人员预测",
+          "en": "Forecast by Sales Rep"
+        }
+      }
+    },
+    {
+      "id": "table_stage_detail",
+      "type": "smart-table-chart",
+      "x": 0,
+      "y": 4,
+      "w": 6,
+      "h": 1,
+      "title": {
+        "zh-CN": "阶段预测明细",
+        "en": "Stage Forecast Details"
+      },
+      "config": {
+        "title": {
+          "zh-CN": "阶段预测明细",
+          "en": "Stage Forecast Detail"
+        },
+        "dataSource": {
+          "type": "api",
+          "url": "/api/datasource/list",
+          "params": {
+            "datasourceId": "nq:crm_sales_forecast_by_stage",
+            "format": "records",
+            "maxItems": "10"
+          }
+        },
+        "table": {
+          "columns": [
+            {
+              "field": "stage",
+              "width": 120,
+              "renderType": "tag",
+              "dictCode": "crm_opp_stage",
+              "label": {
+                "zh-CN": "阶段",
+                "en": "Stage"
+              }
+            },
+            {
+              "field": "opportunity_count",
+              "width": 80,
+              "align": "right",
+              "label": {
+                "zh-CN": "商机数",
+                "en": "Deals"
+              }
+            },
+            {
+              "field": "total_amount",
+              "width": 120,
+              "align": "right",
+              "format": "currency",
+              "label": {
+                "zh-CN": "总金额",
+                "en": "Total Amount"
+              }
+            },
+            {
+              "field": "avg_probability",
+              "width": 80,
+              "align": "right",
+              "format": "percent",
+              "label": {
+                "zh-CN": "平均概率",
+                "en": "Avg Prob."
+              }
+            },
+            {
+              "field": "weighted_forecast",
+              "width": 120,
+              "align": "right",
+              "format": "currency",
+              "label": {
+                "zh-CN": "加权预测",
+                "en": "Weighted"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "chart_forecast_by_category",
+      "type": "smart-bar-chart",
+      "x": 6,
+      "y": 1,
+      "w": 6,
+      "h": 1,
+      "title": {
+        "zh-CN": "按预测类别",
+        "en": "Forecast by Category"
+      },
+      "config": {
+        "orientation": "horizontal",
+        "showLabel": true,
+        "visualization": {
+          "metricLabels": {
+            "total_amount": { "zh-CN": "总金额", "en": "Total Amount" },
+            "weighted_forecast": { "zh-CN": "加权预测", "en": "Weighted Forecast" }
+          }
+        },
+        "dataSource": {
+          "type": "namedQuery",
+          "queryCode": "crm_sales_forecast_by_category",
+          "dimensionDicts": {
+            "forecast_category": "crm_forecast_category"
+          },
+          "dimensions": [
+            "forecast_category"
+          ],
+          "metrics": [
+            {
+              "field": "total_amount",
+              "aggregation": "sum",
+              "alias": "total_amount"
+            },
+            {
+              "field": "weighted_forecast",
+              "aggregation": "sum",
+              "alias": "weighted_forecast"
+            }
+          ]
+        },
+        "title": {
+          "zh-CN": "按预测类别",
+          "en": "Forecast by Category"
+        }
+      }
+    },
+    {
+      "id": "table_forecast_by_category_detail",
+      "type": "smart-table-chart",
+      "x": 0,
+      "y": 3,
+      "w": 6,
+      "h": 1,
+      "title": {
+        "zh-CN": "预测类别明细",
+        "en": "Forecast Category Detail"
+      },
+      "config": {
+        "title": {
+          "zh-CN": "预测类别明细",
+          "en": "Forecast Category Detail"
+        },
+        "dataSource": {
+          "type": "api",
+          "url": "/api/datasource/list",
+          "params": {
+            "datasourceId": "nq:crm_sales_forecast_by_category",
+            "format": "records",
+            "maxItems": "10"
+          }
+        },
+        "table": {
+          "columns": [
+            {
+              "field": "forecast_category",
+              "width": 130,
+              "renderType": "tag",
+              "dictCode": "crm_forecast_category",
+              "label": {
+                "zh-CN": "预测类别",
+                "en": "Category"
+              }
+            },
+            {
+              "field": "opportunity_count",
+              "width": 80,
+              "align": "right",
+              "label": {
+                "zh-CN": "商机数",
+                "en": "Deals"
+              }
+            },
+            {
+              "field": "total_amount",
+              "width": 120,
+              "align": "right",
+              "format": "currency",
+              "label": {
+                "zh-CN": "总金额",
+                "en": "Total"
+              }
+            },
+            {
+              "field": "weighted_forecast",
+              "width": 120,
+              "align": "right",
+              "format": "currency",
+              "label": {
+                "zh-CN": "加权预测",
+                "en": "Weighted"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "table_open_opportunities",
+      "type": "smart-table-chart",
+      "x": 0,
+      "y": 6,
+      "w": 12,
+      "h": 1,
+      "title": {
+        "zh-CN": "进行中商机明细",
+        "en": "In-Progress Opportunity Details"
+      },
+      "config": {
+        "title": {
+          "zh-CN": "进行中商机明细",
+          "en": "Open Opportunities Detail"
+        },
+        "dataSource": {
+          "type": "api",
+          "url": "/api/datasource/list",
+          "params": {
+            "datasourceId": "nq:crm_open_opportunities_detail",
+            "format": "records",
+            "maxItems": "50"
+          }
+        },
+        "table": {
+          "columns": [
+            {
+              "field": "crm_opp_name",
+              "width": 180,
+              "label": {
+                "zh-CN": "商机名称",
+                "en": "Opportunity"
+              }
+            },
+            {
+              "field": "account_name",
+              "width": 140,
+              "label": {
+                "zh-CN": "客户",
+                "en": "Account"
+              }
+            },
+            {
+              "field": "crm_opp_stage",
+              "width": 110,
+              "renderType": "tag",
+              "dictCode": "crm_opp_stage",
+              "label": {
+                "zh-CN": "阶段",
+                "en": "Stage"
+              }
+            },
+            {
+              "field": "crm_opp_expected_amount",
+              "width": 120,
+              "align": "right",
+              "format": "currency",
+              "label": {
+                "zh-CN": "预期金额",
+                "en": "Amount"
+              }
+            },
+            {
+              "field": "crm_opp_probability",
+              "width": 80,
+              "align": "right",
+              "format": "percent",
+              "label": {
+                "zh-CN": "概率",
+                "en": "Prob."
+              }
+            },
+            {
+              "field": "weighted_amount",
+              "width": 120,
+              "align": "right",
+              "format": "currency",
+              "label": {
+                "zh-CN": "加权金额",
+                "en": "Weighted"
+              }
+            },
+            {
+              "field": "crm_opp_expected_close_date",
+              "width": 110,
+              "label": {
+                "zh-CN": "预计成交",
+                "en": "Close Date"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

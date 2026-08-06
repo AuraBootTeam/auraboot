@@ -1,0 +1,44 @@
+{
+  "pageKey": "crm_sla_breach_detail",
+  "name:zh-CN": "SLA违规详情",
+  "name:en": "SLA Breach Detail",
+  "modelCode": "crm_sla_breach",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "crm_sla_breach_overview",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "违规信息",
+        "en-US": "Breach Information"
+      },
+      "columns": 2,
+      "fields": [
+        {
+          "field": "crm_sb_complaint_id",
+          "readOnly": true
+        },
+        {
+          "field": "crm_sb_policy_id",
+          "readOnly": true
+        },
+        {
+          "field": "crm_sb_breach_type",
+          "readOnly": true
+        },
+        {
+          "field": "crm_sb_breached_at",
+          "readOnly": true
+        },
+        {
+          "field": "crm_sb_notified",
+          "readOnly": true
+        }
+      ]
+    }
+  ]
+}

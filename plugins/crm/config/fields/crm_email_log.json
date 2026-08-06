@@ -1,0 +1,100 @@
+[
+  {
+    "code": "crm_el_direction",
+    "displayName:zh-CN": "方向",
+    "displayName:en": "Direction",
+    "dataType": "enum",
+    "dictCode": "crm_email_direction",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_el_from_address",
+    "displayName:zh-CN": "发件人",
+    "displayName:en": "From",
+    "dataType": "string",
+    "constraints": { "maxLength": 500 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_el_to_address",
+    "displayName:zh-CN": "收件人",
+    "displayName:en": "To",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 1000 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_el_cc_address",
+    "displayName:zh-CN": "抄送",
+    "displayName:en": "CC",
+    "dataType": "string",
+    "constraints": { "maxLength": 1000 }
+  },
+  {
+    "code": "crm_el_subject",
+    "displayName:zh-CN": "主题",
+    "displayName:en": "Subject",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 500 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_el_body",
+    "displayName:zh-CN": "正文",
+    "displayName:en": "Body",
+    "dataType": "text",
+    "extension": { "renderComponent": "richtext" }
+  },
+  {
+    "code": "crm_el_template_id",
+    "displayName:zh-CN": "使用的模板",
+    "displayName:en": "Template",
+    "dataType": "reference",
+    "referenceModelCode": "crm_email_template"
+  },
+  {
+    "code": "crm_el_related_type",
+    "displayName:zh-CN": "关联类型",
+    "displayName:en": "Related Type",
+    "dataType": "enum",
+    "dictCode": "crm_related_type",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_el_related_id",
+    "displayName:zh-CN": "关联记录ID",
+    "displayName:en": "Related Record ID",
+    "dataType": "string",
+    "constraints": { "maxLength": 100 }
+  },
+  {
+    "code": "crm_el_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_email_status",
+    "defaultValue": "draft",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_el_sent_at",
+    "displayName:zh-CN": "发送时间",
+    "displayName:en": "Sent At",
+    "dataType": "datetime",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_el_opened_at",
+    "displayName:zh-CN": "打开时间",
+    "displayName:en": "Opened At",
+    "dataType": "datetime",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_el_remark",
+    "displayName:zh-CN": "备注",
+    "displayName:en": "Remark",
+    "dataType": "text"
+  }
+]

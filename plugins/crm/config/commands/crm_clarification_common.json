@@ -1,0 +1,196 @@
+[
+  {
+    "code": "crm:create_clarification",
+    "displayName:zh-CN": "新建澄清项",
+    "displayName:en": "Create Clarification",
+    "type": "create",
+    "modelCode": "crm_clarification_common",
+    "inputFields": [
+      "crm_cl_title",
+      "crm_cl_clarification_type",
+      "crm_cl_status",
+      "crm_cl_priority",
+      "crm_cl_review_id",
+      "crm_cl_customer_request_id",
+      "crm_cl_account_id",
+      "crm_cl_owner_id",
+      "crm_cl_question",
+      "crm_cl_answer",
+      "crm_cl_raised_at",
+      "crm_cl_resolved_at",
+      "crm_cl_source_model",
+      "crm_cl_source_id",
+      "crm_cl_common_payload"
+    ],
+    "autoSetFields": {
+      "crm_cl_code": {
+        "strategy": "auto_generate",
+        "pattern": "CL-{yyyyMMdd}-{seq}"
+      }
+    },
+    "permissions": [
+      "crm.clarification.manage"
+    ],
+    "agent_hint": "Create a generic Clarification fact. Industry packages keep industry-specific fields in their own 1:1 sidecar model.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_clarification",
+    "displayName:zh-CN": "编辑澄清项",
+    "displayName:en": "Update Clarification",
+    "type": "update",
+    "modelCode": "crm_clarification_common",
+    "inputFields": [
+      "crm_cl_title",
+      "crm_cl_clarification_type",
+      "crm_cl_status",
+      "crm_cl_priority",
+      "crm_cl_review_id",
+      "crm_cl_customer_request_id",
+      "crm_cl_account_id",
+      "crm_cl_owner_id",
+      "crm_cl_question",
+      "crm_cl_answer",
+      "crm_cl_raised_at",
+      "crm_cl_resolved_at",
+      "crm_cl_source_model",
+      "crm_cl_source_id",
+      "crm_cl_common_payload"
+    ],
+    "permissions": [
+      "crm.clarification.manage"
+    ],
+    "agent_hint": "Update a generic Clarification fact.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_clarification",
+    "displayName:zh-CN": "删除澄清项",
+    "displayName:en": "Delete Clarification",
+    "type": "delete",
+    "modelCode": "crm_clarification_common",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此澄清项？",
+      "confirmMessage:en": "Delete this clarification?"
+    },
+    "permissions": [
+      "crm.clarification.manage"
+    ],
+    "agent_hint": "Delete a Clarification record.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:detail_clarification",
+    "displayName:zh-CN": "查看澄清项",
+    "displayName:en": "View Clarification",
+    "type": "query",
+    "modelCode": "crm_clarification_common",
+    "permissions": [
+      "crm.clarification.read"
+    ],
+    "agent_hint": "Query Clarification records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:list_clarifications",
+    "displayName:zh-CN": "澄清项列表",
+    "displayName:en": "List Clarification",
+    "type": "query",
+    "modelCode": "crm_clarification_common",
+    "permissions": [
+      "crm.clarification.read"
+    ],
+    "agent_hint": "List Clarification records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:send_clarification",
+    "displayName:zh-CN": "发给客户",
+    "displayName:en": "Send to Customer",
+    "description": "Mark a clarification as awaiting customer response.",
+    "type": "state_transition",
+    "modelCode": "crm_clarification_common",
+    "stateField": "crm_cl_status",
+    "fromStates": [
+      "pending"
+    ],
+    "toState": "awaiting_customer",
+    "permissions": [
+      "crm.clarification.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认已将澄清发给客户？",
+      "confirmMessage:en": "Mark this clarification as awaiting customer?"
+    }
+  },
+  {
+    "code": "crm:mark_clarification_replied",
+    "displayName:zh-CN": "客户已回复",
+    "displayName:en": "Customer Replied",
+    "description": "Record that the customer has replied (answer required).",
+    "type": "state_transition",
+    "modelCode": "crm_clarification_common",
+    "stateField": "crm_cl_status",
+    "fromStates": [
+      "pending",
+      "awaiting_customer"
+    ],
+    "toState": "customer_replied",
+    "preconditions": [
+      {
+        "field": "crm_cl_answer",
+        "operator": "is_not_null",
+        "message:zh-CN": "请先填写客户回复内容",
+        "message:en": "The customer answer must be recorded first"
+      }
+    ],
+    "permissions": [
+      "crm.clarification.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认客户已回复？",
+      "confirmMessage:en": "Mark this clarification as customer-replied?"
+    }
+  },
+  {
+    "code": "crm:resolve_clarification",
+    "displayName:zh-CN": "标记已解决",
+    "displayName:en": "Resolve Clarification",
+    "description": "Resolve a clarification after the customer reply has been processed.",
+    "type": "state_transition",
+    "modelCode": "crm_clarification_common",
+    "stateField": "crm_cl_status",
+    "fromStates": [
+      "customer_replied"
+    ],
+    "toState": "resolved",
+    "permissions": [
+      "crm.clarification.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认此澄清已解决？",
+      "confirmMessage:en": "Resolve this clarification?"
+    }
+  },
+  {
+    "code": "crm:cancel_clarification",
+    "displayName:zh-CN": "取消澄清",
+    "displayName:en": "Cancel Clarification",
+    "description": "Cancel a clarification that is no longer needed.",
+    "type": "state_transition",
+    "modelCode": "crm_clarification_common",
+    "stateField": "crm_cl_status",
+    "fromStates": [
+      "pending",
+      "awaiting_customer"
+    ],
+    "toState": "cancelled",
+    "permissions": [
+      "crm.clarification.manage"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认取消此澄清？",
+      "confirmMessage:en": "Cancel this clarification?"
+    }
+  }
+]

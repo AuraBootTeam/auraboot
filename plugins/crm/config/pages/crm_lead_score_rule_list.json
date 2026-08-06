@@ -1,0 +1,122 @@
+{
+  "pageKey": "crm_lead_score_rule_list",
+  "name:zh-CN": "线索评分规则",
+  "name:en": "Lead Score Rules",
+  "modelCode": "crm_lead_score_rule",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_lsr_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "crm.lead_score_rule.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_lead_score_rule_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_lsr_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_lsr_code",
+          "width": 160,
+          "sortable": true
+        },
+        {
+          "field": "crm_lsr_name",
+          "width": 200,
+          "sortable": true
+        },
+        {
+          "field": "crm_lsr_dimension",
+          "width": 140,
+          "renderType": "tag",
+          "dictCode": "crm_lead_score_dimension"
+        },
+        {
+          "field": "crm_lsr_operator",
+          "width": 130,
+          "renderType": "tag",
+          "dictCode": "crm_lead_score_operator"
+        },
+        {
+          "field": "crm_lsr_match_value",
+          "width": 140
+        },
+        {
+          "field": "crm_lsr_points",
+          "width": 90,
+          "align": "right",
+          "sortable": true
+        },
+        {
+          "field": "crm_lsr_status",
+          "width": 110,
+          "renderType": "tag",
+          "dictCode": "crm_lead_score_rule_status"
+        },
+        {
+          "field": "crm_lsr_sort_order",
+          "width": 90,
+          "align": "right",
+          "sortable": true
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "label": "$i18n:common.actions",
+          "buttons": [
+            {
+              "code": "view",
+              "label": "$i18n:common.button.view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_lead_score_rule_detail"
+              }
+            },
+            {
+              "code": "edit",
+              "permissionCode": "crm.lead_score_rule.manage",
+              "label": "$i18n:common.button.edit",
+              "action": {
+                "type": "navigate",
+                "to": "crm_lead_score_rule_form"
+              }
+            },
+            {
+              "code": "delete",
+              "danger": true,
+              "permissionCode": "crm.lead_score_rule.manage",
+              "label": "$i18n:common.button.delete",
+              "confirm": "delete.confirm",
+              "action": {
+                "type": "command"
+              }
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "crm_lsr_code",
+        "crm_lsr_name"
+      ],
+      "defaultSort": {
+        "field": "crm_lsr_sort_order",
+        "order": "asc"
+      }
+    }
+  ]
+}

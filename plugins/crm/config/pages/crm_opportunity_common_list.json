@@ -1,0 +1,205 @@
+{
+  "pageKey": "crm_opportunity_common_list",
+  "name:zh-CN": "商机列表",
+  "name:en": "Opportunities",
+  "modelCode": "crm_opportunity_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_opp_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "en": "All",
+            "zh-CN": "全部"
+          },
+          "filter": null
+        },
+        {
+          "key": "qualification",
+          "label": {
+            "en": "Qualification",
+            "zh-CN": "资格确认"
+          },
+          "filter": {
+            "field": "crm_opp_stage",
+            "value": "qualification",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "proposal",
+          "label": {
+            "en": "Proposal",
+            "zh-CN": "方案提报"
+          },
+          "filter": {
+            "field": "crm_opp_stage",
+            "value": "proposal",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "negotiation",
+          "label": {
+            "en": "Negotiation",
+            "zh-CN": "商务谈判"
+          },
+          "filter": {
+            "field": "crm_opp_stage",
+            "value": "negotiation",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "closed_won",
+          "label": {
+            "en": "Won",
+            "zh-CN": "赢单"
+          },
+          "filter": {
+            "field": "crm_opp_stage",
+            "value": "closed_won",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "closed_lost",
+          "label": {
+            "en": "Lost",
+            "zh-CN": "丢单"
+          },
+          "filter": {
+            "field": "crm_opp_stage",
+            "value": "closed_lost",
+            "operator": "EQ"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_opp_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "crm.opportunity.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_opportunity_common_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_opp_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_opp_code",
+          "width": 150,
+          "sortable": true
+        },
+        {
+          "field": "crm_opp_name",
+          "width": 200,
+          "sortable": true
+        },
+        {
+          "field": "crm_opp_account_id",
+          "width": 180
+        },
+        {
+          "field": "crm_opp_stage",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_opp_stage",
+          "editable": true
+        },
+        {
+          "field": "crm_opp_forecast_category",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_forecast_category",
+          "editable": true
+        },
+        {
+          "field": "crm_opp_expected_amount",
+          "width": 140,
+          "sortable": true,
+          "editable": true
+        },
+        {
+          "field": "crm_opp_expected_close_date",
+          "width": 140,
+          "valueType": "date",
+          "editable": true
+        },
+        {
+          "field": "crm_opp_probability",
+          "width": 100,
+          "editable": true
+        },
+        {
+          "field": "crm_opp_owner",
+          "width": 120,
+          "editable": true
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "view",
+              "label": "$i18n:common.button.view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_opportunity_common_detail"
+              }
+            },
+            {
+              "code": "edit",
+              "permissionCode": "crm.opportunity.manage",
+              "label": "$i18n:common.button.edit",
+              "action": {
+                "type": "navigate",
+                "to": "crm_opportunity_common_form"
+              }
+            },
+            {
+              "code": "delete",
+              "danger": true,
+              "permissionCode": "crm.opportunity.manage",
+              "label": "$i18n:common.button.delete",
+              "confirm": "delete.confirm",
+              "action": {
+                "type": "command"
+              }
+            }
+          ],
+          "label": "$i18n:common.actions"
+        }
+      ],
+      "searchFields": [
+        "crm_opp_name",
+        "crm_opp_code"
+      ],
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
+      }
+    }
+  ],
+  "extension": {
+    "enableMultiView": true
+  }
+}

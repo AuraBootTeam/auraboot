@@ -32,7 +32,7 @@ test.describe('Multi-Tenant Data Isolation', () => {
     adminAccountPid = result.recordId;
 
     // Admin can see the record
-    const resp = await page.request.get(`/api/dynamic/crm_account/${adminAccountPid}`);
+    const resp = await page.request.get(`/api/dynamic/crm_account_common/${adminAccountPid}`);
     const body = await resp.json();
     expect(body?.code).toBe('0');
     expect(body?.data?.crm_acc_name).toContain(`TenantTest_Admin_${uid}`);
@@ -43,7 +43,7 @@ test.describe('Multi-Tenant Data Isolation', () => {
   test('Admin data appears in list query', async ({ page }) => {
     // Query with keyword filter
     const resp = await page.request.get(
-      `/api/dynamic/crm_account/list?keyword=TenantTest_Admin_${uid}`,
+      `/api/dynamic/crm_account_common/list?keyword=TenantTest_Admin_${uid}`,
     );
     const body = await resp.json();
 
@@ -76,7 +76,7 @@ test.describe('Multi-Tenant Data Isolation', () => {
       // Operator may or may not be granted CRM account permissions by the
       // current seed. Either way, the authorization layer must answer
       // explicitly instead of leaking data or producing a server error.
-      const resp = await operatorPage.request.get('/api/dynamic/crm_account/list?pageSize=5');
+      const resp = await operatorPage.request.get('/api/dynamic/crm_account_common/list?pageSize=5');
 
       // 401 means operator session expired/invalid — skip rather than fail
       if (resp.status() === 401) {
@@ -92,7 +92,7 @@ test.describe('Multi-Tenant Data Isolation', () => {
         console.log(`  Operator sees ${body?.data?.total ?? 0} accounts (same tenant) ✅`);
       } else {
         expect(String(body?.code ?? '')).not.toBe('0');
-        console.log('  Operator lacks crm_account permission; RBAC returned 403 as expected ✅');
+        console.log('  Operator lacks crm_account_common permission; RBAC returned 403 as expected ✅');
       }
     } finally {
       await operatorContext.close();
@@ -101,7 +101,7 @@ test.describe('Multi-Tenant Data Isolation', () => {
 
   test('API returns proper error for invalid record access', async ({ page }) => {
     // Try to access a non-existent record — should return proper error, not crash
-    const resp = await page.request.get('/api/dynamic/crm_account/999999999');
+    const resp = await page.request.get('/api/dynamic/crm_account_common/999999999');
 
     // Should return a proper API response (not 500 server error)
     // 404 or 200 with error code are both acceptable

@@ -16,7 +16,7 @@ class PageKeyConverterTest {
 
     @Test
     void toModelCode_alreadyUnderscore_unchanged() {
-        assertThat(PageKeyConverter.toModelCode("crm_lead")).isEqualTo("crm_lead");
+        assertThat(PageKeyConverter.toModelCode("crm_lead_common")).isEqualTo("crm_lead_common");
     }
 
     @Test
@@ -43,7 +43,7 @@ class PageKeyConverterTest {
 
     @Test
     void toPageKey_underscore_replacesWithHyphen() {
-        assertThat(PageKeyConverter.toPageKey("crm_lead")).isEqualTo("crm-lead");
+        assertThat(PageKeyConverter.toPageKey("crm_lead_common")).isEqualTo("crm-lead-common");
     }
 
     @Test
@@ -80,7 +80,7 @@ class PageKeyConverterTest {
 
     @Test
     void toModelCode_formSuffix_stripped() {
-        assertThat(PageKeyConverter.toModelCode("crm_lead_form")).isEqualTo("crm_lead");
+        assertThat(PageKeyConverter.toModelCode("crm_lead_common_form")).isEqualTo("crm_lead_common");
     }
 
     @Test
@@ -95,7 +95,7 @@ class PageKeyConverterTest {
 
     @Test
     void toModelCode_noSuffix_unchanged() {
-        assertThat(PageKeyConverter.toModelCode("crm_lead")).isEqualTo("crm_lead");
+        assertThat(PageKeyConverter.toModelCode("crm_lead_common")).isEqualTo("crm_lead_common");
     }
 
     @Test

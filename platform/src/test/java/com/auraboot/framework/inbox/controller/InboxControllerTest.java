@@ -55,10 +55,10 @@ class InboxControllerTest {
 
         InboxItemResponse record = response.getData().getRecords().get(0);
         assertEquals("Call customer before Friday", record.getSummary());
-        assertEquals("crm_activity", record.getSourceModel());
+        assertEquals("crm_activity_common", record.getSourceModel());
         assertEquals("ACT-2002-PID", record.getSourceRecordPid());
         assertEquals("Acme Corp", record.getCardData().get("accountName"));
-        assertEquals("crm_activity", record.getModelCode(), "legacy field must remain available");
+        assertEquals("crm_activity_common", record.getModelCode(), "legacy field must remain available");
         assertEquals("Follow up quote", record.getTitle());
 
         verify(inboxService).listByUser(101L, 202L, "approval", "pending", 1, 20);
@@ -77,7 +77,7 @@ class InboxControllerTest {
         assertTrue(response.isSuccess());
         assertNotNull(response.getData());
         assertEquals("Call customer before Friday", response.getData().getSummary());
-        assertEquals("crm_activity", response.getData().getSourceModel());
+        assertEquals("crm_activity_common", response.getData().getSourceModel());
         assertEquals("ACT-2002-PID", response.getData().getSourceRecordPid());
         assertEquals("{\"accountName\":\"Acme Corp\",\"nextStep\":\"Call procurement owner\"}", response.getData().getCardPayload());
         assertEquals(Map.of("accountName", "Acme Corp", "nextStep", "Call procurement owner"), response.getData().getCardData());
@@ -219,10 +219,10 @@ class InboxControllerTest {
         item.setPriority("high");
         item.setSourceType("command");
         item.setSourceId("cmd-01");
-        item.setModelCode("crm_activity");
+        item.setModelCode("crm_activity_common");
         item.setRecordPid("ACT-2002-PID");
         item.setCardPayload("{\"accountName\":\"Acme Corp\",\"nextStep\":\"Call procurement owner\"}");
-        item.setDeepLink("auraboot://object/crm_activity/ACT-2002-PID");
+        item.setDeepLink("auraboot://object/crm_activity_common/ACT-2002-PID");
         item.setIsRead(false);
         return item;
     }

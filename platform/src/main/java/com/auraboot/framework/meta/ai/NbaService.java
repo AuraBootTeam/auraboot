@@ -44,7 +44,7 @@ public class NbaService {
     /**
      * Generate next best action suggestions for a specific record.
      *
-     * @param modelCode the model code (e.g., "crm_lead", "crm_opportunity")
+     * @param modelCode the model code (e.g., "crm_lead_common", "crm_opportunity_common")
      * @param recordPid the record PID
      * @return list of action suggestions, max 3
      */

@@ -1,0 +1,69 @@
+plugins {
+    id 'java'
+    id 'jacoco'
+}
+
+group = 'com.auraboot.plugins'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+repositories {
+    mavenLocal()
+    maven { url = 'https://maven.aliyun.com/repository/public' }
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly 'com.auraboot:platform-plugin-api:1.0.0-SNAPSHOT'
+    compileOnly 'org.pf4j:pf4j:3.13.0'
+    annotationProcessor 'org.pf4j:pf4j:3.13.0'
+    compileOnly 'org.projectlombok:lombok:1.18.32'
+    annotationProcessor 'org.projectlombok:lombok:1.18.32'
+    compileOnly 'org.slf4j:slf4j-api:2.0.12'
+    compileOnly 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+
+    testImplementation 'com.auraboot:platform-plugin-api:1.0.0-SNAPSHOT'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+    testImplementation 'org.pf4j:pf4j:3.13.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testImplementation 'org.mockito:mockito-core:5.11.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.11.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+    testRuntimeOnly 'org.slf4j:slf4j-simple:2.0.12'
+}
+
+test {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        csv.required = true
+        xml.required = true
+        html.required = true
+    }
+}
+
+jar {
+    archiveBaseName = 'crm-plugin'
+
+    manifest {
+        attributes(
+            'Plugin-Id': 'com.auraboot.crm',
+            'Plugin-Version': version,
+            'Plugin-Class': 'com.auraboot.plugins.crm.CrmPlugin',
+            'Plugin-Provider': 'AuraBoot Team',
+            'Plugin-Description': 'CRM hybrid backend: lead scoring engine + lead assignment engine + command handlers'
+        )
+    }
+
+    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
+}
+
+build.dependsOn jar

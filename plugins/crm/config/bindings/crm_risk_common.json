@@ -1,0 +1,176 @@
+[
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_code",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_title",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_risk_type",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_severity",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_status",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_review_id",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_customer_request_id",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_account_id",
+    "sequence": 8,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_owner_id",
+    "sequence": 9,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_description",
+    "sequence": 10,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_mitigation",
+    "sequence": 11,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_due_at",
+    "sequence": 12,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_resolved_at",
+    "sequence": 13,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_source_model",
+    "sequence": 14,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_source_id",
+    "sequence": 15,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_risk_common",
+    "fieldCode": "crm_rk_common_payload",
+    "sequence": 16,
+    "required": false,
+    "visible": true,
+    "editable": true
+  }
+]

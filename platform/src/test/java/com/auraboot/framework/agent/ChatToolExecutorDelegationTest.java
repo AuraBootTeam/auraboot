@@ -34,7 +34,7 @@ class ChatToolExecutorDelegationTest extends BaseIntegrationTest {
 
     @Test
     void execute_getRecord_missingPid_returnsError() {
-        Map<String, Object> result = chatToolExecutor.execute("get_crm_account", Map.of(), "crm_account");
+        Map<String, Object> result = chatToolExecutor.execute("get_crm_account", Map.of(), "crm_account_common");
         assertThat(result.get("success")).isEqualTo(false);
     }
 

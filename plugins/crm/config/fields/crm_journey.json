@@ -1,0 +1,66 @@
+[
+  {
+    "code": "crm_jny_code",
+    "displayName:zh-CN": "旅程编号",
+    "displayName:en": "Code",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 50
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_jny_name",
+    "displayName:zh-CN": "旅程名称",
+    "displayName:en": "Name",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 200
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_jny_total_steps",
+    "displayName:zh-CN": "步骤数",
+    "displayName:en": "Total Steps",
+    "dataType": "integer",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_jny_description",
+    "displayName:zh-CN": "描述",
+    "displayName:en": "Description",
+    "dataType": "text"
+  },
+  {
+    "code": "crm_jny_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_journey_status",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_jny_step_delay_minutes",
+    "displayName:zh-CN": "步骤间隔(分钟)",
+    "displayName:en": "Step Delay (min)",
+    "dataType": "integer",
+    "feature": {
+      "sortable": true
+    }
+  }
+]

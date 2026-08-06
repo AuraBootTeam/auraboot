@@ -1,0 +1,73 @@
+[
+  {
+    "code": "crm_cm_campaign_id",
+    "displayName:zh-CN": "营销活动",
+    "displayName:en": "Campaign",
+    "dataType": "reference",
+    "referenceModelCode": "crm_campaign",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_cm_member_type",
+    "displayName:zh-CN": "成员类型",
+    "displayName:en": "Member Type",
+    "dataType": "enum",
+    "dictCode": "crm_campaign_member_type",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_cm_lead_id",
+    "displayName:zh-CN": "线索",
+    "displayName:en": "Lead",
+    "dataType": "reference",
+    "referenceModelCode": "crm_lead_common"
+  },
+  {
+    "code": "crm_cm_contact_id",
+    "displayName:zh-CN": "联系人",
+    "displayName:en": "Contact",
+    "dataType": "reference",
+    "referenceModelCode": "crm_contact_common"
+  },
+  {
+    "code": "crm_cm_member_name",
+    "displayName:zh-CN": "成员名称",
+    "displayName:en": "Member Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_cm_email",
+    "displayName:zh-CN": "邮箱",
+    "displayName:en": "Email",
+    "dataType": "string",
+    "constraints": { "maxLength": 300 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_cm_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_campaign_member_status",
+    "defaultValue": "invited",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_cm_added_date",
+    "displayName:zh-CN": "加入日期",
+    "displayName:en": "Added Date",
+    "dataType": "datetime",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_cm_responded_date",
+    "displayName:zh-CN": "响应日期",
+    "displayName:en": "Responded Date",
+    "dataType": "datetime",
+    "feature": { "sortable": true }
+  }
+]

@@ -719,7 +719,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           icon: '🏢',
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_account',
+            modelCode: 'crm_account_common',
             metrics: [{ field: 'pid', aggregation: 'count', alias: 'account_count' }],
           },
         },
@@ -739,7 +739,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           precision: 0,
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_opportunity',
+            modelCode: 'crm_opportunity_common',
             metrics: [
               { field: 'crm_opp_expected_amount', aggregation: 'sum', alias: 'pipeline_amount' },
             ],
@@ -770,7 +770,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         },
       },
       {
-        // GAP (was "本月新线索"): crm_lead has no business date field, and the
+        // GAP (was "本月新线索"): crm_lead_common has no business date field, and the
         // aggregate data source only supports static filter values — there is no
         // relative-time filter ("this month"). Bound to the honest total instead.
         id: 'w_num_leads',
@@ -785,7 +785,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           icon: '📋',
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_lead',
+            modelCode: 'crm_lead_common',
             metrics: [{ field: 'pid', aggregation: 'count', alias: 'lead_count' }],
           },
         },
@@ -840,7 +840,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           },
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_opportunity',
+            modelCode: 'crm_opportunity_common',
             dimensions: ['crm_opp_expected_close_date__month'],
             metrics: [{ field: 'pid', aggregation: 'count', alias: 'opp_count' }],
             orderBy: [{ field: 'crm_opp_expected_close_date__month', direction: 'asc' }],
@@ -861,7 +861,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           title: '商机阶段分布',
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_opportunity',
+            modelCode: 'crm_opportunity_common',
             dimensions: ['crm_opp_stage'],
             metrics: [{ field: 'pid', aggregation: 'count', alias: 'deal_count' }],
           },
@@ -879,7 +879,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           title: '销售漏斗',
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_opportunity',
+            modelCode: 'crm_opportunity_common',
             dimensions: ['crm_opp_stage'],
             metrics: [{ field: 'pid', aggregation: 'count', alias: 'deal_count' }],
           },
@@ -906,7 +906,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           },
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_opportunity',
+            modelCode: 'crm_opportunity_common',
             dimensions: ['crm_opp_owner'],
             metrics: [
               { field: 'pid', aggregation: 'count', alias: 'deal_count' },
@@ -952,7 +952,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           visualization: { max: 20000000 },
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_opportunity',
+            modelCode: 'crm_opportunity_common',
             filters: [{ field: 'crm_opp_stage', operator: 'eq', value: 'closed_won' }],
             metrics: [
               { field: 'crm_opp_expected_amount', aggregation: 'sum', alias: 'won_amount' },
@@ -974,14 +974,14 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           visualization: { target: 30, format: 'fraction' },
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_opportunity',
+            modelCode: 'crm_opportunity_common',
             filters: [{ field: 'crm_opp_stage', operator: 'eq', value: 'closed_won' }],
             metrics: [{ field: 'pid', aggregation: 'count', alias: 'won_count' }],
           },
         },
       },
       {
-        // Was "客户规模 vs 商机金额" — crm_account has no numeric size field (only a
+        // Was "客户规模 vs 商机金额" — crm_account_common has no numeric size field (only a
         // varchar rating), so the original pairing was unbindable. Amount vs
         // probability is two real numeric columns on the same row.
         // Scatter reads x = metrics[0], y = metrics[1], label = dimensions[0]
@@ -1003,7 +1003,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           },
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_opportunity',
+            modelCode: 'crm_opportunity_common',
             dimensions: ['crm_opp_name'],
             metrics: [
               { field: 'crm_opp_expected_amount', aggregation: 'avg', alias: 'amount' },
@@ -1035,7 +1035,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           },
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_opportunity',
+            modelCode: 'crm_opportunity_common',
             dimensions: ['crm_opp_owner'],
             metrics: [
               { field: 'pid', aggregation: 'count', alias: 'deal_count' },
@@ -1063,7 +1063,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           },
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_activity',
+            modelCode: 'crm_activity_common',
             dimensions: ['crm_act_owner', 'crm_act_type'],
             metrics: [{ field: 'pid', aggregation: 'count', alias: 'activity_count' }],
           },
@@ -1087,7 +1087,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           visualization: { nameField: 'crm_acc_industry', valueField: 'account_count' },
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_account',
+            modelCode: 'crm_account_common',
             dimensions: ['crm_acc_industry'],
             metrics: [{ field: 'pid', aggregation: 'count', alias: 'account_count' }],
           },
@@ -1152,7 +1152,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           visualization: { rankField: 'crm_opp_owner', valueField: 'total_amount', maxItems: 8 },
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_opportunity',
+            modelCode: 'crm_opportunity_common',
             dimensions: ['crm_opp_owner'],
             metrics: [
               { field: 'crm_opp_expected_amount', aggregation: 'sum', alias: 'total_amount' },
@@ -1176,7 +1176,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           title: '线索行业分布',
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_lead',
+            modelCode: 'crm_lead_common',
             dimensions: ['crm_lead_industry'],
             metrics: [{ field: 'pid', aggregation: 'count', alias: 'lead_count' }],
           },
@@ -1230,7 +1230,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           },
           dataSource: {
             type: 'aggregate',
-            modelCode: 'crm_opportunity',
+            modelCode: 'crm_opportunity_common',
             dimensions: ['crm_opp_stage'],
             metrics: [
               { field: 'pid', aggregation: 'count', alias: 'deal_count' },
@@ -1411,7 +1411,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
               blockType: 'table',
               title: '客户清单',
               config: {
-                dataSource: { type: 'model', modelCode: 'crm_account' },
+                dataSource: { type: 'model', modelCode: 'crm_account_common' },
                 columns: [
                   { field: 'crm_acc_code', title: '编号', width: 120 },
                   { field: 'crm_acc_name', title: '客户名', width: 200 },
@@ -1710,7 +1710,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
       {
         name: '军火展 — 字段变更触发(ON_FIELD_CHANGE)',
         triggerType: 'on_field_change',
-        modelCode: 'crm_opportunity',
+        modelCode: 'crm_opportunity_common',
         triggerConfig: { fieldCode: 'crm_opp_expected_amount', stateField: 'crm_opp_stage' },
         actions: [
           {
@@ -1724,7 +1724,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
       {
         name: '军火展 — 记录更新触发(ON_RECORD_UPDATE)',
         triggerType: 'on_record_update',
-        modelCode: 'crm_account',
+        modelCode: 'crm_account_common',
         triggerConfig: { watchFields: ['crm_acc_rating', 'crm_acc_status'] },
         actions: [
           {
@@ -1754,7 +1754,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           },
           {
             type: 'create_record',
-            config: { targetModel: 'crm_lead', message: '从外部创建线索' },
+            config: { targetModel: 'crm_lead_common', message: '从外部创建线索' },
             sequence: 1,
             label: '创建线索',
           },
@@ -1809,7 +1809,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
       const resp = await page.request.post('/api/views', {
         data: {
           name: v.name,
-          modelCode: 'crm_opportunity',
+          modelCode: 'crm_opportunity_common',
           viewType: v.viewType.toLowerCase(),
           scope: 'global',
           viewConfig: v.config,
@@ -1824,7 +1824,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         );
       }
     }
-    console.log(`  Created ${created}/7 SavedViews for crm_opportunity`);
+    console.log(`  Created ${created}/7 SavedViews for crm_opportunity_common`);
   });
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -1994,7 +1994,7 @@ A: 新客户预付 50%，老客户月结 30-60 天。支持银行转账、承兑
     );
 
     // SavedViews
-    const viewResp = await page.request.get('/api/views/accessible?modelCode=crm_opportunity');
+    const viewResp = await page.request.get('/api/views/accessible?modelCode=crm_opportunity_common');
     const viewBody = await viewResp.json().catch(() => ({}));
     const viewCount = Array.isArray(viewBody?.data)
       ? viewBody.data.length

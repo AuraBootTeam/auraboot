@@ -27,7 +27,7 @@
 #   PUBLIC_HTTP_PORT=80               # (direct) host port for the gateway
 #   ADMIN_EMAIL / ADMIN_PASSWORD      # default admin@auraboot.com / Test2026x
 #   SEED_PHASES="data extended workflow ai supplement"
-#   SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_overview
+#   SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_dashboard
 #   APK_MIRROR=mirrors.aliyun.com  NPM_REGISTRY=https://registry.npmmirror.com
 #   PLATFORM=linux/amd64              # target arch of the host
 #   ICP_COMPLIANCE_ENABLED=1          # show the temporary ICP review profile
@@ -62,7 +62,7 @@ ICP_COMPLIANCE_ENABLED="${ICP_COMPLIANCE_ENABLED:-0}"
 ICP_SITE_TITLE="${ICP_SITE_TITLE:-个人技术}"
 ICP_RECORD_NUMBER="${ICP_RECORD_NUMBER:-浙ICP备2023054087号}"
 SEED_PHASES="${SEED_PHASES:-data extended workflow ai supplement}"
-SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_overview}"
+SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_dashboard}"
 STEP="${STEP:-all}"
 SSH=(ssh -o BatchMode=yes "$HOST")
 BE_IMG="auraboot-oss/backend:$TAG"; FE_IMG="auraboot-oss/frontend:$TAG"

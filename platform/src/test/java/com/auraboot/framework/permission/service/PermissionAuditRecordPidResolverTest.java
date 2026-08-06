@@ -54,18 +54,18 @@ class PermissionAuditRecordPidResolverTest {
     @Test
     @DisplayName("resolves the public pid when the audit row maps to a live record")
     void resolvesPidForLiveRecord() {
-        when(metaModelService.findByCode("crm_lead")).thenReturn(model("crm_lead", "mt_crm_lead"));
+        when(metaModelService.findByCode("crm_lead_common")).thenReturn(model("crm_lead_common", "mt_crm_lead_common"));
         Map<String, Object> row = new HashMap<>();
         row.put("pid", "P123");
         when(dynamicDataMapper.selectByQuery(anyString(), any())).thenReturn(List.of(row));
 
-        assertThat(resolver.resolve(auditLog(5L, "crm_lead", 1L))).isEqualTo("P123");
+        assertThat(resolver.resolve(auditLog(5L, "crm_lead_common", 1L))).isEqualTo("P123");
     }
 
     @Test
     @DisplayName("returns the persisted public pid without resolving internal id")
     void returnsPersistedRecordPidFirst() {
-        PermissionAuditLog log = auditLog(null, "crm_lead", 1L);
+        PermissionAuditLog log = auditLog(null, "crm_lead_common", 1L);
         log.setRecordPid("PERSISTED-PID-1");
 
         assertThat(resolver.resolve(log)).isEqualTo("PERSISTED-PID-1");
@@ -74,7 +74,7 @@ class PermissionAuditRecordPidResolverTest {
     @Test
     @DisplayName("returns null when the audit row has no internal record id")
     void returnsNullWhenRecordIdMissing() {
-        assertThat(resolver.resolve(auditLog(null, "crm_lead", 1L))).isNull();
+        assertThat(resolver.resolve(auditLog(null, "crm_lead_common", 1L))).isNull();
     }
 
     @Test
@@ -87,9 +87,9 @@ class PermissionAuditRecordPidResolverTest {
     @Test
     @DisplayName("returns null when no row matches the internal id")
     void returnsNullWhenNoRowMatches() {
-        when(metaModelService.findByCode("crm_lead")).thenReturn(model("crm_lead", "mt_crm_lead"));
+        when(metaModelService.findByCode("crm_lead_common")).thenReturn(model("crm_lead_common", "mt_crm_lead_common"));
         when(dynamicDataMapper.selectByQuery(anyString(), any())).thenReturn(List.of());
 
-        assertThat(resolver.resolve(auditLog(5L, "crm_lead", 1L))).isNull();
+        assertThat(resolver.resolve(auditLog(5L, "crm_lead_common", 1L))).isNull();
     }
 }

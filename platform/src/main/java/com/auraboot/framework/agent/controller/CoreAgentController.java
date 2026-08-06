@@ -285,7 +285,7 @@ public class CoreAgentController {
      * Request body:
      * <ul>
      *   <li>eventType  — required (e.g. "entity_status_changed")</li>
-     *   <li>modelCode  — optional (e.g. "crm_lead")</li>
+     *   <li>modelCode  — optional (e.g. "crm_lead_common")</li>
      *   <li>eventData  — optional map of extra key/value pairs for condition matching</li>
      * </ul>
      */

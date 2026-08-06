@@ -1,0 +1,77 @@
+[
+  {
+    "code": "crm_cmet_campaign_id",
+    "displayName:zh-CN": "营销活动",
+    "displayName:en": "Campaign",
+    "dataType": "reference",
+    "referenceModelCode": "crm_campaign",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_cmet_metric_date",
+    "displayName:zh-CN": "统计日期",
+    "displayName:en": "Metric Date",
+    "dataType": "date",
+    "constraints": { "required": true },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_cmet_leads_generated",
+    "displayName:zh-CN": "产生线索数",
+    "displayName:en": "Leads Generated",
+    "dataType": "integer",
+    "defaultValue": "0",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_cmet_emails_sent",
+    "displayName:zh-CN": "发送邮件数",
+    "displayName:en": "Emails Sent",
+    "dataType": "integer",
+    "defaultValue": "0",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_cmet_open_rate",
+    "displayName:zh-CN": "打开率(%)",
+    "displayName:en": "Open Rate (%)",
+    "dataType": "decimal",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_cmet_click_rate",
+    "displayName:zh-CN": "点击率(%)",
+    "displayName:en": "Click Rate (%)",
+    "dataType": "decimal",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_cmet_conversion_rate",
+    "displayName:zh-CN": "转化率(%)",
+    "displayName:en": "Conversion Rate (%)",
+    "dataType": "decimal",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_cmet_cost",
+    "displayName:zh-CN": "花费",
+    "displayName:en": "Cost",
+    "dataType": "decimal",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_cmet_revenue",
+    "displayName:zh-CN": "收入",
+    "displayName:en": "Revenue",
+    "dataType": "decimal",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_cmet_roi",
+    "displayName:zh-CN": "ROI(%)",
+    "displayName:en": "ROI (%)",
+    "dataType": "decimal",
+    "feature": { "sortable": true }
+  }
+]

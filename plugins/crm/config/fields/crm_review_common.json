@@ -1,0 +1,160 @@
+[
+  {
+    "code": "crm_rv_code",
+    "displayName:zh-CN": "评审编号",
+    "displayName:en": "Review Code",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 50
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_rv_title",
+    "displayName:zh-CN": "评审标题",
+    "displayName:en": "Review Title",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 200
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_rv_review_type",
+    "displayName:zh-CN": "评审类型",
+    "displayName:en": "Review Type",
+    "dataType": "enum",
+    "dictCode": "crm_review_type",
+    "defaultValue": "requirement",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_rv_status",
+    "displayName:zh-CN": "评审状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_review_status",
+    "defaultValue": "pending",
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_rv_priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "enum",
+    "dictCode": "crm_review_priority",
+    "defaultValue": "normal",
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_rv_account_id",
+    "displayName:zh-CN": "客户",
+    "displayName:en": "Account",
+    "dataType": "reference",
+    "referenceModelCode": "crm_account_common",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_rv_customer_request_id",
+    "displayName:zh-CN": "客户需求",
+    "displayName:en": "Customer Request",
+    "dataType": "reference",
+    "referenceModelCode": "crm_customer_request_common",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_rv_reviewer_id",
+    "displayName:zh-CN": "评审人",
+    "displayName:en": "Reviewer",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 80
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_rv_conclusion",
+    "displayName:zh-CN": "评审结论",
+    "displayName:en": "Conclusion",
+    "dataType": "text",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_rv_recommendation",
+    "displayName:zh-CN": "处理建议",
+    "displayName:en": "Recommendation",
+    "dataType": "text"
+  },
+  {
+    "code": "crm_rv_source_model",
+    "displayName:zh-CN": "来源模型",
+    "displayName:en": "Source Model",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 80
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_rv_source_id",
+    "displayName:zh-CN": "来源对象ID",
+    "displayName:en": "Source Object ID",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 80
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_rv_submitted_at",
+    "displayName:zh-CN": "提交时间",
+    "displayName:en": "Submitted At",
+    "dataType": "datetime",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_rv_decided_at",
+    "displayName:zh-CN": "结论时间",
+    "displayName:en": "Decided At",
+    "dataType": "datetime",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_rv_common_payload",
+    "displayName:zh-CN": "通用留痕",
+    "displayName:en": "Common Payload",
+    "dataType": "json"
+  }
+]

@@ -1,0 +1,118 @@
+{
+  "pageKey": "crm_quote_summary_common_detail",
+  "name:zh-CN": "报价摘要详情",
+  "name:en": "Quote Summary Detail",
+  "modelCode": "crm_quote_summary_common",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "crm_qs_info",
+      "blockType": "detail-section",
+      "title": {
+        "zh-CN": "报价摘要",
+        "en": "Quote Summary"
+      },
+      "fields": [
+        {
+          "field": "crm_qs_code",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_account_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_opportunity_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_customer_request_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_source_quote_type",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_source_quote_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_quote_amount",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_currency",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_valid_until",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_approval_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_customer_feedback_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_won_lost_result",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_sent_at",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_source_updated_at",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_owner",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qs_summary",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "crm_qs_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "icon": "Edit",
+          "permissionCode": "crm.quote_summary.manage",
+          "label": "$i18n:common.button.edit",
+          "action": {
+            "type": "navigate",
+            "to": "crm_quote_summary_common_form"
+          }
+        },
+        {
+          "code": "delete",
+          "icon": "Trash2",
+          "danger": true,
+          "permissionCode": "crm.quote_summary.manage",
+          "label": "$i18n:common.button.delete",
+          "confirm": "delete.confirm",
+          "action": {
+            "type": "command"
+          }
+        }
+      ]
+    }
+  ]
+}

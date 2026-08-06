@@ -6,7 +6,7 @@ import java.util.List;
 @Data
 public class PlatformAiScoreRequest {
 
-    /** DSL model code, e.g. "crm_lead" */
+    /** DSL model code, e.g. "crm_lead_common" */
     private String modelCode;
 
     /** DSL field code to write the score back to (0-100); must already exist on the model */

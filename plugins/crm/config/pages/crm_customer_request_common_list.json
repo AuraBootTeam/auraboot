@@ -1,0 +1,213 @@
+{
+  "pageKey": "crm_customer_request_common_list",
+  "name:zh-CN": "客户需求",
+  "name:en": "Customer Requests",
+  "modelCode": "crm_customer_request_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_cr_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "zh-CN": "全部",
+            "en": "All"
+          }
+        },
+        {
+          "key": "submitted",
+          "label": {
+            "zh-CN": "待路由",
+            "en": "To Route"
+          },
+          "filter": {
+            "field": "crm_cr_status",
+            "operator": "EQ",
+            "value": "submitted"
+          }
+        },
+        {
+          "key": "routed",
+          "label": {
+            "zh-CN": "已路由",
+            "en": "Routed"
+          },
+          "filter": {
+            "field": "crm_cr_status",
+            "operator": "EQ",
+            "value": "routed"
+          }
+        },
+        {
+          "key": "in_progress",
+          "label": {
+            "zh-CN": "处理中",
+            "en": "In Progress"
+          },
+          "filter": {
+            "field": "crm_cr_status",
+            "operator": "EQ",
+            "value": "in_progress"
+          }
+        },
+        {
+          "key": "quoted",
+          "label": {
+            "zh-CN": "已报价",
+            "en": "Quoted"
+          },
+          "filter": {
+            "field": "crm_cr_status",
+            "operator": "EQ",
+            "value": "quoted"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_cr_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "icon": "Plus",
+          "permissionCode": "crm.customer_request.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_customer_request_common_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_cr_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_cr_code",
+          "width": 150,
+          "sortable": true
+        },
+        {
+          "field": "crm_cr_title",
+          "width": 240,
+          "sortable": true
+        },
+        {
+          "field": "crm_cr_account_id",
+          "width": 180
+        },
+        {
+          "field": "crm_cr_opportunity_id",
+          "width": 180
+        },
+        {
+          "field": "crm_cr_type",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_customer_request_type"
+        },
+        {
+          "field": "crm_cr_priority",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "crm_customer_request_priority"
+        },
+        {
+          "field": "crm_cr_status",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_customer_request_status"
+        },
+        {
+          "field": "crm_cr_route_status",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_customer_request_route_status"
+        },
+        {
+          "field": "crm_cr_expected_date",
+          "width": 140
+        },
+        {
+          "field": "crm_cr_owner",
+          "width": 120
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "label": "$i18n:common.actions",
+          "buttons": [
+            {
+              "code": "view",
+              "icon": "Eye",
+              "permissionCode": "crm.customer_request.read",
+              "label": "$i18n:common.button.view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_customer_request_common_detail"
+              }
+            },
+            {
+              "code": "edit",
+              "icon": "Edit",
+              "permissionCode": "crm.customer_request.manage",
+              "visibleWhen": "record.crm_cr_status === 'draft' || record.crm_cr_status === 'submitted'",
+              "label": "$i18n:common.button.edit",
+              "action": {
+                "type": "navigate",
+                "to": "crm_customer_request_common_form"
+              }
+            },
+            {
+              "code": "submit",
+              "icon": "Send",
+              "permissionCode": "crm.customer_request.manage",
+              "visibleWhen": "record.crm_cr_status === 'draft'",
+              "label": {
+                "zh-CN": "提交",
+                "en-US": "Submit"
+              },
+              "action": {
+                "type": "command",
+                "command": "crm:submit_customer_request"
+              }
+            },
+            {
+              "code": "delete",
+              "icon": "Trash2",
+              "danger": true,
+              "permissionCode": "crm.customer_request.manage",
+              "visibleWhen": "record.crm_cr_status === 'draft' || record.crm_cr_status === 'cancelled'",
+              "label": "$i18n:common.button.delete",
+              "action": {
+                "type": "command"
+              }
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "crm_cr_code",
+        "crm_cr_title",
+        "crm_cr_account_id",
+        "crm_cr_opportunity_id",
+        "crm_cr_status",
+        "crm_cr_route_status"
+      ],
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
+      }
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+[
+  {
+    "modelCode": "crm_sales_snapshot",
+    "fieldCode": "crm_ss_code",
+    "sequence": 1,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_sales_snapshot",
+    "fieldCode": "crm_ss_period",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_sales_snapshot",
+    "fieldCode": "crm_ss_total_opps",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_sales_snapshot",
+    "fieldCode": "crm_ss_won_count",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_sales_snapshot",
+    "fieldCode": "crm_ss_won_amount",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_sales_snapshot",
+    "fieldCode": "crm_ss_pipeline_amount",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_sales_snapshot",
+    "fieldCode": "crm_ss_conversion_rate",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_sales_snapshot",
+    "fieldCode": "crm_ss_refreshed_at",
+    "sequence": 8,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  }
+]

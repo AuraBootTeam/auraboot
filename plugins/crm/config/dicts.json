@@ -1,0 +1,3974 @@
+[
+  {
+    "code": "crm_account_status",
+    "name": "Account Status",
+    "name:zh-CN": "客户状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "活跃",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "inactive",
+        "label": "Inactive",
+        "label:zh-CN": "停用",
+        "sortNo": 20,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_account_industry",
+    "name": "Account Industry",
+    "name:zh-CN": "客户行业",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "retail",
+        "label": "Retail",
+        "label:zh-CN": "零售业",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "catering",
+        "label": "Catering",
+        "label:zh-CN": "餐饮业",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "education",
+        "label": "Education & Training",
+        "label:zh-CN": "教育培训",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "healthcare",
+        "label": "Healthcare",
+        "label:zh-CN": "医疗健康",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "finance",
+        "label": "Financial Services",
+        "label:zh-CN": "金融服务",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "technology",
+        "label": "Technology & Internet",
+        "label:zh-CN": "科技互联网",
+        "sortNo": 60,
+        "status": "enabled"
+      },
+      {
+        "value": "manufacturing",
+        "label": "Manufacturing",
+        "label:zh-CN": "制造业",
+        "sortNo": 70,
+        "status": "enabled"
+      },
+      {
+        "value": "logistics",
+        "label": "Logistics & Transportation",
+        "label:zh-CN": "物流运输",
+        "sortNo": 80,
+        "status": "enabled"
+      },
+      {
+        "value": "real_estate",
+        "label": "Real Estate",
+        "label:zh-CN": "房地产",
+        "sortNo": 90,
+        "status": "enabled"
+      },
+      {
+        "value": "entertainment",
+        "label": "Culture & Entertainment",
+        "label:zh-CN": "文化娱乐",
+        "sortNo": 100,
+        "status": "enabled"
+      },
+      {
+        "value": "tech",
+        "label": "Technology (Legacy)",
+        "label:zh-CN": "科技（兼容）",
+        "sortNo": 200,
+        "status": "enabled"
+      },
+      {
+        "value": "electronics",
+        "label": "Electronics",
+        "label:zh-CN": "电子",
+        "sortNo": 210,
+        "status": "enabled"
+      },
+      {
+        "value": "semiconductor",
+        "label": "Semiconductor",
+        "label:zh-CN": "半导体",
+        "sortNo": 220,
+        "status": "enabled"
+      },
+      {
+        "value": "consumer_electronics",
+        "label": "Consumer Electronics",
+        "label:zh-CN": "消费电子",
+        "sortNo": 230,
+        "status": "enabled"
+      },
+      {
+        "value": "building_tech",
+        "label": "Building Technology",
+        "label:zh-CN": "楼宇科技",
+        "sortNo": 240,
+        "status": "enabled"
+      },
+      {
+        "value": "robotics",
+        "label": "Robotics",
+        "label:zh-CN": "机器人",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "automotive",
+        "label": "Automotive",
+        "label:zh-CN": "汽车",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "industrial_control",
+        "label": "Industrial Control",
+        "label:zh-CN": "工控",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "energy",
+        "label": "Energy",
+        "label:zh-CN": "能源",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "medical",
+        "label": "Medical",
+        "label:zh-CN": "医疗",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "consumer",
+        "label": "Consumer",
+        "label:zh-CN": "消费",
+        "sortNo": 60,
+        "status": "enabled"
+      },
+      {
+        "value": "agriculture",
+        "label": "Agriculture",
+        "label:zh-CN": "农业",
+        "sortNo": 70,
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 80,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_account_rating",
+    "name": "Account Rating",
+    "name:zh-CN": "客户评级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "A",
+        "label": "A - Key Account",
+        "label:zh-CN": "A - 重点客户",
+        "sortNo": 10,
+        "color": "#10B981",
+        "status": "enabled"
+      },
+      {
+        "value": "B",
+        "label": "B - Important",
+        "label:zh-CN": "B - 重要客户",
+        "sortNo": 20,
+        "color": "#3B82F6",
+        "status": "enabled"
+      },
+      {
+        "value": "C",
+        "label": "C - Normal",
+        "label:zh-CN": "C - 一般客户",
+        "sortNo": 30,
+        "color": "#F59E0B",
+        "status": "enabled"
+      },
+      {
+        "value": "D",
+        "label": "D - Low Priority",
+        "label:zh-CN": "D - 低优先级",
+        "sortNo": 40,
+        "color": "#6B7280",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_lead_status",
+    "name": "Lead Status",
+    "name:zh-CN": "线索状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "new",
+        "label": "New",
+        "label:zh-CN": "新建",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "contacted",
+        "label": "Contacted",
+        "label:zh-CN": "已联系",
+        "sortNo": 20,
+        "color": "#13c2c2",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "qualified",
+        "label": "Qualified",
+        "label:zh-CN": "已合格",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "converted",
+        "label": "Converted",
+        "label:zh-CN": "已转化",
+        "sortNo": 40,
+        "color": "#722ed1",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "lost",
+        "label": "Lost",
+        "label:zh-CN": "已丢失",
+        "sortNo": 50,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_lead_source",
+    "name": "Lead Source",
+    "name:zh-CN": "线索来源",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "exhibition",
+        "label": "Exhibition",
+        "label:zh-CN": "展会",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "website",
+        "label": "Website",
+        "label:zh-CN": "网站",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "referral",
+        "label": "Referral",
+        "label:zh-CN": "推荐",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "cold_call",
+        "label": "Cold Call",
+        "label:zh-CN": "陌拜",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "social_media",
+        "label": "Social Media",
+        "label:zh-CN": "社交媒体",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 60,
+        "status": "enabled"
+      },
+      {
+        "value": "web_form",
+        "label": "Web Form",
+        "label:zh-CN": "网页表单",
+        "sortNo": 110,
+        "status": "enabled"
+      },
+      {
+        "value": "email_inbound",
+        "label": "Email Inbound",
+        "label:zh-CN": "邮件接入",
+        "sortNo": 120,
+        "status": "enabled"
+      },
+      {
+        "value": "wechat_work",
+        "label": "WeChat Work",
+        "label:zh-CN": "企业微信",
+        "sortNo": 130,
+        "status": "enabled"
+      },
+      {
+        "value": "facebook_ads",
+        "label": "Facebook Ads",
+        "label:zh-CN": "Facebook广告",
+        "sortNo": 140,
+        "status": "enabled"
+      },
+      {
+        "value": "generic_webhook",
+        "label": "Webhook",
+        "label:zh-CN": "Webhook",
+        "sortNo": 150,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_opp_stage",
+    "name": "Opportunity Stage",
+    "name:zh-CN": "商机阶段",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "discovery",
+        "label": "Discovery",
+        "label:zh-CN": "发现",
+        "sortNo": 10,
+        "color": "#3B82F6",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "qualification",
+        "label": "Qualification",
+        "label:zh-CN": "资格确认",
+        "sortNo": 20,
+        "color": "#6366F1",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "proposal",
+        "label": "Proposal",
+        "label:zh-CN": "方案提报",
+        "sortNo": 30,
+        "color": "#8B5CF6",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "negotiation",
+        "label": "Negotiation",
+        "label:zh-CN": "商务谈判",
+        "sortNo": 40,
+        "color": "#F97316",
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "closed_won",
+        "label": "Closed Won",
+        "label:zh-CN": "赢单",
+        "sortNo": 50,
+        "color": "#10B981",
+        "status": "enabled",
+        "extension": {
+          "color": "green",
+          "terminal": "won"
+        }
+      },
+      {
+        "value": "closed_lost",
+        "label": "Closed Lost",
+        "label:zh-CN": "丢单",
+        "sortNo": 60,
+        "color": "#EF4444",
+        "status": "enabled",
+        "extension": {
+          "color": "gray",
+          "terminal": "lost"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_activity_type",
+    "name": "Activity Type",
+    "name:zh-CN": "活动类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "task",
+        "label": "Task",
+        "label:zh-CN": "任务",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "call",
+        "label": "Call",
+        "label:zh-CN": "电话",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "email",
+        "label": "Email",
+        "label:zh-CN": "邮件",
+        "sortNo": 30,
+        "color": "#13c2c2",
+        "status": "enabled"
+      },
+      {
+        "value": "meeting",
+        "label": "Meeting",
+        "label:zh-CN": "会议",
+        "sortNo": 40,
+        "color": "#722ed1",
+        "status": "enabled"
+      },
+      {
+        "value": "note",
+        "label": "Note",
+        "label:zh-CN": "笔记",
+        "sortNo": 50,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "visit",
+        "label": "Visit",
+        "label:zh-CN": "拜访",
+        "sortNo": 60,
+        "color": "#eb2f96",
+        "status": "enabled"
+      },
+      {
+        "value": "wechat",
+        "label": "WeChat",
+        "label:zh-CN": "微信",
+        "sortNo": 90,
+        "color": "#07c160",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_activity_source",
+    "name": "Activity Source",
+    "name:zh-CN": "活动来源",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "manual",
+        "label": "Manual",
+        "label:zh-CN": "手动",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "email_sync",
+        "label": "Email Sync",
+        "label:zh-CN": "邮件同步",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "calendar_sync",
+        "label": "Calendar Sync",
+        "label:zh-CN": "日历同步",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "api",
+        "label": "api",
+        "label:zh-CN": "api",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "automation",
+        "label": "Automation",
+        "label:zh-CN": "自动化",
+        "sortNo": 50,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_task_status",
+    "name": "Task Status",
+    "name:zh-CN": "任务状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "open",
+        "label": "Open",
+        "label:zh-CN": "待办",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "in_progress",
+        "label": "In Progress",
+        "label:zh-CN": "进行中",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "done",
+        "label": "Done",
+        "label:zh-CN": "已完成",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "cancelled",
+        "label": "Cancelled",
+        "label:zh-CN": "已取消",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_task_priority",
+    "name": "Task Priority",
+    "name:zh-CN": "任务优先级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "critical",
+        "label": "Critical",
+        "label:zh-CN": "紧急",
+        "sortNo": 10,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "medium",
+        "label": "Medium",
+        "label:zh-CN": "中",
+        "sortNo": 30,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "low",
+        "label": "Low",
+        "label:zh-CN": "低",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_call_direction",
+    "name": "Call Direction",
+    "name:zh-CN": "通话方向",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "inbound",
+        "label": "Inbound",
+        "label:zh-CN": "呼入",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "outbound",
+        "label": "Outbound",
+        "label:zh-CN": "呼出",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_relatable_object_type",
+    "name": "Relatable Object Type",
+    "name:zh-CN": "可关联对象类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "account",
+        "label": "Account",
+        "label:zh-CN": "客户",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "contact",
+        "label": "Contact",
+        "label:zh-CN": "联系人",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "lead",
+        "label": "Lead",
+        "label:zh-CN": "线索",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "opportunity",
+        "label": "Opportunity",
+        "label:zh-CN": "商机",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "quote",
+        "label": "Quote",
+        "label:zh-CN": "报价",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "complaint",
+        "label": "Complaint",
+        "label:zh-CN": "投诉",
+        "sortNo": 60,
+        "status": "enabled"
+      },
+      {
+        "value": "campaign",
+        "label": "Campaign",
+        "label:zh-CN": "营销活动",
+        "sortNo": 70,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_relation_role",
+    "name": "Relation Role",
+    "name:zh-CN": "关联角色",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "primary",
+        "label": "Primary",
+        "label:zh-CN": "主要",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "related",
+        "label": "Related",
+        "label:zh-CN": "相关",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "participant",
+        "label": "Participant",
+        "label:zh-CN": "参与者",
+        "sortNo": 30,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_contact_role",
+    "name": "Contact Role",
+    "name:zh-CN": "联系人角色",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "decision_maker",
+        "label": "Decision Maker",
+        "label:zh-CN": "决策者",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "technical",
+        "label": "Technical",
+        "label:zh-CN": "技术",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "procurement",
+        "label": "Procurement",
+        "label:zh-CN": "采购",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "influencer",
+        "label": "Influencer",
+        "label:zh-CN": "影响者",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 50,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_complaint_type",
+    "name": "Complaint Type",
+    "name:zh-CN": "投诉类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "quality",
+        "label": "Quality",
+        "label:zh-CN": "质量问题",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "delivery",
+        "label": "Delivery",
+        "label:zh-CN": "交付问题",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "service",
+        "label": "Service",
+        "label:zh-CN": "服务问题",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "price",
+        "label": "Price",
+        "label:zh-CN": "价格问题",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 50,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_complaint_status",
+    "name": "Complaint Status",
+    "name:zh-CN": "投诉状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "open",
+        "label": "Open",
+        "label:zh-CN": "待处理",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "investigating",
+        "label": "Investigating",
+        "label:zh-CN": "调查中",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "resolved",
+        "label": "Resolved",
+        "label:zh-CN": "已解决",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "closed",
+        "label": "Closed",
+        "label:zh-CN": "已关闭",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_severity",
+    "name": "Severity",
+    "name:zh-CN": "严重程度",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "low",
+        "label": "Low",
+        "label:zh-CN": "低",
+        "sortNo": 10,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "medium",
+        "label": "Medium",
+        "label:zh-CN": "中",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 30,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "critical",
+        "label": "Critical",
+        "label:zh-CN": "严重",
+        "sortNo": 40,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_campaign_type",
+    "name": "Campaign Type",
+    "name:zh-CN": "营销活动类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "email",
+        "label": "Email",
+        "label:zh-CN": "邮件营销",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "exhibition",
+        "label": "Exhibition",
+        "label:zh-CN": "展会",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "webinar",
+        "label": "Webinar",
+        "label:zh-CN": "网络研讨会",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "advertising",
+        "label": "Advertising",
+        "label:zh-CN": "广告投放",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "referral",
+        "label": "Referral",
+        "label:zh-CN": "推荐计划",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 60,
+        "status": "enabled"
+      },
+      {
+        "value": "digital",
+        "label": "Digital",
+        "label:zh-CN": "数字营销",
+        "sortNo": 80,
+        "status": "enabled"
+      },
+      {
+        "value": "social_media",
+        "label": "Social Media",
+        "label:zh-CN": "社交媒体",
+        "sortNo": 81,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_campaign_status",
+    "name": "Campaign Status",
+    "name:zh-CN": "营销活动状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "planned",
+        "label": "Planned",
+        "label:zh-CN": "计划中",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "进行中",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "completed",
+        "label": "Completed",
+        "label:zh-CN": "已完成",
+        "sortNo": 30,
+        "color": "#722ed1",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "cancelled",
+        "label": "Cancelled",
+        "label:zh-CN": "已取消",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_currency_code",
+    "name": "Currency",
+    "name:zh-CN": "币种",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "cny",
+        "label": "cny",
+        "label:zh-CN": "人民币",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "usd",
+        "label": "usd",
+        "label:zh-CN": "美元",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "eur",
+        "label": "eur",
+        "label:zh-CN": "欧元",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "gbp",
+        "label": "gbp",
+        "label:zh-CN": "英镑",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "jpy",
+        "label": "jpy",
+        "label:zh-CN": "日元",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "hkd",
+        "label": "hkd",
+        "label:zh-CN": "港币",
+        "sortNo": 60,
+        "status": "enabled"
+      },
+      {
+        "value": "sgd",
+        "label": "sgd",
+        "label:zh-CN": "新加坡元",
+        "sortNo": 70,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_email_category",
+    "name": "Email Category",
+    "name:zh-CN": "邮件分类",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "follow_up",
+        "label": "Follow Up",
+        "label:zh-CN": "跟进",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "quotation",
+        "label": "Quotation",
+        "label:zh-CN": "报价",
+        "sortNo": 20,
+        "color": "#722ed1",
+        "status": "enabled"
+      },
+      {
+        "value": "thank_you",
+        "label": "Thank You",
+        "label:zh-CN": "感谢",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "welcome",
+        "label": "Welcome",
+        "label:zh-CN": "欢迎",
+        "sortNo": 40,
+        "color": "#13c2c2",
+        "status": "enabled"
+      },
+      {
+        "value": "notification",
+        "label": "Notification",
+        "label:zh-CN": "通知",
+        "sortNo": 50,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 60,
+        "color": "#d9d9d9",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_email_template_status",
+    "name": "Email Template Status",
+    "name:zh-CN": "邮件模板状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "color": "#bfbfbf",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "启用",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "archived",
+        "label": "Archived",
+        "label:zh-CN": "已归档",
+        "sortNo": 30,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_email_direction",
+    "name": "Email Direction",
+    "name:zh-CN": "邮件方向",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "outbound",
+        "label": "Outbound",
+        "label:zh-CN": "发件",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "inbound",
+        "label": "Inbound",
+        "label:zh-CN": "收件",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_related_type",
+    "name": "CRM Related Type",
+    "name:zh-CN": "CRM关联类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "account",
+        "label": "Account",
+        "label:zh-CN": "客户",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "contact",
+        "label": "Contact",
+        "label:zh-CN": "联系人",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "lead",
+        "label": "Lead",
+        "label:zh-CN": "线索",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "opportunity",
+        "label": "Opportunity",
+        "label:zh-CN": "商机",
+        "sortNo": 40,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_email_status",
+    "name": "Email Status",
+    "name:zh-CN": "邮件状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "color": "#bfbfbf",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "sent",
+        "label": "Sent",
+        "label:zh-CN": "已发送",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "delivered",
+        "label": "Delivered",
+        "label:zh-CN": "已送达",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "opened",
+        "label": "Opened",
+        "label:zh-CN": "已打开",
+        "sortNo": 40,
+        "color": "#722ed1",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "bounced",
+        "label": "Bounced",
+        "label:zh-CN": "已退信",
+        "sortNo": 50,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "failed",
+        "label": "Failed",
+        "label:zh-CN": "失败",
+        "sortNo": 60,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_campaign_member_type",
+    "name": "Campaign Member Type",
+    "name:zh-CN": "活动成员类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "lead",
+        "label": "Lead",
+        "label:zh-CN": "线索",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "contact",
+        "label": "Contact",
+        "label:zh-CN": "联系人",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_campaign_member_status",
+    "name": "Campaign Member Status",
+    "name:zh-CN": "活动成员状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "invited",
+        "label": "Invited",
+        "label:zh-CN": "已邀请",
+        "sortNo": 10,
+        "color": "#bfbfbf",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "sent",
+        "label": "Sent",
+        "label:zh-CN": "已发送",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "opened",
+        "label": "Opened",
+        "label:zh-CN": "已打开",
+        "sortNo": 30,
+        "color": "#13c2c2",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "clicked",
+        "label": "Clicked",
+        "label:zh-CN": "已点击",
+        "sortNo": 40,
+        "color": "#722ed1",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "converted",
+        "label": "Converted",
+        "label:zh-CN": "已转化",
+        "sortNo": 50,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "unsubscribed",
+        "label": "Unsubscribed",
+        "label:zh-CN": "已退订",
+        "sortNo": 60,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_sla_status",
+    "name": "SLA Status",
+    "name:zh-CN": "SLA状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "on_track",
+        "label": "On Track",
+        "label:zh-CN": "正常",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "at_risk",
+        "label": "At Risk",
+        "label:zh-CN": "预警",
+        "sortNo": 20,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "breached",
+        "label": "Breached",
+        "label:zh-CN": "违规",
+        "sortNo": 30,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_sla_breach_type",
+    "name": "SLA Breach Type",
+    "name:zh-CN": "SLA违规类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "response",
+        "label": "Response",
+        "label:zh-CN": "响应超时",
+        "sortNo": 10,
+        "color": "#fa8c16",
+        "status": "enabled"
+      },
+      {
+        "value": "resolution",
+        "label": "Resolution",
+        "label:zh-CN": "解决超时",
+        "sortNo": 20,
+        "color": "#f5222d",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_inbound_channel_type",
+    "name": "Inbound Channel Type",
+    "name:zh-CN": "入站渠道类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "web_form",
+        "label": "Web Form",
+        "label:zh-CN": "网页表单",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled"
+      },
+      {
+        "value": "email_imap",
+        "label": "Email (IMAP)",
+        "label:zh-CN": "邮件(IMAP)",
+        "sortNo": 20,
+        "color": "#722ed1",
+        "status": "enabled"
+      },
+      {
+        "value": "email_inbound_webhook",
+        "label": "Email (Webhook)",
+        "label:zh-CN": "邮件(Webhook)",
+        "sortNo": 30,
+        "color": "#722ed1",
+        "status": "enabled"
+      },
+      {
+        "value": "wechat_work",
+        "label": "WeChat Work",
+        "label:zh-CN": "企业微信",
+        "sortNo": 40,
+        "color": "#52c41a",
+        "status": "enabled"
+      },
+      {
+        "value": "facebook_lead_ads",
+        "label": "Facebook Lead Ads",
+        "label:zh-CN": "Facebook广告线索",
+        "sortNo": 50,
+        "color": "#1877f2",
+        "status": "enabled"
+      },
+      {
+        "value": "generic_webhook",
+        "label": "Generic Webhook",
+        "label:zh-CN": "通用Webhook",
+        "sortNo": 60,
+        "color": "#fa8c16",
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_merge_queue_status",
+    "name": "Merge Queue Status",
+    "name:zh-CN": "合并队列状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Pending Review",
+        "label:zh-CN": "待审核",
+        "sortNo": 10,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "merged",
+        "label": "Merged",
+        "label:zh-CN": "已合并",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已拒绝",
+        "sortNo": 30,
+        "color": "#ff4d4f",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "created_new",
+        "label": "Created as New",
+        "label:zh-CN": "创建为新线索",
+        "sortNo": 40,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_lead_score_dimension",
+    "name": "Lead Score Dimension",
+    "name:zh-CN": "评分维度",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "lead_source",
+        "label": "Lead Source",
+        "label:zh-CN": "线索来源",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "industry",
+        "label": "Industry",
+        "label:zh-CN": "行业",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "requirement",
+        "label": "Requirement",
+        "label:zh-CN": "需求描述",
+        "sortNo": 30,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "activity_count",
+        "label": "Activity Count",
+        "label:zh-CN": "活动次数",
+        "sortNo": 40,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "campaign",
+        "label": "Campaign",
+        "label:zh-CN": "关联活动",
+        "sortNo": 50,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "contact_email",
+        "label": "Contact Email",
+        "label:zh-CN": "联系邮箱",
+        "sortNo": 60,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "contact_phone",
+        "label": "Contact Phone",
+        "label:zh-CN": "联系电话",
+        "sortNo": 70,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_lead_score_operator",
+    "name": "Score Operator",
+    "name:zh-CN": "匹配条件",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "equals",
+        "label": "Equals",
+        "label:zh-CN": "等于",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "not_equals",
+        "label": "Not Equals",
+        "label:zh-CN": "不等于",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "contains",
+        "label": "Contains",
+        "label:zh-CN": "包含",
+        "sortNo": 30,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "is_present",
+        "label": "Is Present",
+        "label:zh-CN": "不为空",
+        "sortNo": 40,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "is_absent",
+        "label": "Is Absent",
+        "label:zh-CN": "为空",
+        "sortNo": 50,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "gte",
+        "label": "Greater or Equal",
+        "label:zh-CN": "大于等于",
+        "sortNo": 60,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "gt",
+        "label": "Greater Than",
+        "label:zh-CN": "大于",
+        "sortNo": 70,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "lte",
+        "label": "Less or Equal",
+        "label:zh-CN": "小于等于",
+        "sortNo": 80,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "length_gte",
+        "label": "Length ≥",
+        "label:zh-CN": "文本长度大于等于",
+        "sortNo": 90,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_lead_score_rule_status",
+    "name": "Score Rule Status",
+    "name:zh-CN": "评分规则状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "启用",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "inactive",
+        "label": "Inactive",
+        "label:zh-CN": "停用",
+        "sortNo": 20,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_assignment_strategy",
+    "name": "Assignment Strategy",
+    "name:zh-CN": "分配策略",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "round_robin",
+        "label": "Round Robin",
+        "label:zh-CN": "轮询",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "by_territory",
+        "label": "By Territory",
+        "label:zh-CN": "按区域/属性",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "by_load",
+        "label": "By Load",
+        "label:zh-CN": "按负载",
+        "sortNo": 30,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_assignment_match_field",
+    "name": "Assignment Match Field",
+    "name:zh-CN": "分配匹配字段",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "crm_lead_source",
+        "label": "Lead Source",
+        "label:zh-CN": "线索来源",
+        "sortNo": 10,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "crm_lead_industry",
+        "label": "Industry",
+        "label:zh-CN": "行业",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "crm_lead_campaign",
+        "label": "Campaign",
+        "label:zh-CN": "关联活动",
+        "sortNo": 30,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_assignment_rule_status",
+    "name": "Assignment Rule Status",
+    "name:zh-CN": "分配规则状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "启用",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "inactive",
+        "label": "Inactive",
+        "label:zh-CN": "停用",
+        "sortNo": 20,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_forecast_category",
+    "name": "Forecast Category",
+    "name:zh-CN": "预测类别",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pipeline",
+        "label": "Pipeline",
+        "label:zh-CN": "管道",
+        "sortNo": 10,
+        "color": "#8c8c8c",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "best_case",
+        "label": "Best Case",
+        "label:zh-CN": "最佳预期",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "commit",
+        "label": "Commit",
+        "label:zh-CN": "承诺",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "omitted",
+        "label": "Omitted",
+        "label:zh-CN": "排除",
+        "sortNo": 40,
+        "color": "#bfbfbf",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "closed",
+        "label": "Closed",
+        "label:zh-CN": "已成交",
+        "sortNo": 50,
+        "color": "#722ed1",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_opp_lost_reason",
+    "name": "Lost Reason",
+    "name:zh-CN": "丢单原因",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "price",
+        "label": "Price",
+        "label:zh-CN": "价格过高",
+        "sortNo": 10,
+        "color": "#f5222d",
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "competitor",
+        "label": "Lost to Competitor",
+        "label:zh-CN": "输给对手",
+        "sortNo": 20,
+        "color": "#fa541c",
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "no_budget",
+        "label": "No Budget",
+        "label:zh-CN": "无预算",
+        "sortNo": 30,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "no_decision",
+        "label": "No Decision",
+        "label:zh-CN": "未决策",
+        "sortNo": 40,
+        "color": "#bfbfbf",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "requirement_change",
+        "label": "Requirement Change",
+        "label:zh-CN": "需求变更",
+        "sortNo": 50,
+        "color": "#13c2c2",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "timing",
+        "label": "Timing",
+        "label:zh-CN": "时机不合",
+        "sortNo": 60,
+        "color": "#2f54eb",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 70,
+        "color": "#8c8c8c",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_fcst_status",
+    "name": "Forecast Submission Status",
+    "name:zh-CN": "预测提交状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "submitted",
+        "label": "Submitted",
+        "label:zh-CN": "已提交",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_health_band",
+    "name": "Health Band",
+    "name:zh-CN": "健康等级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "healthy",
+        "label": "Healthy",
+        "label:zh-CN": "健康",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "at_risk",
+        "label": "At Risk",
+        "label:zh-CN": "风险",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "critical",
+        "label": "Critical",
+        "label:zh-CN": "严重",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_consent_channel",
+    "name": "Consent Channel",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "email",
+        "label": "Email",
+        "label:zh-CN": "邮件",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "sms",
+        "label": "SMS",
+        "label:zh-CN": "短信",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "phone",
+        "label": "Phone",
+        "label:zh-CN": "电话",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_consent_status",
+    "name": "Consent Status",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待定",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "opt_in",
+        "label": "Opt In",
+        "label:zh-CN": "已同意",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "opt_out",
+        "label": "Opt Out",
+        "label:zh-CN": "已撤回",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_subscription_status",
+    "name": "Subscription Status",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待生效",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "生效中",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "renewal_due",
+        "label": "Renewal Due",
+        "label:zh-CN": "待续约",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "expired",
+        "label": "Expired",
+        "label:zh-CN": "已过期",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_attribution_model",
+    "name": "Attribution Model",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "first_touch",
+        "label": "First Touch",
+        "label:zh-CN": "首次触点",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "last_touch",
+        "label": "Last Touch",
+        "label:zh-CN": "末次触点",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "linear",
+        "label": "Linear",
+        "label:zh-CN": "线性平均",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_omni_channel",
+    "name": "Omni Channel",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "email",
+        "label": "Email",
+        "label:zh-CN": "邮件",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "chat",
+        "label": "Chat",
+        "label:zh-CN": "在线聊天",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "phone",
+        "label": "Phone",
+        "label:zh-CN": "电话",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "social",
+        "label": "Social",
+        "label:zh-CN": "社交",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_omni_status",
+    "name": "Omni Status",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "open",
+        "label": "Open",
+        "label:zh-CN": "进行中",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待处理",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "resolved",
+        "label": "Resolved",
+        "label:zh-CN": "已解决",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_journey_status",
+    "name": "Journey Status",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "进行中",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "archived",
+        "label": "Archived",
+        "label:zh-CN": "已归档",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_enrollment_status",
+    "name": "Enrollment Status",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "进行中",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "completed",
+        "label": "Completed",
+        "label:zh-CN": "已完成",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "exited",
+        "label": "Exited",
+        "label:zh-CN": "已退出",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_customer_request_type",
+    "name": "Customer Request Type",
+    "name:zh-CN": "客户需求类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "inquiry",
+        "label": "Inquiry",
+        "label:zh-CN": "咨询",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "rfq",
+        "label": "RFQ",
+        "label:zh-CN": "询价/RFQ",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "expansion",
+        "label": "Expansion",
+        "label:zh-CN": "扩容",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "service",
+        "label": "Service",
+        "label:zh-CN": "服务",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "project_brief",
+        "label": "Project Brief",
+        "label:zh-CN": "项目需求",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 99,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_customer_request_priority",
+    "name": "Customer Request Priority",
+    "name:zh-CN": "客户需求优先级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "urgent",
+        "label": "Urgent",
+        "label:zh-CN": "紧急",
+        "sortNo": 5,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "medium",
+        "label": "Medium",
+        "label:zh-CN": "中",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "low",
+        "label": "Low",
+        "label:zh-CN": "低",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_customer_request_status",
+    "name": "Customer Request Status",
+    "name:zh-CN": "客户需求状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "submitted",
+        "label": "Submitted",
+        "label:zh-CN": "已提交",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "routed",
+        "label": "Routed",
+        "label:zh-CN": "已路由",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "in_progress",
+        "label": "In Progress",
+        "label:zh-CN": "处理中",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "quoted",
+        "label": "Quoted",
+        "label:zh-CN": "已报价",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "won",
+        "label": "Won",
+        "label:zh-CN": "赢单",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "lost",
+        "label": "Lost",
+        "label:zh-CN": "丢单",
+        "sortNo": 70,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "cancelled",
+        "label": "Cancelled",
+        "label:zh-CN": "已取消",
+        "sortNo": 80,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_customer_request_route_status",
+    "name": "Customer Request Route Status",
+    "name:zh-CN": "客户需求路由状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "unrouted",
+        "label": "Unrouted",
+        "label:zh-CN": "未路由",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "routed",
+        "label": "Routed",
+        "label:zh-CN": "已路由",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "failed",
+        "label": "Failed",
+        "label:zh-CN": "路由失败",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "closed",
+        "label": "Closed",
+        "label:zh-CN": "已关闭",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_customer_request_source_channel",
+    "name": "Customer Request Source Channel",
+    "name:zh-CN": "客户需求来源渠道",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "visit",
+        "label": "Visit",
+        "label:zh-CN": "拜访",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "email",
+        "label": "Email",
+        "label:zh-CN": "邮件",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "form",
+        "label": "Form",
+        "label:zh-CN": "表单",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "campaign",
+        "label": "Campaign",
+        "label:zh-CN": "营销活动",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "import",
+        "label": "Import",
+        "label:zh-CN": "导入",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "portal",
+        "label": "Portal",
+        "label:zh-CN": "门户",
+        "sortNo": 60,
+        "status": "enabled"
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 99,
+        "status": "enabled"
+      }
+    ]
+  },
+  {
+    "code": "crm_quote_summary_source_type",
+    "name": "Quote Summary Source Type",
+    "name:zh-CN": "报价摘要来源类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pcba_quote",
+        "label": "PCBA Quote",
+        "label:zh-CN": "PCBA 报价",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "subscription_quote",
+        "label": "Subscription Quote",
+        "label:zh-CN": "订阅报价",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "service_proposal",
+        "label": "Service Proposal",
+        "label:zh-CN": "服务方案",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_quote_summary_status",
+    "name": "Quote Summary Status",
+    "name:zh-CN": "报价摘要状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "pricing",
+        "label": "Pricing",
+        "label:zh-CN": "定价中",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "approval",
+        "label": "Approval",
+        "label:zh-CN": "审批中",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "sent",
+        "label": "Sent",
+        "label:zh-CN": "已发送",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "accepted",
+        "label": "Accepted",
+        "label:zh-CN": "已接受",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "ordered",
+        "label": "Ordered",
+        "label:zh-CN": "已转订单",
+        "sortNo": 55,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已拒绝",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "expired",
+        "label": "Expired",
+        "label:zh-CN": "已过期",
+        "sortNo": 70,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_quote_summary_approval_status",
+    "name": "Quote Summary Approval Status",
+    "name:zh-CN": "报价摘要审批状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "none",
+        "label": "None",
+        "label:zh-CN": "无需审批",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待审批",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "已通过",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已拒绝",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_quote_summary_feedback_status",
+    "name": "Quote Feedback Status",
+    "name:zh-CN": "报价客户反馈状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "none",
+        "label": "None",
+        "label:zh-CN": "无反馈",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "viewed",
+        "label": "Viewed",
+        "label:zh-CN": "已查看",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "replied",
+        "label": "Replied",
+        "label:zh-CN": "已回复",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "target_price",
+        "label": "Target Price",
+        "label:zh-CN": "目标价反馈",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "accepted",
+        "label": "Accepted",
+        "label:zh-CN": "接受",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "拒绝",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_quote_summary_result",
+    "name": "Quote Result",
+    "name:zh-CN": "报价结果",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "open",
+        "label": "Open",
+        "label:zh-CN": "进行中",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "won",
+        "label": "Won",
+        "label:zh-CN": "赢单",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "lost",
+        "label": "Lost",
+        "label:zh-CN": "丢单",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_approval_case_domain",
+    "name": "Approval Case Domain",
+    "name:zh-CN": "审批事项业务域",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "quote",
+        "label": "Quote",
+        "label:zh-CN": "报价",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "order",
+        "label": "Order",
+        "label:zh-CN": "订单",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "contract",
+        "label": "Contract",
+        "label:zh-CN": "合同",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "credit",
+        "label": "Credit",
+        "label:zh-CN": "授信",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "payment_term",
+        "label": "Payment Term",
+        "label:zh-CN": "账期",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "service",
+        "label": "Service",
+        "label:zh-CN": "服务",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "other",
+        "label": "Other",
+        "label:zh-CN": "其他",
+        "sortNo": 90,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_approval_case_type",
+    "name": "Approval Case Type",
+    "name:zh-CN": "审批事项类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "margin_discount",
+        "label": "Margin / Discount",
+        "label:zh-CN": "毛利/折扣",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "payment_term",
+        "label": "Payment Term",
+        "label:zh-CN": "账期",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "credit_exception",
+        "label": "Credit Exception",
+        "label:zh-CN": "授信例外",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "contract_clause",
+        "label": "Contract Clause",
+        "label:zh-CN": "合同条款",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "order_exception",
+        "label": "Order Exception",
+        "label:zh-CN": "订单例外",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "manual",
+        "label": "Manual",
+        "label:zh-CN": "人工创建",
+        "sortNo": 90,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_approval_case_status",
+    "name": "Approval Case Status",
+    "name:zh-CN": "审批事项状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待审批",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "已批准",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已驳回",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "cancelled",
+        "label": "Cancelled",
+        "label:zh-CN": "已取消",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_approval_case_priority",
+    "name": "Approval Case Priority",
+    "name:zh-CN": "审批事项优先级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "low",
+        "label": "Low",
+        "label:zh-CN": "低",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "normal",
+        "label": "Normal",
+        "label:zh-CN": "普通",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "urgent",
+        "label": "Urgent",
+        "label:zh-CN": "紧急",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_approval_case_decision",
+    "name": "Approval Case Decision",
+    "name:zh-CN": "审批决策",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待决策",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "批准",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "驳回",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "cancelled",
+        "label": "Cancelled",
+        "label:zh-CN": "取消",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "auto_approved",
+        "label": "Auto Approved",
+        "label:zh-CN": "自动批准",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_manager_workbench_risk_reason",
+    "name": "Manager Workbench Risk Reason",
+    "name:zh-CN": "经理工作台风险原因",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "route_failed",
+        "label": "Route Failed",
+        "label:zh-CN": "路由失败",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "approval_pending",
+        "label": "Approval Pending",
+        "label:zh-CN": "待审批",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "task_overdue",
+        "label": "Task Overdue",
+        "label:zh-CN": "任务逾期",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "request_overdue",
+        "label": "Request Overdue",
+        "label:zh-CN": "需求逾期",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "quote_missing",
+        "label": "Quote Missing",
+        "label:zh-CN": "缺少报价",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "watch",
+        "label": "Watch",
+        "label:zh-CN": "关注",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_review_type",
+    "name": "Review Type",
+    "name:zh-CN": "评审类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "requirement",
+        "label": "Requirement",
+        "label:zh-CN": "需求评审",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "technical",
+        "label": "Technical",
+        "label:zh-CN": "技术评审",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "compliance",
+        "label": "Compliance",
+        "label:zh-CN": "合规评审",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "contract",
+        "label": "Contract",
+        "label:zh-CN": "合同评审",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "quality",
+        "label": "Quality",
+        "label:zh-CN": "质量评审",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "dfm",
+        "label": "DFM",
+        "label:zh-CN": "DFM 评审",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_review_status",
+    "name": "Review Status",
+    "name:zh-CN": "评审状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待评审",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "in_review",
+        "label": "In Review",
+        "label:zh-CN": "评审中",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "passed",
+        "label": "Passed",
+        "label:zh-CN": "通过",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "conditional",
+        "label": "Conditional",
+        "label:zh-CN": "有条件通过",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "failed",
+        "label": "Failed",
+        "label:zh-CN": "未通过",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "cancelled",
+        "label": "Cancelled",
+        "label:zh-CN": "已取消",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_review_priority",
+    "name": "Review Priority",
+    "name:zh-CN": "评审优先级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "normal",
+        "label": "Normal",
+        "label:zh-CN": "中",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "low",
+        "label": "Low",
+        "label:zh-CN": "低",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_risk_type",
+    "name": "Risk Type",
+    "name:zh-CN": "风险类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "technical",
+        "label": "Technical",
+        "label:zh-CN": "技术风险",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "commercial",
+        "label": "Commercial",
+        "label:zh-CN": "商务风险",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "delivery",
+        "label": "Delivery",
+        "label:zh-CN": "交付风险",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "compliance",
+        "label": "Compliance",
+        "label:zh-CN": "合规风险",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "quality",
+        "label": "Quality",
+        "label:zh-CN": "质量风险",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "supply",
+        "label": "Supply",
+        "label:zh-CN": "供应风险",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_risk_severity",
+    "name": "Severity",
+    "name:zh-CN": "严重度",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "critical",
+        "label": "Critical",
+        "label:zh-CN": "致命",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "medium",
+        "label": "Medium",
+        "label:zh-CN": "中",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "low",
+        "label": "Low",
+        "label:zh-CN": "低",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_risk_status",
+    "name": "Risk Status",
+    "name:zh-CN": "风险状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "open",
+        "label": "Open",
+        "label:zh-CN": "未处理",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "mitigating",
+        "label": "Mitigating",
+        "label:zh-CN": "缓解中",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "accepted",
+        "label": "Accepted",
+        "label:zh-CN": "接受风险",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "mitigated",
+        "label": "Mitigated",
+        "label:zh-CN": "已缓解",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "resolved",
+        "label": "Resolved",
+        "label:zh-CN": "已解决",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "closed",
+        "label": "Closed",
+        "label:zh-CN": "已关闭",
+        "sortNo": 60,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_clarification_type",
+    "name": "Clarification Type",
+    "name:zh-CN": "澄清类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "customer",
+        "label": "Customer",
+        "label:zh-CN": "客户澄清",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "internal",
+        "label": "Internal",
+        "label:zh-CN": "内部澄清",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "supplier",
+        "label": "Supplier",
+        "label:zh-CN": "供应商澄清",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "compliance",
+        "label": "Compliance",
+        "label:zh-CN": "合规澄清",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_clarification_status",
+    "name": "Clarification Status",
+    "name:zh-CN": "澄清状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "pending",
+        "label": "Pending",
+        "label:zh-CN": "待处理",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "awaiting_customer",
+        "label": "Awaiting Customer",
+        "label:zh-CN": "待客户澄清",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      },
+      {
+        "value": "customer_replied",
+        "label": "Customer Replied",
+        "label:zh-CN": "客户已回复",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "resolved",
+        "label": "Resolved",
+        "label:zh-CN": "已解决",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "cancelled",
+        "label": "Cancelled",
+        "label:zh-CN": "已取消",
+        "sortNo": 50,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "crm_clarification_priority",
+    "name": "Clarification Priority",
+    "name:zh-CN": "澄清优先级",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "high",
+        "label": "High",
+        "label:zh-CN": "高",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "red"
+        }
+      },
+      {
+        "value": "normal",
+        "label": "Normal",
+        "label:zh-CN": "中",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "low",
+        "label": "Low",
+        "label:zh-CN": "低",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  }
+]

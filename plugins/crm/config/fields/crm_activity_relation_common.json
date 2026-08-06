@@ -1,0 +1,33 @@
+[
+  {
+    "code": "crm_ar_activity_id",
+    "displayName:zh-CN": "活动",
+    "displayName:en": "Activity",
+    "dataType": "reference",
+    "referenceModelCode": "crm_activity_common",
+    "constraints": { "required": true }
+  },
+  {
+    "code": "crm_ar_object_type",
+    "displayName:zh-CN": "对象类型",
+    "displayName:en": "Object Type",
+    "dataType": "enum",
+    "dictCode": "crm_relatable_object_type",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_ar_object_id",
+    "displayName:zh-CN": "对象ID",
+    "displayName:en": "Object ID",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 50 }
+  },
+  {
+    "code": "crm_ar_role",
+    "displayName:zh-CN": "关联角色",
+    "displayName:en": "Relation Role",
+    "dataType": "enum",
+    "dictCode": "crm_relation_role"
+  }
+]

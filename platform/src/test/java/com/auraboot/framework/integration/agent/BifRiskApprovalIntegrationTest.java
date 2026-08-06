@@ -82,7 +82,7 @@ class BifRiskApprovalIntegrationTest extends BaseIntegrationTest {
     private void setBif(String riskLevel) {
         BusinessIntentFrame bif = BusinessIntentFrame.builder()
                 .intent("delete")
-                .object("crm_account")
+                .object("crm_account_common")
                 .riskLevel(riskLevel)
                 .actionability("execute")
                 .confidence(ConfidenceScore.of(0.9, 0.9))

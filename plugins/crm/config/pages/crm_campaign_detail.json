@@ -1,0 +1,364 @@
+{
+  "pageKey": "crm_campaign_detail",
+  "name:zh-CN": "营销活动详情",
+  "name:en": "Campaign Detail",
+  "modelCode": "crm_campaign",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "block_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "overview",
+          "label": {
+            "zh-CN": "概览",
+            "en-US": "Overview"
+          },
+          "blocks": [
+            {
+              "id": "section_basic",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "活动信息",
+                "en-US": "Campaign Information"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "crm_cpn_code",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cpn_name",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cpn_type",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cpn_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cpn_start_date",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cpn_end_date",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cpn_budget",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cpn_owner",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cpn_description",
+                  "span": 2,
+                  "readOnly": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "members",
+          "label": {
+            "zh-CN": "活动成员",
+            "en-US": "Members"
+          },
+          "blocks": [
+            {
+              "id": "block_members",
+              "blockType": "sub-table",
+              "subTable": {
+                "modelCode": "crm_campaign_member",
+                "foreignKey": "crm_cm_campaign_id",
+                "columns": [
+                  {
+                    "field": "crm_cm_member_name",
+                    "width": 180
+                  },
+                  {
+                    "field": "crm_cm_member_type",
+                    "width": 100,
+                    "component": "tag"
+                  },
+                  {
+                    "field": "crm_cm_email",
+                    "width": 200
+                  },
+                  {
+                    "field": "crm_cm_status",
+                    "width": 120,
+                    "component": "tag"
+                  },
+                  {
+                    "field": "crm_cm_added_date",
+                    "width": 150
+                  }
+                ],
+                "actions": {
+                  "create": {
+                    "command": "crm:add_campaign_member"
+                  },
+                  "rowActions": [
+                    {
+                      "code": "delete",
+                      "label": "$i18n:common.button.delete",
+                      "danger": true,
+                      "action": {
+                        "type": "command",
+                        "command": "crm:remove_campaign_member"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "key": "metrics",
+          "label": {
+            "zh-CN": "绩效指标",
+            "en-US": "Metrics"
+          },
+          "blocks": [
+            {
+              "id": "block_metrics_stats",
+              "blockType": "stat-card",
+              "dataSource": {
+                "type": "api",
+                "url": "/api/datasource/list",
+                "method": "get",
+                "params": {
+                  "datasourceId": "nq:crm_campaign_performance_summary",
+                  "campaignId": "${recordPid}"
+                }
+              },
+              "cards": [
+                {
+                  "field": "total_members",
+                  "label": {
+                    "zh-CN": "成员总数",
+                    "en-US": "Total Members"
+                  }
+                },
+                {
+                  "field": "total_leads",
+                  "label": {
+                    "zh-CN": "线索数",
+                    "en-US": "Leads Generated"
+                  }
+                },
+                {
+                  "field": "total_emails",
+                  "label": {
+                    "zh-CN": "邮件数",
+                    "en-US": "Emails Sent"
+                  }
+                },
+                {
+                  "field": "avg_open_rate",
+                  "label": {
+                    "zh-CN": "平均打开率",
+                    "en-US": "Avg Open Rate"
+                  },
+                  "suffix": "%"
+                },
+                {
+                  "field": "avg_conversion_rate",
+                  "label": {
+                    "zh-CN": "平均转化率",
+                    "en-US": "Avg Conversion Rate"
+                  },
+                  "suffix": "%"
+                }
+              ]
+            },
+            {
+              "id": "block_metrics_table",
+              "blockType": "sub-table",
+              "subTable": {
+                "modelCode": "crm_campaign_metric",
+                "foreignKey": "crm_cmet_campaign_id",
+                "columns": [
+                  {
+                    "field": "crm_cmet_metric_date",
+                    "width": 120
+                  },
+                  {
+                    "field": "crm_cmet_leads_generated",
+                    "width": 120
+                  },
+                  {
+                    "field": "crm_cmet_emails_sent",
+                    "width": 120
+                  },
+                  {
+                    "field": "crm_cmet_open_rate",
+                    "width": 110
+                  },
+                  {
+                    "field": "crm_cmet_click_rate",
+                    "width": 110
+                  },
+                  {
+                    "field": "crm_cmet_conversion_rate",
+                    "width": 110
+                  },
+                  {
+                    "field": "crm_cmet_roi",
+                    "width": 100
+                  }
+                ],
+                "actions": {
+                  "create": {
+                    "command": "crm:record_campaign_metric"
+                  },
+                  "rowActions": [
+                    {
+                      "code": "delete",
+                      "label": "$i18n:common.button.delete",
+                      "danger": true,
+                      "action": {
+                        "type": "command",
+                        "command": "crm:delete_campaign_metric"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "key": "activities",
+          "label": {
+            "zh-CN": "活动记录",
+            "en-US": "Activities"
+          },
+          "blocks": [
+            {
+              "id": "block_activities",
+              "blockType": "sub-table",
+              "subTable": {
+                "dataSource": {
+                  "type": "api",
+                  "url": "/api/datasource/list",
+                  "method": "get",
+                  "params": {
+                    "datasourceId": "nq:crm_activities_by_object",
+                    "objectType": "campaign",
+                    "objectId": "${recordPid}"
+                  }
+                },
+                "readOnly": true,
+                "columns": [
+                  {
+                    "field": "crm_act_type",
+                    "width": 100,
+                    "component": "tag"
+                  },
+                  {
+                    "field": "crm_act_subject",
+                    "width": 250
+                  },
+                  {
+                    "field": "crm_act_date",
+                    "width": 150
+                  },
+                  {
+                    "field": "crm_act_owner",
+                    "width": 120
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crm_campaign_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "icon": "Edit",
+          "permissionCode": "crm.campaign.manage",
+          "label": "$i18n:common.button.edit",
+          "action": {
+            "type": "navigate",
+            "to": "crm_campaign_form"
+          }
+        },
+        {
+          "code": "activate",
+          "label": {
+            "zh-CN": "启动活动",
+            "en-US": "Activate Campaign"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:activate_campaign"
+          }
+        },
+        {
+          "code": "complete",
+          "primary": true,
+          "label": {
+            "zh-CN": "完成活动",
+            "en-US": "Complete Campaign"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:complete_campaign"
+          }
+        },
+        {
+          "code": "cancel",
+          "danger": true,
+          "label": {
+            "zh-CN": "取消活动",
+            "en-US": "Cancel Campaign"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:cancel_campaign"
+          }
+        },
+        {
+          "code": "log_activity",
+          "icon": "MessageSquare",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_activity_common_form",
+            "command": "crm:log_campaign_activity"
+          }
+        },
+        {
+          "code": "create_task",
+          "icon": "CheckSquare",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_activity_common_form",
+            "command": "crm:create_campaign_task"
+          }
+        }
+      ]
+    }
+  ]
+}

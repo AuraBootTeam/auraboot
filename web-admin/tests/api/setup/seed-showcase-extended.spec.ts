@@ -71,7 +71,7 @@ async function getModelFieldDataType(page: any, modelCode: string, fieldCode: st
 async function opportunityCloseDateValue(page: any, date: string): Promise<string> {
   opportunityCloseDateType ??= await getModelFieldDataType(
     page,
-    'crm_opportunity',
+    'crm_opportunity_common',
     'crm_opp_expected_close_date',
   );
   return opportunityCloseDateType === 'datetime' ? `${date}T09:00:00+08:00` : date;
@@ -500,7 +500,7 @@ test.describe.serial('Showcase Seed — Extended', () => {
 
   test('Phase 11: CRM — Additional Opportunities (30)', async ({ page }) => {
     // First, fetch existing A/B tier account IDs by querying the list
-    const listResp = await page.request.get('/api/dynamic/crm_account/list?pageSize=100');
+    const listResp = await page.request.get('/api/dynamic/crm_account_common/list?pageSize=100');
     const listBody = await listResp.json();
     const existingAccounts: Array<{ pid: string; crm_acc_name: string; crm_acc_rating: string }> =
       listBody?.data?.records || [];
@@ -809,7 +809,7 @@ test.describe.serial('Showcase Seed — Extended', () => {
 
   test('Phase 14: CRM — C-tier Small Opportunities (15)', async ({ page }) => {
     // Look up C-tier accounts from DB (so the phase is rerunnable when ext.accounts cache is empty).
-    const listResp = await page.request.get('/api/dynamic/crm_account/list?pageSize=200');
+    const listResp = await page.request.get('/api/dynamic/crm_account_common/list?pageSize=200');
     const listBody = await listResp.json();
     const dbAccounts: Array<{ pid: string; crm_acc_name: string; crm_acc_rating: string }> =
       listBody?.data?.records || [];
@@ -889,11 +889,11 @@ test.describe.serial('Showcase Seed — Extended', () => {
   test('Verification: Extended seed summary', async ({ page }) => {
     // Query actual counts from API
     const endpoints = [
-      { name: 'Accounts', url: '/api/dynamic/crm_account/list?pageSize=1' },
-      { name: 'Contacts', url: '/api/dynamic/crm_contact/list?pageSize=1' },
-      { name: 'Leads', url: '/api/dynamic/crm_lead/list?pageSize=1' },
-      { name: 'Opportunities', url: '/api/dynamic/crm_opportunity/list?pageSize=1' },
-      { name: 'Activities', url: '/api/dynamic/crm_activity/list?pageSize=1' },
+      { name: 'Accounts', url: '/api/dynamic/crm_account_common/list?pageSize=1' },
+      { name: 'Contacts', url: '/api/dynamic/crm_contact_common/list?pageSize=1' },
+      { name: 'Leads', url: '/api/dynamic/crm_lead_common/list?pageSize=1' },
+      { name: 'Opportunities', url: '/api/dynamic/crm_opportunity_common/list?pageSize=1' },
+      { name: 'Activities', url: '/api/dynamic/crm_activity_common/list?pageSize=1' },
       { name: 'Campaigns', url: '/api/dynamic/crm_campaign/list?pageSize=1' },
       { name: 'Departments', url: '/api/dynamic/org_department/list?pageSize=1' },
       { name: 'Employees', url: '/api/dynamic/org_employee/list?pageSize=1' },
@@ -912,19 +912,19 @@ test.describe.serial('Showcase Seed — Extended', () => {
     console.log('═══════════════════════════════════════\n');
 
     // Verify minimum thresholds
-    const accResp = await page.request.get('/api/dynamic/crm_account/list?pageSize=1');
+    const accResp = await page.request.get('/api/dynamic/crm_account_common/list?pageSize=1');
     const accBody = await accResp.json();
     expect(accBody?.data?.total).toBeGreaterThanOrEqual(50);
 
-    const leadResp = await page.request.get('/api/dynamic/crm_lead/list?pageSize=1');
+    const leadResp = await page.request.get('/api/dynamic/crm_lead_common/list?pageSize=1');
     const leadBody = await leadResp.json();
     expect(leadBody?.data?.total).toBeGreaterThanOrEqual(70);
 
-    const oppResp = await page.request.get('/api/dynamic/crm_opportunity/list?pageSize=1');
+    const oppResp = await page.request.get('/api/dynamic/crm_opportunity_common/list?pageSize=1');
     const oppBody = await oppResp.json();
     expect(oppBody?.data?.total).toBeGreaterThanOrEqual(40);
 
-    const actResp = await page.request.get('/api/dynamic/crm_activity/list?pageSize=1');
+    const actResp = await page.request.get('/api/dynamic/crm_activity_common/list?pageSize=1');
     const actBody = await actResp.json();
     expect(actBody?.data?.total).toBeGreaterThanOrEqual(200);
   });

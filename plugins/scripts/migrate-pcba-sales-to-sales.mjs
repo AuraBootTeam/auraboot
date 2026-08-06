@@ -173,7 +173,7 @@ const PLUGIN_JSON = {
 
 // ── Special case: pe_so_customer field rename ────────────────────────
 // The field code pe_so_customer → sl_so_account_id (better semantic)
-// But keep targetModel as crm_account
+// But keep targetModel as crm_account_common
 const SPECIAL_FIELD_RENAMES = [
   ['pe_so_customer', 'sl_so_account_id'],
   ['pe_sq_customer', 'sl_sq_account_id'],

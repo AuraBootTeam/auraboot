@@ -48,7 +48,7 @@ class AgentPlanStepContractTest {
         AgentPlanStep original = new AgentPlanStep(0, "describe");
         original.setSkillCode("dsl.command");
         original.setStatus(AgentPlanStep.StepStatus.FAILED);
-        original.setInput(Map.of("modelCode", "crm_lead"));
+        original.setInput(Map.of("modelCode", "crm_lead_common"));
         original.setOutput(Map.of("status", "failed", "error", "boom"));
         original.setStartedAt(LocalDateTime.of(2026, 4, 18, 10, 0));
         original.setFinishedAt(LocalDateTime.of(2026, 4, 18, 10, 1));
@@ -59,7 +59,7 @@ class AgentPlanStepContractTest {
         assertThat(parsed.getStepIndex()).isEqualTo(0);
         assertThat(parsed.getSkillCode()).isEqualTo("dsl.command");
         assertThat(parsed.getStatus()).isEqualTo(AgentPlanStep.StepStatus.FAILED);
-        assertThat(parsed.getInput()).containsEntry("modelCode", "crm_lead");
+        assertThat(parsed.getInput()).containsEntry("modelCode", "crm_lead_common");
         assertThat(parsed.getOutput()).containsEntry("error", "boom");
         assertThat(parsed.getStartedAt()).isEqualTo(LocalDateTime.of(2026, 4, 18, 10, 0));
         assertThat(parsed.getFinishedAt()).isEqualTo(LocalDateTime.of(2026, 4, 18, 10, 1));

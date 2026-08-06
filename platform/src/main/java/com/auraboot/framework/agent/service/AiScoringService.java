@@ -168,7 +168,7 @@ public class AiScoringService {
                 Map<String, Object> updateData = Map.of("crm_lead_score", score);
                 var idEntry = resolveIdColumn(leadId);
                 Map<String, Object> conditions = Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue());
-                dynamicDataMapper.update("mt_crm_lead", updateData, conditions);
+                dynamicDataMapper.update("mt_crm_lead_common", updateData, conditions);
                 updated++;
             } catch (Exception e) {
                 log.warn("Failed to update score for lead {}: {}", leadId, e.getMessage());

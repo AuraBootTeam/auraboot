@@ -48,11 +48,11 @@ class EmailRecordLinkServiceUnitTest {
     @DisplayName("manualLink builds and inserts link with type=manual")
     void manualLink_inserts() {
         EmailRecordLink result = service.manualLink(7L, 100L, "thread-1",
-                "crm_contact", "REC-1");
+                "crm_contact_common", "REC-1");
         assertThat(result.getTenantId()).isEqualTo(7L);
         assertThat(result.getMessageId()).isEqualTo(100L);
         assertThat(result.getThreadId()).isEqualTo("thread-1");
-        assertThat(result.getModelCode()).isEqualTo("crm_contact");
+        assertThat(result.getModelCode()).isEqualTo("crm_contact_common");
         assertThat(result.getRecordPid()).isEqualTo("REC-1");
         assertThat(result.getLinkType()).isEqualTo(EmailConstants.LINK_TYPE_MANUAL);
         assertThat(result.getCreatedAt()).isNotNull();
@@ -155,7 +155,7 @@ class EmailRecordLinkServiceUnitTest {
 
         EmailRecordLink sibling = new EmailRecordLink();
         sibling.setMessageId(20L); // different message
-        sibling.setModelCode("crm_lead");
+        sibling.setModelCode("crm_lead_common");
         sibling.setRecordPid("LEAD-1");
         when(linkMapper.findByThread(7L, "THR-99")).thenReturn(List.of(sibling));
 

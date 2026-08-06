@@ -118,13 +118,13 @@ class ToolLoopServiceSafetyTest {
     void genericModelReadToolExecutesThroughProviderRegistry() {
         Map<String, Object> input = Map.of("recordPid", "ct_001");
         AgentToolDefinition tool = AgentToolDefinition.builder()
-                .name("get:crm_contact")
+                .name("get:crm_contact_common")
                 .description("Get CRM contact by pid")
                 .toolType("dsl_query")
-                .sourceCode("crm_contact")
+                .sourceCode("crm_contact_common")
                 .riskLevel("L0")
                 .build();
-        when(toolProviderRegistry.execute(eq(1L), eq("get:crm_contact"), eq(input)))
+        when(toolProviderRegistry.execute(eq(1L), eq("get:crm_contact_common"), eq(input)))
                 .thenReturn(ProviderExecutionResult.builder()
                         .success(true)
                         .data(Map.of("record", Map.of("pid", "ct_001")))
@@ -135,7 +135,7 @@ class ToolLoopServiceSafetyTest {
                 tool.getName(), input, List.of(tool), null);
 
         assertThat(result).contains("\"success\":true").contains("\"pid\":\"ct_001\"");
-        verify(toolProviderRegistry).execute(1L, "get:crm_contact", input);
+        verify(toolProviderRegistry).execute(1L, "get:crm_contact_common", input);
         verifyNoInteractions(namedQueryService, commandExecutor);
     }
 

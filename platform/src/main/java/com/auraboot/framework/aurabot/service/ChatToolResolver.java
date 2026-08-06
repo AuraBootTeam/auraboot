@@ -102,7 +102,7 @@ public class ChatToolResolver {
      * matching tools. Returns empty tools if ports are unavailable or message is blank.
      *
      * @param userMessage the raw user message text
-     * @param modelCode   the current page model code (e.g., "crm_lead")
+     * @param modelCode   the current page model code (e.g., "crm_lead_common")
      * @param recordPid   optional current record PID
      * @return resolved tools with optional grounding metadata
      */
@@ -286,7 +286,7 @@ public class ChatToolResolver {
                     .inputSchema(Map.of("type", "object",
                             "properties", Map.of(
                                     "modelCode", Map.of("type", "string",
-                                            "description", "The model to aggregate (e.g. crm_lead)."),
+                                            "description", "The model to aggregate (e.g. crm_lead_common)."),
                                     "dimensions", Map.of("type", "array",
                                             "items", Map.of("type", "string"),
                                             "description", "Group-by fields (category axis / pie slices). Omit for a single KPI."),

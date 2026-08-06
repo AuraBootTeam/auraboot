@@ -1,0 +1,84 @@
+[
+  {
+    "code": "crm_attr_code",
+    "displayName:zh-CN": "归因编号",
+    "displayName:en": "Code",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 50
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_attr_deal_name",
+    "displayName:zh-CN": "交易名称",
+    "displayName:en": "Deal",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 200
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_attr_revenue",
+    "displayName:zh-CN": "收入",
+    "displayName:en": "Revenue",
+    "dataType": "money",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_attr_model",
+    "displayName:zh-CN": "归因模型",
+    "displayName:en": "Model",
+    "dataType": "enum",
+    "dictCode": "crm_attribution_model",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_attr_touchpoints",
+    "displayName:zh-CN": "触点(JSON)",
+    "displayName:en": "Touchpoints (JSON)",
+    "dataType": "json"
+  },
+  {
+    "code": "crm_attr_result",
+    "displayName:zh-CN": "归因结果",
+    "displayName:en": "Result",
+    "dataType": "json"
+  },
+  {
+    "code": "crm_attr_top_campaign",
+    "displayName:zh-CN": "主归因触点",
+    "displayName:en": "Top Campaign",
+    "dataType": "string",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_attr_top_amount",
+    "displayName:zh-CN": "主归因金额",
+    "displayName:en": "Top Amount",
+    "dataType": "decimal",
+    "feature": {
+      "sortable": true
+    }
+  }
+]

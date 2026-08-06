@@ -95,9 +95,9 @@ class SkillConsolidationIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void objectResolver_exactModelCode_resolvesWithHighConfidence() {
-        // "crm_account" is a known model code in the inverted index
-        var result = objectResolver.resolve(tenantId, "crm_account");
-        // If index contains crm_account, should resolve with high confidence
+        // "crm_account_common" is a known model code in the inverted index
+        var result = objectResolver.resolve(tenantId, "crm_account_common");
+        // If index contains crm_account_common, should resolve with high confidence
         if (result.getModelCode() != null) {
             assertThat(result.getConfidence()).isGreaterThan(0.7);
             assertThat(result.getMatchType()).isIn("exact", "alias", "fuzzy");
@@ -185,8 +185,8 @@ class SkillConsolidationIntegrationTest extends BaseIntegrationTest {
     void skillEngine_dslQuery_list_dispatchesCorrectly() {
         SkillInput input = SkillInput.builder()
                 .intent("query")
-                .object("crm_account")
-                .parameters(Map.of("model", "crm_account"))
+                .object("crm_account_common")
+                .parameters(Map.of("model", "crm_account_common"))
                 .build();
 
         SkillResult result = skillEngine.execute(tenantId, "e2e-run", "dsl.query", input, null, null, null);
@@ -219,7 +219,7 @@ class SkillConsolidationIntegrationTest extends BaseIntegrationTest {
     void skillEngine_dslCommand_dispatches_to_commandExecutor() {
         SkillInput input = SkillInput.builder()
                 .intent("create")
-                .object("crm_account")
+                .object("crm_account_common")
                 .parameters(Map.of(
                         "commandCode", "crm_account_create",
                         "crm_account_name", "SkillConsolidationTest_" + System.currentTimeMillis()
@@ -297,7 +297,7 @@ class SkillConsolidationIntegrationTest extends BaseIntegrationTest {
     void providerRegistry_discoverWithModelHint_returnsDslTools() {
         var ctx = ToolDiscoveryContext.builder()
                 .tenantId(tenantId)
-                .modelHint("crm_account")
+                .modelHint("crm_account_common")
                 .maxResults(50)
                 .build();
         var tools = toolProviderRegistry.discoverAll(ctx);
@@ -306,7 +306,7 @@ class SkillConsolidationIntegrationTest extends BaseIntegrationTest {
         var toolCodes = tools.stream()
                 .map(ToolDefinition::getToolCode)
                 .collect(Collectors.toSet());
-        assertThat(toolCodes).contains("list:crm_account", "get:crm_account");
+        assertThat(toolCodes).contains("list:crm_account_common", "get:crm_account_common");
     }
 
     @Test
@@ -346,8 +346,8 @@ class SkillConsolidationIntegrationTest extends BaseIntegrationTest {
         String actionability = riskEvaluator.deriveActionability(intent.getIntent());
         assertThat(actionability).isEqualTo("read_only");
 
-        // Step 4: Execute via SkillEngine (use crm_account as fallback if resolver didn't match)
-        String modelCode = resolved.getModelCode() != null ? resolved.getModelCode() : "crm_account";
+        // Step 4: Execute via SkillEngine (use crm_account_common as fallback if resolver didn't match)
+        String modelCode = resolved.getModelCode() != null ? resolved.getModelCode() : "crm_account_common";
         SkillInput input = SkillInput.builder()
                 .intent(intent.getIntent())
                 .object(modelCode)
@@ -373,14 +373,14 @@ class SkillConsolidationIntegrationTest extends BaseIntegrationTest {
         assertThat(riskEvaluator.deriveActionability(intent.getIntent())).isEqualTo("execute");
 
         // Step 3: Resolve command (if model exists in test tenant)
-        String commandCode = objectResolver.resolveCommand(tenantId, "crm_account", "create");
-        // commandCode may be null if crm_account commands aren't in test tenant
+        String commandCode = objectResolver.resolveCommand(tenantId, "crm_account_common", "create");
+        // commandCode may be null if crm_account_common commands aren't in test tenant
 
         // Step 4: Execute via SkillEngine with a command code
         String effectiveCommand = commandCode != null ? commandCode : "crm_account_create";
         SkillInput input = SkillInput.builder()
                 .intent("create")
-                .object("crm_account")
+                .object("crm_account_common")
                 .parameters(Map.of(
                         "commandCode", effectiveCommand,
                         "crm_account_name", "FullPipelineTest_" + System.currentTimeMillis()
