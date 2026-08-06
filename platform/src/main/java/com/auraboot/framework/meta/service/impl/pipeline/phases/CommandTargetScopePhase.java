@@ -3,7 +3,6 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
-import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
@@ -109,8 +108,6 @@ public class CommandTargetScopePhase implements CommandPhase {
             return;
         }
 
-        assertClientExpectedVersion(ctx);
-
         if (readable == null) {
             // No subject, or the named record does not exist — no authorization decision to make.
             ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.abstain(name()));
@@ -138,26 +135,6 @@ public class CommandTargetScopePhase implements CommandPhase {
         if (enforcing) {
             throw new BusinessException(ResponseCode.FORBIDDEN,
                     "Access denied: you do not have permission to view this record");
-        }
-    }
-
-    /**
-     * A client-provided version is a precondition, not a hint. The permit plan deliberately uses
-     * the server-captured version for downstream writes, but it must first prove that the client's
-     * view was current. Otherwise replacing a stale v6 with the freshly-read v7 would make the
-     * optimistic-concurrency contract silently accept the very race it is meant to reject.
-     */
-    private void assertClientExpectedVersion(CommandPipelineContext ctx) {
-        Integer requested = ctx.getRequest().getExpectedVersion();
-        if (requested == null) {
-            return;
-        }
-        Long authoritative = ctx.getTargetRecordVersion();
-        if (authoritative == null || requested.longValue() != authoritative) {
-            throw new ConflictException(
-                    "Command target version conflict (expected " + requested
-                            + ", current " + (authoritative == null ? "unavailable" : authoritative)
-                            + ")");
         }
     }
 

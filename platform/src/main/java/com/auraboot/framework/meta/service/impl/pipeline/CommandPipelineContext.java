@@ -41,6 +41,9 @@ public class CommandPipelineContext {
     @Builder.Default
     private Map<String, Object> payload = new HashMap<>();
 
+    /** Immutable canonical request intent claimed by the idempotency phase. */
+    private Map<String, Object> idempotencyIntent;
+
     /** Parsed executionConfig JSON */
     @Builder.Default
     private Map<String, Object> execConfig = new HashMap<>();

@@ -122,8 +122,11 @@ public class CompletionPhase implements CommandPhase {
         if (StringUtils.hasText(ctx.getRequest().getClientRequestId())) {
             var resultData = new HashMap<>(ctx.getFieldMapResults());
             resultData.putAll(ctx.getHandlerResults());
-            idempotencyService.recordOutcome(ctx.getRequest().getClientRequestId(),
-                    ctx.getCommandCode(), ctx.getPayload(), resultData, ctx.getTenantId());
+            if (ctx.getIdempotencyIntent() == null) {
+                throw new IllegalStateException("Command idempotency intent was not claimed");
+            }
+            idempotencyService.recordScopedOutcome(ctx.getRequest().getClientRequestId(),
+                    ctx.getCommandCode(), ctx.getIdempotencyIntent(), resultData, ctx.getTenantId());
         }
 
         // Audit log (after-commit)

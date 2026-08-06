@@ -21,6 +21,33 @@ public interface IdempotencyService {
     Map<String, Object> checkIdempotency(String clientRequestId, Long tenantId);
 
     /**
+     * Check a replay key inside one operation and require the canonical request payload to match.
+     * A reused key with different intent is a conflict, never a cached success.
+     */
+    Map<String, Object> checkScopedIdempotency(
+            String clientRequestId,
+            String operationCode,
+            Map<String, Object> payload,
+            Long tenantId);
+
+    /**
+     * Atomically claim an operation-scoped request inside the caller's transaction.
+     *
+     * <p>The unique ledger row is inserted with {@code processing} status. A concurrent caller
+     * blocks on the database uniqueness fence until the owner transaction commits or rolls back:
+     * completed owners replay their outcome, while rolled-back owners leave no poison row and let
+     * the waiter claim the request. A different canonical intent always conflicts.</p>
+     *
+     * @return cached outcome for a completed replay, or {@code null} when this transaction owns
+     *         the newly-created claim and may execute the operation
+     */
+    Map<String, Object> claimScopedIdempotency(
+            String clientRequestId,
+            String operationCode,
+            Map<String, Object> payload,
+            Long tenantId);
+
+    /**
      * Record successful execution outcome for future idempotent replay.
      *
      * @param clientRequestId unique client request identifier
@@ -32,6 +59,14 @@ public interface IdempotencyService {
     void recordOutcome(String clientRequestId, String commandCode,
                        Map<String, Object> payload, Map<String, Object> result,
                        Long tenantId);
+
+    /**
+     * Complete the transaction-owned scoped claim using the exact canonical intent used to claim
+     * it. Missing/mismatched claims fail rather than silently committing an un-replayable write.
+     */
+    void recordScopedOutcome(String clientRequestId, String operationCode,
+                             Map<String, Object> payload, Map<String, Object> result,
+                             Long tenantId);
 
     /**
      * Clean up expired idempotency records.

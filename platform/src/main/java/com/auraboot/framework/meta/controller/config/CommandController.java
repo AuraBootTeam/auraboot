@@ -1,7 +1,6 @@
 package com.auraboot.framework.meta.controller.config;
 
 import com.auraboot.framework.common.dto.ApiResponse;
-import com.auraboot.framework.meta.annotation.Idempotent;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.service.CommandAuditLogService;
 import com.auraboot.framework.meta.service.CommandExecutor;
@@ -144,7 +143,6 @@ public class CommandController {
 
     @PostMapping("/execute/{commandCode}")
     @RequirePermission(MetaPermission.COMMAND_EXECUTE)
-    @Idempotent(keyExpression = "#request.clientRequestId != null ? #commandCode + ':' + #request.clientRequestId : null", ttl = 86400)
     @Operation(summary = "Execute a command", description = "Execute a DSL command by code. The payload is passed as the command's input data. Supports idempotency via clientRequestId.")
     public ApiResponse<CommandExecuteResult> execute(
             @PathVariable String commandCode,

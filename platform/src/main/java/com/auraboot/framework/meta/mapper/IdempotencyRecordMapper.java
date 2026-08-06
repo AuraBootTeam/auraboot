@@ -16,6 +16,16 @@ public interface IdempotencyRecordMapper extends BaseMapper<IdempotencyRecord> {
     @Select("SELECT * FROM ab_idempotency_record WHERE tenant_id = #{tenantId} AND client_request_id = #{clientRequestId} AND expires_at > NOW()")
     IdempotencyRecord findByClientRequestId(@Param("tenantId") Long tenantId, @Param("clientRequestId") String clientRequestId);
 
+    @Delete("""
+        DELETE FROM ab_idempotency_record
+        WHERE tenant_id = #{tenantId}
+          AND client_request_id = #{clientRequestId}
+          AND expires_at <= NOW()
+        """)
+    int deleteExpiredByClientRequestId(
+            @Param("tenantId") Long tenantId,
+            @Param("clientRequestId") String clientRequestId);
+
     @Insert("""
         INSERT INTO ab_idempotency_record
         (tenant_id, client_request_id, request_hash, command_code, outcome, status, expires_at, created_at)
@@ -27,6 +37,23 @@ public interface IdempotencyRecordMapper extends BaseMapper<IdempotencyRecord> {
         """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertIdempotent(IdempotencyRecord record);
+
+    @Update("""
+        UPDATE ab_idempotency_record
+        SET outcome = #{outcome, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler},
+            status = 'completed'
+        WHERE tenant_id = #{tenantId}
+          AND client_request_id = #{clientRequestId}
+          AND command_code = #{commandCode}
+          AND request_hash = #{requestHash}
+          AND status = 'processing'
+        """)
+    int completeClaim(
+            @Param("tenantId") Long tenantId,
+            @Param("clientRequestId") String clientRequestId,
+            @Param("commandCode") String commandCode,
+            @Param("requestHash") String requestHash,
+            @Param("outcome") String outcome);
 
     @Delete("DELETE FROM ab_idempotency_record WHERE expires_at < NOW()")
     int deleteExpired();

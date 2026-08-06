@@ -2,7 +2,6 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.BusinessException;
-import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.service.DynamicDataService;
@@ -78,16 +77,14 @@ class CommandTargetScopePhaseTest {
     }
 
     @Test
-    void rejectsAStaleClientVersionBeforeTheServerVersionEntersThePermitPlan() {
+    void defersAStaleClientVersionUntilAfterEveryAuthorizationGate() {
         CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
         givenRecordIsReadable(true);
         CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
         ctx.getRequest().setExpectedVersion(12);
 
-        assertThatThrownBy(() -> phase.execute(ctx))
-                .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("expected 12")
-                .hasMessageContaining("current 13");
+        phase.execute(ctx);
+
         assertThat(ctx.getTargetRecordVersion()).isEqualTo(13L);
     }
 
@@ -104,7 +101,7 @@ class CommandTargetScopePhaseTest {
     }
 
     @Test
-    void failsClosedWhenAClientVersionTargetsAnUnversionedRow() {
+    void leavesAnUnversionedObservationForTheTransactionalLockToReject() {
         CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
         when(dynamicDataService.getById(anyString(), anyString()))
                 .thenReturn(Map.of("pid", "REC-1", "owner_id", 7L));
@@ -112,9 +109,9 @@ class CommandTargetScopePhaseTest {
         CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
         ctx.getRequest().setExpectedVersion(1);
 
-        assertThatThrownBy(() -> phase.execute(ctx))
-                .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("current unavailable");
+        phase.execute(ctx);
+
+        assertThat(ctx.getTargetRecordVersion()).isNull();
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.auraboot.framework.meta.service.impl.pipeline.phases.AssertPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.AutoSetPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.CommandAuthorizationPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.CommandTargetScopePhase;
+import com.auraboot.framework.meta.service.impl.pipeline.phases.CommandTargetVersionLockPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.CompletionPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.ComputedFieldsPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.phases.EntitlementPhase;
@@ -41,9 +42,10 @@ class CommandPipelinePhaseOrderTest {
             CommandAuthorizationPhase.class,
             CommandTargetScopePhase.class,
             SchemaValidatePhase.class,
-            IdempotencyPhase.class,
             EntitlementPhase.class,
             SodCheckPhase.class,
+            IdempotencyPhase.class,
+            CommandTargetVersionLockPhase.class,
             PermitPlanAssemblyPhase.class,
             StateCheckPhase.class,
             AssertPhase.class,

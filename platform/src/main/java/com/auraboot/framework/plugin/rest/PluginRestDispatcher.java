@@ -3,6 +3,7 @@ package com.auraboot.framework.plugin.rest;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.service.ApiRateLimiter;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.plugin.extension.AuthPolicy;
@@ -129,6 +130,8 @@ public class PluginRestDispatcher {
             buffered.flushTo(httpRes);
         } catch (ValidationException e) {
             writeError(httpRes, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+        } catch (ConflictException e) {
+            writeError(httpRes, HttpServletResponse.SC_CONFLICT, e.getMessage());
         } catch (BusinessException e) {
             writeError(httpRes, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
         } catch (RuntimeException e) {
