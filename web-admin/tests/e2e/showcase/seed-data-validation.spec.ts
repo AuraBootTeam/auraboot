@@ -34,11 +34,11 @@ test.describe('Seed Data Validation', () => {
       { model: 'org_department', min: 6, label: 'Departments' },
       { model: 'org_position', min: 12, label: 'Positions' },
       { model: 'org_employee', min: 25, label: 'Employees' },
-      { model: 'crm_account', min: 50, label: 'Accounts' },
-      { model: 'crm_contact', min: 50, label: 'Contacts' },
-      { model: 'crm_lead', min: 70, label: 'Leads' },
-      { model: 'crm_opportunity', min: 40, label: 'Opportunities' },
-      { model: 'crm_activity', min: 200, label: 'Activities' },
+      { model: 'crm_account_common', min: 50, label: 'Accounts' },
+      { model: 'crm_contact_common', min: 50, label: 'Contacts' },
+      { model: 'crm_lead_common', min: 70, label: 'Leads' },
+      { model: 'crm_opportunity_common', min: 40, label: 'Opportunities' },
+      { model: 'crm_activity_common', min: 200, label: 'Activities' },
       { model: 'crm_campaign', min: 5, label: 'Campaigns' },
     ];
 
@@ -56,7 +56,7 @@ test.describe('Seed Data Validation', () => {
   });
 
   test('Account rating distribution', async ({ page }) => {
-    const records = await getRecords(page, 'crm_account');
+    const records = await getRecords(page, 'crm_account_common');
     const ratings: Record<string, number> = {};
     for (const r of records) {
       const rating = r.crm_acc_rating || 'unknown';
@@ -72,7 +72,7 @@ test.describe('Seed Data Validation', () => {
   });
 
   test('Lead status distribution', async ({ page }) => {
-    const records = await getRecords(page, 'crm_lead');
+    const records = await getRecords(page, 'crm_lead_common');
     const statuses: Record<string, number> = {};
     for (const r of records) {
       const status = r.crm_lead_status || 'unknown';
@@ -90,7 +90,7 @@ test.describe('Seed Data Validation', () => {
   });
 
   test('Opportunity stage distribution', async ({ page }) => {
-    const records = await getRecords(page, 'crm_opportunity');
+    const records = await getRecords(page, 'crm_opportunity_common');
     const stages: Record<string, number> = {};
     for (const r of records) {
       const stage = r.crm_opp_stage || 'unknown';
@@ -122,7 +122,7 @@ test.describe('Seed Data Validation', () => {
   });
 
   test('Opportunity amounts are realistic (not all the same)', async ({ page }) => {
-    const records = await getRecords(page, 'crm_opportunity');
+    const records = await getRecords(page, 'crm_opportunity_common');
     const amounts = records
       .map((r: any) => Number(r.crm_opp_expected_amount || 0))
       .filter((a: number) => a > 0);
@@ -138,7 +138,7 @@ test.describe('Seed Data Validation', () => {
   });
 
   test('Activity types are diverse', async ({ page }) => {
-    const records = await getRecords(page, 'crm_activity');
+    const records = await getRecords(page, 'crm_activity_common');
     const types: Record<string, number> = {};
     for (const r of records) {
       const type = r.crm_act_type || 'unknown';
@@ -157,7 +157,7 @@ test.describe('Seed Data Validation', () => {
 
   test('Data has no "Test_" prefixed names', async ({ page }) => {
     // Spot check: accounts should have real Chinese names
-    const accounts = await getRecords(page, 'crm_account', 20);
+    const accounts = await getRecords(page, 'crm_account_common', 20);
     for (const acc of accounts) {
       const name = acc.crm_acc_name || '';
       expect(name).not.toMatch(/^Test[_\s]/i);
@@ -166,7 +166,7 @@ test.describe('Seed Data Validation', () => {
     }
 
     // Spot check: contacts should have real Chinese names
-    const contacts = await getRecords(page, 'crm_contact', 20);
+    const contacts = await getRecords(page, 'crm_contact_common', 20);
     for (const ct of contacts) {
       const name = ct.crm_ct_name || '';
       expect(name).not.toMatch(/^Test/i);

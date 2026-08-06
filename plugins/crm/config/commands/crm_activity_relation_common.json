@@ -1,0 +1,48 @@
+[
+  {
+    "code": "crm:create_activity_relation",
+    "displayName:zh-CN": "关联活动",
+    "displayName:en": "Create Activity Relation",
+    "type": "create",
+    "modelCode": "crm_activity_relation_common",
+    "inputFields": [
+      "crm_ar_activity_id",
+      "crm_ar_object_type",
+      "crm_ar_object_id",
+      "crm_ar_role"
+    ],
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Create a new crm activity relation record. Key inputs: activity_id, object_type, object_id, role.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_activity_relation",
+    "displayName:zh-CN": "删除活动关联",
+    "displayName:en": "Delete Activity Relation",
+    "type": "delete",
+    "modelCode": "crm_activity_relation_common",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此关联？",
+      "confirmMessage:en": "Confirm delete this relation?"
+    },
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Delete crm activity relation record(s). This is irreversible.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:list_activity_relations",
+    "displayName:zh-CN": "活动关联列表",
+    "displayName:en": "List Activity Relations",
+    "type": "query",
+    "modelCode": "crm_activity_relation_common",
+    "permissions": [
+      "crm.activity.read"
+    ],
+    "agent_hint": "Query crm activity relation records.",
+    "cmd_risk_level": "L0"
+  }
+]

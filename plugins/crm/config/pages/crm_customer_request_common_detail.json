@@ -1,0 +1,305 @@
+{
+  "pageKey": "crm_customer_request_common_detail",
+  "name:zh-CN": "客户需求详情",
+  "name:en": "Customer Request Detail",
+  "modelCode": "crm_customer_request_common",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "crm_cr_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "overview",
+          "label": {
+            "zh-CN": "概览",
+            "en-US": "Overview"
+          },
+          "blocks": [
+            {
+              "id": "crm_cr_info",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "需求信息",
+                "en-US": "Request Information"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "crm_cr_code",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_title",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_account_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_contact_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_lead_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_opportunity_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_type",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_priority",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_route_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_expected_date",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_owner",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_source_channel",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_summary",
+                  "span": 2,
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_submitted_at"
+                },
+                {
+                  "field": "crm_cr_due_at"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "routing",
+          "label": {
+            "zh-CN": "行业路由",
+            "en-US": "Routing"
+          },
+          "blocks": [
+            {
+              "id": "crm_cr_route_info",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "路由结果",
+                "en-US": "Route Result"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "crm_cr_route_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_routed_package",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_routed_object_type",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_routed_object_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_route_error",
+                  "span": 2,
+                  "readOnly": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "quotes",
+          "label": {
+            "zh-CN": "报价摘要",
+            "en-US": "Quote Summaries"
+          },
+          "blocks": [
+            {
+              "id": "crm_cr_quote_summaries",
+              "blockType": "sub-table",
+              "title": {
+                "zh-CN": "关联报价摘要",
+                "en-US": "Related Quote Summaries"
+              },
+              "subTable": {
+                "childModel": "crm_quote_summary_common",
+                "parentField": "crm_qs_customer_request_id",
+                "readOnly": true,
+                "columns": [
+                  {
+                    "field": "crm_qs_code",
+                    "width": 150
+                  },
+                  {
+                    "field": "crm_qs_source_quote_type",
+                    "width": 140,
+                    "renderType": "tag",
+                    "dictCode": "crm_quote_summary_source_type"
+                  },
+                  {
+                    "field": "crm_qs_status",
+                    "width": 120,
+                    "renderType": "tag",
+                    "dictCode": "crm_quote_summary_status"
+                  },
+                  {
+                    "field": "crm_qs_quote_amount",
+                    "width": 140,
+                    "align": "right"
+                  },
+                  {
+                    "field": "crm_qs_currency",
+                    "width": 100,
+                    "renderType": "tag",
+                    "dictCode": "crm_currency_code"
+                  },
+                  {
+                    "field": "crm_qs_valid_until",
+                    "width": 120
+                  },
+                  {
+                    "field": "crm_qs_won_lost_result",
+                    "width": 120,
+                    "renderType": "tag",
+                    "dictCode": "crm_quote_summary_result"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crm_cr_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "icon": "Edit",
+          "permissionCode": "crm.customer_request.manage",
+          "visibleWhen": "record.crm_cr_status === 'draft' || record.crm_cr_status === 'submitted'",
+          "label": "$i18n:common.button.edit",
+          "action": {
+            "type": "navigate",
+            "to": "crm_customer_request_common_form"
+          }
+        },
+        {
+          "code": "submit",
+          "icon": "Send",
+          "permissionCode": "crm.customer_request.manage",
+          "visibleWhen": "record.crm_cr_status === 'draft'",
+          "label": {
+            "zh-CN": "提交",
+            "en-US": "Submit"
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:submit_customer_request"
+          }
+        },
+        {
+          "code": "start",
+          "icon": "Play",
+          "permissionCode": "crm.customer_request.manage",
+          "visibleWhen": "record.crm_cr_status === 'submitted' || record.crm_cr_status === 'routed'",
+          "label": {
+            "zh-CN": "开始处理",
+            "en-US": "Start"
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:start_customer_request"
+          }
+        },
+        {
+          "code": "quoted",
+          "icon": "FileText",
+          "permissionCode": "crm.customer_request.manage",
+          "visibleWhen": "record.crm_cr_status === 'in_progress' || record.crm_cr_status === 'routed'",
+          "label": {
+            "zh-CN": "标记已报价",
+            "en-US": "Mark Quoted"
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:mark_customer_request_quoted"
+          }
+        },
+        {
+          "code": "win",
+          "icon": "Trophy",
+          "permissionCode": "crm.customer_request.manage",
+          "visibleWhen": "record.crm_cr_status === 'quoted'",
+          "label": {
+            "zh-CN": "标记赢单",
+            "en-US": "Mark Won"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:win_customer_request"
+          }
+        },
+        {
+          "code": "lose",
+          "icon": "XCircle",
+          "permissionCode": "crm.customer_request.manage",
+          "visibleWhen": "['submitted','routed','in_progress','quoted'].includes(record.crm_cr_status)",
+          "label": {
+            "zh-CN": "标记丢单",
+            "en-US": "Mark Lost"
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:lose_customer_request"
+          }
+        },
+        {
+          "code": "cancel",
+          "icon": "Ban",
+          "permissionCode": "crm.customer_request.manage",
+          "visibleWhen": "['draft','submitted'].includes(record.crm_cr_status)",
+          "label": {
+            "zh-CN": "取消需求",
+            "en-US": "Cancel Request"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:cancel_customer_request"
+          }
+        }
+      ]
+    }
+  ]
+}

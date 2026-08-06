@@ -53,7 +53,7 @@ public class ChatBiSkill implements AuraBotSkill {
     private static final String SCHEMA_JSON = "{"
             + "\"type\":\"object\",\"additionalProperties\":false,"
             + "\"properties\":{"
-            + "  \"modelCode\":{\"type\":\"string\",\"description\":\"The model to aggregate (e.g. crm_lead).\"},"
+            + "  \"modelCode\":{\"type\":\"string\",\"description\":\"The model to aggregate (e.g. crm_lead_common).\"},"
             + "  \"dimensions\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},"
             + "    \"description\":\"Group-by fields (category axis / pie slices). Omit for a single KPI.\"},"
             + "  \"metrics\":{\"type\":\"array\",\"minItems\":1,\"items\":{"

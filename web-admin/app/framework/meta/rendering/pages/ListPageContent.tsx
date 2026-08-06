@@ -1540,7 +1540,7 @@ function ListPageContentInner(props: PageContentProps) {
           method = (schema.dataSource!.method as typeof method) || 'get';
         } else {
           // Use schema.modelCode for API endpoint when available (supports NQ-backed pages
-          // where URL tableName differs from actual model, e.g., /p/crm-my-tasks → crm_activity)
+          // where URL tableName differs from actual model, e.g., /p/crm-my-tasks → crm_activity_common)
           const apiTableName = schema.modelCode ? schema.modelCode : tableName;
           endpoint = `${buildApiEndpoint(apiTableName)}/list`;
         }

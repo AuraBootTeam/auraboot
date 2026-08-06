@@ -13,7 +13,7 @@ import java.util.List;
 /**
  * REST controller for AI Next Best Action suggestions.
  *
- * GET /api/ai/nba?modelCode=crm_lead&recordPid=01ABC...
+ * GET /api/ai/nba?modelCode=crm_lead_common&recordPid=01ABC...
  *
  * @since 6.3.0
  */

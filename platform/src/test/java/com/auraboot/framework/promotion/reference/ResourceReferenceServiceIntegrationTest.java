@@ -44,7 +44,7 @@ class ResourceReferenceServiceIntegrationTest extends BaseIntegrationTest {
         Long envId = createEnv("ref_" + shortId());
         MetaContext.setEnvironmentId(envId);
 
-        PageSchema page = newPage(envId, "p_" + shortId(), "tcrm_lead",
+        PageSchema page = newPage(envId, "p_" + shortId(), "crm_lead_common",
                 "[{\"blockType\":\"filters\",\"fields\":[{\"code\":\"name\"},{\"code\":\"status\"}]}]");
 
         referenceService.refresh(page);
@@ -56,7 +56,7 @@ class ResourceReferenceServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(all).hasSize(3);  // 1 MODEL + 2 FIELD
         assertThat(all).extracting(ResourceReference::getTargetType, ResourceReference::getTargetCode)
                 .containsExactlyInAnyOrder(
-                        tuple("MODEL", "tcrm_lead"),
+                        tuple("MODEL", "crm_lead_common"),
                         tuple("FIELD", "name"),
                         tuple("FIELD", "status")
                 );
@@ -73,7 +73,7 @@ class ResourceReferenceServiceIntegrationTest extends BaseIntegrationTest {
         PageSchema pageB = newPage(envId, "p_b_" + shortId(), "ap_work_package",
                 "[{\"blockType\":\"table\",\"columns\":[{\"code\":\"ap_wp_name\"},{\"code\":\"created_at\"}]}]");
         // Page C in same env does NOT reference ap_wp_name
-        PageSchema pageC = newPage(envId, "p_c_" + shortId(), "tcrm_lead",
+        PageSchema pageC = newPage(envId, "p_c_" + shortId(), "crm_lead_common",
                 "[{\"blockType\":\"filters\",\"fields\":[{\"code\":\"name\"}]}]");
 
         referenceService.refresh(pageA);
@@ -91,7 +91,7 @@ class ResourceReferenceServiceIntegrationTest extends BaseIntegrationTest {
         Long envId = createEnv("repl_" + shortId());
         MetaContext.setEnvironmentId(envId);
 
-        PageSchema page = newPage(envId, "p_" + shortId(), "tcrm_lead",
+        PageSchema page = newPage(envId, "p_" + shortId(), "crm_lead_common",
                 "[{\"blockType\":\"filters\",\"fields\":[{\"code\":\"old_field\"}]}]");
         referenceService.refresh(page);
         assertThat(referenceService.findReferencingPages("FIELD", "old_field")).hasSize(1);
@@ -111,13 +111,13 @@ class ResourceReferenceServiceIntegrationTest extends BaseIntegrationTest {
 
         // Insert page A in dev and refresh refs
         MetaContext.setEnvironmentId(devEnv);
-        PageSchema devPage = newPage(devEnv, "p_dev_" + shortId(), "tcrm_lead",
+        PageSchema devPage = newPage(devEnv, "p_dev_" + shortId(), "crm_lead_common",
                 "[{\"blockType\":\"filters\",\"fields\":[{\"code\":\"shared_field\"}]}]");
         referenceService.refresh(devPage);
 
         // Insert page B in prod, also references shared_field
         MetaContext.setEnvironmentId(prodEnv);
-        PageSchema prodPage = newPage(prodEnv, "p_prod_" + shortId(), "tcrm_lead",
+        PageSchema prodPage = newPage(prodEnv, "p_prod_" + shortId(), "crm_lead_common",
                 "[{\"blockType\":\"filters\",\"fields\":[{\"code\":\"shared_field\"}]}]");
         referenceService.refresh(prodPage);
 

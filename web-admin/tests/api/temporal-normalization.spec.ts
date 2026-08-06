@@ -17,7 +17,7 @@
  *
  * Models used:
  *   - e2et_order     → e2et_order_date (DATE)
- *   - crm_activity   → crm_act_date (DATETIME), crm_act_start_time (DATETIME)
+ *   - crm_activity_common   → crm_act_date (DATETIME), crm_act_start_time (DATETIME)
  *
  * @since 8.1.0
  */
@@ -122,7 +122,7 @@ test.describe('Temporal Normalization — DATE fields', () => {
 });
 
 // ---------------------------------------------------------------------------
-// DATETIME field tests  (model: crm_activity, field: crm_act_date / crm_act_start_time)
+// DATETIME field tests  (model: crm_activity_common, field: crm_act_date / crm_act_start_time)
 // ---------------------------------------------------------------------------
 
 test.describe('Temporal Normalization — DATETIME fields', () => {

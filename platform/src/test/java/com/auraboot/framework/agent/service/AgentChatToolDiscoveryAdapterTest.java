@@ -55,18 +55,18 @@ class AgentChatToolDiscoveryAdapterTest {
         when(registry.discoverAlwaysOn(any())).thenReturn(List.of());
         // the bound skill declares one governed list tool...
         when(skills.resolveSkillTools(eq(1L), eq("crm_quarterly_review")))
-                .thenReturn(List.of(AgentToolDefinition.builder().name("list:crm_account").build()));
+                .thenReturn(List.of(AgentToolDefinition.builder().name("list:crm_account_common").build()));
         // ...which resolves through the same registry path as an explicit tool.
         when(registry.discoverAll(any())).thenReturn(List.of(
-                ToolDefinition.builder().toolCode("list:crm_account").toolType("dsl_query")
-                        .sourceCode("crm_account").modelCode("crm_account").operationKind("query").build()));
+                ToolDefinition.builder().toolCode("list:crm_account_common").toolType("dsl_query")
+                        .sourceCode("crm_account_common").modelCode("crm_account_common").operationKind("query").build()));
 
         List<ToolDefinition> result = new AgentChatToolDiscoveryAdapter(
                 mock(DynamicDataMapper.class), registry, grounding, new ObjectMapper(), skills)
                 .discover(1L, 2L, "ops-colleague", "web", "quarterly review",
                         Map.of("skills", "[\"crm_quarterly_review\"]")); // NO "tools" key
 
-        assertThat(result).extracting(ToolDefinition::getToolCode).contains("list:crm_account");
+        assertThat(result).extracting(ToolDefinition::getToolCode).contains("list:crm_account_common");
     }
 
     @Test
@@ -79,17 +79,17 @@ class AgentChatToolDiscoveryAdapterTest {
         when(registry.discoverAlwaysOn(any())).thenReturn(List.of(
                 ToolDefinition.builder().toolCode("escalate_to_human").toolType("custom").build()));
         when(registry.discoverAll(any())).thenReturn(List.of(
-                ToolDefinition.builder().toolCode("list:crm_account").toolType("dsl_query")
-                        .sourceCode("crm_account").modelCode("crm_account").operationKind("query").build(),
-                ToolDefinition.builder().toolCode("list:crm_lead").toolType("dsl_query")
-                        .sourceCode("crm_lead").modelCode("crm_lead").operationKind("query").build()));
+                ToolDefinition.builder().toolCode("list:crm_account_common").toolType("dsl_query")
+                        .sourceCode("crm_account_common").modelCode("crm_account_common").operationKind("query").build(),
+                ToolDefinition.builder().toolCode("list:crm_lead_common").toolType("dsl_query")
+                        .sourceCode("crm_lead_common").modelCode("crm_lead_common").operationKind("query").build()));
 
         List<ToolDefinition> result = adapter(registry, grounding)
                 .discover(1L, 2L, "cs-agent", "cs_widget", "show accounts",
-                        Map.of("allowed_models", List.of("crm_account")));
+                        Map.of("allowed_models", List.of("crm_account_common")));
 
         assertThat(result).extracting(ToolDefinition::getToolCode)
-                .containsExactly("escalate_to_human", "list:crm_account");
+                .containsExactly("escalate_to_human", "list:crm_account_common");
     }
 
     @Test

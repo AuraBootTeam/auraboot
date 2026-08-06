@@ -1,0 +1,78 @@
+[
+  {
+    "name": "Pipeline Board",
+    "description": "Opportunity pipeline kanban board grouped by sales stage",
+    "modelCode": "crm_opportunity_common",
+    "pageKey": "crm_opportunity_common",
+    "scope": "global",
+    "viewType": "kanban",
+    "isDefault": true,
+    "sortOrder": 1,
+    "viewConfig": {
+      "groupByField": "crm_opp_stage",
+      "groupByDictCode": "crm_opp_stage",
+      "titleField": "crm_opp_name",
+      "idField": "pid",
+      "cardFields": [
+        { "field": "crm_opp_account_id", "label": "Account", "type": "text" },
+        { "field": "crm_opp_expected_amount", "label": "Amount", "type": "currency", "currencyCode": "CNY" },
+        { "field": "crm_opp_probability", "label": "Probability", "type": "progress" },
+        { "field": "crm_opp_expected_close_date", "label": "Close", "type": "date-relative" },
+        { "field": "crm_opp_owner", "label": "Owner", "type": "avatar" }
+      ],
+      "kanbanAggregations": [
+        { "field": "crm_opp_expected_amount", "function": "sum", "label": "Pipeline Value" },
+        { "field": null, "function": "count", "label": "Count" }
+      ],
+      "draggable": true,
+      "showCount": true,
+      "showAggregations": true,
+      "terminalStages": { "won": ["closed_won"], "lost": ["closed_lost"] }
+    }
+  },
+  {
+    "name": "Lead Board",
+    "description": "Lead pipeline kanban board grouped by status",
+    "modelCode": "crm_lead_common",
+    "pageKey": "crm_lead_common",
+    "scope": "global",
+    "viewType": "kanban",
+    "isDefault": false,
+    "sortOrder": 1,
+    "viewConfig": {
+      "groupByField": "crm_lead_status",
+      "groupByDictCode": "crm_lead_status",
+      "titleField": "crm_lead_company",
+      "idField": "pid",
+      "cardFields": [
+        { "field": "crm_lead_contact_name", "label": "Contact", "type": "text" },
+        { "field": "crm_lead_source", "label": "Source", "type": "tag" },
+        { "field": "crm_lead_score", "label": "Score", "type": "progress" },
+        { "field": "crm_lead_assigned_to", "label": "Owner", "type": "avatar" }
+      ],
+      "kanbanAggregations": [
+        { "field": null, "function": "count", "label": "Count" }
+      ],
+      "draggable": true,
+      "showCount": true,
+      "showAggregations": true,
+      "terminalStages": { "won": ["converted"], "lost": ["lost"] }
+    }
+  },
+  {
+    "name": "Activity Calendar",
+    "description": "CRM activities displayed in calendar view",
+    "modelCode": "crm_activity_common",
+    "pageKey": "crm_activity_common",
+    "scope": "global",
+    "viewType": "calendar",
+    "isDefault": false,
+    "sortOrder": 1,
+    "viewConfig": {
+      "calendarDateField": "crm_act_activity_date",
+      "calendarTitleField": "crm_act_subject",
+      "calendarColorField": "crm_act_type",
+      "calendarDefaultView": "dayGridMonth"
+    }
+  }
+]

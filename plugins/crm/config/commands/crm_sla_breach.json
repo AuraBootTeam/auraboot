@@ -1,0 +1,39 @@
+[
+  {
+    "code": "crm:create_sla_breach",
+    "displayName:zh-CN": "记录SLA违规",
+    "displayName:en": "Record SLA Breach",
+    "type": "create",
+    "modelCode": "crm_sla_breach",
+    "inputFields": [
+      "crm_sb_complaint_id",
+      "crm_sb_policy_id",
+      "crm_sb_breach_type",
+      "crm_sb_breached_at",
+      "crm_sb_remark"
+    ],
+    "autoSetFields": {
+      "crm_sb_notified": {
+        "strategy": "fixed_value",
+        "value": "false"
+      }
+    },
+    "permissions": [
+      "crm.sla.manage"
+    ],
+    "agent_hint": "Record an SLA breach event. Key inputs: complaint_id, policy_id, breach_type, breached_at.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:list_sla_breaches",
+    "displayName:zh-CN": "SLA违规列表",
+    "displayName:en": "List SLA Breaches",
+    "type": "query",
+    "modelCode": "crm_sla_breach",
+    "permissions": [
+      "crm.sla.read"
+    ],
+    "agent_hint": "Query SLA breach records.",
+    "cmd_risk_level": "L0"
+  }
+]

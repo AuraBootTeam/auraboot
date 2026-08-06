@@ -72,11 +72,11 @@ async function navigateToCrmLeadList(page: Page): Promise<void> {
   await crmBtn.evaluate((el: HTMLElement) => el.click());
   await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
 
-  const leafLink = nav.locator('a[href="/p/crm_lead"]').first();
+  const leafLink = nav.locator('a[href="/p/crm_lead_common"]').first();
   await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
 
   const listResponsePromise = page
-    .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead') && r.status() === 200, {
+    .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead_common') && r.status() === 200, {
       timeout: 15_000,
     })
     .catch(() => null);
@@ -209,7 +209,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
     await Promise.race([
       createResponsePromise,
       page
-        .waitForURL((url) => url.pathname === '/p/crm_lead', { timeout: 10_000 })
+        .waitForURL((url) => url.pathname === '/p/crm_lead_common', { timeout: 10_000 })
         .catch(() => null),
     ]);
 
@@ -233,7 +233,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
     const currentUrl = page.url();
     const navigatedBack =
       currentUrl.includes('crm-lead') ||
-      currentUrl.includes('crm_lead') ||
+      currentUrl.includes('crm_lead_common') ||
       (await page
         .locator('[data-testid="dynamic-list"]')
         .isVisible({ timeout: 5_000 })
@@ -290,7 +290,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
       if (hasLastPage) {
         await lastPageBtn.click();
         await page
-          .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead') && r.status() === 200, {
+          .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead_common') && r.status() === 200, {
             timeout: 8_000,
           })
           .catch(() => null);
@@ -341,7 +341,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
       if (hasLastPage) {
         await lastPageBtn.click();
         await page
-          .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead') && r.status() === 200, {
+          .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead_common') && r.status() === 200, {
             timeout: 8_000,
           })
           .catch(() => null);
@@ -366,7 +366,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
       .waitForResponse(
         (r) =>
           (r.url().includes('/api/meta/commands/execute/') ||
-            r.url().includes('/api/dynamic/crm_lead/')) &&
+            r.url().includes('/api/dynamic/crm_lead_common/')) &&
           (r.request().method() === 'POST' || r.request().method() === 'DELETE'),
         { timeout: 15_000 },
       )
@@ -380,7 +380,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
 
     // Wait for list to refresh
     await page
-      .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead') && r.status() === 200, {
+      .waitForResponse((r) => r.url().includes('/api/dynamic/crm_lead_common') && r.status() === 200, {
         timeout: 10_000,
       })
       .catch(() => null);
@@ -515,7 +515,7 @@ test.describe('UX Operation Feedback — Toast and Confirm Dialog', () => {
     // If action navigated to a detail/form page, go back to list
     const currentUrl = page.url();
     const isOnList =
-      currentUrl.includes('/p/crm_lead') &&
+      currentUrl.includes('/p/crm_lead_common') &&
       !currentUrl.includes('/new') &&
       !currentUrl.includes('/edit');
     if (!isOnList) {

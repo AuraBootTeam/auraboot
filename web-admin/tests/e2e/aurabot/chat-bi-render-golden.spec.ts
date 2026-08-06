@@ -3,7 +3,7 @@
  *
  * Convergence endgame §7. This closes the S5 mis-classification ("ChatBI 即席图表浏览器
  * golden 不可做"): the correct form is an AuraBot-chat golden. The agent (stub-mode →
- * deterministic scripted tool_use) calls `aurabot:chat-bi` over the REAL `crm_lead` model;
+ * deterministic scripted tool_use) calls `aurabot:chat-bi` over the REAL `crm_lead_common` model;
  * the resulting {records, columns, chartType} flow through AuraBotChat → ChatBiResultCard,
  * which renders an ECharts chart inline in the chat panel.
  *
@@ -11,7 +11,7 @@
  * params with real DeepSeek), S5 dashboard golden (the raw aggregate path live). This spec
  * pins the last mile — the browser render of the chat-bi result card.
  *
- * Runs against the admin storageState whose tenant has the seeded crm_lead model + rows.
+ * Runs against the admin storageState whose tenant has the seeded crm_lead_common model + rows.
  */
 import { test, expect, type Page, type Locator } from '../../fixtures';
 import { openAuraBotPanel } from './_open-panel';
@@ -60,8 +60,8 @@ test.describe('chat-bi browser golden (AuraBot chat renders a chart)', () => {
   // (DDR-2026-06-19-aurabot-chat-tool-exposure-pin-vs-retrieve): it's the safe structured
   // sibling of the always-on platform_execute_sql, so the default chat always offers it.
   // The stub emits the SANITIZED LLM name aurabot_chat-bi (provider code aurabot:chat-bi),
-  // which routes to the real ChatBiSkill over the real crm_lead model.
-  test('agent chat-bi tool over crm_lead renders a chart card inline', async ({ page }) => {
+  // which routes to the real ChatBiSkill over the real crm_lead_common model.
+  test('agent chat-bi tool over crm_lead_common renders a chart card inline', async ({ page }) => {
     // Navigate to the concrete /home page, not '/': the '/' index route redirects
     // to /home, and on client hydration react-router re-runs that loader and fires a
     // LATE client-side navigation to /home that races with — and wipes — the chat
@@ -75,7 +75,7 @@ test.describe('chat-bi browser golden (AuraBot chat renders a chart)', () => {
       page,
       panel,
       stubToolUse('aurabot_chat-bi', {
-        modelCode: 'crm_lead',
+        modelCode: 'crm_lead_common',
         dimensions: ['crm_lead_status'],
         metrics: [{ field: 'pid', aggregation: 'count', alias: 'cnt' }],
         chartType: 'bar',
@@ -88,9 +88,9 @@ test.describe('chat-bi browser golden (AuraBot chat renders a chart)', () => {
     await expect(card, 'chat-bi result card should render in chat').toBeVisible({ timeout: 30000 });
     await expect(card).toHaveAttribute('data-chart-type', 'bar');
 
-    // Real aggregate over the seeded crm_lead statuses → at least one grouped row.
+    // Real aggregate over the seeded crm_lead_common statuses → at least one grouped row.
     const rowCount = Number(await card.getAttribute('data-row-count'));
-    expect(rowCount, 'chat-bi should return real grouped rows from crm_lead').toBeGreaterThan(0);
+    expect(rowCount, 'chat-bi should return real grouped rows from crm_lead_common').toBeGreaterThan(0);
 
     // The shared dashboard chart component (SharedChartFactory, via a synchronous static
     // dataSource) renders an ECharts canvas inside the card's chart area.

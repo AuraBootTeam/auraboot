@@ -21,8 +21,8 @@ async function getAccountWithLinkedContact(
   page: Page,
 ): Promise<{ accountPid: string; contactName: string } | null> {
   const [accountResp, contactResp] = await Promise.all([
-    page.request.get('/api/dynamic/crm_account/list?pageSize=200'),
-    page.request.get('/api/dynamic/crm_contact/list?pageSize=300'),
+    page.request.get('/api/dynamic/crm_account_common/list?pageSize=200'),
+    page.request.get('/api/dynamic/crm_contact_common/list?pageSize=300'),
   ]);
   expect(accountResp.ok()).toBeTruthy();
   expect(contactResp.ok()).toBeTruthy();
@@ -49,8 +49,8 @@ async function getAccountWithLinkedContact(
 
 async function getAccountWithoutLinkedContact(page: Page): Promise<{ accountPid: string } | null> {
   const [accountResp, contactResp] = await Promise.all([
-    page.request.get('/api/dynamic/crm_account/list?pageSize=200'),
-    page.request.get('/api/dynamic/crm_contact/list?pageSize=300'),
+    page.request.get('/api/dynamic/crm_account_common/list?pageSize=200'),
+    page.request.get('/api/dynamic/crm_contact_common/list?pageSize=300'),
   ]);
   expect(accountResp.ok()).toBeTruthy();
   expect(contactResp.ok()).toBeTruthy();
@@ -70,7 +70,7 @@ async function getAccountWithoutLinkedContact(page: Page): Promise<{ accountPid:
 }
 
 async function fetchContact(page: Page, contactPid: string): Promise<any> {
-  const resp = await page.request.get(`/api/dynamic/crm_contact/${contactPid}`);
+  const resp = await page.request.get(`/api/dynamic/crm_contact_common/${contactPid}`);
   expect(resp.ok()).toBeTruthy();
   const body = await resp.json();
   return body?.data ?? body;
@@ -147,7 +147,7 @@ test.describe('Showcase UX Regression', () => {
   // ─── B3: Rating dict has colors (API-level check) ────────────────────
 
   test('B3: CRM Account rating distribution exists', async ({ page }) => {
-    const resp = await page.request.get('/api/dynamic/crm_account/list?pageSize=100');
+    const resp = await page.request.get('/api/dynamic/crm_account_common/list?pageSize=100');
     const body = await resp.json();
     expect(body?.data?.total).toBeGreaterThan(0);
 
@@ -161,7 +161,7 @@ test.describe('Showcase UX Regression', () => {
   // ─── B3+: Opportunity stage distribution ─────────────────────────────
 
   test('B3+: CRM Opportunity all 6 stages present', async ({ page }) => {
-    const resp = await page.request.get('/api/dynamic/crm_opportunity/list?pageSize=200');
+    const resp = await page.request.get('/api/dynamic/crm_opportunity_common/list?pageSize=200');
     const body = await resp.json();
     expect(body?.data?.total).toBeGreaterThan(0);
 
@@ -172,7 +172,7 @@ test.describe('Showcase UX Regression', () => {
   // ─── B5: Action column renders (page loads) ──────────────────────────
 
   test('B5: CRM Account list page loads', async ({ page }) => {
-    await navigateToListViaMenu(page, /CRM|客户关系|menu\.crm/i, '/p/crm_account', 'crm_account');
+    await navigateToListViaMenu(page, /CRM|客户关系|menu\.crm/i, '/p/crm_account_common', 'crm_account_common');
     // Table renders synchronously after the list response settles in
     // navigateToListViaMenu — 5s is sufficient for per-action visibility.
     await expect(page.locator('table, [data-testid="dynlist_table_view"]')).toBeVisible({
@@ -184,7 +184,7 @@ test.describe('Showcase UX Regression', () => {
 
   test('B7: CRM Account detail page loads with related data', async ({ page, browserName }) => {
     // Navigate via sidebar menu, then drill into detail through row-action-view.
-    await navigateToListViaMenu(page, /CRM|客户关系|menu\.crm/i, '/p/crm_account', 'crm_account');
+    await navigateToListViaMenu(page, /CRM|客户关系|menu\.crm/i, '/p/crm_account_common', 'crm_account_common');
     const firstRow = page
       .locator('[data-testid="dynamic-list"] table tbody tr')
       .first();
@@ -194,7 +194,7 @@ test.describe('Showcase UX Regression', () => {
     const viewBtn = firstRow.locator('[data-testid="row-action-view"]').first();
     await viewBtn.waitFor({ state: 'visible', timeout: 5_000 });
     await Promise.all([
-      page.waitForURL(/\/p\/crm_account\/view\/.+/, { timeout: 5_000 }),
+      page.waitForURL(/\/p\/crm_account_common\/view\/.+/, { timeout: 5_000 }),
       viewBtn.click(),
     ]);
 
@@ -207,7 +207,7 @@ test.describe('Showcase UX Regression', () => {
     const linked = await getAccountWithLinkedContact(page);
     expect(linked, 'Seed data should contain at least one account with a linked contact').not.toBeNull();
 
-    await page.goto(`/p/crm_account/view/${linked!.accountPid}#contacts`, {
+    await page.goto(`/p/crm_account_common/view/${linked!.accountPid}#contacts`, {
       waitUntil: 'domcontentloaded',
     });
 
@@ -225,7 +225,7 @@ test.describe('Showcase UX Regression', () => {
     const unlinked = await getAccountWithoutLinkedContact(page);
     expect(unlinked, 'Seed data should contain at least one account without contacts').not.toBeNull();
 
-    await page.goto(`/p/crm_account/view/${unlinked!.accountPid}#contacts`, {
+    await page.goto(`/p/crm_account_common/view/${unlinked!.accountPid}#contacts`, {
       waitUntil: 'domcontentloaded',
     });
 
@@ -313,7 +313,7 @@ test.describe('Showcase UX Regression', () => {
       .poll(
         async () => {
           const resp = await page.request.get('/api/activities', {
-            params: { objectModel: 'crm_account', objectRecord: account.recordId, limit: 10 },
+            params: { objectModel: 'crm_account_common', objectRecord: account.recordId, limit: 10 },
           });
           expect(resp.ok()).toBeTruthy();
           const body = await resp.json();
@@ -331,7 +331,7 @@ test.describe('Showcase UX Regression', () => {
   // ─── C1: Search works via API ────────────────────────────────────────
 
   test('C1: CRM Account search by keyword returns results', async ({ page }) => {
-    const resp = await page.request.get('/api/dynamic/crm_account/list?keyword=宁波&pageSize=10');
+    const resp = await page.request.get('/api/dynamic/crm_account_common/list?keyword=宁波&pageSize=10');
     const body = await resp.json();
     expect(body?.data?.total).toBeGreaterThanOrEqual(1);
     expect(body.data.records[0].crm_acc_name).toContain('宁波');
@@ -414,7 +414,7 @@ test.describe('Showcase UX Regression', () => {
   // ─── Seed data quality checks ────────────────────────────────────────
 
   test('Seed: Activities have realistic content', async ({ page }) => {
-    const resp = await page.request.get('/api/dynamic/crm_activity/list?pageSize=5');
+    const resp = await page.request.get('/api/dynamic/crm_activity_common/list?pageSize=5');
     const body = await resp.json();
     expect(body?.data?.total).toBeGreaterThanOrEqual(200);
 
@@ -426,7 +426,7 @@ test.describe('Showcase UX Regression', () => {
   });
 
   test('Seed: Opportunity amounts have realistic spread', async ({ page }) => {
-    const resp = await page.request.get('/api/dynamic/crm_opportunity/list?pageSize=200');
+    const resp = await page.request.get('/api/dynamic/crm_opportunity_common/list?pageSize=200');
     const body = await resp.json();
     const amounts = (body.data.records || [])
       .map((r: any) => Number(r.crm_opp_expected_amount || 0))
@@ -441,7 +441,7 @@ test.describe('Showcase UX Regression', () => {
 
   test('Seed: SavedViews exist for opportunity', async ({ page }) => {
     // Use the list endpoint which doesn't require special permissions
-    const resp = await page.request.get('/api/views?modelCode=crm_opportunity');
+    const resp = await page.request.get('/api/views?modelCode=crm_opportunity_common');
     const body = await resp.json();
     const views = body?.data?.records || body?.data || [];
     // At minimum the auto-created default view should exist after model publish

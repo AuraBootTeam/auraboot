@@ -1,0 +1,75 @@
+{
+  "pageKey": "crm_email_template_form",
+  "name:zh-CN": "邮件模板表单",
+  "name:en": "Email Template Form",
+  "modelCode": "crm_email_template",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "模板信息",
+        "en-US": "Template Information"
+      },
+      "fields": [
+        {
+          "field": "crm_et_name",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_et_category",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_et_subject",
+          "colSpan": 12,
+          "required": true
+        },
+        {
+          "field": "crm_et_description",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "content",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "邮件内容",
+        "en-US": "Email Content"
+      },
+      "fields": [
+        {
+          "field": "crm_et_body",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

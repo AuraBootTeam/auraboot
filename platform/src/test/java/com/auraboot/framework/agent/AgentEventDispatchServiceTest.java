@@ -41,11 +41,11 @@ class AgentEventDispatchServiceTest extends BaseIntegrationTest {
     @Order(1)
     void matchesTrigger_returnsTrueWhenEventTypeAndModelCodeMatch() {
         String triggersJson = """
-                {"triggers":[{"eventType":"entity_status_changed","modelCode":"crm_lead"}]}
+                {"triggers":[{"eventType":"entity_status_changed","modelCode":"crm_lead_common"}]}
                 """;
 
         boolean matched = dispatchService.matchesTrigger(
-                triggersJson, "entity_status_changed", "crm_lead", Map.of());
+                triggersJson, "entity_status_changed", "crm_lead_common", Map.of());
 
         assertThat(matched).isTrue();
     }
@@ -58,11 +58,11 @@ class AgentEventDispatchServiceTest extends BaseIntegrationTest {
     @Order(2)
     void matchesTrigger_returnsFalseWhenEventTypeDiffers() {
         String triggersJson = """
-                {"triggers":[{"eventType":"record_created","modelCode":"crm_lead"}]}
+                {"triggers":[{"eventType":"record_created","modelCode":"crm_lead_common"}]}
                 """;
 
         boolean matched = dispatchService.matchesTrigger(
-                triggersJson, "entity_status_changed", "crm_lead", Map.of());
+                triggersJson, "entity_status_changed", "crm_lead_common", Map.of());
 
         assertThat(matched).isFalse();
     }
@@ -75,11 +75,11 @@ class AgentEventDispatchServiceTest extends BaseIntegrationTest {
     @Order(3)
     void matchesTrigger_returnsFalseWhenModelCodeDiffers() {
         String triggersJson = """
-                {"triggers":[{"eventType":"entity_status_changed","modelCode":"crm_opportunity"}]}
+                {"triggers":[{"eventType":"entity_status_changed","modelCode":"crm_opportunity_common"}]}
                 """;
 
         boolean matched = dispatchService.matchesTrigger(
-                triggersJson, "entity_status_changed", "crm_lead", Map.of());
+                triggersJson, "entity_status_changed", "crm_lead_common", Map.of());
 
         assertThat(matched).isFalse();
     }
@@ -92,11 +92,11 @@ class AgentEventDispatchServiceTest extends BaseIntegrationTest {
     @Order(4)
     void matchesTrigger_returnsTrueWhenConditionSatisfied() {
         String triggersJson = """
-                {"triggers":[{"eventType":"entity_status_changed","modelCode":"crm_lead","condition":"newStatus=QUALIFIED"}]}
+                {"triggers":[{"eventType":"entity_status_changed","modelCode":"crm_lead_common","condition":"newStatus=QUALIFIED"}]}
                 """;
 
         boolean matched = dispatchService.matchesTrigger(
-                triggersJson, "entity_status_changed", "crm_lead",
+                triggersJson, "entity_status_changed", "crm_lead_common",
                 Map.of("newStatus", "qualified"));
 
         assertThat(matched).isTrue();
@@ -110,11 +110,11 @@ class AgentEventDispatchServiceTest extends BaseIntegrationTest {
     @Order(5)
     void matchesTrigger_returnsFalseWhenConditionNotSatisfied() {
         String triggersJson = """
-                {"triggers":[{"eventType":"entity_status_changed","modelCode":"crm_lead","condition":"newStatus=QUALIFIED"}]}
+                {"triggers":[{"eventType":"entity_status_changed","modelCode":"crm_lead_common","condition":"newStatus=QUALIFIED"}]}
                 """;
 
         boolean matched = dispatchService.matchesTrigger(
-                triggersJson, "entity_status_changed", "crm_lead",
+                triggersJson, "entity_status_changed", "crm_lead_common",
                 Map.of("newStatus", "new"));
 
         assertThat(matched).isFalse();

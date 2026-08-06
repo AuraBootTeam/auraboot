@@ -1,0 +1,202 @@
+{
+  "pageKey": "crm_sales_workbench_detail",
+  "name:zh-CN": "销售工作台",
+  "name:en": "Sales Workbench",
+  "modelCode": "crm_customer_request_common",
+  "description": "Sales workbench detail for one customer request, its route status, and related quote summaries.",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "extension": {
+    "showShare": false,
+    "showReport": false,
+    "showPrint": false,
+    "showEdit": false
+  },
+  "blocks": [
+    {
+      "id": "crm_sales_workbench_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "overview",
+          "label": {
+            "zh-CN": "概览",
+            "en-US": "Overview"
+          },
+          "blocks": [
+            {
+              "id": "crm_sales_workbench_request",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "客户需求",
+                "en-US": "Customer Request"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "crm_cr_code",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_title",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_account_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_contact_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_lead_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_opportunity_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_type",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_priority",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_route_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_expected_date",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_owner",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_source_channel",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_summary",
+                  "readOnly": true,
+                  "span": 2
+                }
+              ]
+            },
+            {
+              "id": "crm_sales_workbench_route",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "路由状态",
+                "en-US": "Route Status"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "crm_cr_routed_package",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_routed_object_type",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_routed_object_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_route_error",
+                  "readOnly": true,
+                  "span": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "quote_summaries",
+          "label": {
+            "zh-CN": "报价摘要",
+            "en-US": "Quote Summaries"
+          },
+          "blocks": [
+            {
+              "id": "crm_sales_workbench_quote_summaries",
+              "blockType": "sub-table",
+              "title": {
+                "zh-CN": "关联报价摘要",
+                "en-US": "Related Quote Summaries"
+              },
+              "subTable": {
+                "childModel": "crm_quote_summary_common",
+                "parentField": "crm_qs_customer_request_id",
+                "readOnly": true,
+                "columns": [
+                  {
+                    "field": "crm_qs_code",
+                    "width": 150
+                  },
+                  {
+                    "field": "crm_qs_source_quote_type",
+                    "width": 140,
+                    "renderType": "tag",
+                    "dictCode": "crm_quote_summary_source_type"
+                  },
+                  {
+                    "field": "crm_qs_status",
+                    "width": 120,
+                    "renderType": "tag",
+                    "dictCode": "crm_quote_summary_status"
+                  },
+                  {
+                    "field": "crm_qs_quote_amount",
+                    "width": 140,
+                    "align": "right"
+                  },
+                  {
+                    "field": "crm_qs_currency",
+                    "width": 100,
+                    "renderType": "tag",
+                    "dictCode": "crm_currency_code"
+                  },
+                  {
+                    "field": "crm_qs_valid_until",
+                    "width": 120
+                  },
+                  {
+                    "field": "crm_qs_approval_status",
+                    "width": 120,
+                    "renderType": "tag",
+                    "dictCode": "crm_quote_summary_approval_status"
+                  },
+                  {
+                    "field": "crm_qs_won_lost_result",
+                    "width": 120,
+                    "renderType": "tag",
+                    "dictCode": "crm_quote_summary_result"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "title": {
+    "zh-CN": "销售工作台",
+    "en": "Sales Workbench"
+  }
+}

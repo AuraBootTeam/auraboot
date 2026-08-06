@@ -1,0 +1,33 @@
+[
+  {
+    "code": "crm_oc_opportunity_id",
+    "displayName:zh-CN": "商机",
+    "displayName:en": "Opportunity",
+    "dataType": "reference",
+    "referenceModelCode": "crm_opportunity_common",
+    "constraints": { "required": true }
+  },
+  {
+    "code": "crm_oc_contact_id",
+    "displayName:zh-CN": "联系人",
+    "displayName:en": "Contact",
+    "dataType": "reference",
+    "referenceModelCode": "crm_contact_common",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_oc_role",
+    "displayName:zh-CN": "角色",
+    "displayName:en": "Role",
+    "dataType": "enum",
+    "dictCode": "crm_contact_role"
+  },
+  {
+    "code": "crm_oc_is_primary",
+    "displayName:zh-CN": "主要联系人",
+    "displayName:en": "Primary",
+    "dataType": "boolean",
+    "defaultValue": "false"
+  }
+]

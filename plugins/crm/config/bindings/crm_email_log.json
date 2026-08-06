@@ -1,0 +1,15 @@
+[
+  { "modelCode": "crm_email_log", "fieldCode": "crm_el_direction", "sequence": 1, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_email_log", "fieldCode": "crm_el_subject", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_email_log", "fieldCode": "crm_el_from_address", "sequence": 3, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_email_log", "fieldCode": "crm_el_to_address", "sequence": 4, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_email_log", "fieldCode": "crm_el_cc_address", "sequence": 5, "required": false, "visible": false, "editable": true },
+  { "modelCode": "crm_email_log", "fieldCode": "crm_el_template_id", "sequence": 6, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_email_log", "fieldCode": "crm_el_related_type", "sequence": 7, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_email_log", "fieldCode": "crm_el_related_id", "sequence": 8, "required": false, "visible": false, "editable": true },
+  { "modelCode": "crm_email_log", "fieldCode": "crm_el_status", "sequence": 9, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_email_log", "fieldCode": "crm_el_sent_at", "sequence": 10, "required": false, "visible": true, "editable": false, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_email_log", "fieldCode": "crm_el_opened_at", "sequence": 11, "required": false, "visible": false, "editable": false },
+  { "modelCode": "crm_email_log", "fieldCode": "crm_el_body", "sequence": 12, "required": false, "visible": false, "editable": true },
+  { "modelCode": "crm_email_log", "fieldCode": "crm_el_remark", "sequence": 13, "required": false, "visible": false, "editable": true }
+]

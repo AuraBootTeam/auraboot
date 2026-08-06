@@ -35,12 +35,12 @@ class TriggerConfigTypeHandlerTest {
     void getNullableResult_byColumnName_validJson_parsesObject() throws SQLException {
         ResultSet rs = mock(ResultSet.class);
         when(rs.getString("trigger_config")).thenReturn(
-                "{\"modelCode\":\"crm_lead\",\"watchFields\":[\"status\"]}");
+                "{\"modelCode\":\"crm_lead_common\",\"watchFields\":[\"status\"]}");
 
         TriggerConfig result = handler.getNullableResult(rs, "trigger_config");
 
         assertThat(result).isNotNull();
-        assertThat(result.getModelCode()).isEqualTo("crm_lead");
+        assertThat(result.getModelCode()).isEqualTo("crm_lead_common");
         assertThat(result.getWatchFields()).containsExactly("status");
     }
 
@@ -131,7 +131,7 @@ class TriggerConfigTypeHandlerTest {
     void setNonNullParameter_setsJsonbObject() throws SQLException {
         PreparedStatement ps = mock(PreparedStatement.class);
         TriggerConfig config = new TriggerConfig();
-        config.setModelCode("crm_lead");
+        config.setModelCode("crm_lead_common");
         config.setWatchFields(List.of("status", "priority"));
 
         // Should not throw

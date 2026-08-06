@@ -1,0 +1,135 @@
+{
+  "pluginId": "com.auraboot.crm",
+  "namespace": "crm",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "hybrid",
+  "displayName": "Customer Relationship Management",
+  "displayName:zh-CN": "客户关系管理",
+  "displayName:en": "Customer Relationship Management",
+  "description": "Official AuraBoot CRM core for accounts, contacts, leads, opportunities, activities, service, campaigns, forecasting, and customer lifecycle automation",
+  "author": "AuraBoot Team",
+  "homepage": "https://auraboot.io/plugins/crm",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "backend": {
+    "jarPath": "backend/build/libs/crm-plugin-1.0.0.jar",
+    "entryClass": "com.auraboot.plugins.crm.CrmPlugin"
+  },
+  "provides": [
+    {
+      "type": "model",
+      "code": "crm_lead_score_rule"
+    },
+    {
+      "type": "model",
+      "code": "crm_assignment_rule"
+    },
+    {
+      "type": "command",
+      "code": "crm:rescore_lead"
+    },
+    {
+      "type": "command",
+      "code": "crm:auto_assign_lead"
+    },
+    {
+      "type": "model",
+      "code": "crm_account_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_contact_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_lead_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_opportunity_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_campaign_member"
+    },
+    {
+      "type": "model",
+      "code": "crm_campaign_metric"
+    },
+    {
+      "type": "model",
+      "code": "crm_sla_policy"
+    },
+    {
+      "type": "model",
+      "code": "crm_sla_breach"
+    },
+    {
+      "type": "command",
+      "code": "crm:create_lead"
+    },
+    {
+      "type": "command",
+      "code": "crm:convert_lead"
+    },
+    {
+      "type": "command",
+      "code": "crm:add_campaign_member"
+    },
+    {
+      "type": "command",
+      "code": "crm:create_sla_policy"
+    },
+    {
+      "type": "query",
+      "code": "crm_pipeline_summary"
+    },
+    {
+      "type": "query",
+      "code": "crm_campaign_performance_summary"
+    },
+    {
+      "type": "query",
+      "code": "crm_tickets_by_sla_status"
+    },
+    {
+      "type": "page",
+      "code": "crm_account_360"
+    },
+    {
+      "type": "page",
+      "code": "crm_lead_conversion"
+    }
+  ],
+  "requires": [],
+  "resourceDirs": {
+    "models": "config/models.json",
+    "fields": "config/fields",
+    "modelFieldBindings": "config/bindings",
+    "commands": "config/commands",
+    "pages": "config/pages",
+    "dicts": "config/dicts.json",
+    "permissions": "config/permissions.json",
+    "menus": "config/menus.json",
+    "i18n": "config/i18n.json",
+    "roles": "config/roles.json",
+    "fieldMasks": "config/fieldMasks.json",
+    "capabilities": "config/capabilities.json",
+    "namedQueries": "config/named-queries.json",
+    "savedViews": "config/saved-views.json",
+    "bindingRules": "config/bindingRules.json",
+    "dashboards": "config/dashboards",
+    "defaultBootstrap": "config/default-bootstrap.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoPublishModels": true,
+    "autoPublishFields": true,
+    "autoPublishCommands": true,
+    "autoPublishPages": true,
+    "autoDeployProcesses": false,
+    "createResourcePermissions": true
+  }
+}

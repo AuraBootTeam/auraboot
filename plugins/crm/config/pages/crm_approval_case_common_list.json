@@ -1,0 +1,203 @@
+{
+  "pageKey": "crm_approval_case_common_list",
+  "name:zh-CN": "审批事项",
+  "name:en": "Approval Cases",
+  "modelCode": "crm_approval_case_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_apc_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "zh-CN": "全部",
+            "en": "All"
+          }
+        },
+        {
+          "key": "pending",
+          "label": {
+            "zh-CN": "待审批",
+            "en": "Pending"
+          },
+          "filter": {
+            "field": "crm_apc_status",
+            "operator": "EQ",
+            "value": "pending"
+          }
+        },
+        {
+          "key": "approved",
+          "label": {
+            "zh-CN": "已批准",
+            "en": "Approved"
+          },
+          "filter": {
+            "field": "crm_apc_status",
+            "operator": "EQ",
+            "value": "approved"
+          }
+        },
+        {
+          "key": "rejected",
+          "label": {
+            "zh-CN": "已驳回",
+            "en": "Rejected"
+          },
+          "filter": {
+            "field": "crm_apc_status",
+            "operator": "EQ",
+            "value": "rejected"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_apc_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "icon": "Plus",
+          "permissionCode": "crm.approval_case.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_approval_case_common_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_apc_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_apc_code",
+          "width": 150,
+          "sortable": true
+        },
+        {
+          "field": "crm_apc_subject",
+          "width": 220
+        },
+        {
+          "field": "crm_apc_domain",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_approval_case_domain"
+        },
+        {
+          "field": "crm_apc_case_type",
+          "width": 140,
+          "renderType": "tag",
+          "dictCode": "crm_approval_case_type"
+        },
+        {
+          "field": "crm_apc_reason",
+          "width": 260
+        },
+        {
+          "field": "crm_apc_status",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_approval_case_status"
+        },
+        {
+          "field": "crm_apc_priority",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "crm_approval_case_priority"
+        },
+        {
+          "field": "crm_apc_source_code",
+          "width": 150
+        },
+        {
+          "field": "crm_apc_account_id",
+          "width": 180
+        },
+        {
+          "field": "crm_apc_amount",
+          "width": 130,
+          "align": "right",
+          "sortable": true
+        },
+        {
+          "field": "crm_apc_margin_pct",
+          "width": 120,
+          "align": "right",
+          "sortable": true
+        },
+        {
+          "field": "crm_apc_discount_pct",
+          "width": 120,
+          "align": "right",
+          "sortable": true
+        },
+        {
+          "field": "crm_apc_submitted_at",
+          "width": 180,
+          "sortable": true
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "label": "$i18n:common.actions",
+          "buttons": [
+            {
+              "code": "view",
+              "icon": "Eye",
+              "permissionCode": "crm.approval_case.read",
+              "label": "$i18n:common.button.view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_approval_case_common_detail"
+              }
+            },
+            {
+              "code": "edit",
+              "icon": "Edit",
+              "permissionCode": "crm.approval_case.manage",
+              "label": "$i18n:common.button.edit",
+              "action": {
+                "type": "navigate",
+                "to": "crm_approval_case_common_form"
+              }
+            },
+            {
+              "code": "delete",
+              "icon": "Trash2",
+              "danger": true,
+              "permissionCode": "crm.approval_case.manage",
+              "label": "$i18n:common.button.delete",
+              "confirm": "delete.confirm",
+              "action": {
+                "type": "command"
+              }
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "crm_apc_code",
+        "crm_apc_subject",
+        "crm_apc_source_code",
+        "crm_apc_source_id",
+        "crm_apc_reason"
+      ],
+      "defaultSort": {
+        "field": "crm_apc_submitted_at",
+        "order": "desc"
+      }
+    }
+  ]
+}

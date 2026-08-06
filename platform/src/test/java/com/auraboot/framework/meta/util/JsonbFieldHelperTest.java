@@ -188,8 +188,8 @@ class JsonbFieldHelperTest {
 
     private ModelDefinition buildTestModel() {
         return ModelDefinition.builder()
-                .code("crm_activity")
-                .tableName("mt_crm_activity")
+                .code("crm_activity_common")
+                .tableName("mt_crm_activity_common")
                 .fields(List.of(
                         FieldDefinition.builder()
                                 .code("subject").dataType("string").columnName("subject").build(),

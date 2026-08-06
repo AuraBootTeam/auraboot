@@ -1,0 +1,250 @@
+{
+  "pageKey": "crm_sales_workbench_list",
+  "name:zh-CN": "销售工作台",
+  "name:en": "Sales Workbench",
+  "modelCode": "crm_customer_request_common",
+  "description": "Role-based sales queue over customer requests and quote summaries.",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_sales_workbench_tabs",
+      "blockType": "tabs",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "zh-CN": "全部",
+            "en": "All"
+          }
+        },
+        {
+          "key": "submitted",
+          "label": {
+            "zh-CN": "待处理",
+            "en": "To Process"
+          },
+          "filter": {
+            "field": "crm_cr_status",
+            "operator": "EQ",
+            "value": "submitted"
+          }
+        },
+        {
+          "key": "routed",
+          "label": {
+            "zh-CN": "已路由",
+            "en": "Routed"
+          },
+          "filter": {
+            "field": "crm_cr_status",
+            "operator": "EQ",
+            "value": "routed"
+          }
+        },
+        {
+          "key": "in_progress",
+          "label": {
+            "zh-CN": "处理中",
+            "en": "In Progress"
+          },
+          "filter": {
+            "field": "crm_cr_status",
+            "operator": "EQ",
+            "value": "in_progress"
+          }
+        },
+        {
+          "key": "quoted",
+          "label": {
+            "zh-CN": "已报价",
+            "en": "Quoted"
+          },
+          "filter": {
+            "field": "crm_cr_status",
+            "operator": "EQ",
+            "value": "quoted"
+          }
+        },
+        {
+          "key": "ordered",
+          "label": {
+            "zh-CN": "已转订单",
+            "en": "Ordered"
+          },
+          "filter": {
+            "field": "crm_cr_status",
+            "operator": "EQ",
+            "value": "ordered"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_sales_workbench_toolbar",
+      "blockType": "toolbar",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "buttons": [
+        {
+          "code": "create_request",
+          "primary": true,
+          "icon": "Plus",
+          "permissionCode": "crm.customer_request.manage",
+          "label": {
+            "zh-CN": "新建客户需求",
+            "en-US": "Create Request"
+          },
+          "action": {
+            "type": "navigate",
+            "to": "crm_customer_request_common_form",
+            "command": "crm:create_customer_request"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_sales_workbench_table",
+      "blockType": "table",
+      "layout": {
+        "colSpan": 12,
+        "rowSpan": 1
+      },
+      "onRowClick": "navigate",
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
+      },
+      "searchFields": [
+        "crm_cr_code",
+        "crm_cr_title",
+        "crm_cr_account_id",
+        "crm_cr_opportunity_id",
+        "crm_cr_status",
+        "crm_cr_route_status"
+      ],
+      "table": {
+        "columns": [
+          {
+            "field": "crm_cr_code",
+            "width": 150,
+            "fixed": "left",
+            "label": {
+              "zh-CN": "需求编号",
+              "en": "Request Code"
+            }
+          },
+          {
+            "field": "crm_cr_title",
+            "width": 260,
+            "label": {
+              "zh-CN": "客户需求",
+              "en": "Customer Request"
+            }
+          },
+          {
+            "field": "crm_cr_account_id",
+            "width": 180,
+            "label": {
+              "zh-CN": "客户",
+              "en": "Account"
+            }
+          },
+          {
+            "field": "crm_cr_opportunity_id",
+            "width": 180,
+            "label": {
+              "zh-CN": "商机",
+              "en": "Opportunity"
+            }
+          },
+          {
+            "field": "crm_cr_type",
+            "width": 120,
+            "renderType": "tag",
+            "dictCode": "crm_customer_request_type",
+            "label": {
+              "zh-CN": "需求类型",
+              "en": "Type"
+            }
+          },
+          {
+            "field": "crm_cr_priority",
+            "width": 100,
+            "renderType": "tag",
+            "dictCode": "crm_customer_request_priority",
+            "label": {
+              "zh-CN": "优先级",
+              "en": "Priority"
+            }
+          },
+          {
+            "field": "crm_cr_status",
+            "width": 120,
+            "renderType": "tag",
+            "dictCode": "crm_customer_request_status",
+            "label": {
+              "zh-CN": "状态",
+              "en": "Status"
+            }
+          },
+          {
+            "field": "crm_cr_route_status",
+            "width": 120,
+            "renderType": "tag",
+            "dictCode": "crm_customer_request_route_status",
+            "label": {
+              "zh-CN": "路由",
+              "en": "Route"
+            }
+          },
+          {
+            "field": "crm_cr_expected_date",
+            "width": 140,
+            "label": {
+              "zh-CN": "期望完成",
+              "en": "Expected"
+            }
+          },
+          {
+            "field": "actions",
+            "isActionColumn": true,
+            "label": {
+              "zh-CN": "操作",
+              "en": "Actions"
+            },
+            "buttons": [
+              {
+                "code": "open_workbench",
+                "icon": "PanelRightOpen",
+                "permissionCode": "crm.customer_request.read",
+                "label": {
+                  "zh-CN": "打开工作台",
+                  "en-US": "Open Workbench"
+                },
+                "action": {
+                  "type": "navigate",
+                  "to": "crm_sales_workbench_detail"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "title": {
+    "zh-CN": "销售工作台",
+    "en": "Sales Workbench"
+  }
+}

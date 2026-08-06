@@ -1,0 +1,167 @@
+{
+  "pageKey": "crm_review_common_form",
+  "name:zh-CN": "评审表单",
+  "name:en": "Review Form",
+  "modelCode": "crm_review_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "crm_rv_ctx",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "基础信息",
+        "en": "Basics"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 2,
+      "fields": [
+        {
+          "field": "crm_rv_title",
+          "layout": {
+            "colSpan": 6
+          },
+          "required": true
+        },
+        {
+          "field": "crm_rv_account_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_rv_customer_request_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_rv_reviewer_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_rv_source_model",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_rv_source_id",
+          "layout": {
+            "colSpan": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_rv_status",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "状态与时间",
+        "en": "Status & Timing"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 3,
+      "fields": [
+        {
+          "field": "crm_rv_review_type",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_rv_status",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_rv_priority",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_rv_submitted_at",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_rv_decided_at",
+          "layout": {
+            "colSpan": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_rv_notes",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "详情与留痕",
+        "en": "Details & Payload"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 1,
+      "fields": [
+        {
+          "field": "crm_rv_conclusion",
+          "layout": {
+            "colSpan": 12
+          }
+        },
+        {
+          "field": "crm_rv_recommendation",
+          "layout": {
+            "colSpan": 12
+          }
+        },
+        {
+          "field": "crm_rv_common_payload",
+          "layout": {
+            "colSpan": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_rv_buttons",
+      "blockType": "form-buttons",
+      "layout": {
+        "colSpan": 12
+      },
+      "buttons": [
+        {
+          "code": "save",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel",
+          "action": {
+            "type": "builtin",
+            "name": "back"
+          }
+        }
+      ]
+    }
+  ]
+}

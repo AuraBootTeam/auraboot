@@ -1,0 +1,48 @@
+[
+  {
+    "code": "crm_et_name",
+    "displayName:zh-CN": "模板名称",
+    "displayName:en": "Template Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_et_subject",
+    "displayName:zh-CN": "邮件主题",
+    "displayName:en": "Email Subject",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 500 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_et_body",
+    "displayName:zh-CN": "邮件正文",
+    "displayName:en": "Email Body",
+    "dataType": "text",
+    "extension": { "renderComponent": "richtext" }
+  },
+  {
+    "code": "crm_et_category",
+    "displayName:zh-CN": "分类",
+    "displayName:en": "Category",
+    "dataType": "enum",
+    "dictCode": "crm_email_category",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_et_description",
+    "displayName:zh-CN": "描述",
+    "displayName:en": "Description",
+    "dataType": "text"
+  },
+  {
+    "code": "crm_et_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_email_template_status",
+    "defaultValue": "draft",
+    "feature": { "searchable": true }
+  }
+]

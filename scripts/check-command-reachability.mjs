@@ -35,8 +35,13 @@ export const DEFAULT_CONFIG = 'scripts/command-reachability.json';
  *  part after the plugin namespace, e.g. `seed_defaults` for `bom:seed_defaults`. */
 export const DEFAULT_EXEMPT_SUFFIXES = ['seed_', 'internal_'];
 
-function readJson(abs) {
-  return JSON.parse(fs.readFileSync(abs, 'utf8'));
+function readOptionalJson(abs) {
+  try {
+    return JSON.parse(fs.readFileSync(abs, 'utf8'));
+  } catch (error) {
+    if (error?.code === 'ENOENT') return {};
+    throw error;
+  }
 }
 
 /** Every command code declared by a plugin (single-file or sharded layout). */
@@ -44,6 +49,56 @@ export function declaredCommands(pluginDir) {
   return loadConfigList(pluginDir, 'commands')
     .map((c) => c?.code)
     .filter((c) => typeof c === 'string' && c.length > 0);
+}
+
+const CONVENTION_BUTTON_TYPES = {
+  create: ['create'],
+  edit: ['update'],
+  delete: ['delete'],
+  save: ['create', 'update'],
+  submit: ['create', 'update'],
+};
+
+/**
+ * CRUD commands reached through the platform's convention resolver.
+ *
+ * Standard DSL buttons intentionally omit action.command: the runtime resolves
+ * the one unambiguous command for the page model and button role. Counting only
+ * quoted command codes would therefore contradict check-dsl-command-convention
+ * and call every canonical create/edit/delete button unreachable.
+ */
+export function conventionReferencedCommands(pluginDir) {
+  const byModelType = new Map();
+  for (const command of loadConfigList(pluginDir, 'commands')) {
+    if (!command?.modelCode || !command?.type || !command?.code) continue;
+    if (!['create', 'update', 'delete'].includes(command.type)) continue;
+    const key = `${command.modelCode}::${command.type}`;
+    if (!byModelType.has(key)) byModelType.set(key, new Set());
+    byModelType.get(key).add(command.code);
+  }
+
+  const found = new Set();
+  const visit = (node, modelCode) => {
+    if (Array.isArray(node)) {
+      for (const item of node) visit(item, modelCode);
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+
+    const types = CONVENTION_BUTTON_TYPES[node.code] ?? [];
+    if (node.action && typeof node.action === 'object') {
+      for (const type of types) {
+        const codes = byModelType.get(`${modelCode}::${type}`);
+        if (codes?.size === 1) found.add([...codes][0]);
+      }
+    }
+    for (const value of Object.values(node)) visit(value, modelCode);
+  };
+
+  for (const page of loadConfigList(pluginDir, 'pages')) {
+    if (page?.modelCode) visit(page, page.modelCode);
+  }
+  return found;
 }
 
 /**
@@ -66,6 +121,7 @@ export function referencedCommands(pluginDir) {
   // that knows four of five reports reachable commands as unreachable.
   const text = loadConfigText(pluginDir, 'pages', 'menus');
   for (const m of text.matchAll(/"([a-z0-9_-]+:[a-z0-9_]+)"/gi)) found.add(m[1]);
+  for (const code of conventionReferencedCommands(pluginDir)) found.add(code);
   return found;
 }
 
@@ -167,7 +223,7 @@ function main(argv) {
   const asJson = argv.includes('--json');
   const rootFlag = argv.indexOf('--plugin-root');
   const cfgAbs = path.join(repoRoot, DEFAULT_CONFIG);
-  const config = fs.existsSync(cfgAbs) ? readJson(cfgAbs) : {};
+  const config = readOptionalJson(cfgAbs);
   const roots = rootFlag >= 0
     ? [path.resolve(repoRoot, argv[rootFlag + 1])]
     : (config.roots ?? ['plugins']).map((r) => path.resolve(repoRoot, r));

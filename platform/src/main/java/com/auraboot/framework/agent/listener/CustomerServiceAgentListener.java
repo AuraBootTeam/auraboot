@@ -126,7 +126,7 @@ public class CustomerServiceAgentListener {
      *
      * Resolution priority:
      * 1. If the event already carries a contactId (resolved upstream), look up by id.
-     * 2. Otherwise, look up by email address in mt_crm_contact.crm_ct_email.
+     * 2. Otherwise, look up by email address in mt_crm_contact_common.crm_ct_email.
      *
      * Returns null if no matching contact is found.
      */
@@ -135,14 +135,14 @@ public class CustomerServiceAgentListener {
             List<Map<String, Object>> rows;
             if (event.getContactId() != null) {
                 String sql = "SELECT pid, crm_ct_name, crm_ct_email, crm_ct_phone, crm_ct_title, crm_ct_account_id " +
-                        "FROM mt_crm_contact " +
+                        "FROM mt_crm_contact_common " +
                         "WHERE tenant_id = #{params.tenantId} AND id = #{params.contactId} " +
                         "LIMIT 1";
                 rows = dynamicDataMapper.selectByQuery(sql,
                         Map.of("tenantId", tenantId, "contactId", event.getContactId()));
             } else {
                 String sql = "SELECT pid, crm_ct_name, crm_ct_email, crm_ct_phone, crm_ct_title, crm_ct_account_id " +
-                        "FROM mt_crm_contact " +
+                        "FROM mt_crm_contact_common " +
                         "WHERE tenant_id = #{params.tenantId} " +
                         "AND lower(crm_ct_email) = lower(#{params.email}) " +
                         "LIMIT 1";

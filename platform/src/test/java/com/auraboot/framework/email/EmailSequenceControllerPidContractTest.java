@@ -33,7 +33,7 @@ class EmailSequenceControllerPidContractTest {
         MetaContext.setCurrentTenantId(7L);
         EmailSequenceEnrollment enrollment = new EmailSequenceEnrollment();
         enrollment.setRecordPid("01KSEQPID");
-        when(emailSequenceService.enroll(7L, 55L, 9L, "alice@example.com", "crm_contact", "01KSEQPID"))
+        when(emailSequenceService.enroll(7L, 55L, 9L, "alice@example.com", "crm_contact_common", "01KSEQPID"))
                 .thenReturn(enrollment);
 
         EmailSequenceController controller = new EmailSequenceController(emailSequenceService);
@@ -43,12 +43,12 @@ class EmailSequenceControllerPidContractTest {
                         "accountId", 9L,
                         "contacts", List.of(Map.of(
                                 "email", "alice@example.com",
-                                "modelCode", "crm_contact",
+                                "modelCode", "crm_contact_common",
                                 "recordPid", "01KSEQPID"))));
 
         assertThat(response.isSuccess()).isTrue();
         assertThat(response.getData()).hasSize(1);
         assertThat(response.getData().get(0).getRecordPid()).isEqualTo("01KSEQPID");
-        verify(emailSequenceService).enroll(7L, 55L, 9L, "alice@example.com", "crm_contact", "01KSEQPID");
+        verify(emailSequenceService).enroll(7L, 55L, 9L, "alice@example.com", "crm_contact_common", "01KSEQPID");
     }
 }

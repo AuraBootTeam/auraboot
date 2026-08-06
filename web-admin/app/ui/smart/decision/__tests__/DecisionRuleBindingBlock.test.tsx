@@ -1085,7 +1085,9 @@ describe('DecisionRuleBindingBlock', () => {
     );
 
     await waitFor(() => expect(api.getModelFields).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: '添加映射' }));
+    const addMappingButton = screen.getByRole('button', { name: '添加映射' });
+    await waitFor(() => expect(addMappingButton).toBeEnabled());
+    fireEvent.click(addMappingButton);
 
     const fieldPicker = screen.getByLabelText('mapping-field-0');
     expect(fieldPicker).toHaveTextContent('请假申请 / 请假天数');

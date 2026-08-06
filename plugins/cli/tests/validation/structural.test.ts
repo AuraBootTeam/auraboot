@@ -79,6 +79,32 @@ describe('validateStructural plugin manifest schema', () => {
       ]));
   });
 
+  it('accepts canonical page capabilities, command handlers, and field extraProps', () => {
+    const plugin = pluginWithManifest({
+      pluginId: 'canonical-runtime-contract',
+      namespace: 'canonical_runtime_contract',
+      version: '1.0.0',
+      provides: [{ type: 'page', code: 'crm_account_360' }],
+    });
+    plugin.resourceFiles.set('commands', [{
+      code: 'crm:rescore_lead',
+      modelCode: 'crm_lead_common',
+      type: 'action',
+      handler: 'crm:rescore_lead',
+    }]);
+    plugin.resourceFiles.set('fields', [{
+      code: 'crm_lead_email',
+      dataType: 'string',
+      extraProps: { fieldPermission: { view: ['crm_sales'] } },
+    }]);
+
+    const result = validateStructural(plugin);
+
+    expect(result.messages.filter((message) => message.code === 'L1-MANIFEST')).toEqual([]);
+    expect(result.messages.filter((message) => message.code === 'L1-RESOURCE')).toEqual([]);
+    expect(result.errorCount).toBe(0);
+  });
+
   it('rejects the removed top-level entryPoint field', () => {
     const result = validateStructural(
       pluginWithManifest({

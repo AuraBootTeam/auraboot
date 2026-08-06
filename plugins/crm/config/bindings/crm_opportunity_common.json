@@ -1,0 +1,20 @@
+[
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_code", "sequence": 1, "required": true, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_name", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_account_id", "sequence": 3, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_lead_id", "sequence": 4, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_stage", "sequence": 5, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_currency_code", "sequence": 6, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_expected_amount", "sequence": 7, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_exchange_rate", "sequence": 8, "required": false, "visible": false, "editable": false, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_expected_amount_base", "sequence": 10, "required": false, "visible": false, "editable": false, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_base_currency_code", "sequence": 11, "required": false, "visible": false, "editable": false },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_expected_close_date", "sequence": 12, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_probability", "sequence": 13, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_notes", "sequence": 14, "required": false, "visible": false, "editable": true },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_lost_reason", "sequence": 15, "required": false, "visible": false, "editable": true },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_lost_reason_code", "sequence": 16, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_competitor", "sequence": 17, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_forecast_category", "sequence": 18, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_opportunity_common", "fieldCode": "crm_opp_owner", "sequence": 19, "required": false, "visible": true, "editable": true }
+]

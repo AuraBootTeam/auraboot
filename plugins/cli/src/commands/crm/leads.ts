@@ -44,7 +44,7 @@ export async function crmLeadsCommand(options: LeadOptions): Promise<void> {
     filters.push({ fieldName: 'crm_lead_source', operator: 'EQ', value: options.source.toLowerCase() });
   }
 
-  const records = await queryDynamicList(client, 'crm_lead', {
+  const records = await queryDynamicList(client, 'crm_lead_common', {
     pageSize: Number(options.limit) || 50,
     keyword: options.keyword,
     filters,

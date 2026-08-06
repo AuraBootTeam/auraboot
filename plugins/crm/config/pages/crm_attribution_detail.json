@@ -1,0 +1,52 @@
+{
+  "pageKey": "crm_attribution_detail",
+  "name:zh-CN": "归因详情",
+  "name:en": "Attribution Detail",
+  "modelCode": "crm_attribution",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "info",
+      "blockType": "detail-section",
+      "title": {
+        "zh-CN": "归因信息",
+        "en": "Attribution Info"
+      },
+      "fields": [
+        {
+          "field": "crm_attr_code",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_attr_deal_name",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_attr_revenue",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_attr_model",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_attr_top_campaign",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_attr_touchpoints",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_attr_result",
+          "colSpan": 12
+        }
+      ]
+    }
+  ]
+}

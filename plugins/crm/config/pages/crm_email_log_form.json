@@ -1,0 +1,106 @@
+{
+  "pageKey": "crm_email_log_form",
+  "name:zh-CN": "邮件记录表单",
+  "name:en": "Email Log Form",
+  "modelCode": "crm_email_log",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "邮件信息",
+        "en-US": "Email Information"
+      },
+      "fields": [
+        {
+          "field": "crm_el_direction",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_el_template_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_el_from_address",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_el_to_address",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_el_cc_address",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_el_subject",
+          "colSpan": 12,
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "association",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "关联信息",
+        "en-US": "Association"
+      },
+      "fields": [
+        {
+          "field": "crm_el_related_type",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_el_related_id",
+          "colSpan": 6
+        }
+      ]
+    },
+    {
+      "id": "content",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "邮件内容",
+        "en-US": "Email Content"
+      },
+      "fields": [
+        {
+          "field": "crm_el_body",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_el_remark",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

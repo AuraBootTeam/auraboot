@@ -63,13 +63,13 @@ test.describe('Digital employee — allowed operations', () => {
     page,
   }) => {
     // --- something for it to try to delete --------------------------------
-    const created = await page.request.post('/api/dynamic/crm_account/create', {
+    const created = await page.request.post('/api/dynamic/crm_account_common/create', {
       data: { crm_acc_name: ACCOUNT_NAME, crm_acc_code: `e2eacc${UNIQUE}` },
     });
     expect(created.status(), 'seeding the target record must succeed').toBeLessThan(400);
 
     const stillThere = async () => {
-      const res = await page.request.get('/api/dynamic/crm_account/list', {
+      const res = await page.request.get('/api/dynamic/crm_account_common/list', {
         params: { pageNum: 1, pageSize: 50, keyword: ACCOUNT_NAME },
       });
       const body = await res.json();

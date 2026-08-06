@@ -144,7 +144,7 @@ fi
 if [ "$SKIP_SEED" != "1" ]; then
   echo "[bugfix-oss-demo] running showcase seed sequence"
   SHOWCASE_COMMERCIAL_SEED=auto \
-  SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_overview \
+  SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_dashboard \
     node scripts/run-showcase-seed-sequence.mjs \
       --config=playwright.seed.config.ts \
       --reporter=line \

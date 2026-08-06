@@ -8,7 +8,7 @@ const listPage = (pageKey) => entry({ pageKey, kind: 'list' });
 const formPage = (pageKey, extension) => entry({ pageKey, kind: 'form', ...(extension ? { extension } : {}) });
 
 test('a CRUD form backed by its own list page is clean', () => {
-  const problems = findBrokenBackLinks([listPage('crm_account_list'), formPage('crm_account_form')]);
+  const problems = findBrokenBackLinks([listPage('crm_account_common_list'), formPage('crm_account_common_form')]);
   assert.deepEqual(problems, []);
 });
 
@@ -81,6 +81,6 @@ test('classifyBackTo maps each dialect to what must exist', () => {
 });
 
 test('derivedListPageKey mirrors the router suffix rule', () => {
-  assert.equal(derivedListPageKey('crm_account_form'), 'crm_account_list');
+  assert.equal(derivedListPageKey('crm_account_common_form'), 'crm_account_common_list');
   assert.equal(derivedListPageKey('enterprise_info_form'), 'enterprise_info_list');
 });

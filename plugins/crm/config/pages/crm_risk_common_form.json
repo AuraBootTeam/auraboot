@@ -1,0 +1,173 @@
+{
+  "pageKey": "crm_risk_common_form",
+  "name:zh-CN": "风险项表单",
+  "name:en": "Risk Form",
+  "modelCode": "crm_risk_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "crm_rk_ctx",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "基础信息",
+        "en": "Basics"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 2,
+      "fields": [
+        {
+          "field": "crm_rk_title",
+          "layout": {
+            "colSpan": 6
+          },
+          "required": true
+        },
+        {
+          "field": "crm_rk_review_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_rk_customer_request_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_rk_account_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_rk_owner_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_rk_source_model",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_rk_source_id",
+          "layout": {
+            "colSpan": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_rk_status",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "状态与时间",
+        "en": "Status & Timing"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 3,
+      "fields": [
+        {
+          "field": "crm_rk_risk_type",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_rk_severity",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_rk_status",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_rk_due_at",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_rk_resolved_at",
+          "layout": {
+            "colSpan": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_rk_notes",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "详情与留痕",
+        "en": "Details & Payload"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 1,
+      "fields": [
+        {
+          "field": "crm_rk_description",
+          "layout": {
+            "colSpan": 12
+          }
+        },
+        {
+          "field": "crm_rk_mitigation",
+          "layout": {
+            "colSpan": 12
+          }
+        },
+        {
+          "field": "crm_rk_common_payload",
+          "layout": {
+            "colSpan": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_rk_buttons",
+      "blockType": "form-buttons",
+      "layout": {
+        "colSpan": 12
+      },
+      "buttons": [
+        {
+          "code": "save",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel",
+          "action": {
+            "type": "builtin",
+            "name": "back"
+          }
+        }
+      ]
+    }
+  ]
+}

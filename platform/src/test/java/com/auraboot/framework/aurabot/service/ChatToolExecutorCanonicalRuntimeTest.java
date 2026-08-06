@@ -103,7 +103,7 @@ class ChatToolExecutorCanonicalRuntimeTest {
         ChatToolExecutor executor = new ChatToolExecutor(toolLoopService, chatToolResolver, objectMapper);
 
         MetaContext.setSystemTenantContext(7L);
-        Map<String, Object> result = executor.execute("cmd_crm_list_leads", Map.of(), "crm_lead");
+        Map<String, Object> result = executor.execute("cmd_crm_list_leads", Map.of(), "crm_lead_common");
 
         assertThat(result).containsEntry("success", true);
         verify(toolLoopService).executeToolCall(eq(7L), eq("aurabot_chat"), isNull(), eq("aurabot"),
@@ -253,7 +253,7 @@ class ChatToolExecutorCanonicalRuntimeTest {
 
         MetaContext.setSystemTenantContext(7L);
         Map<String, Object> result = executor.executeConfirmed(
-                "cmd_crm_update_lead", input, "crm_lead", "run-2", null, "aurabot");
+                "cmd_crm_update_lead", input, "crm_lead_common", "run-2", null, "aurabot");
 
         assertThat(result).containsEntry("approvalRequired", true);
         @SuppressWarnings("unchecked")

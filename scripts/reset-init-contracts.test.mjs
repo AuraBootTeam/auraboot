@@ -184,11 +184,11 @@ test('plugin import profiles use explicit semantic names and deprecate default',
       );
     }
     const ownershipIndex = plugins.indexOf('core-ownership');
-    const crmStarterIndex = plugins.indexOf('crm-starter');
-    if (crmStarterIndex >= 0) {
+    const crmIndex = plugins.indexOf('crm');
+    if (crmIndex >= 0 && ownershipIndex >= 0) {
       assert.ok(
-        ownershipIndex >= 0 && ownershipIndex < crmStarterIndex,
-        `${profile} must import core-ownership before crm-starter because CRM bindings reference owner_type/owner_id`,
+        ownershipIndex < crmIndex,
+        `${profile} must import core-ownership before crm when both are present`,
       );
     }
   }
@@ -300,34 +300,32 @@ test('markdownlint MD025 ignores frontmatter title without disabling single-h1 c
   assert.doesNotMatch(config, /"MD025"\s*:\s*false/);
 });
 
-test('seeded CS agent declares only OSS CRM starter tools that can be imported', () => {
+test('seeded CS agent declares only official CRM tools that can be imported', () => {
   const seed = read('scripts/seed-cs-agent.sql');
-  for (const staleReference of [
-    'crm_account_common',
-    'crm_contact_common',
-    'crm_complaint',
-    'crm_sla_status_breakdown',
-  ]) {
-    assert.doesNotMatch(seed, new RegExp(staleReference), `${staleReference} is not provided by OSS crm-starter`);
+  const officialTools = [
+    'get:crm_account_common,',
+    'get:crm_contact_common,',
+    'list:crm_activity_common,',
+    'get:crm_activity_common,',
+  ];
+  for (const staleReference of officialTools.map((tool) => tool.replace('_common', ''))) {
+    assert.doesNotMatch(seed, new RegExp(staleReference), `${staleReference} is a removed CRM starter alias`);
   }
 
-  const models = JSON.parse(read('plugins/crm-starter/config/models.json'));
+  const models = JSON.parse(read('plugins/crm/config/models.json'));
   const modelCodes = new Set(models.map((model) => model.code));
 
   const commandCodes = new Set();
-  for (const file of readdirSync('plugins/crm-starter/config/commands')) {
+  for (const file of readdirSync('plugins/crm/config/commands')) {
     if (!file.endsWith('.json')) continue;
-    for (const command of JSON.parse(read(`plugins/crm-starter/config/commands/${file}`))) {
+    for (const command of JSON.parse(read(`plugins/crm/config/commands/${file}`))) {
       commandCodes.add(command.code);
     }
   }
 
-  const namedQueryCodes = new Set();
-  for (const file of readdirSync('plugins/crm-starter/config/named-queries')) {
-    if (!file.endsWith('.json')) continue;
-    const query = JSON.parse(read(`plugins/crm-starter/config/named-queries/${file}`));
-    namedQueryCodes.add(query.code);
-  }
+  const namedQueryCodes = new Set(
+    JSON.parse(read('plugins/crm/config/named-queries.json')).map((query) => query.code),
+  );
 
   const toolsMatch = seed.match(/'([^']*custom:send_customer_reply[^']*)',\s*\n\s*120,/);
   assert.ok(toolsMatch, 'seed-cs-agent.sql must define the cs_agent tools list');
@@ -335,11 +333,11 @@ test('seeded CS agent declares only OSS CRM starter tools that can be imported',
 
   for (const tool of declaredTools) {
     if (tool.startsWith('cmd:')) {
-      assert.ok(commandCodes.has(tool.slice(4)), `${tool} must exist in crm-starter commands`);
+      assert.ok(commandCodes.has(tool.slice(4)), `${tool} must exist in official CRM commands`);
     } else if (tool.startsWith('get:') || tool.startsWith('list:')) {
-      assert.ok(modelCodes.has(tool.slice(tool.indexOf(':') + 1)), `${tool} must reference a crm-starter model`);
+      assert.ok(modelCodes.has(tool.slice(tool.indexOf(':') + 1)), `${tool} must reference an official CRM model`);
     } else if (tool.startsWith('nq:')) {
-      assert.ok(namedQueryCodes.has(tool.slice(3)), `${tool} must exist in crm-starter named queries`);
+      assert.ok(namedQueryCodes.has(tool.slice(3)), `${tool} must exist in official CRM named queries`);
     } else if (tool === 'custom:send_customer_reply') {
       assert.match(seed, /'send_customer_reply'/);
     } else {
@@ -354,27 +352,27 @@ test('seeded CS agent declares only OSS CRM starter tools that can be imported',
   );
 });
 
-test('customer service agent integration scenario follows OSS CRM starter activity flow', () => {
+test('customer service agent integration scenario follows official CRM activity flow', () => {
   const integrationTest = read('platform/src/test/java/com/auraboot/framework/agent/CustomerServiceAgentIntegrationTest.java');
-  for (const staleReference of [
-    'crm_account_common',
-    'crm_contact_common',
-    'crm_complaint',
-    'create_complaint',
-    'mt_crm_account_common',
-    'mt_crm_contact_common',
-    'mt_crm_complaint',
-  ]) {
+  const officialReferences = [
+    '"mt_crm_account_common"',
+    '"mt_crm_contact_common"',
+    '"mt_crm_activity_common"',
+    'get:crm_account_common\\"',
+    'get:crm_contact_common\\"',
+    'list:crm_activity_common\\"',
+  ];
+  for (const staleReference of officialReferences.map((reference) => reference.replace('_common', ''))) {
     assert.doesNotMatch(
       integrationTest,
       new RegExp(staleReference),
-      `${staleReference} belongs to the old complaint/common CRM scenario, not OSS crm-starter`,
+      `${staleReference} belongs to the removed CRM starter contract`,
     );
   }
 
-  assert.match(integrationTest, /mt_crm_account/);
-  assert.match(integrationTest, /mt_crm_contact/);
-  assert.match(integrationTest, /mt_crm_activity/);
+  assert.match(integrationTest, /mt_crm_account_common/);
+  assert.match(integrationTest, /mt_crm_contact_common/);
+  assert.match(integrationTest, /mt_crm_activity_common/);
   assert.match(integrationTest, /cmd:crm:create_activity/);
   assert.match(integrationTest, /custom:send_customer_reply/);
 });

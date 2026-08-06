@@ -10,8 +10,7 @@
 #                base showcase seed remains fail-fast; commercial CRM seed runs
 #                only when full CRM quote/complaint commands are present unless
 #                SHOWCASE_COMMERCIAL_SEED=required; dashboard-default targets
-#                SHOWCASE_DEFAULT_DASHBOARD_CODE or the best imported CRM
-#                dashboard (crm_dashboard, else crm_overview).
+#                SHOWCASE_DEFAULT_DASHBOARD_CODE or the official CRM dashboard.
 #   2026-05-10 — §8 seed is now fail-fast: Playwright seed output is written to
 #                per-step logs, failures print the tail and stop the script, and
 #                final invariants verify CRM/showcase/arsenal/default dashboard.
@@ -74,7 +73,7 @@ for arg in "$@"; do
             echo "  PLUGIN_IMPORT_PROFILE=core|demo|e2e  Override plugin import profile"
             echo "  AURABOOT_DEMO_SEED=false  Backward-compatible alias for PLUGIN_IMPORT_PROFILE=core"
             echo "  SHOWCASE_COMMERCIAL_SEED=auto|required|skip  Control full-CRM commercial seed"
-            echo "  SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_overview|crm_dashboard  Override demo default dashboard"
+            echo "  SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_dashboard  Override demo default dashboard"
             exit 0
             ;;
     esac
@@ -245,15 +244,12 @@ select_default_showcase_dashboard() {
         return
     fi
 
-    if dashboard_definition_exists "crm_dashboard"; then
-        export SHOWCASE_DEFAULT_DASHBOARD_CODE="crm_dashboard"
-    elif dashboard_definition_exists "crm_overview"; then
-        export SHOWCASE_DEFAULT_DASHBOARD_CODE="crm_overview"
-    else
+    if ! dashboard_definition_exists "crm_dashboard"; then
         echo -e "${RED}   No CRM dashboard is imported for demo default selection.${NC}"
-        echo "   Expected crm_dashboard (full CRM) or crm_overview (OSS crm-starter)."
+        echo "   Expected crm_dashboard from the official CRM plugin."
         exit 1
     fi
+    export SHOWCASE_DEFAULT_DASHBOARD_CODE="crm_dashboard"
 }
 
 # Step 0: Preflight — required local services must be running.
@@ -636,13 +632,13 @@ WHERE u.email = 'admin@auraboot.com'
                     seed_phases+=(commercial)
                 else
                     echo -e "${YELLOW}   Commercial seed skipped: full CRM quote/complaint commands are not imported.${NC}"
-                    echo "     OSS crm-starter supports base CRM seed; full commercial seed requires the enterprise CRM plugin."
+                    echo "     The optional showcase quote seed requires Sales quote commands outside the CRM core."
                 fi
                 ;;
             required)
                 if ! command_definition_exists "crm:create_quote" || ! command_definition_exists "crm:create_complaint"; then
                     echo -e "${RED}   Commercial seed required but full CRM quote/complaint commands are not imported.${NC}"
-                    echo "   Import the enterprise CRM plugin resources, or set SHOWCASE_COMMERCIAL_SEED=auto/skip."
+                    echo "   Import a Sales quote extension, or set SHOWCASE_COMMERCIAL_SEED=auto/skip."
                     exit 1
                 fi
                 seed_phases+=(commercial)

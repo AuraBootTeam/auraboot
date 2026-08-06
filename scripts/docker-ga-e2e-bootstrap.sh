@@ -287,7 +287,7 @@ else
         if [ "$(command_exists 'crm:create_quote')" = "yes" ] && [ "$(command_exists 'crm:create_complaint')" = "yes" ]; then
           seed_names+=(commercial)
         else
-          echo "  seed-showcase-commercial ... SKIP (OSS crm-starter lacks full CRM quote/complaint commands)"
+          echo "  seed-showcase-commercial ... SKIP (Sales quote commands are not installed)"
         fi
         ;;
       *)
@@ -305,7 +305,7 @@ else
          PGUSER=auraboot \
          PGDATABASE=aura_boot \
          PGPASSWORD=auraboot_dev \
-         SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_overview}" \
+         SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_dashboard}" \
          PLAYWRIGHT_BASE_URL=http://127.0.0.1:5174 \
          NO_PROXY=localhost,127.0.0.1 \
          node scripts/run-showcase-seed-sequence.mjs \

@@ -1,0 +1,137 @@
+[
+  {
+    "code": "crm_qs_code",
+    "displayName:zh-CN": "报价摘要编号",
+    "displayName:en": "Summary Code",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_qs_account_id",
+    "displayName:zh-CN": "客户",
+    "displayName:en": "Account",
+    "dataType": "reference",
+    "referenceModelCode": "crm_account_common",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_qs_opportunity_id",
+    "displayName:zh-CN": "关联商机",
+    "displayName:en": "Opportunity",
+    "dataType": "reference",
+    "referenceModelCode": "crm_opportunity_common",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_qs_customer_request_id",
+    "displayName:zh-CN": "客户需求",
+    "displayName:en": "Customer Request",
+    "dataType": "reference",
+    "referenceModelCode": "crm_customer_request_common",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_qs_source_quote_type",
+    "displayName:zh-CN": "来源报价类型",
+    "displayName:en": "Source Quote Type",
+    "dataType": "enum",
+    "dictCode": "crm_quote_summary_source_type",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_qs_source_quote_id",
+    "displayName:zh-CN": "来源报价ID",
+    "displayName:en": "Source Quote ID",
+    "dataType": "string",
+    "constraints": { "maxLength": 80 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_qs_status",
+    "displayName:zh-CN": "报价状态",
+    "displayName:en": "Quote Status",
+    "dataType": "enum",
+    "dictCode": "crm_quote_summary_status",
+    "defaultValue": "draft",
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_qs_quote_amount",
+    "displayName:zh-CN": "报价金额",
+    "displayName:en": "Quote Amount",
+    "dataType": "decimal",
+    "constraints": { "precision": 14, "scale": 2 },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_qs_currency",
+    "displayName:zh-CN": "币种",
+    "displayName:en": "Currency",
+    "dataType": "enum",
+    "dictCode": "crm_currency_code",
+    "defaultValue": "CNY"
+  },
+  {
+    "code": "crm_qs_valid_until",
+    "displayName:zh-CN": "有效期至",
+    "displayName:en": "Valid Until",
+    "dataType": "date",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_qs_approval_status",
+    "displayName:zh-CN": "审批状态",
+    "displayName:en": "Approval Status",
+    "dataType": "enum",
+    "dictCode": "crm_quote_summary_approval_status",
+    "defaultValue": "none",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_qs_sent_at",
+    "displayName:zh-CN": "发送时间",
+    "displayName:en": "Sent At",
+    "dataType": "datetime",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_qs_customer_feedback_status",
+    "displayName:zh-CN": "客户反馈状态",
+    "displayName:en": "Customer Feedback",
+    "dataType": "enum",
+    "dictCode": "crm_quote_summary_feedback_status",
+    "defaultValue": "none",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_qs_won_lost_result",
+    "displayName:zh-CN": "赢输结果",
+    "displayName:en": "Won/Lost Result",
+    "dataType": "enum",
+    "dictCode": "crm_quote_summary_result",
+    "defaultValue": "open",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_qs_owner",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Owner",
+    "dataType": "string",
+    "constraints": { "maxLength": 100 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_qs_source_updated_at",
+    "displayName:zh-CN": "来源更新时间",
+    "displayName:en": "Source Updated At",
+    "dataType": "datetime",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_qs_summary",
+    "displayName:zh-CN": "摘要",
+    "displayName:en": "Summary",
+    "dataType": "text"
+  }
+]

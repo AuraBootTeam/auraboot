@@ -40,7 +40,8 @@ public class EmailRecordLinkService {
 
     /**
      * Attempts to automatically link the given message to CRM records by matching
-     * participant email addresses against {@code mt_crm_contact} and {@code mt_crm_lead}.
+     * participant email addresses against {@code mt_crm_contact_common} and
+     * {@code mt_crm_lead_common}.
      *
      * <p>Strategy:
      * <ol>
@@ -69,13 +70,13 @@ public class EmailRecordLinkService {
             // Match against CRM Contact
             List<String> contactPids = findCrmContactPidsByEmail(tenantId, email);
             for (String contactPid : contactPids) {
-                links.add(buildLink(tenantId, messageId, threadId, "crm_contact", contactPid,
+                links.add(buildLink(tenantId, messageId, threadId, "crm_contact_common", contactPid,
                         EmailConstants.LINK_TYPE_AUTO));
 
                 // Also link to related Opportunities via opp_contact junction
                 List<String> oppPids = findRelatedOpportunityPids(tenantId, contactPid);
                 for (String oppPid : oppPids) {
-                    links.add(buildLink(tenantId, messageId, threadId, "crm_opportunity", oppPid,
+                    links.add(buildLink(tenantId, messageId, threadId, "crm_opportunity_common", oppPid,
                             EmailConstants.LINK_TYPE_AUTO));
                 }
             }
@@ -83,7 +84,7 @@ public class EmailRecordLinkService {
             // Match against CRM Lead
             List<String> leadPids = findCrmLeadPidsByEmail(tenantId, email);
             for (String leadPid : leadPids) {
-                links.add(buildLink(tenantId, messageId, threadId, "crm_lead", leadPid,
+                links.add(buildLink(tenantId, messageId, threadId, "crm_lead_common", leadPid,
                         EmailConstants.LINK_TYPE_AUTO));
             }
         }
@@ -121,7 +122,7 @@ public class EmailRecordLinkService {
      * @param tenantId  owning tenant
      * @param messageId message to link (may be null for thread-level links)
      * @param threadId  Gmail thread ID (may be null if message-level only)
-     * @param modelCode DSL model code (e.g. {@code crm_contact})
+     * @param modelCode DSL model code (e.g. {@code crm_contact_common})
      * @param recordPid public pid of the CRM record
      * @return the persisted link
      */
@@ -187,11 +188,11 @@ public class EmailRecordLinkService {
         }
     }
 
-    /** Queries mt_crm_contact for record pids with the given email address. */
+    /** Queries the official CRM contact model for record pids with the given email address. */
     private List<String> findCrmContactPidsByEmail(Long tenantId, String email) {
         try {
             return jdbcTemplate.queryForList(
-                    "SELECT pid::text FROM mt_crm_contact WHERE tenant_id = ? AND lower(crm_ct_email) = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
+                    "SELECT pid::text FROM mt_crm_contact_common WHERE tenant_id = ? AND lower(crm_ct_email) = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
                     String.class, tenantId, email);
         } catch (Exception e) {
             log.debug("CRM contact lookup skipped (table may not exist): {}", e.getMessage());
@@ -199,11 +200,11 @@ public class EmailRecordLinkService {
         }
     }
 
-    /** Queries mt_crm_lead for record pids with the given email address. */
+    /** Queries the official CRM lead model for record pids with the given email address. */
     private List<String> findCrmLeadPidsByEmail(Long tenantId, String email) {
         try {
             return jdbcTemplate.queryForList(
-                    "SELECT pid::text FROM mt_crm_lead WHERE tenant_id = ? AND lower(crm_lead_contact_email) = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
+                    "SELECT pid::text FROM mt_crm_lead_common WHERE tenant_id = ? AND lower(crm_lead_contact_email) = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
                     String.class, tenantId, email);
         } catch (Exception e) {
             log.debug("CRM lead lookup skipped (table may not exist): {}", e.getMessage());
@@ -215,7 +216,7 @@ public class EmailRecordLinkService {
     private List<String> findRelatedOpportunityPids(Long tenantId, String contactPid) {
         try {
             return jdbcTemplate.queryForList(
-                    "SELECT crm_opc_opp_id::text FROM mt_crm_opp_contact WHERE tenant_id = ? AND crm_opc_contact_id::text = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
+                    "SELECT crm_oc_opportunity_id::text FROM mt_crm_opportunity_contact_common WHERE tenant_id = ? AND crm_oc_contact_id::text = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
                     String.class, tenantId, contactPid);
         } catch (Exception e) {
             log.debug("Opportunity junction lookup skipped (table may not exist): {}", e.getMessage());

@@ -61,9 +61,9 @@ class SkillDraftNamerIntegrationTest extends BaseIntegrationTest {
             jdbc.update("INSERT INTO ab_agent_action " +
                             "(pid, tenant_id, run_id, action_code, action_type, target_model, " +
                             " command_signature, tool_ref, fidelity, action_status, executed_at, created_at) " +
-                            "VALUES (?, ?, ?, ?, 'update', 'crm_lead', ?, 'cmd_X', 'full', 'success', NOW(), NOW())",
+                            "VALUES (?, ?, ?, ?, 'update', 'crm_lead_common', ?, 'cmd_X', 'full', 'success', NOW(), NOW())",
                     UniqueIdGenerator.generate(), tenantId, UniqueIdGenerator.generate(),
-                    "crm_lead.update", sig);
+                    "crm_lead_common.update", sig);
         }
         extractor.extractPatterns();
         String patternPid = jdbc.queryForObject(

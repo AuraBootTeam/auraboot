@@ -56,7 +56,7 @@ class SkillEngineIntegrationTest extends BaseIntegrationTest {
         // (e.g., model not found) but the dispatch routing itself works.
         SkillInput input = new SkillInput();
         input.setIntent("create");
-        input.setObject("crm_account");
+        input.setObject("crm_account_common");
         input.setParameters(Map.of(
                 "commandCode", "crm_account_create",
                 "crm_account_name", "SkillEngineTest_" + System.currentTimeMillis()
@@ -82,8 +82,8 @@ class SkillEngineIntegrationTest extends BaseIntegrationTest {
         // in the test tenant, but that proves routing worked.
         SkillInput input = new SkillInput();
         input.setIntent("query");
-        input.setObject("crm_account");
-        input.setParameters(Map.of("model", "crm_account"));
+        input.setObject("crm_account_common");
+        input.setParameters(Map.of("model", "crm_account_common"));
 
         SkillResult result = skillEngine.execute(tenantId, "test-run", "dsl.query", input, null, null, null);
 

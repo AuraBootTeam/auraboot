@@ -276,14 +276,14 @@ test.describe('UX Empty States — Guidance Text When No Data', () => {
   // -------------------------------------------------------------------------
 
   test('UES-001: CRM Lead list shows empty-state text after no-match search', async ({ page }) => {
-    await navigateViaMenu(page, /crm/i, 'crm_lead');
+    await navigateViaMenu(page, /crm/i, 'crm_lead_common');
 
     // Layer 1 (Render): page loaded successfully
     await expect(page.locator('[data-testid="dynamic-list"]')).toBeVisible({ timeout: 12_000 });
     await ensureDefaultTableView(page);
 
     // Apply no-match search to manufacture empty state
-    await applyNoMatchSearch(page, 'crm_lead');
+    await applyNoMatchSearch(page, 'crm_lead_common');
 
     // Layer 2 (Data): no data rows — tbody contains exactly 1 row (the empty message row)
     const emptyState = await waitForVisibleEmptyState(page);
@@ -324,7 +324,7 @@ test.describe('UX Empty States — Guidance Text When No Data', () => {
   test('UES-002: CRM Account list shows empty-state text after no-match search', async ({
     page,
   }) => {
-    await navigateViaMenu(page, /crm/i, 'crm_account');
+    await navigateViaMenu(page, /crm/i, 'crm_account_common');
 
     await expect(page.locator('[data-testid="dynamic-list"]')).toBeVisible({ timeout: 12_000 });
 
@@ -332,7 +332,7 @@ test.describe('UX Empty States — Guidance Text When No Data', () => {
     await page.locator('tbody').waitFor({ state: 'visible', timeout: 10_000 });
 
     // Apply no-match search
-    await applyNoMatchSearch(page, 'crm_account');
+    await applyNoMatchSearch(page, 'crm_account_common');
 
     // Layer 2 (Data): list response returned 0 records
     const tableBody = page.locator('tbody');
@@ -353,7 +353,7 @@ test.describe('UX Empty States — Guidance Text When No Data', () => {
   // -------------------------------------------------------------------------
 
   test('UES-003: Empty state row uses colspan — not a partial-width stub row', async ({ page }) => {
-    await navigateViaMenu(page, /crm/i, 'crm_lead');
+    await navigateViaMenu(page, /crm/i, 'crm_lead_common');
 
     await expect(page.locator('[data-testid="dynamic-list"]')).toBeVisible({ timeout: 12_000 });
 
@@ -363,7 +363,7 @@ test.describe('UX Empty States — Guidance Text When No Data', () => {
     expect(columnCount, 'UES-003: must have at least 1 column').toBeGreaterThan(0);
 
     // Apply no-match search to trigger empty state
-    await applyNoMatchSearch(page, 'crm_lead');
+    await applyNoMatchSearch(page, 'crm_lead_common');
 
     // Layer 1 (Render): empty row cell is visible
     const emptyCell = page.locator('tbody tr td').first();
@@ -387,7 +387,7 @@ test.describe('UX Empty States — Guidance Text When No Data', () => {
   // -------------------------------------------------------------------------
 
   test('UES-004: Empty state shown when quick-filter returns no records', async ({ page }) => {
-    await navigateViaMenu(page, /crm/i, 'crm_lead');
+    await navigateViaMenu(page, /crm/i, 'crm_lead_common');
 
     await expect(page.locator('[data-testid="dynamic-list"]')).toBeVisible({ timeout: 12_000 });
 
@@ -397,11 +397,11 @@ test.describe('UX Empty States — Guidance Text When No Data', () => {
 
     if (!hasQuickFilters) {
       // Fall back to keyword search
-      await applyNoMatchSearch(page, 'crm_lead');
+      await applyNoMatchSearch(page, 'crm_lead_common');
     } else {
       // Try to find a quick filter that might yield empty results
       // We use the keyword approach as the most reliable cross-state method
-      await applyNoMatchSearch(page, 'crm_lead');
+      await applyNoMatchSearch(page, 'crm_lead_common');
     }
 
     // Layer 2 (Data): no data rows after filter
@@ -426,7 +426,7 @@ test.describe('UX Empty States — Guidance Text When No Data', () => {
   // -------------------------------------------------------------------------
 
   test('UES-005: Clearing no-match search restores data rows', async ({ page }) => {
-    await navigateViaMenu(page, /crm/i, 'crm_lead');
+    await navigateViaMenu(page, /crm/i, 'crm_lead_common');
 
     await expect(page.locator('[data-testid="dynamic-list"]')).toBeVisible({ timeout: 12_000 });
 
@@ -458,8 +458,8 @@ test.describe('UX Empty States — Guidance Text When No Data', () => {
     await page
       .waitForResponse(
         (r) =>
-          (r.url().includes('/api/dynamic/crm_lead') ||
-            r.url().includes('/api/dynamic/crm_lead')) &&
+          (r.url().includes('/api/dynamic/crm_lead_common') ||
+            r.url().includes('/api/dynamic/crm_lead_common')) &&
           r.status() === 200,
         { timeout: 12_000 },
       )
@@ -473,8 +473,8 @@ test.describe('UX Empty States — Guidance Text When No Data', () => {
     const listRestorePromise = page
       .waitForResponse(
         (r) =>
-          (r.url().includes('/api/dynamic/crm_lead') ||
-            r.url().includes('/api/dynamic/crm_lead')) &&
+          (r.url().includes('/api/dynamic/crm_lead_common') ||
+            r.url().includes('/api/dynamic/crm_lead_common')) &&
           r.status() === 200,
         { timeout: 10_000 },
       )

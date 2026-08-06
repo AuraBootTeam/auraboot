@@ -1,0 +1,210 @@
+{
+  "pageKey": "crm_quote_summary_common_list",
+  "name:zh-CN": "报价摘要",
+  "name:en": "Quote Summaries",
+  "modelCode": "crm_quote_summary_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_qs_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "zh-CN": "全部",
+            "en": "All"
+          }
+        },
+        {
+          "key": "pricing",
+          "label": {
+            "zh-CN": "定价中",
+            "en": "Pricing"
+          },
+          "filter": {
+            "field": "crm_qs_status",
+            "operator": "EQ",
+            "value": "pricing"
+          }
+        },
+        {
+          "key": "approval",
+          "label": {
+            "zh-CN": "审批中",
+            "en": "Approval"
+          },
+          "filter": {
+            "field": "crm_qs_status",
+            "operator": "EQ",
+            "value": "approval"
+          }
+        },
+        {
+          "key": "sent",
+          "label": {
+            "zh-CN": "已发送",
+            "en": "Sent"
+          },
+          "filter": {
+            "field": "crm_qs_status",
+            "operator": "EQ",
+            "value": "sent"
+          }
+        },
+        {
+          "key": "accepted",
+          "label": {
+            "zh-CN": "已接受",
+            "en": "Accepted"
+          },
+          "filter": {
+            "field": "crm_qs_status",
+            "operator": "EQ",
+            "value": "accepted"
+          }
+        },
+        {
+          "key": "ordered",
+          "label": {
+            "zh-CN": "已转订单",
+            "en": "Ordered"
+          },
+          "filter": {
+            "field": "crm_qs_status",
+            "operator": "EQ",
+            "value": "ordered"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_qs_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "icon": "Plus",
+          "permissionCode": "crm.quote_summary.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_quote_summary_common_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_qs_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_qs_code",
+          "width": 150,
+          "sortable": true
+        },
+        {
+          "field": "crm_qs_account_id",
+          "width": 180
+        },
+        {
+          "field": "crm_qs_opportunity_id",
+          "width": 180
+        },
+        {
+          "field": "crm_qs_customer_request_id",
+          "width": 180
+        },
+        {
+          "field": "crm_qs_source_quote_type",
+          "width": 140,
+          "renderType": "tag",
+          "dictCode": "crm_quote_summary_source_type"
+        },
+        {
+          "field": "crm_qs_status",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_quote_summary_status"
+        },
+        {
+          "field": "crm_qs_quote_amount",
+          "width": 140,
+          "align": "right",
+          "sortable": true
+        },
+        {
+          "field": "crm_qs_currency",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "crm_currency_code"
+        },
+        {
+          "field": "crm_qs_valid_until",
+          "width": 120
+        },
+        {
+          "field": "crm_qs_won_lost_result",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_quote_summary_result"
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "label": "$i18n:common.actions",
+          "buttons": [
+            {
+              "code": "view",
+              "icon": "Eye",
+              "permissionCode": "crm.quote_summary.read",
+              "label": "$i18n:common.button.view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_quote_summary_common_detail"
+              }
+            },
+            {
+              "code": "edit",
+              "icon": "Edit",
+              "permissionCode": "crm.quote_summary.manage",
+              "label": "$i18n:common.button.edit",
+              "action": {
+                "type": "navigate",
+                "to": "crm_quote_summary_common_form"
+              }
+            },
+            {
+              "code": "delete",
+              "icon": "Trash2",
+              "danger": true,
+              "permissionCode": "crm.quote_summary.manage",
+              "label": "$i18n:common.button.delete",
+              "confirm": "delete.confirm",
+              "action": {
+                "type": "command"
+              }
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "crm_qs_code",
+        "crm_qs_account_id",
+        "crm_qs_opportunity_id",
+        "crm_qs_customer_request_id",
+        "crm_qs_source_quote_id"
+      ],
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
+      }
+    }
+  ]
+}

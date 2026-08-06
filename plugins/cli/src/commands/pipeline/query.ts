@@ -18,10 +18,10 @@ interface QueryOptions {
  * Errors go to stderr.
  *
  * Examples:
- *   aura query crm_lead --filter "crm_lead_status=NEW"
- *   aura query crm_lead --filter "crm_lead_score>80" --sort crm_lead_score:desc
+ *   aura query crm_lead_common --filter "crm_lead_status=NEW"
+ *   aura query crm_lead_common --filter "crm_lead_score>80" --sort crm_lead_score:desc
  *   aura query --nq crm_dashboard_kpi
- *   aura query crm_lead | aura analyze churn-risk
+ *   aura query crm_lead_common | aura analyze churn-risk
  */
 export async function queryCommand(entity: string | undefined, options: QueryOptions): Promise<void> {
   const client = new ApiClient(options);

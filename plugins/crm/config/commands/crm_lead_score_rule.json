@@ -1,0 +1,91 @@
+[
+  {
+    "code": "crm:create_score_rule",
+    "displayName:zh-CN": "新建评分规则",
+    "displayName:en": "Create Score Rule",
+    "type": "create",
+    "modelCode": "crm_lead_score_rule",
+    "inputFields": [
+      "crm_lsr_name",
+      "crm_lsr_dimension",
+      "crm_lsr_operator",
+      "crm_lsr_match_value",
+      "crm_lsr_points",
+      "crm_lsr_status",
+      "crm_lsr_sort_order",
+      "crm_lsr_remark"
+    ],
+    "autoSetFields": {
+      "crm_lsr_code": { "strategy": "auto_generate", "pattern": "LSR-{yyyyMMdd}-{seq}" }
+    },
+    "permissions": ["crm.lead_score_rule.manage"],
+    "agent_hint": "Create a lead scorecard rule. Key inputs: name, dimension, operator, match_value, points. Auto-generated: code.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_score_rule",
+    "displayName:zh-CN": "编辑评分规则",
+    "displayName:en": "Update Score Rule",
+    "type": "update",
+    "modelCode": "crm_lead_score_rule",
+    "inputFields": [
+      "crm_lsr_name",
+      "crm_lsr_dimension",
+      "crm_lsr_operator",
+      "crm_lsr_match_value",
+      "crm_lsr_points",
+      "crm_lsr_status",
+      "crm_lsr_sort_order",
+      "crm_lsr_remark"
+    ],
+    "permissions": ["crm.lead_score_rule.manage"],
+    "agent_hint": "Update an existing lead scorecard rule.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_score_rule",
+    "displayName:zh-CN": "删除评分规则",
+    "displayName:en": "Delete Score Rule",
+    "type": "delete",
+    "modelCode": "crm_lead_score_rule",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此评分规则？",
+      "confirmMessage:en": "Confirm delete this score rule?"
+    },
+    "permissions": ["crm.lead_score_rule.manage"],
+    "agent_hint": "Delete a lead scorecard rule. Irreversible.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:list_score_rules",
+    "displayName:zh-CN": "评分规则列表",
+    "displayName:en": "List Score Rules",
+    "type": "query",
+    "modelCode": "crm_lead_score_rule",
+    "permissions": ["crm.lead_score_rule.read"],
+    "agent_hint": "Query lead scorecard rules.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:detail_score_rule",
+    "displayName:zh-CN": "查看评分规则",
+    "displayName:en": "View Score Rule",
+    "type": "query",
+    "modelCode": "crm_lead_score_rule",
+    "permissions": ["crm.lead_score_rule.read"],
+    "agent_hint": "Query lead scorecard rules.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:rescore_lead",
+    "displayName:zh-CN": "重新评分",
+    "displayName:en": "Rescore Lead",
+    "type": "custom",
+    "modelCode": "crm_lead_common",
+    "handler": "crm:rescore_lead",
+    "description": "Recompute a lead's score by evaluating every active crm_lead_score_rule against the lead and summing the points of all matching rules. Pass the lead record id as the target. Delegates to the Java scoring engine (RescoreLeadHandler). Idempotent: re-running recomputes deterministically. When no active scoring rule exists the command fails loud (no rules configured), rather than silently leaving the score unchanged.",
+    "permissions": ["crm.lead.manage"],
+    "agent_hint": "Recompute a lead's lead_score from the active scorecard rules. Target = lead id.",
+    "cmd_risk_level": "L2"
+  }
+]

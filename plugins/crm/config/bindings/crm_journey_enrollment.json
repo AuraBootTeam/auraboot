@@ -1,0 +1,69 @@
+[
+  {
+    "modelCode": "crm_journey_enrollment",
+    "fieldCode": "crm_jne_code",
+    "sequence": 1,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_journey_enrollment",
+    "fieldCode": "crm_jne_journey_id",
+    "sequence": 2,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_journey_enrollment",
+    "fieldCode": "crm_jne_contact_id",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_journey_enrollment",
+    "fieldCode": "crm_jne_current_step",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_journey_enrollment",
+    "fieldCode": "crm_jne_status",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_journey_enrollment",
+    "fieldCode": "crm_jne_last_advanced_at",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  }
+]

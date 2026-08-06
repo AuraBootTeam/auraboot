@@ -21,7 +21,7 @@ class AgentRunQuerySupportPidContractTest {
                 .pid("action-pid")
                 .actionCode("crm.account.update")
                 .actionType("update")
-                .targetModel("crm_account")
+                .targetModel("crm_account_common")
                 .targetRecordPid("record-pid-1")
                 .actionStatus("success")
                 .build();

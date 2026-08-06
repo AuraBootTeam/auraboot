@@ -122,7 +122,7 @@ Then open [http://localhost:3000](http://localhost:3000) and log in:
 | **Email** | `admin@auraboot.com` |
 | **Password** | `Test2026x` (change immediately on first login) |
 
-You should land on a platform with ~41 models and ~109 menus, including a CRM (`crm_lead`, `crm_account`, `crm_opportunity`, …).
+You should land on the platform with the official public CRM (`crm_lead_common`, `crm_account_common`, `crm_opportunity_common`, …) available from the main navigation.
 
 If local PostgreSQL is already using port 5432, keep your local service running and start AuraBoot with a different host port:
 

@@ -42,7 +42,7 @@ class ActionFidelityIntegrationTest extends BaseIntegrationTest {
         nqCode = "nq_fid_" + System.nanoTime();
         jdbc.update("INSERT INTO ab_named_query (pid, tenant_id, code, from_sql, status, current_version) " +
                         "VALUES (?, ?, ?, ?, 'published', 1)",
-                "nq-" + nqCode, tenantId, nqCode, "SELECT * FROM mt_crm_lead");
+                "nq-" + nqCode, tenantId, nqCode, "SELECT * FROM mt_crm_lead_common");
     }
 
     @AfterEach
@@ -90,7 +90,7 @@ class ActionFidelityIntegrationTest extends BaseIntegrationTest {
     @DisplayName("recordReadAction inherits skill_code from current BifContext when present")
     void read_action_reads_skill_from_bif() {
         BifContext.setCurrentBif(BusinessIntentFrame.builder()
-                .intent("query").object("crm_lead").riskLevel("L0")
+                .intent("query").object("crm_lead_common").riskLevel("L0")
                 .actionability("read_only")
                 .candidateSkills(java.util.List.of("dsl.query", "crm.analysis.pipeline"))
                 .candidateSkillsMode("hint")

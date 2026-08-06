@@ -2,7 +2,7 @@
  * Showcase Demo Dashboard Default
  *
  * Runs after CRM plugin import and showcase data seeding. The target dashboard
- * is explicit so OSS crm-starter can use crm_overview while full CRM demos can
+ * is explicit so every distribution can select its imported CRM dashboard while demos can
  * use crm_dashboard without silent fallback.
  */
 

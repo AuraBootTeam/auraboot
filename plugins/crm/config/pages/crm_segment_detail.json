@@ -1,0 +1,48 @@
+{
+  "pageKey": "crm_segment_detail",
+  "name:zh-CN": "细分详情",
+  "name:en": "Segment Detail",
+  "modelCode": "crm_segment",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "info",
+      "blockType": "detail-section",
+      "title": {
+        "zh-CN": "细分信息",
+        "en": "Segment Info"
+      },
+      "fields": [
+        {
+          "field": "crm_seg_code",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_seg_member_count",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_seg_name",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_seg_description",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_seg_criteria",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_seg_last_computed",
+          "colSpan": 6
+        }
+      ]
+    }
+  ]
+}

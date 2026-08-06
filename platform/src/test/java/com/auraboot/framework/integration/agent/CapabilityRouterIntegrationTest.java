@@ -28,21 +28,21 @@ class CapabilityRouterIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("query intent on crm_* model routes to dsl.query")
     void crm_query_routes() {
-        List<String> skills = router.route(testTenant.getId(), "query", "crm_account");
+        List<String> skills = router.route(testTenant.getId(), "query", "crm_account_common");
         assertThat(skills).contains("dsl.query");
     }
 
     @Test
     @DisplayName("create intent on crm_* model routes to dsl.command")
     void crm_manage_routes() {
-        List<String> skills = router.route(testTenant.getId(), "create", "crm_lead");
+        List<String> skills = router.route(testTenant.getId(), "create", "crm_lead_common");
         assertThat(skills).contains("dsl.command");
     }
 
     @Test
     @DisplayName("analyze intent (read family) on crm_* routes to dsl.query")
     void analyze_intent_routes_to_query() {
-        List<String> skills = router.route(testTenant.getId(), "analyze", "crm_opportunity");
+        List<String> skills = router.route(testTenant.getId(), "analyze", "crm_opportunity_common");
         assertThat(skills).contains("dsl.query");
     }
 

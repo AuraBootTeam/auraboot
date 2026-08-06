@@ -25,9 +25,9 @@ class DataSyncSseRegistryTest {
         var counter = new AtomicInteger(0);
         var emitter = new TestSseEmitter(counter);
         Long connId = registry.registerEmitter(1L, 100L, emitter);
-        registry.subscribe(connId, Set.of("crm_opportunity"));
+        registry.subscribe(connId, Set.of("crm_opportunity_common"));
 
-        registry.pushToSubscribers(new DataSyncMessage(100L, "crm_opportunity", "update", "r1", 2L));
+        registry.pushToSubscribers(new DataSyncMessage(100L, "crm_opportunity_common", "update", "r1", 2L));
         assertEquals(1, counter.get());
     }
 
@@ -37,7 +37,7 @@ class DataSyncSseRegistryTest {
         var counter = new AtomicInteger(0);
         var emitter = new TestSseEmitter(counter);
         Long connId = registry.registerEmitter(1L, 100L, emitter);
-        registry.subscribe(connId, Set.of("crm_opportunity"));
+        registry.subscribe(connId, Set.of("crm_opportunity_common"));
 
         registry.pushToSubscribers(new DataSyncMessage(100L, "inventory_item", "update", "r1", 2L));
         assertEquals(0, counter.get());
@@ -49,9 +49,9 @@ class DataSyncSseRegistryTest {
         var counter = new AtomicInteger(0);
         var emitter = new TestSseEmitter(counter);
         Long connId = registry.registerEmitter(1L, 100L, emitter);
-        registry.subscribe(connId, Set.of("crm_opportunity"));
+        registry.subscribe(connId, Set.of("crm_opportunity_common"));
 
-        registry.pushToSubscribers(new DataSyncMessage(200L, "crm_opportunity", "update", "r1", 2L));
+        registry.pushToSubscribers(new DataSyncMessage(200L, "crm_opportunity_common", "update", "r1", 2L));
         assertEquals(0, counter.get());
     }
 
@@ -62,10 +62,10 @@ class DataSyncSseRegistryTest {
         var counter2 = new AtomicInteger(0);
         Long conn1 = registry.registerEmitter(1L, 100L, new TestSseEmitter(counter1));
         Long conn2 = registry.registerEmitter(1L, 100L, new TestSseEmitter(counter2));
-        registry.subscribe(conn1, Set.of("crm_opportunity"));
+        registry.subscribe(conn1, Set.of("crm_opportunity_common"));
         registry.subscribe(conn2, Set.of("inventory_item"));
 
-        registry.pushToSubscribers(new DataSyncMessage(100L, "crm_opportunity", "create", "r1", 2L));
+        registry.pushToSubscribers(new DataSyncMessage(100L, "crm_opportunity_common", "create", "r1", 2L));
         assertEquals(1, counter1.get());
         assertEquals(0, counter2.get());
     }
@@ -90,11 +90,11 @@ class DataSyncSseRegistryTest {
         var registry = new DataSyncSseRegistry();
         var counter = new AtomicInteger(0);
         Long connId = registry.registerEmitter(1L, 100L, new TestSseEmitter(counter));
-        registry.subscribe(connId, Set.of("crm_opportunity"));
+        registry.subscribe(connId, Set.of("crm_opportunity_common"));
 
         registry.removeConnection(connId);
 
-        registry.pushToSubscribers(new DataSyncMessage(100L, "crm_opportunity", "update", "r1", 2L));
+        registry.pushToSubscribers(new DataSyncMessage(100L, "crm_opportunity_common", "update", "r1", 2L));
         assertEquals(0, counter.get());
         assertEquals(0, registry.getActiveConnectionCount());
     }

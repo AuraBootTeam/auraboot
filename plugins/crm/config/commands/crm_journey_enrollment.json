@@ -1,0 +1,58 @@
+[
+  {
+    "code": "crm:enroll_journey",
+    "displayName:zh-CN": "加入旅程",
+    "displayName:en": "Enroll Journey",
+    "type": "custom",
+    "handler": "crm:enroll_journey",
+    "modelCode": "crm_journey_enrollment",
+    "permissions": [
+      "crm.journey.manage"
+    ],
+    "agent_hint": "Enroll a contact into a journey (step 0). Blocks duplicate active enrollment.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:advance_enrollment",
+    "displayName:zh-CN": "推进一步",
+    "displayName:en": "Advance Step",
+    "type": "custom",
+    "handler": "crm:advance_enrollment",
+    "modelCode": "crm_journey_enrollment",
+    "permissions": [
+      "crm.journey.manage"
+    ],
+    "agent_hint": "Advance an enrollment to the next step, or complete it at the last step.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:exit_enrollment",
+    "displayName:zh-CN": "退出旅程",
+    "displayName:en": "Exit Journey",
+    "type": "state_transition",
+    "modelCode": "crm_journey_enrollment",
+    "stateField": "crm_jne_status",
+    "fromStates": [
+      "active"
+    ],
+    "toState": "exited",
+    "permissions": [
+      "crm.journey.manage"
+    ],
+    "agent_hint": "Exit an active enrollment.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:run_journey_scheduler",
+    "displayName:zh-CN": "运行旅程调度",
+    "displayName:en": "Run Journey Scheduler",
+    "type": "custom",
+    "handler": "crm:run_journey_scheduler",
+    "modelCode": "crm_journey_enrollment",
+    "permissions": [
+      "crm.journey.manage"
+    ],
+    "agent_hint": "Scheduler tick: auto-advance all active enrollments whose step delay has elapsed.",
+    "cmd_risk_level": "L1"
+  }
+]

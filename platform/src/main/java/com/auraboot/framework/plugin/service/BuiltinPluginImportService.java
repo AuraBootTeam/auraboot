@@ -12,7 +12,7 @@ package com.auraboot.framework.plugin.service;
  *       deployment ({@code core-meta}, {@code core-bpm}, {@code core-aurabot},
  *       {@code page-manager}, {@code org-management}, {@code platform-admin}).</li>
  *   <li><b>demo</b> — opt-in only. Provides showcase / demo plugins
- *       ({@code crm-starter}, {@code showcase}, {@code agent-control-plane},
+ *       ({@code crm}, {@code showcase}, {@code agent-control-plane},
  *       {@code workflow-demo}).
  *       Imported only when {@code includeDemoPlugins=true}.</li>
  * </ul>

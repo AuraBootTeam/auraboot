@@ -15,8 +15,8 @@
  *     only for UNAMBIGUOUS (model, type) pairs (exactly one command). Models
  *     with multiple create/update/delete commands (e.g. wd_leave_request) are
  *     skipped — their explicit config is correct.
- *   - cross-model sub-resource actions (a crm_account page invoking a
- *     crm_contact command), state_transition / custom commands, and variants
+ *   - cross-model sub-resource actions (a crm_account_common page invoking a
+ *     crm_contact_common command), state_transition / custom commands, and variants
  *     never match the page model's convention command, so they are never flagged.
  *
  * Usage: node scripts/check-dsl-command-convention.mjs

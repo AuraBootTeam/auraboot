@@ -4,7 +4,7 @@ version: "1.0"
 
 steps:
   - type: query
-    source: crm_lead
+    source: crm_lead_common
     filters:
       - field: crm_lead_status
         operator: EQ

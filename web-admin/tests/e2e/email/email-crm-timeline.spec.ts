@@ -47,7 +47,7 @@ async function navigateToContactList(page: any): Promise<void> {
   await page.waitForResponse(() => true, { timeout: 2000 }).catch(() => null);
 
   // Click Contacts leaf link (directly under CRM root, no sub-menu)
-  const contactLink = nav.locator('a[href*="crm_contact"]').first();
+  const contactLink = nav.locator('a[href*="crm_contact_common"]').first();
   await contactLink.waitFor({ state: 'attached', timeout: 8_000 });
   await contactLink.scrollIntoViewIfNeeded().catch(() => null);
 
@@ -63,8 +63,8 @@ async function navigateToContactList(page: any): Promise<void> {
   await listApiPromise;
   await page.waitForLoadState('domcontentloaded');
 
-  if (!page.url().includes('crm_contact')) {
-    await page.goto('/p/crm_contact', { waitUntil: 'domcontentloaded' });
+  if (!page.url().includes('crm_contact_common')) {
+    await page.goto('/p/crm_contact_common', { waitUntil: 'domcontentloaded' });
     await page
       .waitForResponse(
         (r: any) =>
@@ -105,7 +105,7 @@ test.describe('Email CRM Timeline', () => {
         await page.request
           .post('/api/email/messages/seed-link-test', {
             data: {
-              modelCode: 'crm_contact',
+              modelCode: 'crm_contact_common',
               recordId: Number(contactRecordId),
               subject: EMAIL_SUBJECT,
               fromAddress: `sender-${UID}@example.com`,
@@ -129,9 +129,9 @@ test.describe('Email CRM Timeline', () => {
   test('T1: navigate to CRM Contacts via sidebar menu', async ({ page }) => {
     await navigateToContactList(page);
 
-    // Assert navigation succeeded — URL should contain crm_contact
+    // Assert navigation succeeded — URL should contain crm_contact_common
     const url = page.url();
-    expect(url).toContain('crm_contact');
+    expect(url).toContain('crm_contact_common');
 
     // Assert contact list or dynamic page is visible
     // Note: if the CRM contact page schema has a backend error, this may fail
@@ -195,7 +195,7 @@ test.describe('Email CRM Timeline', () => {
       }
     } else {
       // Navigate directly to the contact we created
-      await page.goto(`/p/crm_contact/view/${contactRecordId}`, {
+      await page.goto(`/p/crm_contact_common/view/${contactRecordId}`, {
         waitUntil: 'domcontentloaded',
       });
     }
@@ -244,7 +244,7 @@ test.describe('Email CRM Timeline', () => {
       return;
     }
 
-    await page.goto(`/p/crm_contact/view/${contactRecordId}`, {
+    await page.goto(`/p/crm_contact_common/view/${contactRecordId}`, {
       waitUntil: 'domcontentloaded',
     });
 
@@ -299,7 +299,7 @@ test.describe('Email CRM Timeline', () => {
       )
       .catch(() => null);
 
-    await page.goto(`/p/crm_contact/view/${contactRecordId}`, {
+    await page.goto(`/p/crm_contact_common/view/${contactRecordId}`, {
       waitUntil: 'domcontentloaded',
     });
 

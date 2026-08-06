@@ -97,7 +97,12 @@ async function executeCommand(
   const innerData = body.data?.data || body.data;
   return {
     success: true,
-    recordId: innerData?.recordId || innerData?.pid || body.data?.recordId,
+    recordId:
+      innerData?.recordPid ||
+      innerData?.recordId ||
+      innerData?.pid ||
+      body.data?.recordPid ||
+      body.data?.recordId,
     data: body.data,
   };
 }
@@ -256,9 +261,9 @@ test.describe('CRM Agent deterministic validation', () => {
   });
 
   test('AV-00 metadata readiness: CRM models, commands, and named queries exist', async () => {
-    const leadModel = await apiGet(token, '/api/meta/models/code/crm_lead');
+    const leadModel = await apiGet(token, '/api/meta/models/code/crm_lead_common');
     const complaintModel = await apiGet(token, '/api/meta/models/code/crm_complaint');
-    expect(leadModel?.code).toBe('crm_lead');
+    expect(leadModel?.code).toBe('crm_lead_common');
     expect(complaintModel?.code).toBe('crm_complaint');
 
     for (const commandCode of [
@@ -281,7 +286,7 @@ test.describe('CRM Agent deterministic validation', () => {
       expect.arrayContaining([
         expect.objectContaining({
           type: 'create_record',
-          modelCode: 'crm_opportunity',
+          modelCode: 'crm_opportunity_common',
         }),
       ]),
     );
@@ -301,29 +306,29 @@ test.describe('CRM Agent deterministic validation', () => {
     const tag = uniqueId('lead_lifecycle');
     const leadPid = await createLead(token, tag);
 
-    const created = await detail(token, 'crm_lead_list', leadPid);
+    const created = await detail(token, 'crm_lead_common_list', leadPid);
     expect(created.crm_lead_company).toBe(`Agent Oracle ${tag}`);
     expect(created.crm_lead_status).toBe('new');
 
     const illegalConvert = await executeCommand(token, 'crm:convert_lead', {}, leadPid);
     expect(illegalConvert.success).toBe(false);
-    const stillNew = await detail(token, 'crm_lead_list', leadPid);
+    const stillNew = await detail(token, 'crm_lead_common_list', leadPid);
     expect(stillNew.crm_lead_status).toBe('new');
 
     const update = await executeCommand(token, 'crm:update_lead', { crm_lead_score: 88 }, leadPid);
     expect(update.success, update.error).toBe(true);
-    expect((await detail(token, 'crm_lead_list', leadPid)).crm_lead_score).toBe(88);
+    expect((await detail(token, 'crm_lead_common_list', leadPid)).crm_lead_score).toBe(88);
 
     expect((await executeCommand(token, 'crm:contact_lead', {}, leadPid)).success).toBe(true);
-    expect((await detail(token, 'crm_lead_list', leadPid)).crm_lead_status).toBe('contacted');
+    expect((await detail(token, 'crm_lead_common_list', leadPid)).crm_lead_status).toBe('contacted');
 
     expect((await executeCommand(token, 'crm:qualify_lead', {}, leadPid)).success).toBe(true);
-    expect((await detail(token, 'crm_lead_list', leadPid)).crm_lead_status).toBe('qualified');
+    expect((await detail(token, 'crm_lead_common_list', leadPid)).crm_lead_status).toBe('qualified');
 
     expect((await executeCommand(token, 'crm:convert_lead', {}, leadPid)).success).toBe(true);
-    expect((await detail(token, 'crm_lead_list', leadPid)).crm_lead_status).toBe('converted');
+    expect((await detail(token, 'crm_lead_common_list', leadPid)).crm_lead_status).toBe('converted');
 
-    const opportunities = await queryList(token, 'crm_opportunity_list', [
+    const opportunities = await queryList(token, 'crm_opportunity_common_list', [
       { fieldName: 'crm_opp_lead_id', operator: 'EQ', value: leadPid },
     ]);
     const convertedOpportunity = opportunities.records.find(
@@ -357,25 +362,25 @@ test.describe('CRM Agent deterministic validation', () => {
       operator: 'LIKE',
       value: `%${tag}%`,
     };
-    const allSeeded = await queryList(token, 'crm_lead_list', [tagFilter]);
+    const allSeeded = await queryList(token, 'crm_lead_common_list', [tagFilter]);
     expect(allSeeded.records.map((r) => r.pid)).toEqual(
       expect.arrayContaining([websiteHighPid, referralPid]),
     );
 
-    const newLeads = await queryList(token, 'crm_lead_list', [
+    const newLeads = await queryList(token, 'crm_lead_common_list', [
       tagFilter,
       { fieldName: 'crm_lead_status', operator: 'EQ', value: 'new' },
     ]);
     expect(newLeads.records.map((r) => r.pid)).toContain(websiteHighPid);
 
-    const convertedReferral = await queryList(token, 'crm_lead_list', [
+    const convertedReferral = await queryList(token, 'crm_lead_common_list', [
       tagFilter,
       { fieldName: 'crm_lead_source', operator: 'EQ', value: 'referral' },
       { fieldName: 'crm_lead_status', operator: 'EQ', value: 'converted' },
     ]);
     expect(convertedReferral.records.map((r) => r.pid)).toContain(referralPid);
 
-    const highScore = await queryList(token, 'crm_lead_list', [
+    const highScore = await queryList(token, 'crm_lead_common_list', [
       tagFilter,
       { fieldName: 'crm_lead_score', operator: 'GT', value: 80 },
     ]);
@@ -383,7 +388,7 @@ test.describe('CRM Agent deterministic validation', () => {
       `Agent Analytics ${tag} Website High`,
     );
 
-    const technology = await queryList(token, 'crm_lead_list', [
+    const technology = await queryList(token, 'crm_lead_common_list', [
       tagFilter,
       { fieldName: 'crm_lead_industry', operator: 'EQ', value: 'technology' },
     ]);
@@ -475,7 +480,7 @@ test.describe('CRM Agent deterministic validation', () => {
     ]);
     expect(relatedComplaints.records.map((r) => r.pid)).toContain(complaint.recordId);
 
-    const recentLead = await queryList(token, 'crm_lead_list', [
+    const recentLead = await queryList(token, 'crm_lead_common_list', [
       { fieldName: 'crm_lead_company', operator: 'LIKE', value: `%${tag}%` },
     ]);
     expect(recentLead.records.map((r) => r.pid)).toContain(leadPid);
@@ -527,7 +532,7 @@ test.describe('CRM Agent deterministic validation', () => {
 
     const viewerLeadList = await apiGetRaw(
       viewer.token,
-      '/api/dynamic/crm_lead_list/list?pageNum=1&pageSize=5',
+      '/api/dynamic/crm_lead_common_list/list?pageNum=1&pageSize=5',
     );
     expect(apiSucceeded(viewerLeadList), apiErrorText(viewerLeadList)).toBe(true);
 
@@ -540,11 +545,11 @@ test.describe('CRM Agent deterministic validation', () => {
       crm_lead_industry: 'technology',
     });
     expect(viewerCreateLead.httpStatus, apiErrorText(viewerCreateLead)).toBe(403);
-    expect(apiErrorText(viewerCreateLead)).toContain('system.command.execute');
+    expect(apiErrorText(viewerCreateLead)).toContain('meta.command.execute');
 
     const salesLeadList = await apiGetRaw(
       sales.token,
-      '/api/dynamic/crm_lead_list/list?pageNum=1&pageSize=5',
+      '/api/dynamic/crm_lead_common_list/list?pageNum=1&pageSize=5',
     );
     expect(apiSucceeded(salesLeadList), apiErrorText(salesLeadList)).toBe(true);
 

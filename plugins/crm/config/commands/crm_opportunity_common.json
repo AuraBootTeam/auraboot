@@ -1,0 +1,213 @@
+[
+  {
+    "code": "crm:create_opportunity",
+    "displayName:zh-CN": "新建商机",
+    "displayName:en": "Create Opportunity",
+    "type": "create",
+    "modelCode": "crm_opportunity_common",
+    "inputFields": [
+      "crm_opp_name",
+      "crm_opp_account_id",
+      "crm_opp_lead_id",
+      "crm_opp_currency_code",
+      "crm_opp_expected_amount",
+      "crm_opp_expected_close_date",
+      "crm_opp_probability",
+      "crm_opp_owner",
+      "crm_opp_notes",
+      "crm_opp_forecast_category",
+      "crm_opp_competitor"
+    ],
+    "autoSetFields": {
+      "crm_opp_code": {
+        "strategy": "auto_generate",
+        "pattern": "OPP-{yyyyMMdd}-{seq}"
+      },
+      "crm_opp_stage": {
+        "strategy": "fixed_value",
+        "value": "discovery"
+      }
+    },
+    "permissions": [
+      "crm.opportunity.manage"
+    ],
+    "agent_hint": "Create a new crm opportunity record. Key inputs: name, account_id, lead_id, expected_amount, expected_close_date. Auto-generated: code, stage.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_opportunity",
+    "displayName:zh-CN": "编辑商机",
+    "displayName:en": "Update Opportunity",
+    "type": "update",
+    "modelCode": "crm_opportunity_common",
+    "inputFields": [
+      "crm_opp_name",
+      "crm_opp_account_id",
+      "crm_opp_lead_id",
+      "crm_opp_currency_code",
+      "crm_opp_expected_amount",
+      "crm_opp_expected_close_date",
+      "crm_opp_probability",
+      "crm_opp_owner",
+      "crm_opp_notes",
+      "crm_opp_forecast_category",
+      "crm_opp_competitor"
+    ],
+    "permissions": [
+      "crm.opportunity.manage"
+    ],
+    "agent_hint": "Update an existing crm opportunity record. Editable fields: name, account_id, lead_id, expected_amount, expected_close_date.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:qualify_opportunity",
+    "displayName:zh-CN": "资格确认",
+    "displayName:en": "Qualify Opportunity",
+    "type": "state_transition",
+    "modelCode": "crm_opportunity_common",
+    "stateField": "crm_opp_stage",
+    "fromStates": [
+      "discovery"
+    ],
+    "toState": "qualification",
+    "permissions": [
+      "crm.opportunity.manage"
+    ],
+    "agent_hint": "Transition crm opportunity stage from DISCOVERY to QUALIFICATION.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:advance_opp_to_proposal",
+    "displayName:zh-CN": "推进到方案阶段",
+    "displayName:en": "Advance to Proposal",
+    "type": "state_transition",
+    "modelCode": "crm_opportunity_common",
+    "stateField": "crm_opp_stage",
+    "fromStates": [
+      "qualification"
+    ],
+    "toState": "proposal",
+    "permissions": [
+      "crm.opportunity.manage"
+    ],
+    "agent_hint": "Transition crm opportunity stage from QUALIFICATION to PROPOSAL.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:advance_opp_to_negotiation",
+    "displayName:zh-CN": "推进到谈判阶段",
+    "displayName:en": "Advance to Negotiation",
+    "type": "state_transition",
+    "modelCode": "crm_opportunity_common",
+    "stateField": "crm_opp_stage",
+    "fromStates": [
+      "proposal"
+    ],
+    "toState": "negotiation",
+    "permissions": [
+      "crm.opportunity.manage"
+    ],
+    "agent_hint": "Transition crm opportunity stage from PROPOSAL to NEGOTIATION.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:win_opportunity",
+    "displayName:zh-CN": "赢单",
+    "displayName:en": "Win Opportunity",
+    "type": "state_transition",
+    "modelCode": "crm_opportunity_common",
+    "stateField": "crm_opp_stage",
+    "fromStates": [
+      "negotiation"
+    ],
+    "toState": "closed_won",
+    "extension": {
+      "confirmMessage:zh-CN": "确认标记此商机为赢单？",
+      "confirmMessage:en": "Confirm mark this opportunity as won?"
+    },
+    "permissions": [
+      "crm.opportunity.manage"
+    ],
+    "agent_hint": "Transition a CRM opportunity from NEGOTIATION to CLOSED_WON. Downstream sales packages may add order creation as an atomic secondary handler.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:lose_opportunity",
+    "displayName:zh-CN": "丢单",
+    "displayName:en": "Lose Opportunity",
+    "type": "state_transition",
+    "modelCode": "crm_opportunity_common",
+    "stateField": "crm_opp_stage",
+    "fromStates": [
+      "discovery",
+      "qualification",
+      "proposal",
+      "negotiation"
+    ],
+    "toState": "closed_lost",
+    "inputFields": [
+      "crm_opp_lost_reason",
+      "crm_opp_lost_reason_code",
+      "crm_opp_competitor"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认标记此商机为丢单？",
+      "confirmMessage:en": "Confirm mark this opportunity as lost?"
+    },
+    "permissions": [
+      "crm.opportunity.manage"
+    ],
+    "agent_hint": "Transition crm opportunity stage from DISCOVERY/QUALIFICATION/PROPOSAL/NEGOTIATION to CLOSED_LOST.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_opportunity",
+    "displayName:zh-CN": "删除商机",
+    "displayName:en": "Delete Opportunity",
+    "type": "delete",
+    "modelCode": "crm_opportunity_common",
+    "preconditions": [
+      {
+        "field": "crm_opp_stage",
+        "operator": "IN",
+        "value": [
+          "discovery",
+          "qualification"
+        ]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此商机？",
+      "confirmMessage:en": "Confirm delete this opportunity?"
+    },
+    "permissions": [
+      "crm.opportunity.manage"
+    ],
+    "agent_hint": "Delete crm opportunity record(s). This is irreversible. Preconditions: stage IN [\"DISCOVERY\",\"QUALIFICATION\"].",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:detail_opportunity",
+    "displayName:zh-CN": "查看商机",
+    "displayName:en": "View Opportunity",
+    "type": "query",
+    "modelCode": "crm_opportunity_common",
+    "permissions": [
+      "crm.opportunity.read"
+    ],
+    "agent_hint": "Query crm opportunity records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:list_opportunities",
+    "displayName:zh-CN": "商机列表",
+    "displayName:en": "List Opportunities",
+    "type": "query",
+    "modelCode": "crm_opportunity_common",
+    "permissions": [
+      "crm.opportunity.read"
+    ],
+    "agent_hint": "Query crm opportunity records.",
+    "cmd_risk_level": "L0"
+  }
+]

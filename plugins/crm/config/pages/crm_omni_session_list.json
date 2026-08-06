@@ -1,0 +1,80 @@
+{
+  "pageKey": "crm_omni_session_list",
+  "name:zh-CN": "全渠道会话",
+  "name:en": "Omni Sessions",
+  "modelCode": "crm_omni_session",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "filters",
+      "blockType": "filters",
+      "fields": [
+        {
+          "field": "crm_oss_channel"
+        },
+        {
+          "field": "crm_oss_status"
+        }
+      ]
+    },
+    {
+      "id": "toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "crm.omni.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_omni_session_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_oss_code"
+        },
+        {
+          "field": "crm_oss_channel",
+          "renderType": "tag",
+          "dictCode": "crm_omni_channel"
+        },
+        {
+          "field": "crm_oss_subject"
+        },
+        {
+          "field": "crm_oss_status",
+          "renderType": "tag",
+          "dictCode": "crm_omni_status"
+        },
+        {
+          "field": "crm_oss_queue"
+        },
+        {
+          "field": "crm_oss_priority"
+        }
+      ],
+      "rowActions": [
+        {
+          "code": "route",
+          "label": "$i18n:crm.omni.route",
+          "permissionCode": "crm.omni.manage",
+          "action": {
+            "type": "command",
+            "command": "crm:route_session"
+          }
+        }
+      ]
+    }
+  ]
+}

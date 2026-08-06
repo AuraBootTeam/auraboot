@@ -32,12 +32,12 @@ class ObjectResolverEmbeddingTest extends BaseIntegrationTest {
                     pid, tenant_id, code, table_name, extension, capabilities,
                     version, is_current, status, deleted_flag
                 )
-                SELECT ?, ?, 'crm_account', 'mt_crm_account',
+                SELECT ?, ?, 'crm_account_common', 'mt_crm_account_common',
                        '{"displayName":"客户"}'::jsonb, '{}'::jsonb,
                        1, TRUE, 'published', FALSE
                 WHERE NOT EXISTS (
                     SELECT 1 FROM ab_meta_model
-                    WHERE tenant_id = ? AND code = 'crm_account' AND deleted_flag = FALSE
+                    WHERE tenant_id = ? AND code = 'crm_account_common' AND deleted_flag = FALSE
                 )
                 """, UniqueIdGenerator.generate(), tenantId, tenantId);
         objectResolver.rebuildIndex();
@@ -76,8 +76,8 @@ class ObjectResolverEmbeddingTest extends BaseIntegrationTest {
     @Test
     void resolve_existingModel_stillMatchesViaExactOrFuzzy() {
         Long tenantId = getTestTenant().getId();
-        // "crm_account" should match via exact model_code even with embedding service present
-        var result = objectResolver.resolve(tenantId, "crm_account");
+        // "crm_account_common" should match via exact model_code even with embedding service present
+        var result = objectResolver.resolve(tenantId, "crm_account_common");
         assertThat(result).isNotNull();
         // Should match exact or alias before reaching embedding phase
         assertThat(result.getMatchType()).isIn("exact", "alias", "fuzzy");

@@ -30,7 +30,7 @@ import java.util.Map;
  *     "label": "...",
  *     "config": {
  *       "triggerType": "on_record_create",   // required
- *       "modelCode": "crm_lead",             // optional — absent for scheduled/webhook
+ *       "modelCode": "crm_lead_common",             // optional — absent for scheduled/webhook
  *       ...additional TriggerConfig fields...
  *     }
  *   }

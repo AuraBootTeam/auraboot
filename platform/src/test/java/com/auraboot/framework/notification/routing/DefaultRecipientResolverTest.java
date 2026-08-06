@@ -107,7 +107,7 @@ class DefaultRecipientResolverTest {
     void resolve_watchers_usesRecordPidWithoutNumericParsing() {
         WatchService watchService = mock(WatchService.class);
         ReflectionTestUtils.setField(resolver, "watchService", watchService);
-        when(watchService.getWatchersByRecordPid("crm_lead", "rec-001"))
+        when(watchService.getWatchersByRecordPid("crm_lead_common", "rec-001"))
                 .thenReturn(List.of(501L, 502L));
 
         CommandCompletedEvent event = buildEvent(Map.of());
@@ -115,7 +115,7 @@ class DefaultRecipientResolverTest {
         List<Long> result = resolver.resolve(event, "watchers", null);
 
         assertThat(result).containsExactly(501L, 502L);
-        verify(watchService).getWatchersByRecordPid("crm_lead", "rec-001");
+        verify(watchService).getWatchersByRecordPid("crm_lead_common", "rec-001");
         verify(watchService, never()).getWatchers(anyString(), anyLong());
     }
 
@@ -147,6 +147,6 @@ class DefaultRecipientResolverTest {
 
     private CommandCompletedEvent buildEvent(Map<String, Object> payload) {
         Map<String, Object> mutablePayload = new HashMap<>(payload);
-        return new CommandCompletedEvent(100L, "rec-001", "crm_lead", mutablePayload, "test_cmd", "create");
+        return new CommandCompletedEvent(100L, "rec-001", "crm_lead_common", mutablePayload, "test_cmd", "create");
     }
 }

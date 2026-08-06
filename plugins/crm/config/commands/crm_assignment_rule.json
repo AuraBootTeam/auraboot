@@ -1,0 +1,92 @@
+[
+  {
+    "code": "crm:create_assignment_rule",
+    "displayName:zh-CN": "新建分配规则",
+    "displayName:en": "Create Assignment Rule",
+    "type": "create",
+    "modelCode": "crm_assignment_rule",
+    "inputFields": [
+      "crm_asgn_name",
+      "crm_asgn_strategy",
+      "crm_asgn_match_field",
+      "crm_asgn_match_value",
+      "crm_asgn_rep_pool",
+      "crm_asgn_status",
+      "crm_asgn_priority",
+      "crm_asgn_remark"
+    ],
+    "autoSetFields": {
+      "crm_asgn_code": { "strategy": "auto_generate", "pattern": "ASGN-{yyyyMMdd}-{seq}" },
+      "crm_asgn_rr_cursor": { "strategy": "fixed_value", "value": 0 }
+    },
+    "permissions": ["crm.assignment_rule.manage"],
+    "agent_hint": "Create a lead assignment rule. Key inputs: name, strategy (round_robin/by_territory/by_load), rep_pool (comma-separated user ids). Auto-generated: code, rr_cursor=0.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_assignment_rule",
+    "displayName:zh-CN": "编辑分配规则",
+    "displayName:en": "Update Assignment Rule",
+    "type": "update",
+    "modelCode": "crm_assignment_rule",
+    "inputFields": [
+      "crm_asgn_name",
+      "crm_asgn_strategy",
+      "crm_asgn_match_field",
+      "crm_asgn_match_value",
+      "crm_asgn_rep_pool",
+      "crm_asgn_status",
+      "crm_asgn_priority",
+      "crm_asgn_remark"
+    ],
+    "permissions": ["crm.assignment_rule.manage"],
+    "agent_hint": "Update an existing lead assignment rule.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_assignment_rule",
+    "displayName:zh-CN": "删除分配规则",
+    "displayName:en": "Delete Assignment Rule",
+    "type": "delete",
+    "modelCode": "crm_assignment_rule",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此分配规则？",
+      "confirmMessage:en": "Confirm delete this assignment rule?"
+    },
+    "permissions": ["crm.assignment_rule.manage"],
+    "agent_hint": "Delete a lead assignment rule. Irreversible.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:list_assignment_rules",
+    "displayName:zh-CN": "分配规则列表",
+    "displayName:en": "List Assignment Rules",
+    "type": "query",
+    "modelCode": "crm_assignment_rule",
+    "permissions": ["crm.assignment_rule.read"],
+    "agent_hint": "Query lead assignment rules.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:detail_assignment_rule",
+    "displayName:zh-CN": "查看分配规则",
+    "displayName:en": "View Assignment Rule",
+    "type": "query",
+    "modelCode": "crm_assignment_rule",
+    "permissions": ["crm.assignment_rule.read"],
+    "agent_hint": "Query lead assignment rules.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:auto_assign_lead",
+    "displayName:zh-CN": "自动分配",
+    "displayName:en": "Auto Assign Lead",
+    "type": "custom",
+    "modelCode": "crm_lead_common",
+    "handler": "crm:auto_assign_lead",
+    "description": "Assign a lead to a sales rep by evaluating the active crm_assignment_rule set ordered by priority (lowest number first). round_robin cycles the rep pool via a persisted cursor; by_territory matches a lead field to the rule's match value and assigns the single target rep; by_load assigns to the pooled rep with the fewest open (non-converted, non-lost) leads. Writes crm_lead_assigned_to. Pass the lead record id as target. Delegates to the Java AssignmentEngine (AutoAssignLeadHandler). When no active rule matches, the command FAILS LOUD (no silent fallback to a default rep, red line §8).",
+    "permissions": ["crm.lead.manage"],
+    "agent_hint": "Auto-assign a lead to a sales rep from the active assignment rules. Target = lead id. Fails loud when no rule matches.",
+    "cmd_risk_level": "L2"
+  }
+]

@@ -1,0 +1,12 @@
+[
+  { "modelCode": "crm_assignment_rule", "fieldCode": "crm_asgn_code", "sequence": 1, "required": true, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_assignment_rule", "fieldCode": "crm_asgn_name", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_assignment_rule", "fieldCode": "crm_asgn_strategy", "sequence": 3, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_assignment_rule", "fieldCode": "crm_asgn_match_field", "sequence": 4, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_assignment_rule", "fieldCode": "crm_asgn_match_value", "sequence": 5, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_assignment_rule", "fieldCode": "crm_asgn_rep_pool", "sequence": 6, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_assignment_rule", "fieldCode": "crm_asgn_status", "sequence": 7, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_assignment_rule", "fieldCode": "crm_asgn_priority", "sequence": 8, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_assignment_rule", "fieldCode": "crm_asgn_rr_cursor", "sequence": 9, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_assignment_rule", "fieldCode": "crm_asgn_remark", "sequence": 10, "required": false, "visible": false, "editable": true }
+]

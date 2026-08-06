@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * and command resolution via ab_command_definition.
  *
  * Uses real PostgreSQL — no mocks per project convention.
- * Relies on seed data: ab_object_alias (客户→crm_account), ab_meta_model (published models),
+ * Relies on seed data: ab_object_alias (客户→crm_account_common), ab_meta_model (published models),
  * and ab_command_definition (crm:create_account etc.).
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -43,9 +43,9 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
         // Force rebuild to ensure test starts with a clean, populated index
         objectResolver.rebuildIndex();
 
-        // Find a tenant that has crm_account commands for command resolution tests
+        // Find a tenant that has crm_account_common commands for command resolution tests
         String sql = "SELECT DISTINCT tenant_id FROM ab_command_definition " +
-                "WHERE model_code = 'crm_account' AND is_current = true " +
+                "WHERE model_code = 'crm_account_common' AND is_current = true " +
                 "AND (deleted_flag = FALSE OR deleted_flag IS NULL) LIMIT 1";
         List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(sql, Map.of());
         if (!rows.isEmpty()) {
@@ -70,12 +70,12 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(1)
     void resolve_exactMatch_alias() {
-        // "客户" is an alias for crm_account in ab_object_alias
+        // "客户" is an alias for crm_account_common in ab_object_alias
         ObjectResolver.ObjectResult result = objectResolver.resolve(
                 getTestTenant().getId(), "查一下客户列表");
 
         assertThat(result).isNotNull();
-        assertThat(result.getModelCode()).isEqualTo("crm_account");
+        assertThat(result.getModelCode()).isEqualTo("crm_account_common");
         assertThat(result.getMatchType()).isEqualTo("alias");
         assertThat(result.getConfidence()).isGreaterThanOrEqualTo(0.70);
         assertThat(result.getCandidates()).isEmpty();
@@ -86,10 +86,10 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
     void resolve_exactMatch_modelCode() {
         // Using exact model code as input should match with highest confidence
         ObjectResolver.ObjectResult result = objectResolver.resolve(
-                getTestTenant().getId(), "crm_account");
+                getTestTenant().getId(), "crm_account_common");
 
         assertThat(result).isNotNull();
-        assertThat(result.getModelCode()).isEqualTo("crm_account");
+        assertThat(result.getModelCode()).isEqualTo("crm_account_common");
         assertThat(result.getMatchType()).isEqualTo("exact");
         assertThat(result.getConfidence()).isGreaterThanOrEqualTo(0.95);
     }
@@ -177,8 +177,8 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(30)
     void resolveCommand_findsCreateCommand() {
-        Assumptions.assumeTrue(commandTenantId != null, "No tenant with crm_account commands found");
-        String commandCode = objectResolver.resolveCommand(commandTenantId, "crm_account", "create");
+        Assumptions.assumeTrue(commandTenantId != null, "No tenant with crm_account_common commands found");
+        String commandCode = objectResolver.resolveCommand(commandTenantId, "crm_account_common", "create");
 
         assertThat(commandCode).isNotNull();
         assertThat(commandCode).contains("account");
@@ -187,8 +187,8 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(31)
     void resolveCommand_findsUpdateCommand() {
-        Assumptions.assumeTrue(commandTenantId != null, "No tenant with crm_account commands found");
-        String commandCode = objectResolver.resolveCommand(commandTenantId, "crm_account", "update");
+        Assumptions.assumeTrue(commandTenantId != null, "No tenant with crm_account_common commands found");
+        String commandCode = objectResolver.resolveCommand(commandTenantId, "crm_account_common", "update");
 
         assertThat(commandCode).isNotNull();
         assertThat(commandCode).contains("account");
@@ -197,8 +197,8 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(32)
     void resolveCommand_findsDeleteCommand() {
-        Assumptions.assumeTrue(commandTenantId != null, "No tenant with crm_account commands found");
-        String commandCode = objectResolver.resolveCommand(commandTenantId, "crm_account", "delete");
+        Assumptions.assumeTrue(commandTenantId != null, "No tenant with crm_account_common commands found");
+        String commandCode = objectResolver.resolveCommand(commandTenantId, "crm_account_common", "delete");
 
         assertThat(commandCode).isNotNull();
         assertThat(commandCode).contains("account");
@@ -207,8 +207,8 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(33)
     void resolveCommand_findsQueryCommand() {
-        Assumptions.assumeTrue(commandTenantId != null, "No tenant with crm_account commands found");
-        String commandCode = objectResolver.resolveCommand(commandTenantId, "crm_account", "query");
+        Assumptions.assumeTrue(commandTenantId != null, "No tenant with crm_account_common commands found");
+        String commandCode = objectResolver.resolveCommand(commandTenantId, "crm_account_common", "query");
 
         assertThat(commandCode).isNotNull();
         assertThat(commandCode).contains("account");
@@ -217,9 +217,9 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(34)
     void resolveCommand_intentSynonym() {
-        Assumptions.assumeTrue(commandTenantId != null, "No tenant with crm_account commands found");
+        Assumptions.assumeTrue(commandTenantId != null, "No tenant with crm_account_common commands found");
         // "add" should map to "create" execution type
-        String commandCode = objectResolver.resolveCommand(commandTenantId, "crm_account", "add");
+        String commandCode = objectResolver.resolveCommand(commandTenantId, "crm_account_common", "add");
 
         assertThat(commandCode).isNotNull();
     }
@@ -237,7 +237,7 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
     @Order(36)
     void resolveCommand_unknownIntent_returnsNull() {
         String commandCode = objectResolver.resolveCommand(
-                getTestTenant().getId(), "crm_account", "dance");
+                getTestTenant().getId(), "crm_account_common", "dance");
 
         assertThat(commandCode).isNull();
     }
@@ -265,7 +265,7 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
         ObjectResolver.ObjectResult result = objectResolver.resolve(tenantId, "客户");
 
         assertThat(result).isNotNull();
-        assertThat(result.getModelCode()).isEqualTo("crm_account");
+        assertThat(result.getModelCode()).isEqualTo("crm_account_common");
     }
 
     @Test
@@ -281,14 +281,14 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
 
         // Should still work (fresh load)
         ObjectResolver.ObjectResult result = objectResolver.resolve(tenantId, "客户");
-        assertThat(result.getModelCode()).isEqualTo("crm_account");
+        assertThat(result.getModelCode()).isEqualTo("crm_account_common");
     }
 
     private void seedResolverFixture() {
         Long tenantId = getTestTenant().getId();
         jdbcTemplate.update("""
                 INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language, acp_priority, deleted_flag)
-                VALUES (?, -1, 'crm_account', '客户', 'zh-CN', 1000, FALSE)
+                VALUES (?, -1, 'crm_account_common', '客户', 'zh-CN', 1000, FALSE)
                 ON CONFLICT (tenant_id, alias, language)
                 DO UPDATE SET model_code = EXCLUDED.model_code,
                               acp_priority = EXCLUDED.acp_priority,
@@ -300,12 +300,12 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
                     pid, tenant_id, code, table_name, extension, capabilities,
                     version, is_current, status, deleted_flag
                 )
-                SELECT ?, ?, 'crm_account', 'mt_crm_account',
+                SELECT ?, ?, 'crm_account_common', 'mt_crm_account_common',
                        '{"displayName":"客户"}'::jsonb, '{}'::jsonb,
                        1, TRUE, 'published', FALSE
                 WHERE NOT EXISTS (
                     SELECT 1 FROM ab_meta_model
-                    WHERE tenant_id = ? AND code = 'crm_account' AND deleted_flag = FALSE
+                    WHERE tenant_id = ? AND code = 'crm_account_common' AND deleted_flag = FALSE
                 )
                 """, UniqueIdGenerator.generate(), tenantId, tenantId);
         seedCommand(tenantId, "crm:create_account", "create");
@@ -321,7 +321,7 @@ class ObjectResolverIntegrationTest extends BaseIntegrationTest {
                     input_schema, target_models, execution_config, extension,
                     version, is_current, status, deleted_flag
                 )
-                VALUES (?, ?, ?, ?, 'crm_account',
+                VALUES (?, ?, ?, ?, 'crm_account_common',
                         '{}'::jsonb, '[]'::jsonb, ?::jsonb, '{}'::jsonb,
                         1, TRUE, 'published', FALSE)
                 ON CONFLICT (tenant_id, code, version)

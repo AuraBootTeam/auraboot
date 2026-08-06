@@ -1,0 +1,56 @@
+[
+  {
+    "code": "crm_sla_name",
+    "displayName:zh-CN": "策略名称",
+    "displayName:en": "Policy Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_sla_priority_level",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority Level",
+    "dataType": "enum",
+    "dictCode": "crm_severity",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_sla_response_time_hours",
+    "displayName:zh-CN": "响应时限(小时)",
+    "displayName:en": "Response Time (hours)",
+    "dataType": "integer",
+    "constraints": { "required": true },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_sla_resolution_time_hours",
+    "displayName:zh-CN": "解决时限(小时)",
+    "displayName:en": "Resolution Time (hours)",
+    "dataType": "integer",
+    "constraints": { "required": true },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_sla_escalation_after_hours",
+    "displayName:zh-CN": "升级时限(小时)",
+    "displayName:en": "Escalation After (hours)",
+    "dataType": "integer",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_sla_is_active",
+    "displayName:zh-CN": "是否启用",
+    "displayName:en": "Active",
+    "dataType": "boolean",
+    "defaultValue": "true",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_sla_description",
+    "displayName:zh-CN": "描述",
+    "displayName:en": "Description",
+    "dataType": "text"
+  }
+]

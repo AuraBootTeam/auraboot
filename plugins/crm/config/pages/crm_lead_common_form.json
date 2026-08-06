@@ -1,0 +1,85 @@
+{
+  "pageKey": "crm_lead_common_form",
+  "name:zh-CN": "线索表单",
+  "name:en": "Lead Form",
+  "modelCode": "crm_lead_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "线索信息",
+        "en-US": "Lead Information"
+      },
+      "fields": [
+        {
+          "field": "crm_lead_company",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_lead_contact_name",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_lead_contact_phone",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_lead_contact_email",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_lead_source",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_lead_industry",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_lead_score",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_lead_campaign",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_lead_assigned_to",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_lead_requirement",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

@@ -50,17 +50,17 @@ class EmailMessageControllerPidContractTest {
 
         EmailRecordLink link = new EmailRecordLink();
         link.setRecordPid("01KEMAILPID");
-        when(emailRecordLinkService.manualLink(7L, 100L, "thread-body", "crm_contact", "01KEMAILPID"))
+        when(emailRecordLinkService.manualLink(7L, 100L, "thread-body", "crm_contact_common", "01KEMAILPID"))
                 .thenReturn(link);
 
         EmailMessageController controller = newController();
         ApiResponse<EmailRecordLink> response = controller.linkRecord(
                 100L,
-                Map.of("modelCode", "crm_contact", "recordPid", "01KEMAILPID", "threadId", "thread-body"));
+                Map.of("modelCode", "crm_contact_common", "recordPid", "01KEMAILPID", "threadId", "thread-body"));
 
         assertThat(response.isSuccess()).isTrue();
         assertThat(response.getData().getRecordPid()).isEqualTo("01KEMAILPID");
-        verify(emailRecordLinkService).manualLink(7L, 100L, "thread-body", "crm_contact", "01KEMAILPID");
+        verify(emailRecordLinkService).manualLink(7L, 100L, "thread-body", "crm_contact_common", "01KEMAILPID");
     }
 
     @Test

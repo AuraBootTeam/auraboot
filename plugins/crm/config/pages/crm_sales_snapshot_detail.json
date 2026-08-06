@@ -1,0 +1,52 @@
+{
+  "pageKey": "crm_sales_snapshot_detail",
+  "name:zh-CN": "快照详情",
+  "name:en": "Snapshot Detail",
+  "modelCode": "crm_sales_snapshot",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "info",
+      "blockType": "detail-section",
+      "title": {
+        "zh-CN": "快照",
+        "en": "Snapshot"
+      },
+      "fields": [
+        {
+          "field": "crm_ss_period",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_ss_refreshed_at",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_ss_total_opps",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_ss_won_count",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_ss_conversion_rate",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_ss_won_amount",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_ss_pipeline_amount",
+          "colSpan": 6
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+[
+  {
+    "code": "crm:create_subscription",
+    "displayName:zh-CN": "新建订阅",
+    "displayName:en": "Create Subscription",
+    "type": "create",
+    "modelCode": "crm_subscription",
+    "inputFields": [
+      "crm_sub_account_id",
+      "crm_sub_plan",
+      "crm_sub_start_date",
+      "crm_sub_end_date",
+      "crm_sub_monthly_amount"
+    ],
+    "autoSetFields": {
+      "crm_sub_code": {
+        "strategy": "auto_generate",
+        "pattern": "SUB-{yyyyMMdd}-{seq}"
+      },
+      "crm_sub_status": {
+        "strategy": "fixed_value",
+        "value": "pending"
+      }
+    },
+    "permissions": [
+      "crm.subscription.manage"
+    ],
+    "agent_hint": "Create subscription. Inputs: account, plan, start/end date, monthly amount.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:recompute_subscription",
+    "displayName:zh-CN": "重算订阅",
+    "displayName:en": "Recompute Subscription",
+    "type": "custom",
+    "handler": "crm:recompute_subscription",
+    "modelCode": "crm_subscription",
+    "permissions": [
+      "crm.subscription.manage"
+    ],
+    "agent_hint": "Recompute MRR/ARR/status from subscription dates + monthly amount.",
+    "cmd_risk_level": "L1"
+  }
+]

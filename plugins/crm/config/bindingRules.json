@@ -1,0 +1,30 @@
+[
+  {
+    "commandCode": "crm:create_opportunity",
+    "ruleType": "handler",
+    "handlerClass": "currencyConversionHandler",
+    "config": {
+      "mode": "header",
+      "currencyField": "crm_opp_currency_code",
+      "rateField": "crm_opp_exchange_rate",
+      "baseCurrencyField": "crm_opp_base_currency_code",
+      "amountFields": ["crm_opp_expected_amount"]
+    },
+    "sequence": 50,
+    "enabled": true
+  },
+  {
+    "commandCode": "crm:update_opportunity",
+    "ruleType": "handler",
+    "handlerClass": "currencyConversionHandler",
+    "config": {
+      "mode": "header",
+      "currencyField": "crm_opp_currency_code",
+      "rateField": "crm_opp_exchange_rate",
+      "baseCurrencyField": "crm_opp_base_currency_code",
+      "amountFields": ["crm_opp_expected_amount"]
+    },
+    "sequence": 50,
+    "enabled": true
+  }
+]

@@ -1,0 +1,216 @@
+[
+  {
+    "code": "crm_cr_code",
+    "displayName:zh-CN": "需求编号",
+    "displayName:en": "Request Code",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 50
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cr_title",
+    "displayName:zh-CN": "需求标题",
+    "displayName:en": "Title",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 200
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cr_account_id",
+    "displayName:zh-CN": "客户",
+    "displayName:en": "Account",
+    "dataType": "reference",
+    "referenceModelCode": "crm_account_common",
+    "refTarget": {
+      "targetModel": "crm_account_common",
+      "targetField": "crm_acc_name"
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cr_contact_id",
+    "displayName:zh-CN": "联系人",
+    "displayName:en": "Contact",
+    "dataType": "reference",
+    "referenceModelCode": "crm_contact_common",
+    "refTarget": {
+      "targetModel": "crm_contact_common",
+      "targetField": "crm_ct_name"
+    }
+  },
+  {
+    "code": "crm_cr_lead_id",
+    "displayName:zh-CN": "来源线索",
+    "displayName:en": "Source Lead",
+    "dataType": "reference",
+    "referenceModelCode": "crm_lead_common"
+  },
+  {
+    "code": "crm_cr_opportunity_id",
+    "displayName:zh-CN": "关联商机",
+    "displayName:en": "Opportunity",
+    "dataType": "reference",
+    "referenceModelCode": "crm_opportunity_common",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cr_type",
+    "displayName:zh-CN": "需求类型",
+    "displayName:en": "Request Type",
+    "dataType": "enum",
+    "dictCode": "crm_customer_request_type",
+    "defaultValue": "inquiry",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cr_priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "enum",
+    "dictCode": "crm_customer_request_priority",
+    "defaultValue": "medium",
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cr_status",
+    "displayName:zh-CN": "需求状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_customer_request_status",
+    "defaultValue": "draft",
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cr_expected_date",
+    "displayName:zh-CN": "期望完成日期",
+    "displayName:en": "Expected Date",
+    "dataType": "date",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cr_owner",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Owner",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 100
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cr_source_channel",
+    "displayName:zh-CN": "来源渠道",
+    "displayName:en": "Source Channel",
+    "dataType": "enum",
+    "dictCode": "crm_customer_request_source_channel",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cr_route_status",
+    "displayName:zh-CN": "路由状态",
+    "displayName:en": "Route Status",
+    "dataType": "enum",
+    "dictCode": "crm_customer_request_route_status",
+    "defaultValue": "unrouted",
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cr_routed_package",
+    "displayName:zh-CN": "已路由行业包",
+    "displayName:en": "Routed Package",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 100
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cr_routed_object_type",
+    "displayName:zh-CN": "已路由对象类型",
+    "displayName:en": "Routed Object Type",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 100
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cr_routed_object_id",
+    "displayName:zh-CN": "已路由对象ID",
+    "displayName:en": "Routed Object ID",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 80
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cr_route_error",
+    "displayName:zh-CN": "路由失败原因",
+    "displayName:en": "Route Error",
+    "dataType": "text"
+  },
+  {
+    "code": "crm_cr_summary",
+    "displayName:zh-CN": "需求摘要",
+    "displayName:en": "Summary",
+    "dataType": "text"
+  },
+  {
+    "code": "crm_cr_submitted_at",
+    "displayName:zh-CN": "提交时间",
+    "displayName:en": "Submitted At",
+    "dataType": "datetime",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cr_due_at",
+    "displayName:zh-CN": "报价截止",
+    "displayName:en": "Quote Due",
+    "dataType": "datetime",
+    "feature": {
+      "sortable": true
+    }
+  }
+]

@@ -53,7 +53,7 @@ public class TemplateController {
             description = "Parse template resources without installing. Returns models, fields, commands, pages that would be created.")
     @SuppressWarnings("java/csrf-unprotected-request-type")
     public ResponseEntity<?> preview(
-            @Parameter(description = "Template ID, e.g., 'crm-quick-start'")
+            @Parameter(description = "Template ID, e.g., 'project-management'")
             @PathVariable String templateId) {
 
         String absolutePath = templateRegistry.resolveAbsolutePath(templateId);
@@ -76,7 +76,7 @@ public class TemplateController {
             description = "Install a template into the current tenant. Creates all models, fields, commands, pages, menus, and permissions.")
     @SuppressWarnings("java/csrf-unprotected-request-type")
     public ResponseEntity<?> install(
-            @Parameter(description = "Template ID, e.g., 'crm-quick-start'")
+            @Parameter(description = "Template ID, e.g., 'project-management'")
             @PathVariable String templateId,
             @RequestBody(required = false) Map<String, Object> options) {
 

@@ -336,7 +336,7 @@ test.describe('Finance Accounting — AR/AP, Payment, Period & Template', () => 
         { allowHttpError: true },
       );
       if (!createCustomer.recordId || createCustomer.code !== ErrorCodes.SUCCESS) {
-        throw new Error('Failed to create reference customer (crm_account) for receivable tests');
+        throw new Error('Failed to create reference customer (crm_account_common) for receivable tests');
       }
       sharedReceivableCustomerPid = createCustomer.recordId;
       await ctx.close();

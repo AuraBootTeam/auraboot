@@ -1,0 +1,225 @@
+{
+  "pageKey": "crm_complaint_detail",
+  "name:zh-CN": "投诉详情",
+  "name:en": "Complaint Detail",
+  "modelCode": "crm_complaint",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "block_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "overview",
+          "label": {
+            "zh-CN": "概览",
+            "en-US": "Overview"
+          },
+          "blocks": [
+            {
+              "id": "section_basic",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "投诉信息",
+                "en-US": "Complaint Information"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "crm_cmp_code",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cmp_account_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cmp_contact_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cmp_date",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cmp_type",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cmp_severity",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cmp_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cmp_description",
+                  "span": 2,
+                  "readOnly": true
+                }
+              ]
+            },
+            {
+              "id": "section_sla",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "SLA追踪",
+                "en-US": "SLA Tracking"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "crm_cmp_sla_policy_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cmp_sla_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cmp_first_response_at",
+                  "readOnly": true
+                }
+              ]
+            },
+            {
+              "id": "section_resolution",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "解决方案",
+                "en-US": "Resolution"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "crm_cmp_root_cause",
+                  "span": 2,
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cmp_corrective_action",
+                  "span": 2,
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cmp_resolution_date",
+                  "readOnly": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "activities",
+          "label": {
+            "zh-CN": "活动记录",
+            "en-US": "Activities"
+          },
+          "blocks": [
+            {
+              "id": "block_activities",
+              "blockType": "sub-table",
+              "subTable": {
+                "dataSource": {
+                  "type": "api",
+                  "url": "/api/datasource/list",
+                  "method": "get",
+                  "params": {
+                    "datasourceId": "nq:crm_activities_by_object",
+                    "objectType": "complaint",
+                    "objectId": "${recordPid}"
+                  }
+                },
+                "readOnly": true,
+                "columns": [
+                  {
+                    "field": "crm_act_type",
+                    "width": 100,
+                    "component": "tag"
+                  },
+                  {
+                    "field": "crm_act_subject",
+                    "width": 250
+                  },
+                  {
+                    "field": "crm_act_date",
+                    "width": 150
+                  },
+                  {
+                    "field": "crm_act_owner",
+                    "width": 120
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crm_complaint_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "icon": "Edit",
+          "permissionCode": "crm.complaint.manage",
+          "label": "$i18n:common.button.edit",
+          "action": {
+            "type": "navigate",
+            "to": "crm_complaint_form"
+          }
+        },
+        {
+          "code": "investigate",
+          "label": {
+            "zh-CN": "开始调查",
+            "en-US": "Investigate"
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:investigate_complaint"
+          }
+        },
+        {
+          "code": "resolve",
+          "primary": true,
+          "label": {
+            "zh-CN": "解决投诉",
+            "en-US": "Resolve"
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:resolve_complaint"
+          }
+        },
+        {
+          "code": "close",
+          "label": {
+            "zh-CN": "关闭投诉",
+            "en-US": "Close"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:close_complaint"
+          }
+        },
+        {
+          "code": "log_activity",
+          "icon": "MessageSquare",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_activity_common_form",
+            "command": "crm:log_complaint_activity"
+          }
+        }
+      ]
+    }
+  ]
+}

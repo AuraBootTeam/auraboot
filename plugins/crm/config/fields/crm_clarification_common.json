@@ -1,0 +1,170 @@
+[
+  {
+    "code": "crm_cl_code",
+    "displayName:zh-CN": "澄清编号",
+    "displayName:en": "Clarification Code",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 50
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cl_title",
+    "displayName:zh-CN": "澄清标题",
+    "displayName:en": "Clarification Title",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 200
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cl_clarification_type",
+    "displayName:zh-CN": "澄清类型",
+    "displayName:en": "Clarification Type",
+    "dataType": "enum",
+    "dictCode": "crm_clarification_type",
+    "defaultValue": "customer",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cl_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_clarification_status",
+    "defaultValue": "pending",
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cl_priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "enum",
+    "dictCode": "crm_clarification_priority",
+    "defaultValue": "normal",
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cl_review_id",
+    "displayName:zh-CN": "关联评审",
+    "displayName:en": "Review",
+    "dataType": "reference",
+    "referenceModelCode": "crm_review_common",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cl_customer_request_id",
+    "displayName:zh-CN": "客户需求",
+    "displayName:en": "Customer Request",
+    "dataType": "reference",
+    "referenceModelCode": "crm_customer_request_common",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cl_account_id",
+    "displayName:zh-CN": "客户",
+    "displayName:en": "Account",
+    "dataType": "reference",
+    "referenceModelCode": "crm_account_common",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cl_owner_id",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Owner",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 80
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cl_question",
+    "displayName:zh-CN": "澄清问题",
+    "displayName:en": "Question",
+    "dataType": "text",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cl_answer",
+    "displayName:zh-CN": "客户回复",
+    "displayName:en": "Answer",
+    "dataType": "text"
+  },
+  {
+    "code": "crm_cl_raised_at",
+    "displayName:zh-CN": "提出时间",
+    "displayName:en": "Raised At",
+    "dataType": "datetime",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cl_resolved_at",
+    "displayName:zh-CN": "解决时间",
+    "displayName:en": "Resolved At",
+    "dataType": "datetime",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cl_source_model",
+    "displayName:zh-CN": "来源模型",
+    "displayName:en": "Source Model",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 80
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cl_source_id",
+    "displayName:zh-CN": "来源对象ID",
+    "displayName:en": "Source Object ID",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 80
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cl_common_payload",
+    "displayName:zh-CN": "通用留痕",
+    "displayName:en": "Common Payload",
+    "dataType": "json"
+  }
+]

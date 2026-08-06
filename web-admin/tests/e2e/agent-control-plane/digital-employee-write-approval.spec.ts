@@ -9,7 +9,7 @@
  * (digital-employee-skill-review) which covers the read path.
  *
  * Self-contained: seeds its own write colleague (bound to cmd:crm:create_account,
- * pointed at a configured provider). It sets `allowed_models: [crm_account]` so tool
+ * pointed at a configured provider). It sets `allowed_models: [crm_account_common]` so tool
  * discovery is scoped to the CRM model — without it, a fixture-polluted stack floods
  * the turn with unrelated ACP tools and the model picks unreliably (root cause of the
  * earlier intermittent write turns).
@@ -54,7 +54,7 @@ async function ensureWriteColleague(request: APIRequestContext): Promise<void> {
       tools: JSON.stringify([WRITE_COMMAND]),
       // Scope discovery to the CRM model so unrelated (ACP fixture) tools do not flood
       // the turn and make the model pick unreliably.
-      allowed_models: JSON.stringify(['crm_account']),
+      allowed_models: JSON.stringify(['crm_account_common']),
       guardrails: JSON.stringify({ provider: llmProvider }),
       status: 'active',
     },
@@ -67,9 +67,9 @@ async function crmAccountCount(request: APIRequestContext, name: string): Promis
     JSON.stringify([{ fieldName: 'crm_acc_name', operator: 'EQ', value: name }]),
   );
   const resp = await request.get(
-    `/api/dynamic/crm_account/list?pageNum=1&pageSize=1&filters=${filters}`,
+    `/api/dynamic/crm_account_common/list?pageNum=1&pageSize=1&filters=${filters}`,
   );
-  expect(resp.ok(), 'crm_account count query must succeed').toBeTruthy();
+  expect(resp.ok(), 'crm_account_common count query must succeed').toBeTruthy();
   return (await resp.json())?.data?.total ?? 0;
 }
 
@@ -143,14 +143,14 @@ test.describe('Digital employee — write + approval through the browser UI', ()
 
     // Cleanup: remove the row this run created so reruns stay deterministic.
     const listResp = await page.request.get(
-      `/api/dynamic/crm_account/list?pageNum=1&pageSize=1&filters=${encodeURIComponent(
+      `/api/dynamic/crm_account_common/list?pageNum=1&pageSize=1&filters=${encodeURIComponent(
         JSON.stringify([{ fieldName: 'crm_acc_name', operator: 'EQ', value: recordName }]),
       )}`,
     );
     const pid = (await listResp.json())?.data?.records?.[0]?.pid;
     if (pid) {
       // Delete endpoint is DELETE /api/dynamic/{pageKey}/{recordPid} (DynamicController#delete).
-      await page.request.delete(`/api/dynamic/crm_account/${pid}`).catch(() => {});
+      await page.request.delete(`/api/dynamic/crm_account_common/${pid}`).catch(() => {});
     }
   });
 });

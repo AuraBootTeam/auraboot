@@ -92,7 +92,7 @@ class ScopeRestrictionFilterIntegrationTest {
         String token = visitorToken();
 
         for (String path : new String[]{
-                "/api/dynamic/crm_lead/list",
+                "/api/dynamic/crm_lead_common/list",
                 "/api/im/conversations",
                 "/api/meta/models",
                 "/api/user/profile"}) {
@@ -123,7 +123,7 @@ class ScopeRestrictionFilterIntegrationTest {
         String rogue = jwtUtil.generateScopedToken("someone", "not_a_registered_scope", Map.of(), 600);
 
         assertThat(get("/api/public/cs/session/ping", rogue).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        assertThat(get("/api/dynamic/crm_lead/list", rogue).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(get("/api/dynamic/crm_lead_common/list", rogue).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test

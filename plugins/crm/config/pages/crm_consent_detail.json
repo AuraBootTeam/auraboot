@@ -1,0 +1,52 @@
+{
+  "pageKey": "crm_consent_detail",
+  "name:zh-CN": "同意详情",
+  "name:en": "Consent Detail",
+  "modelCode": "crm_consent",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "info",
+      "blockType": "detail-section",
+      "title": {
+        "zh-CN": "同意信息",
+        "en": "Consent Info"
+      },
+      "fields": [
+        {
+          "field": "crm_cns_code",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cns_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cns_contact_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cns_channel",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cns_source",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cns_legal_basis",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cns_granted_at",
+          "colSpan": 6
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+[
+  { "modelCode": "crm_sla_policy", "fieldCode": "crm_sla_name", "sequence": 1, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_sla_policy", "fieldCode": "crm_sla_priority_level", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_sla_policy", "fieldCode": "crm_sla_response_time_hours", "sequence": 3, "required": true, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_sla_policy", "fieldCode": "crm_sla_resolution_time_hours", "sequence": 4, "required": true, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_sla_policy", "fieldCode": "crm_sla_escalation_after_hours", "sequence": 5, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_sla_policy", "fieldCode": "crm_sla_is_active", "sequence": 6, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_sla_policy", "fieldCode": "crm_sla_description", "sequence": 7, "required": false, "visible": false, "editable": true }
+]

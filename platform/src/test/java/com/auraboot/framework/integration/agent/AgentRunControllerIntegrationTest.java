@@ -127,7 +127,7 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
                         "(pid, tenant_id, run_id, action_code, action_type, target_model, target_record_pid, " +
                         " action_status, executed_at, before_snapshot, after_snapshot, " +
                         " field_changes, risk_level, cost_usd) " +
-                        "VALUES (?, ?, ?, ?, 'data_write', 'crm_account', 'REC-PID-001', ?, NOW(), " +
+                        "VALUES (?, ?, ?, ?, 'data_write', 'crm_account_common', 'REC-PID-001', ?, NOW(), " +
                         " '{\"name\":\"old\"}'::jsonb, '{\"name\":\"new\"}'::jsonb, " +
                         " '[{\"field\":\"name\",\"from\":\"old\",\"to\":\"new\"}]'::jsonb, " +
                         " 'L1', 0.000123)",
@@ -179,7 +179,7 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
         jdbc.update("INSERT INTO ab_agent_bif " +
                         "(pid, tenant_id, run_id, nl_input, intent, primary_object, " +
                         " risk_level, confidence, dispatched_skill, channel, created_at) " +
-                        "VALUES (?, ?, ?, ?, ?, 'crm_account', 'L1', " +
+                        "VALUES (?, ?, ?, ?, ?, 'crm_account_common', 'L1', " +
                         " '{\"object\":0.9,\"intent\":0.95}'::jsonb, ?, 'web', NOW())",
                 pid, tenantId, runPid, "查询最近活跃客户", intent, dispatchedSkill);
     }
@@ -426,7 +426,7 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
                 .containsExactlyInAnyOrder(actionA, actionB);
         AgentActionItem first = d.getActions().get(0);
         assertThat(first.getActionCode()).startsWith("crm.account.");
-        assertThat(first.getTargetModel()).isEqualTo("crm_account");
+        assertThat(first.getTargetModel()).isEqualTo("crm_account_common");
         assertThat(first.getTargetRecordPid()).isEqualTo("REC-PID-001");
         assertThat(first.getRiskLevel()).isEqualTo("L1");
         assertThat(first.getBeforeSnapshot()).contains("\"name\"").contains("old");
@@ -449,7 +449,7 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(d.getBif()).isNotNull();
         assertThat(d.getBif().getIntent()).isEqualTo("UPDATE_RECORD");
         assertThat(d.getBif().getDispatchedSkill()).isEqualTo("crm.account.update");
-        assertThat(d.getBif().getPrimaryObject()).isEqualTo("crm_account");
+        assertThat(d.getBif().getPrimaryObject()).isEqualTo("crm_account_common");
         assertThat(d.getBif().getChannel()).isEqualTo("web");
     }
 
@@ -580,7 +580,7 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
                 .containsEntry("actionPid", actionPid)
                 .containsEntry("actionCode", "crm.account.search")
                 .containsEntry("actionType", "data_write")
-                .containsEntry("targetModel", "crm_account");
+                .containsEntry("targetModel", "crm_account_common");
         assertThat(contractData.get("beforeSnapshot")).isInstanceOf(Map.class);
         @SuppressWarnings("unchecked")
         Map<String, Object> beforeSnapshot = (Map<String, Object>) contractData.get("beforeSnapshot");

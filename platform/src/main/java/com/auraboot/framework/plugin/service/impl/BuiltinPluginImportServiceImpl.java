@@ -72,7 +72,7 @@ public class BuiltinPluginImportServiceImpl implements BuiltinPluginImportServic
             new BuiltinPlugin("org-management",        "com.auraboot.org-management",      Profile.CORE),
             new BuiltinPlugin("platform-admin",        "com.auraboot.platform-admin",      Profile.CORE),
             // ── Demo profile (only when includeDemoPlugins=true) ────────
-            new BuiltinPlugin("crm-starter",           "com.auraboot.crm-starter",         Profile.DEMO),
+            new BuiltinPlugin("crm",                   "com.auraboot.crm",                 Profile.DEMO),
             new BuiltinPlugin("showcase",              "com.auraboot.showcase",            Profile.DEMO),
             new BuiltinPlugin("agent-control-plane",   "com.auraboot.agent-control-plane", Profile.DEMO),
             new BuiltinPlugin("workflow-demo",         "com.auraboot.workflow-demo",       Profile.DEMO)

@@ -84,8 +84,8 @@ class LearningLoopControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("GET /drafts lists tenant's drafts in reverse-chron order")
     void list_drafts_default() {
-        seedDraft("sig1_" + tenantId, "crm_lead",        "update");
-        seedDraft("sig2_" + tenantId, "crm_opportunity", "create");
+        seedDraft("sig1_" + tenantId, "crm_lead_common",        "update");
+        seedDraft("sig2_" + tenantId, "crm_opportunity_common", "create");
 
         ApiResponse<List<Map<String, Object>>> response = controller.listDrafts(null, 50);
         assertThat(response.getData()).hasSize(2);
@@ -96,8 +96,8 @@ class LearningLoopControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("GET /drafts?status=REVIEWED_OK filters by status")
     void list_drafts_filtered() {
-        String draft1 = seedDraft("sig3_" + tenantId, "crm_lead", "update");
-        String draft2 = seedDraft("sig4_" + tenantId, "crm_lead", "create");
+        String draft1 = seedDraft("sig3_" + tenantId, "crm_lead_common", "update");
+        String draft2 = seedDraft("sig4_" + tenantId, "crm_lead_common", "create");
         controller.review(draft1, Map.of("decision", "approve", "comment", "lgtm"));
 
         ApiResponse<List<Map<String, Object>>> reviewed = controller.listDrafts("REVIEWED_OK", 50);
@@ -112,7 +112,7 @@ class LearningLoopControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("GET /drafts caps limit between 1 and 200")
     void list_drafts_caps_limit() {
-        seedDraft("cap_" + tenantId, "crm_lead", "update");
+        seedDraft("cap_" + tenantId, "crm_lead_common", "update");
         // Over 200 caps to 200; below 1 caps to 1.
         assertThat(controller.listDrafts(null, 500).getCode()).isEqualTo("0");
         assertThat(controller.listDrafts(null, -1).getCode()).isEqualTo("0");
@@ -121,7 +121,7 @@ class LearningLoopControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("other tenants' drafts are invisible")
     void list_drafts_tenant_scoped() {
-        String draft = seedDraft("scope_" + tenantId, "crm_lead", "update");
+        String draft = seedDraft("scope_" + tenantId, "crm_lead_common", "update");
 
         // Switch tenant context to a foreign one
         Long otherTenant = tenantId + 1_000_000;
@@ -142,7 +142,7 @@ class LearningLoopControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("GET /drafts/{pid} returns draft + source pattern + recent shadow runs")
     void get_draft_detail() {
-        String draftPid = seedDraft("sig_det_" + tenantId, "crm_lead", "update");
+        String draftPid = seedDraft("sig_det_" + tenantId, "crm_lead_common", "update");
 
         ApiResponse<Map<String, Object>> response = controller.getDraft(draftPid);
         assertThat(response.getCode()).isEqualTo("0");
@@ -167,7 +167,7 @@ class LearningLoopControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("approve DRAFT_PENDING_REVIEW → REVIEWED_OK + reviewer_id + reviewed_at set")
     void approve_pending() {
-        String draftPid = seedDraft("sig_apv_" + tenantId, "crm_lead", "update");
+        String draftPid = seedDraft("sig_apv_" + tenantId, "crm_lead_common", "update");
         ApiResponse<Map<String, Object>> r = controller.review(draftPid,
                 Map.of("decision", "approve", "comment", "looks good"));
         assertThat(r.getCode()).isEqualTo("0");
@@ -185,7 +185,7 @@ class LearningLoopControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("reject any status → REVIEWED_REJECTED")
     void reject_transitions() {
-        String draftPid = seedDraft("sig_rej_" + tenantId, "crm_lead", "update");
+        String draftPid = seedDraft("sig_rej_" + tenantId, "crm_lead_common", "update");
         ApiResponse<Map<String, Object>> r = controller.review(draftPid,
                 Map.of("decision", "reject", "comment", "unsafe"));
         assertThat(r.getData().get("status")).isEqualTo("REVIEWED_REJECTED");
@@ -194,7 +194,7 @@ class LearningLoopControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("approve PROMOTED_PENDING_HUMAN → ACTIVE + promoted_at set")
     void promote_to_active() {
-        String draftPid = seedDraft("sig_pro_" + tenantId, "crm_lead", "update");
+        String draftPid = seedDraft("sig_pro_" + tenantId, "crm_lead_common", "update");
         // Force state to PROMOTED_PENDING_HUMAN (the evaluator would normally do this)
         jdbc.update("UPDATE ab_agent_skill_draft SET status='PROMOTED_PENDING_HUMAN' WHERE pid = ?", draftPid);
 
@@ -209,7 +209,7 @@ class LearningLoopControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("approve from REVIEWED_REJECTED returns 409")
     void approve_from_rejected_rejected() {
-        String draftPid = seedDraft("sig_conf_" + tenantId, "crm_lead", "update");
+        String draftPid = seedDraft("sig_conf_" + tenantId, "crm_lead_common", "update");
         controller.review(draftPid, Map.of("decision", "reject"));
 
         ApiResponse<Map<String, Object>> r = controller.review(draftPid, Map.of("decision", "approve"));
@@ -219,7 +219,7 @@ class LearningLoopControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("invalid decision returns 400")
     void invalid_decision_400() {
-        String draftPid = seedDraft("sig_bad_" + tenantId, "crm_lead", "update");
+        String draftPid = seedDraft("sig_bad_" + tenantId, "crm_lead_common", "update");
         ApiResponse<Map<String, Object>> r = controller.review(draftPid, Map.of("decision", "maybe"));
         assertThat(r.getCode()).isEqualTo("400");
     }
@@ -231,7 +231,7 @@ class LearningLoopControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("auto-rename returns renamed=false gracefully when no LLM configured")
     void auto_rename_no_llm_graceful() {
-        String draftPid = seedDraft("sig_ren_" + tenantId, "crm_lead", "update");
+        String draftPid = seedDraft("sig_ren_" + tenantId, "crm_lead_common", "update");
         doReturn(null).when(providerFactory).resolveConfig(eq(tenantId), any());
         ApiResponse<Map<String, Object>> r = controller.autoRename(draftPid);
         assertThat(r.getCode()).isEqualTo("0");

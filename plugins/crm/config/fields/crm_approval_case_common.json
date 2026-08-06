@@ -1,0 +1,160 @@
+[
+  {
+    "code": "crm_apc_code",
+    "displayName:zh-CN": "审批编号",
+    "displayName:en": "Approval Case Code",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_apc_subject",
+    "displayName:zh-CN": "审批主题",
+    "displayName:en": "Subject",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_apc_domain",
+    "displayName:zh-CN": "业务域",
+    "displayName:en": "Domain",
+    "dataType": "enum",
+    "dictCode": "crm_approval_case_domain",
+    "defaultValue": "quote",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_apc_case_type",
+    "displayName:zh-CN": "审批类型",
+    "displayName:en": "Case Type",
+    "dataType": "enum",
+    "dictCode": "crm_approval_case_type",
+    "defaultValue": "manual",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_apc_status",
+    "displayName:zh-CN": "审批状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_approval_case_status",
+    "defaultValue": "pending",
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_apc_priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "enum",
+    "dictCode": "crm_approval_case_priority",
+    "defaultValue": "normal",
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_apc_source_model",
+    "displayName:zh-CN": "来源模型",
+    "displayName:en": "Source Model",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 80 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_apc_source_id",
+    "displayName:zh-CN": "来源对象ID",
+    "displayName:en": "Source Object ID",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 80 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_apc_source_code",
+    "displayName:zh-CN": "来源编号",
+    "displayName:en": "Source Code",
+    "dataType": "string",
+    "constraints": { "maxLength": 80 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_apc_account_id",
+    "displayName:zh-CN": "客户",
+    "displayName:en": "Account",
+    "dataType": "reference",
+    "referenceModelCode": "crm_account_common",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_apc_customer_request_id",
+    "displayName:zh-CN": "客户需求",
+    "displayName:en": "Customer Request",
+    "dataType": "reference",
+    "referenceModelCode": "crm_customer_request_common",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_apc_amount",
+    "displayName:zh-CN": "关联金额",
+    "displayName:en": "Amount",
+    "dataType": "decimal",
+    "constraints": { "precision": 14, "scale": 2 },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_apc_margin_pct",
+    "displayName:zh-CN": "毛利率",
+    "displayName:en": "Margin %",
+    "dataType": "decimal",
+    "constraints": { "precision": 8, "scale": 2 },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_apc_discount_pct",
+    "displayName:zh-CN": "折扣率",
+    "displayName:en": "Discount %",
+    "dataType": "decimal",
+    "constraints": { "precision": 8, "scale": 2 },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_apc_reason",
+    "displayName:zh-CN": "审批原因",
+    "displayName:en": "Reason",
+    "dataType": "text",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_apc_policy_snapshot",
+    "displayName:zh-CN": "策略快照",
+    "displayName:en": "Policy Snapshot",
+    "dataType": "text"
+  },
+  {
+    "code": "crm_apc_submitted_at",
+    "displayName:zh-CN": "提交时间",
+    "displayName:en": "Submitted At",
+    "dataType": "datetime",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_apc_decided_at",
+    "displayName:zh-CN": "决策时间",
+    "displayName:en": "Decided At",
+    "dataType": "datetime",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_apc_decision",
+    "displayName:zh-CN": "决策结果",
+    "displayName:en": "Decision",
+    "dataType": "enum",
+    "dictCode": "crm_approval_case_decision",
+    "defaultValue": "pending",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_apc_decision_note",
+    "displayName:zh-CN": "决策备注",
+    "displayName:en": "Decision Note",
+    "dataType": "text"
+  }
+]

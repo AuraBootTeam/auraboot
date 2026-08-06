@@ -51,13 +51,13 @@ class CreateRecordExecutorTest {
     @SuppressWarnings("unchecked")
     void execute_basicFields_createsRecord() {
         Map<String, Object> createdRecord = Map.of("id", 100L, "name", "John", "status", "new");
-        when(dynamicDataService.create(eq("crm_lead"), any())).thenAnswer(inv -> {
+        when(dynamicDataService.create(eq("crm_lead_common"), any())).thenAnswer(inv -> {
             assertThat(MetaContext.getCommandPermitScope()).isEqualTo("ALL");
             return createdRecord;
         });
 
         AutomationAction action = buildAction(Map.of(
-                "modelCode", "crm_lead",
+                "modelCode", "crm_lead_common",
                 "fields", Map.of("name", "John", "status", "new")
         ));
         Map<String, Object> context = Map.of();
@@ -65,9 +65,9 @@ class CreateRecordExecutorTest {
         Map<String, Object> result = (Map<String, Object>) executor.execute(action, context);
 
         assertThat(result.get("success")).isEqualTo(true);
-        assertThat(result.get("modelCode")).isEqualTo("crm_lead");
+        assertThat(result.get("modelCode")).isEqualTo("crm_lead_common");
         assertThat(result.get("record")).isEqualTo(createdRecord);
-        verify(dynamicDataService).create(eq("crm_lead"), argThat(fields ->
+        verify(dynamicDataService).create(eq("crm_lead_common"), argThat(fields ->
                 fields.get("name").equals("John") && fields.get("status").equals("new")));
         assertThat(MetaContext.getCommandPermitScope()).isNull();
     }
@@ -82,7 +82,7 @@ class CreateRecordExecutorTest {
         context.put("userId", 789L);
 
         AutomationAction action = buildAction(Map.of(
-                "modelCode", "crm_activity",
+                "modelCode", "crm_activity_common",
                 "fields", Map.of(
                         "relatedLeadId", "${recordPid}",
                         "assigneeId", "${userId}",
@@ -93,7 +93,7 @@ class CreateRecordExecutorTest {
         Map<String, Object> result = (Map<String, Object>) executor.execute(action, context);
 
         assertThat(result.get("success")).isEqualTo(true);
-        verify(dynamicDataService).create(eq("crm_activity"), argThat(fields ->
+        verify(dynamicDataService).create(eq("crm_activity_common"), argThat(fields ->
                 "lead-456".equals(fields.get("relatedLeadId")) &&
                 789L == (long) fields.get("assigneeId") &&
                 "Follow up".equals(fields.get("title"))));
@@ -180,7 +180,7 @@ class CreateRecordExecutorTest {
     @Test
     void execute_nullFields_throwsIllegalArgument() {
         Map<String, Object> config = new HashMap<>();
-        config.put("modelCode", "crm_lead");
+        config.put("modelCode", "crm_lead_common");
         config.put("fields", null);
         AutomationAction action = buildAction(config);
 
@@ -192,7 +192,7 @@ class CreateRecordExecutorTest {
     @Test
     void execute_emptyFields_throwsIllegalArgument() {
         AutomationAction action = buildAction(Map.of(
-                "modelCode", "crm_lead",
+                "modelCode", "crm_lead_common",
                 "fields", Map.of()
         ));
 

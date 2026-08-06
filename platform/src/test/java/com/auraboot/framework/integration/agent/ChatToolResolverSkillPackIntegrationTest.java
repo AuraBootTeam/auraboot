@@ -80,7 +80,7 @@ class ChatToolResolverSkillPackIntegrationTest extends BaseIntegrationTest {
         bindAnyDim(pack);
 
         var grounding = new com.auraboot.framework.agent.port.GroundingPort.GroundingResult(
-                "query", "crm_lead", 0.9,
+                "query", "crm_lead_common", 0.9,
                 List.of("crm.lead.list", "dsl.query", "crm.lead.update", "hr.delete_user"),
                 true);
         when(groundingPort.ground(anyLong(), any(), any(), any())).thenReturn(grounding);
@@ -90,7 +90,7 @@ class ChatToolResolverSkillPackIntegrationTest extends BaseIntegrationTest {
         // ChatToolResolver reads MetaContext — seed via ThreadLocal for this call.
         com.auraboot.framework.application.tenant.MetaContext.setCurrentTenantId(tenantId);
         try {
-            resolver.resolveTools("list my leads", "crm_lead", null, null);
+            resolver.resolveTools("list my leads", "crm_lead_common", null, null);
         } finally {
             com.auraboot.framework.application.tenant.MetaContext.clear();
         }
@@ -106,7 +106,7 @@ class ChatToolResolverSkillPackIntegrationTest extends BaseIntegrationTest {
     @DisplayName("tenant without bindings → candidate list passes through unchanged")
     void no_bindings_passthrough() {
         var grounding = new com.auraboot.framework.agent.port.GroundingPort.GroundingResult(
-                "query", "crm_lead", 0.9,
+                "query", "crm_lead_common", 0.9,
                 List.of("crm.lead.list", "hr.delete_user"),
                 true);
         when(groundingPort.ground(anyLong(), any(), any(), any())).thenReturn(grounding);
@@ -115,7 +115,7 @@ class ChatToolResolverSkillPackIntegrationTest extends BaseIntegrationTest {
 
         com.auraboot.framework.application.tenant.MetaContext.setCurrentTenantId(tenantId);
         try {
-            resolver.resolveTools("anything", "crm_lead", null, null);
+            resolver.resolveTools("anything", "crm_lead_common", null, null);
         } finally {
             com.auraboot.framework.application.tenant.MetaContext.clear();
         }

@@ -136,14 +136,14 @@ class ActiveMemoryPreRecallIntegrationTest extends BaseIntegrationTest {
     @DisplayName("GroundingService.ground() populates BIF.preContext from ActiveMemory")
     void grounding_populates_preContext() {
         memory.createScopedMemory(tenantId, agent, "preference", "user",
-                "crm_lead prefers weekly digest", "summarize leads weekly on Monday",
+                "crm_lead_common prefers weekly digest", "summarize leads weekly on Monday",
                 8, false, "user", userId);
         memory.createScopedMemory(tenantId, agent, "fact", "agent",
                 "quarterly planning Q2", "Q2 targets: 50 new leads",
                 6, false, "tenant", null);
 
         GroundingService.GroundingContext ctx = GroundingService.GroundingContext.builder()
-                .pageModel("crm_lead")
+                .pageModel("crm_lead_common")
                 .userId(userId)
                 .sessionId("sess-test")
                 .build();
@@ -153,7 +153,7 @@ class ActiveMemoryPreRecallIntegrationTest extends BaseIntegrationTest {
         assertThat(bif.getPreContext()).isNotEmpty();
         // Both rows are visible to this user (user + tenant scope).
         assertThat(bif.getPreContext()).extracting(s -> s.get("title"))
-                .contains("crm_lead prefers weekly digest", "quarterly planning Q2");
+                .contains("crm_lead_common prefers weekly digest", "quarterly planning Q2");
     }
 
     @Test
@@ -173,7 +173,7 @@ class ActiveMemoryPreRecallIntegrationTest extends BaseIntegrationTest {
                 tenantId, agent);
 
         GroundingService.GroundingContext ctx = GroundingService.GroundingContext.builder()
-                .pageModel("crm_lead")
+                .pageModel("crm_lead_common")
                 .userId(null)
                 .build();
 

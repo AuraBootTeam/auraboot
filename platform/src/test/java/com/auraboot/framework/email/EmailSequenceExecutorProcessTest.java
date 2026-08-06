@@ -166,7 +166,7 @@ class EmailSequenceExecutorProcessTest {
     void sendsNextStep_andAdvances() throws Exception {
         EmailSequenceEnrollment e = enrollment(4L, 8L, 0);
         e.setRecordPid("REC");
-        e.setModelCode("crm_contact");
+        e.setModelCode("crm_contact_common");
         EmailAccount account = new EmailAccount();
         account.setId(8L);
         when(enrollmentMapper.findDueEnrollments()).thenReturn(List.of(e));

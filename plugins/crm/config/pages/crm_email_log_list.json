@@ -1,0 +1,201 @@
+{
+  "pageKey": "crm_email_log_list",
+  "name:zh-CN": "邮件记录列表",
+  "name:en": "Email Logs",
+  "modelCode": "crm_email_log",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_el_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "en": "All",
+            "zh-CN": "全部"
+          },
+          "filter": null
+        },
+        {
+          "key": "draft",
+          "label": {
+            "en": "Draft",
+            "zh-CN": "草稿"
+          },
+          "filter": {
+            "field": "crm_el_status",
+            "value": "draft",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "sent",
+          "label": {
+            "en": "Sent",
+            "zh-CN": "已发送"
+          },
+          "filter": {
+            "field": "crm_el_status",
+            "value": "sent",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "delivered",
+          "label": {
+            "en": "Delivered",
+            "zh-CN": "已送达"
+          },
+          "filter": {
+            "field": "crm_el_status",
+            "value": "delivered",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "opened",
+          "label": {
+            "en": "Opened",
+            "zh-CN": "已打开"
+          },
+          "filter": {
+            "field": "crm_el_status",
+            "value": "opened",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "bounced",
+          "label": {
+            "en": "Bounced",
+            "zh-CN": "已退信"
+          },
+          "filter": {
+            "field": "crm_el_status",
+            "value": "bounced",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "failed",
+          "label": {
+            "en": "Failed",
+            "zh-CN": "失败"
+          },
+          "filter": {
+            "field": "crm_el_status",
+            "value": "failed",
+            "operator": "EQ"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_el_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "crm.email_log.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_email_log_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_el_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_el_direction",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "crm_email_direction"
+        },
+        {
+          "field": "crm_el_subject",
+          "width": 300,
+          "sortable": true
+        },
+        {
+          "field": "crm_el_from_address",
+          "width": 200
+        },
+        {
+          "field": "crm_el_to_address",
+          "width": 200
+        },
+        {
+          "field": "crm_el_related_type",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_related_type"
+        },
+        {
+          "field": "crm_el_status",
+          "width": 110,
+          "renderType": "tag",
+          "dictCode": "crm_email_status"
+        },
+        {
+          "field": "crm_el_sent_at",
+          "width": 160,
+          "sortable": true,
+          "format": "YYYY-MM-DD HH:mm"
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "view",
+              "label": "$i18n:common.button.view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_email_log_detail"
+              }
+            },
+            {
+              "code": "edit",
+              "permissionCode": "crm.email_log.manage",
+              "label": "$i18n:common.button.edit",
+              "action": {
+                "type": "navigate",
+                "to": "crm_email_log_form"
+              }
+            },
+            {
+              "code": "delete",
+              "danger": true,
+              "permissionCode": "crm.email_log.manage",
+              "label": "$i18n:common.button.delete",
+              "confirm": "delete.confirm",
+              "action": {
+                "type": "command"
+              }
+            }
+          ],
+          "label": "$i18n:common.actions"
+        }
+      ],
+      "searchFields": [
+        "crm_el_subject",
+        "crm_el_to_address"
+      ],
+      "defaultSort": {
+        "field": "crm_el_sent_at",
+        "order": "desc"
+      }
+    }
+  ]
+}

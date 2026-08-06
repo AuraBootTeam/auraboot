@@ -18,8 +18,8 @@
  *   crm_assignment_rule   list   [B1] path nav + localized columns + seeded data row + no leak
  *   crm_assignment_rule   form   [B2] create form full-field render + required markers + no leak
  *   crm_assignment_rule   detail [B3] open row -> read-only fields + toolbar + no leak
- *   crm_lead              detail [C1] rescore command from toolbar -> score updates in UI
- *   crm_lead              detail [C2] auto_assign command from toolbar -> assigned_to updates in UI
+ *   crm_lead_common              detail [C1] rescore command from toolbar -> score updates in UI
+ *   crm_lead_common              detail [C2] auto_assign command from toolbar -> assigned_to updates in UI
  */
 import { test, expect, type Page, type Locator } from '@playwright/test';
 
@@ -93,9 +93,19 @@ async function uiLogin(page: Page): Promise<void> {
 }
 
 async function gotoPage(page: Page, path: string): Promise<void> {
-  await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-  await page.waitForTimeout(1500);
+  await page.goto(`${BASE}/dashboards`, { waitUntil: 'domcontentloaded' });
+  const nav = page.locator('nav, aside, [role="navigation"]').first();
+  const link = nav.locator(`a[href="${path}"]`).first();
+  if (!(await link.isVisible().catch(() => false))) {
+    const root = nav.getByRole('button', { name: /客户关系管理|crm/i }).first();
+    if (await root.isVisible().catch(() => false)) await root.click();
+  }
+  await link.waitFor({ state: 'visible', timeout: 10_000 });
+  await link.click();
+  await expect(page).toHaveURL(new RegExp(`${path.replaceAll('/', '\\/')}(?:\\?.*)?$`), {
+    timeout: 15_000,
+  });
+  await expect(page.locator('main, table, form').first()).toBeVisible({ timeout: 10_000 });
 }
 
 async function assertNoRawCodeLeak(page: Page, label: string): Promise<void> {
@@ -119,6 +129,7 @@ let assignLeadId = '';
 test.describe.configure({ mode: 'serial' });
 
 test.describe('CRM M4 lead engine (L4 UI golden)', () => {
+  test.setTimeout(60_000);
   // psql helper for test isolation (deactivate pre-existing active rules so the
   // seeded rule is the sole scoring match -> deterministic score 30).
   // DynamicController list is a GET (red line 5): /api/dynamic/<model>/list?pageNum&pageSize
@@ -206,7 +217,7 @@ test.describe('CRM M4 lead engine (L4 UI golden)', () => {
   test('A2 score-rule form: full-field create form + required markers', async ({ page }) => {
     await gotoPage(page, '/p/crm_lead_score_rule');
     await page.getByRole('button', { name: /新建|新增|创建|Create/ }).first().click();
-    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/p\/crm_lead_score_rule\/new(?:\?.*)?$/, { timeout: 10_000 });
     await expect(page.getByText('规则名称', { exact: false }).first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('评分维度', { exact: false }).first()).toBeVisible();
     await expect(page.getByText('匹配条件', { exact: false }).first()).toBeVisible();
@@ -220,7 +231,7 @@ test.describe('CRM M4 lead engine (L4 UI golden)', () => {
     await gotoPage(page, '/p/crm_lead_score_rule');
     await expect(page.getByText(`E2E Source referral ${TAG}`).first()).toBeVisible({ timeout: 10000 });
     await firstDataRow(page).click();
-    await page.waitForTimeout(1500);
+    await expect(page).toHaveURL(/\/p\/crm_lead_score_rule\/view\//, { timeout: 10_000 });
     await expect(page.getByText('规则编号', { exact: false }).first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('评分维度', { exact: false }).first()).toBeVisible();
     await assertNoRawCodeLeak(page, 'score_rule_detail');
@@ -242,7 +253,7 @@ test.describe('CRM M4 lead engine (L4 UI golden)', () => {
   test('B2 assignment-rule form: full-field create form + required markers', async ({ page }) => {
     await gotoPage(page, '/p/crm_assignment_rule');
     await page.getByRole('button', { name: /新建|新增|创建|Create/ }).first().click();
-    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/p\/crm_assignment_rule\/new(?:\?.*)?$/, { timeout: 10_000 });
     await expect(page.getByText('规则名称', { exact: false }).first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('分配策略', { exact: false }).first()).toBeVisible();
     await expect(page.getByText('销售人员池', { exact: false }).first()).toBeVisible();
@@ -255,7 +266,7 @@ test.describe('CRM M4 lead engine (L4 UI golden)', () => {
     await gotoPage(page, '/p/crm_assignment_rule');
     await expect(page.getByText(`E2E Tech territory ${TAG}`).first()).toBeVisible({ timeout: 10000 });
     await firstDataRow(page).click();
-    await page.waitForTimeout(1500);
+    await expect(page).toHaveURL(/\/p\/crm_assignment_rule\/view\//, { timeout: 10_000 });
     await expect(page.getByText('分配策略', { exact: false }).first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('销售人员池', { exact: false }).first()).toBeVisible();
     await assertNoRawCodeLeak(page, 'assignment_rule_detail');
@@ -264,17 +275,20 @@ test.describe('CRM M4 lead engine (L4 UI golden)', () => {
 
   /** Open a lead's detail page by searching the list for its company and clicking the row. */
   async function openLeadDetail(page: Page, company: string): Promise<void> {
-    await gotoPage(page, '/p/crm_lead');
+    await gotoPage(page, '/p/crm_lead_common');
     const search = page.locator('[data-testid="list-search-input"], input[placeholder*="搜索"], input[type="search"]').first();
     if (await search.isVisible({ timeout: 3000 }).catch(() => false)) {
+      const listResponse = page
+        .waitForResponse((response) => response.url().includes('/api/dynamic/crm_lead_common') && response.url().includes('/list'))
+        .catch(() => null);
       await search.fill(company);
-      await page.waitForTimeout(1200);
+      await listResponse;
     }
-    const cell = page.getByText(company).first();
+    const cell = page.getByText(company, { exact: true }).first();
     await expect(cell).toBeVisible({ timeout: 10000 });
-    await cell.click();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(1500);
+    const row = page.locator('tbody tr').filter({ hasText: company }).first();
+    await row.getByText(/^(查看|View)$/).first().click();
+    await expect(page).toHaveURL(/\/p\/crm_lead_common\/view\//, { timeout: 10_000 });
   }
 
   // ---- C1: rescore command drives a real score change visible in the UI ----

@@ -110,7 +110,7 @@ test.describe('Showcase Seed — CRM ownership distribution', () => {
   test('Ownership 1: Opportunities spread across the sales team', async ({ page }) => {
     const distribution = await distributeOwners(
       page,
-      'crm_opportunity',
+      'crm_opportunity_common',
       'crm:update_opportunity',
       'crm_opp_owner',
     );
@@ -129,7 +129,7 @@ test.describe('Showcase Seed — CRM ownership distribution', () => {
   test('Ownership 2: Activities spread across the sales team', async ({ page }) => {
     const distribution = await distributeOwners(
       page,
-      'crm_activity',
+      'crm_activity_common',
       'crm:update_activity',
       'crm_act_owner',
     );
@@ -145,7 +145,7 @@ test.describe('Showcase Seed — CRM ownership distribution', () => {
     // The owner column is a plain string field. Before this phase it held the
     // admin user's pid (a ULID), which would surface as the category label on
     // every owner-grouped chart.
-    const opportunities = await listAll(page, 'crm_opportunity');
+    const opportunities = await listAll(page, 'crm_opportunity_common');
     const owners = new Set(
       opportunities.map((r) => String(r.crm_opp_owner ?? '')).filter(Boolean),
     );

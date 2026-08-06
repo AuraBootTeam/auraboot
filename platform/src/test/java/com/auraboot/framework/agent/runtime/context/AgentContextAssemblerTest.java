@@ -90,9 +90,9 @@ class AgentContextAssemblerTest {
                 "webhook",
                 null,
                 "email (varchar), status (varchar)",
-                "crm_lead",
+                "crm_lead_common",
                 Map.of("pid", "LEAD-9", "status", "new"),
-                "crm_lead",
+                "crm_lead_common",
                 "LEAD-9",
                 "RAG: lead qualification policy",
                 List.of("kb-leads")));
@@ -103,14 +103,14 @@ class AgentContextAssemblerTest {
                         AgentContextSource.SCHEMA,
                         AgentContextSource.RECORD,
                         AgentContextSource.RAG);
-        assertThat(bundle.blocks().get(0).provenance().scope()).isEqualTo("crm_lead");
+        assertThat(bundle.blocks().get(0).provenance().scope()).isEqualTo("crm_lead_common");
         assertThat(bundle.blocks().get(1).provenance().recordPids()).containsExactly("LEAD-9");
         assertThat(bundle.blocks().get(1).provenance().permission()).isEqualTo("STRUCTURED_RECORD_CONTEXT");
         assertThat(bundle.blocks().get(0).provenance().metadata())
-                .containsEntry("modelCode", "crm_lead")
-                .containsEntry("table", "mt_crm_lead");
+                .containsEntry("modelCode", "crm_lead_common")
+                .containsEntry("table", "mt_crm_lead_common");
         assertThat(bundle.blocks().get(1).provenance().metadata())
-                .containsEntry("modelCode", "crm_lead")
+                .containsEntry("modelCode", "crm_lead_common")
                 .containsEntry("recordPid", "LEAD-9")
                 .containsEntry("fieldCount", 2);
         assertThat(bundle.blocks().get(2).provenance().metadata())

@@ -1,7 +1,7 @@
 /**
  * ActivitiesWidget — Timeline of recent CRM activities.
  *
- * Data source: GET /api/dynamic/crm_activity/list (dynamic controller)
+ * Data source: GET /api/dynamic/crm_activity_common/list (dynamic controller)
  * Sorted by created_at desc, top N items.
  */
 
@@ -83,7 +83,7 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
       setPermissionDenied(false);
       try {
         const result = await get<ActivityListResponse>(
-          `/api/dynamic/crm_activity/list?pageNum=1&pageSize=${maxItems}&sortField=created_at&sortOrder=desc`,
+          `/api/dynamic/crm_activity_common/list?pageNum=1&pageSize=${maxItems}&sortField=created_at&sortOrder=desc`,
         );
         if (!cancelled && result.code === '0' && result.data) {
           setActivities(result.data.records || []);
@@ -108,7 +108,7 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
     }
     const recordPid = getActivityRecordId(activity);
     if (recordPid) {
-      window.location.href = `/p/crm_activity/view/${encodeURIComponent(recordPid)}`;
+      window.location.href = `/p/crm_activity_common/view/${encodeURIComponent(recordPid)}`;
     }
   };
 

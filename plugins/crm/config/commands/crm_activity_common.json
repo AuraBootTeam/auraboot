@@ -1,0 +1,174 @@
+[
+  {
+    "code": "crm:create_activity",
+    "displayName:zh-CN": "新建活动",
+    "displayName:en": "Create Activity",
+    "type": "create",
+    "modelCode": "crm_activity_common",
+    "inputFields": [
+      "crm_act_type",
+      "crm_act_subject",
+      "crm_act_content",
+      "crm_act_date",
+      "crm_act_source",
+      "crm_act_parent_id",
+      "crm_act_files",
+      "crm_act_status",
+      "crm_act_priority",
+      "crm_act_due_date",
+      "crm_act_assignee",
+      "crm_act_duration",
+      "crm_act_direction",
+      "crm_act_location",
+      "crm_act_start_time",
+      "crm_act_end_time",
+      "crm_act_related_model",
+      "crm_act_related_id"
+    ],
+    "autoSetFields": {
+      "crm_act_owner": {
+        "strategy": "current_username"
+      },
+      "crm_act_date": {
+        "strategy": "current_datetime"
+      }
+    },
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Create a new crm activity record. Key inputs: type, subject, content, date, source. Auto-generated: owner, date.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_activity",
+    "displayName:zh-CN": "编辑活动",
+    "displayName:en": "Update Activity",
+    "type": "update",
+    "modelCode": "crm_activity_common",
+    "inputFields": [
+      "crm_act_type",
+      "crm_act_subject",
+      "crm_act_content",
+      "crm_act_date",
+      "crm_act_source",
+      "crm_act_parent_id",
+      "crm_act_files",
+      "crm_act_status",
+      "crm_act_priority",
+      "crm_act_due_date",
+      "crm_act_assignee",
+      "crm_act_duration",
+      "crm_act_direction",
+      "crm_act_location",
+      "crm_act_start_time",
+      "crm_act_end_time",
+      "crm_act_related_model",
+      "crm_act_related_id"
+    ],
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Update an existing crm activity record. Editable fields: type, subject, content, date, source.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:start_task",
+    "displayName:zh-CN": "开始任务",
+    "displayName:en": "Start Task",
+    "type": "state_transition",
+    "modelCode": "crm_activity_common",
+    "stateField": "crm_act_status",
+    "fromStates": [
+      "open"
+    ],
+    "toState": "in_progress",
+    "preconditions": [
+      {
+        "field": "crm_act_type",
+        "operator": "EQ",
+        "value": "task"
+      }
+    ],
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Transition crm activity status from open to in_progress.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:complete_task",
+    "displayName:zh-CN": "完成任务",
+    "displayName:en": "Complete Task",
+    "type": "state_transition",
+    "modelCode": "crm_activity_common",
+    "stateField": "crm_act_status",
+    "fromStates": [
+      "open",
+      "in_progress"
+    ],
+    "toState": "done",
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Transition crm activity status from open/in_progress to DONE.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:cancel_task",
+    "displayName:zh-CN": "取消任务",
+    "displayName:en": "Cancel Task",
+    "type": "state_transition",
+    "modelCode": "crm_activity_common",
+    "stateField": "crm_act_status",
+    "fromStates": [
+      "open",
+      "in_progress"
+    ],
+    "toState": "cancelled",
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Transition crm activity status from open/in_progress to cancelled.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_activity",
+    "displayName:zh-CN": "删除活动",
+    "displayName:en": "Delete Activity",
+    "type": "delete",
+    "modelCode": "crm_activity_common",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此活动？",
+      "confirmMessage:en": "Confirm delete this activity?"
+    },
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Delete crm activity record(s). This is irreversible.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:detail_activity",
+    "displayName:zh-CN": "查看活动",
+    "displayName:en": "View Activity",
+    "type": "query",
+    "modelCode": "crm_activity_common",
+    "permissions": [
+      "crm.activity.read"
+    ],
+    "agent_hint": "Query crm activity records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:list_activities",
+    "displayName:zh-CN": "活动列表",
+    "displayName:en": "List Activities",
+    "type": "query",
+    "modelCode": "crm_activity_common",
+    "permissions": [
+      "crm.activity.read"
+    ],
+    "agent_hint": "Query crm activity records.",
+    "cmd_risk_level": "L0"
+  }
+]

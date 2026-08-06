@@ -46,7 +46,7 @@ class ChatBiSkillTest {
 
     private ObjectNode baseParams() {
         ObjectNode params = om.createObjectNode();
-        params.put("modelCode", "crm_lead");
+        params.put("modelCode", "crm_lead_common");
         params.putArray("dimensions").add("crm_lead_status");
         ObjectNode metric = params.putArray("metrics").addObject();
         metric.put("field", "pid").put("aggregation", "count").put("alias", "cnt");
@@ -80,7 +80,7 @@ class ChatBiSkillTest {
         assertThat(req.getType()).isEqualTo("aggregate");
         assertThat(req.getSemanticModelCode()).as("raw path forced; smuggled semantic model stripped").isNull();
         assertThat(req.getQueryCode()).as("smuggled named query stripped").isNull();
-        assertThat(req.getModelCode()).isEqualTo("crm_lead");
+        assertThat(req.getModelCode()).isEqualTo("crm_lead_common");
         assertThat(req.getDimensions()).containsExactly("crm_lead_status");
         assertThat(req.getMetrics()).hasSize(1);
         assertThat(req.getMetrics().get(0).getField()).isEqualTo("pid");
@@ -89,7 +89,7 @@ class ChatBiSkillTest {
 
         assertThat(r.getStatus()).isEqualTo(SkillResult.Status.SUCCESS);
         JsonNode payload = om.valueToTree(r.getPayload());
-        assertThat(payload.get("modelCode").asText()).isEqualTo("crm_lead");
+        assertThat(payload.get("modelCode").asText()).isEqualTo("crm_lead_common");
         assertThat(payload.get("chartType").asText()).isEqualTo("bar");
         assertThat(payload.get("columns").toString()).contains("crm_lead_status").contains("cnt");
         assertThat(payload.get("records")).hasSize(2);
@@ -110,7 +110,7 @@ class ChatBiSkillTest {
         when(aggregateQueryService.execute(any())).thenReturn(resp);
 
         ObjectNode params = om.createObjectNode();
-        params.put("modelCode", "crm_lead");
+        params.put("modelCode", "crm_lead_common");
         ObjectNode metric = params.putArray("metrics").addObject();
         metric.put("field", "pid").put("aggregation", "count").put("alias", "cnt");
 
@@ -131,7 +131,7 @@ class ChatBiSkillTest {
     @DisplayName("missing metrics is rejected")
     void missingMetrics() {
         ObjectNode params = om.createObjectNode();
-        params.put("modelCode", "crm_lead");
+        params.put("modelCode", "crm_lead_common");
         assertThatThrownBy(() -> run(params)).isInstanceOf(SkillSpiException.class);
     }
 
@@ -139,7 +139,7 @@ class ChatBiSkillTest {
     @DisplayName("unsupported aggregation is rejected")
     void badAggregation() {
         ObjectNode params = om.createObjectNode();
-        params.put("modelCode", "crm_lead");
+        params.put("modelCode", "crm_lead_common");
         params.putArray("metrics").addObject().put("field", "crm_lead_score").put("aggregation", "median");
         assertThatThrownBy(() -> run(params)).isInstanceOf(SkillSpiException.class);
     }

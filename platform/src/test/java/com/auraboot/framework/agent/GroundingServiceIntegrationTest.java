@@ -76,7 +76,7 @@ class GroundingServiceIntegrationTest extends BaseIntegrationTest {
     void testObjectResolver_aliasMatch() {
         Long tenantId = getTestTenant().getId();
         ObjectResolver.ObjectResult result = objectResolver.resolve(tenantId, "查一下客户列表");
-        assertThat(result.getModelCode()).isEqualTo("crm_account");
+        assertThat(result.getModelCode()).isEqualTo("crm_account_common");
         assertThat(result.getMatchType()).isEqualTo("alias");
     }
 
@@ -84,7 +84,7 @@ class GroundingServiceIntegrationTest extends BaseIntegrationTest {
     void testObjectResolver_leadAlias() {
         Long tenantId = getTestTenant().getId();
         ObjectResolver.ObjectResult result = objectResolver.resolve(tenantId, "线索有多少");
-        assertThat(result.getModelCode()).isEqualTo("crm_lead");
+        assertThat(result.getModelCode()).isEqualTo("crm_lead_common");
     }
 
     @Test
@@ -118,7 +118,7 @@ class GroundingServiceIntegrationTest extends BaseIntegrationTest {
         BusinessIntentFrame bif = groundingService.ground(tenantId, "查一下CRM线索", ctx);
 
         assertThat(bif.getIntent()).isEqualTo("query");
-        assertThat(bif.getObject()).isEqualTo("crm_lead");
+        assertThat(bif.getObject()).isEqualTo("crm_lead_common");
         assertThat(bif.getConfidence()).isNotNull();
         assertThat(bif.getConfidence().getOverall()).isGreaterThan(0.5);
         assertThat(bif.getRiskLevel()).isEqualTo("L0");

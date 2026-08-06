@@ -16,9 +16,9 @@ interface CreateOptions {
  * Outputs created records as JSON to stdout.
  *
  * Examples:
- *   aura query crm_lead --filter "crm_lead_status=QUALIFIED" | aura create crm_opportunity
- *   echo '[{"crm_lead_code":"LD-001","crm_lead_company":"Test"}]' | aura create crm_lead
- *   aura query crm_lead | aura create crm_lead --dry-run
+ *   aura query crm_lead_common --filter "crm_lead_status=QUALIFIED" | aura create crm_opportunity_common
+ *   echo '[{"crm_lead_code":"LD-001","crm_lead_company":"Test"}]' | aura create crm_lead_common
+ *   aura query crm_lead_common | aura create crm_lead_common --dry-run
  */
 export async function createCommand(entity: string, options: CreateOptions): Promise<void> {
   const client = new ApiClient(options);
@@ -27,7 +27,7 @@ export async function createCommand(entity: string, options: CreateOptions): Pro
   const inputData = await readStdin();
   if (!inputData || inputData.length === 0) {
     console.error(chalk.red('No data from stdin. Pipe JSON data to this command.'));
-    console.error(chalk.dim('  Example: aura query crm_lead | aura create crm_opportunity'));
+    console.error(chalk.dim('  Example: aura query crm_lead_common | aura create crm_opportunity_common'));
     process.exit(EXIT.FAILURE);
   }
 

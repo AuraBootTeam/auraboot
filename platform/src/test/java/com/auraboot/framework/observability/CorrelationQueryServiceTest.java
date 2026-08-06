@@ -91,7 +91,7 @@ class CorrelationQueryServiceTest {
         when(behaviorEventMapper.selectList(any())).thenReturn(List.of(new BehaviorEvent()));
         when(adminEventLogMapper.selectList(any())).thenReturn(List.of(new AdminEventLog()));
         when(permissionAuditLogMapper.findByOtelTraceId(eq(7L), eq("trace-abc"), anyInt()))
-                .thenReturn(List.of(denial("crm_account", "delete", "denied by policy")));
+                .thenReturn(List.of(denial("crm_account_common", "delete", "denied by policy")));
         when(adminAuditService.findByTraceId(eq(7L), eq("trace-abc"), anyInt()))
                 .thenReturn(List.of(adminAction("/api/admin/users", 200)));
 
@@ -113,13 +113,13 @@ class CorrelationQueryServiceTest {
     void byTraceSurfacesPermissionDenials() {
         stubEmptyBaseDomains();
         when(permissionAuditLogMapper.findByOtelTraceId(eq(7L), eq("trace-deny"), anyInt()))
-                .thenReturn(List.of(denial("crm_account", "delete", "denied by policy")));
+                .thenReturn(List.of(denial("crm_account_common", "delete", "denied by policy")));
         when(adminAuditService.findByTraceId(any(), any(), anyInt())).thenReturn(List.of());
 
         CorrelationView view = service.byTrace("trace-deny");
 
         assertThat(view.getPermissionDenials()).singleElement().satisfies(denial -> {
-            assertThat(denial.resourceCode()).isEqualTo("crm_account");
+            assertThat(denial.resourceCode()).isEqualTo("crm_account_common");
             assertThat(denial.reason()).isEqualTo("denied by policy");
             assertThat(denial.recordPid()).isEqualTo("REC-PID-9");
             assertThat(denial.memberId()).isEqualTo("4242");

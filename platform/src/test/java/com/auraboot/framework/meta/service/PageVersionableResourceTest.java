@@ -54,7 +54,7 @@ class PageVersionableResourceTest {
     void createSnapshot_serializes_basic_fields() {
         PageSchema page = new PageSchema();
         page.setPageKey("p1");
-        page.setModelCode("crm_lead");
+        page.setModelCode("crm_lead_common");
         page.setName("Lead Page");
         page.setTitle("Leads");
         page.setDescription("desc");
@@ -65,7 +65,7 @@ class PageVersionableResourceTest {
         JsonNode snapshot = resource.createSnapshot("p1");
 
         assertThat(snapshot.get("pageKey").asText()).isEqualTo("p1");
-        assertThat(snapshot.get("modelCode").asText()).isEqualTo("crm_lead");
+        assertThat(snapshot.get("modelCode").asText()).isEqualTo("crm_lead_common");
         assertThat(snapshot.get("name").asText()).isEqualTo("Lead Page");
         assertThat(snapshot.get("title").asText()).isEqualTo("Leads");
         assertThat(snapshot.get("description").asText()).isEqualTo("desc");

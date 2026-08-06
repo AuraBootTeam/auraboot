@@ -45,7 +45,7 @@ public class DryRunResult {
     public static class MissingDependency {
         private String resourceType;
         private String resourcePid;
-        /** What references it (e.g. "page tcrm_lead_list references model tcrm_lead"). */
+        /** What references it (e.g. "page crm_lead_common_list references model crm_lead_common"). */
         private String referencedBy;
     }
 }

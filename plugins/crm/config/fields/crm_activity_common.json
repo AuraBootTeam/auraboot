@@ -1,0 +1,190 @@
+[
+  {
+    "code": "crm_act_type",
+    "displayName:zh-CN": "活动类型",
+    "displayName:en": "Activity Type",
+    "dataType": "enum",
+    "dictCode": "crm_activity_type",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_act_subject",
+    "displayName:zh-CN": "主题",
+    "displayName:en": "Subject",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_act_content",
+    "displayName:zh-CN": "内容",
+    "displayName:en": "Content",
+    "dataType": "text",
+    "extension": { "renderComponent": "richtext" }
+  },
+  {
+    "code": "crm_act_date",
+    "displayName:zh-CN": "活动日期",
+    "displayName:en": "Activity Date",
+    "dataType": "datetime",
+    "constraints": { "required": true },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_act_owner",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Owner",
+    "dataType": "string",
+    "constraints": { "maxLength": 100 }
+  },
+  {
+    "code": "crm_act_source",
+    "displayName:zh-CN": "来源",
+    "displayName:en": "Source",
+    "dataType": "enum",
+    "dictCode": "crm_activity_source",
+    "defaultValue": "manual"
+  },
+  {
+    "code": "crm_act_ext",
+    "displayName:zh-CN": "扩展数据",
+    "displayName:en": "Extension Data",
+    "dataType": "json",
+    "description": "Host JSONB column for type-specific virtual fields"
+  },
+  {
+    "code": "crm_act_parent_id",
+    "displayName:zh-CN": "父活动",
+    "displayName:en": "Parent Activity",
+    "dataType": "reference",
+    "referenceModelCode": "crm_activity_common"
+  },
+  {
+    "code": "crm_act_files",
+    "displayName:zh-CN": "附件",
+    "displayName:en": "Attachments",
+    "dataType": "string",
+    "extension": { "renderComponent": "upload" }
+  },
+  {
+    "code": "crm_act_status",
+    "displayName:zh-CN": "任务状态",
+    "displayName:en": "Task Status",
+    "dataType": "enum",
+    "dictCode": "crm_task_status",
+    "description": "JSONB virtual field: stored inside crm_act_ext",
+    "extension": {
+      "jsonbColumn": "crm_act_ext",
+      "jsonbPath": "status"
+    }
+  },
+  {
+    "code": "crm_act_priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "enum",
+    "dictCode": "crm_task_priority",
+    "description": "JSONB virtual field: stored inside crm_act_ext",
+    "extension": {
+      "jsonbColumn": "crm_act_ext",
+      "jsonbPath": "priority"
+    }
+  },
+  {
+    "code": "crm_act_due_date",
+    "displayName:zh-CN": "截止日期",
+    "displayName:en": "Due Date",
+    "dataType": "date",
+    "description": "JSONB virtual field: stored inside crm_act_ext",
+    "extension": {
+      "jsonbColumn": "crm_act_ext",
+      "jsonbPath": "dueDate"
+    }
+  },
+  {
+    "code": "crm_act_assignee",
+    "displayName:zh-CN": "执行人",
+    "displayName:en": "Assignee",
+    "dataType": "string",
+    "description": "JSONB virtual field: stored inside crm_act_ext",
+    "extension": {
+      "jsonbColumn": "crm_act_ext",
+      "jsonbPath": "assignee"
+    }
+  },
+  {
+    "code": "crm_act_duration",
+    "displayName:zh-CN": "时长(分钟)",
+    "displayName:en": "Duration (min)",
+    "dataType": "integer",
+    "description": "JSONB virtual field: stored inside crm_act_ext",
+    "extension": {
+      "jsonbColumn": "crm_act_ext",
+      "jsonbPath": "duration"
+    }
+  },
+  {
+    "code": "crm_act_direction",
+    "displayName:zh-CN": "通话方向",
+    "displayName:en": "Call Direction",
+    "dataType": "enum",
+    "dictCode": "crm_call_direction",
+    "description": "JSONB virtual field: stored inside crm_act_ext",
+    "extension": {
+      "jsonbColumn": "crm_act_ext",
+      "jsonbPath": "direction"
+    }
+  },
+  {
+    "code": "crm_act_location",
+    "displayName:zh-CN": "地点",
+    "displayName:en": "Location",
+    "dataType": "string",
+    "constraints": { "maxLength": 200 },
+    "description": "JSONB virtual field: stored inside crm_act_ext",
+    "extension": {
+      "jsonbColumn": "crm_act_ext",
+      "jsonbPath": "location"
+    }
+  },
+  {
+    "code": "crm_act_start_time",
+    "displayName:zh-CN": "开始时间",
+    "displayName:en": "Start Time",
+    "dataType": "datetime",
+    "description": "JSONB virtual field: stored inside crm_act_ext",
+    "extension": {
+      "jsonbColumn": "crm_act_ext",
+      "jsonbPath": "startTime"
+    }
+  },
+  {
+    "code": "crm_act_end_time",
+    "displayName:zh-CN": "结束时间",
+    "displayName:en": "End Time",
+    "dataType": "datetime",
+    "description": "JSONB virtual field: stored inside crm_act_ext",
+    "extension": {
+      "jsonbColumn": "crm_act_ext",
+      "jsonbPath": "endTime"
+    }
+  },
+  {
+    "code": "crm_act_related_model",
+    "displayName:zh-CN": "关联对象类型",
+    "displayName:en": "Related Model",
+    "dataType": "string",
+    "constraints": { "maxLength": 80 },
+    "description": "Direct polymorphic anchor used by workspace sub-tables. Multi-object graph links still live in crm_activity_relation_common."
+  },
+  {
+    "code": "crm_act_related_id",
+    "displayName:zh-CN": "关联对象ID",
+    "displayName:en": "Related Object ID",
+    "dataType": "string",
+    "constraints": { "maxLength": 50 },
+    "feature": { "searchable": true },
+    "description": "Direct polymorphic anchor id used by workspace sub-tables. Usually stores the pid of a customer request, account, opportunity, RFQ, or quote."
+  }
+]

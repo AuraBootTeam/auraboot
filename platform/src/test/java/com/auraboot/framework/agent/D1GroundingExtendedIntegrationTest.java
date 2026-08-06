@@ -63,7 +63,7 @@ class D1GroundingExtendedIntegrationTest extends BaseIntegrationTest {
     @Test
     void testValidator_queryIntent_alwaysValid() {
         SemanticValidator.ValidationResult result =
-                semanticValidator.validate("query", "crm_lead", Map.of(), tenantId);
+                semanticValidator.validate("query", "crm_lead_common", Map.of(), tenantId);
 
         assertThat(result.isValid()).isTrue();
         assertThat(result.getAdjustedConfidence()).isEqualTo(1.0);
@@ -72,11 +72,11 @@ class D1GroundingExtendedIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void testValidator_createIntent_withCommand_valid() {
-        // Seed a create command for crm_lead in test tenant
-        seedCommand("test_create_lead_" + System.currentTimeMillis(), "crm_lead", "create");
+        // Seed a create command for crm_lead_common in test tenant
+        seedCommand("test_create_lead_" + System.currentTimeMillis(), "crm_lead_common", "create");
 
         SemanticValidator.ValidationResult result =
-                semanticValidator.validate("create", "crm_lead", Map.of(), tenantId);
+                semanticValidator.validate("create", "crm_lead_common", Map.of(), tenantId);
 
         assertThat(result.isValid()).isTrue();
         assertThat(result.getAdjustedConfidence()).isEqualTo(1.0);
@@ -99,11 +99,11 @@ class D1GroundingExtendedIntegrationTest extends BaseIntegrationTest {
     @Test
     void testValidator_updateIntent_noScope_lowConfidence() {
         // Seed an update command so layer 1 passes
-        seedCommand("test_update_lead_" + System.currentTimeMillis(), "crm_lead", "update");
+        seedCommand("test_update_lead_" + System.currentTimeMillis(), "crm_lead_common", "update");
 
         // Update without recordPids in scope => layer 2 reduces confidence
         SemanticValidator.ValidationResult result =
-                semanticValidator.validate("update", "crm_lead", Map.of(), tenantId);
+                semanticValidator.validate("update", "crm_lead_common", Map.of(), tenantId);
 
         assertThat(result.isValid()).isTrue();
         assertThat(result.getAdjustedConfidence()).isLessThan(1.0);
@@ -131,7 +131,7 @@ class D1GroundingExtendedIntegrationTest extends BaseIntegrationTest {
     void testTermResolver_filterTerm() {
         // Test with platform-seeded "活跃客户" if available
         List<SemanticTermResolver.ResolvedTerm> results =
-                semanticTermResolver.resolve(tenantId, "查一下活跃客户", "crm_account");
+                semanticTermResolver.resolve(tenantId, "查一下活跃客户", "crm_account_common");
 
         if (!results.isEmpty()) {
             assertThat(results).anyMatch(r -> "filter".equals(r.getTermType()));

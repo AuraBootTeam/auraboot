@@ -25,7 +25,7 @@ public class RecordShare {
 
     private Long tenantId;
 
-    /** Model/resource code (e.g. "crm_opportunity") */
+    /** Model/resource code (e.g. "crm_opportunity_common") */
     private String resourceCode;
 
     /** The numeric ID of the shared record (legacy internal ID). */

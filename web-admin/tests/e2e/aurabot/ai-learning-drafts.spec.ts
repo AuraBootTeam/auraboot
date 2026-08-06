@@ -46,7 +46,7 @@ function makeDetail(overrides: Partial<Record<string, unknown>> = {}) {
       '# Auto-generated Skill draft\n' +
       'skill_code: auto.crm_lead_update.abc123\n' +
       'substrate: dsl\n' +
-      'target_model: crm_lead\n' +
+      'target_model: crm_lead_common\n' +
       'action_type: update\n',
     derived_from_runs_json: '[{"run_id":"01RUN1"},{"run_id":"01RUN2"}]',
     source_pattern: {

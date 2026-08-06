@@ -31,7 +31,7 @@ public class EmailRecordLink {
     @TableField("thread_id")
     private String threadId;
 
-    /** DSL model code of the linked CRM entity (e.g. 'crm_contact'). */
+    /** DSL model code of the linked CRM entity (e.g. 'crm_contact_common'). */
     @TableField("model_code")
     private String modelCode;
 

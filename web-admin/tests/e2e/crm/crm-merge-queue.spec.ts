@@ -110,7 +110,7 @@ test.describe('CRM Lead Merge Queue @critical', () => {
       }
 
       // 2. Create existing lead via dynamic API (uses actual DB column names)
-      const createLeadResp = await page.request.post('/api/dynamic/crm_lead/create', {
+      const createLeadResp = await page.request.post('/api/dynamic/crm_lead_common/create', {
         data: {
           crm_lead_code: `MQ-${uid}`,
           crm_lead_company: companyName,

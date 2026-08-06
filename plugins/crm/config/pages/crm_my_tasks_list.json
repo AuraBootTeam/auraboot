@@ -1,0 +1,68 @@
+{
+  "pageKey": "crm_my_tasks_list",
+  "name:zh-CN": "我的任务",
+  "name:en": "My Tasks",
+  "modelCode": "crm_activity_common",
+  "description": "My open tasks filtered by current user via NamedQuery",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "crm_my_tasks_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create_task",
+          "label": "$i18n:common.button.create",
+          "icon": "Plus",
+          "primary": true,
+          "action": {
+            "type": "navigate",
+            "to": "crm_activity_common_form",
+            "command": "crm:create_activity"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_my_tasks_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_act_subject",
+          "width": 250
+        },
+        {
+          "field": "crm_act_date",
+          "width": 160
+        },
+        {
+          "field": "crm_act_status",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "crm_task_status"
+        },
+        {
+          "field": "crm_act_priority",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "crm_task_priority"
+        },
+        {
+          "field": "crm_act_due_date",
+          "width": 140
+        },
+        {
+          "field": "crm_act_owner",
+          "width": 120
+        }
+      ]
+    }
+  ],
+  "extension": {
+    "queryCode": "crm_my_tasks"
+  }
+}

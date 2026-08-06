@@ -37,7 +37,7 @@ class ActionStepIndexIntegrationTest extends BaseIntegrationTest {
         nqCode = "test_nq_" + System.nanoTime();
         jdbc.update("INSERT INTO ab_named_query (pid, tenant_id, code, from_sql, status, current_version) " +
                         "VALUES (?, ?, ?, ?, 'published', 1)",
-                "nq-" + nqCode, tenantId, nqCode, "SELECT * FROM mt_crm_lead");
+                "nq-" + nqCode, tenantId, nqCode, "SELECT * FROM mt_crm_lead_common");
     }
 
     @AfterEach
@@ -89,11 +89,11 @@ class ActionStepIndexIntegrationTest extends BaseIntegrationTest {
                 java.util.Map.of(), 1, null);
 
         StepContext.setStepIndex(1);
-        String a1 = actionRecorder.recordReadAction(tenantId, runPid, "crm_account_list", null,
+        String a1 = actionRecorder.recordReadAction(tenantId, runPid, "crm_account_common_list", null,
                 java.util.Map.of(), 2, null);
 
         StepContext.setStepIndex(2);
-        String a2 = actionRecorder.recordReadAction(tenantId, runPid, "crm_contact_list", null,
+        String a2 = actionRecorder.recordReadAction(tenantId, runPid, "crm_contact_common_list", null,
                 java.util.Map.of(), 3, null);
 
         assertThat(jdbc.queryForObject(

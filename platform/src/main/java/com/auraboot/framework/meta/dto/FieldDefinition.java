@@ -311,7 +311,7 @@ public class FieldDefinition {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class RefTarget {
-        /** Model code of the referenced entity (e.g. "crm_account"). */
+        /** Model code of the referenced entity (e.g. "crm_account_common"). */
         @JsonAlias("targetModel")
         private String targetEntity;
         /** Physical target table when a legacy/system reference cannot be resolved by model code. */

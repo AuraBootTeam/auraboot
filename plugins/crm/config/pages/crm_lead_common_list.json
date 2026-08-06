@@ -1,0 +1,232 @@
+{
+  "pageKey": "crm_lead_common_list",
+  "name:zh-CN": "线索列表",
+  "name:en": "Leads",
+  "modelCode": "crm_lead_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_lead_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "en": "All",
+            "zh-CN": "全部"
+          },
+          "filter": null
+        },
+        {
+          "key": "new",
+          "label": {
+            "en": "New",
+            "zh-CN": "新建"
+          },
+          "filter": {
+            "field": "crm_lead_status",
+            "value": "new",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "contacted",
+          "label": {
+            "en": "Contacted",
+            "zh-CN": "已联系"
+          },
+          "filter": {
+            "field": "crm_lead_status",
+            "value": "contacted",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "qualified",
+          "label": {
+            "en": "Qualified",
+            "zh-CN": "已合格"
+          },
+          "filter": {
+            "field": "crm_lead_status",
+            "value": "qualified",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "converted",
+          "label": {
+            "en": "Converted",
+            "zh-CN": "已转化"
+          },
+          "filter": {
+            "field": "crm_lead_status",
+            "value": "converted",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "lost",
+          "label": {
+            "en": "Lost",
+            "zh-CN": "已丢失"
+          },
+          "filter": {
+            "field": "crm_lead_status",
+            "value": "lost",
+            "operator": "EQ"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "crm.lead.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_lead_common_form"
+          }
+        },
+        {
+          "code": "ai_score",
+          "icon": "Sparkles",
+          "confirm": "crm.action.ai_score.confirm",
+          "mobile": {
+            "disabled": true,
+            "reason": "Bulk AI scoring is a web-admin batch tool; no mobile use case scoped for P7."
+          },
+          "action": {
+            "type": "flow",
+            "steps": [
+              {
+                "endpoint": "/api/crm/ai/score-leads",
+                "method": "post",
+                "successMessage": {
+                  "zh-CN": "AI 评分完成",
+                  "en-US": "AI scoring complete"
+                }
+              }
+            ]
+          },
+          "content": {
+            "zh-CN": "AI 评分",
+            "en": "AI Score"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_table",
+      "blockType": "table",
+      "table": {
+        "selection": {
+          "mode": "multiple",
+          "bind": "{{state.selectedIds}}"
+        }
+      },
+      "selection": {
+        "type": "checkbox"
+      },
+      "columns": [
+        {
+          "field": "crm_lead_code",
+          "width": 150,
+          "sortable": true
+        },
+        {
+          "field": "crm_lead_company",
+          "width": 200,
+          "sortable": true,
+          "editable": true
+        },
+        {
+          "field": "crm_lead_contact_name",
+          "width": 120
+        },
+        {
+          "field": "crm_lead_contact_phone",
+          "width": 140
+        },
+        {
+          "field": "crm_lead_source",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_lead_source",
+          "editable": true
+        },
+        {
+          "field": "crm_lead_score",
+          "width": 80,
+          "sortable": true,
+          "editable": true
+        },
+        {
+          "field": "crm_lead_status",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_lead_status",
+          "editable": true
+        },
+        {
+          "field": "crm_lead_assigned_to",
+          "width": 120,
+          "editable": true
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "view",
+              "label": "$i18n:common.button.view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_lead_common_detail"
+              }
+            },
+            {
+              "code": "edit",
+              "permissionCode": "crm.lead.manage",
+              "label": "$i18n:common.button.edit",
+              "action": {
+                "type": "navigate",
+                "to": "crm_lead_common_form"
+              }
+            },
+            {
+              "code": "delete",
+              "danger": true,
+              "permissionCode": "crm.lead.manage",
+              "label": "$i18n:common.button.delete",
+              "confirm": "delete.confirm",
+              "action": {
+                "type": "command"
+              }
+            }
+          ],
+          "label": "$i18n:common.actions"
+        }
+      ],
+      "searchFields": [
+        "crm_lead_company",
+        "crm_lead_code",
+        "crm_lead_contact_name"
+      ],
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
+      }
+    }
+  ]
+}

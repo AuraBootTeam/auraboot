@@ -40,7 +40,7 @@ class RecordShareControllerAuthzTest {
 
     private static final long TENANT_ID = 1L;
     private static final long CALLER_ID = 5L;
-    private static final String RESOURCE = "crm_opportunity";
+    private static final String RESOURCE = "crm_opportunity_common";
     private static final String RECORD_PID = "rec-1";
 
     @Mock private RecordShareService recordShareService;

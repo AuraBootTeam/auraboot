@@ -47,12 +47,19 @@ describe('workflow templates', () => {
       expect(wf).not.toBeNull();
       expect(wf!.name).toBe('daily-sales-report');
       expect(wf!.steps.length).toBeGreaterThanOrEqual(2);
+      expect(wf!.steps[0]).toMatchObject({ type: 'query', source: 'crm_opportunity_common' });
     });
 
     it('should load overdue-tasks-alert template', () => {
       const wf = loadTemplate('overdue-tasks-alert');
       expect(wf).not.toBeNull();
       expect(wf!.steps.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should query the canonical CRM lead model in new-leads-digest', () => {
+      const wf = loadTemplate('new-leads-digest');
+      expect(wf).not.toBeNull();
+      expect(wf!.steps[0]).toMatchObject({ type: 'query', source: 'crm_lead_common' });
     });
 
     it('should return null for unknown template', () => {

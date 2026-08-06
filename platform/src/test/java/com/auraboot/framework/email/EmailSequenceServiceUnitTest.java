@@ -158,7 +158,7 @@ class EmailSequenceServiceUnitTest {
         when(stepMapper.findBySequenceId(40L)).thenReturn(List.of(step));
 
         EmailSequenceEnrollment e = service.enroll(7L, 40L, 5L,
-                "x@y.com", "crm_contact", "REC1");
+                "x@y.com", "crm_contact_common", "REC1");
 
         assertThat(e.getTenantId()).isEqualTo(7L);
         assertThat(e.getSequenceId()).isEqualTo(40L);

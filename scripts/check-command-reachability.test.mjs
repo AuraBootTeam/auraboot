@@ -3,17 +3,23 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { auditReachability, referencedCommands } from './check-command-reachability.mjs';
+import {
+  auditReachability,
+  conventionReferencedCommands,
+  referencedCommands,
+} from './check-command-reachability.mjs';
 
 // Every case builds a repo that SHOULD be red and asserts it is, then asserts
 // silence on the clean one. A gate whose failure nobody has seen is not a gate.
 
-function makeRepo({ commands = [], pagesJson = null, pagesDir = null, menusJson = null } = {}) {
+function makeRepo({ commands = [], commandDefinitions = null, pagesJson = null, pagesDir = null, menusJson = null } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cmdreach-'));
   const cfg = path.join(root, 'plugins', 'demo', 'config');
   fs.mkdirSync(cfg, { recursive: true });
   fs.writeFileSync(path.join(cfg, 'commands.json'),
-    JSON.stringify({ commands: commands.map((code) => ({ code, type: 'custom' })) }, null, 2));
+    JSON.stringify({
+      commands: commandDefinitions ?? commands.map((code) => ({ code, type: 'custom' })),
+    }, null, 2));
   if (pagesJson) fs.writeFileSync(path.join(cfg, 'pages.json'), JSON.stringify(pagesJson, null, 2));
   if (menusJson) fs.writeFileSync(path.join(cfg, 'menus.json'), JSON.stringify(menusJson, null, 2));
   if (pagesDir) {
@@ -42,6 +48,52 @@ test('a command referenced by a page is reachable', () => {
     pagesJson: [{ pageKey: 'p', blocks: [{ action: { type: 'command', command: 'demo:do_thing' } }] }],
   });
   assert.deepEqual(auditReachability({ roots: [root], config: {} }).findings, []);
+});
+
+test('an unambiguous CRUD command reached by a standard convention button is reachable', () => {
+  const { root, pluginDir } = makeRepo({
+    commandDefinitions: [
+      { code: 'demo:create_thing', type: 'create', modelCode: 'demo_thing' },
+      { code: 'demo:update_thing', type: 'update', modelCode: 'demo_thing' },
+      { code: 'demo:delete_thing', type: 'delete', modelCode: 'demo_thing' },
+    ],
+    pagesJson: [{
+      pageKey: 'demo_thing_list',
+      modelCode: 'demo_thing',
+      blocks: [{
+        buttons: [
+          { code: 'create', action: { type: 'navigate', to: 'demo_thing_form' } },
+          { code: 'edit', action: { type: 'navigate', to: 'demo_thing_form' } },
+          { code: 'delete', action: { type: 'command' } },
+        ],
+      }],
+    }],
+  });
+
+  assert.deepEqual(
+    [...conventionReferencedCommands(pluginDir)].sort(),
+    ['demo:create_thing', 'demo:delete_thing', 'demo:update_thing'],
+  );
+  assert.deepEqual(auditReachability({ roots: [root], config: {} }).findings, []);
+});
+
+test('an ambiguous CRUD command is not credited by convention', () => {
+  const { root } = makeRepo({
+    commandDefinitions: [
+      { code: 'demo:create_thing', type: 'create', modelCode: 'demo_thing' },
+      { code: 'demo:clone_thing', type: 'create', modelCode: 'demo_thing' },
+    ],
+    pagesJson: [{
+      pageKey: 'demo_thing_list',
+      modelCode: 'demo_thing',
+      blocks: [{ buttons: [{ code: 'create', action: { type: 'navigate' } }] }],
+    }],
+  });
+
+  assert.deepEqual(
+    errs(auditReachability({ roots: [root], config: {} })).map((finding) => finding.code),
+    ['demo:create_thing', 'demo:clone_thing'],
+  );
 });
 
 test('a command no page references is an error', () => {

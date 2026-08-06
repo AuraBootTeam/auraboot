@@ -27,7 +27,7 @@ test.describe('Aggregate time bucketing + orderBy', () => {
     const resp = await page.request.post(AGG, {
       data: {
         type: 'aggregate',
-        modelCode: 'crm_opportunity',
+        modelCode: 'crm_opportunity_common',
         dimensions: ['crm_opp_expected_close_date__month'],
         metrics: [{ field: 'pid', aggregation: 'count', alias: 'cnt' }],
         orderBy: [{ field: 'crm_opp_expected_close_date__month', direction: 'asc' }],
@@ -52,7 +52,7 @@ test.describe('Aggregate time bucketing + orderBy', () => {
     const resp = await page.request.post(AGG, {
       data: {
         type: 'aggregate',
-        modelCode: 'crm_opportunity',
+        modelCode: 'crm_opportunity_common',
         dimensions: ['crm_opp_expected_close_date__fortnight'],
         metrics: [{ field: 'pid', aggregation: 'count', alias: 'cnt' }],
       },
@@ -66,7 +66,7 @@ test.describe('Aggregate time bucketing + orderBy', () => {
     const resp = await page.request.post(AGG, {
       data: {
         type: 'aggregate',
-        modelCode: 'crm_opportunity',
+        modelCode: 'crm_opportunity_common',
         dimensions: ['crm_opp_owner'],
         metrics: [{ field: 'crm_opp_expected_amount', aggregation: 'sum', alias: 'total' }],
         orderBy: [{ field: 'total', direction: 'desc' }],
@@ -92,7 +92,7 @@ test.describe('Aggregate time bucketing + orderBy', () => {
     const resp = await page.request.post(AGG, {
       data: {
         type: 'aggregate',
-        modelCode: 'crm_opportunity',
+        modelCode: 'crm_opportunity_common',
         metrics: [{ field: 'pid', aggregation: 'count', alias: 'cnt' }],
         orderBy: [{ field: '1) UNION SELECT version() --', direction: 'asc' }],
       },
@@ -115,7 +115,7 @@ test.describe('Aggregate time bucketing + orderBy', () => {
     const resp = await page.request.post(AGG, {
       data: {
         type: 'aggregate',
-        modelCode: 'crm_opportunity',
+        modelCode: 'crm_opportunity_common',
         dimensions: ['crm_opp_expected_close_date__month'],
         metrics: [{ field: 'pid', aggregation: 'count', alias: 'opp_count' }],
       },

@@ -1,0 +1,129 @@
+[
+  {
+    "code": "crm_cpn_code",
+    "displayName:zh-CN": "活动编号",
+    "displayName:en": "Campaign Code",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 50
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cpn_name",
+    "displayName:zh-CN": "活动名称",
+    "displayName:en": "Campaign Name",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 200
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cpn_type",
+    "displayName:zh-CN": "活动类型",
+    "displayName:en": "Campaign Type",
+    "dataType": "enum",
+    "dictCode": "crm_campaign_type",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cpn_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_campaign_status",
+    "defaultValue": "planned",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cpn_start_date",
+    "displayName:zh-CN": "开始日期",
+    "displayName:en": "Start Date",
+    "dataType": "date",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cpn_end_date",
+    "displayName:zh-CN": "结束日期",
+    "displayName:en": "End Date",
+    "dataType": "date",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cpn_budget",
+    "displayName:zh-CN": "预算",
+    "displayName:en": "Budget",
+    "dataType": "decimal",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cpn_description",
+    "displayName:zh-CN": "描述",
+    "displayName:en": "Description",
+    "dataType": "text"
+  },
+  {
+    "code": "crm_cpn_owner",
+    "displayName:zh-CN": "负责人",
+    "displayName:en": "Owner",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 100
+    }
+  },
+  {
+    "code": "crm_cpn_member_count",
+    "displayName:zh-CN": "成员数",
+    "displayName:en": "Member Count",
+    "dataType": "integer",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cpn_response_rate",
+    "displayName:zh-CN": "响应率%",
+    "displayName:en": "Response Rate %",
+    "dataType": "decimal",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cpn_conversion_rate",
+    "displayName:zh-CN": "转化率%",
+    "displayName:en": "Conversion Rate %",
+    "dataType": "decimal",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cpn_cost_per_member",
+    "displayName:zh-CN": "单成员成本",
+    "displayName:en": "Cost Per Member",
+    "dataType": "decimal",
+    "feature": {
+      "sortable": true
+    }
+  }
+]

@@ -1,0 +1,30 @@
+[
+  {
+    "code": "crm:create_journey",
+    "displayName:zh-CN": "新建旅程",
+    "displayName:en": "Create Journey",
+    "type": "create",
+    "modelCode": "crm_journey",
+    "inputFields": [
+      "crm_jny_name",
+      "crm_jny_total_steps",
+      "crm_jny_description",
+      "crm_jny_step_delay_minutes"
+    ],
+    "autoSetFields": {
+      "crm_jny_code": {
+        "strategy": "auto_generate",
+        "pattern": "JNY-{yyyyMMdd}-{seq}"
+      },
+      "crm_jny_status": {
+        "strategy": "fixed_value",
+        "value": "active"
+      }
+    },
+    "permissions": [
+      "crm.journey.manage"
+    ],
+    "agent_hint": "Create a nurture journey with N steps.",
+    "cmd_risk_level": "L1"
+  }
+]

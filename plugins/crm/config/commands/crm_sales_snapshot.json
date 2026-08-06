@@ -1,0 +1,15 @@
+[
+  {
+    "code": "crm:refresh_sales_snapshot",
+    "displayName:zh-CN": "刷新销售快照",
+    "displayName:en": "Refresh Sales Snapshot",
+    "type": "custom",
+    "handler": "crm:refresh_sales_snapshot",
+    "modelCode": "crm_sales_snapshot",
+    "permissions": [
+      "crm.analytics.manage"
+    ],
+    "agent_hint": "Materialize sales snapshot (total/won/pipeline/conversion) from opportunities; upsert by period.",
+    "cmd_risk_level": "L1"
+  }
+]

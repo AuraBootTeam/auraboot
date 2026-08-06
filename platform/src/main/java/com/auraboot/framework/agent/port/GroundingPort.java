@@ -27,7 +27,7 @@ public interface GroundingPort {
      * Result of grounding a user message — captures intent, target object, and candidate skills.
      *
      * @param intent          resolved intent (e.g., "create", "query", "summarize", "navigate")
-     * @param object          resolved model code (e.g., "crm_lead"), or null if not object-specific
+     * @param object          resolved model code (e.g., "crm_lead_common"), or null if not object-specific
      * @param confidence      confidence score between 0.0 and 1.0
      * @param candidateSkills list of candidate skill codes that match the intent + object
      * @param readOnly        true if the intent is read-only (query, summarize, navigate)

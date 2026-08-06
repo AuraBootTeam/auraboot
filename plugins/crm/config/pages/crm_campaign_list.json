@@ -1,0 +1,200 @@
+{
+  "pageKey": "crm_campaign_list",
+  "name:zh-CN": "营销活动列表",
+  "name:en": "Campaigns",
+  "modelCode": "crm_campaign",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_cpn_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "en": "All",
+            "zh-CN": "全部"
+          },
+          "filter": null
+        },
+        {
+          "key": "planned",
+          "label": {
+            "en": "Planned",
+            "zh-CN": "计划中"
+          },
+          "filter": {
+            "field": "crm_cpn_status",
+            "value": "planned",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "active",
+          "label": {
+            "en": "Active",
+            "zh-CN": "进行中"
+          },
+          "filter": {
+            "field": "crm_cpn_status",
+            "value": "active",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "completed",
+          "label": {
+            "en": "Completed",
+            "zh-CN": "已完成"
+          },
+          "filter": {
+            "field": "crm_cpn_status",
+            "value": "completed",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "cancelled",
+          "label": {
+            "en": "Cancelled",
+            "zh-CN": "已取消"
+          },
+          "filter": {
+            "field": "crm_cpn_status",
+            "value": "cancelled",
+            "operator": "EQ"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_cpn_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "crm.campaign.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_campaign_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_cpn_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_cpn_code",
+          "width": 150,
+          "sortable": true
+        },
+        {
+          "field": "crm_cpn_name",
+          "width": 200,
+          "sortable": true
+        },
+        {
+          "field": "crm_cpn_type",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "crm_campaign_type"
+        },
+        {
+          "field": "crm_cpn_status",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "crm_campaign_status"
+        },
+        {
+          "field": "crm_cpn_start_date",
+          "width": 120
+        },
+        {
+          "field": "crm_cpn_end_date",
+          "width": 120
+        },
+        {
+          "field": "crm_cpn_budget",
+          "width": 120,
+          "sortable": true
+        },
+        {
+          "field": "crm_cpn_owner",
+          "width": 120
+        },
+        {
+          "field": "crm_cpn_member_count"
+        },
+        {
+          "field": "crm_cpn_response_rate"
+        },
+        {
+          "field": "crm_cpn_conversion_rate"
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "view",
+              "permissionCode": "crm.campaign.read",
+              "label": "$i18n:common.button.view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_campaign_detail"
+              }
+            },
+            {
+              "code": "edit",
+              "permissionCode": "crm.campaign.manage",
+              "label": "$i18n:common.button.edit",
+              "action": {
+                "type": "navigate",
+                "to": "crm_campaign_form"
+              }
+            },
+            {
+              "code": "delete",
+              "danger": true,
+              "permissionCode": "crm.campaign.manage",
+              "label": "$i18n:common.button.delete",
+              "confirm": "delete.confirm",
+              "action": {
+                "type": "command"
+              }
+            }
+          ],
+          "label": "$i18n:common.actions"
+        }
+      ],
+      "searchFields": [
+        "crm_cpn_name",
+        "crm_cpn_code"
+      ],
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
+      },
+      "rowActions": [
+        {
+          "code": "recompute_metrics",
+          "label": "$i18n:crm.campaign.recompute_metrics",
+          "permissionCode": "crm.campaign.manage",
+          "action": {
+            "type": "command",
+            "command": "crm:recompute_campaign_metrics"
+          }
+        }
+      ]
+    }
+  ]
+}

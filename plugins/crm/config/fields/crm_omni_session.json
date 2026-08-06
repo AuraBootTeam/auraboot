@@ -1,0 +1,100 @@
+[
+  {
+    "code": "crm_oss_code",
+    "displayName:zh-CN": "会话编号",
+    "displayName:en": "Code",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 50
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_oss_channel",
+    "displayName:zh-CN": "渠道",
+    "displayName:en": "Channel",
+    "dataType": "enum",
+    "dictCode": "crm_omni_channel",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_oss_customer",
+    "displayName:zh-CN": "客户",
+    "displayName:en": "Customer",
+    "dataType": "reference",
+    "referenceModelCode": "crm_account_common",
+    "refTarget": {
+      "targetModel": "crm_account_common",
+      "targetField": "id",
+      "relationship": "many_to_one",
+      "displayField": "crm_acc_name"
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_oss_subject",
+    "displayName:zh-CN": "主题",
+    "displayName:en": "Subject",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 200
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_oss_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_omni_status",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_oss_vip",
+    "displayName:zh-CN": "VIP",
+    "displayName:en": "VIP",
+    "dataType": "boolean"
+  },
+  {
+    "code": "crm_oss_queue",
+    "displayName:zh-CN": "队列",
+    "displayName:en": "Queue",
+    "dataType": "string",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_oss_priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "string",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_oss_assigned_to",
+    "displayName:zh-CN": "处理人",
+    "displayName:en": "Assigned To",
+    "dataType": "string",
+    "feature": {
+      "searchable": true
+    }
+  }
+]

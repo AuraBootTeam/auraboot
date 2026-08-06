@@ -71,7 +71,7 @@ class ResultContractMapperTest {
     @DisplayName("actionability derived from BifContext when not passed explicitly")
     void actionability_from_bif_context() {
         BusinessIntentFrame bif = BusinessIntentFrame.builder()
-                .intent("delete").object("crm_lead").riskLevel("L3")
+                .intent("delete").object("crm_lead_common").riskLevel("L3")
                 .actionability("execute")
                 .confidence(ConfidenceScore.of(0.9, 0.9))
                 .build();

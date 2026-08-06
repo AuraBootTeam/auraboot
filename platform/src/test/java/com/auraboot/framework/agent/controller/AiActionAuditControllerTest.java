@@ -45,7 +45,7 @@ class AiActionAuditControllerTest {
         body.put("messageId", "msg-1");
         body.put("actionType", "execute_command");
         body.put("commandCode", "crm.account.update");
-        body.put("modelCode", "crm_account");
+        body.put("modelCode", "crm_account_common");
         body.put("targetRecordPid", "REC-PID-001");
         body.put("riskLevel", "medium");
         body.put("userDecision", "confirmed");
@@ -62,7 +62,7 @@ class AiActionAuditControllerTest {
                 eq("msg-1"),
                 eq("execute_command"),
                 eq("crm.account.update"),
-                eq("crm_account"),
+                eq("crm_account_common"),
                 eq("REC-PID-001"),
                 eq("medium"),
                 eq("confirmed"),
@@ -79,7 +79,7 @@ class AiActionAuditControllerTest {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("actionType", "execute_command");
         body.put("commandCode", "crm.account.update");
-        body.put("modelCode", "crm_account");
+        body.put("modelCode", "crm_account_common");
         body.put("targetRecord" + "Id", "legacy-target");
         body.put("record" + "Id", "legacy-record");
         body.put("riskLevel", "medium");
@@ -94,7 +94,7 @@ class AiActionAuditControllerTest {
                 eq(null),
                 eq("execute_command"),
                 eq("crm.account.update"),
-                eq("crm_account"),
+                eq("crm_account_common"),
                 eq(null),
                 eq("medium"),
                 eq("confirmed"),
