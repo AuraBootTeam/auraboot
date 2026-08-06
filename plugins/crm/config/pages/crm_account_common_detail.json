@@ -429,7 +429,7 @@
                   "url": "/api/datasource/list",
                   "params": {
                     "datasourceId": "nq:crm_account_timeline",
-                    "objectId": "${recordId}",
+                    "objectId": "${recordPid}",
                     "format": "records"
                   }
                 },
@@ -503,7 +503,7 @@
           "code": "view_360",
           "label": "$i18n:common.button.view",
           "icon": "BarChart2",
-          "variant": "outline",
+          "variant": "default",
           "action": {
             "type": "navigate",
             "to": "/dashboards/view/crm_account_360"

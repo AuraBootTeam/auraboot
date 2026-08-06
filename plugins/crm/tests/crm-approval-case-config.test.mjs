@@ -439,7 +439,7 @@ test('CRM manager workbench exposes pipeline risk and approval review queue', ()
   assert.equal(tasks.parentField, 'crm_act_related_id');
   assert.equal(tasks.dataSource?.params?.datasourceId, 'nq:crm_direct_tasks_by_related_object');
   assert.equal(tasks.dataSource?.params?.relatedModel, 'crm_customer_request_common');
-  assert.equal(tasks.dataSource?.params?.relatedId, '${recordId}');
+  assert.equal(tasks.dataSource?.params?.relatedId, '${recordPid}');
   const taskActions = new Set(tasks.actions?.map((action) => action.action?.command));
   assert.ok(taskActions.has('crm:start_task'), 'manager task table should allow starting tasks');
   assert.ok(taskActions.has('crm:complete_task'), 'manager task table should allow completing tasks');

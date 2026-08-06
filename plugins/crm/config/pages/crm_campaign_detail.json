@@ -143,7 +143,7 @@
                 "method": "get",
                 "params": {
                   "datasourceId": "nq:crm_campaign_performance_summary",
-                  "campaignId": "${recordId}"
+                  "campaignId": "${recordPid}"
                 }
               },
               "cards": [
@@ -260,7 +260,7 @@
                   "params": {
                     "datasourceId": "nq:crm_activities_by_object",
                     "objectType": "campaign",
-                    "objectId": "${recordId}"
+                    "objectId": "${recordPid}"
                   }
                 },
                 "readOnly": true,

@@ -22,8 +22,9 @@
  *   E4  opportunity form exposes forecast-category + competitor dimensions
  */
 import { test, expect, type Page } from '@playwright/test';
+import { BASE_URL } from '../../helpers/playwright-env';
 
-const BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5189';
+const BASE = BASE_URL;
 const EMAIL = 'admin@auraboot.com';
 const PW = 'Test2026x';
 const SHOT = '/tmp/m4-e2e';

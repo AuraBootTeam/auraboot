@@ -132,7 +132,7 @@
                   "params": {
                     "datasourceId": "nq:crm_activities_by_object",
                     "objectType": "complaint",
-                    "objectId": "${recordId}"
+                    "objectId": "${recordPid}"
                   }
                 },
                 "readOnly": true,

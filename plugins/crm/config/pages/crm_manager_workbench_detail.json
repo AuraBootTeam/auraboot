@@ -322,7 +322,7 @@
                   "params": {
                     "datasourceId": "nq:crm_direct_tasks_by_related_object",
                     "relatedModel": "crm_customer_request_common",
-                    "relatedId": "${recordId}",
+                    "relatedId": "${recordPid}",
                     "format": "records"
                   }
                 },

@@ -406,7 +406,7 @@
                   "params": {
                     "datasourceId": "nq:crm_activities_by_object",
                     "objectType": "opportunity",
-                    "objectId": "${recordId}",
+                    "objectId": "${recordPid}",
                     "format": "records"
                   }
                 },

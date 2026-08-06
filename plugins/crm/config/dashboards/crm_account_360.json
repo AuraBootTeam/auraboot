@@ -33,7 +33,7 @@
           "type": "namedQuery",
           "queryCode": "crm_account_stats",
           "params": {
-            "accountId": "${recordId}"
+            "accountId": "${recordPid}"
           }
         },
         "valueField": "total_contacts",
@@ -61,7 +61,7 @@
           "type": "namedQuery",
           "queryCode": "crm_account_stats",
           "params": {
-            "accountId": "${recordId}"
+            "accountId": "${recordPid}"
           }
         },
         "valueField": "open_opportunities",
@@ -89,7 +89,7 @@
           "type": "namedQuery",
           "queryCode": "crm_account_stats",
           "params": {
-            "accountId": "${recordId}"
+            "accountId": "${recordPid}"
           }
         },
         "valueField": "won_revenue",
@@ -118,7 +118,7 @@
           "type": "namedQuery",
           "queryCode": "crm_account_stats",
           "params": {
-            "accountId": "${recordId}"
+            "accountId": "${recordPid}"
           }
         },
         "valueField": "total_quotes",
@@ -146,7 +146,7 @@
           "type": "namedQuery",
           "queryCode": "crm_account_stats",
           "params": {
-            "accountId": "${recordId}"
+            "accountId": "${recordPid}"
           }
         },
         "valueField": "total_complaints",
@@ -174,7 +174,7 @@
           {
             "fieldName": "crm_opp_account_id",
             "operator": "EQ",
-            "value": "${recordId}"
+            "value": "${recordPid}"
           }
         ],
         "columns": [
@@ -236,7 +236,7 @@
           "url": "/api/datasource/list",
           "params": {
             "datasourceId": "nq:crm_account_timeline",
-            "objectId": "${recordId}",
+            "objectId": "${recordPid}",
             "format": "records",
             "maxItems": "10"
           }

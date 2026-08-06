@@ -39,7 +39,7 @@
             "type": "create_record",
             "modelCode": "crm_activity_relation_common",
             "fields": {
-              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "opportunity",
               "crm_ar_object_id": "${sourceRecordId}",
               "crm_ar_role": "primary"
@@ -94,7 +94,7 @@
             "type": "create_record",
             "modelCode": "crm_activity_relation_common",
             "fields": {
-              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "account",
               "crm_ar_object_id": "${sourceRecordId}",
               "crm_ar_role": "primary"
@@ -149,7 +149,7 @@
             "type": "create_record",
             "modelCode": "crm_activity_relation_common",
             "fields": {
-              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "lead",
               "crm_ar_object_id": "${sourceRecordId}",
               "crm_ar_role": "primary"
@@ -203,7 +203,7 @@
             "type": "create_record",
             "modelCode": "crm_activity_relation_common",
             "fields": {
-              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "opportunity",
               "crm_ar_object_id": "${sourceRecordId}",
               "crm_ar_role": "primary"
@@ -257,7 +257,7 @@
             "type": "create_record",
             "modelCode": "crm_activity_relation_common",
             "fields": {
-              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "account",
               "crm_ar_object_id": "${sourceRecordId}",
               "crm_ar_role": "primary"
@@ -311,7 +311,7 @@
             "type": "create_record",
             "modelCode": "crm_activity_relation_common",
             "fields": {
-              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "lead",
               "crm_ar_object_id": "${sourceRecordId}",
               "crm_ar_role": "primary"
@@ -365,7 +365,7 @@
             "type": "create_record",
             "modelCode": "crm_activity_relation_common",
             "fields": {
-              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "contact",
               "crm_ar_object_id": "${sourceRecordId}",
               "crm_ar_role": "primary"
@@ -418,7 +418,7 @@
             "type": "create_record",
             "modelCode": "crm_activity_relation_common",
             "fields": {
-              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "contact",
               "crm_ar_object_id": "${sourceRecordId}",
               "crm_ar_role": "primary"
@@ -472,7 +472,7 @@
             "type": "create_record",
             "modelCode": "crm_activity_relation_common",
             "fields": {
-              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "complaint",
               "crm_ar_object_id": "${sourceRecordId}",
               "crm_ar_role": "primary"
@@ -526,7 +526,7 @@
             "type": "create_record",
             "modelCode": "crm_activity_relation_common",
             "fields": {
-              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "campaign",
               "crm_ar_object_id": "${sourceRecordId}",
               "crm_ar_role": "primary"
@@ -579,7 +579,7 @@
             "type": "create_record",
             "modelCode": "crm_activity_relation_common",
             "fields": {
-              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "campaign",
               "crm_ar_object_id": "${sourceRecordId}",
               "crm_ar_role": "primary"
