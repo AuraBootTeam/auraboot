@@ -5,7 +5,9 @@ import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.IdempotencyService;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPipeline;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.permission.engine.model.PermissionResult;
 import com.auraboot.framework.permission.service.PermissionFacade;
@@ -18,7 +20,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationContext;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
@@ -50,21 +51,48 @@ class CommandTargetScopePhaseTest {
     @Mock private TenantMemberService tenantMemberService;
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private TransactionStatus transactionStatus;
+    @Mock private IdempotencyService idempotencyService;
+
+    /**
+     * A cached response is data too. Revoking the caller's row scope must stop the request before
+     * the idempotency ledger can reveal the old result.
+     */
+    @Test
+    void unreadableTargetCannotReplayACachedResult() {
+        CommandTargetScopePhase targetScope = phase();
+        givenRecordIsReadable(false);
+        CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
+        ctx.getRequest().setClientRequestId("known-key");
+        CommandPipeline pipeline = new CommandPipeline(
+                List.of(targetScope),
+                List.of(new IdempotencyPhase(idempotencyService)));
+
+        assertThatThrownBy(() -> {
+            if (pipeline.executePreGuardPhases(ctx) == null) {
+                pipeline.executeGuardedPhases(ctx);
+            }
+        }).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("do not have permission to view this record");
+
+        verifyNoInteractions(idempotencyService);
+    }
 
     @Test
-    void observeModeRecordsADenialWithoutBlockingTheCommand() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+    void targetDenialIsAlwaysEnforced() {
+        CommandTargetScopePhase phase = phase();
         givenRecordIsReadable(false);
         CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
 
-        phase.execute(ctx);
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("do not have permission to view this record");
 
         assertThat(ctx.getTargetRecordReadable()).isFalse();
     }
 
     @Test
-    void observeModeRecordsThatTheCallerCanSeeTheirOwnTarget() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+    void recordsThatTheCallerCanSeeTheirOwnTarget() {
+        CommandTargetScopePhase phase = phase();
         givenRecordIsReadable(true);
         CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
 
@@ -78,7 +106,7 @@ class CommandTargetScopePhaseTest {
 
     @Test
     void defersAStaleClientVersionUntilAfterEveryAuthorizationGate() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+        CommandTargetScopePhase phase = phase();
         givenRecordIsReadable(true);
         CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
         ctx.getRequest().setExpectedVersion(12);
@@ -90,7 +118,7 @@ class CommandTargetScopePhaseTest {
 
     @Test
     void acceptsAMatchingClientVersionAndRetainsTheAuthoritativeVersion() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+        CommandTargetScopePhase phase = phase();
         givenRecordIsReadable(true);
         CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
         ctx.getRequest().setExpectedVersion(13);
@@ -101,8 +129,8 @@ class CommandTargetScopePhaseTest {
     }
 
     @Test
-    void leavesAnUnversionedObservationForTheTransactionalLockToReject() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+    void leavesAnUnversionedBoundaryReadForTheTransactionalLockToReject() {
+        CommandTargetScopePhase phase = phase();
         when(dynamicDataService.getById(anyString(), anyString()))
                 .thenReturn(Map.of("pid", "REC-1", "owner_id", 7L));
         givenPermission(true);
@@ -114,16 +142,6 @@ class CommandTargetScopePhaseTest {
         assertThat(ctx.getTargetRecordVersion()).isNull();
     }
 
-    @Test
-    void enforceModeDeniesATargetTheCallerCannotSee() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_ENFORCE);
-        givenRecordIsReadable(false);
-
-        assertThatThrownBy(() -> phase.execute(context("qo_quote_common", "REC-1")))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("do not have permission to view this record");
-    }
-
     /**
      * The boundary has to SEE the row to judge it. Reading it through the very projection under
      * evaluation would deny the read for exactly the callers this check exists to evaluate, and the
@@ -131,7 +149,7 @@ class CommandTargetScopePhaseTest {
      */
     @Test
     void readsTheTargetOutsideTheCallersOwnProjection() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+        CommandTargetScopePhase phase = phase();
         AtomicBoolean allPermitDuringRead = new AtomicBoolean(false);
         when(dynamicDataService.getById(anyString(), anyString())).thenAnswer(invocation -> {
             allPermitDuringRead.set("ALL".equals(MetaContext.getCommandPermitScope()));
@@ -149,50 +167,47 @@ class CommandTargetScopePhaseTest {
 
     @Test
     void skipsWhenTheRequestNamesNoTargetRecord() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_ENFORCE);
+        CommandTargetScopePhase phase = phase();
 
         assertThat(phase.shouldSkip(context("qo_quote_common", null))).isTrue();
     }
 
     @Test
     void skipsWhenTheCommandHasNoModel() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_ENFORCE);
+        CommandTargetScopePhase phase = phase();
 
         assertThat(phase.shouldSkip(context(null, "REC-1"))).isTrue();
     }
 
     @Test
-    void offModeDoesNotReadTheRecordAtAll() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OFF);
+    void targetedCommandCannotSkipTheGate() {
+        CommandTargetScopePhase phase = phase();
 
-        assertThat(phase.shouldSkip(context("qo_quote_common", "REC-1"))).isTrue();
+        assertThat(phase.shouldSkip(context("qo_quote_common", "REC-1"))).isFalse();
         verifyNoInteractions(dynamicDataService);
     }
 
     /**
-     * An observation must not be able to break the thing it observes. The target may be addressed in
-     * a way this lookup does not resolve (getById THROWS for a miss, it does not return null), or the
-     * permission beans may be absent in a narrowed context — none of which is a reason to fail a
-     * command that would otherwise have succeeded. Caught by the DSL command tests before this test
-     * existed: every UPDATE command in them died on "Record not found".
+     * An authorization read that cannot be evaluated must fail closed and roll back its isolated
+     * transaction before the error reaches the outer command transaction.
      */
     @Test
-    void observeModeNeverBreaksTheCommandItObserves() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+    void lookupFailureFailsClosedAndRollsBackTheBoundaryRead() {
+        CommandTargetScopePhase phase = phase();
         givenMember();
         when(dynamicDataService.getById(anyString(), anyString()))
                 .thenThrow(new BusinessException("Record not found: 1 in model: dsl_t_1"));
         CommandPipelineContext ctx = context("qo_quote_common", "1");
 
-        phase.execute(ctx);
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class);
 
         assertThat(ctx.getTargetRecordReadable()).isNull();
         verify(transactionManager).rollback(transactionStatus);
     }
 
     @Test
-    void evaluatesTheObservationInARequiresNewTransaction() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+    void evaluatesTheBoundaryReadInARequiresNewTransaction() {
+        CommandTargetScopePhase phase = phase();
         givenRecordIsReadable(true);
 
         phase.execute(context("qo_quote_common", "REC-1"));
@@ -203,22 +218,10 @@ class CommandTargetScopePhaseTest {
         verify(transactionManager).commit(transactionStatus);
     }
 
-    /** An enforcing gate that cannot evaluate must fail closed, never degrade to a warning. */
-    @Test
-    void enforceModeFailsClosedWhenItCannotEvaluate() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_ENFORCE);
-        givenMember();
-        when(dynamicDataService.getById(anyString(), anyString()))
-                .thenThrow(new BusinessException("Record not found: 1 in model: dsl_t_1"));
-
-        assertThatThrownBy(() -> phase.execute(context("qo_quote_common", "1")))
-                .isInstanceOf(BusinessException.class);
-    }
-
     /** A missing record is a "not found" answer for a later phase, not an authorization verdict. */
     @Test
     void leavesTheVerdictUnsetWhenTheTargetDoesNotExist() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_ENFORCE);
+        CommandTargetScopePhase phase = phase();
         when(dynamicDataService.getById(anyString(), anyString())).thenReturn(null);
         givenMember();
         CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
@@ -232,11 +235,11 @@ class CommandTargetScopePhaseTest {
 
     @Test
     void recordsADenyPhaseDecisionWhenTheCallerCannotSeeTheTarget() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+        CommandTargetScopePhase phase = phase();
         givenRecordIsReadable(false);
         CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
 
-        phase.execute(ctx);
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class);
 
         assertThat(ctx.getPhaseDecisions()).singleElement().satisfies(d -> {
             assertThat(d.decision()).isEqualTo(CommandPermitPlan.Decision.DENY);
@@ -245,10 +248,10 @@ class CommandTargetScopePhaseTest {
         });
     }
 
-    /** The decision is recorded even while enforcing, before the throw aborts the pipeline. */
+    /** The decision is recorded before the throw aborts the pipeline. */
     @Test
-    void recordsTheDenyPhaseDecisionBeforeThrowingInEnforceMode() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_ENFORCE);
+    void recordsTheDenyPhaseDecisionBeforeThrowing() {
+        CommandTargetScopePhase phase = phase();
         givenRecordIsReadable(false);
         CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
 
@@ -267,7 +270,7 @@ class CommandTargetScopePhaseTest {
      */
     @Test
     void abstainsRatherThanPermitsWhenTheCallerCanSeeTheTarget() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+        CommandTargetScopePhase phase = phase();
         givenRecordIsReadable(true);
         CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
 
@@ -280,7 +283,7 @@ class CommandTargetScopePhaseTest {
 
     @Test
     void recordsAnAbstainPhaseDecisionWhenTheTargetDoesNotExist() {
-        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_ENFORCE);
+        CommandTargetScopePhase phase = phase();
         when(dynamicDataService.getById(anyString(), anyString())).thenReturn(null);
         givenMember();
         CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
@@ -292,13 +295,24 @@ class CommandTargetScopePhaseTest {
                 .isEqualTo(CommandPermitPlan.Decision.ABSTAIN);
     }
 
-    private CommandTargetScopePhase phase(String mode) {
+    @Test
+    void authenticatedCallerWithoutTenantMembershipFailsClosed() {
+        CommandTargetScopePhase phase = phase();
+        when(dynamicDataService.getById(anyString(), anyString())).thenReturn(RECORD);
+        when(applicationContext.getBean(TenantMemberService.class)).thenReturn(tenantMemberService);
+        when(tenantMemberService.findByTenantIdAndUserId(1L, 42L)).thenReturn(null);
+
+        assertThatThrownBy(() -> phase.execute(context("qo_quote_common", "REC-1")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("active tenant membership is required");
+
+        verifyNoInteractions(permissionFacade);
+    }
+
+    private CommandTargetScopePhase phase() {
         when(transactionManager.getTransaction(any(TransactionDefinition.class)))
                 .thenReturn(transactionStatus);
-        CommandTargetScopePhase phase =
-                new CommandTargetScopePhase(dynamicDataService, applicationContext, transactionManager);
-        ReflectionTestUtils.setField(phase, "mode", mode);
-        return phase;
+        return new CommandTargetScopePhase(dynamicDataService, applicationContext, transactionManager);
     }
 
     private void givenRecordIsReadable(boolean readable) {

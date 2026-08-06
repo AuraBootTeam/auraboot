@@ -14,7 +14,6 @@ import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -40,12 +39,10 @@ import java.util.Map;
  * record, and where "which record" is still a meaningful question. Rows the handler derives for
  * itself (evidence, audit, roll-ups) are internal bookkeeping and are deliberately out of scope.</p>
  *
- * <p><b>Currently observing, not enforcing.</b> While the deep projection is still in place this
- * check would only duplicate it, and turning both on at once would make it impossible to tell which
- * one denied a request. Running it in observe mode first also answers the question that decides
- * whether the deeper change is safe at all: on a real workload, which commands would newly be
- * allowed to touch a target the caller cannot read? If that set is empty, the boundary is complete;
- * if it is not, the boundary is not ready and enforcement must wait.</p>
+ * <p><b>This is an enforcing gate.</b> It runs before idempotency lookup, so a caller whose row
+ * access was revoked cannot use a previously known request key to retrieve a cached result. The
+ * former observe/off migration modes were intentionally removed once command permit plans became
+ * authoritative: an authorization gate cannot safely be configurable as fail-open.</p>
  */
 @Slf4j
 @Component
@@ -53,22 +50,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CommandTargetScopePhase implements CommandPhase {
 
-    /** Observe (default): evaluate and record, never deny. */
-    static final String MODE_OBSERVE = "observe";
-    /** Enforce: deny at the boundary. Flipped together with removing the deep projection. */
-    static final String MODE_ENFORCE = "enforce";
-
     /** The caller cannot read the record they named — a BOLA refusal. */
     static final String REASON_TARGET_NOT_READABLE = "target_record_not_readable";
-    /** Off: skip entirely. Diagnostic escape hatch — costs one read per targeted command. */
-    static final String MODE_OFF = "off";
 
     private final DynamicDataService dynamicDataService;
     private final ApplicationContext applicationContext;
     private final PlatformTransactionManager transactionManager;
-
-    @Value("${aura.command.target-scope.mode:observe}")
-    private String mode;
 
     @Override
     public String name() {
@@ -77,9 +64,6 @@ public class CommandTargetScopePhase implements CommandPhase {
 
     @Override
     public boolean shouldSkip(CommandPipelineContext ctx) {
-        if (MODE_OFF.equalsIgnoreCase(mode)) {
-            return true;
-        }
         CommandDefinition command = ctx.getCommand();
         return command == null
                 || !StringUtils.hasText(command.getModelCode())
@@ -88,25 +72,9 @@ public class CommandTargetScopePhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
-        boolean enforcing = MODE_ENFORCE.equalsIgnoreCase(mode);
-
-        Boolean readable;
-        try {
-            readable = evaluateReadableInIsolatedTransaction(ctx);
-        } catch (RuntimeException ex) {
-            if (enforcing) {
-                // A gate that cannot evaluate must fail closed. Never downgrade an enforcing check
-                // into a warning — that is how a gate quietly stops being a gate.
-                throw ex;
-            }
-            // While only observing, this phase must not be able to break the command it is
-            // observing: the target may be addressed in a way this lookup does not resolve, or the
-            // permission beans may be absent in a narrowed context. Those are reasons to have no
-            // observation, not reasons to fail a command that would otherwise have succeeded.
-            log.warn("Boundary target-scope observation failed; command unaffected: command={} error={}",
-                    ctx.getCommandCode(), ex.toString());
-            return;
-        }
+        // An authorization gate that cannot evaluate must fail closed. This includes lookup,
+        // membership and permission-engine failures; none may degrade into an idempotent replay.
+        Boolean readable = evaluateReadableInIsolatedTransaction(ctx);
 
         if (readable == null) {
             // No subject, or the named record does not exist — no authorization decision to make.
@@ -125,28 +93,23 @@ public class CommandTargetScopePhase implements CommandPhase {
         }
 
         // The caller cannot see the record they named. Record the refusal for the permit plan
-        // regardless of this phase's own observe/enforce mode — the plan captures what was DECIDED,
-        // not whether this phase happened to throw immediately.
+        // before throwing so the complete boundary decision remains auditable.
         ctx.recordPhaseDecision(
                 CommandPermitPlan.PhaseDecision.deny(REASON_TARGET_NOT_READABLE, name()));
-        log.info("Boundary target-scope check would deny: command={} model={} record={} mode={}",
+        log.info("Boundary target-scope check denied: command={} model={} record={}",
                 ctx.getCommandCode(), ctx.getCommand().getModelCode(),
-                ctx.getRequest().getTargetRecordId(), mode);
-        if (enforcing) {
-            throw new BusinessException(ResponseCode.FORBIDDEN,
-                    "Access denied: you do not have permission to view this record");
-        }
+                ctx.getRequest().getTargetRecordId());
+        throw new BusinessException(ResponseCode.FORBIDDEN,
+                "Access denied: you do not have permission to view this record");
     }
 
     /**
-     * Keep an observational read failure from poisoning the command transaction.
+     * Keep a boundary read failure from poisoning the outer command transaction.
      *
      * <p>PostgreSQL marks the whole transaction aborted after a statement error. Catching the
-     * resulting exception in observe mode is therefore not enough: every later phase still fails
-     * with {@code current transaction is aborted}. A new transaction gives the observation its own
-     * rollback boundary, so the documented "command unaffected" contract is actually true. In
-     * enforce mode the same exception is rethrown after the inner rollback and the gate still fails
-     * closed.</p>
+     * resulting exception is therefore not enough: the outer transaction would remain aborted.
+     * A new transaction gives the boundary read its own rollback boundary; the exception is then
+     * rethrown and the gate fails closed without contaminating unrelated transaction state.</p>
      */
     private Boolean evaluateReadableInIsolatedTransaction(CommandPipelineContext ctx) {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
@@ -209,11 +172,20 @@ public class CommandTargetScopePhase implements CommandPhase {
         }
         Long tenantId = ctx.getTenantId();
         Long userId = ctx.getUserId();
-        if (tenantId == null || userId == null) {
+        if (userId == null) {
+            // A true system/scheduled invocation has no user subject to evaluate.
             return null;
+        }
+        if (tenantId == null) {
+            throw new BusinessException(ResponseCode.FORBIDDEN,
+                    "Access denied: tenant membership context is missing");
         }
         TenantMember member = applicationContext.getBean(TenantMemberService.class)
                 .findByTenantIdAndUserId(tenantId, userId);
-        return member == null ? null : member.getId();
+        if (member == null || member.getId() == null) {
+            throw new BusinessException(ResponseCode.FORBIDDEN,
+                    "Access denied: active tenant membership is required");
+        }
+        return member.getId();
     }
 }

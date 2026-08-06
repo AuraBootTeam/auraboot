@@ -97,9 +97,9 @@ public class CommandPipelineContext {
      * Whether the caller may read the record they named in the request — evaluated at the boundary
      * by CommandTargetScopePhase. Null when the command has no user-named target to check.
      *
-     * <p>Currently observed, not enforced: today the caller's record-level projection still runs
-     * deeper in the data layer, so enforcing here would only duplicate it. It becomes the surviving
-     * check once that deep projection stops applying to a handler's own bookkeeping writes.</p>
+     * <p>This verdict is enforced before idempotency lookup. The data layer may still apply its own
+     * scoped guards, but a cached result is never returned to a caller who can no longer read the
+     * named target.</p>
      */
     private Boolean targetRecordReadable;
 

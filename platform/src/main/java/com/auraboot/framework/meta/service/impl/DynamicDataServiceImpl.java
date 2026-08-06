@@ -18,6 +18,8 @@ import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.util.JsonbFieldHelper;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
 import com.auraboot.framework.permission.engine.model.PermissionResult;
@@ -646,6 +648,48 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return false;
     }
 
+    private record ReferenceReadAccess(boolean allowed, String rowFilter) {
+        private static ReferenceReadAccess denied() {
+            return new ReferenceReadAccess(false, "");
+        }
+
+        private static ReferenceReadAccess allowed(String rowFilter) {
+            return new ReferenceReadAccess(true, rowFilter == null ? "" : rowFilter);
+        }
+    }
+
+    /**
+     * Resolve the complete target-side read boundary for a reference lookup.
+     *
+     * <p>Reading the source model is not authority to enumerate or reveal labels from a different
+     * business model. Reference options and display enrichment therefore require target-model
+     * RBAC first, then apply that target's row scope. The small system identity map retains the
+     * platform's existing tenant-scoped user-name resolution contract; it has no dynamic model
+     * permission definition to evaluate.
+     */
+    private ReferenceReadAccess evaluateReferenceReadAccess(
+            Long tenantId, Long userId, String targetModelCode) {
+        if (tenantId == null || userId == null || !hasText(targetModelCode)) {
+            return ReferenceReadAccess.denied();
+        }
+        if (SYSTEM_TABLE_MAP.containsKey(targetModelCode)) {
+            return ReferenceReadAccess.allowed("");
+        }
+        try {
+            Long memberId = currentMemberIdForFieldPermissions();
+            if (memberId == null
+                    || !getPermissionFacade().canAction(memberId, targetModelCode, "read")) {
+                return ReferenceReadAccess.denied();
+            }
+            return ReferenceReadAccess.allowed(
+                    dataPermissionEngine.buildRowFilter(tenantId, targetModelCode, userId));
+        } catch (Exception e) {
+            log.error("Reference target authorization failed for model {}; denying lookup",
+                    logSafe(targetModelCode), e);
+            return ReferenceReadAccess.denied();
+        }
+    }
+
     private void enrichReferenceDisplayFields(String modelCode, List<Map<String, Object>> records) {
         Optional<ModelDefinition> modelOpt = metadataService.getModelDefinition(modelCode);
         if (modelOpt.isEmpty()) return;
@@ -671,6 +715,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             String targetModelCode = canonical[0];
             String displayField = canonical[1];
             if (targetModelCode == null || targetModelCode.isBlank()) continue;
+
+            ReferenceReadAccess targetAccess = evaluateReferenceReadAccess(
+                    tenantId, userId, targetModelCode);
+            if (!targetAccess.allowed()) {
+                continue;
+            }
 
             // Sensitive reference: if the display field is masked for THIS user on the target model,
             // do NOT system-resolve a name — leave it to the normal per-user path so masking/field
@@ -710,7 +760,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 String sql = "SELECT pid, " + displayColumnExpr + " AS " + displayColumnName
                         + " FROM " + targetTable
                         + " WHERE pid IN (" + inClause + ")"
-                        + buildSoftDeleteClause(targetModelOpt.orElse(null));
+                        + buildSoftDeleteClause(targetModelOpt.orElse(null))
+                        + (targetAccess.rowFilter().isBlank() ? "" : " " + targetAccess.rowFilter());
 
                 List<Map<String, Object>> targetRows = dynamicDataMapper.selectByQuery(sql, java.util.Collections.emptyMap());
                 Map<String, String> displayMap = new java.util.HashMap<>();
@@ -2793,8 +2844,18 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
 
         Long tenantId = getCurrentTenantId();
+        Long userId = getCurrentUserId();
         int limit = optionRequest != null && optionRequest.getLimit() != null ? optionRequest.getLimit() : 50;
         int offset = optionRequest != null && optionRequest.getOffset() != null ? optionRequest.getOffset() : 0;
+
+        ReferenceReadAccess targetAccess = evaluateReferenceReadAccess(
+                tenantId, userId, target.targetModelCode());
+        if (!targetAccess.allowed()) {
+            throw new BusinessException(
+                    ResponseCode.FORBIDDEN,
+                    "Read permission is required for reference target model: "
+                            + target.targetModelCode());
+        }
 
         // Build query
         StringBuilder sql = new StringBuilder();
@@ -2806,19 +2867,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         Map<String, Object> params = new HashMap<>();
         params.put("tenantId", tenantId);
 
-        // Row-level permission filter on reference target model (fail-secure)
-        try {
-            String refModelCode = target.targetModelCode();
-            if (refModelCode != null) {
-                Long userId = getCurrentUserId();
-                String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, refModelCode, userId);
-                if (rowFilter != null && !rowFilter.isBlank()) {
-                    sql.append(" ").append(rowFilter);
-                }
-            }
-        } catch (Exception e) {
-            log.error("Failed to apply row-level permission in getFieldOptions — denying access", e);
-            throw new MetaServiceException("Data permission evaluation failed for field options", e);
+        if (!targetAccess.rowFilter().isBlank()) {
+            sql.append(" ").append(targetAccess.rowFilter());
         }
 
         // Add keyword filter

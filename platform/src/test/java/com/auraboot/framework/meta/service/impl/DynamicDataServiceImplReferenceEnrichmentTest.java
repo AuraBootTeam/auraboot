@@ -1,14 +1,19 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.file.service.FileService;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.auraboot.framework.meta.dto.FieldDefinition;
+import com.auraboot.framework.meta.dto.FieldOption;
+import com.auraboot.framework.meta.dto.FieldOptionRequest;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.service.*;
 import com.auraboot.framework.meta.service.executor.ExecutorRegistry;
 import com.auraboot.framework.permission.service.FieldPermissionService;
+import com.auraboot.framework.permission.service.PermissionFacade;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -74,6 +80,7 @@ class DynamicDataServiceImplReferenceEnrichmentTest {
     @Mock private PayloadTemporalNormalizer payloadTemporalNormalizer;
     @Mock private FieldPermissionService fieldPermissionService;
     @Mock private ExecutorRegistry executorRegistry;
+    @Mock private PermissionFacade permissionFacade;
 
     @InjectMocks
     private DynamicDataServiceImpl service;
@@ -81,6 +88,9 @@ class DynamicDataServiceImplReferenceEnrichmentTest {
     @BeforeEach
     void setContext() {
         MetaContext.setContext(1L, 2L, "user-pid", "tester");
+        // PermissionFacade is member-scoped, while DataPermissionEngine is user-scoped. Keep the
+        // ids deliberately different so a regression cannot silently interchange them.
+        MetaContext.setMemberId(99L);
     }
 
     @AfterEach
@@ -184,5 +194,169 @@ class DynamicDataServiceImplReferenceEnrichmentTest {
 
         assertEquals("Alice", record.get("crm_acc_owner_display"));
         verify(dynamicDataMapper).selectByQuery(argThat(sql -> sql.contains(" AS display_value")), anyMap());
+    }
+
+    @Test
+    @DisplayName("business reference display is suppressed when the caller cannot read the target model")
+    void targetModelReadDenialSuppressesReferenceDisplay() {
+        String targetModelCode = "crm_customer_request";
+        FieldDefinition requestRef = field("crm_qdp_request_id", "reference", Map.of(
+                "refTarget", Map.of(
+                        "targetEntity", targetModelCode,
+                        "valueField", "pid",
+                        "displayField", "crm_cr_title")));
+        requestRef.setColumnName("crm_qdp_request_id");
+        ModelDefinition source = ModelDefinition.builder()
+                .code("pcba_qdp_release")
+                .tableName("mt_pcba_qdp_release")
+                .fields(List.of(requestRef))
+                .build();
+        when(metadataService.getModelDefinition("pcba_qdp_release")).thenReturn(Optional.of(source));
+        when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
+        when(permissionFacade.canAction(99L, targetModelCode, "read")).thenReturn(false);
+
+        Map<String, Object> record = new HashMap<>();
+        record.put("crm_qdp_request_id", "request-1");
+        ReflectionTestUtils.invokeMethod(service, "enrichReferenceDisplayFields",
+                "pcba_qdp_release", new ArrayList<>(List.of(record)));
+
+        assertFalse(record.containsKey("crm_qdp_request_id_display"));
+        verify(dynamicDataMapper, never()).selectByQuery(argThat(sql -> true), anyMap());
+    }
+
+    @Test
+    @DisplayName("business reference display query applies the target model row filter")
+    void targetModelRowScopeRestrictsReferenceDisplay() {
+        String targetModelCode = "crm_customer_request";
+        FieldDefinition requestRef = field("crm_qdp_request_id", "reference", Map.of(
+                "refTarget", Map.of(
+                        "targetEntity", targetModelCode,
+                        "valueField", "pid",
+                        "displayField", "crm_cr_title")));
+        requestRef.setColumnName("crm_qdp_request_id");
+        ModelDefinition source = ModelDefinition.builder()
+                .code("pcba_qdp_release")
+                .tableName("mt_pcba_qdp_release")
+                .fields(List.of(requestRef))
+                .build();
+        ModelDefinition target = targetModel(targetModelCode, "crm_cr_title", "mt_crm_customer_request");
+        when(metadataService.getModelDefinition("pcba_qdp_release")).thenReturn(Optional.of(source));
+        when(metadataService.getModelDefinition(targetModelCode)).thenReturn(Optional.of(target));
+        when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
+        when(permissionFacade.canAction(99L, targetModelCode, "read")).thenReturn(true);
+        when(dataPermissionEngine.buildRowFilter(1L, targetModelCode, 2L))
+                .thenReturn("AND created_by = 2");
+        when(dataPermissionEngine.getFieldMaskRules(1L, targetModelCode, 2L)).thenReturn(List.of());
+        when(dynamicDataMapper.selectByQuery(argThat(sql -> sql.contains("AND created_by = 2")), anyMap()))
+                .thenReturn(List.of(Map.of("pid", "request-1", "crm_cr_title", "Authorized request")));
+
+        Map<String, Object> record = new HashMap<>();
+        record.put("crm_qdp_request_id", "request-1");
+        ReflectionTestUtils.invokeMethod(service, "enrichReferenceDisplayFields",
+                "pcba_qdp_release", new ArrayList<>(List.of(record)));
+
+        assertEquals("Authorized request", record.get("crm_qdp_request_id_display"));
+        verify(dynamicDataMapper).selectByQuery(
+                argThat(sql -> sql.contains("AND created_by = 2")), anyMap());
+    }
+
+    @Test
+    @DisplayName("field options fail with 403 before SQL when target model read is denied")
+    void fieldOptionsDenyBeforeQueryWithoutTargetModelRead() {
+        ReferenceModels models = referenceModels();
+        when(metadataService.getModelDefinition(models.source().getCode()))
+                .thenReturn(Optional.of(models.source()));
+        when(metadataService.getModelDefinition(models.target().getCode()))
+                .thenReturn(Optional.of(models.target()));
+        when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
+        when(permissionFacade.canAction(99L, models.target().getCode(), "read")).thenReturn(false);
+
+        BusinessException denied = org.junit.jupiter.api.Assertions.assertThrows(
+                BusinessException.class,
+                () -> service.getFieldOptions(
+                        models.source().getCode(), "customer_request_id", FieldOptionRequest.builder().build()));
+
+        assertEquals(ResponseCode.FORBIDDEN, denied.getResponseCode());
+        verify(dynamicDataMapper, never()).selectByQuery(argThat(sql -> true), anyMap());
+    }
+
+    @Test
+    @DisplayName("field options fail closed before SQL when target authorization cannot be evaluated")
+    void fieldOptionsFailClosedWhenTargetAuthorizationErrors() {
+        ReferenceModels models = referenceModels();
+        when(metadataService.getModelDefinition(models.source().getCode()))
+                .thenReturn(Optional.of(models.source()));
+        when(metadataService.getModelDefinition(models.target().getCode()))
+                .thenReturn(Optional.of(models.target()));
+        when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
+        when(permissionFacade.canAction(99L, models.target().getCode(), "read"))
+                .thenThrow(new IllegalStateException("permission backend unavailable"));
+
+        BusinessException denied = org.junit.jupiter.api.Assertions.assertThrows(
+                BusinessException.class,
+                () -> service.getFieldOptions(
+                        models.source().getCode(), "customer_request_id", FieldOptionRequest.builder().build()));
+
+        assertEquals(ResponseCode.FORBIDDEN, denied.getResponseCode());
+        verify(dynamicDataMapper, never()).selectByQuery(argThat(sql -> true), anyMap());
+    }
+
+    @Test
+    @DisplayName("field options apply target model read permission and row scope")
+    void fieldOptionsApplyTargetModelReadAndRowScope() {
+        ReferenceModels models = referenceModels();
+        when(metadataService.getModelDefinition(models.source().getCode()))
+                .thenReturn(Optional.of(models.source()));
+        when(metadataService.getModelDefinition(models.target().getCode()))
+                .thenReturn(Optional.of(models.target()));
+        when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
+        when(permissionFacade.canAction(99L, models.target().getCode(), "read")).thenReturn(true);
+        when(dataPermissionEngine.buildRowFilter(1L, models.target().getCode(), 2L))
+                .thenReturn("AND created_by = 2");
+        when(dynamicDataMapper.selectByQuery(
+                argThat(sql -> sql.contains("AND created_by = 2")), anyMap()))
+                .thenReturn(List.of(Map.of("pid", "request-1", "crm_cr_title", "Authorized request")));
+
+        List<FieldOption> options = service.getFieldOptions(
+                models.source().getCode(), "customer_request_id", FieldOptionRequest.builder().build());
+
+        assertEquals(1, options.size());
+        assertEquals("request-1", options.getFirst().getValue());
+        assertEquals("Authorized request", options.getFirst().getLabel());
+        verify(dynamicDataMapper).selectByQuery(
+                argThat(sql -> sql.contains("AND created_by = 2")), anyMap());
+    }
+
+    private ReferenceModels referenceModels() {
+        String targetModelCode = "crm_customer_request";
+        FieldDefinition requestRef = field("customer_request_id", "reference", Map.of(
+                "refTarget", Map.of(
+                        "targetEntity", targetModelCode,
+                        "valueField", "pid",
+                        "displayField", "crm_cr_title")));
+        requestRef.setColumnName("customer_request_id");
+        ModelDefinition source = ModelDefinition.builder()
+                .code("pcba_qdp_release")
+                .tableName("mt_pcba_qdp_release")
+                .fields(List.of(requestRef))
+                .build();
+        return new ReferenceModels(
+                source,
+                targetModel(targetModelCode, "crm_cr_title", "mt_crm_customer_request"));
+    }
+
+    private ModelDefinition targetModel(String code, String displayField, String tableName) {
+        FieldDefinition pid = field("pid", "string", Map.of());
+        pid.setColumnName("pid");
+        FieldDefinition title = field(displayField, "string", Map.of());
+        title.setColumnName(displayField);
+        return ModelDefinition.builder()
+                .code(code)
+                .tableName(tableName)
+                .fields(List.of(pid, title))
+                .build();
+    }
+
+    private record ReferenceModels(ModelDefinition source, ModelDefinition target) {
     }
 }
