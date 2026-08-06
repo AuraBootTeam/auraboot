@@ -58,4 +58,26 @@ class CommandIdempotencyIntentTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unsupported mutable command payload value");
     }
+
+    @Test
+    void bindsAReplayToTheAuthenticatedActor() {
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setTargetRecordPid("REQ-1");
+        CommandPipelineContext firstCaller = CommandPipelineContext.builder()
+                .commandCode("dq:release")
+                .request(request)
+                .userId(101L)
+                .payload(Map.of("source", "same"))
+                .build();
+        CommandPipelineContext secondCaller = CommandPipelineContext.builder()
+                .commandCode("dq:release")
+                .request(request)
+                .userId(202L)
+                .payload(Map.of("source", "same"))
+                .build();
+
+        assertThat(CommandIdempotencyIntent.snapshot(firstCaller))
+                .containsEntry("actorUserId", 101L)
+                .isNotEqualTo(CommandIdempotencyIntent.snapshot(secondCaller));
+    }
 }

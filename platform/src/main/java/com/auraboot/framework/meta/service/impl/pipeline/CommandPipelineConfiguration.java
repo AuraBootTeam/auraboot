@@ -47,8 +47,9 @@ public class CommandPipelineConfiguration {
 
         List<CommandPhase> guardedPhases = List.of(
                 sodCheckPhase,
-                // Replay is allowed only after every authorization gate. The atomic database claim
-                // then fences handler execution; a non-replay locks/rechecks the target version.
+                // Replay is allowed only after every enforcing authorization gate, including the
+                // target-row BOLA gate. The atomic database claim then fences handler execution; a
+                // non-replay locks/rechecks the target version.
                 idempotencyPhase,
                 commandTargetVersionLockPhase,
                 // Assemble the permit plan right after the last authorization gate (SoD) and before

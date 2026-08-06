@@ -14,9 +14,10 @@ import java.util.Map;
 /**
  * Builds the immutable, canonical command intent fenced by an idempotency key.
  *
- * <p>The command payload is intentionally copied before any normalize/auto-set/computed phase can
- * mutate it. Claim and completion then hash the exact same object, so successful execution can
- * never write an outcome under a different intent than the one that entered the handler.</p>
+ * <p>The authenticated actor and command payload are intentionally captured before any
+ * normalize/auto-set/computed phase can mutate state. Claim and completion then hash the exact same
+ * object, so successful execution can never write an outcome under a different actor or intent than
+ * the one that entered the handler.</p>
  */
 public final class CommandIdempotencyIntent {
 
@@ -27,6 +28,10 @@ public final class CommandIdempotencyIntent {
     public static Map<String, Object> snapshot(CommandPipelineContext ctx) {
         CommandExecuteRequest request = ctx.getRequest();
         Map<String, Object> intent = new LinkedHashMap<>();
+        // A cached command response may contain actor-specific data. Binding the immutable intent
+        // to the authenticated user makes a known key unusable by another caller: the durable
+        // idempotency claim sees an intent mismatch and fails closed instead of replaying it.
+        intent.put("actorUserId", ctx.getUserId());
         intent.put("commandCode", ctx.getCommandCode());
         intent.put("targetRecordPid", request == null ? null : request.getTargetRecordId());
         intent.put("operationType", request == null ? null : request.getOperationType());
