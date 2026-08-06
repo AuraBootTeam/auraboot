@@ -302,6 +302,7 @@ public class CommandSideEffectExecutor {
         }
 
         try {
+            assertMutableTarget(targetModel, "updated by a side effect");
             String tableName = metaModelService.getTableName(targetModel);
             String recordIdVal = targetRecordIdObj.toString();
             var idEntry = CommandExecutorUtils.resolveRecordIdColumn(recordIdVal);
@@ -600,6 +601,7 @@ public class CommandSideEffectExecutor {
         BigDecimal result = computeAggregate(function, values);
 
         // Update parent record
+        assertMutableTarget(targetModel, "updated by an aggregate side effect");
         String parentTable = metaModelService.getTableName(targetModel);
         var idEntry = CommandExecutorUtils.resolveRecordIdColumn(parentId);
         executeScopedUpdate(parentTable, targetModel, idEntry, Map.of(parentField, result),
@@ -696,6 +698,7 @@ public class CommandSideEffectExecutor {
             return;
         }
 
+        assertMutableTarget(targetModel, "batch updated by a side effect");
         String tableName = metaModelService.getTableName(targetModel);
         // Resolve jsonb columns once per batch — same model/table for every row.
         Set<String> jsonbCols = resolveJsonbColumns(targetModel, tableName);
@@ -733,6 +736,11 @@ public class CommandSideEffectExecutor {
 
         log.info("BATCH_UPDATE_RECORD: updated {} record(s) in {} from sourceField '{}'",
                 totalUpdated, targetModel, sourceField);
+    }
+
+    private void assertMutableTarget(String modelCode, String operation) {
+        ModelDefinition model = metaModelService.getModelDefinition(modelCode).orElse(null);
+        ModelMutationGuard.assertMutable(model, operation);
     }
 
     /**

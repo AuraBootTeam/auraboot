@@ -34,6 +34,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -202,5 +203,30 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
         // Exactly one permission evaluation — the pre-update read. If the post-write
         // read-back stops using explicit ALL it adds a second one and this fails.
         verify(permissionFacade, times(1)).canOperate(anyLong(), eq(MODEL_CODE), eq("read"), anyMap());
+    }
+
+    @Test
+    @DisplayName("immutable model rejects direct update before reading or writing the record")
+    void update_immutableModel_rejectedAtRuntimeBoundary() {
+        model.setImmutable(true);
+
+        assertThatThrownBy(() -> service.update(
+                MODEL_CODE, RECORD_ID, new HashMap<>(Map.of("name", "forbidden"))))
+                .hasMessageContaining("immutable");
+
+        verify(dynamicDataMapper, never()).updateByQuery(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
+    }
+
+    @Test
+    @DisplayName("immutable model rejects direct delete before reading or writing the record")
+    void delete_immutableModel_rejectedAtRuntimeBoundary() {
+        model.setImmutable(true);
+
+        assertThatThrownBy(() -> service.delete(MODEL_CODE, RECORD_ID))
+                .hasMessageContaining("immutable");
+
+        verify(dynamicDataMapper, never()).deleteByQuery(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
     }
 }

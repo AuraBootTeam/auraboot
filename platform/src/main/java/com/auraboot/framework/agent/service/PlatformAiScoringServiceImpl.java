@@ -8,6 +8,7 @@ import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.impl.ModelMutationGuard;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,12 @@ public class PlatformAiScoringServiceImpl implements PlatformAiScoringService {
 
     @Override
     public PlatformAiScoreResult score(PlatformAiScoreRequest request, Long tenantId) throws Exception {
+        // Scoring persists onto the target row. Reject append-only models before spending LLM
+        // tokens; the per-row write loop intentionally catches ordinary record failures.
+        ModelMutationGuard.assertMutable(
+                metaModelService.getModelDefinition(request.getModelCode()).orElse(null),
+                "updated by AI scoring");
+
         // 1. Resolve LLM provider
         LlmProviderFactory.ProviderConfig config = llmProviderFactory.resolveConfig(tenantId, null);
         if (config == null) {

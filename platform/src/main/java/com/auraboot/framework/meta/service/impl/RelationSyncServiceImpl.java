@@ -83,6 +83,15 @@ public class RelationSyncServiceImpl implements RelationSyncService {
         Set<String> toRemove = new HashSet<>(oldSet);
         toRemove.removeAll(newSet);
 
+        if (!toAdd.isEmpty() || !toRemove.isEmpty()) {
+            // The owning source was already guarded by its normal update path. Inverse and
+            // junction writes mutate the target record's relationship state and must not bypass
+            // an append-only target model.
+            ModelMutationGuard.assertMutable(
+                    metaModelService.getModelDefinition(targetModelCode).orElse(null),
+                    "updated by inverse relation synchronization");
+        }
+
         log.debug("Relation sync diff: toAdd={}, toRemove={}", toAdd.size(), toRemove.size());
 
         // Sync based on relation type

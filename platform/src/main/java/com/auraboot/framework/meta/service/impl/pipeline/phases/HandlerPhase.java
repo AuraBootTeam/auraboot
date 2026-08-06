@@ -25,6 +25,7 @@ import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl;
 import com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutor;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
+import com.auraboot.framework.meta.service.impl.ModelMutationGuard;
 import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
@@ -237,6 +238,9 @@ public class HandlerPhase implements CommandPhase {
         if (!StringUtils.hasText(recordIdStr)) {
             return;
         }
+
+        ModelMutationGuard.assertMutableOrInsertedInThisCommand(
+                modelDef, "updated by handler result persistence", fieldMapResults, recordIdStr);
 
         String tableName = metaModelService.getTableName(modelCode);
         CommandExecutorUtils.validateSqlIdentifier(tableName, "handler field tableName");

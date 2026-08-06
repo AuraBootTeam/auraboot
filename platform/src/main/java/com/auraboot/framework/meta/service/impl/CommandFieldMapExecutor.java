@@ -112,6 +112,7 @@ public class CommandFieldMapExecutor {
             Map<String, Object> columnData = prepareColumnData(modelDef, data, jsonbCols);
 
             // Determine operation type - use actual table name for database operations
+            ModelMutationGuard.assertMutableForOperation(modelDef, operationType);
             if ("update".equalsIgnoreCase(operationType) && StringUtils.hasText(request.getTargetRecordId())) {
                 // F-5 fix: UPDATE must refresh updated_at — DDL DEFAULT CURRENT_TIMESTAMP only
                 // applies to INSERT, so without explicit assignment audit timestamps stale forever.
@@ -283,6 +284,7 @@ public class CommandFieldMapExecutor {
         Map<String, Object> columnData = prepareColumnData(modelDef, data, jsonbColumns);
 
         // Execute the database operation
+        ModelMutationGuard.assertMutableForOperation(modelDef, operationType);
         if (isUpdateLike && StringUtils.hasText(request.getTargetRecordId())) {
             // F-5 fix: UPDATE must refresh updated_at — DDL DEFAULT CURRENT_TIMESTAMP only
             // applies to INSERT, so without explicit assignment audit timestamps stale forever.
@@ -326,6 +328,7 @@ public class CommandFieldMapExecutor {
                         "targetRecordPid is required for update operations");
             }
             // INSERT: generate pid and set audit timestamps for new records
+            ModelMutationGuard.assertCreateAllowed(modelDef);
             String newPid = UniqueIdGenerator.generate();
             java.time.Instant now = java.time.Instant.now();
             columnData.put("pid", newPid);

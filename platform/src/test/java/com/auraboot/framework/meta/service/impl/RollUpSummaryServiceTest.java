@@ -1,6 +1,8 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.MetaModelService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,8 +19,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -49,11 +53,29 @@ class RollUpSummaryServiceTest {
         service = new RollUpSummaryService(dynamicDataMapper, metaModelService);
 
         // Default table and column name resolution
-        when(metaModelService.getTableName(CHILD_MODEL)).thenReturn("mt_order_line");
-        when(metaModelService.getTableName(PARENT_MODEL)).thenReturn("mt_sales_order");
-        when(metaModelService.getColumnName(CHILD_MODEL, CHILD_FIELD)).thenReturn("ol_amount");
-        when(metaModelService.getColumnName(CHILD_MODEL, CHILD_FK)).thenReturn("ol_order_id");
-        when(metaModelService.getColumnName(PARENT_MODEL, PARENT_FIELD)).thenReturn("or_total_amount");
+        lenient().when(metaModelService.getTableName(CHILD_MODEL)).thenReturn("mt_order_line");
+        lenient().when(metaModelService.getTableName(PARENT_MODEL)).thenReturn("mt_sales_order");
+        lenient().when(metaModelService.getColumnName(CHILD_MODEL, CHILD_FIELD)).thenReturn("ol_amount");
+        lenient().when(metaModelService.getColumnName(CHILD_MODEL, CHILD_FK)).thenReturn("ol_order_id");
+        lenient().when(metaModelService.getColumnName(PARENT_MODEL, PARENT_FIELD)).thenReturn("or_total_amount");
+    }
+
+    @Test
+    void immutableParentRejectsDirectAndBatchRollUpBeforeAnyDataAccess() {
+        when(metaModelService.getModelDefinition(PARENT_MODEL)).thenReturn(Optional.of(
+                ModelDefinition.builder().code(PARENT_MODEL).immutable(true).build()));
+
+        assertThatThrownBy(() -> service.recalculate(
+                PARENT_MODEL, PARENT_FIELD, PARENT_ID,
+                CHILD_MODEL, CHILD_FIELD, CHILD_FK, "sum", null, TENANT_ID))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("immutable");
+        assertThatThrownBy(() -> service.batchRecalculate(
+                PARENT_MODEL, PARENT_FIELD,
+                CHILD_MODEL, CHILD_FIELD, CHILD_FK, "sum", null, TENANT_ID))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("immutable");
+        verifyNoInteractions(dynamicDataMapper);
     }
 
     private List<Map<String, Object>> makeChildRows(BigDecimal... amounts) {

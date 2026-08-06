@@ -9,6 +9,7 @@ import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.entity.BindingRule;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
 import com.auraboot.framework.permission.service.FieldPermissionService;
@@ -122,6 +123,34 @@ class CommandFieldMapExecutorFieldPermissionTest {
 
         verify(dynamicDataMapper, never()).insert(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap());
         verify(dynamicDataMapper, never()).update(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap(), org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void explicitFieldMapCannotUpdateImmutableModel() {
+        ModelDefinition immutableModel = modelDefinition();
+        immutableModel.setImmutable(true);
+        when(metaModelService.getModelDefinition(MODEL)).thenReturn(Optional.of(immutableModel));
+        when(fieldPermissionService.getFieldPermissions(MEMBER_ID, MODEL))
+                .thenReturn(FieldPermissionSet.allAllowed(Set.of("name", "gross_margin")));
+
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setOperationType("update");
+        request.setTargetRecordId("quote-1");
+
+        assertThatThrownBy(() -> executor.executeFieldMapPhase(
+                List.of(bindingRule("name", "name")),
+                Map.of("name", "forbidden"),
+                TENANT_ID,
+                request))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("immutable");
+
+        verify(dynamicDataMapper, never()).updateByQuery(
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap());
+        verify(dynamicDataMapper, never()).update(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyMap(),
+                org.mockito.ArgumentMatchers.anyMap());
     }
 
     private BindingRule bindingRule(String sourceField, String targetField) {

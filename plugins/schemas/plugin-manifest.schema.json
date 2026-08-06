@@ -798,6 +798,16 @@
           "description": "Whether this model is abstract (cannot be instantiated directly)",
           "default": false
         },
+        "immutable": {
+          "type": "boolean",
+          "description": "Whether records are append-only after creation. Immutable models reject update and delete operations across runtime write paths.",
+          "default": false
+        },
+        "commandOnlyCreate": {
+          "type": "boolean",
+          "description": "Whether records may be created only inside an authorized command pipeline.",
+          "default": false
+        },
         "parentModelCode": {
           "type": "string",
           "description": "Parent model code for inheritance"

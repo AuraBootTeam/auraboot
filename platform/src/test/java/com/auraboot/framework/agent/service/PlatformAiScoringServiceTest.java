@@ -7,6 +7,8 @@ import com.auraboot.framework.agent.dto.PlatformAiScoreResult;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -143,6 +146,19 @@ class PlatformAiScoringServiceTest {
         assertThat(updateDataCaptor.getValue()).containsEntry(SCORE_FIELD, 85);
         assertThat(conditionsCaptor.getValue()).containsEntry("pid", "pid001");
         assertThat(conditionsCaptor.getValue()).containsEntry("tenant_id", TENANT_ID);
+    }
+
+    @Test
+    void score_rejectsImmutableModelBeforeProviderOrDataAccess() {
+        when(metaModelService.getModelDefinition(MODEL_CODE)).thenReturn(Optional.of(
+                ModelDefinition.builder().code(MODEL_CODE).immutable(true).build()));
+
+        assertThatThrownBy(() -> service.score(buildRequest(), TENANT_ID))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("immutable");
+
+        verifyNoInteractions(llmProviderFactory, llmProvider, dynamicDataMapper);
+        verify(metaModelService, never()).getTableName(anyString());
     }
 
     // =========================================================================
