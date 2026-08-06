@@ -23,13 +23,13 @@ class TemplateRegistryTest {
     @DisplayName("listAll discovers metadata templates and legacy template directories")
     void listAllDiscoversMetadataAndLegacyTemplates() throws IOException {
         createPlugin(
-                tempDir.resolve("plugins/crm-quick-start"),
+                tempDir.resolve("plugins/asset-management"),
                 """
                 {
-                  "pluginId": "com.auraboot.template.crm-quick-start",
-                  "namespace": "tcrm",
+                  "pluginId": "com.auraboot.template.asset-management",
+                  "namespace": "tasset",
                   "version": "1.0.0",
-                  "displayName": "CRM Quick Start",
+                  "displayName": "Asset Management",
                   "pluginType": "config",
                   "catalogType": "template"
                 }
@@ -65,9 +65,9 @@ class TemplateRegistryTest {
         List<TemplateRegistry.TemplateDef> templates = registry.listAll();
 
         assertThat(templates).extracting(TemplateRegistry.TemplateDef::id)
-                .containsExactly("crm-quick-start", "hr-essentials");
-        assertThat(registry.resolveAbsolutePath("crm-quick-start"))
-                .endsWith("plugins/crm-quick-start");
+                .containsExactly("asset-management", "hr-essentials");
+        assertThat(registry.resolveAbsolutePath("asset-management"))
+                .endsWith("plugins/asset-management");
         assertThat(registry.resolveAbsolutePath("hr-essentials"))
                 .endsWith("plugins/templates/hr-essentials");
         assertThat(registry.getTemplate("regular-plugin")).isNull();

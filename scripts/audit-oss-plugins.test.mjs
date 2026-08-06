@@ -34,6 +34,17 @@ function collectValues(value, predicate, matches = []) {
 }
 
 describe('OSS plugin config audit', () => {
+  it('ships one official CRM plugin without legacy starter copies', () => {
+    assert.equal(fs.existsSync(path.join(repoRoot, 'plugins', 'crm', 'plugin.json')), true);
+    for (const legacyPlugin of ['crm-quick-start', 'crm-starter']) {
+      assert.equal(
+        fs.existsSync(path.join(repoRoot, 'plugins', legacyPlugin)),
+        false,
+        `${legacyPlugin} must not coexist with the official CRM plugin.`,
+      );
+    }
+  });
+
   it('keeps ACP priority fields namespaced away from core announcement priority', () => {
     const fields = readJson('plugins/agent-control-plane/config/fields.json');
     const bindings = readJson('plugins/agent-control-plane/config/bindings.json');

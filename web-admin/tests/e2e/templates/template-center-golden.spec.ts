@@ -165,21 +165,22 @@ test.describe('Template Center Gallery — Golden', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Test 2: Catalog renders ≥6 cards with real metadata
+  // Test 2: Catalog renders ≥5 cards with real metadata
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
    * TC-GAL-002 @golden @catalog
    *
-   * Proves the gallery renders at least 6 template cards (OSS ships 6 real
-   * templates: crm-quick-start, simple-inventory, golden-path, project-management,
-   * asset-management, hr-essentials).
+   * Proves the gallery renders at least 5 template cards (OSS ships 5 real
+   * templates: simple-inventory, golden-path, project-management,
+   * asset-management, hr-essentials). CRM is an official product plugin, not a
+   * second starter template.
    *
    * Also verifies that the "simple-inventory" card shows RESOLVED displayName text
    * (e.g. "简易进销存" or "Simple Inventory") — not a raw key — proving that the
    * i18n + API serialization pipeline works end-to-end.
    */
-  test('TC-GAL-002 @golden — catalog renders ≥6 cards with real metadata', async ({ page }) => {
+  test('TC-GAL-002 @golden — catalog renders ≥5 cards with real metadata', async ({ page }) => {
     test.setTimeout(45_000);
 
     await page.goto(GALLERY_ROUTE, { waitUntil: 'domcontentloaded' });
@@ -192,15 +193,15 @@ test.describe('Template Center Gallery — Golden', () => {
       timeout: 20_000,
     });
 
-    // Assert ≥6 cards
+    // Assert ≥5 cards
     const cards = mainContent.locator('[data-testid="card-grid-card"]');
-    await expect(cards).toHaveCount(6, { timeout: 10_000 });
-    // Allow for more cards in the future (≥6)
+    await expect(cards).toHaveCount(5, { timeout: 10_000 });
+    // Allow for more cards in the future (≥5)
     const cardCount = await cards.count();
     expect(
       cardCount,
-      `Expected ≥6 template cards, got ${cardCount}`,
-    ).toBeGreaterThanOrEqual(6);
+      `Expected ≥5 template cards, got ${cardCount}`,
+    ).toBeGreaterThanOrEqual(5);
 
     // Assert that the simple-inventory card shows real displayName text.
     // The card title is rendered from the API response `name` field via

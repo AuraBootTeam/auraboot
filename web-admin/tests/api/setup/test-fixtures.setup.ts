@@ -737,7 +737,6 @@ test.describe('E2E Test Fixtures Setup', () => {
       'platform-admin',
       'agent-control-plane',
       // App templates used by templates-smoke
-      'templates/crm-quick-start',
       'templates/project-management',
       'templates/asset-management',
       'templates/simple-inventory',
@@ -773,7 +772,6 @@ test.describe('E2E Test Fixtures Setup', () => {
         'pcba-crm': 'crm_customer_request_pcba_rfq',
         'pcba-industry': 'pe_production_plan',
         'pcba-solution': 'pe_supplier_contact',
-        'templates/crm-quick-start': 'tcrm_lead',
         'templates/project-management': 'tpm_project',
         'templates/asset-management': 'tasset_asset',
         'templates/simple-inventory': 'tinv_product',
@@ -804,7 +802,6 @@ test.describe('E2E Test Fixtures Setup', () => {
         'pcba-solution': 'com.auraboot.pcba-solution',
         'platform-admin': 'com.auraboot.platform-admin',
         'agent-control-plane': 'com.auraboot.agent-control-plane',
-        'templates/crm-quick-start': 'com.auraboot.template.crm-quick-start',
         'templates/project-management': 'com.auraboot.template.project-management',
         'templates/asset-management': 'com.auraboot.template.asset-management',
         'templates/simple-inventory': 'com.auraboot.template.simple-inventory',

@@ -2,15 +2,14 @@
  * App Templates — Smoke E2E Tests (GAP-080)
  *
  * Covers the currently supported application templates:
- * 1. CRM Quick Start     (namespace: tcrm)
- * 2. Project Management  (namespace: tpm)
- * 3. Asset Management    (namespace: tasset)
- * 4. Simple Inventory    (namespace: tinv)
- * 5. HR Essentials       (namespace: thr)
- * 6. Golden Path         (namespace: gp)
- * 7. Enterprise HR       (namespace: ehr)
- * 8. Enterprise Compliance (namespace: ecm)
- * 9. Enterprise Asset    (namespace: eam)
+ * 1. Project Management  (namespace: tpm)
+ * 2. Asset Management    (namespace: tasset)
+ * 3. Simple Inventory    (namespace: tinv)
+ * 4. HR Essentials       (namespace: thr)
+ * 5. Golden Path         (namespace: gp)
+ * 6. Enterprise HR       (namespace: ehr)
+ * 7. Enterprise Compliance (namespace: ecm)
+ * 8. Enterprise Asset    (namespace: eam)
  *
  * Per-template checks:
  * @smoke  Navigate via sidebar menu → page loads → table visible
@@ -185,63 +184,7 @@ async function createViaApiAndVerifyInList(
 }
 
 // ===========================================================================
-// 1. CRM Quick Start (tcrm)
-// ===========================================================================
-
-test.describe('Template: CRM Quick Start', () => {
-  test.setTimeout(45_000);
-  const rootMenu = 'crm';
-  const ts = uniqueId('tcrm');
-
-  test.beforeEach(async ({ page }) => {
-    // Check if tcrm template plugin is installed and accessible
-    const resp = await page.request.get('/api/dynamic/tcrm_lead/list?pageSize=1');
-    // Skip if model doesn't exist (404) or if permission denied (403)
-    test.skip(!resp.ok(), `CRM Quick Start template not accessible: ${resp.status()} (model may not be installed or user lacks permission)`);
-  });
-
-  test('TMP-CRM-001 @smoke — 线索列表页可访问', async ({ page }) => {
-    await navigateToTemplate(page, rootMenu, '线索', 'tcrm_lead');
-    await expect(page.locator('table, [data-testid="dynamic-list"]').first()).toBeVisible();
-  });
-
-  test('TMP-CRM-002 @smoke — 客户列表页可访问', async ({ page }) => {
-    await navigateToTemplate(page, rootMenu, '客户', 'tcrm_account');
-    await expect(page.locator('table, [data-testid="dynamic-list"]').first()).toBeVisible();
-  });
-
-  test('TMP-CRM-003 @smoke — 联系人列表页可访问', async ({ page }) => {
-    await navigateToTemplate(page, rootMenu, '联系人', 'tcrm_contact');
-    await expect(page.locator('table, [data-testid="dynamic-list"]').first()).toBeVisible();
-  });
-
-  test('TMP-CRM-004 @smoke — 商机列表页可访问', async ({ page }) => {
-    await navigateToTemplate(page, rootMenu, '商机', 'tcrm_opportunity');
-    await expect(page.locator('table, [data-testid="dynamic-list"]').first()).toBeVisible();
-  });
-
-  test('TMP-CRM-005 @critical — 创建线索后出现在列表中', async ({ page }) => {
-    const leadName = `测试线索 ${ts}`;
-    await createViaApiAndVerifyInList(
-      page,
-      'tcrm:create_lead',
-      {
-        tcrm_ld_name: leadName,
-        tcrm_ld_company: `Test Company ${ts}`,
-        tcrm_ld_email: `${ts}@example.com`,
-        tcrm_ld_source: 'website',
-      },
-      rootMenu,
-      '线索',
-      'tcrm_lead',
-      ts,
-      'tcrm_ld_name',
-    );
-  });
-});
-
-// ===========================================================================
-// 2. Project Management (tpm)
+// 1. Project Management (tpm)
 // ===========================================================================
 
 test.describe('Template: Project Management', () => {
@@ -289,7 +232,7 @@ test.describe('Template: Project Management', () => {
 });
 
 // ===========================================================================
-// 3. Asset Management (tasset)
+// 2. Asset Management (tasset)
 // ===========================================================================
 
 test.describe('Template: Asset Management', () => {
@@ -328,7 +271,7 @@ test.describe('Template: Asset Management', () => {
 });
 
 // ===========================================================================
-// 4. Simple Inventory (tinv)
+// 3. Simple Inventory (tinv)
 // ===========================================================================
 
 test.describe('Template: Simple Inventory', () => {
@@ -372,7 +315,7 @@ test.describe('Template: Simple Inventory', () => {
 });
 
 // ===========================================================================
-// 5. HR Essentials (thr)
+// 4. HR Essentials (thr)
 // ===========================================================================
 
 test.describe('Template: HR Essentials', () => {
@@ -435,7 +378,7 @@ test.describe('Template: HR Essentials', () => {
 });
 
 // ===========================================================================
-// 6. Golden Path (gp)
+// 5. Golden Path (gp)
 // ===========================================================================
 
 test.describe('Template: Golden Path', () => {
@@ -483,7 +426,7 @@ test.describe('Template: Golden Path', () => {
 });
 
 // ===========================================================================
-// 7. Enterprise HR (ehr)
+// 6. Enterprise HR (ehr)
 // ===========================================================================
 
 test.describe('Template: Enterprise HR', () => {
@@ -536,7 +479,7 @@ test.describe('Template: Enterprise HR', () => {
 });
 
 // ===========================================================================
-// 8. Enterprise Compliance (ecm)
+// 7. Enterprise Compliance (ecm)
 // ===========================================================================
 
 test.describe('Template: Enterprise Compliance', () => {
@@ -590,7 +533,7 @@ test.describe('Template: Enterprise Compliance', () => {
 });
 
 // ===========================================================================
-// 9. Enterprise Asset (eam)
+// 8. Enterprise Asset (eam)
 // ===========================================================================
 
 test.describe('Template: Enterprise Asset', () => {

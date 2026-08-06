@@ -1,8 +1,8 @@
 # AuraBoot CRM
 
-`com.auraboot.crm` is the official CRM package shipped with AuraBoot. It is the
-single product-grade CRM implementation in the public repository; `crm-quick-start`
-remains a small learning template and is not a second CRM product.
+`com.auraboot.crm` is the official CRM package shipped with AuraBoot and the
+single product-grade CRM implementation in the public repository. The legacy
+`crm-quick-start` learning template has been removed to keep one canonical CRM.
 
 ## Included
 

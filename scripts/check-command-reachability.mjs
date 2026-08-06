@@ -35,8 +35,13 @@ export const DEFAULT_CONFIG = 'scripts/command-reachability.json';
  *  part after the plugin namespace, e.g. `seed_defaults` for `bom:seed_defaults`. */
 export const DEFAULT_EXEMPT_SUFFIXES = ['seed_', 'internal_'];
 
-function readJson(abs) {
-  return JSON.parse(fs.readFileSync(abs, 'utf8'));
+function readOptionalJson(abs) {
+  try {
+    return JSON.parse(fs.readFileSync(abs, 'utf8'));
+  } catch (error) {
+    if (error?.code === 'ENOENT') return {};
+    throw error;
+  }
 }
 
 /** Every command code declared by a plugin (single-file or sharded layout). */
@@ -218,7 +223,7 @@ function main(argv) {
   const asJson = argv.includes('--json');
   const rootFlag = argv.indexOf('--plugin-root');
   const cfgAbs = path.join(repoRoot, DEFAULT_CONFIG);
-  const config = fs.existsSync(cfgAbs) ? readJson(cfgAbs) : {};
+  const config = readOptionalJson(cfgAbs);
   const roots = rootFlag >= 0
     ? [path.resolve(repoRoot, argv[rootFlag + 1])]
     : (config.roots ?? ['plugins']).map((r) => path.resolve(repoRoot, r));

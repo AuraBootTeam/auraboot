@@ -80,20 +80,6 @@
     "core-site-key": [
       "behavior_site_key:create"
     ],
-    "crm-quick-start": [
-      "tcrm:detail_account",
-      "tcrm:detail_contact",
-      "tcrm:detail_lead",
-      "tcrm:detail_opportunity",
-      "tcrm:list_accounts",
-      "tcrm:list_contacts",
-      "tcrm:list_leads",
-      "tcrm:list_opportunities",
-      "tcrm:update_account",
-      "tcrm:update_contact",
-      "tcrm:update_lead",
-      "tcrm:update_opportunity"
-    ],
     "golden-path": [
       "gp:approve",
       "gp:detail_task",
