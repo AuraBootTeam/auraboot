@@ -13,15 +13,15 @@
       "blockType": "toolbar",
       "buttons": [
         {
-          "code": "submit_qdp_review",
+          "code": "compile_qdp_revision",
           "primary": true,
-          "icon": "ClipboardCheck",
+          "icon": "LoaderCircle",
           "permissionCode": "crm.qdp.review",
           "visibleWhen": "record.crm_qdp_status === 'draft' || record.crm_qdp_status === 'validation_failed'",
-          "label": { "zh-CN": "提交评审", "en-US": "Submit for Review" },
+          "label": { "zh-CN": "编制并校验", "en-US": "Compile and Validate" },
           "action": {
             "type": "command",
-            "command": "crm:submit_qdp_review",
+            "command": "crm:compile_qdp_revision",
             "operationType": "update",
             "targetRecordPid": "${record.pid}",
             "payload": {
@@ -58,6 +58,22 @@
             ]
           }
         }
+      ]
+    },
+    {
+      "id": "crm_qdp_compilation",
+      "blockType": "form-section",
+      "title": { "zh-CN": "异步编制与校验", "en-US": "Async Compilation and Validation" },
+      "fields": [
+        { "field": "crm_qdp_compilation_outcome", "layout": { "colSpan": 4 }, "renderType": "tag", "dictCode": "crm_qdp_compilation_outcome" },
+        { "field": "crm_qdp_compilation_stage", "layout": { "colSpan": 4 }, "renderType": "tag", "dictCode": "crm_qdp_compilation_stage" },
+        { "field": "crm_qdp_compilation_progress", "layout": { "colSpan": 4 }, "suffix": "%" },
+        { "field": "crm_qdp_compilation_summary", "layout": { "colSpan": 12 } },
+        { "field": "crm_qdp_validation_failure_summary", "layout": { "colSpan": 12 } },
+        { "field": "crm_qdp_compilation_started_at", "layout": { "colSpan": 3 } },
+        { "field": "crm_qdp_compilation_started_by", "layout": { "colSpan": 3 } },
+        { "field": "crm_qdp_compiled_at", "layout": { "colSpan": 3 } },
+        { "field": "crm_qdp_compiled_by", "layout": { "colSpan": 3 } }
       ]
     },
     {

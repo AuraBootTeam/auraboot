@@ -36,6 +36,16 @@
           "dictCode": "crm_qdp_lifecycle"
         },
         {
+          "field": "crm_qdp_compilation_outcome",
+          "width": 150,
+          "renderType": "tag",
+          "dictCode": "crm_qdp_compilation_outcome"
+        },
+        {
+          "field": "crm_qdp_compilation_progress",
+          "width": 110
+        },
+        {
           "field": "crm_qdp_requirement_version",
           "width": 180
         },

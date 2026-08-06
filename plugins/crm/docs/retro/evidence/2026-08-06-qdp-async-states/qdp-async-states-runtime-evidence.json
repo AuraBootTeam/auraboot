@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260806-231048",
+  "composition": "amos-qdp-async-states-s59",
+  "sourceState": {
+    "coreBranch": "codex/amos-qdp-release-center-public-crm",
+    "coreStartingHead": "454034b12c017443b55def09f27fc088aaa5bc54",
+    "coreSourceRoot": "/Users/ghj/work/auraboot/auraboot/.worktrees/amos-qdp-release-center-public-crm/plugins/crm",
+    "pluginBranch": "codex/amos-qdp-release-center",
+    "pluginHead": "598454bbee9a2177ce892d29756993a08740667c",
+    "pluginSourceRoot": "/Users/ghj/work/auraboot/plugins/.worktrees/amos-qdp-release-center/pcba-crm",
+    "note": "The runtime jar and imported DSL were assembled from the current Core working-tree patch over coreStartingHead plus the exact clean Plugin head."
+  },
+  "runtime": {
+    "backendUrl": "http://127.0.0.1:6459",
+    "webUrl": "http://127.0.0.1:5159",
+    "bffUrl": "http://127.0.0.1:6159",
+    "postgresHost": "127.0.0.1",
+    "postgresPort": 5432,
+    "postgresDatabase": "auraboot_59",
+    "redisDatabase": 10,
+    "backendHealth": "UP",
+    "bffHealth": "healthy"
+  },
+  "artifacts": {
+    "bootJarSha256": "7bb5bfa4fccf9c691bb79fbad83223a0e6daba80613526501858c471e6a02a70",
+    "builtCrmPluginJarSha256": "6e3f49ec2abc9fd1c7e6c709a3b23e3b3524a8f6be5e7d6081d9c153ee1a71d2",
+    "runtimeCrmPluginJarSha256": "6e3f49ec2abc9fd1c7e6c709a3b23e3b3524a8f6be5e7d6081d9c153ee1a71d2",
+    "jarIdentityMatch": true
+  },
+  "import": {
+    "coreCrm": "OK",
+    "pluginPcbaAdapter": "OK",
+    "referenceIntegrity": "OK",
+    "danglingCrossPluginReferences": 0
+  },
+  "executableEvidence": {
+    "trueStack": "qdp-release-center-true-stack-20260806-231048.json",
+    "trueStackChecks": 21,
+    "browser": "qdp-release-center-browser-20260806-231048.json",
+    "browserScenarios": 6,
+    "browserWorkers": 1,
+    "browserRetries": 0
+  },
+  "verdict": "pass"
+}

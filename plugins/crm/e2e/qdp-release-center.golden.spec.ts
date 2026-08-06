@@ -32,8 +32,21 @@ let releasedCode = '';
 let browserQdpPid = '';
 let browserQdpCode = '';
 let browserFilePid = '';
+let compileQdpPid = '';
+let compileQdpCode = '';
+let compileFilePid = '';
+let compileConfirmationPid = '';
+let compileConfirmationHash = '';
 const screenshots: string[] = [];
 const completedScenarios = new Set<string>();
+const EXPECTED_SCENARIOS = [
+  'async-loading-validation-failed-partial-recovery',
+  'empty-state',
+  'external-failure-recovery-release',
+  'no-permission',
+  'release-center-list-and-detail',
+  'stale-visible-feedback',
+] as const;
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -112,15 +125,32 @@ async function executeCommand(
   });
 }
 
-async function uploadBrowserFixture(): Promise<string> {
-  const content = `QDP browser external-failure fixture\nrun=${BROWSER_RUN}\n`;
+async function uploadBrowserFixture(purpose = 'external-failure'): Promise<string> {
+  const content = `QDP browser ${purpose} fixture\nrun=${BROWSER_RUN}\n`;
   const form = new FormData();
-  form.append('file', new Blob([content], { type: 'text/plain' }), `qdp-browser-${BROWSER_RUN}.txt`);
+  form.append(
+    'file',
+    new Blob([content], { type: 'text/plain' }),
+    `qdp-browser-${purpose}-${BROWSER_RUN}.txt`,
+  );
   const result = await api('/api/file/upload', { method: 'POST', body: form });
   const body = assertOk(result, 'upload browser fixture');
   const pid = findValue(body?.data, ['fileId', 'pid']);
   expect(pid).toBeTruthy();
   return String(pid);
+}
+
+function setConfirmationHash(confirmationPid: string, hash: string): void {
+  expect(confirmationPid).toMatch(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
+  expect(hash).toMatch(/^[0-9a-f]{64}$/);
+  execFileSync('psql', [
+    '-h', PG.host,
+    '-p', PG.port,
+    '-U', PG.user,
+    '-d', PG.database,
+    '-v', 'ON_ERROR_STOP=1',
+    '-c', `UPDATE mt_crm_customer_confirmation_common SET crm_cc_file_package_hash='${hash}' WHERE pid='${confirmationPid}'`,
+  ], { env: { ...process.env, PGPASSWORD: PG.password }, stdio: 'pipe' });
 }
 
 function setFileStatus(filePid: string, status: 'success' | 'failed'): void {
@@ -141,7 +171,7 @@ function handlerData(body: any): Record<string, any> {
 }
 
 async function seedBrowserFailureRevision(): Promise<void> {
-  browserFilePid = await uploadBrowserFixture();
+  browserFilePid = await uploadBrowserFixture('external-failure');
   const request = await getRecord('crm_customer_request_common', REQUEST_PID);
   const expectedVersion = Number(request.row_version ?? request.rowVersion);
   expect(expectedVersion).toBeGreaterThan(0);
@@ -183,6 +213,51 @@ async function seedBrowserFailureRevision(): Promise<void> {
   );
   assertOk(reviewed, 'review browser QDP');
   setFileStatus(browserFilePid, 'failed');
+}
+
+async function seedBrowserCompilationRevision(): Promise<void> {
+  compileFilePid = await uploadBrowserFixture('async-state');
+  const request = await getRecord('crm_customer_request_common', REQUEST_PID);
+  const expectedVersion = Number(request.row_version ?? request.rowVersion);
+  expect(expectedVersion).toBeGreaterThan(0);
+  const packHash = sha256(`browser-compile-pack-${BROWSER_RUN}`);
+  const payload = {
+    crm_qdp_customer_request_id: REQUEST_PID,
+    crm_qdp_pcba_rfq_id: SIDECAR_PID,
+    crm_qdp_primary_file_id: compileFilePid,
+    crm_qdp_file_manifest: [{ filePid: compileFilePid, purpose: 'browser_async_compile' }],
+    crm_qdp_requirement_version: `RV-COMPILE-${BROWSER_RUN}`,
+    crm_qdp_customer_confirmation_ref: `PORTAL-COMPILE-${BROWSER_RUN}`,
+    crm_qdp_customer_confirmed_by: 'browser.customer@example.test',
+    crm_qdp_customer_confirmed_at: '2026-08-06T17:00:00+08:00',
+    crm_qdp_pack_set: [{ packCode: 'PCBA-MFG', version: 'async', contentHash: packHash }],
+    crm_qdp_downstream_impact: [{
+      objectType: 'crm_customer_request_pcba_rfq',
+      objectPid: SIDECAR_PID,
+      impact: 'browser verified async QDP compilation',
+      owner: 'browser-program-owner',
+      disposition: 'accepted',
+    }],
+    crm_qdp_assumptions: ['Browser compile uses exact uploaded bytes'],
+    crm_qdp_approved_exceptions: [{
+      code: `APPROVED-${BROWSER_RUN}`,
+      reason: 'Customer-approved tolerance pending downstream acknowledgement',
+    }],
+    crm_qdp_release_note: 'Browser async compilation state verification',
+  };
+  const prepared = await executeCommand(
+    'crm:prepare_qdp_draft', payload, REQUEST_PID, expectedVersion, `qdp-compile-${BROWSER_RUN}`,
+  );
+  assertOk(prepared, 'prepare browser compilation QDP');
+  compileQdpPid = String(handlerData(prepared.body).qdpRevisionId || '');
+  expect(compileQdpPid).toMatch(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
+  const draft = await getRecord('crm_qdp_revision_common', compileQdpPid);
+  compileQdpCode = String(draft.crm_qdp_code);
+  compileConfirmationPid = String(draft.crm_qdp_customer_confirmation_id || '');
+  compileConfirmationHash = String(draft.crm_qdp_file_package_hash || '');
+  expect(compileConfirmationPid).toMatch(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
+  expect(compileConfirmationHash).toMatch(/^[0-9a-f]{64}$/);
+  setConfirmationHash(compileConfirmationPid, 'e'.repeat(64));
 }
 
 async function uiLogin(page: Page, email = RELEASE_MANAGER_EMAIL): Promise<void> {
@@ -241,6 +316,15 @@ async function submitRelease(page: Page, note: string): Promise<{ response: any;
   return { response, body: await response.json().catch(() => ({})) };
 }
 
+async function submitCompilation(page: Page): Promise<{ response: any; body: any }> {
+  const responsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/meta/commands/execute/crm:compile_qdp_revision')
+      && response.request().method() === 'POST');
+  await page.getByRole('button', { name: /编制并校验|Compile and Validate/ }).first().click();
+  const response = await responsePromise;
+  return { response, body: await response.json().catch(() => ({})) };
+}
+
 async function shot(page: Page, name: string): Promise<void> {
   const output = path.join(EVIDENCE_DIR, name);
   await page.screenshot({ path: output, fullPage: true });
@@ -255,10 +339,14 @@ test.beforeAll(async () => {
   staleCode = String((await getRecord('crm_qdp_revision_common', STALE_QDP_PID)).crm_qdp_code);
   releasedCode = String((await getRecord('crm_qdp_revision_common', RELEASED_QDP_PID)).crm_qdp_code);
   await seedBrowserFailureRevision();
+  await seedBrowserCompilationRevision();
 });
 
 test.afterAll(async () => {
   if (browserFilePid) setFileStatus(browserFilePid, 'success');
+  if (compileConfirmationPid && compileConfirmationHash) {
+    setConfirmationHash(compileConfirmationPid, compileConfirmationHash);
+  }
   const evidence = {
     schemaVersion: 1,
     runId: RUN,
@@ -269,9 +357,14 @@ test.afterAll(async () => {
     releasedQdpPid: RELEASED_QDP_PID,
     browserQdpPid,
     browserFilePid,
+    compileQdpPid,
+    compileFilePid,
     screenshots,
     completedScenarios: [...completedScenarios].sort(),
-    verdict: completedScenarios.size === 4 ? 'pass' : 'incomplete',
+    expectedScenarios: EXPECTED_SCENARIOS,
+    verdict: EXPECTED_SCENARIOS.every((scenario) => completedScenarios.has(scenario))
+      ? 'pass'
+      : 'incomplete',
   };
   writeFileSync(path.join(EVIDENCE_DIR, `qdp-release-center-browser-${RUN}.json`),
     `${JSON.stringify(evidence, null, 2)}\n`);
@@ -295,11 +388,80 @@ test('Release Center list and released detail show localized lifecycle, hash, di
   expect(body).toMatch(/[0-9a-f]{64}/);
   expect(body).not.toMatch(/\bcrm_qdp_[a-z_]+\b/);
   await shot(page, 'qdp-release-center-released-detail.png');
+  const identitySection = page.getByText(/版本与生命周期|Revision and Lifecycle/).first();
+  await identitySection.evaluate((element) => element.scrollIntoView({ block: 'start' }));
+  await expect(identitySection).toBeVisible();
+  await shot(page, 'qdp-release-center-released-identity.png');
   const impactSection = page.getByText(/Pack Set 与下游影响|Pack Set and Downstream Impact/).first();
   await impactSection.scrollIntoViewIfNeeded();
   await expect(impactSection).toBeVisible();
   await shot(page, 'qdp-release-center-released-impact.png');
   completedScenarios.add('release-center-list-and-detail');
+});
+
+test('Release Center search exposes a real empty state instead of an ambiguous blank table', async ({ page }) => {
+  await uiLogin(page);
+  await gotoReleaseCenter(page);
+  const search = page.getByTestId('list-search-input');
+  await search.fill(`NO-MATCH-${BROWSER_RUN}`);
+  const responsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/dynamic/crm_qdp_revision_common'));
+  await search.press('Enter');
+  const response = await responsePromise;
+  expect(response.ok(), `empty-state query returned HTTP ${response.status()}`).toBeTruthy();
+  await expect(page.getByTestId('empty-state')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/暂无数据|No data/).last()).toBeVisible();
+  await shot(page, 'qdp-release-center-empty-state.png');
+  completedScenarios.add('empty-state');
+});
+
+test('browser-driven async compilation shows loading, validation recovery and partial success', async ({ page }) => {
+  await uiLogin(page);
+  await openDetail(page, compileQdpCode);
+
+  const failedDispatch = await submitCompilation(page);
+  expect(failedDispatch.response.ok(), JSON.stringify(failedDispatch.body)).toBeTruthy();
+  expect(String(failedDispatch.body?.code)).toBe('0');
+  await expect(page.getByRole('progressbar')).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText(/编制并校验.*进行中|Compile and Validate.*进行中|任务执行中/).first())
+    .toBeVisible();
+  await shot(page, 'qdp-release-center-compiling-loading.png');
+
+  await expect(page.getByTestId('async-task-modal-failed')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('async-task-modal-error'))
+    .toContainText(/confirmation|customer|确认|hash/i);
+  await shot(page, 'qdp-release-center-validation-failed-modal.png');
+  await page.getByRole('button', { name: /关闭/ }).last().click();
+  await expect(page.getByText(/校验失败|Validation Failed/).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/校验失败与恢复提示|Validation Failure and Recovery/).first())
+    .toBeVisible();
+  const failedBody = await page.locator('body').innerText();
+  expect(failedBody).toMatch(/confirmation|customer|确认|hash/i);
+  expect(failedBody).not.toMatch(/\bcrm_qdp_[a-z_]+\b/);
+  await shot(page, 'qdp-release-center-validation-failed-detail.png');
+
+  setConfirmationHash(compileConfirmationPid, compileConfirmationHash);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const recoveredDispatch = await submitCompilation(page);
+  expect(recoveredDispatch.response.ok(), JSON.stringify(recoveredDispatch.body)).toBeTruthy();
+  expect(String(recoveredDispatch.body?.code)).toBe('0');
+  await expect(page.getByText(/QDP 编制完成|QDP compilation completed/).last())
+    .toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/部分成功|Partial Success/).last()).toBeVisible();
+  await shot(page, 'qdp-release-center-partial-success-modal.png');
+  await page.getByRole('button', { name: /关闭/ }).last().click();
+  await expect(page.getByText(/部分成功|Partial Success/).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/批准例外|approved exception/i).first()).toBeVisible();
+  const recoveredBody = await page.locator('body').innerText();
+  expect(recoveredBody).not.toContain('partial_success');
+  expect(recoveredBody).not.toMatch(/\bcrm_qdp_[a-z_]+\b/);
+  await shot(page, 'qdp-release-center-partial-success-detail.png');
+
+  const recovered = await getRecord('crm_qdp_revision_common', compileQdpPid);
+  expect(recovered.crm_qdp_status).toBe('ready_for_review');
+  expect(recovered.crm_qdp_compilation_outcome).toBe('partial_success');
+  expect(recovered.crm_qdp_compilation_progress).toBe(100);
+  completedScenarios.add('async-loading-validation-failed-partial-recovery');
 });
 
 test('stale QDP release produces visible browser feedback and remains in review', async ({ page }) => {

@@ -739,7 +739,7 @@
     "code": "crm_qdp_revision_common",
     "displayName:zh-CN": "QDP 版本",
     "displayName:en": "QDP Revision",
-    "description": "Command-owned QDP revision with controlled Draft, Review, Released and Superseded lifecycle",
+    "description": "Command-owned QDP revision with controlled Draft, Compiling, Validation Failed, Review, Released and Superseded lifecycle",
     "modelType": "entity",
     "modelCategory": "document",
     "immutable": false,
@@ -757,6 +757,6 @@
     "semantic_description": "A command-owned QDP revision under a stable CRM Customer Request. Content and source fields are sole-writer facts and remain frozen; only exact lifecycle commands may advance status evidence. Industry plugins retain only this revision pid plus their own sidecar facts.",
     "domain_category": "crm",
     "data_sensitivity": "confidential",
-    "lifecycle_description": "Draft -> Ready for Review -> Released -> Superseded. Published content changes always create a new numbered QDP revision; only status and lifecycle evidence may change on an existing record."
+    "lifecycle_description": "Draft -> Compiling -> Validation Failed / Ready for Review -> Released -> Superseded. Published content changes always create a new numbered QDP revision; only async compilation and lifecycle evidence may change on an existing record."
   }
 ]

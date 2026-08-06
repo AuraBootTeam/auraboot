@@ -84,6 +84,18 @@ const NEW_CONTENT_FIELDS = [
   'crm_qdp_version_diff_summary',
 ];
 
+const COMPILATION_FIELDS = [
+  'crm_qdp_compilation_stage',
+  'crm_qdp_compilation_progress',
+  'crm_qdp_compilation_outcome',
+  'crm_qdp_compilation_summary',
+  'crm_qdp_validation_failure_summary',
+  'crm_qdp_compilation_started_at',
+  'crm_qdp_compilation_started_by',
+  'crm_qdp_compiled_at',
+  'crm_qdp_compiled_by',
+];
+
 function command(code) {
   const found = commandByCode.get(code);
   assert.ok(found, `command ${code} should exist`);
@@ -113,6 +125,7 @@ test('QDP Release Center is a discoverable CRM minor release with one existing w
     ['model', 'crm_file_package_common'],
     ['model', 'crm_customer_confirmation_common'],
     ['command', 'crm:prepare_qdp_draft'],
+    ['command', 'crm:compile_qdp_revision'],
     ['command', 'crm:submit_qdp_review'],
     ['command', 'crm:publish_qdp_revision'],
     ['command', 'crm:release_qdp'],
@@ -123,6 +136,7 @@ test('QDP Release Center is a discoverable CRM minor release with one existing w
 
   for (const code of [
     'crm:prepare_qdp_draft',
+    'crm:compile_qdp_revision',
     'crm:submit_qdp_review',
     'crm:publish_qdp_revision',
     'crm:release_qdp',
@@ -181,7 +195,17 @@ test('supporting evidence objects are immutable while QDP only exposes exact lif
   }
 
   assert.deepEqual(fieldByCode.get('crm_qdp_status').allowedWriterCommands,
-    ['crm:prepare_qdp_draft', 'crm:submit_qdp_review', 'crm:publish_qdp_revision', 'crm:release_qdp']);
+    ['crm:prepare_qdp_draft', 'crm:compile_qdp_revision', 'crm:submit_qdp_review',
+      'crm:publish_qdp_revision', 'crm:release_qdp']);
+  assert.deepEqual(fieldByCode.get('crm_qdp_gate_verdict').allowedWriterCommands,
+    ['crm:prepare_qdp_draft', 'crm:compile_qdp_revision', 'crm:submit_qdp_review',
+      'crm:publish_qdp_revision']);
+  for (const fieldCode of COMPILATION_FIELDS) {
+    const field = fieldByCode.get(fieldCode);
+    assert.ok(field, `${fieldCode} should exist`);
+    assert.deepEqual(field.allowedWriterCommands, ['crm:compile_qdp_revision']);
+    assert.equal(bindingByKey.get(`crm_qdp_revision_common:${fieldCode}`)?.editable, false);
+  }
   assert.deepEqual(fieldByCode.get('crm_qdp_review_submitted_at').allowedWriterCommands,
     ['crm:submit_qdp_review']);
   assert.deepEqual(fieldByCode.get('crm_qdp_superseded_by_revision_id').allowedWriterCommands,
@@ -193,6 +217,7 @@ test('supporting evidence objects are immutable while QDP only exposes exact lif
 test('prepare, review and publish commands have exact targets, permissions and one aggregate lock', () => {
   const expected = [
     ['crm:prepare_qdp_draft', 'crm_customer_request_common', 'crm.qdp.prepare', true],
+    ['crm:compile_qdp_revision', 'crm_qdp_revision_common', 'crm.qdp.review', false],
     ['crm:submit_qdp_review', 'crm_qdp_revision_common', 'crm.qdp.review', false],
     ['crm:publish_qdp_revision', 'crm_qdp_revision_common', 'crm.qdp.release', false],
   ];
@@ -209,6 +234,14 @@ test('prepare, review and publish commands have exact targets, permissions and o
       'dialog-only inputs must not be misdeclared as model-bound command fields');
     assert.ok(permissionCodes.has(permission));
   }
+
+  const compile = command('crm:compile_qdp_revision');
+  assert.equal(compile.handlerParams.async, true);
+  assert.equal(compile.handlerParams.dslPersistence, false);
+  assert.equal(compile.handlerParams.taskPresentation.metrics.length, 4);
+  assert.deepEqual(compile.handlerParams.taskPresentation.metrics.map((metric) => metric.field),
+    ['passedChecks', 'warningCount', 'failedChecks', 'outcomeLabel']);
+  assert.match(compile.description, /Compiling/);
 
   const legacy = command('crm:release_qdp');
   assert.equal(legacy.modelCode, 'crm_customer_request_common');
@@ -289,8 +322,10 @@ test('Customer Request and Release Center pages expose complete lifecycle feedba
     'frozen Core only preloads detail dictionaries from form-section blocks');
   const lifecycleButtons = new Map(block(detail.pageKey, 'crm_qdp_release_actions').buttons
     .map((button) => [button.code, button]));
-  assert.equal(lifecycleButtons.get('submit_qdp_review')?.permissionCode, 'crm.qdp.review');
-  assert.match(lifecycleButtons.get('submit_qdp_review')?.visibleWhen, /draft/);
+  assert.equal(lifecycleButtons.get('compile_qdp_revision')?.permissionCode, 'crm.qdp.review');
+  assert.match(lifecycleButtons.get('compile_qdp_revision')?.visibleWhen, /draft/);
+  assert.equal(lifecycleButtons.get('compile_qdp_revision')?.action?.command,
+    'crm:compile_qdp_revision');
   assert.equal(lifecycleButtons.get('release_qdp')?.permissionCode, 'crm.qdp.release');
   assert.match(lifecycleButtons.get('release_qdp')?.visibleWhen, /ready_for_review/);
   assert.equal(lifecycleButtons.get('release_qdp')?.action?.command, 'crm:publish_qdp_revision');
@@ -299,10 +334,27 @@ test('Customer Request and Release Center pages expose complete lifecycle feedba
     'draft', 'compiling', 'validation_failed', 'ready_for_review', 'released', 'superseded',
   ]);
   assert.ok(dictByCode.has('crm_qdp_gate_verdict'));
+  assert.deepEqual(dictByCode.get('crm_qdp_gate_verdict')?.items.map((item) => item.value), [
+    'pending_review', 'ready', 'ready_with_approved_exception', 'blocked',
+  ]);
+  assert.deepEqual(dictByCode.get('crm_qdp_compilation_outcome')?.items.map((item) => item.value), [
+    'running', 'success', 'partial_success', 'validation_failed',
+  ]);
+  assert.deepEqual(dictByCode.get('crm_qdp_compilation_stage')?.items.map((item) => item.value), [
+    'validating_confirmation', 'validating_gate', 'assembling_result', 'completed',
+    'validation_failed',
+  ]);
+  const compilation = block(detail.pageKey, 'crm_qdp_compilation');
+  assert.equal(compilation.blockType, 'form-section',
+    'frozen Core only preloads compilation outcome dictionaries from form-section blocks');
+  assert.deepEqual(new Set(compilation.fields.map((field) => field.field)),
+    new Set(COMPILATION_FIELDS));
   assert.equal(fieldByCode.get('crm_qdp_status')?.dictCode, 'crm_qdp_lifecycle',
     'detail rendering resolves lifecycle labels from field metadata');
   assert.equal(fieldByCode.get('crm_qdp_gate_verdict')?.dictCode, 'crm_qdp_gate_verdict',
     'detail rendering resolves GT-D04 labels from field metadata');
+  assert.equal(fieldByCode.get('crm_qdp_compilation_stage')?.dictCode,
+    'crm_qdp_compilation_stage', 'detail rendering resolves compilation stage labels');
   for (const fieldCode of [
     'crm_qdp_content_hash',
     'crm_qdp_version_diff_summary',

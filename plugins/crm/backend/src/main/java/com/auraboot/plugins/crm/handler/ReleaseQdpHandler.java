@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
 
 /**
@@ -47,6 +48,7 @@ public class ReleaseQdpHandler implements CommandHandlerExtension {
 
     public static final String COMMAND_TYPE = "crm:release_qdp";
     static final String PREPARE_COMMAND = "crm:prepare_qdp_draft";
+    static final String COMPILE_COMMAND = "crm:compile_qdp_revision";
     static final String REVIEW_COMMAND = "crm:submit_qdp_review";
     static final String PUBLISH_COMMAND = "crm:publish_qdp_revision";
     static final String CUSTOMER_REQUEST_MODEL = "crm_customer_request_common";
@@ -103,6 +105,9 @@ public class ReleaseQdpHandler implements CommandHandlerExtension {
         String commandCode = firstNonBlank(trimToNull(setting(context, "__commandCode")), COMMAND_TYPE);
         if (PREPARE_COMMAND.equals(commandCode)) {
             return prepareDraft(context);
+        }
+        if (COMPILE_COMMAND.equals(commandCode)) {
+            return compileRevision(context);
         }
         if (REVIEW_COMMAND.equals(commandCode)) {
             return submitForReview(context);
@@ -474,6 +479,160 @@ public class ReleaseQdpHandler implements CommandHandlerExtension {
         qdpRow.put("crm_qdp_prepared_by", actor);
         Map<String, Object> created = db.create(QDP_REVISION_MODEL, qdpRow);
         return lifecycleResult(created, false, null);
+    }
+
+    private Object compileRevision(CommandContext context) {
+        DataAccessor db = requireDataAccessor(context, "compile QDP revision");
+        requireTenant(context, "compile QDP revision");
+        String actor = requireActor(context, "compile QDP revision");
+        Map<String, Object> commandPayload = payload(context);
+        String qdpPid = requireExactTarget(
+                context.recordId(), commandPayload.get("crm_qdp_revision_id"), "QDP revision");
+        Map<String, Object> qdp = requiredRecord(db, QDP_REVISION_MODEL, qdpPid, "QDP revision");
+        requireExactCustomerRequest(qdp, commandPayload);
+        Long currentVersion = requireExpectedVersion(context, qdp, "QDP revision");
+        String state = trimToNull(qdp.get("crm_qdp_status"));
+        if (!Set.of("draft", "validation_failed").contains(state)) {
+            throw new IllegalArgumentException("QDP revision state '" + state
+                    + "' cannot compile; expected draft or validation_failed");
+        }
+
+        if (context.dryRun()) {
+            validateConfirmationBinding(db, qdp);
+            validateGateCompleteness(qdp);
+            return lifecycleDryRun(qdp, "compilation_validated", Map.of(
+                    "crm_qdp_status", "ready_for_review",
+                    "crm_qdp_compilation_stage", "completed",
+                    "crm_qdp_compilation_progress", 100));
+        }
+
+        String startedAt = Instant.now().toString();
+        Map<String, Object> compilingPatch = new LinkedHashMap<>();
+        compilingPatch.put("_expectedVersion", currentVersion);
+        compilingPatch.put("crm_qdp_status", "compiling");
+        compilingPatch.put("crm_qdp_gate_verdict", "pending_review");
+        compilingPatch.put("crm_qdp_compilation_stage", "validating_confirmation");
+        compilingPatch.put("crm_qdp_compilation_progress", 10);
+        compilingPatch.put("crm_qdp_compilation_outcome", "running");
+        compilingPatch.put("crm_qdp_compilation_summary", "QDP compilation is validating GT-D04 inputs.");
+        compilingPatch.put("crm_qdp_validation_failure_summary", "");
+        compilingPatch.put("crm_qdp_compilation_started_at", startedAt);
+        compilingPatch.put("crm_qdp_compilation_started_by", actor);
+        Map<String, Object> compiling = db.update(QDP_REVISION_MODEL, qdpPid, compilingPatch);
+        if (compiling == null) {
+            throw new IllegalStateException("QDP revision disappeared before compilation could start");
+        }
+        reportCompilationProgress(context, 10, 0, 3, 0, 0, 0);
+
+        try {
+            validateConfirmationBinding(db, compiling);
+            checkpointCompilation(db, qdpPid, compiling, "validating_gate", 45,
+                    "Customer confirmation binding passed; validating GT-D04 completeness.");
+            reportCompilationProgress(context, 45, 1, 3, 1, 0, 0);
+
+            validateGateCompleteness(compiling);
+            checkpointCompilation(db, qdpPid, compiling, "assembling_result", 75,
+                    "GT-D04 content is complete; assembling the review result.");
+            reportCompilationProgress(context, 75, 2, 3, 2, 0, 0);
+
+            int warningCount = compilationWarningCount(compiling);
+            String outcome = warningCount > 0 ? "partial_success" : "success";
+            String verdict = warningCount > 0 ? "ready_with_approved_exception" : "ready";
+            String summary = warningCount > 0
+                    ? "Compiled 3 GT-D04 checks with " + warningCount
+                            + " approved exception warning(s); review is required before release."
+                    : "Compiled 3 GT-D04 checks with no warnings; ready for review.";
+            String completedAt = Instant.now().toString();
+            Map<String, Object> completedPatch = new LinkedHashMap<>();
+            completedPatch.put("_expectedVersion", positiveLong(compiling.get("row_version")));
+            completedPatch.put("crm_qdp_status", "ready_for_review");
+            completedPatch.put("crm_qdp_gate_verdict", verdict);
+            completedPatch.put("crm_qdp_compilation_stage", "completed");
+            completedPatch.put("crm_qdp_compilation_progress", 100);
+            completedPatch.put("crm_qdp_compilation_outcome", outcome);
+            completedPatch.put("crm_qdp_compilation_summary", summary);
+            completedPatch.put("crm_qdp_validation_failure_summary", "");
+            completedPatch.put("crm_qdp_compiled_at", completedAt);
+            completedPatch.put("crm_qdp_compiled_by", actor);
+            Map<String, Object> completed = db.update(QDP_REVISION_MODEL, qdpPid, completedPatch);
+            if (completed == null) {
+                throw new IllegalStateException("QDP revision disappeared before compilation could complete");
+            }
+            reportCompilationProgress(context, 100, 3, 3, 3, 0, warningCount);
+            Map<String, Object> result = lifecycleResult(completed, false, null);
+            result.put("outcome", outcome);
+            result.put("outcomeLabel", warningCount > 0
+                    ? "部分成功 / Partial Success"
+                    : "成功 / Success");
+            result.put("passedChecks", 3);
+            result.put("warningCount", warningCount);
+            result.put("failedChecks", 0);
+            result.put("message", summary);
+            return result;
+        } catch (IllegalArgumentException | IllegalStateException validationFailure) {
+            String message = limitedFailureSummary(validationFailure);
+            Map<String, Object> failurePatch = new LinkedHashMap<>();
+            failurePatch.put("_expectedVersion", positiveLong(compiling.get("row_version")));
+            failurePatch.put("crm_qdp_status", "validation_failed");
+            failurePatch.put("crm_qdp_gate_verdict", "blocked");
+            failurePatch.put("crm_qdp_compilation_stage", "validation_failed");
+            failurePatch.put("crm_qdp_compilation_progress", 100);
+            failurePatch.put("crm_qdp_compilation_outcome", "validation_failed");
+            failurePatch.put("crm_qdp_compilation_summary",
+                    "Compilation stopped because one or more GT-D04 checks failed.");
+            failurePatch.put("crm_qdp_validation_failure_summary", message);
+            failurePatch.put("crm_qdp_compiled_at", Instant.now().toString());
+            failurePatch.put("crm_qdp_compiled_by", actor);
+            db.update(QDP_REVISION_MODEL, qdpPid, failurePatch);
+            reportCompilationProgress(context, 100, 3, 3, 2, 1, 0);
+            throw validationFailure;
+        }
+    }
+
+    private static void checkpointCompilation(DataAccessor db, String qdpPid,
+                                              Map<String, Object> compiling, String stage,
+                                              int progress, String summary) {
+        Map<String, Object> patch = new LinkedHashMap<>();
+        patch.put("_expectedVersion", positiveLong(compiling.get("row_version")));
+        patch.put("crm_qdp_compilation_stage", stage);
+        patch.put("crm_qdp_compilation_progress", progress);
+        patch.put("crm_qdp_compilation_summary", summary);
+        Map<String, Object> updated = db.update(QDP_REVISION_MODEL, qdpPid, patch);
+        if (updated == null) {
+            throw new IllegalStateException("QDP revision disappeared during compilation stage " + stage);
+        }
+        Map<String, Object> snapshot = new LinkedHashMap<>(updated);
+        compiling.clear();
+        compiling.putAll(snapshot);
+    }
+
+    private static int compilationWarningCount(Map<String, Object> qdp) {
+        Object exceptions = parseJsonValue(qdp.get("crm_qdp_approved_exceptions"), "Approved exceptions");
+        int count = exceptions instanceof List<?> list ? list.size() : 0;
+        if ("conditional".equals(trimToNull(qdp.get("crm_qdp_qualification_verdict")))) {
+            count++;
+        }
+        return count;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void reportCompilationProgress(CommandContext context, int percent,
+                                                  int processed, int total, int ok,
+                                                  int failed, int skipped) {
+        Object reporter = setting(context, "__progressReporter");
+        if (reporter instanceof BiConsumer<?, ?> rawReporter) {
+            BiConsumer<Integer, String> typed = (BiConsumer<Integer, String>) rawReporter;
+            typed.accept(percent, "{\"processed\":" + processed
+                    + ",\"total\":" + total
+                    + ",\"ok\":" + ok
+                    + ",\"failed\":" + failed
+                    + ",\"skipped\":" + skipped + "}");
+        }
+    }
+
+    private static String limitedFailureSummary(RuntimeException failure) {
+        String message = firstNonBlank(trimToNull(failure.getMessage()), failure.getClass().getSimpleName());
+        return message.length() <= 2_000 ? message : message.substring(0, 2_000);
     }
 
     private Object submitForReview(CommandContext context) {

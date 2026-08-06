@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -964,6 +965,105 @@ class ReleaseQdpHandlerTest {
     }
 
     @Test
+    void asynchronouslyCompilesDraftWithVisibleProgressAndPartialSuccessSummary() throws Exception {
+        FakeDataAccessor db = eligibleRequestWithPcbaSidecar();
+        FakeFileAccessor files = new FakeFileAccessor().put("file-compile", "confirmed-package-v1");
+        Map<String, Object> draftPayload = lifecyclePayload(
+                "compile-partial", "file-compile", "RV-COMPILE-001");
+        draftPayload.put("crm_qdp_approved_exceptions", List.of(row(
+                "code", "APPROVED-EX-1",
+                "reason", "Customer-approved tolerance pending downstream acknowledgement")));
+        Map<String, Object> prepared = executeLifecycle(db, files,
+                ReleaseQdpHandler.PREPARE_COMMAND, "crm_customer_request_common", "request-1",
+                draftPayload, 7L);
+        String qdpPid = String.valueOf(prepared.get("qdpRevisionId"));
+        List<String> progress = new ArrayList<>();
+
+        Map<String, Object> compiled = executeLifecycleWithSettings(db, files,
+                ReleaseQdpHandler.COMPILE_COMMAND, "crm_qdp_revision_common", qdpPid,
+                lifecycleTargetPayload(qdpPid), 1L,
+                Map.of("__progressReporter", (BiConsumer<Integer, String>) (pct, message) ->
+                        progress.add(pct + ":" + message + ":"
+                                + db.getById("crm_qdp_revision_common", qdpPid).get("crm_qdp_status"))));
+
+        Map<String, Object> qdp = db.getById("crm_qdp_revision_common", qdpPid);
+        assertEquals("ready_for_review", compiled.get("status"));
+        assertEquals("partial_success", compiled.get("outcome"));
+        assertEquals("部分成功 / Partial Success", compiled.get("outcomeLabel"));
+        assertEquals("ready_for_review", qdp.get("crm_qdp_status"));
+        assertEquals("partial_success", qdp.get("crm_qdp_compilation_outcome"));
+        assertEquals("completed", qdp.get("crm_qdp_compilation_stage"));
+        assertEquals(100, qdp.get("crm_qdp_compilation_progress"));
+        assertTrue(String.valueOf(qdp.get("crm_qdp_compilation_summary"))
+                .contains("approved exception"));
+        assertNotNull(qdp.get("crm_qdp_compiled_at"));
+        assertEquals("user-501", qdp.get("crm_qdp_compiled_by"));
+        assertTrue(progress.stream().anyMatch(event -> event.endsWith(":compiling")),
+                "the async progress oracle must observe the persisted Compiling state");
+        assertTrue(progress.stream().anyMatch(event -> event.startsWith("100:")));
+    }
+
+    @Test
+    void failedAsyncCompilationPersistsValidationFailedAndSupportsCorrectedRetry() throws Exception {
+        FakeDataAccessor db = eligibleRequestWithPcbaSidecar();
+        FakeFileAccessor files = new FakeFileAccessor().put("file-compile-fail", "confirmed-package-v1");
+        Map<String, Object> prepared = executeLifecycle(db, files,
+                ReleaseQdpHandler.PREPARE_COMMAND, "crm_customer_request_common", "request-1",
+                lifecyclePayload("compile-failure", "file-compile-fail", "RV-COMPILE-FAIL"), 7L);
+        String qdpPid = String.valueOf(prepared.get("qdpRevisionId"));
+        Map<String, Object> confirmation = db.only("crm_customer_confirmation_common");
+        String confirmedHash = String.valueOf(confirmation.get("crm_cc_file_package_hash"));
+        confirmation.put("crm_cc_file_package_hash", "f".repeat(64));
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
+                () -> executeLifecycle(db, files, ReleaseQdpHandler.COMPILE_COMMAND,
+                        "crm_qdp_revision_common", qdpPid, lifecycleTargetPayload(qdpPid), 1L));
+
+        Map<String, Object> failed = db.getById("crm_qdp_revision_common", qdpPid);
+        assertTrue(failure.getMessage().toLowerCase().contains("confirmation"));
+        assertEquals("validation_failed", failed.get("crm_qdp_status"));
+        assertEquals("validation_failed", failed.get("crm_qdp_compilation_outcome"));
+        assertEquals("validation_failed", failed.get("crm_qdp_compilation_stage"));
+        assertEquals(100, failed.get("crm_qdp_compilation_progress"));
+        assertTrue(String.valueOf(failed.get("crm_qdp_validation_failure_summary"))
+                .toLowerCase().contains("confirmation"));
+
+        confirmation.put("crm_cc_file_package_hash", confirmedHash);
+        Map<String, Object> retried = executeLifecycle(db, files,
+                ReleaseQdpHandler.COMPILE_COMMAND, "crm_qdp_revision_common", qdpPid,
+                lifecycleTargetPayload(qdpPid), 3L);
+        assertEquals("ready_for_review", retried.get("status"));
+        assertEquals("success", retried.get("outcome"));
+        assertEquals("成功 / Success", retried.get("outcomeLabel"));
+        assertEquals("ready_for_review", failed.get("crm_qdp_status"));
+        assertEquals("success", failed.get("crm_qdp_compilation_outcome"));
+        assertEquals("", failed.get("crm_qdp_validation_failure_summary"));
+    }
+
+    @Test
+    void compileRejectsStaleAndNonDraftTargetsWithoutChangingLifecycle() throws Exception {
+        FakeDataAccessor db = eligibleRequestWithPcbaSidecar();
+        FakeFileAccessor files = new FakeFileAccessor().put("file-compile-guard", "confirmed-package-v1");
+        Map<String, Object> prepared = executeLifecycle(db, files,
+                ReleaseQdpHandler.PREPARE_COMMAND, "crm_customer_request_common", "request-1",
+                lifecyclePayload("compile-guard", "file-compile-guard", "RV-COMPILE-GUARD"), 7L);
+        String qdpPid = String.valueOf(prepared.get("qdpRevisionId"));
+
+        IllegalStateException stale = assertThrows(IllegalStateException.class,
+                () -> executeLifecycle(db, files, ReleaseQdpHandler.COMPILE_COMMAND,
+                        "crm_qdp_revision_common", qdpPid, lifecycleTargetPayload(qdpPid), 99L));
+        assertTrue(stale.getMessage().contains("stale"));
+        assertEquals("draft", db.getById("crm_qdp_revision_common", qdpPid).get("crm_qdp_status"));
+
+        db.getById("crm_qdp_revision_common", qdpPid).put("crm_qdp_status", "compiling");
+        IllegalArgumentException duplicate = assertThrows(IllegalArgumentException.class,
+                () -> executeLifecycle(db, files, ReleaseQdpHandler.COMPILE_COMMAND,
+                        "crm_qdp_revision_common", qdpPid, lifecycleTargetPayload(qdpPid), 1L));
+        assertTrue(duplicate.getMessage().contains("expected draft or validation_failed"));
+        assertEquals("compiling", db.getById("crm_qdp_revision_common", qdpPid).get("crm_qdp_status"));
+    }
+
+    @Test
     void prepareReplayIsStableAndChangedContentWithSameKeyConflictsBeforeSupportingFactsAreCreated()
             throws Exception {
         FakeDataAccessor db = eligibleRequestWithPcbaSidecar();
@@ -1098,6 +1198,14 @@ class ReleaseQdpHandlerTest {
             FakeDataAccessor db, FakeFileAccessor files, String commandCode,
             String modelCode, String targetRecordId, Map<String, Object> payload,
             long expectedVersion) {
+        return executeLifecycleWithSettings(db, files, commandCode, modelCode, targetRecordId,
+                payload, expectedVersion, Map.of());
+    }
+
+    private Map<String, Object> executeLifecycleWithSettings(
+            FakeDataAccessor db, FakeFileAccessor files, String commandCode,
+            String modelCode, String targetRecordId, Map<String, Object> payload,
+            long expectedVersion, Map<String, Object> extraSettings) {
         Map<String, Object> settings = new HashMap<>();
         settings.put("__dataAccessor", db);
         settings.put("__fileAccessor", files);
@@ -1106,6 +1214,7 @@ class ReleaseQdpHandlerTest {
                 TEST_CLIENT_REQUEST_ID, commandCode + "-request")));
         settings.put("__expectedVersion", expectedVersion);
         settings.put("__commandCode", commandCode);
+        settings.putAll(extraSettings);
         Map<String, Object> commandPayload = new HashMap<>(payload);
         commandPayload.remove(TEST_CLIENT_REQUEST_ID);
         commandPayload.remove(TEST_EXPECTED_VERSION);

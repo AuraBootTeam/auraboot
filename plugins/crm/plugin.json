@@ -123,6 +123,10 @@
     },
     {
       "type": "command",
+      "code": "crm:compile_qdp_revision"
+    },
+    {
+      "type": "command",
       "code": "crm:submit_qdp_review"
     },
     {

@@ -43,6 +43,7 @@ from qdp_release_true_stack import (
 
 
 PREPARE = "crm:prepare_qdp_draft"
+COMPILE = "crm:compile_qdp_revision"
 REVIEW = "crm:submit_qdp_review"
 RELEASE = "crm:publish_qdp_revision"
 LEGACY_RELEASE = "crm:release_qdp"
@@ -67,6 +68,8 @@ def lifecycle_payload(
     file_pid: str,
     tag: str,
     revision: int,
+    *,
+    approved_exception: bool = False,
 ) -> dict[str, Any]:
     pack_hash = hashlib.sha256(f"pack-{tag}-{revision}".encode()).hexdigest()
     return {
@@ -91,7 +94,10 @@ def lifecycle_payload(
             }
         ],
         "crm_qdp_assumptions": ["Customer approval covers the exact uploaded package bytes"],
-        "crm_qdp_approved_exceptions": [],
+        "crm_qdp_approved_exceptions": ([{
+            "code": f"APPROVED-{tag}-{revision}",
+            "reason": "Customer-approved tolerance pending downstream acknowledgement",
+        }] if approved_exception else []),
         "crm_qdp_release_note": f"QDP Release Center true-stack revision {revision}",
     }
 
@@ -178,6 +184,49 @@ def review(jwt: str, qdp_pid: str, request_pid: str, expected: int):
             "crm_qdp_customer_request_id": request_pid,
         },
     )
+
+
+def compile_qdp(jwt: str, qdp_pid: str, request_pid: str, expected: int):
+    return command(
+        COMPILE,
+        jwt,
+        target=qdp_pid,
+        expected_version=expected,
+        payload={
+            "crm_qdp_revision_id": qdp_pid,
+            "crm_qdp_customer_request_id": request_pid,
+        },
+    )
+
+
+def async_task_code(result: Any, label: str) -> str:
+    require_ok(result, label)
+    task_code = str(find_value(result.body.get("data"), ("taskCode",)) or "")
+    assert re.fullmatch(r"[A-Za-z0-9._:-]{4,128}", task_code), (
+        f"{label} returned no safe async task code: {result.body}"
+    )
+    return task_code
+
+
+def wait_async_task(jwt: str, task_code: str, qdp_pid: str) -> tuple[dict[str, Any], list[str], list[str]]:
+    task_statuses: list[str] = []
+    lifecycle_states: list[str] = []
+    for _ in range(600):
+        response = http("GET", f"/api/async-tasks/{task_code}", jwt=jwt)
+        body = require_ok(response, f"poll async task {task_code}")
+        task = body.get("data") or {}
+        assert isinstance(task, dict), f"async task {task_code} returned no task object: {body}"
+        status = str(task.get("status") or "").lower()
+        if status and (not task_statuses or task_statuses[-1] != status):
+            task_statuses.append(status)
+        qdp = dynamic_get("crm_qdp_revision_common", qdp_pid, jwt)
+        lifecycle = str(qdp.get("crm_qdp_status") or "")
+        if lifecycle and (not lifecycle_states or lifecycle_states[-1] != lifecycle):
+            lifecycle_states.append(lifecycle)
+        if status in {"completed", "failed", "cancelled"}:
+            return task, task_statuses, lifecycle_states
+        time.sleep(0.1)
+    raise AssertionError(f"async task {task_code} did not reach a terminal state")
 
 
 def release(jwt: str, qdp_pid: str, request_pid: str, expected: int, note: str):
@@ -339,7 +388,8 @@ def main() -> int:
     source_v1 = f"QDP Release Center v1\nrequest={request_pid}\ntag={tag}\n".encode()
     file_v1 = upload(jwt, f"qdp-release-center-{tag}-v1.txt", source_v1, "text/plain")
     request_version = row_version(dynamic_get("crm_customer_request_common", request_pid, jwt), "Customer Request")
-    payload_v1 = lifecycle_payload(request_pid, sidecar_pid, file_v1, tag, 1)
+    payload_v1 = lifecycle_payload(
+        request_pid, sidecar_pid, file_v1, tag, 1, approved_exception=True)
 
     unqualified = prepare(jwt, request_pid, request_version, f"qdp-unqualified-{tag}", payload_v1)
     require_denied(unqualified, "unqualified prepare", "qualification", "passed", "conditional")
@@ -449,18 +499,39 @@ def main() -> int:
     require_denied(direct_status, "direct QDP lifecycle mutation", "writer", "command")
     checks.append({"id": "WRITER-EXACT-UPDATE", "result": "pass"})
 
-    missing_qdp_version = review(jwt, qdp1, request_pid, 0)
-    require_denied(missing_qdp_version, "review missing version", "version", "expected")
+    missing_qdp_version = compile_qdp(jwt, qdp1, request_pid, 0)
+    require_denied(missing_qdp_version, "compile missing version", "version", "expected")
     qdp1_version = row_version(qdp1_row, "QDP draft")
-    stale_qdp_version = review(jwt, qdp1, request_pid, qdp1_version + 1)
-    require_denied(stale_qdp_version, "review stale version", "stale", "version", "optimistic")
-    wrong_request = review(jwt, qdp1, "other-request-pid", qdp1_version)
-    require_denied(wrong_request, "review cross-request", "match", "stored")
-    lifecycle_result(review(jwt, qdp1, request_pid, qdp1_version), "submit first QDP review")
+    stale_qdp_version = compile_qdp(jwt, qdp1, request_pid, qdp1_version + 1)
+    require_denied(stale_qdp_version, "compile stale version", "stale", "version", "optimistic")
+    no_compile_permission = compile_qdp(
+        no_permission_jwt, qdp1, request_pid, qdp1_version)
+    require_denied(
+        no_compile_permission, "compile without permission", "permission", "forbidden", "denied")
+    compile_dispatch = compile_qdp(jwt, qdp1, request_pid, qdp1_version)
+    compile_task_code = async_task_code(compile_dispatch, "dispatch first QDP compilation")
+    compile_task, task_statuses, lifecycle_states = wait_async_task(jwt, compile_task_code, qdp1)
+    assert str(compile_task.get("status") or "").lower() == "completed", compile_task
     qdp1_review = dynamic_get("crm_qdp_revision_common", qdp1, jwt)
     assert qdp1_review.get("crm_qdp_status") == "ready_for_review", qdp1_review
-    assert qdp1_review.get("crm_qdp_gate_verdict") == "ready", qdp1_review
-    checks.append({"id": "LIFECYCLE-DRAFT-REVIEW", "result": "pass"})
+    assert qdp1_review.get("crm_qdp_gate_verdict") == "ready_with_approved_exception", qdp1_review
+    assert qdp1_review.get("crm_qdp_compilation_outcome") == "partial_success", qdp1_review
+    assert qdp1_review.get("crm_qdp_compilation_progress") == 100, qdp1_review
+    assert "approved exception" in str(qdp1_review.get("crm_qdp_compilation_summary") or "").lower()
+    checks.append({
+        "id": "ASYNC-COMPILE-PARTIAL-SUCCESS",
+        "result": "pass",
+        "taskCode": compile_task_code,
+        "taskStatuses": task_statuses,
+        "lifecycleStatesObserved": lifecycle_states,
+        "outcome": qdp1_review.get("crm_qdp_compilation_outcome"),
+    })
+    checks.append({
+        "id": "NEG-COMPILE-PERMISSION-STALE",
+        "result": "pass",
+        "noPermissionStatus": no_compile_permission.status,
+        "staleStatus": stale_qdp_version.status,
+    })
 
     qdp1_content_hash = qdp1_review.get("crm_qdp_content_hash")
     release_version = row_version(qdp1_review, "QDP in review")
@@ -491,7 +562,49 @@ def main() -> int:
     )
     qdp2 = str(qdp2_data.get("qdpRevisionId") or "")
     qdp2_row = dynamic_get("crm_qdp_revision_common", qdp2, jwt)
-    lifecycle_result(review(jwt, qdp2, request_pid, row_version(qdp2_row, "QDP 2 draft")), "review QDP 2")
+    qdp2_confirmation = str(qdp2_row.get("crm_qdp_customer_confirmation_id") or "")
+    qdp2_package_hash = str(qdp2_row.get("crm_qdp_file_package_hash") or "")
+    assert PID_RE.fullmatch(qdp2_confirmation) and re.fullmatch(r"[0-9a-f]{64}", qdp2_package_hash)
+    psql(
+        "UPDATE mt_crm_customer_confirmation_common SET crm_cc_file_package_hash="
+        + "'" + ("f" * 64) + "'"
+        + " WHERE tenant_id=" + tenant_id
+        + " AND pid=" + sql_literal(qdp2_confirmation)
+    )
+    failed_dispatch = compile_qdp(
+        jwt, qdp2, request_pid, row_version(qdp2_row, "QDP 2 draft"))
+    failed_task_code = async_task_code(failed_dispatch, "dispatch failing QDP compilation")
+    failed_task, failed_statuses, failed_lifecycle = wait_async_task(jwt, failed_task_code, qdp2)
+    assert str(failed_task.get("status") or "").lower() == "failed", failed_task
+    qdp2_failed = dynamic_get("crm_qdp_revision_common", qdp2, jwt)
+    assert qdp2_failed.get("crm_qdp_status") == "validation_failed", qdp2_failed
+    assert qdp2_failed.get("crm_qdp_compilation_outcome") == "validation_failed", qdp2_failed
+    assert "confirmation" in str(qdp2_failed.get("crm_qdp_validation_failure_summary") or "").lower()
+    psql(
+        "UPDATE mt_crm_customer_confirmation_common SET crm_cc_file_package_hash="
+        + "'" + qdp2_package_hash + "'"
+        + " WHERE tenant_id=" + tenant_id
+        + " AND pid=" + sql_literal(qdp2_confirmation)
+    )
+    retry_dispatch = compile_qdp(
+        jwt, qdp2, request_pid, row_version(qdp2_failed, "QDP 2 validation failure"))
+    retry_task_code = async_task_code(retry_dispatch, "dispatch corrected QDP compilation")
+    retry_task, retry_statuses, retry_lifecycle = wait_async_task(jwt, retry_task_code, qdp2)
+    assert str(retry_task.get("status") or "").lower() == "completed", retry_task
+    qdp2_ready = dynamic_get("crm_qdp_revision_common", qdp2, jwt)
+    assert qdp2_ready.get("crm_qdp_status") == "ready_for_review", qdp2_ready
+    assert qdp2_ready.get("crm_qdp_compilation_outcome") == "success", qdp2_ready
+    assert not str(qdp2_ready.get("crm_qdp_validation_failure_summary") or "").strip()
+    checks.append({
+        "id": "ASYNC-VALIDATION-FAILED-RECOVERY",
+        "result": "pass",
+        "failedTaskCode": failed_task_code,
+        "failedTaskStatuses": failed_statuses,
+        "failedLifecycleStatesObserved": failed_lifecycle,
+        "retryTaskCode": retry_task_code,
+        "retryTaskStatuses": retry_statuses,
+        "retryLifecycleStatesObserved": retry_lifecycle,
+    })
     bump_request(admin_jwt, request_pid, f"source changed after QDP 2 review {tag}")
     qdp2_review = dynamic_get("crm_qdp_revision_common", qdp2, jwt)
     stale_source = release(jwt, qdp2, request_pid, row_version(qdp2_review, "QDP 2 review"), "must fail stale")
@@ -626,10 +739,10 @@ def main() -> int:
     assert legacy_writer_count == "20", f"legacy writer compatibility count is {legacy_writer_count!r}"
     audit_count = int(psql(
         "SELECT count(*) FROM ab_command_audit_log WHERE tenant_id=" + tenant_id
-        + " AND command_code IN ('crm:prepare_qdp_draft','crm:submit_qdp_review',"
+        + " AND command_code IN ('crm:prepare_qdp_draft','crm:compile_qdp_revision','crm:submit_qdp_review',"
         + "'crm:publish_qdp_revision','crm:release_qdp')"
     ) or 0)
-    assert audit_count >= 6, f"lifecycle command audit rows missing: {audit_count}"
+    assert audit_count >= 9, f"lifecycle command audit rows missing: {audit_count}"
     checks.append({"id": "AUDIT-AND-METADATA", "result": "pass", "auditRows": audit_count,
                    "legacyWriterFields": int(legacy_writer_count)})
 
@@ -658,7 +771,7 @@ def main() -> int:
         output.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n")
         print(f"evidence: {output}")
     print(json.dumps(evidence, ensure_ascii=False, indent=2))
-    print("PASS: QDP Release Center lifecycle, binding, replay, concurrency, permission, tenant and external-failure checks")
+    print("PASS: QDP Release Center async compilation, lifecycle, binding, replay, concurrency, permission, tenant and external-failure checks")
     return 0
 
 

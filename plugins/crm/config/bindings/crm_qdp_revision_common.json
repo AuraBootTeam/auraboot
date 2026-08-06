@@ -43,5 +43,14 @@
   { "modelCode": "crm_qdp_revision_common", "fieldCode": "crm_qdp_released_by", "sequence": 42, "required": false, "visible": true, "editable": false },
   { "modelCode": "crm_qdp_revision_common", "fieldCode": "crm_qdp_superseded_at", "sequence": 43, "required": false, "visible": true, "editable": false },
   { "modelCode": "crm_qdp_revision_common", "fieldCode": "crm_qdp_superseded_by", "sequence": 44, "required": false, "visible": true, "editable": false },
-  { "modelCode": "crm_qdp_revision_common", "fieldCode": "crm_qdp_superseded_by_revision_id", "sequence": 45, "required": false, "visible": true, "editable": false }
+  { "modelCode": "crm_qdp_revision_common", "fieldCode": "crm_qdp_superseded_by_revision_id", "sequence": 45, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_qdp_revision_common", "fieldCode": "crm_qdp_compilation_stage", "sequence": 46, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_qdp_revision_common", "fieldCode": "crm_qdp_compilation_progress", "sequence": 47, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_qdp_revision_common", "fieldCode": "crm_qdp_compilation_outcome", "sequence": 48, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_qdp_revision_common", "fieldCode": "crm_qdp_compilation_summary", "sequence": 49, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_qdp_revision_common", "fieldCode": "crm_qdp_validation_failure_summary", "sequence": 50, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_qdp_revision_common", "fieldCode": "crm_qdp_compilation_started_at", "sequence": 51, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_qdp_revision_common", "fieldCode": "crm_qdp_compilation_started_by", "sequence": 52, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_qdp_revision_common", "fieldCode": "crm_qdp_compiled_at", "sequence": 53, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_qdp_revision_common", "fieldCode": "crm_qdp_compiled_by", "sequence": 54, "required": false, "visible": true, "editable": false }
 ]
