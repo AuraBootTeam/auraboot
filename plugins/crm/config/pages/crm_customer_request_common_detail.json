@@ -114,7 +114,11 @@
               "fields": [
                 {
                   "field": "crm_cr_route_status",
-                  "readOnly": true
+                  "readOnly": true,
+                  "helpText": {
+                    "zh-CN": "QDP 首片仅支持已由 PCBA 销售完成权威路由、且 DFM 已通过或条件通过的需求；未路由或其他行业需求不可发布。",
+                    "en-US": "This QDP slice requires an authoritative PCBA Sales route and a passed or conditional DFM gate; unrouted and non-PCBA requests cannot release."
+                  }
                 },
                 {
                   "field": "crm_cr_routed_package",
@@ -201,9 +205,95 @@
       ]
     },
     {
+      "id": "crm_cr_qdp_history",
+      "blockType": "sub-table",
+      "title": {
+        "zh-CN": "QDP 发布历史",
+        "en-US": "QDP Release History"
+      },
+      "subTable": {
+        "childModel": "crm_qdp_revision_common",
+        "parentField": "crm_qdp_customer_request_id",
+        "readOnly": true,
+        "columns": [
+          {
+            "field": "crm_qdp_code",
+            "width": 190
+          },
+          {
+            "field": "crm_qdp_revision_no",
+            "width": 90
+          },
+          {
+            "field": "crm_qdp_qualification_verdict",
+            "width": 140
+          },
+          {
+            "field": "crm_qdp_content_hash",
+            "width": 260
+          },
+          {
+            "field": "crm_qdp_file_names",
+            "width": 220
+          },
+          {
+            "field": "crm_qdp_released_by",
+            "width": 140
+          },
+          {
+            "field": "crm_qdp_released_at",
+            "width": 180
+          }
+        ]
+      }
+    },
+    {
       "id": "crm_cr_detail_toolbar",
       "blockType": "toolbar",
       "buttons": [
+        {
+          "code": "release_qdp",
+          "primary": true,
+          "icon": "PackageCheck",
+          "permissionCode": "crm.qdp.release",
+          "visibleWhen": "(record.crm_cr_status === 'routed' || record.crm_cr_status === 'in_progress') && record.crm_cr_route_status === 'routed' && record.crm_cr_routed_package === 'pcba-crm' && record.crm_cr_routed_object_type === 'crm_customer_request_pcba_rfq' && record.crm_cr_routed_object_id != null && record.crm_cr_routed_object_id !== ''",
+          "label": {
+            "zh-CN": "发布 QDP",
+            "en-US": "Release QDP"
+          },
+          "promptUpload": {
+            "key": "crm_qdp_primary_file_id",
+            "accept": ".zip,.xlsx,.xls,.csv,.pdf,.gbr,.ger,.drl"
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:release_qdp",
+            "operationType": "update",
+            "targetRecordPid": "${record.pid}",
+            "payload": {
+              "crm_qdp_customer_request_id": "${record.pid}"
+            },
+            "inputFieldsTitle": {
+              "zh-CN": "QDP 发布信息",
+              "en-US": "QDP Release Information"
+            },
+            "inputFieldsSubmitLabel": {
+              "zh-CN": "发布",
+              "en-US": "Release"
+            },
+            "inputFields": [
+              {
+                "field": "crm_qdp_release_note",
+                "label": {
+                  "zh-CN": "发布说明",
+                  "en-US": "Release Note"
+                },
+                "type": "textarea",
+                "required": false
+              }
+            ]
+          }
+        },
         {
           "code": "edit",
           "icon": "Edit",

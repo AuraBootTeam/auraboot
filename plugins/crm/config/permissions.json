@@ -537,5 +537,26 @@
     "name:en": "Read Clarification Model",
     "resourceType": "data",
     "module": "crm"
+  },
+  {
+    "code": "crm.qdp.release",
+    "name:zh-CN": "发布 QDP",
+    "name:en": "Release QDP",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
+    "code": "crm.qdp.read",
+    "name:zh-CN": "查看 QDP 历史",
+    "name:en": "View QDP History",
+    "resourceType": "data",
+    "module": "crm"
+  },
+  {
+    "code": "model.crm_qdp_revision_common.read",
+    "name:zh-CN": "查看 QDP 发布版本数据",
+    "name:en": "Read QDP Release Revision Model",
+    "resourceType": "data",
+    "module": "crm"
   }
 ]

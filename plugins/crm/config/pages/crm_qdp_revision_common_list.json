@@ -1,0 +1,82 @@
+{
+  "pageKey": "crm_qdp_revision_common_list",
+  "name:zh-CN": "QDP 发布历史",
+  "name:en": "QDP Release History",
+  "modelCode": "crm_qdp_revision_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_qdp_history_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_qdp_code",
+          "width": 190,
+          "sortable": true
+        },
+        {
+          "field": "crm_qdp_customer_request_id",
+          "width": 180
+        },
+        {
+          "field": "crm_qdp_revision_no",
+          "width": 100,
+          "sortable": true
+        },
+        {
+          "field": "crm_qdp_qualification_verdict",
+          "width": 140
+        },
+        {
+          "field": "crm_qdp_content_hash",
+          "width": 260
+        },
+        {
+          "field": "crm_qdp_file_names",
+          "width": 220
+        },
+        {
+          "field": "crm_qdp_released_by",
+          "width": 140
+        },
+        {
+          "field": "crm_qdp_released_at",
+          "width": 180,
+          "sortable": true
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "label": "$i18n:common.actions",
+          "buttons": [
+            {
+              "code": "view",
+              "icon": "Eye",
+              "permissionCode": "crm.qdp.read",
+              "label": "$i18n:common.button.view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_qdp_revision_common_detail"
+              }
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "crm_qdp_code",
+        "crm_qdp_customer_request_id",
+        "crm_qdp_content_hash",
+        "crm_qdp_released_by"
+      ],
+      "defaultSort": {
+        "field": "crm_qdp_released_at",
+        "order": "desc"
+      }
+    }
+  ]
+}

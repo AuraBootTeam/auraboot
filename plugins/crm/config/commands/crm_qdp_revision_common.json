@@ -1,0 +1,28 @@
+[
+  {
+    "code": "crm:release_qdp",
+    "displayName:zh-CN": "发布 QDP",
+    "displayName:en": "Release QDP",
+    "description": "Freeze an immutable QDP revision under the targeted Customer Request after optimistic-version, qualification, file-ownership and permission guards pass.",
+    "type": "custom",
+    "modelCode": "crm_customer_request_common",
+    "handler": "crm:release_qdp",
+    "handlerParams": {
+      "dslPersistence": false
+    },
+    "inputFields": [
+      "crm_qdp_customer_request_id",
+      "crm_qdp_primary_file_id",
+      "crm_qdp_file_manifest",
+      "crm_qdp_release_note",
+      "crm_qdp_pcba_rfq_id"
+    ],
+    "permissions": [
+      "crm.qdp.release"
+    ],
+    "concurrencyKey": "crm:qdp:${payload.crm_qdp_customer_request_id}",
+    "lockTimeoutMs": 8000,
+    "agent_hint": "Release one append-only QDP revision for the targeted Customer Request with public platform file pid references. Optimistic concurrency and idempotency come only from the server-owned expectedVersion and clientRequestId command contexts; payload version fields are ignored.",
+    "cmd_risk_level": "L2"
+  }
+]

@@ -1,0 +1,82 @@
+{
+  "pageKey": "crm_qdp_revision_common_detail",
+  "name:zh-CN": "QDP 发布版本详情",
+  "name:en": "QDP Release Revision Detail",
+  "modelCode": "crm_qdp_revision_common",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "extension": {
+    "showEdit": false
+  },
+  "blocks": [
+    {
+      "id": "crm_qdp_identity",
+      "blockType": "detail-section",
+      "title": {
+        "zh-CN": "不可变版本",
+        "en-US": "Immutable Revision"
+      },
+      "fields": [
+        {
+          "field": "crm_qdp_code",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qdp_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qdp_customer_request_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qdp_revision_no",
+          "colSpan": 3
+        },
+        {
+          "field": "crm_qdp_schema_version",
+          "colSpan": 3
+        },
+        {
+          "field": "crm_qdp_expected_request_version",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qdp_source_revision",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qdp_qualification_verdict",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qdp_content_hash",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_qdp_primary_filename",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qdp_file_names",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_qdp_released_by",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qdp_released_at",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_qdp_release_note",
+          "colSpan": 12
+        }
+      ]
+    }
+  ]
+}
