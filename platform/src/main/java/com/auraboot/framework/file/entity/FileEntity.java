@@ -136,6 +136,10 @@ public class FileEntity implements Serializable {
     @TableField("deleted_flag")
     @TableLogic(value = "false", delval = "true")
     private Boolean deletedFlag;
+
+    /** Monotonic release/legal hold: protected bytes cannot be deleted. */
+    @TableField("retention_locked")
+    private Boolean retentionLocked;
     
     // 手动添加setter/getter方法以解决Lombok编译问题
     public void setFileName(String fileName) {
@@ -200,6 +204,14 @@ public class FileEntity implements Serializable {
     
     public void setDeletedFlag(Boolean deletedFlag) {
         this.deletedFlag = deletedFlag;
+    }
+
+    public Boolean getRetentionLocked() {
+        return retentionLocked;
+    }
+
+    public void setRetentionLocked(Boolean retentionLocked) {
+        this.retentionLocked = retentionLocked;
     }
     
     public String getPid() {

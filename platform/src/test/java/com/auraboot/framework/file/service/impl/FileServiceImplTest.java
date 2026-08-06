@@ -1,5 +1,6 @@
 package com.auraboot.framework.file.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.file.constant.StorageType;
 import com.auraboot.framework.file.dao.mapper.FileMapper;
@@ -10,6 +11,7 @@ import com.auraboot.framework.file.entity.FileRelationEntity;
 import com.auraboot.framework.infrastructure.storage.CdnUrlRewriter;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +20,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Duration;
@@ -68,6 +72,18 @@ class FileServiceImplTest {
         // cdnUrlRewriter is @Autowired(required=false); InjectMocks will set it.
         // Explicit null-out to default to "no CDN" for most tests.
         ReflectionTestUtils.setField(fileService, "cdnUrlRewriter", null);
+        MetaContext.setContext(7L, 42L, "user-pid", "user");
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        TransactionSynchronizationManager.initSynchronization();
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+        TransactionSynchronizationManager.setActualTransactionActive(false);
+        MetaContext.clear();
     }
 
     // ----- uploadFile -----
@@ -183,6 +199,21 @@ class FileServiceImplTest {
 
         assertThat(resp).isNotNull();
         assertThat(resp.getOriginalName()).isEqualTo("Board_Outline.gko");
+        verify(fileMapper).insert(any(FileEntity.class));
+    }
+
+    @Test
+    void uploadFile_gerberGerWithOctetStream_persistsAndReturnsResponse() {
+        MultipartFile good = new MockMultipartFile(
+                "file", "top-copper.ger", "application/octet-stream", "gerber-lines".getBytes());
+
+        when(storageProvider.upload(anyString(), any(), anyLong(), any()))
+                .thenReturn("/uploads/top-copper.ger");
+        when(storageProvider.type()).thenReturn(StorageType.LOCAL);
+
+        var resp = fileService.uploadFile(good, 42L);
+
+        assertThat(resp.getOriginalName()).isEqualTo("top-copper.ger");
         verify(fileMapper).insert(any(FileEntity.class));
     }
 
@@ -406,9 +437,6 @@ class FileServiceImplTest {
 
     @Test
     void deleteFile_notFound_throwsBusinessException() {
-        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(null);
-        when(fileMapper.selectById((java.io.Serializable) "404")).thenReturn(null);
-
         assertThatThrownBy(() -> fileService.deleteFile("404", 1L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("File not found");
@@ -420,7 +448,7 @@ class FileServiceImplTest {
         entity.setId(1L);
         entity.setCreatedBy(99L); // different from caller
         entity.setFileName("file.png");
-        when(fileMapper.selectById((java.io.Serializable) "1")).thenReturn(entity);
+        when(fileMapper.selectActiveByIdForUpdate(7L, 1L)).thenReturn(entity);
 
         assertThatThrownBy(() -> fileService.deleteFile("1", 42L))
                 .isInstanceOf(BusinessException.class)
@@ -433,15 +461,16 @@ class FileServiceImplTest {
         entity.setId(1L);
         entity.setCreatedBy(42L);
         entity.setFileName("k1");
-        when(fileMapper.selectById((java.io.Serializable) "1")).thenReturn(entity);
-        when(fileMapper.deleteById(1L)).thenReturn(1);
+        when(fileMapper.selectActiveByIdForUpdate(7L, 1L)).thenReturn(entity);
+        when(fileMapper.markDeletedIfUnlocked(eq(7L), eq(1L), any(Instant.class))).thenReturn(1);
 
         boolean ok = fileService.deleteFile("1", 42L);
 
         assertThat(ok).isTrue();
+        verify(storageProvider, never()).delete("k1");
+        fireAfterCommit();
         verify(storageProvider).delete("k1");
-        verify(fileMapper).updateById(entity);
-        verify(fileMapper).deleteById(1L);
+        verify(fileMapper).markDeletedIfUnlocked(eq(7L), eq(1L), any(Instant.class));
     }
 
     @Test
@@ -451,15 +480,62 @@ class FileServiceImplTest {
         entity.setPid("01KSWFILEPID");
         entity.setCreatedBy(42L);
         entity.setFileName("k1");
-        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(entity);
-        when(fileMapper.deleteById(1L)).thenReturn(1);
+        when(fileMapper.selectActiveByPidForUpdate(7L, "01KSWFILEPID")).thenReturn(entity);
+        when(fileMapper.markDeletedIfUnlocked(eq(7L), eq(1L), any(Instant.class))).thenReturn(1);
 
         boolean ok = fileService.deleteFile("01KSWFILEPID", 42L);
 
         assertThat(ok).isTrue();
-        verify(fileMapper, never()).selectById((java.io.Serializable) "01KSWFILEPID");
+        verify(fileMapper, never()).selectActiveByIdForUpdate(eq(7L), anyLong());
+        fireAfterCommit();
         verify(storageProvider).delete("k1");
-        verify(fileMapper).deleteById(1L);
+    }
+
+    @Test
+    void deleteFile_retentionLocked_rejectsBeforePhysicalOrMetadataDeletion() {
+        FileEntity entity = new FileEntity();
+        entity.setId(1L);
+        entity.setPid("released-file-pid");
+        entity.setCreatedBy(42L);
+        entity.setFileName("released.bin");
+        entity.setRetentionLocked(true);
+        when(fileMapper.selectActiveByPidForUpdate(7L, "released-file-pid")).thenReturn(entity);
+
+        assertThatThrownBy(() -> fileService.deleteFile("released-file-pid", 42L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("retention locked");
+
+        verify(storageProvider, never()).delete(anyString());
+        verify(fileMapper, never()).markDeletedIfUnlocked(anyLong(), anyLong(), any(Instant.class));
+    }
+
+    @Test
+    void lockRetention_requiresPublicActivePidAndPersistsMonotonically() {
+        FileEntity entity = new FileEntity();
+        entity.setId(1L);
+        entity.setPid("file-pid");
+        entity.setStatus("success");
+        entity.setDeletedFlag(false);
+        entity.setRetentionLocked(false);
+        when(fileMapper.selectActiveByPidForUpdate(7L, "file-pid")).thenReturn(entity);
+        when(fileMapper.lockRetentionIfFinal(eq(7L), eq(1L), any(Instant.class))).thenReturn(1);
+
+        assertThat(fileService.lockRetention("file-pid")).isTrue();
+        verify(fileMapper).lockRetentionIfFinal(eq(7L), eq(1L), any(Instant.class));
+    }
+
+    @Test
+    void lockRetention_alreadyLocked_isIdempotent() {
+        FileEntity entity = new FileEntity();
+        entity.setId(1L);
+        entity.setPid("file-pid");
+        entity.setStatus("success");
+        entity.setDeletedFlag(false);
+        entity.setRetentionLocked(true);
+        when(fileMapper.selectActiveByPidForUpdate(7L, "file-pid")).thenReturn(entity);
+
+        assertThat(fileService.lockRetention("file-pid")).isTrue();
+        verify(fileMapper, never()).lockRetentionIfFinal(anyLong(), anyLong(), any(Instant.class));
     }
 
     @Test
@@ -468,13 +544,14 @@ class FileServiceImplTest {
         entity.setId(1L);
         entity.setCreatedBy(42L);
         entity.setFileName("k1");
-        when(fileMapper.selectById((java.io.Serializable) "1")).thenReturn(entity);
+        when(fileMapper.selectActiveByIdForUpdate(7L, 1L)).thenReturn(entity);
         lenient().doThrow(new RuntimeException("S3 unreachable"))
                 .when(storageProvider).delete("k1");
-        when(fileMapper.deleteById(1L)).thenReturn(1);
+        when(fileMapper.markDeletedIfUnlocked(eq(7L), eq(1L), any(Instant.class))).thenReturn(1);
 
         boolean ok = fileService.deleteFile("1", 42L);
         assertThat(ok).isTrue();
+        fireAfterCommit();
     }
 
     // ----- file relations -----
@@ -487,11 +564,29 @@ class FileServiceImplTest {
         req.setFieldName("avatar");
         req.setFileIds(new String[]{"f1", "f2"});
 
-        fileService.createFileRelation(req);
+        FileEntity first = new FileEntity();
+        first.setId(11L);
+        first.setPid("f1");
+        first.setCreatedBy(42L);
+        first.setStatus("active");
+        first.setDeletedFlag(false);
+        FileEntity second = new FileEntity();
+        second.setId(12L);
+        second.setPid("f2");
+        second.setCreatedBy(42L);
+        second.setStatus("active");
+        second.setDeletedFlag(false);
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(first, second);
+
+        fileService.createFileRelation(req, 42L);
 
         // Removal step (delete with QueryWrapper) + 2 inserts
         verify(fileRelationMapper).delete(any(QueryWrapper.class));
-        verify(fileRelationMapper, times(2)).insert(any(FileRelationEntity.class));
+        var relationCaptor = forClass(FileRelationEntity.class);
+        verify(fileRelationMapper, times(2)).insert(relationCaptor.capture());
+        assertThat(relationCaptor.getAllValues())
+                .extracting(FileRelationEntity::getFileId)
+                .containsExactly("11", "12");
     }
 
     @Test
@@ -589,7 +684,10 @@ class FileServiceImplTest {
         assertThat(url).isEqualTo("https://oss/path");
     }
 
-    // Touch Instant import to avoid unused warning if reorder happens.
-    @SuppressWarnings("unused")
-    private static final Instant SENTINEL = Instant.EPOCH;
+    private void fireAfterCommit() {
+        for (TransactionSynchronization synchronization
+                : TransactionSynchronizationManager.getSynchronizations()) {
+            synchronization.afterCommit();
+        }
+    }
 }

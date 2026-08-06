@@ -7950,7 +7950,8 @@ CREATE TABLE public.ab_file (
     status character varying(32) DEFAULT 'active'::character varying,
     created_time timestamp with time zone,
     updated_time timestamp with time zone,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false,
+    retention_locked boolean DEFAULT false NOT NULL
 );
 
 

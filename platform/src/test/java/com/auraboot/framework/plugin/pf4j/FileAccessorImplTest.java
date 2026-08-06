@@ -37,6 +37,7 @@ class FileAccessorImplTest {
         entity.setPid("file-pid");
         entity.setFileName("stored.xlsx");
         entity.setLocalPath("/server/internal/path/stored.xlsx");
+        entity.setStatus("success");
         when(fileService.getFileById("file-pid")).thenReturn(entity);
         when(storageProvider.download("stored.xlsx")).thenReturn(new ByteArrayInputStream(bytes));
 
@@ -78,6 +79,24 @@ class FileAccessorImplTest {
     }
 
     @Test
+    void open_rejects_storageAliasesAndUnfinalizedMetadata() {
+        FileEntity alias = file("file-pid", "stored-key.xlsx", "customer-bom.xlsx");
+        alias.setStatus("success");
+        when(fileService.getFileById("stored-key.xlsx")).thenReturn(alias);
+        FileEntity active = file("active-pid", "active-key.xlsx", "active.xlsx");
+        active.setStatus("active");
+        when(fileService.getFileById("active-pid")).thenReturn(active);
+        FileAccessor accessor = new FileAccessorImpl(fileService, storageProvider, 42L);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> accessor.open("stored-key.xlsx"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("public file pid");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> accessor.open("active-pid"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not finalized");
+    }
+
+    @Test
     void isLinkedTo_requires_the_exact_public_pid_in_the_business_field_relation() {
         FileEntity target = file("file-pid", "stored-key.xlsx", "customer-bom.xlsx");
         when(fileService.getFileById("file-pid")).thenReturn(target);
@@ -89,6 +108,18 @@ class FileAccessorImplTest {
         assertThat(accessor.isLinkedTo(
                 "file-pid", "crm_customer_request_common", "request-pid", "qdp_source_files"))
                 .isTrue();
+    }
+
+    @Test
+    void retain_applies_monotonic_host_retention_to_the_exact_public_pid() {
+        FileEntity target = file("file-pid", "stored-key.xlsx", "customer-bom.xlsx");
+        target.setStatus("success");
+        when(fileService.getFileById("file-pid")).thenReturn(target);
+        when(fileService.lockRetention("file-pid")).thenReturn(true);
+        FileAccessor accessor = new FileAccessorImpl(fileService, storageProvider, 42L);
+
+        assertThat(accessor.retain("file-pid")).isTrue();
+        verify(fileService).lockRetention("file-pid");
     }
 
     @Test

@@ -51,12 +51,12 @@ class BpmAttachmentControllerTest {
         uploaded.setFileSize(5L);
         uploaded.setMimeType("application/pdf");
         when(fileService.uploadFile(any(), eq(42L))).thenReturn(uploaded);
-        when(fileService.createFileRelation(any())).thenReturn(true);
+        when(fileService.createFileRelation(any(), eq(42L))).thenReturn(true);
 
         ApiResponse<Map<String, Object>> resp = controller.uploadTaskAttachment("task-9", file, 42L);
 
         ArgumentCaptor<FileRelationRequestDTO> relationCaptor = ArgumentCaptor.forClass(FileRelationRequestDTO.class);
-        verify(fileService).createFileRelation(relationCaptor.capture());
+        verify(fileService).createFileRelation(relationCaptor.capture(), eq(42L));
         FileRelationRequestDTO relation = relationCaptor.getValue();
         assertThat(relation.getEntityType()).isEqualTo("BPM_TASK");
         assertThat(relation.getEntityId()).isEqualTo("task-9");
@@ -73,12 +73,12 @@ class BpmAttachmentControllerTest {
         FileUploadResponseDTO uploaded = new FileUploadResponseDTO();
         uploaded.setFileId("file-2");
         when(fileService.uploadFile(any(), any())).thenReturn(uploaded);
-        when(fileService.createFileRelation(any())).thenReturn(true);
+        when(fileService.createFileRelation(any(), eq(1L))).thenReturn(true);
 
         controller.uploadProcessAttachment("pi-7", file, 1L);
 
         ArgumentCaptor<FileRelationRequestDTO> relationCaptor = ArgumentCaptor.forClass(FileRelationRequestDTO.class);
-        verify(fileService).createFileRelation(relationCaptor.capture());
+        verify(fileService).createFileRelation(relationCaptor.capture(), eq(1L));
         assertThat(relationCaptor.getValue().getEntityType()).isEqualTo("BPM_PROCESS");
         assertThat(relationCaptor.getValue().getEntityId()).isEqualTo("pi-7");
     }

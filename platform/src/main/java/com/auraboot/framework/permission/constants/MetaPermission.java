@@ -604,6 +604,15 @@ public final class MetaPermission {
      */
     public static final String SYS_FILE_UPLOAD = "sys.file.upload";
 
+    /** File metadata and content read permission. */
+    public static final String SYS_FILE_READ = "sys.file.read";
+
+    /** File deletion permission. Retention-locked files remain undeletable. */
+    public static final String SYS_FILE_DELETE = "sys.file.delete";
+
+    /** Business-object file-relation management permission. */
+    public static final String SYS_FILE_RELATION_MANAGE = "sys.file.relation.manage";
+
     /**
      * Scheduled task management permission
      */
