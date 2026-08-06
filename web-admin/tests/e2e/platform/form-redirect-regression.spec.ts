@@ -12,7 +12,7 @@
  *
  * Models tested:
  * - showcase_all_fields (always available)
- * - crm_account (if CRM plugin is installed)
+ * - crm_account_common (if CRM plugin is installed)
  *
  * Dimensions covered: D4 (create form), D8 (edit form), D14 (redirect feedback)
  *
@@ -210,7 +210,7 @@ test.describe('Form Auto-Redirect Regression (normalizeResult fix)', () => {
   test('CRM Account create form auto-redirects after submit', async ({ page }) => {
     // Check if CRM Account model exists
     const listResp = await page.request
-      .get('/api/dynamic/crm_account_list/list?pageNum=1&pageSize=1')
+      .get('/api/dynamic/crm_account_common_list/list?pageNum=1&pageSize=1')
       .catch(() => null);
 
     if (!listResp || !listResp.ok()) {
@@ -219,10 +219,10 @@ test.describe('Form Auto-Redirect Regression (normalizeResult fix)', () => {
     }
 
     // First navigate to CRM Account list to establish history entry
-    await gotoListAndWait(page, 'crm_account');
+    await gotoListAndWait(page, 'crm_account_common');
 
     // Then navigate to create form
-    await page.goto('/p/crm_account/new?commandCode=crm:create_account', {
+    await page.goto('/p/crm_account_common/new?commandCode=crm:create_account', {
       waitUntil: 'domcontentloaded',
       timeout: 30_000,
     });

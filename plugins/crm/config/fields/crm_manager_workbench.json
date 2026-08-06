@@ -1,0 +1,90 @@
+[
+  {
+    "code": "crm_mw_opp_name",
+    "displayName:zh-CN": "商机名称",
+    "displayName:en": "Opportunity Name",
+    "dataType": "string",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_mw_opp_stage",
+    "displayName:zh-CN": "商机阶段",
+    "displayName:en": "Pipeline Stage",
+    "dataType": "enum",
+    "dictCode": "crm_opp_stage",
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_mw_opp_expected_amount",
+    "displayName:zh-CN": "预计金额",
+    "displayName:en": "Pipeline Amount",
+    "dataType": "decimal",
+    "constraints": { "precision": 14, "scale": 2 },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_mw_opp_expected_close_date",
+    "displayName:zh-CN": "预计关闭日期",
+    "displayName:en": "Expected Close Date",
+    "dataType": "date",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_mw_quote_count",
+    "displayName:zh-CN": "报价数",
+    "displayName:en": "Quote Count",
+    "dataType": "integer",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_mw_quote_amount",
+    "displayName:zh-CN": "报价金额",
+    "displayName:en": "Quote Amount",
+    "dataType": "decimal",
+    "constraints": { "precision": 14, "scale": 2 },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_mw_latest_quote_valid_until",
+    "displayName:zh-CN": "最近报价有效期",
+    "displayName:en": "Latest Quote Valid Until",
+    "dataType": "date",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_mw_pending_approval_count",
+    "displayName:zh-CN": "待审批数",
+    "displayName:en": "Pending Approvals",
+    "dataType": "integer",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_mw_open_task_count",
+    "displayName:zh-CN": "未完任务数",
+    "displayName:en": "Open Tasks",
+    "dataType": "integer",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_mw_overdue_task_count",
+    "displayName:zh-CN": "逾期任务数",
+    "displayName:en": "Overdue Tasks",
+    "dataType": "integer",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_mw_risk_reason",
+    "displayName:zh-CN": "风险原因",
+    "displayName:en": "Risk Reason",
+    "dataType": "enum",
+    "dictCode": "crm_manager_workbench_risk_reason",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_mw_age_days",
+    "displayName:zh-CN": "需求年龄(天)",
+    "displayName:en": "Request Age (Days)",
+    "dataType": "integer",
+    "feature": { "sortable": true }
+  }
+]

@@ -1,0 +1,75 @@
+[
+  {
+    "code": "crm_jne_code",
+    "displayName:zh-CN": "参与编号",
+    "displayName:en": "Code",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 120
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_jne_journey_id",
+    "displayName:zh-CN": "关联旅程",
+    "displayName:en": "Journey",
+    "dataType": "reference",
+    "referenceModelCode": "crm_journey",
+    "refTarget": {
+      "targetModel": "crm_journey",
+      "targetField": "id",
+      "relationship": "many_to_one",
+      "displayField": "crm_jny_name"
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_jne_contact_id",
+    "displayName:zh-CN": "关联联系人",
+    "displayName:en": "Contact",
+    "dataType": "reference",
+    "referenceModelCode": "crm_contact_common",
+    "refTarget": {
+      "targetModel": "crm_contact_common",
+      "targetField": "id",
+      "relationship": "many_to_one",
+      "displayField": "crm_ct_name"
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_jne_current_step",
+    "displayName:zh-CN": "当前步骤",
+    "displayName:en": "Current Step",
+    "dataType": "integer",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_jne_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_enrollment_status",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_jne_last_advanced_at",
+    "displayName:zh-CN": "上次推进时间",
+    "displayName:en": "Last Advanced At",
+    "dataType": "datetime",
+    "feature": {
+      "sortable": true
+    }
+  }
+]

@@ -1,0 +1,179 @@
+{
+  "pageKey": "crm_email_log_detail",
+  "name:zh-CN": "邮件记录详情",
+  "name:en": "Email Log Detail",
+  "modelCode": "crm_email_log",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "block_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "overview",
+          "label": {
+            "zh-CN": "概览",
+            "en-US": "Overview"
+          },
+          "blocks": [
+            {
+              "id": "section_basic",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "邮件信息",
+                "en-US": "Email Information"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "crm_el_direction",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_el_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_el_from_address",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_el_to_address",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_el_cc_address",
+                  "span": 2,
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_el_subject",
+                  "span": 2,
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_el_template_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_el_related_type",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_el_related_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_el_sent_at",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_el_opened_at",
+                  "readOnly": true
+                }
+              ]
+            },
+            {
+              "id": "section_content",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "邮件内容",
+                "en-US": "Email Content"
+              },
+              "columns": 1,
+              "fields": [
+                {
+                  "field": "crm_el_body",
+                  "span": 1,
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_el_remark",
+                  "span": 1,
+                  "readOnly": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crm_el_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "icon": "Edit",
+          "permissionCode": "crm.email_log.manage",
+          "label": "$i18n:common.button.edit",
+          "action": {
+            "type": "navigate",
+            "to": "crm_email_log_form"
+          }
+        },
+        {
+          "code": "send",
+          "primary": true,
+          "label": {
+            "zh-CN": "发送",
+            "en-US": "Send"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:send_email_log"
+          }
+        },
+        {
+          "code": "deliver",
+          "label": {
+            "zh-CN": "标记已送达",
+            "en-US": "Mark Delivered"
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:deliver_email_log"
+          }
+        },
+        {
+          "code": "open",
+          "label": {
+            "zh-CN": "标记已打开",
+            "en-US": "Mark Opened"
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:open_email_log"
+          }
+        },
+        {
+          "code": "bounce",
+          "label": {
+            "zh-CN": "标记退信",
+            "en-US": "Mark Bounced"
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:bounce_email_log"
+          }
+        },
+        {
+          "code": "fail",
+          "danger": true,
+          "label": {
+            "zh-CN": "标记失败",
+            "en-US": "Mark Failed"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:fail_email_log"
+          }
+        }
+      ]
+    }
+  ]
+}

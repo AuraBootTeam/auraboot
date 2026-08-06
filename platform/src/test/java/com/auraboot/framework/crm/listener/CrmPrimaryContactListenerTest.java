@@ -25,7 +25,7 @@ class CrmPrimaryContactListenerTest {
         CommandCompletedEvent event = new CommandCompletedEvent(
                 100L,
                 "01KCONTACT",
-                "crm_contact",
+                "crm_contact_common",
                 Map.of(),
                 "crm:update_contact",
                 null
@@ -42,7 +42,7 @@ class CrmPrimaryContactListenerTest {
         CommandCompletedEvent event = new CommandCompletedEvent(
                 100L,
                 "01KCONTACT",
-                "crm_contact",
+                "crm_contact_common",
                 Map.of(),
                 "crm:update_contact",
                 "update"
@@ -59,7 +59,7 @@ class CrmPrimaryContactListenerTest {
         CommandCompletedEvent event = new CommandCompletedEvent(
                 100L,
                 "01KACCOUNT",
-                "crm_account",
+                "crm_account_common",
                 Map.of(),
                 "crm:update_account",
                 "update"

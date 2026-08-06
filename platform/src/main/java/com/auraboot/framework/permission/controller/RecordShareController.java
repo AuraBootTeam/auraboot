@@ -55,7 +55,7 @@ public class RecordShareController {
     /**
      * List all active shares for a record.
      *
-     * @param resourceCode model/resource code (e.g. "crm_opportunity")
+     * @param resourceCode model/resource code (e.g. "crm_opportunity_common")
      * @param recordPid stable public record PID
      * @return list of share entries
      */
@@ -219,7 +219,7 @@ public class RecordShareController {
     @Data
     public static class RecordShareRequest {
 
-        /** Model/resource code (e.g. "crm_opportunity") */
+        /** Model/resource code (e.g. "crm_opportunity_common") */
         @NotBlank
         private String resourceCode;
 

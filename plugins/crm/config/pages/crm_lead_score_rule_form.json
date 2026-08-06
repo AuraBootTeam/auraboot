@@ -1,0 +1,79 @@
+{
+  "pageKey": "crm_lead_score_rule_form",
+  "name:zh-CN": "评分规则表单",
+  "name:en": "Score Rule Form",
+  "modelCode": "crm_lead_score_rule",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "评分规则",
+        "en-US": "Score Rule"
+      },
+      "fields": [
+        {
+          "field": "crm_lsr_name",
+          "colSpan": 12,
+          "required": true
+        },
+        {
+          "field": "crm_lsr_dimension",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_lsr_operator",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_lsr_match_value",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_lsr_points",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_lsr_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_lsr_sort_order",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_lsr_remark",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

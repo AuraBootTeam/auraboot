@@ -48,7 +48,7 @@ class EmailSequenceExecutorRenderTest {
     @Test
     @DisplayName("ESR-01: {{email}} is replaced with contactEmail")
     void esr01_replacesEmail() {
-        EmailSequenceEnrollment enrollment = enrollment("alice@example.com", "crm_contact", "7");
+        EmailSequenceEnrollment enrollment = enrollment("alice@example.com", "crm_contact_common", "7");
         String result = executor.renderTemplate("Hello {{email}}, welcome!", enrollment);
         assertThat(result).isEqualTo("Hello alice@example.com, welcome!");
     }
@@ -60,10 +60,10 @@ class EmailSequenceExecutorRenderTest {
     @Test
     @DisplayName("ESR-02: {{modelCode}} and {{recordPid}} are replaced")
     void esr02_replacesModelCodeAndRecordPid() {
-        EmailSequenceEnrollment enrollment = enrollment("bob@example.com", "crm_lead", "42");
+        EmailSequenceEnrollment enrollment = enrollment("bob@example.com", "crm_lead_common", "42");
         String result = executor.renderTemplate(
                 "Model: {{modelCode}}, Record: {{recordPid}}", enrollment);
-        assertThat(result).isEqualTo("Model: crm_lead, Record: 42");
+        assertThat(result).isEqualTo("Model: crm_lead_common, Record: 42");
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -86,7 +86,7 @@ class EmailSequenceExecutorRenderTest {
     @Test
     @DisplayName("ESR-04: unknown {{variables}} are left unchanged")
     void esr04_unknownVariablesUnchanged() {
-        EmailSequenceEnrollment enrollment = enrollment("dave@example.com", "crm_contact", "1");
+        EmailSequenceEnrollment enrollment = enrollment("dave@example.com", "crm_contact_common", "1");
         String result = executor.renderTemplate(
                 "Hi {{email}}, your rep is {{repName}}", enrollment);
         assertThat(result).isEqualTo("Hi dave@example.com, your rep is {{repName}}");

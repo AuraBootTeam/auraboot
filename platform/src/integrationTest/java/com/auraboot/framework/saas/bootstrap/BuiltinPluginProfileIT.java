@@ -43,7 +43,7 @@ class BuiltinPluginProfileIT extends IntegrationTestBase {
 
     /** Plugin IDs that must NEVER appear in ab_plugin when includeDemoPlugins=false. */
     private static final Set<String> DEMO_PLUGIN_IDS = Set.of(
-            "com.auraboot.crm-starter",
+            "com.auraboot.crm",
             "com.auraboot.showcase",
             "com.auraboot.agent-control-plane",
             "com.auraboot.workflow-demo"

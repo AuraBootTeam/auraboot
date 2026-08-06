@@ -74,7 +74,7 @@
     ]
   },
   {
-    "code": "crm_account_list",
+    "code": "tcrm_account_list",
     "name:zh-CN": "客户列表",
     "name:en": "Customer Account List",
     "description": "List customer accounts with their key fields (name, industry, phone, status, code).",
@@ -91,33 +91,28 @@
         "tenantId"
       ]
     },
-    "fromSql": "SELECT crm_acc_name, crm_acc_industry, crm_acc_phone, crm_acc_status, crm_acc_code FROM mt_crm_account WHERE tenant_id = #{params.tenantId} ORDER BY id DESC LIMIT 200",
+    "fromSql": "SELECT tcrm_ac_name, tcrm_ac_industry, tcrm_ac_phone, tcrm_ac_code FROM mt_tcrm_account WHERE tenant_id = #{params.tenantId} ORDER BY id DESC LIMIT 200",
     "outputFields": [
       {
-        "code": "crm_acc_name",
-        "columnExpr": "crm_acc_name",
+        "code": "tcrm_ac_name",
+        "columnExpr": "tcrm_ac_name",
         "dataType": "string",
         "searchable": true
       },
       {
-        "code": "crm_acc_industry",
-        "columnExpr": "crm_acc_industry",
+        "code": "tcrm_ac_industry",
+        "columnExpr": "tcrm_ac_industry",
         "dataType": "string",
         "searchable": true
       },
       {
-        "code": "crm_acc_phone",
-        "columnExpr": "crm_acc_phone",
+        "code": "tcrm_ac_phone",
+        "columnExpr": "tcrm_ac_phone",
         "dataType": "string"
       },
       {
-        "code": "crm_acc_status",
-        "columnExpr": "crm_acc_status",
-        "dataType": "string"
-      },
-      {
-        "code": "crm_acc_code",
-        "columnExpr": "crm_acc_code",
+        "code": "tcrm_ac_code",
+        "columnExpr": "tcrm_ac_code",
         "dataType": "string"
       }
     ]

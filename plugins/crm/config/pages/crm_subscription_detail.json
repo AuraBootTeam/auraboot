@@ -1,0 +1,60 @@
+{
+  "pageKey": "crm_subscription_detail",
+  "name:zh-CN": "订阅详情",
+  "name:en": "Subscription Detail",
+  "modelCode": "crm_subscription",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "info",
+      "blockType": "detail-section",
+      "title": {
+        "zh-CN": "订阅信息",
+        "en": "Subscription Info"
+      },
+      "fields": [
+        {
+          "field": "crm_sub_code",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_sub_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_sub_account_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_sub_plan",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_sub_start_date",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_sub_end_date",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_sub_monthly_amount",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_sub_mrr",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_sub_arr",
+          "colSpan": 4
+        }
+      ]
+    }
+  ]
+}

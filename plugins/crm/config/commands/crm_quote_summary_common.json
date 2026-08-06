@@ -1,0 +1,111 @@
+[
+  {
+    "code": "crm:create_quote_summary",
+    "displayName:zh-CN": "新建报价摘要",
+    "displayName:en": "Create Quote Summary",
+    "type": "create",
+    "modelCode": "crm_quote_summary_common",
+    "inputFields": [
+      "crm_qs_account_id",
+      "crm_qs_opportunity_id",
+      "crm_qs_customer_request_id",
+      "crm_qs_source_quote_type",
+      "crm_qs_source_quote_id",
+      "crm_qs_status",
+      "crm_qs_quote_amount",
+      "crm_qs_currency",
+      "crm_qs_valid_until",
+      "crm_qs_approval_status",
+      "crm_qs_sent_at",
+      "crm_qs_customer_feedback_status",
+      "crm_qs_won_lost_result",
+      "crm_qs_owner",
+      "crm_qs_source_updated_at",
+      "crm_qs_summary"
+    ],
+    "autoSetFields": {
+      "crm_qs_code": {
+        "strategy": "auto_generate",
+        "pattern": "QS-{yyyyMMdd}-{seq}"
+      },
+      "crm_qs_owner": {
+        "strategy": "current_username"
+      }
+    },
+    "permissions": [
+      "crm.quote_summary.manage"
+    ],
+    "agent_hint": "Create a lightweight quote summary from a quote fact source. Do not create quote lines in CRM.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_quote_summary",
+    "displayName:zh-CN": "编辑报价摘要",
+    "displayName:en": "Update Quote Summary",
+    "type": "update",
+    "modelCode": "crm_quote_summary_common",
+    "inputFields": [
+      "crm_qs_account_id",
+      "crm_qs_opportunity_id",
+      "crm_qs_customer_request_id",
+      "crm_qs_source_quote_type",
+      "crm_qs_source_quote_id",
+      "crm_qs_status",
+      "crm_qs_quote_amount",
+      "crm_qs_currency",
+      "crm_qs_valid_until",
+      "crm_qs_approval_status",
+      "crm_qs_sent_at",
+      "crm_qs_customer_feedback_status",
+      "crm_qs_won_lost_result",
+      "crm_qs_owner",
+      "crm_qs_source_updated_at",
+      "crm_qs_summary"
+    ],
+    "permissions": [
+      "crm.quote_summary.manage"
+    ],
+    "agent_hint": "Update a quote summary after the source quote changes.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_quote_summary",
+    "displayName:zh-CN": "删除报价摘要",
+    "displayName:en": "Delete Quote Summary",
+    "type": "delete",
+    "modelCode": "crm_quote_summary_common",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此报价摘要？",
+      "confirmMessage:en": "Delete this quote summary?"
+    },
+    "permissions": [
+      "crm.quote_summary.manage"
+    ],
+    "agent_hint": "Delete a quote summary. This does not delete the source quote.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:detail_quote_summary",
+    "displayName:zh-CN": "查看报价摘要",
+    "displayName:en": "View Quote Summary",
+    "type": "query",
+    "modelCode": "crm_quote_summary_common",
+    "permissions": [
+      "crm.quote_summary.read"
+    ],
+    "agent_hint": "Query quote summary records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:list_quote_summaries",
+    "displayName:zh-CN": "报价摘要列表",
+    "displayName:en": "List Quote Summaries",
+    "type": "query",
+    "modelCode": "crm_quote_summary_common",
+    "permissions": [
+      "crm.quote_summary.read"
+    ],
+    "agent_hint": "List quote summaries.",
+    "cmd_risk_level": "L0"
+  }
+]

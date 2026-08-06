@@ -1,0 +1,597 @@
+[
+  {
+    "code": "crm:log_opp_activity",
+    "displayName:zh-CN": "记录商机活动",
+    "displayName:en": "Log Opportunity Activity",
+    "description": "Create activity from opportunity detail and auto-link via activity_relation",
+    "type": "create",
+    "modelCode": "crm_activity_common",
+    "inputFields": [
+      "crm_act_type",
+      "crm_act_subject",
+      "crm_act_content",
+      "crm_act_date",
+      "crm_act_source",
+      "crm_act_files",
+      "crm_act_status",
+      "crm_act_priority",
+      "crm_act_due_date",
+      "crm_act_assignee",
+      "crm_act_duration",
+      "crm_act_direction",
+      "crm_act_location",
+      "crm_act_start_time",
+      "crm_act_end_time"
+    ],
+    "autoSetFields": {
+      "crm_act_owner": {
+        "strategy": "current_username"
+      },
+      "crm_act_date": {
+        "strategy": "current_datetime"
+      }
+    },
+    "sideEffects": [
+      {
+        "condition": "#sourceRecordId != null",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "crm_activity_relation_common",
+            "fields": {
+              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_object_type": "opportunity",
+              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_role": "primary"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Create a new crm activity record. Key inputs: type, subject, content, date, source. Auto-generated: owner, date. Side effects: creates crm activity relation record.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:log_account_activity",
+    "displayName:zh-CN": "记录客户活动",
+    "displayName:en": "Log Account Activity",
+    "description": "Create activity from account detail and auto-link via activity_relation",
+    "type": "create",
+    "modelCode": "crm_activity_common",
+    "inputFields": [
+      "crm_act_type",
+      "crm_act_subject",
+      "crm_act_content",
+      "crm_act_date",
+      "crm_act_source",
+      "crm_act_files",
+      "crm_act_status",
+      "crm_act_priority",
+      "crm_act_due_date",
+      "crm_act_assignee",
+      "crm_act_duration",
+      "crm_act_direction",
+      "crm_act_location",
+      "crm_act_start_time",
+      "crm_act_end_time"
+    ],
+    "autoSetFields": {
+      "crm_act_owner": {
+        "strategy": "current_username"
+      },
+      "crm_act_date": {
+        "strategy": "current_datetime"
+      }
+    },
+    "sideEffects": [
+      {
+        "condition": "#sourceRecordId != null",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "crm_activity_relation_common",
+            "fields": {
+              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_object_type": "account",
+              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_role": "primary"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Create a new crm activity record. Key inputs: type, subject, content, date, source. Auto-generated: owner, date. Side effects: creates crm activity relation record.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:log_lead_activity",
+    "displayName:zh-CN": "记录线索活动",
+    "displayName:en": "Log Lead Activity",
+    "description": "Create activity from lead detail and auto-link via activity_relation",
+    "type": "create",
+    "modelCode": "crm_activity_common",
+    "inputFields": [
+      "crm_act_type",
+      "crm_act_subject",
+      "crm_act_content",
+      "crm_act_date",
+      "crm_act_source",
+      "crm_act_files",
+      "crm_act_status",
+      "crm_act_priority",
+      "crm_act_due_date",
+      "crm_act_assignee",
+      "crm_act_duration",
+      "crm_act_direction",
+      "crm_act_location",
+      "crm_act_start_time",
+      "crm_act_end_time"
+    ],
+    "autoSetFields": {
+      "crm_act_owner": {
+        "strategy": "current_username"
+      },
+      "crm_act_date": {
+        "strategy": "current_datetime"
+      }
+    },
+    "sideEffects": [
+      {
+        "condition": "#sourceRecordId != null",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "crm_activity_relation_common",
+            "fields": {
+              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_object_type": "lead",
+              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_role": "primary"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Create a new crm activity record. Key inputs: type, subject, content, date, source. Auto-generated: owner, date. Side effects: creates crm activity relation record.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:create_opp_task",
+    "displayName:zh-CN": "创建商机任务",
+    "displayName:en": "Create Opportunity Task",
+    "description": "Create task from opportunity detail with type=TASK and auto-link",
+    "type": "create",
+    "modelCode": "crm_activity_common",
+    "inputFields": [
+      "crm_act_subject",
+      "crm_act_content",
+      "crm_act_due_date",
+      "crm_act_assignee",
+      "crm_act_priority",
+      "crm_act_files"
+    ],
+    "autoSetFields": {
+      "crm_act_owner": {
+        "strategy": "current_username"
+      },
+      "crm_act_date": {
+        "strategy": "current_datetime"
+      },
+      "crm_act_type": {
+        "strategy": "fixed_value",
+        "value": "task"
+      },
+      "crm_act_status": {
+        "strategy": "fixed_value",
+        "value": "open"
+      }
+    },
+    "sideEffects": [
+      {
+        "condition": "#sourceRecordId != null",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "crm_activity_relation_common",
+            "fields": {
+              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_object_type": "opportunity",
+              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_role": "primary"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Create a new crm activity record. Key inputs: subject, content, due_date, assignee, priority. Auto-generated: owner, date, type, status. Side effects: creates crm activity relation record.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:create_account_task",
+    "displayName:zh-CN": "创建客户任务",
+    "displayName:en": "Create Account Task",
+    "description": "Create task from account detail with type=TASK and auto-link",
+    "type": "create",
+    "modelCode": "crm_activity_common",
+    "inputFields": [
+      "crm_act_subject",
+      "crm_act_content",
+      "crm_act_due_date",
+      "crm_act_assignee",
+      "crm_act_priority",
+      "crm_act_files"
+    ],
+    "autoSetFields": {
+      "crm_act_owner": {
+        "strategy": "current_username"
+      },
+      "crm_act_date": {
+        "strategy": "current_datetime"
+      },
+      "crm_act_type": {
+        "strategy": "fixed_value",
+        "value": "task"
+      },
+      "crm_act_status": {
+        "strategy": "fixed_value",
+        "value": "open"
+      }
+    },
+    "sideEffects": [
+      {
+        "condition": "#sourceRecordId != null",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "crm_activity_relation_common",
+            "fields": {
+              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_object_type": "account",
+              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_role": "primary"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Create a new crm activity record. Key inputs: subject, content, due_date, assignee, priority. Auto-generated: owner, date, type, status. Side effects: creates crm activity relation record.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:create_lead_task",
+    "displayName:zh-CN": "创建线索任务",
+    "displayName:en": "Create Lead Task",
+    "description": "Create task from lead detail with type=TASK and auto-link",
+    "type": "create",
+    "modelCode": "crm_activity_common",
+    "inputFields": [
+      "crm_act_subject",
+      "crm_act_content",
+      "crm_act_due_date",
+      "crm_act_assignee",
+      "crm_act_priority",
+      "crm_act_files"
+    ],
+    "autoSetFields": {
+      "crm_act_owner": {
+        "strategy": "current_username"
+      },
+      "crm_act_date": {
+        "strategy": "current_datetime"
+      },
+      "crm_act_type": {
+        "strategy": "fixed_value",
+        "value": "task"
+      },
+      "crm_act_status": {
+        "strategy": "fixed_value",
+        "value": "open"
+      }
+    },
+    "sideEffects": [
+      {
+        "condition": "#sourceRecordId != null",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "crm_activity_relation_common",
+            "fields": {
+              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_object_type": "lead",
+              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_role": "primary"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Create a new crm activity record. Key inputs: subject, content, due_date, assignee, priority. Auto-generated: owner, date, type, status. Side effects: creates crm activity relation record.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:log_contact_activity",
+    "displayName:zh-CN": "记录联系人活动",
+    "displayName:en": "Log Contact Activity",
+    "type": "create",
+    "modelCode": "crm_activity_common",
+    "inputFields": [
+      "crm_act_type",
+      "crm_act_subject",
+      "crm_act_content",
+      "crm_act_date",
+      "crm_act_source",
+      "crm_act_files",
+      "crm_act_status",
+      "crm_act_priority",
+      "crm_act_due_date",
+      "crm_act_assignee",
+      "crm_act_duration",
+      "crm_act_direction",
+      "crm_act_location",
+      "crm_act_start_time",
+      "crm_act_end_time"
+    ],
+    "autoSetFields": {
+      "crm_act_owner": {
+        "strategy": "current_username"
+      },
+      "crm_act_date": {
+        "strategy": "current_datetime"
+      }
+    },
+    "sideEffects": [
+      {
+        "condition": "#sourceRecordId != null",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "crm_activity_relation_common",
+            "fields": {
+              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_object_type": "contact",
+              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_role": "primary"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Create a new crm activity record. Key inputs: type, subject, content, date, source. Auto-generated: owner, date. Side effects: creates crm activity relation record.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:create_contact_task",
+    "displayName:zh-CN": "创建联系人任务",
+    "displayName:en": "Create Contact Task",
+    "type": "create",
+    "modelCode": "crm_activity_common",
+    "inputFields": [
+      "crm_act_subject",
+      "crm_act_content",
+      "crm_act_due_date",
+      "crm_act_assignee",
+      "crm_act_priority",
+      "crm_act_files"
+    ],
+    "autoSetFields": {
+      "crm_act_owner": {
+        "strategy": "current_username"
+      },
+      "crm_act_date": {
+        "strategy": "current_datetime"
+      },
+      "crm_act_type": {
+        "strategy": "fixed_value",
+        "value": "task"
+      },
+      "crm_act_status": {
+        "strategy": "fixed_value",
+        "value": "open"
+      }
+    },
+    "sideEffects": [
+      {
+        "condition": "#sourceRecordId != null",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "crm_activity_relation_common",
+            "fields": {
+              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_object_type": "contact",
+              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_role": "primary"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Create a new crm activity record. Key inputs: subject, content, due_date, assignee, priority. Auto-generated: owner, date, type, status. Side effects: creates crm activity relation record.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:log_complaint_activity",
+    "displayName:zh-CN": "记录投诉活动",
+    "displayName:en": "Log Complaint Activity",
+    "type": "create",
+    "modelCode": "crm_activity_common",
+    "inputFields": [
+      "crm_act_type",
+      "crm_act_subject",
+      "crm_act_content",
+      "crm_act_date",
+      "crm_act_source",
+      "crm_act_files",
+      "crm_act_status",
+      "crm_act_priority",
+      "crm_act_due_date",
+      "crm_act_assignee",
+      "crm_act_duration",
+      "crm_act_direction",
+      "crm_act_location",
+      "crm_act_start_time",
+      "crm_act_end_time"
+    ],
+    "autoSetFields": {
+      "crm_act_owner": {
+        "strategy": "current_username"
+      },
+      "crm_act_date": {
+        "strategy": "current_datetime"
+      }
+    },
+    "sideEffects": [
+      {
+        "condition": "#sourceRecordId != null",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "crm_activity_relation_common",
+            "fields": {
+              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_object_type": "complaint",
+              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_role": "primary"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Create a new crm activity record. Key inputs: type, subject, content, date, source. Auto-generated: owner, date. Side effects: creates crm activity relation record.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:log_campaign_activity",
+    "displayName:zh-CN": "记录营销活动",
+    "displayName:en": "Log Campaign Activity",
+    "type": "create",
+    "modelCode": "crm_activity_common",
+    "inputFields": [
+      "crm_act_type",
+      "crm_act_subject",
+      "crm_act_content",
+      "crm_act_date",
+      "crm_act_source",
+      "crm_act_files",
+      "crm_act_status",
+      "crm_act_priority",
+      "crm_act_due_date",
+      "crm_act_assignee",
+      "crm_act_duration",
+      "crm_act_direction",
+      "crm_act_location",
+      "crm_act_start_time",
+      "crm_act_end_time"
+    ],
+    "autoSetFields": {
+      "crm_act_owner": {
+        "strategy": "current_username"
+      },
+      "crm_act_date": {
+        "strategy": "current_datetime"
+      }
+    },
+    "sideEffects": [
+      {
+        "condition": "#sourceRecordId != null",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "crm_activity_relation_common",
+            "fields": {
+              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_object_type": "campaign",
+              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_role": "primary"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Create a new crm activity record. Key inputs: type, subject, content, date, source. Auto-generated: owner, date. Side effects: creates crm activity relation record.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:create_campaign_task",
+    "displayName:zh-CN": "创建营销任务",
+    "displayName:en": "Create Campaign Task",
+    "type": "create",
+    "modelCode": "crm_activity_common",
+    "inputFields": [
+      "crm_act_subject",
+      "crm_act_content",
+      "crm_act_due_date",
+      "crm_act_assignee",
+      "crm_act_priority",
+      "crm_act_files"
+    ],
+    "autoSetFields": {
+      "crm_act_owner": {
+        "strategy": "current_username"
+      },
+      "crm_act_date": {
+        "strategy": "current_datetime"
+      },
+      "crm_act_type": {
+        "strategy": "fixed_value",
+        "value": "task"
+      },
+      "crm_act_status": {
+        "strategy": "fixed_value",
+        "value": "open"
+      }
+    },
+    "sideEffects": [
+      {
+        "condition": "#sourceRecordId != null",
+        "actions": [
+          {
+            "type": "create_record",
+            "modelCode": "crm_activity_relation_common",
+            "fields": {
+              "crm_ar_activity_id": "${recordId}",
+              "crm_ar_object_type": "campaign",
+              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_role": "primary"
+            }
+          }
+        ]
+      }
+    ],
+    "permissions": [
+      "crm.activity.manage"
+    ],
+    "agent_hint": "Create a new crm activity record. Key inputs: subject, content, due_date, assignee, priority. Auto-generated: owner, date, type, status. Side effects: creates crm activity relation record.",
+    "cmd_risk_level": "L2"
+  }
+]

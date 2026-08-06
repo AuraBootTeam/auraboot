@@ -1,0 +1,65 @@
+{
+  "pageKey": "crm_sales_snapshot_list",
+  "name:zh-CN": "销售分析快照",
+  "name:en": "Sales Snapshot",
+  "modelCode": "crm_sales_snapshot",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "filters",
+      "blockType": "filters",
+      "fields": [
+        {
+          "field": "crm_ss_period"
+        }
+      ]
+    },
+    {
+      "id": "toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "refresh",
+          "primary": true,
+          "permissionCode": "crm.analytics.manage",
+          "label": "$i18n:crm.analytics.refresh",
+          "action": {
+            "type": "command",
+            "command": "crm:refresh_sales_snapshot"
+          }
+        }
+      ]
+    },
+    {
+      "id": "table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_ss_period"
+        },
+        {
+          "field": "crm_ss_total_opps"
+        },
+        {
+          "field": "crm_ss_won_count"
+        },
+        {
+          "field": "crm_ss_won_amount"
+        },
+        {
+          "field": "crm_ss_pipeline_amount"
+        },
+        {
+          "field": "crm_ss_conversion_rate"
+        },
+        {
+          "field": "crm_ss_refreshed_at"
+        }
+      ]
+    }
+  ]
+}

@@ -189,7 +189,7 @@ public class EmailSequenceController {
      * {
      *   "accountId": 1,
      *   "contacts": [
-     *     { "email": "alice@example.com", "modelCode": "crm_contact", "recordPid": "01K..." },
+     *     { "email": "alice@example.com", "modelCode": "crm_contact_common", "recordPid": "01K..." },
      *     ...
      *   ]
      * }

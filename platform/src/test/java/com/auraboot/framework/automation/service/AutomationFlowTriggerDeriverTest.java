@@ -56,7 +56,7 @@ class AutomationFlowTriggerDeriverTest {
     void derive_recordCreateTrigger_extractsTriggerTypeAndModelCode() {
         Map<String, Object> cfg = Map.of(
                 "triggerType", "on_record_create",
-                "modelCode", "crm_lead");
+                "modelCode", "crm_lead_common");
         Map<String, Object> fc = flowConfig(List.of(
                 triggerNode("trigger-record-create", cfg),
                 actionNode()));
@@ -65,7 +65,7 @@ class AutomationFlowTriggerDeriverTest {
 
         assertThat(result.isEmpty()).isFalse();
         assertThat(result.triggerType()).isEqualTo("on_record_create");
-        assertThat(result.modelCode()).isEqualTo("crm_lead");
+        assertThat(result.modelCode()).isEqualTo("crm_lead_common");
     }
 
     @Test
@@ -85,7 +85,7 @@ class AutomationFlowTriggerDeriverTest {
                         "enabled", true));
         Map<String, Object> cfg = Map.of(
                 "triggerType", "on_record_create",
-                "modelCode", "crm_lead",
+                "modelCode", "crm_lead_common",
                 "ruleBinding", ruleBinding);
         Map<String, Object> fc = flowConfig(List.of(
                 triggerNode("trigger-record-create", cfg),
@@ -133,7 +133,7 @@ class AutomationFlowTriggerDeriverTest {
     void derive_inactivityTrigger_extractsModelThresholdFieldAndStates() {
         Map<String, Object> cfg = Map.of(
                 "triggerType", "on_inactivity",
-                "modelCode", "crm_lead",
+                "modelCode", "crm_lead_common",
                 "inactivityHours", 24,
                 "inactivityField", "last_contacted_at",
                 "stateField", "lead_status",
@@ -145,7 +145,7 @@ class AutomationFlowTriggerDeriverTest {
 
         assertThat(result.isEmpty()).isFalse();
         assertThat(result.triggerType()).isEqualTo("on_inactivity");
-        assertThat(result.modelCode()).isEqualTo("crm_lead");
+        assertThat(result.modelCode()).isEqualTo("crm_lead_common");
         assertThat(result.triggerConfig()).isNotNull();
         assertThat(result.triggerConfig().getInactivityHours()).isEqualTo(24);
         assertThat(result.triggerConfig().getInactivityField()).isEqualTo("last_contacted_at");
@@ -168,7 +168,7 @@ class AutomationFlowTriggerDeriverTest {
         Map<String, Object> wrongShapeNode = Map.of(
                 "id", "t1",
                 "type", "trigger-record-create",
-                "config", Map.of("triggerType", "on_record_create", "modelCode", "crm_lead"),
+                "config", Map.of("triggerType", "on_record_create", "modelCode", "crm_lead_common"),
                 // data exists but has no 'config' key
                 "data", Map.of("label", "trigger"));
 

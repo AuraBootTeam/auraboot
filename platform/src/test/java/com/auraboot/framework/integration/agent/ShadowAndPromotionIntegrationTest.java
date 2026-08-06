@@ -79,14 +79,14 @@ class ShadowAndPromotionIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("read-action draft is ELIGIBLE_DIRECT (shadow execution safe)")
     void eligibility_read_direct() {
-        String draftPid = seedDraft("sig_read_" + tenantId, "crm_lead", "query", "semantic", 5);
+        String draftPid = seedDraft("sig_read_" + tenantId, "crm_lead_common", "query", "semantic", 5);
         assertThat(eligibility.check(draftPid)).isEqualTo(ShadowEligibilityChecker.Eligibility.ELIGIBLE_DIRECT);
     }
 
     @Test
     @DisplayName("write-action draft with dsl substrate is INELIGIBLE_NO_DRY_RUN_SUPPORT (v0)")
     void eligibility_write_blocked() {
-        String draftPid = seedDraft("sig_write_" + tenantId, "crm_lead", "update", "full", 5);
+        String draftPid = seedDraft("sig_write_" + tenantId, "crm_lead_common", "update", "full", 5);
         assertThat(eligibility.check(draftPid))
                 .isEqualTo(ShadowEligibilityChecker.Eligibility.INELIGIBLE_NO_DRY_RUN_SUPPORT);
     }
@@ -94,7 +94,7 @@ class ShadowAndPromotionIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("code substrate is INELIGIBLE_CODE_SIDE_EFFECT_UNKNOWN")
     void eligibility_code_blocked() {
-        String draftPid = seedDraft("sig_code_" + tenantId, "crm_lead", "export", "blackbox", 5);
+        String draftPid = seedDraft("sig_code_" + tenantId, "crm_lead_common", "export", "blackbox", 5);
         assertThat(eligibility.check(draftPid))
                 .isEqualTo(ShadowEligibilityChecker.Eligibility.INELIGIBLE_CODE_SIDE_EFFECT_UNKNOWN);
     }
@@ -112,7 +112,7 @@ class ShadowAndPromotionIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("recordRun persists shadow_run with output_diff JSONB + match booleans")
     void shadow_run_persists() {
-        String draftPid = seedDraft("sig_sr_" + tenantId, "crm_lead", "query", "semantic", 5);
+        String draftPid = seedDraft("sig_sr_" + tenantId, "crm_lead_common", "query", "semantic", 5);
         String origRun = UniqueIdGenerator.generate();
 
         String shadowPid = runner.recordRun(ShadowRunner.ShadowOutcome.builder()
@@ -169,7 +169,7 @@ class ShadowAndPromotionIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("PROMOTE — draft with ≥5 runs all matching flips to PROMOTED_PENDING_HUMAN")
     void promote_when_thresholds_met() {
-        String draftPid = seedDraft("sig_pro_" + tenantId, "crm_lead", "query", "semantic", 5);
+        String draftPid = seedDraft("sig_pro_" + tenantId, "crm_lead_common", "query", "semantic", 5);
         // PR-53 C2: only REVIEWED_OK / SHADOW_RUNNING are promotable — simulate prior human review.
         jdbc.update("UPDATE ab_agent_skill_draft SET status = 'REVIEWED_OK' WHERE pid = ?", draftPid);
         seedShadowRuns(draftPid, 5, 5);
@@ -193,7 +193,7 @@ class ShadowAndPromotionIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("INSUFFICIENT_RUNS — fewer than threshold runs blocks promotion")
     void insufficient_runs_blocks() {
-        String draftPid = seedDraft("sig_few_" + tenantId, "crm_lead", "query", "semantic", 5);
+        String draftPid = seedDraft("sig_few_" + tenantId, "crm_lead_common", "query", "semantic", 5);
         seedShadowRuns(draftPid, 2, 2);
 
         PromotionEvaluator.EvaluationResult r = promoter.evaluate(draftPid);
@@ -207,7 +207,7 @@ class ShadowAndPromotionIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("BELOW_THRESHOLD — enough runs but low match rate keeps draft in current state")
     void below_threshold_keeps_draft() {
-        String draftPid = seedDraft("sig_flaky_" + tenantId, "crm_lead", "query", "semantic", 5);
+        String draftPid = seedDraft("sig_flaky_" + tenantId, "crm_lead_common", "query", "semantic", 5);
         seedShadowRuns(draftPid, 10, 5);   // 50% match, below 0.90
 
         PromotionEvaluator.EvaluationResult r = promoter.evaluate(draftPid);

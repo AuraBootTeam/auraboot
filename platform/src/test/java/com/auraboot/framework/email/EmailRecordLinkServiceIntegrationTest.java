@@ -113,7 +113,7 @@ class EmailRecordLinkServiceIntegrationTest extends BaseIntegrationTest {
     @Order(1)
     @DisplayName("ERL-01: manualLink creates link with link_type=manual")
     void erl01_manualLinkCreatesManualLink() {
-        String modelCode = "crm_contact";
+        String modelCode = "crm_contact_common";
         String recordPid = "01KEMAILREC";
         String threadId  = "gmail-thread-" + runId;
 
@@ -149,15 +149,15 @@ class EmailRecordLinkServiceIntegrationTest extends BaseIntegrationTest {
         String threadId = "gmail-thread-" + runId;
 
         EmailRecordLink contactLink = emailRecordLinkService.manualLink(
-                testTenantId, testMessageId, threadId, "crm_contact", "1");
+                testTenantId, testMessageId, threadId, "crm_contact_common", "1");
         EmailRecordLink leadLink = emailRecordLinkService.manualLink(
-                testTenantId, testMessageId, threadId, "crm_lead", "2");
+                testTenantId, testMessageId, threadId, "crm_lead_common", "2");
         EmailRecordLink oppLink = emailRecordLinkService.manualLink(
-                testTenantId, testMessageId, threadId, "crm_opportunity", "3");
+                testTenantId, testMessageId, threadId, "crm_opportunity_common", "3");
 
-        assertThat(contactLink.getModelCode()).isEqualTo("crm_contact");
-        assertThat(leadLink.getModelCode()).isEqualTo("crm_lead");
-        assertThat(oppLink.getModelCode()).isEqualTo("crm_opportunity");
+        assertThat(contactLink.getModelCode()).isEqualTo("crm_contact_common");
+        assertThat(leadLink.getModelCode()).isEqualTo("crm_lead_common");
+        assertThat(oppLink.getModelCode()).isEqualTo("crm_opportunity_common");
 
         // Verify all three are persisted
         List<EmailRecordLink> links = emailRecordLinkMapper.findByThread(testTenantId, threadId);
@@ -176,7 +176,7 @@ class EmailRecordLinkServiceIntegrationTest extends BaseIntegrationTest {
     void erl03_removeLinkDeletesFromDb() {
         // Create a link first
         EmailRecordLink link = emailRecordLinkService.manualLink(
-                testTenantId, testMessageId, "gmail-thread-" + runId, "crm_contact", "99");
+                testTenantId, testMessageId, "gmail-thread-" + runId, "crm_contact_common", "99");
         Long linkId = link.getId();
         assertThat(emailRecordLinkMapper.selectById(linkId)).isNotNull();
 

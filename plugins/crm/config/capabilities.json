@@ -1,0 +1,259 @@
+[
+  {
+    "code": "crm.cap.account_view",
+    "group": "客户管理",
+    "name:zh-CN": "查看客户",
+    "name:en": "View Accounts",
+    "description": "只读查看客户档案（用于跨模块引用解析与列表/下拉显示客户名，不含创建/编辑）",
+    "includes": [
+      "crm.account.read",
+      "model.crm_account_common.read"
+    ],
+    "tier": "viewer",
+    "order": 9
+  },
+  {
+    "code": "crm.cap.account",
+    "group": "客户管理",
+    "name:zh-CN": "维护客户资料",
+    "name:en": "Manage Accounts",
+    "description": "查看、创建、编辑客户档案",
+    "includes": [
+      "crm.account.read",
+      "crm.account.manage",
+      "model.crm_account_common.read"
+    ],
+    "tier": "editor",
+    "order": 10
+  },
+  {
+    "code": "crm.cap.account_contact_full",
+    "group": "客户管理",
+    "name:zh-CN": "查看完整联系方式(手机/邮箱)",
+    "name:en": "View Unmasked Account Contact",
+    "description": "未授予时客户电话显示为 138****1234",
+    "sensitive": true,
+    "unmasksFields": [
+      "crm_account_common.crm_acc_phone"
+    ],
+    "includes": [
+      "crm.account.contact_unmask"
+    ],
+    "tier": "editor",
+    "order": 11
+  },
+  {
+    "code": "crm.cap.contact",
+    "group": "客户管理",
+    "name:zh-CN": "维护联系人",
+    "name:en": "Manage Contacts",
+    "includes": [
+      "crm.contact.read",
+      "crm.contact.manage",
+      "model.crm_contact_common.read"
+    ],
+    "tier": "editor",
+    "order": 12
+  },
+  {
+    "code": "crm.cap.lead",
+    "group": "线索与商机",
+    "name:zh-CN": "维护线索",
+    "name:en": "Manage Leads",
+    "includes": [
+      "crm.lead.read",
+      "crm.lead.manage",
+      "model.crm_lead_common.read"
+    ],
+    "tier": "editor",
+    "order": 20
+  },
+  {
+    "code": "crm.cap.opportunity",
+    "group": "线索与商机",
+    "name:zh-CN": "维护商机",
+    "name:en": "Manage Opportunities",
+    "includes": [
+      "crm.opportunity.read",
+      "crm.opportunity.manage",
+      "model.crm_opportunity_common.read"
+    ],
+    "tier": "editor",
+    "order": 21
+  },
+  {
+    "code": "crm.cap.customer_request",
+    "group": "客户请求与服务",
+    "name:zh-CN": "处理客户请求",
+    "name:en": "Manage Customer Requests",
+    "includes": [
+      "crm.customer_request.manage",
+      "crm.customer_request.read",
+      "model.crm_customer_request_common.read"
+    ],
+    "tier": "editor",
+    "order": 100
+  },
+  {
+    "code": "crm.cap.complaint",
+    "group": "客户请求与服务",
+    "name:zh-CN": "处理投诉",
+    "name:en": "Handle Complaints",
+    "includes": [
+      "crm.complaint.manage",
+      "crm.complaint.read"
+    ],
+    "tier": "editor",
+    "order": 101
+  },
+  {
+    "code": "crm.cap.activity",
+    "group": "客户请求与服务",
+    "name:zh-CN": "维护活动记录",
+    "name:en": "Manage Activities",
+    "includes": [
+      "crm.activity.manage",
+      "crm.activity.read",
+      "model.crm_activity_common.read"
+    ],
+    "tier": "editor",
+    "order": 102
+  },
+  {
+    "code": "crm.cap.sla",
+    "group": "客户请求与服务",
+    "name:zh-CN": "SLA 策略",
+    "name:en": "Manage SLA",
+    "includes": [
+      "crm.sla.manage",
+      "crm.sla.read"
+    ],
+    "tier": "admin",
+    "order": 103
+  },
+  {
+    "code": "crm.cap.clarification",
+    "group": "客户请求与服务",
+    "name:zh-CN": "澄清事项",
+    "name:en": "Manage Clarifications",
+    "includes": [
+      "crm.clarification.manage",
+      "crm.clarification.read",
+      "model.crm_clarification_common.read"
+    ],
+    "tier": "editor",
+    "order": 104
+  },
+  {
+    "code": "crm.cap.quote_summary",
+    "group": "报价与需求",
+    "name:zh-CN": "报价汇总",
+    "name:en": "Manage Quote Summaries",
+    "includes": [
+      "crm.quote_summary.manage",
+      "crm.quote_summary.read",
+      "model.crm_quote_summary_common.read"
+    ],
+    "tier": "editor",
+    "order": 105
+  },
+  {
+    "code": "crm.cap.approval_case",
+    "group": "报价与需求",
+    "name:zh-CN": "审批单",
+    "name:en": "Manage Approval Cases",
+    "includes": [
+      "crm.approval_case.manage",
+      "crm.approval_case.read",
+      "model.crm_approval_case_common.read"
+    ],
+    "tier": "editor",
+    "order": 108
+  },
+  {
+    "code": "crm.cap.review",
+    "group": "质量与风险",
+    "name:zh-CN": "评审",
+    "name:en": "Manage Reviews",
+    "includes": [
+      "crm.review.manage",
+      "crm.review.read",
+      "model.crm_review_common.read"
+    ],
+    "tier": "editor",
+    "order": 109
+  },
+  {
+    "code": "crm.cap.risk",
+    "group": "质量与风险",
+    "name:zh-CN": "风险",
+    "name:en": "Manage Risks",
+    "includes": [
+      "crm.risk.manage",
+      "crm.risk.read",
+      "model.crm_risk_common.read"
+    ],
+    "tier": "editor",
+    "order": 110
+  },
+  {
+    "code": "crm.cap.campaign",
+    "group": "营销活动",
+    "name:zh-CN": "营销活动",
+    "name:en": "Manage Campaigns",
+    "includes": [
+      "crm.campaign.manage",
+      "crm.campaign.read"
+    ],
+    "tier": "editor",
+    "order": 111
+  },
+  {
+    "code": "crm.cap.email_template",
+    "group": "邮件触达",
+    "name:zh-CN": "邮件模板",
+    "name:en": "Manage Email Templates",
+    "includes": [
+      "crm.email_template.manage",
+      "crm.email_template.read"
+    ],
+    "tier": "admin",
+    "order": 113
+  },
+  {
+    "code": "crm.cap.email_log",
+    "group": "邮件触达",
+    "name:zh-CN": "邮件日志",
+    "name:en": "View Email Logs",
+    "includes": [
+      "crm.email_log.manage",
+      "crm.email_log.read"
+    ],
+    "tier": "editor",
+    "order": 114
+  },
+  {
+    "code": "crm.cap.lead_score_rule",
+    "group": "自动化规则",
+    "name:zh-CN": "线索评分规则",
+    "name:en": "Manage Lead Score Rules",
+    "includes": [
+      "crm.lead_score_rule.manage",
+      "crm.lead_score_rule.read"
+    ],
+    "tier": "admin",
+    "order": 119
+  },
+  {
+    "code": "crm.cap.assignment_rule",
+    "group": "自动化规则",
+    "name:zh-CN": "分配规则",
+    "name:en": "Manage Assignment Rules",
+    "includes": [
+      "crm.assignment_rule.manage",
+      "crm.assignment_rule.read"
+    ],
+    "tier": "admin",
+    "order": 120
+  }
+]

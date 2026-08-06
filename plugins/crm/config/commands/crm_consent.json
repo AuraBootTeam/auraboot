@@ -1,0 +1,65 @@
+[
+  {
+    "code": "crm:create_consent",
+    "displayName:zh-CN": "新建同意",
+    "displayName:en": "Create Consent",
+    "type": "create",
+    "modelCode": "crm_consent",
+    "inputFields": [
+      "crm_cns_contact_id",
+      "crm_cns_channel",
+      "crm_cns_source",
+      "crm_cns_legal_basis"
+    ],
+    "autoSetFields": {
+      "crm_cns_code": {
+        "strategy": "auto_generate",
+        "pattern": "CNS-{yyyyMMdd}-{seq}"
+      },
+      "crm_cns_status": {
+        "strategy": "fixed_value",
+        "value": "pending"
+      }
+    },
+    "permissions": [
+      "crm.consent.manage"
+    ],
+    "agent_hint": "Create a contact consent record (pending). Inputs: contact, channel, source, legal_basis.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:grant_consent",
+    "displayName:zh-CN": "授予同意",
+    "displayName:en": "Grant Consent",
+    "type": "state_transition",
+    "modelCode": "crm_consent",
+    "stateField": "crm_cns_status",
+    "fromStates": [
+      "pending"
+    ],
+    "toState": "opt_in",
+    "permissions": [
+      "crm.consent.manage"
+    ],
+    "agent_hint": "Grant consent (pending->opt_in). Validates legal basis + source (handler); stamps granted_at.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:withdraw_consent",
+    "displayName:zh-CN": "撤回同意",
+    "displayName:en": "Withdraw Consent",
+    "type": "state_transition",
+    "modelCode": "crm_consent",
+    "stateField": "crm_cns_status",
+    "fromStates": [
+      "pending",
+      "opt_in"
+    ],
+    "toState": "opt_out",
+    "permissions": [
+      "crm.consent.manage"
+    ],
+    "agent_hint": "Withdraw consent (->opt_out). Always allowed (right to withdraw).",
+    "cmd_risk_level": "L1"
+  }
+]

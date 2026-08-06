@@ -1,0 +1,72 @@
+{
+  "pageKey": "crm_campaign_form",
+  "name:zh-CN": "营销活动表单",
+  "name:en": "Campaign Form",
+  "modelCode": "crm_campaign",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "营销活动信息",
+        "en-US": "Campaign Information"
+      },
+      "fields": [
+        {
+          "field": "crm_cpn_name",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_cpn_type",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cpn_start_date",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cpn_end_date",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cpn_budget",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cpn_owner",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_cpn_description",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

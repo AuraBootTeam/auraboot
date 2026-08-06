@@ -1,0 +1,56 @@
+{
+  "pageKey": "crm_omni_session_detail",
+  "name:zh-CN": "会话详情",
+  "name:en": "Session Detail",
+  "modelCode": "crm_omni_session",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "info",
+      "blockType": "detail-section",
+      "title": {
+        "zh-CN": "会话信息",
+        "en": "Session Info"
+      },
+      "fields": [
+        {
+          "field": "crm_oss_code",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_oss_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_oss_channel",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_oss_queue",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_oss_priority",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_oss_customer",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_oss_vip",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_oss_subject",
+          "colSpan": 12
+        }
+      ]
+    }
+  ]
+}

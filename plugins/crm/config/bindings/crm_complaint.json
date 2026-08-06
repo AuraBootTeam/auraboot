@@ -1,0 +1,16 @@
+[
+  { "modelCode": "crm_complaint", "fieldCode": "crm_cmp_code", "sequence": 1, "required": true, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_complaint", "fieldCode": "crm_cmp_account_id", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_complaint", "fieldCode": "crm_cmp_contact_id", "sequence": 3, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_complaint", "fieldCode": "crm_cmp_date", "sequence": 4, "required": true, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_complaint", "fieldCode": "crm_cmp_type", "sequence": 5, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_complaint", "fieldCode": "crm_cmp_severity", "sequence": 6, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_complaint", "fieldCode": "crm_cmp_description", "sequence": 7, "required": true, "visible": false, "editable": true },
+  { "modelCode": "crm_complaint", "fieldCode": "crm_cmp_status", "sequence": 8, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_complaint", "fieldCode": "crm_cmp_root_cause", "sequence": 9, "required": false, "visible": false, "editable": true },
+  { "modelCode": "crm_complaint", "fieldCode": "crm_cmp_corrective_action", "sequence": 10, "required": false, "visible": false, "editable": true },
+  { "modelCode": "crm_complaint", "fieldCode": "crm_cmp_resolution_date", "sequence": 11, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_complaint", "fieldCode": "crm_cmp_sla_policy_id", "sequence": 12, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_complaint", "fieldCode": "crm_cmp_first_response_at", "sequence": 13, "required": false, "visible": true, "editable": false, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_complaint", "fieldCode": "crm_cmp_sla_status", "sequence": 14, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } }
+]

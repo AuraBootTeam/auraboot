@@ -50,15 +50,15 @@ class ActionRecorderIntegrationTest extends BaseIntegrationTest {
         leadListQueryCode = "crm_lead_list_" + suffix;
 
         // Seed crm:create_lead command definition
-        insertCommandDef(tenantId, createCommandCode, "crm_lead",
+        insertCommandDef(tenantId, createCommandCode, "crm_lead_common",
                 objectMapper.writeValueAsString(Map.of("type", "create")));
 
         // Seed crm:update_lead command definition
-        insertCommandDef(tenantId, updateCommandCode, "crm_lead",
+        insertCommandDef(tenantId, updateCommandCode, "crm_lead_common",
                 objectMapper.writeValueAsString(Map.of("type", "update")));
 
-        // Seed ab_named_query for crm_lead_list
-        insertNamedQuery(tenantId, leadListQueryCode, "SELECT * FROM mt_crm_lead WHERE tenant_id = :tenantId");
+        // Seed ab_named_query for crm_lead_common_list
+        insertNamedQuery(tenantId, leadListQueryCode, "SELECT * FROM mt_crm_lead_common WHERE tenant_id = :tenantId");
     }
 
     @AfterEach
@@ -143,9 +143,9 @@ class ActionRecorderIntegrationTest extends BaseIntegrationTest {
         assertThat(rows).hasSize(1);
 
         Map<String, Object> action = rows.get(0);
-        assertThat(action.get("action_code")).isEqualTo("crm_lead.create");
+        assertThat(action.get("action_code")).isEqualTo("crm_lead_common.create");
         assertThat(action.get("action_type")).isEqualTo("create");
-        assertThat(action.get("target_model")).isEqualTo("crm_lead");
+        assertThat(action.get("target_model")).isEqualTo("crm_lead_common");
         assertThat(action.get("action_status")).isEqualTo("success");
         assertThat(action.get("business_domain")).isEqualTo("crm");
         assertThat(action.get("run_id")).isEqualTo(runId);
@@ -198,7 +198,7 @@ class ActionRecorderIntegrationTest extends BaseIntegrationTest {
         assertThat(((Number) action.get("affected_count")).intValue()).isEqualTo(25);
         assertThat(action.get("transaction_scope")).isEqualTo("read_only");
         assertThat(action.get("action_status")).isEqualTo("success");
-        assertThat(action.get("target_model")).isEqualTo("crm_lead");
+        assertThat(action.get("target_model")).isEqualTo("crm_lead_common");
     }
 
     @Test

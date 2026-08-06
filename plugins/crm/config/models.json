@@ -1,0 +1,675 @@
+[
+  {
+    "code": "crm_account_common",
+    "displayName:zh-CN": "客户",
+    "displayName:en": "Account",
+    "description": "CRM customer company (Graph Root)",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Building",
+      "category": "crm",
+      "titleField": "crm_acc_name",
+      "subtitleField": "crm_acc_code",
+      "dataScope": {
+        "ownerField": "created_by",
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A company or organization record representing a customer or prospect. Central entity linking contacts, opportunities, and service interactions. Accounts are master data with indefinite lifecycle — no status progression, treated as long-lived reference.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — accounts are long-lived master entities. Created with status=active, may be updated or deleted but do not transition through states."
+  },
+  {
+    "code": "crm_contact_common",
+    "displayName:zh-CN": "联系人",
+    "displayName:en": "Contact",
+    "description": "Contact person linked to an account",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "User",
+      "category": "crm",
+      "titleField": "crm_ct_name",
+      "subtitleField": "crm_ct_email"
+    },
+    "semantic_description": "An individual person at a customer organization. Contacts are reference entities linked to an account and may participate in multiple opportunities and activities. LLM need to understand: primary contact flag, contact title, communication channels.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — contacts are long-lived master entities. Created upon association with an account; may be marked primary or secondary; deletion removes the relationship."
+  },
+  {
+    "code": "crm_lead_common",
+    "displayName:zh-CN": "线索",
+    "displayName:en": "Lead",
+    "description": "Sales lead before qualification",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "Radar",
+      "category": "crm",
+      "titleField": "crm_lead_company",
+      "subtitleField": "crm_lead_code",
+      "dataScope": {
+        "ownerField": "crm_lead_assigned_to",
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A sales prospect or inquire representing early interest from a potential customer. Tracked from initial capture through contact attempts, qualification assessment, and conversion to an opportunity or loss. LLM need to understand: lead score, source tracking, contact attempt history.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "NEW → CONTACTED → QUALIFIED → CONVERTED (to opportunity) / LOST (with reason)"
+  },
+  {
+    "code": "crm_lead_score_rule",
+    "displayName:zh-CN": "线索评分规则",
+    "displayName:en": "Lead Score Rule",
+    "description": "Lead scorecard rule: one scoring criterion (dimension + condition + points)",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Gauge",
+      "category": "crm",
+      "titleField": "crm_lsr_name",
+      "subtitleField": "crm_lsr_dimension"
+    },
+    "semantic_description": "A single lead scorecard rule. Each rule defines a scoring dimension (e.g. lead source, industry, requirement length, activity density), a match condition (operator + value), and the points awarded when a lead satisfies the condition. The crm:rescore_lead command sums the points of every matching active rule into the lead's score. Master configuration data, evaluated by the scoring engine, never auto-repaired at startup.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "ACTIVE → INACTIVE — master configuration. Active rules participate in lead scoring; inactive rules are retained for history but skipped. No mandatory progression."
+  },
+  {
+    "code": "crm_assignment_rule",
+    "displayName:zh-CN": "线索分配规则",
+    "displayName:en": "Lead Assignment Rule",
+    "description": "Lead assignment rule: strategy (round-robin / territory / load) mapping leads to sales reps",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Users",
+      "category": "crm",
+      "titleField": "crm_asgn_name",
+      "subtitleField": "crm_asgn_strategy"
+    },
+    "semantic_description": "A lead assignment rule mapping qualifying leads to a sales rep or a rep pool by strategy. round_robin cycles through the rep pool in order; by_territory matches a lead attribute (e.g. industry / region) to a rep; by_load assigns to the rep with the fewest open leads. The crm:auto_assign_lead command selects the highest-priority matching active rule and writes crm_lead_assigned_to. When no rule matches, the command fails loud (no silent fallback to a default rep).",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "ACTIVE → INACTIVE — master configuration. Active rules participate in auto-assignment ordered by priority; inactive rules are skipped. No mandatory progression."
+  },
+  {
+    "code": "crm_opportunity_common",
+    "displayName:zh-CN": "商机",
+    "displayName:en": "Opportunity",
+    "description": "Sales opportunity with pipeline stages",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "TrendingUp",
+      "category": "crm",
+      "titleField": "crm_opp_name",
+      "subtitleField": "crm_opp_code",
+      "dataScope": {
+        "ownerField": "crm_opp_owner",
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A sales deal opportunity representing a qualified prospect progressing through the sales pipeline. Tracked from discovery through proposal, negotiation, and close (won or lost). LLM need to understand: probability %, expected amount, close date, pipeline stage signals.",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "DISCOVERY → QUALIFICATION → PROPOSAL → NEGOTIATION → CLOSED_WON / CLOSED_LOST. May also lose at early stages; can delete only in discovery/qualification."
+  },
+  {
+    "code": "crm_opportunity_contact_common",
+    "displayName:zh-CN": "商机联系人",
+    "displayName:en": "Opportunity Contact",
+    "description": "Opportunity-Contact junction table (M:N)",
+    "modelType": "entity",
+    "modelCategory": "reference",
+    "extension": {
+      "icon": "Link",
+      "category": "crm",
+      "titleField": "crm_oc_contact_id",
+      "skipDetailPage": true
+    },
+    "semantic_description": "A junction record linking a contact person to a sales opportunity with an assigned role (e.g., decision maker, influencer, technical contact). Supports mapping stakeholders and decision authority within an opportunity pursuit.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — reference relationships. Added when contact engagement in opportunity is identified; removed when no longer relevant."
+  },
+  {
+    "code": "crm_opportunity_line_common",
+    "displayName:zh-CN": "商机行项",
+    "displayName:en": "Opportunity Line Item",
+    "description": "Product/service line items within an opportunity",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "List",
+      "category": "crm",
+      "titleField": "crm_ol_product_name",
+      "skipDetailPage": true
+    },
+    "semantic_description": "A line item representing a product or service included in a sales opportunity. Tracks quantity, unit price, cost, discount, and calculated amounts to build opportunity total value.",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "No status lifecycle — child records created/updated/deleted with parent opportunity. Line items may be added/modified during opportunity progress; deleted when product removed from scope."
+  },
+  {
+    "code": "crm_activity_common",
+    "displayName:zh-CN": "活动",
+    "displayName:en": "Activity",
+    "description": "Unified activity: Task, Call, Email, Meeting, Note, Visit",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "Activity",
+      "category": "crm",
+      "titleField": "crm_act_subject",
+      "subtitleField": "crm_act_type",
+      "dataScope": {
+        "ownerField": "crm_act_owner",
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A unified activity record capturing all customer interactions: tasks, calls, emails, meetings, notes, and visits. Each activity has a type, subject, date, and optional assignment. Tasks follow an open → in_progress → done/cancelled lifecycle.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "For TASK type: OPEN → IN_PROGRESS → DONE / CANCELLED. For other activity types (call, email, meeting, visit): created as OPEN, may be marked complete or cancelled. No mandatory state progression for non-task activities."
+  },
+  {
+    "code": "crm_activity_relation_common",
+    "displayName:zh-CN": "活动关联",
+    "displayName:en": "Activity Relation",
+    "description": "Activity Association Graph edge linking activities to CRM objects",
+    "modelType": "entity",
+    "modelCategory": "reference",
+    "extension": {
+      "icon": "GitBranch",
+      "category": "crm",
+      "titleField": "crm_ar_object_type",
+      "skipDetailPage": true
+    },
+    "semantic_description": "A graph edge linking an activity to one or more CRM objects (account, contact, opportunity, quote, complaint, etc.). Supports multi-parent relationship; enables activity timeline retrieval from any related entity.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — reference edges. Created when activity is related to an object; removed when relationship no longer relevant. Immutable once created."
+  },
+  {
+    "code": "crm_complaint",
+    "displayName:zh-CN": "投诉",
+    "displayName:en": "Complaint",
+    "description": "Customer complaint / service ticket",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "extension": {
+      "icon": "AlertTriangle",
+      "category": "crm",
+      "titleField": "crm_cmp_code",
+      "subtitleField": "crm_cmp_status"
+    },
+    "semantic_description": "A customer complaint or service ticket tied to an account and contact. Tracks complaint type, severity, investigation progress, and resolution. Linked to SLA policies for response/resolution time enforcement and breach tracking.",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "OPEN → INVESTIGATING → RESOLVED → CLOSED. Closure requires documented root cause and corrective action. Can delete only in OPEN state."
+  },
+  {
+    "code": "crm_campaign",
+    "displayName:zh-CN": "营销活动",
+    "displayName:en": "Campaign",
+    "description": "Marketing campaign for lead generation",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Megaphone",
+      "category": "crm",
+      "titleField": "crm_cpn_name",
+      "subtitleField": "crm_cpn_code",
+      "dataScope": {
+        "ownerField": "crm_cpn_owner",
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A marketing campaign representing a planned or active lead generation or customer engagement initiative. Tracks campaign type, date range, budget, and status. Provides context for campaign members and performance metrics tracking.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "PLANNED → ACTIVE → COMPLETED / CANCELLED. Can cancel from PLANNED or ACTIVE. Deletable only in PLANNED state."
+  },
+  {
+    "code": "crm_email_template",
+    "displayName:zh-CN": "邮件模板",
+    "displayName:en": "Email Template",
+    "description": "Reusable email templates for CRM outreach (follow-up, quotation, etc.)",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Mail",
+      "category": "crm",
+      "titleField": "crm_et_name",
+      "subtitleField": "crm_et_category"
+    },
+    "semantic_description": "A reusable email template for CRM outreach: follow-up, quotation request, meeting invitation, etc. Supports template variables for dynamic content. Templates are categorized and may be in draft or active status.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT → ACTIVE (or deleted). Templates start in draft; upon review/approval, activated for use. Deletable when draft; active templates may be archived/deactivated."
+  },
+  {
+    "code": "crm_email_log",
+    "displayName:zh-CN": "邮件记录",
+    "displayName:en": "Email Log",
+    "description": "Log of all sent and received emails related to CRM objects",
+    "modelType": "entity",
+    "modelCategory": "transaction",
+    "extension": {
+      "icon": "MailOpen",
+      "category": "crm",
+      "titleField": "crm_el_subject",
+      "subtitleField": "crm_el_status"
+    },
+    "semantic_description": "A transaction record logging all emails (sent or received) related to CRM activities: outreach, follow-up, replies. Tracks direction (inbound/outbound), addresses, template usage, and relationship to CRM objects (lead/contact/account/opportunity/complaint).",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No state lifecycle — transaction. Created upon email send or receipt. Status field may indicate delivery state (sent, opened, bounced, read) but does not imply mandatory state progression."
+  },
+  {
+    "code": "crm_campaign_member",
+    "displayName:zh-CN": "活动成员",
+    "displayName:en": "Campaign Member",
+    "description": "Links campaign to leads/contacts with engagement tracking status",
+    "modelType": "entity",
+    "modelCategory": "reference",
+    "extension": {
+      "icon": "UserPlus",
+      "category": "crm",
+      "titleField": "crm_cm_member_name",
+      "skipDetailPage": true
+    },
+    "semantic_description": "A member record linking a lead or contact to a campaign with engagement tracking. Supports multiple member types (lead, contact) and tracks participation status (invited, accepted, engaged, unsubscribed, etc.).",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "INVITED → (engagement progression: accepted / engaged / unsubscribed / bounced). Immutable once added unless removed from campaign. Status changes driven by engagement events."
+  },
+  {
+    "code": "crm_campaign_metric",
+    "displayName:zh-CN": "活动指标",
+    "displayName:en": "Campaign Metric",
+    "description": "Campaign performance metrics: leads, emails, open/click/conversion rates, ROI",
+    "modelType": "entity",
+    "modelCategory": "transaction",
+    "extension": {
+      "icon": "BarChart2",
+      "category": "crm",
+      "titleField": "crm_cmet_metric_date",
+      "skipDetailPage": true
+    },
+    "semantic_description": "A transaction record capturing daily or periodic performance metrics for a campaign: leads generated, emails sent, open/click/conversion rates, cost, revenue, and ROI. Immutable once recorded; supports analytics aggregation.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — transaction record. Created when metrics are measured/recorded for a campaign on a given date. Immutable; corrections require new record with updated date or note."
+  },
+  {
+    "code": "crm_sla_policy",
+    "displayName:zh-CN": "SLA策略",
+    "displayName:en": "SLA Policy",
+    "description": "Service Level Agreement rules for complaint response and resolution times",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Clock",
+      "category": "crm",
+      "titleField": "crm_sla_name",
+      "subtitleField": "crm_sla_priority_level"
+    },
+    "semantic_description": "A master SLA policy defining response and resolution time windows for complaint tickets based on priority level. Policies include escalation rules and are linked to complaint records for SLA breach tracking and enforcement.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — master configuration. Policies are created and maintained with is_active flag. Once created, policies are referenced by complaints; deactivation prevents new assignment but does not affect historical records."
+  },
+  {
+    "code": "crm_sla_breach",
+    "displayName:zh-CN": "SLA违规",
+    "displayName:en": "SLA Breach",
+    "description": "SLA breach log tracking response/resolution time violations",
+    "modelType": "entity",
+    "modelCategory": "transaction",
+    "extension": {
+      "icon": "AlertOctagon",
+      "category": "crm",
+      "titleField": "crm_sb_breach_type"
+    },
+    "semantic_description": "A transaction record documenting an SLA breach event: which complaint violated which policy, breach type (response vs resolution), when the breach occurred, and associated notes. Used for SLA compliance reporting and escalation.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "No status lifecycle — immutable transaction. Created when a breach is detected; breach_type indicates response vs resolution violation; notified flag tracks if stakeholders were alerted."
+  },
+  {
+    "code": "crm_forecast_submission",
+    "displayName:zh-CN": "预测提交",
+    "displayName:en": "Forecast Submission",
+    "description": "Rep periodic forecast commitment (commit/best/pipeline) for manager roll-up",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "TrendingUp",
+      "category": "crm",
+      "titleField": "crm_fcst_period",
+      "subtitleField": "crm_fcst_code",
+      "dataScope": {
+        "ownerField": "crm_fcst_owner",
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A salesperson's periodic forecast submission stating Commit / Best Case / Pipeline amounts for a period. Monotonic: commit <= best_case <= pipeline. LLM need to understand: forecast category amounts, submission status, period.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "DRAFT -> SUBMITTED"
+  },
+  {
+    "code": "crm_consent",
+    "displayName:zh-CN": "同意记录",
+    "displayName:en": "Consent",
+    "description": "Contact marketing/data consent (GDPR-style opt-in/opt-out)",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "ShieldCheck",
+      "category": "crm",
+      "titleField": "crm_cns_code",
+      "subtitleField": "crm_cns_channel",
+      "dataScope": {
+        "ownerField": null,
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A contact's consent record per channel. Status: pending/opt_in/opt_out. opt_in requires legal basis + source; opt_out (withdrawal) always allowed.",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "PENDING -> OPT_IN (grant) / OPT_OUT (withdraw)"
+  },
+  {
+    "code": "crm_subscription",
+    "displayName:zh-CN": "订阅",
+    "displayName:en": "Subscription",
+    "description": "Recurring subscription with MRR/ARR + renewal lifecycle",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "Repeat",
+      "category": "crm",
+      "titleField": "crm_sub_code",
+      "subtitleField": "crm_sub_plan",
+      "dataScope": {
+        "ownerField": null,
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A recurring subscription. MRR=monthly amount, ARR=MRR*12. Status pending/active/renewal_due(within 30d)/expired.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "PENDING -> ACTIVE -> RENEWAL_DUE -> EXPIRED"
+  },
+  {
+    "code": "crm_segment",
+    "displayName:zh-CN": "细分人群",
+    "displayName:en": "Segment",
+    "description": "Dynamic audience defined by criteria; member count recomputed on demand",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "Users",
+      "category": "crm",
+      "titleField": "crm_seg_name",
+      "subtitleField": "crm_seg_code",
+      "dataScope": {
+        "ownerField": null,
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A dynamic contact segment. crm_seg_criteria is a JSON array of {field,op,value} (AND semantics); recompute counts matching contacts into member_count.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "draft -> recomputed (member_count populated)"
+  },
+  {
+    "code": "crm_attribution",
+    "displayName:zh-CN": "营销归因",
+    "displayName:en": "Attribution",
+    "description": "Distributes deal revenue across campaign touchpoints by model",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "GitMerge",
+      "category": "crm",
+      "titleField": "crm_attr_deal_name",
+      "subtitleField": "crm_attr_code",
+      "dataScope": {
+        "ownerField": null,
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A revenue attribution run. touchpoints=ordered campaign id JSON array; model first_touch/last_touch/linear; result=per-campaign attributed revenue.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "draft -> recomputed (result populated)"
+  },
+  {
+    "code": "crm_omni_session",
+    "displayName:zh-CN": "全渠道会话",
+    "displayName:en": "Omni Session",
+    "description": "Unified omnichannel customer session routed to a queue by channel + tier",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "MessageCircle",
+      "category": "crm",
+      "titleField": "crm_oss_subject",
+      "subtitleField": "crm_oss_code",
+      "dataScope": {
+        "ownerField": "crm_oss_assigned_to",
+        "departmentField": null
+      }
+    },
+    "semantic_description": "An inbound omnichannel session (email/chat/phone/social). route_session assigns queue+priority (phone=urgent, vip=high).",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "open -> pending -> resolved"
+  },
+  {
+    "code": "crm_journey",
+    "displayName:zh-CN": "客户旅程",
+    "displayName:en": "Journey",
+    "description": "Stateful nurture journey definition with ordered steps",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "GitBranch",
+      "category": "crm",
+      "titleField": "crm_jny_name",
+      "subtitleField": "crm_jny_code",
+      "dataScope": {
+        "ownerField": null,
+        "departmentField": null
+      }
+    },
+    "semantic_description": "Stateful nurture journey definition with ordered steps",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "draft -> active -> archived"
+  },
+  {
+    "code": "crm_journey_enrollment",
+    "displayName:zh-CN": "旅程参与",
+    "displayName:en": "Journey Enrollment",
+    "description": "A contact's enrollment progressing through a journey's steps",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "UserPlus",
+      "category": "crm",
+      "titleField": "crm_jne_code",
+      "subtitleField": "crm_jne_status",
+      "dataScope": {
+        "ownerField": null,
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A contact's enrollment progressing through a journey's steps",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "active -> completed / exited"
+  },
+  {
+    "code": "crm_sales_snapshot",
+    "displayName:zh-CN": "销售分析快照",
+    "displayName:en": "Sales Snapshot",
+    "description": "Materialized (L1) sales analytics rolled up from opportunities",
+    "modelType": "entity",
+    "modelCategory": "entity",
+    "extension": {
+      "icon": "BarChart3",
+      "category": "crm",
+      "titleField": "crm_ss_period",
+      "subtitleField": "crm_ss_code",
+      "dataScope": {
+        "ownerField": null,
+        "departmentField": null
+      }
+    },
+    "semantic_description": "L1 materialized sales snapshot per period: total/won/won_amount/pipeline/conversion, refreshed from crm_opportunity_common via crm:refresh_sales_snapshot.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "refreshed on demand / by scheduler"
+  },
+  {
+    "code": "crm_customer_request_common",
+    "displayName:zh-CN": "客户需求",
+    "displayName:en": "Customer Request",
+    "description": "Generic customer request bridge before industry-specific routing",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "extension": {
+      "icon": "Inbox",
+      "category": "crm",
+      "titleField": "crm_cr_title",
+      "subtitleField": "crm_cr_code",
+      "dataScope": {
+        "ownerField": "crm_cr_owner",
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A cross-industry customer demand record. It links a lead, account, contact and opportunity to an industry-specific routed object without embedding industry details such as BOM lines, part numbers, supplier costing or PCBA quote lines.",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "draft -> submitted -> routed -> in_progress -> quoted -> won / lost / cancelled"
+  },
+  {
+    "code": "crm_quote_summary_common",
+    "displayName:zh-CN": "报价摘要",
+    "displayName:en": "Quote Summary",
+    "description": "Lightweight quote lifecycle summary visible from generic CRM",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "extension": {
+      "icon": "FileText",
+      "category": "crm",
+      "titleField": "crm_qs_code",
+      "subtitleField": "crm_qs_status",
+      "dataScope": {
+        "ownerField": "crm_qs_owner",
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A generic quote/proposal summary synchronized from a quote fact source such as QuoteOps PCBA quote. It exposes account, opportunity, customer request, amount, status and result to Customer 360 and pipeline reports while keeping line-level pricing facts in the industry quote package.",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "draft / pricing / approval / sent / accepted / rejected / expired, synchronized from source quote"
+  },
+  {
+    "code": "crm_approval_case_common",
+    "displayName:zh-CN": "审批事项",
+    "displayName:en": "Approval Case",
+    "description": "Cross-domain approval case and audit fact visible from generic CRM",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "extension": {
+      "icon": "ShieldCheck",
+      "category": "crm",
+      "titleField": "crm_apc_code",
+      "subtitleField": "crm_apc_subject",
+      "dataScope": {
+        "ownerField": null,
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A generic approval case synchronized from domain objects such as QuoteOps quotes. It provides a unified queue and audit record for low margin, high discount, payment term, contract, credit or order exception approvals without embedding industry-specific line facts.",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "pending -> approved / rejected / cancelled, with source object, reason, policy snapshot and decision audit"
+  },
+  {
+    "code": "crm_review_common",
+    "displayName:zh-CN": "评审",
+    "displayName:en": "Review",
+    "description": "Generic cross-industry review fact (requirement / technical / compliance / contract / DFM). Industry packages attach a 1:1 sidecar such as crm_review_pcba_dfm.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "extension": {
+      "icon": "ClipboardCheck",
+      "category": "crm",
+      "titleField": "crm_rv_title",
+      "subtitleField": "crm_rv_code",
+      "dataScope": {
+        "ownerField": null,
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A generic review record shared across industries. PCBA DFM review is one industry implementation that links 1:1 via crm_review_common_id. Common layer owns reviewer, status, priority, account and request context; the industry sidecar owns industry-specific review fields.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "pending -> in_review -> passed / conditional / failed / cancelled"
+  },
+  {
+    "code": "crm_risk_common",
+    "displayName:zh-CN": "风险项",
+    "displayName:en": "Risk",
+    "description": "Generic cross-industry risk item. Industry packages attach a 1:1 sidecar such as crm_risk_pcba_dfm.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "extension": {
+      "icon": "AlertTriangle",
+      "category": "crm",
+      "titleField": "crm_rk_title",
+      "subtitleField": "crm_rk_code",
+      "dataScope": {
+        "ownerField": null,
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A generic risk record shared across industries (technical / commercial / delivery / compliance / quality / supply). The common layer owns severity, status, owner and context; industry sidecars own industry-specific risk facts.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "open -> mitigating -> accepted / mitigated / resolved / closed"
+  },
+  {
+    "code": "crm_clarification_common",
+    "displayName:zh-CN": "澄清项",
+    "displayName:en": "Clarification",
+    "description": "Generic cross-industry clarification thread. Industry packages attach a 1:1 sidecar such as crm_clarification_pcba_dfm.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "extension": {
+      "icon": "MessageCircleQuestion",
+      "category": "crm",
+      "titleField": "crm_cl_title",
+      "subtitleField": "crm_cl_code",
+      "dataScope": {
+        "ownerField": null,
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A generic clarification record shared across industries (customer / internal / supplier / compliance). The common layer owns status, priority, owner and context; industry sidecars own industry-specific clarification facts.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "pending -> awaiting_customer -> customer_replied -> resolved / cancelled"
+  }
+]

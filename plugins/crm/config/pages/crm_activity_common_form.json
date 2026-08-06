@@ -1,0 +1,130 @@
+{
+  "pageKey": "crm_activity_common_form",
+  "name:zh-CN": "活动表单",
+  "name:en": "Activity Form",
+  "modelCode": "crm_activity_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "活动信息",
+        "en-US": "Activity Information"
+      },
+      "fields": [
+        {
+          "field": "crm_act_type",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_act_subject",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_act_date",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_act_source",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_act_parent_id",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_act_files",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_act_content",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "task_fields",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "任务字段",
+        "en-US": "Task Fields"
+      },
+      "fields": [
+        {
+          "field": "crm_act_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_act_priority",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_act_due_date",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_act_assignee",
+          "colSpan": 6
+        }
+      ]
+    },
+    {
+      "id": "call_meeting_fields",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "通话/会议字段",
+        "en-US": "Call/Meeting Fields"
+      },
+      "fields": [
+        {
+          "field": "crm_act_duration",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_act_direction",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_act_location",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_act_start_time",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_act_end_time",
+          "colSpan": 6
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

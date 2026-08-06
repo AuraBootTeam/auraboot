@@ -13,8 +13,8 @@ import java.util.List;
  * Manages per-user notification preferences for IM event notifications.
  *
  * Resolution order (most specific wins):
- * 1. model_code + operation_type match (e.g., "crm_lead" + "state_transition")
- * 2. model_code match (e.g., "crm_lead" + NULL)
+ * 1. model_code + operation_type match (e.g., "crm_lead_common" + "state_transition")
+ * 2. model_code match (e.g., "crm_lead_common" + NULL)
  * 3. operation_type match (e.g., NULL + "state_transition")
  * 4. Global default (NULL + NULL) — defaults to enabled if no preference exists
  *

@@ -505,7 +505,7 @@ test.describe('CRM AI Scenarios', () => {
       crm_lead_source: 'referral',
       crm_lead_industry: 'technology',
     });
-    const seeded = await detail(token, 'crm_lead_list', pid);
+    const seeded = await detail(token, 'crm_lead_common_list', pid);
     expect(seeded.crm_lead_score).toBe(99);
     highScoreLead = { pid, company, contact };
 
@@ -616,7 +616,7 @@ test.describe('CRM AI Scenarios', () => {
 
     const crossTag = uniqueId('cross');
     const crossAccountPid = await createAccount(token, crossTag);
-    const crossAccount = await detail(token, 'crm_account_list', crossAccountPid);
+    const crossAccount = await detail(token, 'crm_account_common_list', crossAccountPid);
     crossOracle = {
       tag: crossTag,
       accountName: String(crossAccount.crm_acc_name),
@@ -726,7 +726,7 @@ test.describe('CRM AI Scenarios', () => {
       const result = await chatWithAuraBot(
         token,
         '帮我看看目前有多少条线索，各状态分布如何？',
-        'crm_lead',
+        'crm_lead_common',
       );
       await writeEvidence(testInfo, 'S1-01', 'L2', result);
 
@@ -744,7 +744,7 @@ test.describe('CRM AI Scenarios', () => {
       const result = await chatWithAuraBot(
         token,
         `不要使用 SQL 或 platform_execute_sql。请只调用 CRM 线索列表工具（cmd_crm_list_leads/list_crm_lead），用 keyword 或 filters 查询公司名包含「${sourceOracle.tag}」的线索。请按来源统计数量和转化率，并列出每条线索的公司名、联系人、来源、状态。`,
-        'crm_lead',
+        'crm_lead_common',
       );
       await writeEvidence(testInfo, 'S1-02', 'L3', result, {
         tag: sourceOracle.tag,
@@ -770,7 +770,7 @@ test.describe('CRM AI Scenarios', () => {
       const result = await chatWithAuraBot(
         token,
         `不要使用 SQL 或 platform_execute_sql。请只调用 CRM 线索列表工具（cmd_crm_list_leads/list_crm_lead），用 keyword 或 filters 查询公司名包含「${highScoreLead.company}」且评分大于 80 的线索，返回公司名、联系人、评分。`,
-        'crm_lead',
+        'crm_lead_common',
       );
       await writeEvidence(testInfo, 'S1-03', 'L3', result, highScoreLead);
 
@@ -797,7 +797,7 @@ test.describe('CRM AI Scenarios', () => {
         crm_lead_contact_name: `Lead Contact ${tag}`,
         crm_lead_source: 'referral',
       });
-      const created = await detail(token, 'crm_lead_list', leadPid);
+      const created = await detail(token, 'crm_lead_common_list', leadPid);
       expect(created.crm_lead_company).toBe(`AI Lifecycle ${tag}`);
       expect(created.crm_lead_status).toBe('new');
     });
@@ -811,31 +811,31 @@ test.describe('CRM AI Scenarios', () => {
         leadPid,
       );
       expect(result.success, result.error).toBe(true);
-      expect((await detail(token, 'crm_lead_list', leadPid)).crm_lead_score).toBe(85);
+      expect((await detail(token, 'crm_lead_common_list', leadPid)).crm_lead_score).toBe(85);
     });
 
     test('S2-03: Transition lead new to contacted', async () => {
       expect(leadPid).toBeTruthy();
       const result = await executeCommand(token, 'crm:contact_lead', {}, leadPid);
       expect(result.success, result.error).toBe(true);
-      expect((await detail(token, 'crm_lead_list', leadPid)).crm_lead_status).toBe('contacted');
+      expect((await detail(token, 'crm_lead_common_list', leadPid)).crm_lead_status).toBe('contacted');
     });
 
     test('S2-04: Transition lead contacted to qualified', async () => {
       expect(leadPid).toBeTruthy();
       const result = await executeCommand(token, 'crm:qualify_lead', {}, leadPid);
       expect(result.success, result.error).toBe(true);
-      expect((await detail(token, 'crm_lead_list', leadPid)).crm_lead_status).toBe('qualified');
+      expect((await detail(token, 'crm_lead_common_list', leadPid)).crm_lead_status).toBe('qualified');
     });
 
     test('S2-05: Convert lead to opportunity workflow', async () => {
       expect(leadPid).toBeTruthy();
-      const leadBefore = await detail(token, 'crm_lead_list', leadPid);
+      const leadBefore = await detail(token, 'crm_lead_common_list', leadPid);
       const result = await executeCommand(token, 'crm:convert_lead', {}, leadPid);
       expect(result.success, result.error).toBe(true);
-      expect((await detail(token, 'crm_lead_list', leadPid)).crm_lead_status).toBe('converted');
+      expect((await detail(token, 'crm_lead_common_list', leadPid)).crm_lead_status).toBe('converted');
 
-      const opportunities = await queryList(token, 'crm_opportunity_list', [
+      const opportunities = await queryList(token, 'crm_opportunity_common_list', [
         { fieldName: 'crm_opp_lead_id', operator: 'EQ', value: leadPid },
       ]);
       const convertedOpportunity = opportunities.records.find(
@@ -979,7 +979,7 @@ test.describe('CRM AI Scenarios', () => {
       const result = await chatWithAuraBot(
         token,
         `不要使用 SQL 或 platform_execute_sql。请只调用 CRM 联系人列表工具（cmd_crm_list_contacts/list_crm_contact），用 keyword 或 filters 查询联系人姓名包含「${crossOracle.tag}」的联系人。根据返回结果按所属客户统计联系人数量，返回客户名称或客户ID、联系人数量，并列出联系人姓名。`,
-        'crm_contact',
+        'crm_contact_common',
       );
       await writeEvidence(testInfo, 'S4-01', 'L3', result, crossOracle);
 
@@ -1002,7 +1002,7 @@ test.describe('CRM AI Scenarios', () => {
       const result = await chatWithAuraBot(
         token,
         `不要使用 SQL 或 platform_execute_sql。请只调用 CRM 线索列表工具（cmd_crm_list_leads/list_crm_lead），用 keyword 或 filters 查询公司名包含「${industryOracle.tag}」的线索。请先列出每条线索的联系人、行业、评分，再按行业统计线索数量和平均评分。`,
-        'crm_lead',
+        'crm_lead_common',
       );
       await writeEvidence(testInfo, 'S4-02', 'L3', result, {
         ...industryOracle,
@@ -1032,7 +1032,7 @@ test.describe('CRM AI Scenarios', () => {
       const result = await chatWithAuraBot(
         token,
         `不要使用 SQL 或 platform_execute_sql。请调用 CRM 长期未跟进线索工具 nq_crm_lead_stale_followup，使用参数 leadKeyword="${staleFollowupOracle.tag}"、staleBefore="${staleFollowupOracle.staleBefore}" 查询 new 状态且超过 7 天没有跟进活动的线索。返回公司名、联系人、最后跟进时间、活动次数；不要返回最近 1 天已跟进的线索。`,
-        'crm_lead',
+        'crm_lead_common',
       );
       await writeEvidence(testInfo, 'S5-01', 'L3', result, staleFollowupOracle);
 
@@ -1053,7 +1053,7 @@ test.describe('CRM AI Scenarios', () => {
       const result = await chatWithAuraBot(
         token,
         `不要使用 SQL 或 platform_execute_sql。请只调用 CRM 线索列表工具（cmd_crm_list_leads/list_crm_lead），用 keyword 或 filters 查询公司名包含「${weeklyOracle.tag}」且最近7天创建的线索。统计数量并返回公司名、联系人。`,
-        'crm_lead',
+        'crm_lead_common',
       );
       await writeEvidence(testInfo, 'S5-02', 'L3', result, {
         tag: weeklyOracle.tag,

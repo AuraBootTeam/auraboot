@@ -4,7 +4,7 @@
  *
  * The backend fixes (#1440 + the named-agent skill→tool wiring and list:/get:
  * execution routing) make a bound builtin skill contribute its governed DSL tool
- * (list:crm_account) to a NAMED-AGENT (colleague) turn, and let that tool actually
+ * (list:crm_account_common) to a NAMED-AGENT (colleague) turn, and let that tool actually
  * execute. This closes the loop at the interface a person uses: the colleague
  * "客户运营助理·小奥" is bound to crm_quarterly_review and, asked for a review, must
  * reach into the CRM and answer from real data — not a generic reply, not silence,
@@ -34,7 +34,7 @@ const SHOTS = 'test-results/digital-employee';
 async function seedReviewAccount(request: APIRequestContext): Promise<string> {
   const suffix = Date.now().toString(36);
   const name = `季度复盘样本-${suffix}`;
-  const created = await request.post('/api/dynamic/crm_account/create', {
+  const created = await request.post('/api/dynamic/crm_account_common/create', {
     data: {
       crm_acc_name: name,
       crm_acc_code: `review-${suffix}`,
@@ -70,10 +70,10 @@ async function ensureOpsColleague(request: APIRequestContext): Promise<void> {
       agent_type: 'reactive',
       model: llmModel,
       system_prompt:
-        '你是客户运营助理。用户请求季度复盘时,必须用 list:crm_account 拉取真实客户数据,' +
+        '你是客户运营助理。用户请求季度复盘时,必须用 list:crm_account_common 拉取真实客户数据,' +
         '先在【事实样本】中逐条列出返回的真实客户名称,再按行业与评级分析结构；' +
         '字段缺失时明确说明,不得猜测。给出结构化复盘并提议拓客动作。只读,不自动执行写操作。用简体中文回复。',
-      // The bound skill contributes its governed read tool (list:crm_account) to the turn.
+      // The bound skill contributes its governed read tool (list:crm_account_common) to the turn.
       skills: JSON.stringify([REVIEW_SKILL]),
       guardrails: JSON.stringify({ provider: llmProvider }),
       status: 'active',
@@ -104,7 +104,7 @@ test.describe('Digital employee — bound skill drives a real customer review', 
     // Read the real customer population the skill will ground on, so the assertions
     // are not tied to a fixed seed size. Goes through the same BFF the app uses
     // (session cookie from storageState), so it sees exactly what the colleague sees.
-    const listResp = await page.request.get('/api/dynamic/crm_account/list?pageNum=1&pageSize=500');
+    const listResp = await page.request.get('/api/dynamic/crm_account_common/list?pageNum=1&pageSize=500');
     expect(listResp.ok(), 'customer list query must succeed').toBeTruthy();
     const listData = (await listResp.json())?.data ?? {};
     const customerTotal: number = listData.total ?? 0;

@@ -94,7 +94,7 @@ class GoalDriftObservationTest {
     @DisplayName("a read under a read-only opening is not drift")
     void readUnderReadOnlyOpeningIsNotDrift() {
         notifyDrift("query", AgentToolDefinition.builder()
-                .name("list:crm_account").toolType("dsl_query").operationKind("query").build());
+                .name("list:crm_account_common").toolType("dsl_query").operationKind("query").build());
         verify(observations, never()).publish(anyLong(), anyString(), anyString(), any(), anyString(), any());
     }
 

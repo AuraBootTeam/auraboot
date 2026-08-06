@@ -32,7 +32,7 @@ const inputSchema = z.object({
     .string()
     .min(1)
     .describe(
-      'Unique command code in the tenant. Convention: <model_code>.<verb>, e.g. crm_lead.assign, hr_leave_request.approve.',
+      'Unique command code in the tenant. Convention: <model_code>.<verb>, e.g. crm_lead_common.assign, hr_leave_request.approve.',
     ),
   displayName: z.string().optional(),
   description: z.string().optional(),

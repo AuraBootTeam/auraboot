@@ -73,7 +73,7 @@ class PatternExtractorIntegrationTest extends BaseIntegrationTest {
     @DisplayName("qualifying pattern is upserted with invocation_count and success_rate")
     void qualifying_pattern_is_upserted() {
         String sig = tag + "sig_q";
-        seedActions(sig, "crm_lead", "update", 10, 10);   // 10 invocations, 100% success
+        seedActions(sig, "crm_lead_common", "update", 10, 10);   // 10 invocations, 100% success
 
         int upserted = extractor.extractPatterns();
         assertThat(upserted).isGreaterThanOrEqualTo(1);
@@ -92,7 +92,7 @@ class PatternExtractorIntegrationTest extends BaseIntegrationTest {
     @DisplayName("below-threshold invocation_count skips insert entirely (no row written)")
     void below_min_invocations_filtered() {
         String sig = tag + "sig_low";
-        seedActions(sig, "crm_lead", "update", 2, 2); // 2 < default 5
+        seedActions(sig, "crm_lead_common", "update", 2, 2); // 2 < default 5
 
         extractor.extractPatterns();
 
@@ -107,7 +107,7 @@ class PatternExtractorIntegrationTest extends BaseIntegrationTest {
     @DisplayName("low success_rate is filtered (pattern observed but not inserted)")
     void low_success_rate_filtered() {
         String sig = tag + "sig_flaky";
-        seedActions(sig, "crm_lead", "update", 10, 5); // 50% success < 0.80
+        seedActions(sig, "crm_lead_common", "update", 10, 5); // 50% success < 0.80
 
         extractor.extractPatterns();
 
@@ -122,7 +122,7 @@ class PatternExtractorIntegrationTest extends BaseIntegrationTest {
     @DisplayName("re-running the extractor updates an existing row (idempotent)")
     void re_run_is_idempotent() {
         String sig = tag + "sig_idem";
-        seedActions(sig, "crm_lead", "update", 10, 10);
+        seedActions(sig, "crm_lead_common", "update", 10, 10);
         extractor.extractPatterns();
 
         String pidBefore = jdbc.queryForObject(
@@ -131,7 +131,7 @@ class PatternExtractorIntegrationTest extends BaseIntegrationTest {
                 String.class, tenantId, sig);
 
         // Add 5 more successful invocations, re-run.
-        seedActions(sig, "crm_lead", "update", 5, 5);
+        seedActions(sig, "crm_lead_common", "update", 5, 5);
         extractor.extractPatterns();
 
         Map<String, Object> row = jdbc.queryForMap(
@@ -146,9 +146,9 @@ class PatternExtractorIntegrationTest extends BaseIntegrationTest {
     @DisplayName("different (model, action_type) tuples produce distinct pattern rows")
     void distinct_patterns_per_tuple() {
         String sig = tag + "sig_same";
-        seedActions(sig, "crm_lead",       "update", 10, 10);
-        seedActions(sig, "crm_opportunity","update", 10, 10);
-        seedActions(sig, "crm_lead",       "create", 10, 10);
+        seedActions(sig, "crm_lead_common",       "update", 10, 10);
+        seedActions(sig, "crm_opportunity_common","update", 10, 10);
+        seedActions(sig, "crm_lead_common",       "create", 10, 10);
 
         extractor.extractPatterns();
 
@@ -163,13 +163,13 @@ class PatternExtractorIntegrationTest extends BaseIntegrationTest {
     @DisplayName("patternHash is deterministic + differs across tuples")
     void pattern_hash_contract() {
         PatternExtractor.PatternCandidate a = PatternExtractor.PatternCandidate.builder()
-                .tenantId(1L).commandSignature("sig1").targetModel("crm_lead").actionType("update")
+                .tenantId(1L).commandSignature("sig1").targetModel("crm_lead_common").actionType("update")
                 .invocationCount(10).successRate(1.0).build();
         PatternExtractor.PatternCandidate aCopy = PatternExtractor.PatternCandidate.builder()
-                .tenantId(1L).commandSignature("sig1").targetModel("crm_lead").actionType("update")
+                .tenantId(1L).commandSignature("sig1").targetModel("crm_lead_common").actionType("update")
                 .invocationCount(99).successRate(0.5).build();  // stats differ
         PatternExtractor.PatternCandidate b = PatternExtractor.PatternCandidate.builder()
-                .tenantId(1L).commandSignature("sig1").targetModel("crm_lead").actionType("create")
+                .tenantId(1L).commandSignature("sig1").targetModel("crm_lead_common").actionType("create")
                 .invocationCount(10).successRate(1.0).build();
 
         String ha = extractor.patternHash(a);
@@ -187,7 +187,7 @@ class PatternExtractorIntegrationTest extends BaseIntegrationTest {
         jdbc.update("INSERT INTO ab_agent_action " +
                         "(pid, tenant_id, run_id, action_code, action_type, target_model, " +
                         " action_status, executed_at, created_at) " +
-                        "VALUES (?, ?, ?, 'x', 'query', 'crm_lead', 'success', NOW(), NOW())",
+                        "VALUES (?, ?, ?, 'x', 'query', 'crm_lead_common', 'success', NOW(), NOW())",
                 tag + "nocs", tenantId, UniqueIdGenerator.generate());
 
         int upserted = extractor.extractPatterns();

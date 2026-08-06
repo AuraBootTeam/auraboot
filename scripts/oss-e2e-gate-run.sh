@@ -124,23 +124,17 @@ dashboard_exists() {
 
 # Resolve SHOWCASE_DEFAULT_DASHBOARD_CODE the way scripts/oss-reset-and-init.sh's
 # select_default_showcase_dashboard does: honour an explicit override (verified to
-# exist), else prefer the full-CRM dashboard, else the OSS crm-starter one. Without
-# this the dashboard-default seed spec defaults to `crm_dashboard`, which the OSS
-# `demo` profile never imports (only `crm_overview`), so it dies "Dashboard not
-# found: crm_dashboard" and the whole gate reports environment-invalid.
+# exist), otherwise require the official CRM dashboard. This fails loudly when
+# the product profile drifts away from the canonical public CRM package.
 resolve_default_dashboard() {
   if [[ -n "${SHOWCASE_DEFAULT_DASHBOARD_CODE:-}" ]]; then
     dashboard_exists "$SHOWCASE_DEFAULT_DASHBOARD_CODE" \
       || die_env "SHOWCASE_DEFAULT_DASHBOARD_CODE=$SHOWCASE_DEFAULT_DASHBOARD_CODE is not imported into ab_dashboard"
     return
   fi
-  if dashboard_exists crm_dashboard; then
-    export SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_dashboard
-  elif dashboard_exists crm_overview; then
-    export SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_overview
-  else
-    die_env "no CRM dashboard imported (expected crm_dashboard [full CRM] or crm_overview [OSS crm-starter]) — the dashboard-default seed cannot resolve a target"
-  fi
+  dashboard_exists crm_dashboard \
+    || die_env "official CRM dashboard is not imported (expected crm_dashboard)"
+  export SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_dashboard
 }
 
 while [[ $# -gt 0 ]]; do
@@ -247,8 +241,8 @@ eval "$("$GS" env "$NAME")" || die_env "could not resolve stack env for '$NAME'"
 log "    base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL bff=$BFF_PORT (AGENT_LLM_STUB_MODE=$AGENT_LLM_STUB_MODE)"
 
 # Resolve the demo default dashboard BEFORE seeding (the finalization phase reads
-# SHOWCASE_DEFAULT_DASHBOARD_CODE). For the OSS demo profile this lands on
-# crm_overview; the enterprise crm_dashboard would only be chosen if imported.
+# SHOWCASE_DEFAULT_DASHBOARD_CODE). The OSS demo profile imports the official
+# public CRM and therefore resolves to crm_dashboard.
 resolve_default_dashboard
 export SHOWCASE_DEFAULT_DASHBOARD_CODE
 log "    default dashboard target: $SHOWCASE_DEFAULT_DASHBOARD_CODE"

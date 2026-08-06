@@ -4781,7 +4781,7 @@ CREATE TABLE IF NOT EXISTS ab_agent_definition (
   -- Agent identity & scope
   system_user_id     BIGINT,                        -- FK to ab_user (user_type=SYSTEM_AGENT) for created_by/updated_by attribution
   service_account_id BIGINT,                        -- Dedicated user account for RBAC (NULL = run as caller)
-  allowed_models     JSONB,                          -- Model codes this agent can access: ["crm_lead","crm_opportunity"], "*" = all
+  allowed_models     JSONB,                          -- Model codes this agent can access: ["crm_lead_common","crm_opportunity_common"], "*" = all
   allowed_operations JSONB DEFAULT '["query","create","update","delete","transition"]', -- Allowed op types
   max_tools          INTEGER DEFAULT 20,             -- Max tools loaded per run (prevent API explosion)
   max_concurrent_runs INTEGER NOT NULL DEFAULT 3,    -- Max simultaneous runs for this agent
@@ -6675,15 +6675,15 @@ COMMENT ON TABLE ab_agent_user_soul_profile_admin_action IS
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- Fuzzy / exact indexes on CRM Lead dynamic table for deduplication.
--- mt_crm_lead is created at runtime when the CRM plugin is imported,
+-- mt_crm_lead_common is created at runtime when the CRM plugin is imported,
 -- so these indexes are conditional on the table existing.
 DO $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'mt_crm_lead') THEN
-        CREATE INDEX IF NOT EXISTS idx_lead_company_trgm ON mt_crm_lead USING gin (crm_lead_company gin_trgm_ops);
-        CREATE INDEX IF NOT EXISTS idx_lead_name_trgm    ON mt_crm_lead USING gin (crm_lead_contact_name gin_trgm_ops);
-        CREATE INDEX IF NOT EXISTS idx_lead_email        ON mt_crm_lead (lower(crm_lead_contact_email));
-        CREATE INDEX IF NOT EXISTS idx_lead_phone        ON mt_crm_lead (crm_lead_contact_phone);
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'mt_crm_lead_common') THEN
+        CREATE INDEX IF NOT EXISTS idx_lead_company_trgm ON mt_crm_lead_common USING gin (crm_lead_company gin_trgm_ops);
+        CREATE INDEX IF NOT EXISTS idx_lead_name_trgm    ON mt_crm_lead_common USING gin (crm_lead_contact_name gin_trgm_ops);
+        CREATE INDEX IF NOT EXISTS idx_lead_email        ON mt_crm_lead_common (lower(crm_lead_contact_email));
+        CREATE INDEX IF NOT EXISTS idx_lead_phone        ON mt_crm_lead_common (crm_lead_contact_phone);
     END IF;
 END $$;
 
@@ -6959,15 +6959,15 @@ CREATE TABLE IF NOT EXISTS ab_semantic_term (
 
 -- Seed: object aliases (platform built-in, tenant_id = -1)
 INSERT INTO ab_object_alias (pid, tenant_id, model_code, alias, language) VALUES
-('01SEED_OA_CRM_ACC_01', -1, 'crm_account', '客户', 'zh-CN'),
-('01SEED_OA_CRM_ACC_02', -1, 'crm_account', '甲方', 'zh-CN'),
-('01SEED_OA_CRM_LEAD01', -1, 'crm_lead', '线索', 'zh-CN'),
-('01SEED_OA_CRM_LEAD02', -1, 'crm_lead', '潜在客户', 'zh-CN'),
-('01SEED_OA_CRM_CONT01', -1, 'crm_contact', '联系人', 'zh-CN'),
-('01SEED_OA_CRM_OPP_01', -1, 'crm_opportunity', '商机', 'zh-CN'),
-('01SEED_OA_CRM_OPP_02', -1, 'crm_opportunity', '机会', 'zh-CN'),
-('01SEED_OA_CRM_ACT_01', -1, 'crm_activity', '活动', 'zh-CN'),
-('01SEED_OA_CRM_ACT_02', -1, 'crm_activity', '跟进记录', 'zh-CN'),
+('01SEED_OA_CRM_ACC_01', -1, 'crm_account_common', '客户', 'zh-CN'),
+('01SEED_OA_CRM_ACC_02', -1, 'crm_account_common', '甲方', 'zh-CN'),
+('01SEED_OA_CRM_LEAD01', -1, 'crm_lead_common', '线索', 'zh-CN'),
+('01SEED_OA_CRM_LEAD02', -1, 'crm_lead_common', '潜在客户', 'zh-CN'),
+('01SEED_OA_CRM_CONT01', -1, 'crm_contact_common', '联系人', 'zh-CN'),
+('01SEED_OA_CRM_OPP_01', -1, 'crm_opportunity_common', '商机', 'zh-CN'),
+('01SEED_OA_CRM_OPP_02', -1, 'crm_opportunity_common', '机会', 'zh-CN'),
+('01SEED_OA_CRM_ACT_01', -1, 'crm_activity_common', '活动', 'zh-CN'),
+('01SEED_OA_CRM_ACT_02', -1, 'crm_activity_common', '跟进记录', 'zh-CN'),
 ('01SEED_OA_CRM_QUO_01', -1, 'crm_quote', '报价单', 'zh-CN'),
 ('01SEED_OA_CRM_CMP_01', -1, 'crm_complaint', '投诉', 'zh-CN'),
 ('01SEED_OA_CRM_CAM_01', -1, 'crm_campaign', '营销活动', 'zh-CN'),
@@ -6982,8 +6982,8 @@ INSERT INTO ab_semantic_term (pid, tenant_id, term, model_code, language, term_t
 ('01SEED_ST_THISQ__0001', -1, '本季度', NULL, 'zh-CN', 'time_range', '{"range": "this_quarter", "field": "created_at"}', '当前季度'),
 ('01SEED_ST_TODAY__0001', -1, '今天', NULL, 'zh-CN', 'time_range', '{"range": "today", "field": "created_at"}', '今天'),
 ('01SEED_ST_THISW__0001', -1, '本周', NULL, 'zh-CN', 'time_range', '{"range": "this_week", "field": "created_at"}', '本周'),
-('01SEED_ST_ACTACC_0001', -1, '活跃客户', 'crm_account', 'zh-CN', 'filter', '{"conditions": [{"field": "updated_at", "op": ">=", "value": "$30d_ago"}], "logic": "AND"}', '近 30 天有更新'),
-('01SEED_ST_HIRISK_0001', -1, '高风险线索', 'crm_lead', 'zh-CN', 'filter', '{"conditions": [{"field": "crm_lead_status", "op": "=", "value": "new"}], "logic": "AND"}', '状态为 new 的线索')
+('01SEED_ST_ACTACC_0001', -1, '活跃客户', 'crm_account_common', 'zh-CN', 'filter', '{"conditions": [{"field": "updated_at", "op": ">=", "value": "$30d_ago"}], "logic": "AND"}', '近 30 天有更新'),
+('01SEED_ST_HIRISK_0001', -1, '高风险线索', 'crm_lead_common', 'zh-CN', 'filter', '{"conditions": [{"field": "crm_lead_status", "op": "=", "value": "new"}], "logic": "AND"}', '状态为 new 的线索')
 ON CONFLICT DO NOTHING;
 
 ALTER TABLE ab_agent_skill

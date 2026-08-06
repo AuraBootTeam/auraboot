@@ -7,7 +7,7 @@ export interface Suggestion {
 
 const CONTEXT_SUGGESTIONS: Record<string, Suggestion[]> = {
   // CRM
-  'detail:crm_lead': [
+  'detail:crm_lead_common': [
     {
       icon: '📊',
       label: 'Summarize lead',
@@ -33,7 +33,7 @@ const CONTEXT_SUGGESTIONS: Record<string, Suggestion[]> = {
       prompt: '为这个线索创建一个跟进任务',
     },
   ],
-  'detail:crm_opportunity': [
+  'detail:crm_opportunity_common': [
     {
       icon: '📊',
       label: 'Deal summary',
@@ -62,7 +62,7 @@ const CONTEXT_SUGGESTIONS: Record<string, Suggestion[]> = {
     },
     { icon: '✉️', label: 'Draft response', labelZh: '生成回复', prompt: '生成一封专业的客户回复' },
   ],
-  'list:crm_lead': [
+  'list:crm_lead_common': [
     {
       icon: '📊',
       label: 'Lead analysis',

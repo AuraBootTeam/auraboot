@@ -24,7 +24,7 @@ class ChatToolExecutorToolNameMappingTest {
     @Test
     void execute_usesExactDiscoveredProviderToolCode() {
         GroundingPort groundingPort = (tenantId, userMessage, pageModel, recordId) ->
-                new GroundingPort.GroundingResult("create", "crm_lead", 0.9, List.of(), false);
+                new GroundingPort.GroundingResult("create", "crm_lead_common", 0.9, List.of(), false);
         AtomicReference<String> executedToolCode = new AtomicReference<>();
         ToolDiscoveryPort toolDiscoveryPort = new ToolDiscoveryPort() {
             @Override
@@ -48,7 +48,7 @@ class ChatToolExecutorToolNameMappingTest {
         ChatToolResolver resolver = new ChatToolResolver(groundingPort, toolDiscoveryPort, null);
         MetaContext.setSystemTenantContext(1L);
         try {
-            resolver.resolveTools("list high-score leads", "crm_lead", null, null);
+            resolver.resolveTools("list high-score leads", "crm_lead_common", null, null);
         } finally {
             MetaContext.clear();
         }
@@ -69,7 +69,7 @@ class ChatToolExecutorToolNameMappingTest {
         MetaContext.setSystemTenantContext(1L);
         Map<String, Object> result;
         try {
-            result = executor.execute("cmd_crm_list_leads", Map.of(), "crm_lead");
+            result = executor.execute("cmd_crm_list_leads", Map.of(), "crm_lead_common");
         } finally {
             MetaContext.clear();
         }

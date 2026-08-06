@@ -186,7 +186,7 @@ public class AgentEventDispatchService {
      * <pre>
      * {
      *   "triggers": [
-     *     {"eventType": "entity_status_changed", "modelCode": "crm_lead", "condition": "newStatus=QUALIFIED"},
+     *     {"eventType": "entity_status_changed", "modelCode": "crm_lead_common", "condition": "newStatus=QUALIFIED"},
      *     {"eventType": "record_created", "modelCode": "crm_complaint"}
      *   ]
      * }

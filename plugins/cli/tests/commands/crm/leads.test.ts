@@ -36,8 +36,8 @@ describe('crm leads command', () => {
     });
 
     it('should use correct page key', () => {
-      const pageKey = 'crm_lead';
-      expect(pageKey).toBe('crm_lead');
+      const pageKey = 'crm_lead_common';
+      expect(pageKey).toBe('crm_lead_common');
     });
   });
 

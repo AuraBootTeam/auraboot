@@ -1,0 +1,60 @@
+{
+  "pageKey": "crm_journey_form",
+  "name:zh-CN": "旅程表单",
+  "name:en": "旅程表单",
+  "modelCode": "crm_journey",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "旅程信息",
+        "en": "Journey"
+      },
+      "fields": [
+        {
+          "field": "crm_jny_name",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_jny_total_steps",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_jny_description",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_jny_step_delay_minutes",
+          "colSpan": 6
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

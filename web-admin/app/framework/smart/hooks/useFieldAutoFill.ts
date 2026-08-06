@@ -14,7 +14,7 @@
  *     "autoFill": {
  *       "trigger": "onChange",
  *       "source": {
- *         "modelCode": "crm_account",
+ *         "modelCode": "crm_account_common",
  *         "recordPidField": "crm_opp_account_id"
  *       },
  *       "mappings": [
@@ -46,7 +46,7 @@ export interface AutoFillConfig {
   trigger: 'onChange';
   /** Source record to look up */
   source: {
-    /** Model code of the referenced entity, e.g. "crm_account" */
+    /** Model code of the referenced entity, e.g. "crm_account_common" */
     modelCode: string;
     /** Field code whose value is the record pid to look up */
     recordPidField: string;

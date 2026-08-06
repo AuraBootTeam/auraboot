@@ -1,0 +1,72 @@
+[
+  {
+    "code": "crm:create_sla_policy",
+    "displayName:zh-CN": "新建SLA策略",
+    "displayName:en": "Create SLA Policy",
+    "type": "create",
+    "modelCode": "crm_sla_policy",
+    "inputFields": [
+      "crm_sla_name",
+      "crm_sla_priority_level",
+      "crm_sla_response_time_hours",
+      "crm_sla_resolution_time_hours",
+      "crm_sla_escalation_after_hours",
+      "crm_sla_is_active",
+      "crm_sla_description"
+    ],
+    "permissions": [
+      "crm.sla.manage"
+    ],
+    "agent_hint": "Create a new SLA policy. Key inputs: name, priority, response/resolution hours.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_sla_policy",
+    "displayName:zh-CN": "编辑SLA策略",
+    "displayName:en": "Update SLA Policy",
+    "type": "update",
+    "modelCode": "crm_sla_policy",
+    "inputFields": [
+      "crm_sla_name",
+      "crm_sla_priority_level",
+      "crm_sla_response_time_hours",
+      "crm_sla_resolution_time_hours",
+      "crm_sla_escalation_after_hours",
+      "crm_sla_is_active",
+      "crm_sla_description"
+    ],
+    "permissions": [
+      "crm.sla.manage"
+    ],
+    "agent_hint": "Update SLA policy details.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_sla_policy",
+    "displayName:zh-CN": "删除SLA策略",
+    "displayName:en": "Delete SLA Policy",
+    "type": "delete",
+    "modelCode": "crm_sla_policy",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此SLA策略？",
+      "confirmMessage:en": "Confirm delete this SLA policy?"
+    },
+    "permissions": [
+      "crm.sla.manage"
+    ],
+    "agent_hint": "Delete an SLA policy. This is irreversible.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:list_sla_policies",
+    "displayName:zh-CN": "SLA策略列表",
+    "displayName:en": "List SLA Policies",
+    "type": "query",
+    "modelCode": "crm_sla_policy",
+    "permissions": [
+      "crm.sla.read"
+    ],
+    "agent_hint": "Query SLA policy records.",
+    "cmd_risk_level": "L0"
+  }
+]

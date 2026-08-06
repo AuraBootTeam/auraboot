@@ -1,0 +1,50 @@
+[
+  {
+    "code": "crm_sb_complaint_id",
+    "displayName:zh-CN": "投诉",
+    "displayName:en": "Complaint",
+    "dataType": "reference",
+    "referenceModelCode": "crm_complaint",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_sb_policy_id",
+    "displayName:zh-CN": "SLA策略",
+    "displayName:en": "SLA Policy",
+    "dataType": "reference",
+    "referenceModelCode": "crm_sla_policy",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_sb_breach_type",
+    "displayName:zh-CN": "违规类型",
+    "displayName:en": "Breach Type",
+    "dataType": "enum",
+    "dictCode": "crm_sla_breach_type",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_sb_breached_at",
+    "displayName:zh-CN": "违规时间",
+    "displayName:en": "Breached At",
+    "dataType": "datetime",
+    "constraints": { "required": true },
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_sb_notified",
+    "displayName:zh-CN": "已通知",
+    "displayName:en": "Notified",
+    "dataType": "boolean",
+    "defaultValue": "false"
+  },
+  {
+    "code": "crm_sb_remark",
+    "displayName:zh-CN": "备注",
+    "displayName:en": "Remark",
+    "dataType": "text"
+  }
+]

@@ -122,7 +122,7 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     // Intercept the list API so we can control timing observations
     let listCallCount = 0;
     page.on('response', (resp) => {
-      if (resp.url().includes('/api/dynamic/crm_lead') && resp.url().includes('/list')) {
+      if (resp.url().includes('/api/dynamic/crm_lead_common') && resp.url().includes('/list')) {
         listCallCount++;
       }
     });
@@ -130,12 +130,12 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     // Set up the response promise BEFORE navigating so we don't miss it
     const listApiPromise = page.waitForResponse(
       (r) =>
-        (r.url().includes('/api/dynamic/crm_lead') || r.url().includes('/api/dynamic/crm_lead')) &&
+        (r.url().includes('/api/dynamic/crm_lead_common') || r.url().includes('/api/dynamic/crm_lead_common')) &&
         r.status() === 200,
       { timeout: 25_000 },
     );
 
-    await navigateToCrmPageViaMenu(page, 'crm_lead');
+    await navigateToCrmPageViaMenu(page, 'crm_lead_common');
 
     // Layer 1 (Render): immediately check for skeleton OR loading spinner
     // The skeleton appears briefly — we check as early as possible
@@ -177,7 +177,7 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
 
   test('ULS-002: List page — loading indicator inside table while fetching', async ({ page }) => {
     // Navigate to CRM Lead page
-    await navigateToCrmPageViaMenu(page, 'crm_lead');
+    await navigateToCrmPageViaMenu(page, 'crm_lead_common');
 
     // Wait for the page URL to settle
     await page.waitForURL(/\/p\/crm[_-]lead/, { timeout: 15_000 });
@@ -186,8 +186,8 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     await page
       .waitForResponse(
         (r) =>
-          (r.url().includes('/api/dynamic/crm_lead') ||
-            r.url().includes('/api/dynamic/crm_lead')) &&
+          (r.url().includes('/api/dynamic/crm_lead_common') ||
+            r.url().includes('/api/dynamic/crm_lead_common')) &&
           r.status() === 200,
         { timeout: 15_000 },
       )
@@ -219,12 +219,12 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     // Fresh page load to ensure we go through the full loading cycle
     const listResponsePromise = page.waitForResponse(
       (r) =>
-        (r.url().includes('/api/dynamic/crm_lead') || r.url().includes('/api/dynamic/crm_lead')) &&
+        (r.url().includes('/api/dynamic/crm_lead_common') || r.url().includes('/api/dynamic/crm_lead_common')) &&
         r.status() === 200,
       { timeout: 20_000 },
     );
 
-    await navigateToCrmPageViaMenu(page, 'crm_lead');
+    await navigateToCrmPageViaMenu(page, 'crm_lead_common');
     await listResponsePromise;
 
     // Wait for data to stabilize
@@ -252,14 +252,14 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
   // -------------------------------------------------------------------------
 
   test('ULS-004: Applying search keyword shows loading then updated results', async ({ page }) => {
-    await navigateToCrmPageViaMenu(page, 'crm_lead');
+    await navigateToCrmPageViaMenu(page, 'crm_lead_common');
 
     // Wait for initial load
     await page
       .waitForResponse(
         (r) =>
-          (r.url().includes('/api/dynamic/crm_lead') ||
-            r.url().includes('/api/dynamic/crm_lead')) &&
+          (r.url().includes('/api/dynamic/crm_lead_common') ||
+            r.url().includes('/api/dynamic/crm_lead_common')) &&
           r.status() === 200,
         { timeout: 15_000 },
       )
@@ -278,14 +278,14 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
 
     const hasSearch = await searchInput.isVisible({ timeout: 5_000 }).catch(() => false);
     if (!hasSearch) {
-      test.skip(true, 'ULS-004: no search input found on crm_lead list — skipping');
+      test.skip(true, 'ULS-004: no search input found on crm_lead_common list — skipping');
       return;
     }
 
     // Intercept next list API call
     const searchResponsePromise = page.waitForResponse(
       (r) =>
-        (r.url().includes('/api/dynamic/crm_lead') || r.url().includes('/api/dynamic/crm_lead')) &&
+        (r.url().includes('/api/dynamic/crm_lead_common') || r.url().includes('/api/dynamic/crm_lead_common')) &&
         r.status() === 200,
       { timeout: 10_000 },
     );
@@ -308,8 +308,8 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     await page
       .waitForResponse(
         (r) =>
-          (r.url().includes('/api/dynamic/crm_lead') ||
-            r.url().includes('/api/dynamic/crm_lead')) &&
+          (r.url().includes('/api/dynamic/crm_lead_common') ||
+            r.url().includes('/api/dynamic/crm_lead_common')) &&
           r.status() === 200,
         { timeout: 10_000 },
       )
@@ -342,7 +342,7 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     await crmBtn.evaluate((el: HTMLElement) => el.click());
     await page.waitForResponse(() => true, { timeout: 1_500 }).catch(() => null);
 
-    const hrefPath = '/p/crm_lead';
+    const hrefPath = '/p/crm_lead_common';
     const leafLink = nav.locator(`a[href="${hrefPath}"]`).first();
     await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
     await leafLink.evaluate((el: HTMLElement) => el.click());
@@ -354,8 +354,8 @@ test.describe('UX Loading States — Skeleton and Spinner Behavior', () => {
     await page
       .waitForResponse(
         (r) =>
-          (r.url().includes('/api/dynamic/crm_lead') ||
-            r.url().includes('/api/dynamic/crm_lead')) &&
+          (r.url().includes('/api/dynamic/crm_lead_common') ||
+            r.url().includes('/api/dynamic/crm_lead_common')) &&
           r.status() === 200,
         { timeout: 20_000 },
       )

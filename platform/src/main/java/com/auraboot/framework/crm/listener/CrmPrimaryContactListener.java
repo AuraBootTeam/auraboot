@@ -12,7 +12,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import java.util.Set;
 
 /**
- * Ensures crm_contact respects the "single primary contact per account" rule
+ * Ensures crm_contact_common respects the "single primary contact per account" rule
  * after command writes commit successfully.
  */
 @Slf4j
@@ -30,7 +30,7 @@ public class CrmPrimaryContactListener {
         if (event == null) {
             return;
         }
-        if (!"crm_contact".equals(event.getModelCode())) {
+        if (!"crm_contact_common".equals(event.getModelCode())) {
             return;
         }
         String operationType = event.getOperationType();

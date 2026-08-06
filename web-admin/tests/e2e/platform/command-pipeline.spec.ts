@@ -34,7 +34,7 @@ test.describe('Command Pipeline Stages', () => {
     accountPid = result.recordId;
 
     // Fetch the record to verify auto-generated code
-    const resp = await page.request.get(`/api/dynamic/crm_account/${accountPid}`);
+    const resp = await page.request.get(`/api/dynamic/crm_account_common/${accountPid}`);
     const body = await resp.json();
     const record = body?.data;
 
@@ -77,7 +77,7 @@ test.describe('Command Pipeline Stages', () => {
     opportunityPid = result.recordId;
 
     // Verify default stage
-    const resp = await page.request.get(`/api/dynamic/crm_opportunity/${opportunityPid}`);
+    const resp = await page.request.get(`/api/dynamic/crm_opportunity_common/${opportunityPid}`);
     const body = await resp.json();
     expect(body?.data?.crm_opp_stage).toBe('discovery');
     expect(body?.data?.crm_opp_code).toMatch(/^OPP-\d{8}-\d+$/);
@@ -97,7 +97,7 @@ test.describe('Command Pipeline Stages', () => {
     expect(qualResult.code).toBe('0');
 
     // Verify stage changed
-    const resp = await page.request.get(`/api/dynamic/crm_opportunity/${opportunityPid}`);
+    const resp = await page.request.get(`/api/dynamic/crm_opportunity_common/${opportunityPid}`);
     const body = await resp.json();
     expect(body?.data?.crm_opp_stage).toBe('qualification');
 
@@ -131,25 +131,25 @@ test.describe('Command Pipeline Stages', () => {
     const leadPid = createResult.recordId;
 
     // Verify initial status = new
-    let resp = await page.request.get(`/api/dynamic/crm_lead/${leadPid}`);
+    let resp = await page.request.get(`/api/dynamic/crm_lead_common/${leadPid}`);
     let body = await resp.json();
     expect(body?.data?.crm_lead_status).toBe('new');
 
     // new → contacted
     await executeCommandViaApi(page, 'crm:contact_lead', {}, leadPid, 'update');
-    resp = await page.request.get(`/api/dynamic/crm_lead/${leadPid}`);
+    resp = await page.request.get(`/api/dynamic/crm_lead_common/${leadPid}`);
     body = await resp.json();
     expect(body?.data?.crm_lead_status).toBe('contacted');
 
     // contacted → qualified
     await executeCommandViaApi(page, 'crm:qualify_lead', {}, leadPid, 'update');
-    resp = await page.request.get(`/api/dynamic/crm_lead/${leadPid}`);
+    resp = await page.request.get(`/api/dynamic/crm_lead_common/${leadPid}`);
     body = await resp.json();
     expect(body?.data?.crm_lead_status).toBe('qualified');
 
     // qualified → converted
     await executeCommandViaApi(page, 'crm:convert_lead', {}, leadPid, 'update');
-    resp = await page.request.get(`/api/dynamic/crm_lead/${leadPid}`);
+    resp = await page.request.get(`/api/dynamic/crm_lead_common/${leadPid}`);
     body = await resp.json();
     expect(body?.data?.crm_lead_status).toBe('converted');
 

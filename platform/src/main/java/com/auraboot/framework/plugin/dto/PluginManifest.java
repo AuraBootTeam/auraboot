@@ -257,7 +257,7 @@ public class PluginManifest {
     public static class CapabilityDeclaration {
         /** Capability type: model, command, query, automation, api. */
         private String type;
-        /** Capability code (e.g., crm_account, crm:create_lead). */
+        /** Capability code (e.g., crm_account_common, crm:create_lead). */
         private String code;
     }
 

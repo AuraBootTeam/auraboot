@@ -1,0 +1,75 @@
+{
+  "pageKey": "crm_sla_policy_form",
+  "name:zh-CN": "SLA策略表单",
+  "name:en": "SLA Policy Form",
+  "modelCode": "crm_sla_policy",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "SLA策略信息",
+        "en-US": "SLA Policy Information"
+      },
+      "fields": [
+        {
+          "field": "crm_sla_name",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_sla_priority_level",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_sla_response_time_hours",
+          "colSpan": 4,
+          "required": true
+        },
+        {
+          "field": "crm_sla_resolution_time_hours",
+          "colSpan": 4,
+          "required": true
+        },
+        {
+          "field": "crm_sla_escalation_after_hours",
+          "colSpan": 4
+        },
+        {
+          "field": "crm_sla_is_active",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_sla_description",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

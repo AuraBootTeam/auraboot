@@ -51,7 +51,7 @@ class PermissionAuditTraceIntegrationTest extends BaseIntegrationTest {
         MetaContext.setOtelTraceId(TRACE_ID);
         PermissionExplanation denial = new PermissionExplanation(
                 42L,
-                "crm_account",
+                "crm_account_common",
                 "delete",
                 null,
                 "ACCOUNT-1",
@@ -71,7 +71,7 @@ class PermissionAuditTraceIntegrationTest extends BaseIntegrationTest {
                                     + "WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 1",
                             tenantId);
                     assertThat(row.get("trace_id")).isEqualTo(TRACE_ID);
-                    assertThat(row.get("resource_code")).isEqualTo("crm_account");
+                    assertThat(row.get("resource_code")).isEqualTo("crm_account_common");
                     assertThat(row.get("action_code")).isEqualTo("delete");
                 });
     }

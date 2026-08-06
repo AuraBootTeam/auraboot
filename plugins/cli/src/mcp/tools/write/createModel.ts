@@ -54,7 +54,7 @@ const inputSchema = z.object({
     .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, {
       message: 'Model code must start with a letter; letters, digits, underscore only.',
     })
-    .describe('Unique model code in the tenant. Convention: <plugin_namespace>_<entity>, e.g. crm_lead, hr_leave_request.'),
+    .describe('Unique model code in the tenant. Convention: <plugin_namespace>_<entity>, e.g. crm_lead_common, hr_leave_request.'),
   displayName: z
     .string()
     .min(1)

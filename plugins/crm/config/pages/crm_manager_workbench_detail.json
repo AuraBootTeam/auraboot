@@ -1,0 +1,395 @@
+{
+  "pageKey": "crm_manager_workbench_detail",
+  "name:zh-CN": "经理复盘",
+  "name:en": "Manager Review",
+  "modelCode": "crm_customer_request_common",
+  "description": "Manager review detail for one customer request, including quote summary, approval cases, and direct collaboration tasks.",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "extension": {
+    "showShare": false,
+    "showReport": false,
+    "showPrint": false,
+    "showEdit": false
+  },
+  "blocks": [
+    {
+      "id": "crm_manager_workbench_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "back_to_manager_queue",
+          "icon": "ListChecks",
+          "permissionCode": "crm.customer_request.read",
+          "label": {
+            "zh-CN": "经理队列",
+            "en-US": "Manager Queue"
+          },
+          "action": {
+            "type": "navigate",
+            "to": "/p/crm_manager_workbench"
+          }
+        },
+        {
+          "code": "open_pipeline_board",
+          "icon": "ChartNoAxesCombined",
+          "permissionCode": "crm.opportunity.read",
+          "label": {
+            "zh-CN": "Pipeline Review",
+            "en-US": "Pipeline Review"
+          },
+          "action": {
+            "type": "navigate",
+            "to": "/p/crm_opportunity_common"
+          }
+        },
+        {
+          "code": "open_approval_cases",
+          "icon": "ShieldCheck",
+          "permissionCode": "crm.approval_case.read",
+          "label": {
+            "zh-CN": "审批中心",
+            "en-US": "Approval Cases"
+          },
+          "action": {
+            "type": "navigate",
+            "to": "/p/crm_approval_case_common"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_manager_workbench_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "overview",
+          "label": {
+            "zh-CN": "概览",
+            "en-US": "Overview"
+          },
+          "blocks": [
+            {
+              "id": "crm_manager_request_facts",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "客户需求事实",
+                "en-US": "Customer Request Facts"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "crm_cr_code",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_title",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_account_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_opportunity_id",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_type",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_priority",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_route_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_expected_date",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_owner",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_cr_summary",
+                  "readOnly": true,
+                  "span": 2
+                },
+                {
+                  "field": "crm_cr_route_error",
+                  "readOnly": true,
+                  "span": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "quote_summaries",
+          "label": {
+            "zh-CN": "报价摘要",
+            "en-US": "Quote Summaries"
+          },
+          "blocks": [
+            {
+              "id": "crm_manager_quote_summaries",
+              "blockType": "sub-table",
+              "title": {
+                "zh-CN": "关联报价摘要",
+                "en-US": "Related Quote Summaries"
+              },
+              "subTable": {
+                "childModel": "crm_quote_summary_common",
+                "parentField": "crm_qs_customer_request_id",
+                "readOnly": true,
+                "actions": [
+                  {
+                    "code": "open_quote_summary",
+                    "label": {
+                      "zh-CN": "打开摘要",
+                      "en-US": "Open Summary"
+                    },
+                    "action": {
+                      "type": "navigate",
+                      "to": "crm_quote_summary_common_detail"
+                    }
+                  }
+                ],
+                "columns": [
+                  {
+                    "field": "crm_qs_code",
+                    "width": 150
+                  },
+                  {
+                    "field": "crm_qs_status",
+                    "width": 120,
+                    "renderType": "tag",
+                    "dictCode": "crm_quote_summary_status"
+                  },
+                  {
+                    "field": "crm_qs_quote_amount",
+                    "width": 140,
+                    "align": "right"
+                  },
+                  {
+                    "field": "crm_qs_currency",
+                    "width": 100,
+                    "renderType": "tag",
+                    "dictCode": "crm_currency_code"
+                  },
+                  {
+                    "field": "crm_qs_valid_until",
+                    "width": 120
+                  },
+                  {
+                    "field": "crm_qs_approval_status",
+                    "width": 120,
+                    "renderType": "tag",
+                    "dictCode": "crm_quote_summary_approval_status"
+                  },
+                  {
+                    "field": "crm_qs_customer_feedback_status",
+                    "width": 140,
+                    "renderType": "tag",
+                    "dictCode": "crm_quote_summary_feedback_status"
+                  },
+                  {
+                    "field": "crm_qs_won_lost_result",
+                    "width": 120,
+                    "renderType": "tag",
+                    "dictCode": "crm_quote_summary_result"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "key": "approval_cases",
+          "label": {
+            "zh-CN": "审批事项",
+            "en-US": "Approval Cases"
+          },
+          "blocks": [
+            {
+              "id": "crm_manager_approval_cases",
+              "blockType": "sub-table",
+              "title": {
+                "zh-CN": "关联审批事项",
+                "en-US": "Related Approval Cases"
+              },
+              "subTable": {
+                "childModel": "crm_approval_case_common",
+                "parentField": "crm_apc_customer_request_id",
+                "readOnly": true,
+                "actions": [
+                  {
+                    "code": "open_approval_case",
+                    "label": {
+                      "zh-CN": "打开审批",
+                      "en-US": "Open Approval"
+                    },
+                    "action": {
+                      "type": "navigate",
+                      "to": "crm_approval_case_common_detail"
+                    }
+                  }
+                ],
+                "columns": [
+                  {
+                    "field": "crm_apc_code",
+                    "width": 150
+                  },
+                  {
+                    "field": "crm_apc_subject",
+                    "width": 220
+                  },
+                  {
+                    "field": "crm_apc_domain",
+                    "width": 120,
+                    "renderType": "tag",
+                    "dictCode": "crm_approval_case_domain"
+                  },
+                  {
+                    "field": "crm_apc_case_type",
+                    "width": 140,
+                    "renderType": "tag",
+                    "dictCode": "crm_approval_case_type"
+                  },
+                  {
+                    "field": "crm_apc_status",
+                    "width": 120,
+                    "renderType": "tag",
+                    "dictCode": "crm_approval_case_status"
+                  },
+                  {
+                    "field": "crm_apc_priority",
+                    "width": 100,
+                    "renderType": "tag",
+                    "dictCode": "crm_approval_case_priority"
+                  },
+                  {
+                    "field": "crm_apc_amount",
+                    "width": 130,
+                    "align": "right"
+                  },
+                  {
+                    "field": "crm_apc_margin_pct",
+                    "width": 120,
+                    "align": "right"
+                  },
+                  {
+                    "field": "crm_apc_submitted_at",
+                    "width": 170
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "key": "tasks",
+          "label": {
+            "zh-CN": "协同任务",
+            "en-US": "Tasks"
+          },
+          "blocks": [
+            {
+              "id": "crm_manager_direct_tasks",
+              "blockType": "sub-table",
+              "title": {
+                "zh-CN": "直接关联任务",
+                "en-US": "Direct Tasks"
+              },
+              "subTable": {
+                "childModel": "crm_activity_common",
+                "parentField": "crm_act_related_id",
+                "dataSource": {
+                  "type": "api",
+                  "url": "/api/datasource/list",
+                  "method": "get",
+                  "params": {
+                    "datasourceId": "nq:crm_direct_tasks_by_related_object",
+                    "relatedModel": "crm_customer_request_common",
+                    "relatedId": "${recordId}",
+                    "format": "records"
+                  }
+                },
+                "readOnly": true,
+                "actions": [
+                  {
+                    "code": "start_task",
+                    "label": {
+                      "zh-CN": "开始",
+                      "en-US": "Start"
+                    },
+                    "action": {
+                      "type": "command",
+                      "command": "crm:start_task"
+                    }
+                  },
+                  {
+                    "code": "complete_task",
+                    "label": {
+                      "zh-CN": "完成",
+                      "en-US": "Complete"
+                    },
+                    "action": {
+                      "type": "command",
+                      "command": "crm:complete_task"
+                    }
+                  }
+                ],
+                "columns": [
+                  {
+                    "field": "crm_act_subject",
+                    "width": 240
+                  },
+                  {
+                    "field": "crm_act_status",
+                    "width": 120,
+                    "renderType": "tag",
+                    "dictCode": "crm_task_status"
+                  },
+                  {
+                    "field": "crm_act_priority",
+                    "width": 110,
+                    "renderType": "tag",
+                    "dictCode": "crm_task_priority"
+                  },
+                  {
+                    "field": "crm_act_due_date",
+                    "width": 130
+                  },
+                  {
+                    "field": "crm_act_assignee",
+                    "width": 140
+                  },
+                  {
+                    "field": "crm_act_owner",
+                    "width": 140
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "title": {
+    "zh-CN": "经理复盘",
+    "en": "Manager Review"
+  }
+}

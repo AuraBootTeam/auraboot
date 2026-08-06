@@ -8,7 +8,7 @@ const { recentVisits, rootLoaderData } = vi.hoisted(() => ({
       {
         title: '客户详情',
         path: '/p/crm_account_common/view/ACC-1',
-        modelCode: 'crm_account',
+        modelCode: 'crm_account_common',
         visitedAt: '2026-06-15T10:00:00.000Z',
       },
       {
@@ -52,7 +52,7 @@ describe('RecentWidget menu focus', () => {
       {
         title: '客户详情',
         path: '/p/crm_account_common/view/ACC-1',
-        modelCode: 'crm_account',
+        modelCode: 'crm_account_common',
         visitedAt: '2026-06-15T10:00:00.000Z',
       },
       {

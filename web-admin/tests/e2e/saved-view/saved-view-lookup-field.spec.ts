@@ -104,7 +104,7 @@ test.describe('Lookup Field Type (GAP-124)', () => {
     await page.locator('nav, [data-testid="sidebar"]').first().waitFor({ timeout: 15000 });
 
     // Test with CRM opportunity which has crm_opp_account_id REFERENCE
-    const data = await fetchList(page, 'crm_opportunity');
+    const data = await fetchList(page, 'crm_opportunity_common');
     // CRM may not be installed — skip gracefully
     if (!data || !data.records) {
       test.skip(true, 'CRM opportunity model not available');

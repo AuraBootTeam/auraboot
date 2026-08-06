@@ -1,0 +1,39 @@
+[
+  {
+    "code": "crm:create_attribution",
+    "displayName:zh-CN": "新建归因",
+    "displayName:en": "Create Attribution",
+    "type": "create",
+    "modelCode": "crm_attribution",
+    "inputFields": [
+      "crm_attr_deal_name",
+      "crm_attr_revenue",
+      "crm_attr_model",
+      "crm_attr_touchpoints"
+    ],
+    "autoSetFields": {
+      "crm_attr_code": {
+        "strategy": "auto_generate",
+        "pattern": "ATTR-{yyyyMMdd}-{seq}"
+      }
+    },
+    "permissions": [
+      "crm.attribution.manage"
+    ],
+    "agent_hint": "Create attribution run. touchpoints=JSON array of campaign ids; model first/last/linear.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:recompute_attribution",
+    "displayName:zh-CN": "重算归因",
+    "displayName:en": "Recompute Attribution",
+    "type": "custom",
+    "handler": "crm:recompute_attribution",
+    "modelCode": "crm_attribution",
+    "permissions": [
+      "crm.attribution.manage"
+    ],
+    "agent_hint": "Recompute per-campaign attributed revenue by model.",
+    "cmd_risk_level": "L1"
+  }
+]

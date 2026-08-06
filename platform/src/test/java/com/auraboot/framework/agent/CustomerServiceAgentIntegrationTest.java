@@ -39,7 +39,7 @@ import static org.awaitility.Awaitility.await;
  *
  * <p>Flow under test:
  * <ol>
- *   <li>Seed OSS CRM starter Account + Contact records</li>
+ *   <li>Seed official public CRM Account + Contact records</li>
  *   <li>Publish InboundEmailEvent → CustomerServiceAgentListener creates ab_agent_task → AgentRunService runs async</li>
  *   <li>Agent drafts a reply, triggers approval gate, and logs customer outreach as CRM activity</li>
  *   <li>Approve the pending reply → agent resumes and writes a sent notification log</li>
@@ -99,8 +99,8 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
 
     @BeforeAll
     void ensureCrmTables() {
-        ensureAccountTable("mt_crm_account");
-        ensureContactTable("mt_crm_contact");
+        ensureAccountTable("mt_crm_account_common");
+        ensureContactTable("mt_crm_contact_common");
         ensureActivityTable();
     }
 
@@ -182,7 +182,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
 
     private void ensureActivityTable() {
         jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS mt_crm_activity (
+                CREATE TABLE IF NOT EXISTS mt_crm_activity_common (
                     id BIGSERIAL PRIMARY KEY,
                     pid VARCHAR(64) UNIQUE NOT NULL,
                     tenant_id BIGINT NOT NULL,
@@ -198,16 +198,16 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
                     deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
                 )
                 """);
-        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS crm_act_type VARCHAR(64)");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS crm_act_subject VARCHAR(255)");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS crm_act_content TEXT");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS crm_act_date TIMESTAMPTZ");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS crm_act_owner VARCHAR(128)");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS created_by BIGINT");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS updated_by BIGINT");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
-        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS deleted_flag BOOLEAN NOT NULL DEFAULT FALSE");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity_common ADD COLUMN IF NOT EXISTS crm_act_type VARCHAR(64)");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity_common ADD COLUMN IF NOT EXISTS crm_act_subject VARCHAR(255)");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity_common ADD COLUMN IF NOT EXISTS crm_act_content TEXT");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity_common ADD COLUMN IF NOT EXISTS crm_act_date TIMESTAMPTZ");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity_common ADD COLUMN IF NOT EXISTS crm_act_owner VARCHAR(128)");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity_common ADD COLUMN IF NOT EXISTS created_by BIGINT");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity_common ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity_common ADD COLUMN IF NOT EXISTS updated_by BIGINT");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity_common ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity_common ADD COLUMN IF NOT EXISTS deleted_flag BOOLEAN NOT NULL DEFAULT FALSE");
     }
 
     // ========== Test 1: Seed CRM Account + Contact ==========
@@ -234,9 +234,9 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         accountData.put("crm_acc_status", "active");
         accountData.put("created_at", LocalDateTime.now());
         accountData.put("updated_at", LocalDateTime.now());
-        dynamicDataMapper.insert("mt_crm_account", accountData);
+        dynamicDataMapper.insert("mt_crm_account_common", accountData);
         accountRecordId = accountPid;
-        accountRowId = findRecordIdByPid("mt_crm_account", accountRecordId, tenantId);
+        accountRowId = findRecordIdByPid("mt_crm_account_common", accountRecordId, tenantId);
         log.info("Created test CRM Account: {}", accountRecordId);
         assertThat(accountRecordId).isNotNull();
         assertThat(accountRowId).isNotNull();
@@ -251,9 +251,9 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         contactData.put("crm_ct_account_id", accountRecordId);
         contactData.put("created_at", LocalDateTime.now());
         contactData.put("updated_at", LocalDateTime.now());
-        dynamicDataMapper.insert("mt_crm_contact", contactData);
+        dynamicDataMapper.insert("mt_crm_contact_common", contactData);
         contactRecordId = contactPid;
-        contactRowId = findRecordIdByPid("mt_crm_contact", contactRecordId, tenantId);
+        contactRowId = findRecordIdByPid("mt_crm_contact_common", contactRecordId, tenantId);
         log.info("Created test CRM Contact: {}", contactRecordId);
         assertThat(contactRecordId).isNotNull();
         assertThat(contactRowId).isNotNull();
@@ -335,7 +335,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
                 });
 
         // Log activity count for diagnostics; the real-LLM run may stop at the approval gate before resume.
-        String activitySql = "SELECT id, crm_act_subject FROM mt_crm_activity " +
+        String activitySql = "SELECT id, crm_act_subject FROM mt_crm_activity_common " +
                 "WHERE tenant_id = #{params.tenantId} " +
                 "ORDER BY created_at DESC LIMIT 5";
         List<Map<String, Object>> activities = dynamicDataMapper.selectByQuery(activitySql,
@@ -554,7 +554,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         agentDef.put("agent_type", "reactive");
         agentDef.put("model", null);
         agentDef.put("system_prompt", buildCsAgentSystemPrompt());
-        agentDef.put("tools", "[\"get:crm_account\",\"get:crm_contact\",\"list:crm_activity\",\"get:crm_activity\",\"cmd:crm:create_activity\",\"custom:send_customer_reply\"]");
+        agentDef.put("tools", "[\"get:crm_account_common\",\"get:crm_contact_common\",\"list:crm_activity_common\",\"get:crm_activity_common\",\"cmd:crm:create_activity\",\"custom:send_customer_reply\"]");
         agentDef.put("max_tools", 20);
         agentDef.put("max_concurrent_runs", 3);
         agentDef.put("execution_timeout_seconds", 300);
@@ -671,7 +671,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         agentDef.put("agent_type", "reactive");
         agentDef.put("model", null);
         agentDef.put("system_prompt", "You are a test agent. Analyze the request thoroughly.");
-        agentDef.put("tools", "[\"list:crm_activity\"]");
+        agentDef.put("tools", "[\"list:crm_activity_common\"]");
         agentDef.put("max_tools", 5);
         agentDef.put("max_concurrent_runs", 1);
         agentDef.put("execution_timeout_seconds", timeoutSeconds);
@@ -731,8 +731,8 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
                 You are a Customer Service Agent. When processing an inbound customer email:
 
                 1. Use the pre-resolved contact/account context when present. If a contact pid is available,
-                   look up the customer with get:crm_contact. If an account pid is available or found, use get:crm_account.
-                2. Review recent customer activity with list:crm_activity when useful.
+                   look up the customer with get:crm_contact_common. If an account pid is available or found, use get:crm_account_common.
+                2. Review recent customer activity with list:crm_activity_common when useful.
                 3. Draft a professional reply email addressing the customer's issue.
                 4. Use custom:send_customer_reply to send the reply email to the customer.
                    Parameters: recipient_email, reply_subject, reply_body, and related_record_id when known.

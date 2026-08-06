@@ -1,0 +1,78 @@
+{
+  "pageKey": "crm_sla_policy_detail",
+  "name:zh-CN": "SLA策略详情",
+  "name:en": "SLA Policy Detail",
+  "modelCode": "crm_sla_policy",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "section_basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "SLA策略信息",
+        "en-US": "SLA Policy Information"
+      },
+      "columns": 2,
+      "fields": [
+        {
+          "field": "crm_sla_name",
+          "readOnly": true
+        },
+        {
+          "field": "crm_sla_priority_level",
+          "readOnly": true
+        },
+        {
+          "field": "crm_sla_response_time_hours",
+          "readOnly": true
+        },
+        {
+          "field": "crm_sla_resolution_time_hours",
+          "readOnly": true
+        },
+        {
+          "field": "crm_sla_escalation_after_hours",
+          "readOnly": true
+        },
+        {
+          "field": "crm_sla_is_active",
+          "readOnly": true
+        },
+        {
+          "field": "crm_sla_description",
+          "span": 2,
+          "readOnly": true
+        }
+      ]
+    },
+    {
+      "id": "toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "icon": "Edit",
+          "permissionCode": "crm.sla.manage",
+          "label": "$i18n:common.button.edit",
+          "action": {
+            "type": "navigate",
+            "to": "crm_sla_policy_form"
+          }
+        },
+        {
+          "code": "delete",
+          "danger": true,
+          "label": "$i18n:common.button.delete",
+          "action": {
+            "type": "command"
+          },
+          "confirm": true
+        }
+      ]
+    }
+  ]
+}

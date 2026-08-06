@@ -1,0 +1,43 @@
+[
+  {
+    "code": "crm:create_session",
+    "displayName:zh-CN": "新建会话",
+    "displayName:en": "Create Session",
+    "type": "create",
+    "modelCode": "crm_omni_session",
+    "inputFields": [
+      "crm_oss_channel",
+      "crm_oss_customer",
+      "crm_oss_subject",
+      "crm_oss_vip"
+    ],
+    "autoSetFields": {
+      "crm_oss_code": {
+        "strategy": "auto_generate",
+        "pattern": "OSS-{yyyyMMdd}-{seq}"
+      },
+      "crm_oss_status": {
+        "strategy": "fixed_value",
+        "value": "open"
+      }
+    },
+    "permissions": [
+      "crm.omni.manage"
+    ],
+    "agent_hint": "Create an omnichannel session. Inputs: channel, customer, subject, vip.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:route_session",
+    "displayName:zh-CN": "路由会话",
+    "displayName:en": "Route Session",
+    "type": "custom",
+    "handler": "crm:route_session",
+    "modelCode": "crm_omni_session",
+    "permissions": [
+      "crm.omni.manage"
+    ],
+    "agent_hint": "Route session to queue + priority by channel/VIP (phone=urgent).",
+    "cmd_risk_level": "L1"
+  }
+]

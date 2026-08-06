@@ -51,13 +51,13 @@ class RecordCommentServiceTest {
     @Test
     @DisplayName("listComments on a registered model denies (before any query) when the record is not visible")
     void listComments_notVisible_deniesBeforeQuery() {
-        when(metaModelService.getModelDefinition("crm_lead"))
+        when(metaModelService.getModelDefinition("crm_lead_common"))
                 .thenReturn(Optional.of(mock(ModelDefinition.class)));
-        when(dynamicDataService.getById("crm_lead", "rec-1"))
+        when(dynamicDataService.getById("crm_lead_common", "rec-1"))
                 .thenThrow(new MetaServiceException(
                         "Access denied: you do not have permission to view this record"));
 
-        assertThatThrownBy(() -> service.listComments("crm_lead", "rec-1"))
+        assertThatThrownBy(() -> service.listComments("crm_lead_common", "rec-1"))
                 .isInstanceOf(MetaServiceException.class);
         // The comment table must never be queried once visibility is denied.
         verifyNoInteractions(jdbcTemplate);
@@ -66,12 +66,12 @@ class RecordCommentServiceTest {
     @Test
     @DisplayName("addComment on a registered model denies (before insert) when the record is not visible")
     void addComment_notVisible_deniesBeforeInsert() {
-        when(metaModelService.getModelDefinition("crm_lead"))
+        when(metaModelService.getModelDefinition("crm_lead_common"))
                 .thenReturn(Optional.of(mock(ModelDefinition.class)));
-        when(dynamicDataService.getById("crm_lead", "rec-1"))
+        when(dynamicDataService.getById("crm_lead_common", "rec-1"))
                 .thenThrow(new MetaServiceException("Access denied"));
 
-        assertThatThrownBy(() -> service.addComment("crm_lead", "rec-1", "secret comment", null))
+        assertThatThrownBy(() -> service.addComment("crm_lead_common", "rec-1", "secret comment", null))
                 .isInstanceOf(MetaServiceException.class);
         verifyNoInteractions(jdbcTemplate);
     }

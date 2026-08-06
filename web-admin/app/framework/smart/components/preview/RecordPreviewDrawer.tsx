@@ -27,7 +27,7 @@ import { buildApiEndpoint } from '~/routes/_shared/dynamic-route-utils';
 export interface RecordPreviewDrawerProps {
   /** Whether the drawer is open */
   open: boolean;
-  /** Model code (e.g., "crm_opportunity") */
+  /** Model code (e.g., "crm_opportunity_common") */
   modelCode: string;
   /** Record PID to preview */
   recordPid: string;

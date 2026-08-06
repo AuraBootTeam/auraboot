@@ -118,7 +118,7 @@ sync_public() {
     sync_file "${MONO_ROOT}/web-admin" "${dst}/web-admin"
 
     # Public plugins
-    sync_file "${MONO_ROOT}/plugins/crm-starter" "${dst}/plugins/crm-starter"
+    sync_file "${MONO_ROOT}/plugins/crm" "${dst}/plugins/crm"
     sync_file "${MONO_ROOT}/plugins/cli" "${dst}/plugins/cli"
     sync_file "${MONO_ROOT}/plugins/schemas" "${dst}/plugins/schemas"
     sync_file "${MONO_ROOT}/plugins/templates" "${dst}/plugins/templates"
@@ -169,7 +169,7 @@ sync_solutions() {
     # `test-fixtures` is an internal-only test-fixture plugin (provides
     # e2et_order / e2et_customer / e2et_payment for the E2E suite).
     # Intentionally excluded from both OSS and commercial distribution.
-    local public_plugins="crm-starter cli schemas templates scripts platform"
+    local public_plugins="crm cli schemas templates scripts platform"
     local internal_plugins="test-fixtures"
 
     for plugin_dir in "${MONO_ROOT}"/plugins/*/; do

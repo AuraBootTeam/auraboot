@@ -1,0 +1,86 @@
+{
+  "pageKey": "crm_consent_list",
+  "name:zh-CN": "同意记录",
+  "name:en": "Consent",
+  "modelCode": "crm_consent",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "filters",
+      "blockType": "filters",
+      "fields": [
+        {
+          "field": "crm_cns_channel"
+        },
+        {
+          "field": "crm_cns_status"
+        }
+      ]
+    },
+    {
+      "id": "toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "crm.consent.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_consent_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_cns_code"
+        },
+        {
+          "field": "crm_cns_channel",
+          "renderType": "tag",
+          "dictCode": "crm_consent_channel"
+        },
+        {
+          "field": "crm_cns_status",
+          "renderType": "tag",
+          "dictCode": "crm_consent_status"
+        },
+        {
+          "field": "crm_cns_source"
+        },
+        {
+          "field": "crm_cns_granted_at"
+        }
+      ],
+      "rowActions": [
+        {
+          "code": "grant",
+          "label": "$i18n:crm.consent.grant",
+          "permissionCode": "crm.consent.manage",
+          "action": {
+            "type": "command",
+            "command": "crm:grant_consent"
+          }
+        },
+        {
+          "code": "withdraw",
+          "label": "$i18n:crm.consent.withdraw",
+          "permissionCode": "crm.consent.manage",
+          "action": {
+            "type": "command",
+            "command": "crm:withdraw_consent"
+          }
+        }
+      ]
+    }
+  ]
+}

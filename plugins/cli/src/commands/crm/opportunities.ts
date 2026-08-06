@@ -40,7 +40,7 @@ export async function crmOpportunitiesCommand(options: OppOptions): Promise<void
     filters.push({ fieldName: 'crm_opp_stage', operator: 'EQ', value: options.stage.toLowerCase() });
   }
 
-  const records = await queryDynamicList(client, 'crm_opportunity', {
+  const records = await queryDynamicList(client, 'crm_opportunity_common', {
     pageSize: Number(options.limit) || 50,
     keyword: options.keyword,
     filters,

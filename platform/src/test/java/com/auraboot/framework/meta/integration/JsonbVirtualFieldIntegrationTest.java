@@ -24,8 +24,8 @@ class JsonbVirtualFieldIntegrationTest {
     // ── Test model: CRM Activity with two virtual fields stored in "crm_act_ext" ──
 
     private static final ModelDefinition CRM_ACTIVITY = ModelDefinition.builder()
-            .code("crm_activity")
-            .tableName("mt_crm_activity")
+            .code("crm_activity_common")
+            .tableName("mt_crm_activity_common")
             .fields(List.of(
                     FieldDefinition.builder()
                             .code("subject").dataType("string").columnName("subject").build(),

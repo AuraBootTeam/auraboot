@@ -14,7 +14,7 @@ public interface WatchService {
      * Toggle watch state for the current user on a record.
      * If already watching, unwatch; if not watching, start watching.
      *
-     * @param modelCode the model code (e.g. "crm_opportunity")
+     * @param modelCode the model code (e.g. "crm_opportunity_common")
      * @param recordId  the record ID
      * @return true if the user is now watching, false if unwatched
      */
@@ -24,7 +24,7 @@ public interface WatchService {
      * Toggle watch state for the current user on a public record PID.
      * Allows pid-only records that do not expose or require the legacy numeric ID.
      *
-     * @param modelCode the model code (e.g. "crm_opportunity")
+     * @param modelCode the model code (e.g. "crm_opportunity_common")
      * @param recordPid the public record PID
      * @return true if the user is now watching, false if unwatched
      */

@@ -31,7 +31,7 @@ public interface PluginSource {
     /**
      * Read a resource as an InputStream.
      *
-     * @param relativePath path relative to plugin root (e.g., "plugin.json", "models/crm_lead.json")
+     * @param relativePath path relative to plugin root (e.g., "plugin.json", "models/crm_lead_common.json")
      * @return input stream for the resource
      * @throws IOException if the resource cannot be read
      */

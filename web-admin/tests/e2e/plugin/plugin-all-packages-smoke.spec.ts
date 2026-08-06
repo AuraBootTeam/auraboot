@@ -38,7 +38,7 @@ const PLUGIN_CASES: PluginSmokeCase[] = [
     pluginOptionalWhenModelPublished: true,
   },
   { pluginId: 'com.auraboot.asset-management', pluginDir: 'asset-management', modelCode: 'asset' },
-  { pluginId: 'com.auraboot.crm', pluginDir: 'crm', modelCode: 'crm_lead' },
+  { pluginId: 'com.auraboot.crm', pluginDir: 'crm', modelCode: 'crm_lead_common' },
   { pluginId: 'com.auraboot.sales', pluginDir: 'sales', modelCode: 'sl_sales_quotation' },
   {
     pluginId: 'com.auraboot.procurement',

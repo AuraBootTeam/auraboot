@@ -1,0 +1,82 @@
+[
+  {
+    "code": "crm_asgn_code",
+    "displayName:zh-CN": "规则编号",
+    "displayName:en": "Rule Code",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 50 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_asgn_name",
+    "displayName:zh-CN": "规则名称",
+    "displayName:en": "Rule Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true, "sortable": true }
+  },
+  {
+    "code": "crm_asgn_strategy",
+    "displayName:zh-CN": "分配策略",
+    "displayName:en": "Strategy",
+    "dataType": "enum",
+    "dictCode": "crm_assignment_strategy",
+    "constraints": { "required": true },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_asgn_match_field",
+    "displayName:zh-CN": "匹配字段",
+    "displayName:en": "Match Field",
+    "dataType": "enum",
+    "dictCode": "crm_assignment_match_field"
+  },
+  {
+    "code": "crm_asgn_match_value",
+    "displayName:zh-CN": "匹配值",
+    "displayName:en": "Match Value",
+    "dataType": "string",
+    "constraints": { "maxLength": 200 }
+  },
+  {
+    "code": "crm_asgn_rep_pool",
+    "displayName:zh-CN": "销售人员池",
+    "displayName:en": "Rep Pool",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 1000 },
+    "extension": { "hint": "Comma-separated user ids cycled by round-robin / least-load; for by_territory the single target rep" }
+  },
+  {
+    "code": "crm_asgn_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_assignment_rule_status",
+    "defaultValue": "active",
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_asgn_priority",
+    "displayName:zh-CN": "优先级",
+    "displayName:en": "Priority",
+    "dataType": "integer",
+    "defaultValue": 100,
+    "feature": { "sortable": true },
+    "extension": { "hint": "Lower number = higher priority; the first matching active rule wins" }
+  },
+  {
+    "code": "crm_asgn_rr_cursor",
+    "displayName:zh-CN": "轮询游标",
+    "displayName:en": "Round-Robin Cursor",
+    "dataType": "integer",
+    "defaultValue": 0,
+    "feature": { "readonly": true },
+    "extension": { "hint": "Internal: index of the next rep to assign for round_robin strategy" }
+  },
+  {
+    "code": "crm_asgn_remark",
+    "displayName:zh-CN": "说明",
+    "displayName:en": "Remark",
+    "dataType": "text"
+  }
+]

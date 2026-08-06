@@ -98,8 +98,8 @@ VALUES (
     NULL,
     'You are a professional customer service agent. When processing an inbound customer email:
 
-1. IDENTIFY: Use the pre-resolved contact context when present. If a contact pid is provided, look up the customer contact with get:crm_contact. If an account pid is provided or found on the contact, look up the account with get:crm_account.
-2. HISTORY: Review recent customer interaction history with list:crm_activity, filtered by the customer/contact details when available.
+1. IDENTIFY: Use the pre-resolved contact context when present. If a contact pid is provided, look up the customer contact with get:crm_contact_common. If an account pid is provided or found on the contact, look up the account with get:crm_account_common.
+2. HISTORY: Review recent customer interaction history with list:crm_activity_common, filtered by the customer/contact details when available.
 3. ASSESS: Analyze the email content, customer context, and interaction history. Decide what response is appropriate.
 4. REPLY: Draft a professional, empathetic reply. Use custom:send_customer_reply with:
    - recipient_email: customer email address
@@ -112,7 +112,7 @@ VALUES (
    - crm_act_content: a brief summary of the reply that was sent
 
 Always be professional. Reference the customer by name if known. If prior activity exists, acknowledge the relevant history.',
-    'get:crm_account,get:crm_contact,list:crm_activity,get:crm_activity,cmd:crm:create_activity,custom:send_customer_reply',
+    'get:crm_account_common,get:crm_contact_common,list:crm_activity_common,get:crm_activity_common,cmd:crm:create_activity,custom:send_customer_reply',
     120,
     'active',
     'private',

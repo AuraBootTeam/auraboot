@@ -1,0 +1,76 @@
+[
+  {
+    "code": "crm:add_campaign_member",
+    "displayName:zh-CN": "添加活动成员",
+    "displayName:en": "Add Campaign Member",
+    "type": "create",
+    "modelCode": "crm_campaign_member",
+    "inputFields": [
+      "crm_cm_campaign_id",
+      "crm_cm_member_type",
+      "crm_cm_lead_id",
+      "crm_cm_contact_id",
+      "crm_cm_member_name",
+      "crm_cm_email"
+    ],
+    "autoSetFields": {
+      "crm_cm_status": {
+        "strategy": "fixed_value",
+        "value": "invited"
+      },
+      "crm_cm_added_date": {
+        "strategy": "current_datetime"
+      }
+    },
+    "permissions": [
+      "crm.campaign.manage"
+    ],
+    "agent_hint": "Add a lead or contact as a campaign member. Key inputs: campaign_id, member_type, name, email.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_campaign_member",
+    "displayName:zh-CN": "编辑活动成员",
+    "displayName:en": "Update Campaign Member",
+    "type": "update",
+    "modelCode": "crm_campaign_member",
+    "inputFields": [
+      "crm_cm_member_name",
+      "crm_cm_email",
+      "crm_cm_status"
+    ],
+    "permissions": [
+      "crm.campaign.manage"
+    ],
+    "agent_hint": "Update a campaign member's details or status.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:remove_campaign_member",
+    "displayName:zh-CN": "移除活动成员",
+    "displayName:en": "Remove Campaign Member",
+    "type": "delete",
+    "modelCode": "crm_campaign_member",
+    "extension": {
+      "confirmMessage:zh-CN": "确认移除此成员？",
+      "confirmMessage:en": "Confirm remove this member?"
+    },
+    "permissions": [
+      "crm.campaign.manage"
+    ],
+    "agent_hint": "Remove a member from a campaign.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:list_campaign_members",
+    "displayName:zh-CN": "活动成员列表",
+    "displayName:en": "List Campaign Members",
+    "type": "query",
+    "modelCode": "crm_campaign_member",
+    "permissions": [
+      "crm.campaign.read"
+    ],
+    "agent_hint": "Query campaign member records.",
+    "cmd_risk_level": "L0"
+  }
+]

@@ -1,0 +1,61 @@
+{
+  "pageKey": "crm_attribution_form",
+  "name:zh-CN": "归因表单",
+  "name:en": "Attribution Form",
+  "modelCode": "crm_attribution",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "归因信息",
+        "en": "Attribution Info"
+      },
+      "fields": [
+        {
+          "field": "crm_attr_deal_name",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_attr_revenue",
+          "colSpan": 3,
+          "required": true
+        },
+        {
+          "field": "crm_attr_model",
+          "colSpan": 3,
+          "required": true
+        },
+        {
+          "field": "crm_attr_touchpoints",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

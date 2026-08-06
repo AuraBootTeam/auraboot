@@ -1,0 +1,100 @@
+[
+  {
+    "modelCode": "crm_omni_session",
+    "fieldCode": "crm_oss_code",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_omni_session",
+    "fieldCode": "crm_oss_channel",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_omni_session",
+    "fieldCode": "crm_oss_customer",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_omni_session",
+    "fieldCode": "crm_oss_subject",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_omni_session",
+    "fieldCode": "crm_oss_status",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_omni_session",
+    "fieldCode": "crm_oss_vip",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {}
+  },
+  {
+    "modelCode": "crm_omni_session",
+    "fieldCode": "crm_oss_queue",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_omni_session",
+    "fieldCode": "crm_oss_priority",
+    "sequence": 8,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_omni_session",
+    "fieldCode": "crm_oss_assigned_to",
+    "sequence": 9,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  }
+]

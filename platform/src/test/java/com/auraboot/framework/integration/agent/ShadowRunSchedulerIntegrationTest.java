@@ -127,7 +127,7 @@ class ShadowRunSchedulerIntegrationTest extends BaseIntegrationTest {
         jdbc.update("INSERT INTO ab_agent_action " +
                         "(pid, tenant_id, run_id, action_code, action_type, target_model, " +
                         " action_status, executed_at, updated_at) " +
-                        "VALUES (?, ?, ?, 'crm.lead.list', 'query', 'crm_lead', " +
+                        "VALUES (?, ?, ?, 'crm.lead.list', 'query', 'crm_lead_common', " +
                         " 'success', NOW() - INTERVAL '100 milliseconds', NOW())",
                 UniqueIdGenerator.generate(), tenantId, runId);
     }
@@ -141,7 +141,7 @@ class ShadowRunSchedulerIntegrationTest extends BaseIntegrationTest {
         jdbc.update("INSERT INTO ab_agent_action " +
                         "(pid, tenant_id, run_id, action_code, action_type, target_model, " +
                         " action_status, affected_count, executed_at, updated_at) " +
-                        "VALUES (?, ?, ?, 'crm.lead.list', 'query', 'crm_lead', " +
+                        "VALUES (?, ?, ?, 'crm.lead.list', 'query', 'crm_lead_common', " +
                         " 'success', ?, NOW() - INTERVAL '100 milliseconds', NOW())",
                 UniqueIdGenerator.generate(), tenantId, runId, affectedCount);
     }

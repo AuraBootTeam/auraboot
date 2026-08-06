@@ -1,0 +1,69 @@
+[
+  {
+    "code": "crm:create_forecast",
+    "displayName:zh-CN": "新建预测提交",
+    "displayName:en": "Create Forecast",
+    "type": "create",
+    "modelCode": "crm_forecast_submission",
+    "inputFields": [
+      "crm_fcst_period",
+      "crm_fcst_owner",
+      "crm_fcst_commit_amount",
+      "crm_fcst_best_case_amount",
+      "crm_fcst_pipeline_amount",
+      "crm_fcst_notes"
+    ],
+    "autoSetFields": {
+      "crm_fcst_code": {
+        "strategy": "auto_generate",
+        "pattern": "FCST-{yyyyMMdd}-{seq}"
+      },
+      "crm_fcst_status": {
+        "strategy": "fixed_value",
+        "value": "draft"
+      }
+    },
+    "permissions": [
+      "crm.forecast.manage"
+    ],
+    "agent_hint": "Create a forecast submission (draft). Inputs: period, owner, commit/best_case/pipeline amounts.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_forecast",
+    "displayName:zh-CN": "编辑预测提交",
+    "displayName:en": "Update Forecast",
+    "type": "update",
+    "modelCode": "crm_forecast_submission",
+    "inputFields": [
+      "crm_fcst_period",
+      "crm_fcst_owner",
+      "crm_fcst_commit_amount",
+      "crm_fcst_best_case_amount",
+      "crm_fcst_pipeline_amount",
+      "crm_fcst_notes"
+    ],
+    "permissions": [
+      "crm.forecast.manage"
+    ],
+    "agent_hint": "Update a draft forecast submission.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:submit_forecast",
+    "displayName:zh-CN": "提交预测",
+    "displayName:en": "Submit Forecast",
+    "type": "state_transition",
+    "modelCode": "crm_forecast_submission",
+    "stateField": "crm_fcst_status",
+    "fromStates": [
+      "draft"
+    ],
+    "toState": "submitted",
+    "permissions": [
+      "crm.forecast.manage"
+    ],
+    "agent_hint": "Submit a draft forecast. Validates commit <= best_case <= pipeline (handler), stamps submitted_at.",
+    "cmd_risk_level": "L1"
+  }
+]

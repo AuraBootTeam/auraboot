@@ -1,0 +1,280 @@
+{
+  "pageKey": "crm_clarification_common_list",
+  "name:zh-CN": "澄清项",
+  "name:en": "Clarifications",
+  "modelCode": "crm_clarification_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_cl_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "zh-CN": "全部",
+            "en": "All"
+          }
+        },
+        {
+          "key": "pending",
+          "label": {
+            "zh-CN": "待处理",
+            "en": "Pending"
+          },
+          "filter": {
+            "field": "crm_cl_status",
+            "operator": "EQ",
+            "value": "pending"
+          }
+        },
+        {
+          "key": "awaiting_customer",
+          "label": {
+            "zh-CN": "待客户澄清",
+            "en": "Awaiting Customer"
+          },
+          "filter": {
+            "field": "crm_cl_status",
+            "operator": "EQ",
+            "value": "awaiting_customer"
+          }
+        },
+        {
+          "key": "customer_replied",
+          "label": {
+            "zh-CN": "客户已回复",
+            "en": "Customer Replied"
+          },
+          "filter": {
+            "field": "crm_cl_status",
+            "operator": "EQ",
+            "value": "customer_replied"
+          }
+        },
+        {
+          "key": "resolved",
+          "label": {
+            "zh-CN": "已解决",
+            "en": "Resolved"
+          },
+          "filter": {
+            "field": "crm_cl_status",
+            "operator": "EQ",
+            "value": "resolved"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_cl_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "icon": "Plus",
+          "permissionCode": "crm.clarification.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_clarification_common_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_cl_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_cl_code",
+          "sortable": true
+        },
+        {
+          "field": "crm_cl_title",
+          "sortable": true
+        },
+        {
+          "field": "crm_cl_clarification_type",
+          "renderType": "tag",
+          "dictCode": "crm_clarification_type"
+        },
+        {
+          "field": "crm_cl_status",
+          "renderType": "tag",
+          "dictCode": "crm_clarification_status",
+          "sortable": true
+        },
+        {
+          "field": "crm_cl_priority",
+          "renderType": "tag",
+          "dictCode": "crm_clarification_priority",
+          "sortable": true
+        },
+        {
+          "field": "crm_cl_review_id"
+        },
+        {
+          "field": "crm_cl_customer_request_id"
+        },
+        {
+          "field": "crm_cl_account_id"
+        },
+        {
+          "field": "crm_cl_owner_id"
+        },
+        {
+          "field": "crm_cl_question"
+        },
+        {
+          "field": "crm_cl_answer"
+        },
+        {
+          "field": "crm_cl_raised_at",
+          "sortable": true
+        },
+        {
+          "field": "crm_cl_resolved_at",
+          "sortable": true
+        },
+        {
+          "field": "crm_cl_source_model"
+        },
+        {
+          "field": "crm_cl_source_id"
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "label": "$i18n:common.actions",
+          "buttons": [
+            {
+              "code": "view",
+              "icon": "Eye",
+              "permissionCode": "crm.clarification.read",
+              "label": "$i18n:common.button.view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_clarification_common_detail"
+              }
+            },
+            {
+              "code": "send_to_customer",
+              "icon": "Send",
+              "permissionCode": "crm.clarification.manage",
+              "label": {
+                "zh-CN": "发给客户",
+                "en-US": "Send to Customer"
+              },
+              "action": {
+                "type": "state_transition",
+                "command": "crm:send_clarification"
+              },
+              "visibleWhen": "record.crm_cl_status === 'pending'"
+            },
+            {
+              "code": "mark_replied",
+              "icon": "MessageSquareReply",
+              "permissionCode": "crm.clarification.manage",
+              "label": {
+                "zh-CN": "客户已回复",
+                "en-US": "Customer Replied"
+              },
+              "action": {
+                "type": "state_transition",
+                "command": "crm:mark_clarification_replied"
+              },
+              "visibleWhen": "['pending','awaiting_customer'].includes(record.crm_cl_status)"
+            },
+            {
+              "code": "resolve",
+              "icon": "BadgeCheck",
+              "permissionCode": "crm.clarification.manage",
+              "label": {
+                "zh-CN": "已解决",
+                "en-US": "Resolve"
+              },
+              "action": {
+                "type": "state_transition",
+                "command": "crm:resolve_clarification"
+              },
+              "visibleWhen": "record.crm_cl_status === 'customer_replied'"
+            },
+            {
+              "code": "delete",
+              "icon": "Trash2",
+              "permissionCode": "crm.clarification.manage",
+              "label": {
+                "zh-CN": "删除",
+                "en-US": "Delete"
+              },
+              "action": {
+                "type": "command"
+              },
+              "danger": true
+            },
+            {
+              "code": "edit",
+              "icon": "Edit",
+              "permissionCode": "crm.clarification.manage",
+              "label": "$i18n:common.button.edit",
+              "action": {
+                "type": "navigate",
+                "to": "crm_clarification_common_form"
+              }
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "crm_cl_code",
+        "crm_cl_title",
+        "crm_cl_owner_id",
+        "crm_cl_question",
+        "crm_cl_source_model",
+        "crm_cl_source_id"
+      ],
+      "defaultSort": {
+        "field": "crm_cl_code",
+        "order": "desc"
+      },
+      "selection": {
+        "mode": "multiple"
+      },
+      "bulkActions": [
+        {
+          "code": "bulk_mark_replied",
+          "icon": "Reply",
+          "permissionCode": "crm.clarification.manage",
+          "label": {
+            "zh-CN": "批量标记客户已回复",
+            "en-US": "Mark Replied"
+          },
+          "action": {
+            "type": "bulk_state_transition",
+            "command": "crm:mark_clarification_replied"
+          }
+        },
+        {
+          "code": "bulk_resolve",
+          "icon": "CheckCircle2",
+          "permissionCode": "crm.clarification.manage",
+          "label": {
+            "zh-CN": "批量解决",
+            "en-US": "Resolve Selected"
+          },
+          "action": {
+            "type": "bulk_state_transition",
+            "command": "crm:resolve_clarification"
+          }
+        }
+      ]
+    }
+  ]
+}

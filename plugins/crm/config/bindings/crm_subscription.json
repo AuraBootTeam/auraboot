@@ -1,0 +1,102 @@
+[
+  {
+    "modelCode": "crm_subscription",
+    "fieldCode": "crm_sub_code",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_subscription",
+    "fieldCode": "crm_sub_account_id",
+    "sequence": 2,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_subscription",
+    "fieldCode": "crm_sub_plan",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_subscription",
+    "fieldCode": "crm_sub_start_date",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_subscription",
+    "fieldCode": "crm_sub_end_date",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_subscription",
+    "fieldCode": "crm_sub_monthly_amount",
+    "sequence": 6,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_subscription",
+    "fieldCode": "crm_sub_mrr",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_subscription",
+    "fieldCode": "crm_sub_arr",
+    "sequence": 8,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_subscription",
+    "fieldCode": "crm_sub_status",
+    "sequence": 9,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true
+    }
+  }
+]

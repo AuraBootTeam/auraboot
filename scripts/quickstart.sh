@@ -64,7 +64,7 @@ PLUGINS=(
   core-aurabot
   page-manager
   org-management
-  crm-starter
+  crm
   showcase
   agent-control-plane
   workflow-demo

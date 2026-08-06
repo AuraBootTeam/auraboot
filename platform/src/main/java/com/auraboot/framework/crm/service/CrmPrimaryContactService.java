@@ -31,7 +31,7 @@ public class CrmPrimaryContactService {
         }
 
         int demoted = jdbcTemplate.update("""
-                UPDATE mt_crm_contact
+                UPDATE mt_crm_contact_common
                    SET crm_ct_is_primary = FALSE,
                        updated_at = NOW()
                  WHERE tenant_id = ?
@@ -47,7 +47,7 @@ public class CrmPrimaryContactService {
     private ContactState loadContactState(Long tenantId, String contactPid) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
                 SELECT crm_ct_account_id, crm_ct_is_primary
-                  FROM mt_crm_contact
+                  FROM mt_crm_contact_common
                  WHERE tenant_id = ?
                    AND pid = ?
                  LIMIT 1

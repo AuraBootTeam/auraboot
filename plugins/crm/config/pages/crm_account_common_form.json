@@ -1,0 +1,104 @@
+{
+  "pageKey": "crm_account_common_form",
+  "name:zh-CN": "客户表单",
+  "name:en": "Account Form",
+  "modelCode": "crm_account_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "基本信息",
+        "en-US": "Basic Information"
+      },
+      "fields": [
+        {
+          "field": "crm_acc_name",
+          "colSpan": 6,
+          "required": true,
+          "props": {
+            "placeholder": "请输入客户名称，例如 深圳智控科技"
+          }
+        },
+        {
+          "field": "crm_acc_industry",
+          "colSpan": 6,
+          "dictCode": "crm_account_industry",
+          "props": {
+            "placeholder": "请选择行业"
+          }
+        },
+        {
+          "field": "crm_acc_website",
+          "colSpan": 6,
+          "props": {
+            "placeholder": "请输入官网地址，例如 https://example.com"
+          }
+        },
+        {
+          "field": "crm_acc_phone",
+          "colSpan": 6,
+          "props": {
+            "placeholder": "请输入联系电话，例如 0755-12345678"
+          }
+        },
+        {
+          "field": "crm_acc_rating",
+          "colSpan": 6,
+          "props": {
+            "placeholder": "请选择客户评级"
+          }
+        },
+        {
+          "field": "crm_acc_status",
+          "colSpan": 6,
+          "required": true,
+          "defaultValue": "active",
+          "dictCode": "crm_account_status",
+          "props": {
+            "placeholder": "请选择状态"
+          }
+        },
+        {
+          "field": "crm_acc_address",
+          "colSpan": 12,
+          "props": {
+            "placeholder": "请输入客户地址，例如 深圳市南山区科技园"
+          }
+        },
+        {
+          "field": "crm_acc_remark",
+          "colSpan": 12,
+          "props": {
+            "placeholder": "记录客户背景、合作要求或跟进说明"
+          }
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

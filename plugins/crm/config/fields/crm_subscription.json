@@ -1,0 +1,102 @@
+[
+  {
+    "code": "crm_sub_code",
+    "displayName:zh-CN": "订阅编号",
+    "displayName:en": "Code",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 50
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_sub_account_id",
+    "displayName:zh-CN": "关联客户",
+    "displayName:en": "Account",
+    "dataType": "reference",
+    "referenceModelCode": "crm_account_common",
+    "refTarget": {
+      "targetModel": "crm_account_common",
+      "targetField": "id",
+      "relationship": "many_to_one",
+      "displayField": "crm_acc_name"
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_sub_plan",
+    "displayName:zh-CN": "套餐",
+    "displayName:en": "Plan",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 100
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_sub_start_date",
+    "displayName:zh-CN": "开始日期",
+    "displayName:en": "Start Date",
+    "dataType": "datetime",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_sub_end_date",
+    "displayName:zh-CN": "结束日期",
+    "displayName:en": "End Date",
+    "dataType": "datetime",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_sub_monthly_amount",
+    "displayName:zh-CN": "月费",
+    "displayName:en": "Monthly Amount",
+    "dataType": "money",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_sub_mrr",
+    "displayName:zh-CN": "MRR",
+    "displayName:en": "MRR",
+    "dataType": "decimal",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_sub_arr",
+    "displayName:zh-CN": "ARR",
+    "displayName:en": "ARR",
+    "dataType": "decimal",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_sub_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_subscription_status",
+    "feature": {
+      "searchable": true
+    }
+  }
+]

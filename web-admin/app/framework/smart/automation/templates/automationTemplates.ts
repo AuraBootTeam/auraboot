@@ -75,7 +75,7 @@ function buildNewLeadNotification(): AutomationTemplate {
             label: 'New Lead Created',
             config: {
               triggerType: 'on_record_create',
-              modelCode: 'crm_lead',
+              modelCode: 'crm_lead_common',
             },
           },
         },

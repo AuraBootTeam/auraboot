@@ -191,7 +191,7 @@ test.describe('GAP-159: Report Templates in ToolbarMoreMenu', () => {
     const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
 
-    // Create a report template associated with crm_account model
+    // Create a report template associated with crm_account_common model
     // templateContent is required for publishing (backend validates hasInlineContent || hasFileContent)
     const minimalJrxml = `<?xml version="1.0" encoding="UTF-8"?>
 <jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
@@ -211,7 +211,7 @@ test.describe('GAP-159: Report Templates in ToolbarMoreMenu', () => {
         pageSize: 'a4',
         orientation: 'portrait',
         dataSourceType: 'model',
-        dataSourceConfig: { modelCode: 'crm_account' },
+        dataSourceConfig: { modelCode: 'crm_account_common' },
         templateContent: minimalJrxml,
         parameters: [],
       },
@@ -237,7 +237,7 @@ test.describe('GAP-159: Report Templates in ToolbarMoreMenu', () => {
     test.skip(!hasReport, 'Report template creation failed — skipping');
 
     // Navigate to CRM Account list page
-    await page.goto('/p/crm_account', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/crm_account_common', { waitUntil: 'domcontentloaded' });
 
     // Wait for the list API to respond
     await page.waitForResponse((resp) => resp.url().includes('/list') && resp.status() === 200, {
@@ -275,7 +275,7 @@ test.describe('GAP-159: Report Templates in ToolbarMoreMenu', () => {
     test.skip(!hasReport, 'Report template creation failed — skipping');
 
     // Navigate to CRM Account list page
-    await page.goto('/p/crm_account', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/crm_account_common', { waitUntil: 'domcontentloaded' });
     await page.waitForResponse((resp) => resp.url().includes('/list') && resp.status() === 200, {
       timeout: 15000,
     });
@@ -310,7 +310,7 @@ test.describe('GAP-159: Report Templates in ToolbarMoreMenu', () => {
     test.skip(!hasReport, 'Report template creation failed — skipping');
 
     // Navigate to CRM Account list page
-    await page.goto('/p/crm_account', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/crm_account_common', { waitUntil: 'domcontentloaded' });
     await page.waitForResponse((resp) => resp.url().includes('/list') && resp.status() === 200, {
       timeout: 15000,
     });

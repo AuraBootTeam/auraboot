@@ -1,0 +1,85 @@
+[
+  {
+    "code": "crm_cns_code",
+    "displayName:zh-CN": "同意编号",
+    "displayName:en": "Code",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 50
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cns_contact_id",
+    "displayName:zh-CN": "关联联系人",
+    "displayName:en": "Contact",
+    "dataType": "reference",
+    "referenceModelCode": "crm_contact_common",
+    "refTarget": {
+      "targetModel": "crm_contact_common",
+      "targetField": "id",
+      "relationship": "many_to_one",
+      "displayField": "crm_con_name"
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cns_channel",
+    "displayName:zh-CN": "渠道",
+    "displayName:en": "Channel",
+    "dataType": "enum",
+    "dictCode": "crm_consent_channel",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cns_status",
+    "displayName:zh-CN": "状态",
+    "displayName:en": "Status",
+    "dataType": "enum",
+    "dictCode": "crm_consent_status",
+    "constraints": {
+      "required": true
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cns_source",
+    "displayName:zh-CN": "来源",
+    "displayName:en": "Source",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 200
+    }
+  },
+  {
+    "code": "crm_cns_legal_basis",
+    "displayName:zh-CN": "法律依据",
+    "displayName:en": "Legal Basis",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 200
+    }
+  },
+  {
+    "code": "crm_cns_granted_at",
+    "displayName:zh-CN": "授权时间",
+    "displayName:en": "Granted At",
+    "dataType": "datetime",
+    "feature": {
+      "sortable": true
+    }
+  }
+]

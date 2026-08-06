@@ -203,7 +203,7 @@ public class ActionRecorder {
     /**
      * Record a lightweight read Action for dsl_query execution.
      * No before/after snapshots needed.
-     * queryCode is the NamedQuery code (e.g., crm_lead_list), which maps to model via ab_meta_named_query.
+     * queryCode is the NamedQuery code (e.g., crm_lead_common_list), which maps to model via ab_meta_named_query.
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public String recordReadAction(Long tenantId, String runPid, String queryCode,
@@ -511,7 +511,7 @@ public class ActionRecorder {
             if (!rows.isEmpty()) {
                 String fromSql = (String) rows.get(0).get("from_sql");
                 if (fromSql != null) {
-                    // Extract mt_xxx from SQL (e.g., "SELECT ... FROM mt_crm_lead WHERE ...")
+                    // Extract mt_xxx from SQL (e.g., "SELECT ... FROM mt_crm_lead_common WHERE ...")
                     String upper = fromSql.toUpperCase();
                     int mtIdx = upper.indexOf("MT_");
                     if (mtIdx >= 0) {

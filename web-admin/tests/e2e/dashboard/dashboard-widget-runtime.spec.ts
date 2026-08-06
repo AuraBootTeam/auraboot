@@ -1174,7 +1174,7 @@ async function expectInboxListContains(
 }
 
 async function createCrmWorkbenchFixture(page: Page): Promise<CreatedCrmWorkbenchFixture> {
-  await ensureCrmStarterPluginImported(page);
+  await ensureCrmPluginImported(page);
 
   const baselinePipelineStage = await readPipelineStageSnapshot(
     page,
@@ -1284,18 +1284,16 @@ async function createCrmWorkbenchFixture(page: Page): Promise<CreatedCrmWorkbenc
   return fixture;
 }
 
-async function ensureCrmStarterPluginImported(page: Page): Promise<void> {
-  if (await hasCommand(page, 'crm_account', 'crm:create_account')) {
+async function ensureCrmPluginImported(page: Page): Promise<void> {
+  if (await hasCommand(page, 'crm_account_common', 'crm:create_account')) {
     return;
   }
 
-  const pluginDir = resolve(BACKEND_PLUGIN_ROOT, 'crm-starter');
+  const pluginDir = resolve(BACKEND_PLUGIN_ROOT, 'crm');
   const manifestPath = resolve(pluginDir, 'plugin.json');
-  expect(existsSync(manifestPath), `crm-starter manifest missing: ${manifestPath}`).toBe(true);
+  expect(existsSync(manifestPath), `CRM manifest missing: ${manifestPath}`).toBe(true);
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-  expect(manifest?.pluginId, `unexpected crm-starter manifest: ${manifestPath}`).toBe(
-    'com.auraboot.crm-starter',
-  );
+  expect(manifest?.pluginId, `unexpected CRM manifest: ${manifestPath}`).toBe('com.auraboot.crm');
 
   const importResponse = await page.request.post('/api/plugins/import/import-directory-sync', {
     data: {
@@ -1312,7 +1310,7 @@ async function ensureCrmStarterPluginImported(page: Page): Promise<void> {
     timeout: 120_000,
   });
   const rawBody = await importResponse.text();
-  expect(importResponse.ok(), `import crm-starter HTTP ${importResponse.status()}: ${rawBody}`).toBe(
+  expect(importResponse.ok(), `import CRM HTTP ${importResponse.status()}: ${rawBody}`).toBe(
     true,
   );
   const body = JSON.parse(rawBody) as {
@@ -1324,11 +1322,11 @@ async function ensureCrmStarterPluginImported(page: Page): Promise<void> {
   const result = body?.data && typeof body.data === 'object' ? body.data : body;
   expect(
     result?.success,
-    `import crm-starter did not succeed (status=${result?.status ?? '?'}, msg=${
+    `import CRM did not succeed (status=${result?.status ?? '?'}, msg=${
       result?.errorMessage ?? '?'
     })`,
   ).toBe(true);
-  expect(await hasCommand(page, 'crm_account', 'crm:create_account')).toBe(true);
+  expect(await hasCommand(page, 'crm_account_common', 'crm:create_account')).toBe(true);
 }
 
 async function hasCommand(page: Page, modelCode: string, commandCode: string): Promise<boolean> {
@@ -1386,7 +1384,7 @@ async function expectCrmLeadListContains(
   context: string,
   response?: APIResponse | PlaywrightResponse,
 ): Promise<void> {
-  const listResponse = response ?? await page.request.get('/api/dynamic/crm_lead/list', {
+  const listResponse = response ?? await page.request.get('/api/dynamic/crm_lead_common/list', {
     params: {
       pageNum: '1',
       pageSize: '20',
@@ -1410,7 +1408,7 @@ async function expectCrmActivityListContains(
   context: string,
   response?: APIResponse | PlaywrightResponse,
 ): Promise<void> {
-  const listResponse = response ?? await page.request.get('/api/dynamic/crm_activity/list', {
+  const listResponse = response ?? await page.request.get('/api/dynamic/crm_activity_common/list', {
     params: {
       pageNum: '1',
       pageSize: '20',
@@ -2037,14 +2035,14 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       );
       const leadResponse = page.waitForResponse(
         (response) =>
-          response.url().includes('/api/dynamic/crm_lead/list') &&
+          response.url().includes('/api/dynamic/crm_lead_common/list') &&
           response.request().method() === 'GET' &&
           response.status() === 200,
         { timeout: 10_000 },
       );
       const activityResponse = page.waitForResponse(
         (response) =>
-          response.url().includes('/api/dynamic/crm_activity/list') &&
+          response.url().includes('/api/dynamic/crm_activity_common/list') &&
           response.request().method() === 'GET' &&
           response.status() === 200,
         { timeout: 10_000 },
@@ -2115,7 +2113,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       const qualificationStage = pipelineBlock.getByTestId('pipeline-stage-qualification');
       await expect(qualificationStage).toBeVisible({ timeout: 10_000 });
       await qualificationStage.click();
-      await expect(page).toHaveURL(/\/p\/crm_opportunity\?/);
+      await expect(page).toHaveURL(/\/p\/crm_opportunity_common\?/);
       const filters = new URL(page.url()).searchParams.get('filters') ?? '';
       expect(filters, 'pipeline stage URL filters').toContain('crm_opp_stage');
       expect(filters, 'pipeline stage URL filters').toContain('qualification');
@@ -2125,7 +2123,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       const leadRow = leadsBlock.getByTestId(`lead-row-${crmFixture.leadId}`);
       await expect(leadRow).toContainText(crmFixture.leadCompany, { timeout: 10_000 });
       await leadRow.click();
-      await expect(page).toHaveURL(new RegExp(`/p/crm_lead/view/${crmFixture.leadId}`));
+      await expect(page).toHaveURL(new RegExp(`/p/crm_lead_common/view/${crmFixture.leadId}`));
 
       await page.goto(`/dashboards/view/${dashboard.code}`, { waitUntil: 'domcontentloaded' });
       const activitiesBlock = await expectRuntimeBlock(
@@ -2136,7 +2134,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
       const activityRow = activitiesBlock.getByTestId(`activity-row-${crmFixture.activityId}`);
       await expect(activityRow).toContainText(crmFixture.activitySubject, { timeout: 10_000 });
       await activityRow.click();
-      await expect(page).toHaveURL(new RegExp(`/p/crm_activity/view/${crmFixture.activityId}`));
+      await expect(page).toHaveURL(new RegExp(`/p/crm_activity_common/view/${crmFixture.activityId}`));
     } finally {
       await cleanupCrmWorkbenchFixture(page, crmFixture);
       await cleanupDashboard(page, dashboard?.pid);
@@ -2162,7 +2160,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
           }),
         });
       });
-      await page.route('**/api/dynamic/crm_lead/list**', async (route) => {
+      await page.route('**/api/dynamic/crm_lead_common/list**', async (route) => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -2172,7 +2170,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
           }),
         });
       });
-      await page.route('**/api/dynamic/crm_activity/list**', async (route) => {
+      await page.route('**/api/dynamic/crm_activity_common/list**', async (route) => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -2298,7 +2296,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
           }),
         });
       });
-      await page.route('**/api/dynamic/crm_lead/list**', async (route) => {
+      await page.route('**/api/dynamic/crm_lead_common/list**', async (route) => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -2308,7 +2306,7 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
           }),
         });
       });
-      await page.route('**/api/dynamic/crm_activity/list**', async (route) => {
+      await page.route('**/api/dynamic/crm_activity_common/list**', async (route) => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -2379,14 +2377,14 @@ test.describe('Dashboard Widget Runtime Semantics', () => {
           body: JSON.stringify(forbiddenBody),
         });
       });
-      await page.route('**/api/dynamic/crm_lead/list**', async (route) => {
+      await page.route('**/api/dynamic/crm_lead_common/list**', async (route) => {
         await route.fulfill({
           status: 403,
           contentType: 'application/json',
           body: JSON.stringify(forbiddenBody),
         });
       });
-      await page.route('**/api/dynamic/crm_activity/list**', async (route) => {
+      await page.route('**/api/dynamic/crm_activity_common/list**', async (route) => {
         await route.fulfill({
           status: 403,
           contentType: 'application/json',

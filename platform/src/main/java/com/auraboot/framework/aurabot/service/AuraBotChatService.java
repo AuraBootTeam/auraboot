@@ -308,7 +308,7 @@ public class AuraBotChatService {
                 hint.append("- Use platform_execute_sql ONLY if no named query or domain list/get tool matches the question.\n");
                 hint.append("- Before calling platform_execute_sql on a table you have NOT already seen the schema for,\n");
                 hint.append("  FIRST call platform_list_models with includeFields=true AND a keyword narrowing the scope\n");
-                hint.append("  (e.g. keyword='crm_account' — NOT empty). Do NOT guess Chinese-to-English field names\n");
+                hint.append("  (e.g. keyword='crm_account_common' — NOT empty). Do NOT guess Chinese-to-English field names\n");
                 hint.append("  (e.g. '行业' is not guaranteed to be 'industry'; it may be 'industry_type', 'trade',\n");
                 hint.append("  'category', or absent). One schema call is enough — the response will contain the fields.\n");
                 hint.append("- If platform_execute_sql returns an error with 'availableFields' and 'recovery', you MUST\n");
@@ -324,7 +324,7 @@ public class AuraBotChatService {
         }
 
         hint.append("\nRules:\n");
-        hint.append("- Table names use 'mt_' prefix (e.g., model 'crm_lead' → table 'mt_crm_lead').\n");
+        hint.append("- Table names use 'mt_' prefix (e.g., model 'crm_lead_common' → table 'mt_crm_lead_common').\n");
         hint.append("- Each tool may be called at most 5 times per turn; total tool rounds capped by the runtime.\n");
         hint.append("- NEVER call the same tool with identical parameters twice.\n");
         hint.append("- Present results as tables in Chinese.\n");

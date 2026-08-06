@@ -1,0 +1,221 @@
+{
+  "pageKey": "crm_lead_conversion",
+  "name:zh-CN": "线索转化详情",
+  "name:en": "Lead Conversion",
+  "modelCode": "crm_lead_common",
+  "description": "Lead detail with AI score, qualification checklist, and one-click Convert to Opportunity",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "crm_lead_conversion_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "overview",
+          "label": {
+            "zh-CN": "线索信息",
+            "en-US": "Lead Info"
+          },
+          "blocks": [
+            {
+              "id": "section_basic",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "基本信息",
+                "en-US": "Basic Information"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "crm_lead_code",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_company",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_industry",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_contact_name",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_contact_phone",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_contact_email",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_source",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_assigned_to",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_campaign",
+                  "readOnly": true
+                }
+              ]
+            },
+            {
+              "id": "section_qualification",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "资格评估",
+                "en-US": "Qualification & Scoring"
+              },
+              "columns": 2,
+              "fields": [
+                {
+                  "field": "crm_lead_score",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_requirement",
+                  "span": 2,
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_lead_lost_reason",
+                  "span": 2,
+                  "readOnly": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "activities",
+          "label": {
+            "zh-CN": "跟进记录",
+            "en-US": "Activity History"
+          },
+          "blocks": [
+            {
+              "id": "block_lead_activities",
+              "blockType": "sub-table",
+              "subTable": {
+                "dataSource": {
+                  "type": "api",
+                  "url": "/api/datasource/list",
+                  "method": "get",
+                  "params": {
+                    "datasourceId": "nq:crm_activities_by_object",
+                    "objectType": "lead",
+                    "objectId": "${recordId}"
+                  }
+                },
+                "readOnly": true,
+                "toolbar": {
+                  "buttons": [
+                    {
+                      "code": "log_activity",
+                      "label": "$i18n:common.button.create",
+                      "action": {
+                        "type": "navigate",
+                        "to": "crm_activity_common_form",
+                        "command": "crm:log_lead_activity"
+                      }
+                    }
+                  ]
+                },
+                "columns": [
+                  {
+                    "field": "crm_act_type",
+                    "width": 100,
+                    "renderType": "tag"
+                  },
+                  {
+                    "field": "crm_act_subject",
+                    "width": 250
+                  },
+                  {
+                    "field": "crm_act_date",
+                    "width": 150
+                  },
+                  {
+                    "field": "crm_act_owner",
+                    "width": 120
+                  },
+                  {
+                    "field": "crm_act_outcome",
+                    "width": 180
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_conversion_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "edit",
+          "icon": "Edit",
+          "permissionCode": "crm.lead.manage",
+          "label": "$i18n:common.button.edit",
+          "action": {
+            "type": "navigate",
+            "to": "crm_lead_common_form"
+          }
+        },
+        {
+          "code": "qualify",
+          "icon": "CheckCircle",
+          "label": {
+            "zh-CN": "标记合格",
+            "en-US": "Qualify Lead"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:qualify_lead"
+          }
+        },
+        {
+          "code": "convert",
+          "primary": true,
+          "icon": "ArrowRight",
+          "label": {
+            "zh-CN": "转化线索",
+            "en-US": "Convert Lead"
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:convert_lead"
+          }
+        },
+        {
+          "code": "lose",
+          "danger": true,
+          "icon": "XCircle",
+          "label": {
+            "zh-CN": "标记丢失",
+            "en-US": "Mark Lost"
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:lose_lead"
+          }
+        }
+      ]
+    }
+  ]
+}

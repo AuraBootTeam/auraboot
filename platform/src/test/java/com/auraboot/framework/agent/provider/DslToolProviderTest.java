@@ -38,8 +38,8 @@ class DslToolProviderTest extends BaseIntegrationTest {
     void handles_correctPrefixes() {
         assertThat(dslToolProvider.handles("cmd:crm_account_create")).isTrue();
         assertThat(dslToolProvider.handles("nq:crm_account_all")).isTrue();
-        assertThat(dslToolProvider.handles("list:crm_account")).isTrue();
-        assertThat(dslToolProvider.handles("get:crm_account")).isTrue();
+        assertThat(dslToolProvider.handles("list:crm_account_common")).isTrue();
+        assertThat(dslToolProvider.handles("get:crm_account_common")).isTrue();
         assertThat(dslToolProvider.handles("platform.execute_sql")).isFalse();
         assertThat(dslToolProvider.handles(null)).isFalse();
         assertThat(dslToolProvider.handles("")).isFalse();
@@ -51,7 +51,7 @@ class DslToolProviderTest extends BaseIntegrationTest {
     @Test
     void execute_getWithoutRecordPid_fails() {
         Long tenantId = getTestTenant().getId();
-        var result = dslToolProvider.execute(tenantId, "get:crm_account", Map.of());
+        var result = dslToolProvider.execute(tenantId, "get:crm_account_common", Map.of());
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getErrorMessage()).contains("recordPid is required");
         assertThat(result.getDurationMs()).isGreaterThanOrEqualTo(0);

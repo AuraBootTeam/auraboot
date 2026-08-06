@@ -4,7 +4,7 @@
  * Gap 1 (backlog 2026-05-08): SmartTableChart must consume widget-level
  * `table.columns[].label` (LocalizedText), and must accept the
  * `modelCode + table.columns` shorthand even when no `dataSource` is
- * authored — the dashboard JSON pattern crm-starter ships.
+ * authored — the dashboard JSON pattern supported by the runtime.
  */
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';

@@ -1,0 +1,11 @@
+[
+  { "modelCode": "crm_lead_score_rule", "fieldCode": "crm_lsr_code", "sequence": 1, "required": true, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_lead_score_rule", "fieldCode": "crm_lsr_name", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_lead_score_rule", "fieldCode": "crm_lsr_dimension", "sequence": 3, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_lead_score_rule", "fieldCode": "crm_lsr_operator", "sequence": 4, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_score_rule", "fieldCode": "crm_lsr_match_value", "sequence": 5, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_score_rule", "fieldCode": "crm_lsr_points", "sequence": 6, "required": true, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_lead_score_rule", "fieldCode": "crm_lsr_status", "sequence": 7, "required": false, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_lead_score_rule", "fieldCode": "crm_lsr_sort_order", "sequence": 8, "required": false, "visible": true, "editable": true, "displayConfig": { "sortable": true } },
+  { "modelCode": "crm_lead_score_rule", "fieldCode": "crm_lsr_remark", "sequence": 9, "required": false, "visible": false, "editable": true }
+]

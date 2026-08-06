@@ -1,0 +1,83 @@
+[
+  {
+    "code": "crm_ss_code",
+    "displayName:zh-CN": "快照编号",
+    "displayName:en": "Code",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 50
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_ss_period",
+    "displayName:zh-CN": "周期",
+    "displayName:en": "Period",
+    "dataType": "string",
+    "constraints": {
+      "required": true,
+      "maxLength": 20
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_ss_total_opps",
+    "displayName:zh-CN": "商机总数",
+    "displayName:en": "Total Opps",
+    "dataType": "integer",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_ss_won_count",
+    "displayName:zh-CN": "赢单数",
+    "displayName:en": "Won Count",
+    "dataType": "integer",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_ss_won_amount",
+    "displayName:zh-CN": "赢单金额",
+    "displayName:en": "Won Amount",
+    "dataType": "decimal",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_ss_pipeline_amount",
+    "displayName:zh-CN": "管道金额",
+    "displayName:en": "Pipeline Amount",
+    "dataType": "decimal",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_ss_conversion_rate",
+    "displayName:zh-CN": "转化率%",
+    "displayName:en": "Conversion %",
+    "dataType": "decimal",
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_ss_refreshed_at",
+    "displayName:zh-CN": "刷新时间",
+    "displayName:en": "Refreshed At",
+    "dataType": "datetime",
+    "feature": {
+      "sortable": true
+    }
+  }
+]

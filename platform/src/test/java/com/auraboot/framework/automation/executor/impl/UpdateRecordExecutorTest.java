@@ -62,7 +62,7 @@ class UpdateRecordExecutorTest {
         });
 
         AutomationAction action = buildAction(Map.of(
-                "modelCode", "crm_lead",
+                "modelCode", "crm_lead_common",
                 "recordPid", "lead-123",
                 "fields", Map.of("status", "qualified")
         ));
@@ -75,7 +75,7 @@ class UpdateRecordExecutorTest {
         @SuppressWarnings("unchecked")
         Set<String> updatedFields = (Set<String>) result.get("updatedFields");
         assertThat(updatedFields).contains("status");
-        verify(dynamicDataService).update(eq("crm_lead"), eq("lead-123"), argThat(f ->
+        verify(dynamicDataService).update(eq("crm_lead_common"), eq("lead-123"), argThat(f ->
                 "qualified".equals(f.get("status"))));
         assertThat(MetaContext.getCommandPermitScope()).isNull();
     }
@@ -86,7 +86,7 @@ class UpdateRecordExecutorTest {
         when(dynamicDataService.update(any(), any(), any())).thenReturn(Map.of());
 
         AutomationAction action = buildAction(Map.of(
-                "modelCode", "crm_lead",
+                "modelCode", "crm_lead_common",
                 "fields", Map.of("priority", "high")
         ));
         Map<String, Object> context = Map.of("recordPid", "ctx-record-789");
@@ -95,7 +95,7 @@ class UpdateRecordExecutorTest {
 
         assertThat(result.get("success")).isEqualTo(true);
         assertThat(result.get("recordPid")).isEqualTo("ctx-record-789");
-        verify(dynamicDataService).update(eq("crm_lead"), eq("ctx-record-789"), any());
+        verify(dynamicDataService).update(eq("crm_lead_common"), eq("ctx-record-789"), any());
     }
 
     @Test
@@ -160,7 +160,7 @@ class UpdateRecordExecutorTest {
     @Test
     void execute_emptyFields_throwsIllegalArgument() {
         AutomationAction action = buildAction(Map.of(
-                "modelCode", "crm_lead",
+                "modelCode", "crm_lead_common",
                 "recordPid", "rec-001",
                 "fields", Map.of()
         ));
@@ -173,7 +173,7 @@ class UpdateRecordExecutorTest {
     @Test
     void execute_nullFields_throwsIllegalArgument() {
         Map<String, Object> config = new HashMap<>();
-        config.put("modelCode", "crm_lead");
+        config.put("modelCode", "crm_lead_common");
         config.put("recordPid", "rec-001");
         config.put("fields", null);
         AutomationAction action = buildAction(config);

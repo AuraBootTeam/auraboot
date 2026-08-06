@@ -1,0 +1,173 @@
+{
+  "pageKey": "crm_clarification_common_form",
+  "name:zh-CN": "澄清项表单",
+  "name:en": "Clarification Form",
+  "modelCode": "crm_clarification_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "crm_cl_ctx",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "基础信息",
+        "en": "Basics"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 2,
+      "fields": [
+        {
+          "field": "crm_cl_title",
+          "layout": {
+            "colSpan": 6
+          },
+          "required": true
+        },
+        {
+          "field": "crm_cl_review_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_cl_customer_request_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_cl_account_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_cl_owner_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_cl_source_model",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_cl_source_id",
+          "layout": {
+            "colSpan": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_cl_status",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "状态与时间",
+        "en": "Status & Timing"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 3,
+      "fields": [
+        {
+          "field": "crm_cl_clarification_type",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_cl_status",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_cl_priority",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_cl_raised_at",
+          "layout": {
+            "colSpan": 4
+          }
+        },
+        {
+          "field": "crm_cl_resolved_at",
+          "layout": {
+            "colSpan": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_cl_notes",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "详情与留痕",
+        "en": "Details & Payload"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 1,
+      "fields": [
+        {
+          "field": "crm_cl_question",
+          "layout": {
+            "colSpan": 12
+          }
+        },
+        {
+          "field": "crm_cl_answer",
+          "layout": {
+            "colSpan": 12
+          }
+        },
+        {
+          "field": "crm_cl_common_payload",
+          "layout": {
+            "colSpan": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_cl_buttons",
+      "blockType": "form-buttons",
+      "layout": {
+        "colSpan": 12
+      },
+      "buttons": [
+        {
+          "code": "save",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel",
+          "action": {
+            "type": "builtin",
+            "name": "back"
+          }
+        }
+      ]
+    }
+  ]
+}

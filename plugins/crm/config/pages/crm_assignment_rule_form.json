@@ -1,0 +1,78 @@
+{
+  "pageKey": "crm_assignment_rule_form",
+  "name:zh-CN": "分配规则表单",
+  "name:en": "Assignment Rule Form",
+  "modelCode": "crm_assignment_rule",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "分配规则",
+        "en-US": "Assignment Rule"
+      },
+      "fields": [
+        {
+          "field": "crm_asgn_name",
+          "colSpan": 12,
+          "required": true
+        },
+        {
+          "field": "crm_asgn_strategy",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_asgn_priority",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_asgn_match_field",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_asgn_match_value",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_asgn_rep_pool",
+          "colSpan": 12,
+          "required": true
+        },
+        {
+          "field": "crm_asgn_status",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_asgn_remark",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

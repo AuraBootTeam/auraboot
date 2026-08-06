@@ -30,16 +30,16 @@ class ImNotificationPreferenceServiceTest {
 
     @Test
     void isEnabled_returns_true_when_no_preference() {
-        when(mapper.findMostSpecific(1L, 10L, "crm_lead", "state_transition")).thenReturn(null);
-        assertThat(service.isEnabled(10L, 1L, "crm_lead", "state_transition")).isTrue();
+        when(mapper.findMostSpecific(1L, 10L, "crm_lead_common", "state_transition")).thenReturn(null);
+        assertThat(service.isEnabled(10L, 1L, "crm_lead_common", "state_transition")).isTrue();
     }
 
     @Test
     void isEnabled_returns_preference_value_when_disabled() {
         ImNotificationPreference pref = new ImNotificationPreference();
         pref.setEnabled(false);
-        when(mapper.findMostSpecific(1L, 10L, "crm_lead", "state_transition")).thenReturn(pref);
-        assertThat(service.isEnabled(10L, 1L, "crm_lead", "state_transition")).isFalse();
+        when(mapper.findMostSpecific(1L, 10L, "crm_lead_common", "state_transition")).thenReturn(pref);
+        assertThat(service.isEnabled(10L, 1L, "crm_lead_common", "state_transition")).isFalse();
     }
 
     @Test
@@ -64,7 +64,7 @@ class ImNotificationPreferenceServiceTest {
         existing.setEnabled(true);
         when(mapper.selectOne(any(QueryWrapper.class))).thenReturn(existing);
 
-        ImNotificationPreference saved = service.setPreference(10L, 1L, "crm_lead", "state_transition", false);
+        ImNotificationPreference saved = service.setPreference(10L, 1L, "crm_lead_common", "state_transition", false);
 
         assertThat(saved).isSameAs(existing);
         assertThat(saved.getEnabled()).isFalse();
@@ -76,11 +76,11 @@ class ImNotificationPreferenceServiceTest {
     void setPreference_inserts_new_when_no_existing() {
         when(mapper.selectOne(any(QueryWrapper.class))).thenReturn(null);
 
-        ImNotificationPreference saved = service.setPreference(10L, 1L, "crm_lead", "custom", true);
+        ImNotificationPreference saved = service.setPreference(10L, 1L, "crm_lead_common", "custom", true);
 
         assertThat(saved.getUserId()).isEqualTo(10L);
         assertThat(saved.getTenantId()).isEqualTo(1L);
-        assertThat(saved.getModelCode()).isEqualTo("crm_lead");
+        assertThat(saved.getModelCode()).isEqualTo("crm_lead_common");
         assertThat(saved.getOperationType()).isEqualTo("custom");
         assertThat(saved.getEnabled()).isTrue();
         assertThat(saved.getCreatedAt()).isNotNull();

@@ -58,7 +58,7 @@ public class AutoPermissionAssignmentService {
      * <p>Creates a 3-level hierarchy: Module (level=1) → Resource (level=2) → Action (level=3).
      * Actions include DynamicController's baseline API actions plus those derived from the model's commands.
      *
-     * @param modelCode  the model code (e.g., "crm_lead")
+     * @param modelCode  the model code (e.g., "crm_lead_common")
      * @param moduleCode the module code (e.g., "crm"); if null, derived from modelCode prefix
      */
     @Transactional
@@ -73,7 +73,7 @@ public class AutoPermissionAssignmentService {
      * reliably carry the tenant ID during post-processing. Passing tenantId explicitly ensures
      * generated permissions are bound to the correct roles (especially tenant_admin/viewer).
      *
-     * @param modelCode  the model code (e.g., "crm_lead")
+     * @param modelCode  the model code (e.g., "crm_lead_common")
      * @param moduleCode the module code (e.g., "crm"); if null, derived from modelCode prefix
      * @param tenantId   the tenant to bind generated permissions to; falls back to MetaContext when null
      */
@@ -121,7 +121,7 @@ public class AutoPermissionAssignmentService {
 
     /**
      * Derive module code from model code by extracting the prefix before the first underscore.
-     * E.g., "crm_lead" → "crm", "pm_project" → "pm", "standalone" → "standalone"
+     * E.g., "crm_lead_common" → "crm", "pm_project" → "pm", "standalone" → "standalone"
      */
     String deriveModuleFromModelCode(String modelCode) {
         int idx = modelCode.indexOf('_');

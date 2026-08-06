@@ -1,7 +1,7 @@
 /**
  * LeadsWidget — List of recent CRM leads.
  *
- * Data source: GET /api/dynamic/crm_lead/list (dynamic controller)
+ * Data source: GET /api/dynamic/crm_lead_common/list (dynamic controller)
  * Sorted by created_at desc, top N items.
  */
 
@@ -75,7 +75,7 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
       setCrmUnavailable(false);
       try {
         const result = await get<LeadListResponse>(
-          `/api/dynamic/crm_lead/list?pageNum=1&pageSize=${maxItems}&sortField=created_at&sortOrder=desc`,
+          `/api/dynamic/crm_lead_common/list?pageNum=1&pageSize=${maxItems}&sortField=created_at&sortOrder=desc`,
         );
         if (!cancelled && result.code === '0' && result.data) {
           setLeads(result.data.records || []);
@@ -101,7 +101,7 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
   const handleRowClick = (lead: LeadRecord) => {
     const recordPid = getLeadRecordId(lead);
     if (recordPid) {
-      window.location.href = `/p/crm_lead/view/${encodeURIComponent(recordPid)}`;
+      window.location.href = `/p/crm_lead_common/view/${encodeURIComponent(recordPid)}`;
     }
   };
 
@@ -194,7 +194,7 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
         <span className="text-sm font-semibold text-gray-900">{resolvedTitle}</span>
         {total > maxItems && (
           <a
-            href="/p/crm_lead"
+            href="/p/crm_lead_common"
             className="text-[11px] text-blue-500 hover:text-blue-600"
           >
             {t('workbench.leads.viewAll', {}, 'View All')} &rarr;

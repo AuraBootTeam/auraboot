@@ -1,0 +1,70 @@
+{
+  "pageKey": "crm_forecast_submission_form",
+  "name:zh-CN": "预测提交表单",
+  "name:en": "Forecast Submission Form",
+  "modelCode": "crm_forecast_submission",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "预测信息",
+        "en": "Forecast Info"
+      },
+      "fields": [
+        {
+          "field": "crm_fcst_period",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_fcst_owner",
+          "colSpan": 6
+        },
+        {
+          "field": "crm_fcst_commit_amount",
+          "colSpan": 4,
+          "required": true
+        },
+        {
+          "field": "crm_fcst_best_case_amount",
+          "colSpan": 4,
+          "required": true
+        },
+        {
+          "field": "crm_fcst_pipeline_amount",
+          "colSpan": 4,
+          "required": true
+        },
+        {
+          "field": "crm_fcst_notes",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

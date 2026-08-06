@@ -137,7 +137,7 @@ class RagDocumentSyncListenerIntegrationTest extends BaseIntegrationTest {
     @DisplayName("SYNC-08: Non-syncable model is ignored")
     void nonSyncableIgnored() {
         CommandCompletedEvent event = new CommandCompletedEvent(
-                getTestTenant().getId(), "pid", "crm_account", Map.of(), "create", "create");
+                getTestTenant().getId(), "pid", "crm_account_common", Map.of(), "create", "create");
         assertThatCode(() -> syncListener.onCommandCompleted(event)).doesNotThrowAnyException();
     }
 

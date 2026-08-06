@@ -121,12 +121,12 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["model", "field", "dict", "command", "process", "query", "automation", "api"],
+            "enum": ["model", "field", "dict", "command", "page", "process", "query", "automation", "api"],
             "description": "Capability type"
           },
           "code": {
             "type": "string",
-            "description": "Capability code (e.g. crm_account, crm:create_lead)"
+            "description": "Capability code (e.g. crm_account_common, crm:create_lead)"
           }
         },
         "additionalProperties": false
@@ -141,7 +141,7 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["model", "field", "dict", "command", "process", "query", "automation", "api"],
+            "enum": ["model", "field", "dict", "command", "page", "process", "query", "automation", "api"],
             "description": "Required capability type"
           },
           "code": {
@@ -758,6 +758,10 @@
           "type": "object",
           "description": "Extension properties"
         },
+        "extraProps": {
+          "type": "object",
+          "description": "Canonical runtime field metadata such as field-level permission policy"
+        },
         "policySchema": {
           "type": "object",
           "description": "Policy schema for configurable permission policies and dynamic ABAC"
@@ -1029,6 +1033,10 @@
           "type": "array",
           "description": "Target models affected by this command",
           "items": { "type": "string" }
+        },
+        "handler": {
+          "type": "string",
+          "description": "Canonical command-handler code resolved by the command pipeline"
         },
         "executionConfig": {
           "type": "object",

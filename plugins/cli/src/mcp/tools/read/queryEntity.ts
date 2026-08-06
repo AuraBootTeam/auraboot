@@ -4,7 +4,7 @@ import { queryDynamicList, type FilterItem } from '../../../client/dynamic-query
 import type { Tool } from '../../registry.js';
 
 const inputSchema = z.object({
-  entityCode: z.string().describe('Model code, e.g. crm_lead, pm_project, crm_account'),
+  entityCode: z.string().describe('Model code, e.g. crm_lead_common, pm_project, crm_account_common'),
   keyword: z.string().optional().describe('Search keyword'),
   filters: z
     .array(
@@ -28,7 +28,7 @@ export function queryEntityTool(client: ApiClient): Tool<Params> {
     name: 'query_entity',
     title: 'Query Entity Data',
     description:
-      'Query any AuraBoot entity (model) with filters. Use model code as entityCode (e.g. crm_lead, pm_project, crm_account).',
+      'Query any AuraBoot entity (model) with filters. Use model code as entityCode (e.g. crm_lead_common, pm_project, crm_account_common).',
     inputSchema,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     handler: async (params) => {

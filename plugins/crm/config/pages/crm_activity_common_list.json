@@ -1,0 +1,203 @@
+{
+  "pageKey": "crm_activity_common_list",
+  "name:zh-CN": "活动列表",
+  "name:en": "Activities",
+  "modelCode": "crm_activity_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "crm_act_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "en": "All",
+            "zh-CN": "全部"
+          },
+          "filter": null
+        },
+        {
+          "key": "task",
+          "label": {
+            "en": "Tasks",
+            "zh-CN": "任务"
+          },
+          "filter": {
+            "field": "crm_act_type",
+            "value": "task",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "call",
+          "label": {
+            "en": "Calls",
+            "zh-CN": "电话"
+          },
+          "filter": {
+            "field": "crm_act_type",
+            "value": "call",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "email",
+          "label": {
+            "en": "Emails",
+            "zh-CN": "邮件"
+          },
+          "filter": {
+            "field": "crm_act_type",
+            "value": "email",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "meeting",
+          "label": {
+            "en": "Meetings",
+            "zh-CN": "会议"
+          },
+          "filter": {
+            "field": "crm_act_type",
+            "value": "meeting",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "note",
+          "label": {
+            "en": "Notes",
+            "zh-CN": "笔记"
+          },
+          "filter": {
+            "field": "crm_act_type",
+            "value": "note",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "visit",
+          "label": {
+            "en": "Visits",
+            "zh-CN": "拜访"
+          },
+          "filter": {
+            "field": "crm_act_type",
+            "value": "visit",
+            "operator": "EQ"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_act_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "crm.activity.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_activity_common_form",
+            "command": "crm:create_activity"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_act_table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_act_type",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "crm_activity_type"
+        },
+        {
+          "field": "crm_act_subject",
+          "width": 250,
+          "sortable": true
+        },
+        {
+          "field": "crm_act_date",
+          "width": 160,
+          "sortable": true,
+          "format": "YYYY-MM-DD HH:mm"
+        },
+        {
+          "field": "crm_act_owner",
+          "width": 120
+        },
+        {
+          "field": "crm_act_status",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "crm_task_status"
+        },
+        {
+          "field": "crm_act_priority",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "crm_task_priority"
+        },
+        {
+          "field": "crm_act_source",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "crm_activity_source"
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "buttons": [
+            {
+              "code": "view",
+              "label": "$i18n:common.button.view",
+              "action": {
+                "type": "navigate",
+                "to": "crm_activity_common_detail"
+              }
+            },
+            {
+              "code": "edit",
+              "permissionCode": "crm.activity.manage",
+              "label": "$i18n:common.button.edit",
+              "action": {
+                "type": "navigate",
+                "to": "crm_activity_common_form"
+              }
+            },
+            {
+              "code": "delete",
+              "danger": true,
+              "permissionCode": "crm.activity.manage",
+              "label": "$i18n:common.button.delete",
+              "confirm": "delete.confirm",
+              "action": {
+                "type": "command"
+              }
+            }
+          ],
+          "label": "$i18n:common.actions"
+        }
+      ],
+      "searchFields": [
+        "crm_act_subject"
+      ],
+      "defaultSort": {
+        "field": "crm_act_date",
+        "order": "desc"
+      }
+    }
+  ]
+}

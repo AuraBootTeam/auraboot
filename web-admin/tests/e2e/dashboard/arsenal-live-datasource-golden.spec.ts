@@ -176,7 +176,7 @@ test.describe('Arsenal dashboard — every widget on a live data source', () => 
     // a probe with a slightly different request shape lands on a different (fresher)
     // cache entry. Asserting across the two reported a working card as broken.
     const accountCall = chartCalls.find(
-      (c) => c.request.includes('crm_account') && c.request.includes('account_count'),
+      (c) => c.request.includes('crm_account_common') && c.request.includes('account_count'),
     );
     expect(accountCall, 'the customer-count card never queried chart-data').toBeTruthy();
 

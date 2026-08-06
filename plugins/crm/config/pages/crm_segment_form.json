@@ -1,0 +1,55 @@
+{
+  "pageKey": "crm_segment_form",
+  "name:zh-CN": "细分表单",
+  "name:en": "Segment Form",
+  "modelCode": "crm_segment",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "columns": 12
+  },
+  "blocks": [
+    {
+      "id": "basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "细分信息",
+        "en": "Segment Info"
+      },
+      "fields": [
+        {
+          "field": "crm_seg_name",
+          "colSpan": 6,
+          "required": true
+        },
+        {
+          "field": "crm_seg_description",
+          "colSpan": 12
+        },
+        {
+          "field": "crm_seg_criteria",
+          "colSpan": 12
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel"
+        }
+      ]
+    }
+  ]
+}

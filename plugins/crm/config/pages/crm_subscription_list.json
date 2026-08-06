@@ -1,0 +1,81 @@
+{
+  "pageKey": "crm_subscription_list",
+  "name:zh-CN": "订阅",
+  "name:en": "Subscriptions",
+  "modelCode": "crm_subscription",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "filters",
+      "blockType": "filters",
+      "fields": [
+        {
+          "field": "crm_sub_status"
+        },
+        {
+          "field": "crm_sub_plan"
+        }
+      ]
+    },
+    {
+      "id": "toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "primary": true,
+          "permissionCode": "crm.subscription.manage",
+          "label": "$i18n:common.button.create",
+          "action": {
+            "type": "navigate",
+            "to": "crm_subscription_form"
+          }
+        }
+      ]
+    },
+    {
+      "id": "table",
+      "blockType": "table",
+      "columns": [
+        {
+          "field": "crm_sub_code"
+        },
+        {
+          "field": "crm_sub_plan"
+        },
+        {
+          "field": "crm_sub_monthly_amount"
+        },
+        {
+          "field": "crm_sub_mrr"
+        },
+        {
+          "field": "crm_sub_arr"
+        },
+        {
+          "field": "crm_sub_status",
+          "renderType": "tag",
+          "dictCode": "crm_subscription_status"
+        },
+        {
+          "field": "crm_sub_end_date"
+        }
+      ],
+      "rowActions": [
+        {
+          "code": "recompute",
+          "label": "$i18n:crm.subscription.recompute",
+          "permissionCode": "crm.subscription.manage",
+          "action": {
+            "type": "command",
+            "command": "crm:recompute_subscription"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -4,7 +4,8 @@
  * Proves through the real browser UI against the isolated CRM-M1 stack:
  *  - B8 fix: the Sales Forecast menu/route now resolves to the forecast dashboard
  *    (previously pointed at an unregistered /crm/sales-forecast route).
- *  - the forecast board renders the attainment-vs-quota table + forecast-by-category.
+ *  - the public forecast board renders pipeline and forecast-by-category views without
+ *    reading the optional private incentive quota model.
  *  - the CRM dashboard renders the lost-reason breakdown + stale-opportunities widgets.
  *  - the opportunity detail surfaces the new forecast-category / competitor /
  *    lost-reason dimensions, all localized, with no raw-code leak.
@@ -16,7 +17,7 @@
  *
  * COVERAGE MATRIX:
  *   E1  forecast dashboard reachable via /dashboards/view/crm_sales_forecast (B8 fix)
- *   E2  forecast board shows attainment-vs-quota + forecast-by-category widgets
+ *   E2  forecast board shows stage + forecast-by-category widgets
  *   E3  CRM dashboard shows lost-reason breakdown + stale-opportunities widgets
  *   E4  opportunity form exposes forecast-category + competitor dimensions
  */
@@ -50,9 +51,19 @@ async function uiLogin(page: Page): Promise<void> {
 }
 
 async function gotoPage(page: Page, path: string): Promise<void> {
-  await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-  await page.waitForTimeout(2000);
+  await page.goto(`${BASE}/dashboards`, { waitUntil: 'domcontentloaded' });
+  const nav = page.locator('nav, aside, [role="navigation"]').first();
+  const link = nav.locator(`a[href="${path}"]`).first();
+  if (!(await link.isVisible().catch(() => false))) {
+    const root = nav.getByRole('button', { name: /客户关系管理|crm/i }).first();
+    if (await root.isVisible().catch(() => false)) await root.click();
+  }
+  await link.waitFor({ state: 'visible', timeout: 10_000 });
+  await link.click();
+  await expect(page).toHaveURL(new RegExp(`${path.replaceAll('/', '\\/')}(?:\\?.*)?$`), {
+    timeout: 15_000,
+  });
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 10_000 });
 }
 
 async function assertNoRawCodeLeak(page: Page, label: string): Promise<void> {
@@ -66,25 +77,28 @@ async function assertNoRawCodeLeak(page: Page, label: string): Promise<void> {
 test.describe.configure({ mode: 'serial' });
 
 test.describe('CRM M4 forecast + win/loss + stale (L4 UI golden)', () => {
+  test.setTimeout(60_000);
   test.beforeEach(async ({ page }) => {
     await uiLogin(page);
   });
 
   // ---- E1/E2: forecast board reachable (B8 fix) + new widgets ----
-  test('E1+E2 forecast board reachable + attainment & category widgets', async ({ page }) => {
+  test('E1+E2 public forecast board reachable with stage and category widgets', async ({ page }) => {
     await gotoPage(page, '/dashboards/view/crm_sales_forecast');
     // B8 fix: the board resolves (NOT the pre-fix "Page Unavailable" / menu-not-found state)
     await expect(page.getByText(/Page Unavailable|Menu configuration not found/)).toHaveCount(0);
     await expect(page.getByText(/销售预测|Sales Forecast/).first()).toBeVisible({ timeout: 15000 });
     // the new M4 forecast widgets render with localized DOM card titles. (ECharts chart
     // titles render as SVG <text> with no stable bounding box, so assert the DOM-backed
-    // card-header widgets — the attainment-vs-quota table and the category detail table —
-    // plus the live attainment row data proving the quota join executed.)
-    await expect(page.getByText(/配额达成率|Quota Attainment/).first()).toBeVisible({ timeout: 10000 });
+    // card-header widgets — the stage and category detail tables — without an
+    // optional incentive-plugin quota join.)
+    await expect(page.getByText(/阶段预测明细|Stage Forecast Detail/).first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/预测类别明细|Forecast Category Detail/).first()).toBeVisible({ timeout: 10000 });
-    // attainment table columns + a real quota row (target 500000 from the seeded M2 quota)
-    await expect(page.getByText(/配额目标|Quota Target/).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('500000').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/配额达成率|Quota Attainment/)).toHaveCount(0);
+    const winRateCard = page.getByText('赢单率', { exact: true }).locator('..');
+    const winRateText = await winRateCard.innerText();
+    const winRate = Number(winRateText.match(/([\d.]+)%/)?.[1]);
+    expect(winRate, `win-rate card must stay within 0-100%, got: ${winRateText}`).toBeLessThanOrEqual(100);
     await page.screenshot({ path: `${SHOT}/e1_forecast_board.png`, fullPage: true });
   });
 
@@ -107,9 +121,9 @@ test.describe('CRM M4 forecast + win/loss + stale (L4 UI golden)', () => {
 
   // ---- E4: opportunity form exposes the new dimensions ----
   test('E4 opportunity form exposes forecast-category + competitor', async ({ page }) => {
-    await gotoPage(page, '/p/crm_opportunity');
+    await gotoPage(page, '/p/crm_opportunity_common');
     await page.getByRole('button', { name: /新建|新增|创建|Create/ }).first().click();
-    await page.waitForTimeout(1500);
+    await expect(page).toHaveURL(/\/p\/crm_opportunity_common\/new(?:\?.*)?$/, { timeout: 10_000 });
     await expect(page.getByText('预测类别', { exact: false }).first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('竞争对手', { exact: false }).first()).toBeVisible({ timeout: 10000 });
     await assertNoRawCodeLeak(page, 'opportunity_form');

@@ -46,6 +46,56 @@ export function declaredCommands(pluginDir) {
     .filter((c) => typeof c === 'string' && c.length > 0);
 }
 
+const CONVENTION_BUTTON_TYPES = {
+  create: ['create'],
+  edit: ['update'],
+  delete: ['delete'],
+  save: ['create', 'update'],
+  submit: ['create', 'update'],
+};
+
+/**
+ * CRUD commands reached through the platform's convention resolver.
+ *
+ * Standard DSL buttons intentionally omit action.command: the runtime resolves
+ * the one unambiguous command for the page model and button role. Counting only
+ * quoted command codes would therefore contradict check-dsl-command-convention
+ * and call every canonical create/edit/delete button unreachable.
+ */
+export function conventionReferencedCommands(pluginDir) {
+  const byModelType = new Map();
+  for (const command of loadConfigList(pluginDir, 'commands')) {
+    if (!command?.modelCode || !command?.type || !command?.code) continue;
+    if (!['create', 'update', 'delete'].includes(command.type)) continue;
+    const key = `${command.modelCode}::${command.type}`;
+    if (!byModelType.has(key)) byModelType.set(key, new Set());
+    byModelType.get(key).add(command.code);
+  }
+
+  const found = new Set();
+  const visit = (node, modelCode) => {
+    if (Array.isArray(node)) {
+      for (const item of node) visit(item, modelCode);
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+
+    const types = CONVENTION_BUTTON_TYPES[node.code] ?? [];
+    if (node.action && typeof node.action === 'object') {
+      for (const type of types) {
+        const codes = byModelType.get(`${modelCode}::${type}`);
+        if (codes?.size === 1) found.add([...codes][0]);
+      }
+    }
+    for (const value of Object.values(node)) visit(value, modelCode);
+  };
+
+  for (const page of loadConfigList(pluginDir, 'pages')) {
+    if (page?.modelCode) visit(page, page.modelCode);
+  }
+  return found;
+}
+
 /**
  * Whether a command code appears anywhere in the plugin's page/menu DSL.
  *
@@ -66,6 +116,7 @@ export function referencedCommands(pluginDir) {
   // that knows four of five reports reachable commands as unreachable.
   const text = loadConfigText(pluginDir, 'pages', 'menus');
   for (const m of text.matchAll(/"([a-z0-9_-]+:[a-z0-9_]+)"/gi)) found.add(m[1]);
+  for (const code of conventionReferencedCommands(pluginDir)) found.add(code);
   return found;
 }
 

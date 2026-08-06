@@ -340,7 +340,7 @@ test.describe('AuraBot Panel', () => {
     // Open AI panel
     const panel = await openPanel(page);
 
-    // Context suggestions should appear for list:crm_lead (or list:* wildcard)
+    // Context suggestions should appear for list:crm_lead_common (or list:* wildcard)
     // Look for suggestion pill buttons (rounded-full small buttons in the suggestions area)
     const suggestionPills = panel.locator('button.rounded-full');
 
@@ -413,7 +413,7 @@ test.describe('AuraBot Panel', () => {
 
   test('AIP-12: ActionBar renders on a CRM list page', async ({ page }) => {
     await gotoAppAndWaitForHeader(page);
-    await page.goto('/p/crm_lead', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/crm_lead_common', { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('domcontentloaded');
 
     const panel = await openPanel(page);

@@ -1,0 +1,56 @@
+[
+  {
+    "code": "crm_ol_opportunity_id",
+    "displayName:zh-CN": "商机",
+    "displayName:en": "Opportunity",
+    "dataType": "reference",
+    "referenceModelCode": "crm_opportunity_common",
+    "constraints": { "required": true }
+  },
+  {
+    "code": "crm_ol_product_name",
+    "displayName:zh-CN": "产品名称",
+    "displayName:en": "Product Name",
+    "dataType": "string",
+    "constraints": { "required": true, "maxLength": 200 },
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_ol_quantity",
+    "displayName:zh-CN": "数量",
+    "displayName:en": "Quantity",
+    "dataType": "decimal",
+    "constraints": { "required": true }
+  },
+  {
+    "code": "crm_ol_unit_price",
+    "displayName:zh-CN": "单价",
+    "displayName:en": "Unit Price",
+    "dataType": "decimal"
+  },
+  {
+    "code": "crm_ol_unit_cost",
+    "displayName:zh-CN": "单位成本",
+    "displayName:en": "Unit Cost",
+    "dataType": "decimal"
+  },
+  {
+    "code": "crm_ol_discount",
+    "displayName:zh-CN": "折扣(%)",
+    "displayName:en": "Discount (%)",
+    "dataType": "decimal"
+  },
+  {
+    "code": "crm_ol_amount",
+    "displayName:zh-CN": "金额",
+    "displayName:en": "Amount",
+    "dataType": "decimal",
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_ol_notes",
+    "displayName:zh-CN": "备注",
+    "displayName:en": "Notes",
+    "dataType": "text"
+  }
+]

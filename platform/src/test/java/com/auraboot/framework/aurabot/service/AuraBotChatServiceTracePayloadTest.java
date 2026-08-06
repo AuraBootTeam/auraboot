@@ -69,7 +69,7 @@ class AuraBotChatServiceTracePayloadTest {
     @DisplayName("resolve tools span keeps inspectable request and selected tools")
     void buildResolveToolsPayloads_keepUsefulDetails() {
         Map<String, Object> input = AuraBotChatService.buildResolveToolsSpanInput(
-                "find accounts", "crm_account", "rec_001");
+                "find accounts", "crm_account_common", "rec_001");
         Map<String, Object> output = AuraBotChatService.buildResolveToolsSpanOutput(List.of(
                 LlmChatRequest.Tool.builder()
                         .name("lookup_account")
@@ -77,7 +77,7 @@ class AuraBotChatServiceTracePayloadTest {
                         .build()));
 
         assertThat(input).containsEntry("message", "find accounts");
-        assertThat(input).containsEntry("model_code", "crm_account");
+        assertThat(input).containsEntry("model_code", "crm_account_common");
         assertThat(output).containsEntry("tool_count", 1);
         assertThat((List<?>) output.get("tools")).hasSize(1);
     }

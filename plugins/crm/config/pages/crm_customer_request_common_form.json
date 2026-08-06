@@ -1,0 +1,121 @@
+{
+  "pageKey": "crm_customer_request_common_form",
+  "name:zh-CN": "客户需求表单",
+  "name:en": "Customer Request Form",
+  "modelCode": "crm_customer_request_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "crm_cr_basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "需求信息",
+        "en-US": "Request Information"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 2,
+      "fields": [
+        {
+          "field": "crm_cr_title",
+          "layout": {
+            "colSpan": 12
+          },
+          "required": true
+        },
+        {
+          "field": "crm_cr_account_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_cr_contact_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_cr_lead_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_cr_opportunity_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_cr_type",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_cr_priority",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_cr_expected_date",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_cr_owner",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_cr_source_channel",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "crm_cr_summary",
+          "layout": {
+            "colSpan": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_cr_form_buttons",
+      "blockType": "form-buttons",
+      "layout": {
+        "colSpan": 12
+      },
+      "buttons": [
+        {
+          "code": "save",
+          "primary": true,
+          "label": "$i18n:common.button.save",
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": "$i18n:common.button.cancel",
+          "action": {
+            "type": "builtin",
+            "name": "back"
+          }
+        }
+      ]
+    }
+  ]
+}

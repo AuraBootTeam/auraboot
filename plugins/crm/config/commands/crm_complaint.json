@@ -1,0 +1,170 @@
+[
+  {
+    "code": "crm:create_complaint",
+    "displayName:zh-CN": "新建投诉",
+    "displayName:en": "Create Complaint",
+    "type": "create",
+    "modelCode": "crm_complaint",
+    "inputFields": [
+      "crm_cmp_account_id",
+      "crm_cmp_contact_id",
+      "crm_cmp_date",
+      "crm_cmp_type",
+      "crm_cmp_severity",
+      "crm_cmp_sla_policy_id",
+      "crm_cmp_description"
+    ],
+    "autoSetFields": {
+      "crm_cmp_code": {
+        "strategy": "auto_generate",
+        "pattern": "CMP-{yyyyMMdd}-{seq}"
+      },
+      "crm_cmp_status": {
+        "strategy": "fixed_value",
+        "value": "open"
+      },
+      "crm_cmp_sla_status": {
+        "strategy": "fixed_value",
+        "value": "on_track"
+      }
+    },
+    "permissions": [
+      "crm.complaint.manage"
+    ],
+    "agent_hint": "Create a new crm complaint record. Key inputs: account_id, contact_id, date, type, severity. Auto-generated: code, status.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_complaint",
+    "displayName:zh-CN": "编辑投诉",
+    "displayName:en": "Update Complaint",
+    "type": "update",
+    "modelCode": "crm_complaint",
+    "inputFields": [
+      "crm_cmp_account_id",
+      "crm_cmp_contact_id",
+      "crm_cmp_date",
+      "crm_cmp_type",
+      "crm_cmp_severity",
+      "crm_cmp_description",
+      "crm_cmp_sla_policy_id",
+      "crm_cmp_root_cause",
+      "crm_cmp_corrective_action",
+      "crm_cmp_resolution_date"
+    ],
+    "permissions": [
+      "crm.complaint.manage"
+    ],
+    "agent_hint": "Update an existing crm complaint record. Editable fields: account_id, contact_id, date, type, severity, sla_policy.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:investigate_complaint",
+    "displayName:zh-CN": "开始调查",
+    "displayName:en": "Investigate",
+    "type": "state_transition",
+    "modelCode": "crm_complaint",
+    "stateField": "crm_cmp_status",
+    "fromStates": [
+      "open"
+    ],
+    "toState": "investigating",
+    "permissions": [
+      "crm.complaint.manage"
+    ],
+    "agent_hint": "Transition crm complaint status from open to INVESTIGATING.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:resolve_complaint",
+    "displayName:zh-CN": "解决投诉",
+    "displayName:en": "Resolve",
+    "type": "state_transition",
+    "modelCode": "crm_complaint",
+    "stateField": "crm_cmp_status",
+    "fromStates": [
+      "investigating"
+    ],
+    "toState": "resolved",
+    "inputFields": [
+      "crm_cmp_root_cause",
+      "crm_cmp_corrective_action",
+      "crm_cmp_resolution_date"
+    ],
+    "permissions": [
+      "crm.complaint.manage"
+    ],
+    "agent_hint": "Transition crm complaint status from INVESTIGATING to resolved.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:close_complaint",
+    "displayName:zh-CN": "关闭投诉",
+    "displayName:en": "Close",
+    "type": "state_transition",
+    "modelCode": "crm_complaint",
+    "stateField": "crm_cmp_status",
+    "fromStates": [
+      "resolved"
+    ],
+    "toState": "closed",
+    "extension": {
+      "confirmMessage:zh-CN": "确认关闭此投诉？",
+      "confirmMessage:en": "Confirm close this complaint?"
+    },
+    "permissions": [
+      "crm.complaint.manage"
+    ],
+    "agent_hint": "Transition crm complaint status from resolved to closed.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_complaint",
+    "displayName:zh-CN": "删除投诉",
+    "displayName:en": "Delete Complaint",
+    "type": "delete",
+    "modelCode": "crm_complaint",
+    "preconditions": [
+      {
+        "field": "crm_cmp_status",
+        "operator": "IN",
+        "value": [
+          "open"
+        ]
+      }
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此投诉？",
+      "confirmMessage:en": "Confirm delete this complaint?"
+    },
+    "permissions": [
+      "crm.complaint.manage"
+    ],
+    "agent_hint": "Delete crm complaint record(s). This is irreversible. Preconditions: status IN [\"open\"].",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:detail_complaint",
+    "displayName:zh-CN": "查看投诉",
+    "displayName:en": "View Complaint",
+    "type": "query",
+    "modelCode": "crm_complaint",
+    "permissions": [
+      "crm.complaint.read"
+    ],
+    "agent_hint": "Query crm complaint records.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:list_complaints",
+    "displayName:zh-CN": "投诉列表",
+    "displayName:en": "List Complaints",
+    "type": "query",
+    "modelCode": "crm_complaint",
+    "permissions": [
+      "crm.complaint.read"
+    ],
+    "agent_hint": "Query crm complaint records.",
+    "cmd_risk_level": "L0"
+  }
+]

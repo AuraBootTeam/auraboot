@@ -21,7 +21,7 @@ export interface KanbanViewProps {
   /** Model code for data fetching */
   modelCode: string;
   /**
-   * Page key used as the dynamic API resource segment (e.g. `crm_opportunity`)
+   * Page key used as the dynamic API resource segment (e.g. `crm_opportunity_common`)
    * for kanban card-move persistence. When omitted, moves stay purely
    * optimistic — see SmartKanban / useKanbanData for the contract.
    */

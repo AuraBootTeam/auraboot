@@ -30,7 +30,7 @@ import java.util.Map;
  * <p>Example JSON:
  * <pre>
  * {
- *   "code": "crm_overview",
+ *   "code": "crm_dashboard",
  *   "title": "CRM Overview",
  *   "description": "Key CRM metrics",
  *   "scope": "global",

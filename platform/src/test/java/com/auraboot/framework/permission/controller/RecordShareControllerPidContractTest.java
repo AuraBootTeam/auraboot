@@ -40,16 +40,16 @@ class RecordShareControllerPidContractTest {
         MetaContext.setCurrentTenantId(7L);
         RecordShare share = new RecordShare();
         share.setRecordPid("01KSHAREPID");
-        when(recordShareService.listByRecordPid(7L, "crm_lead", "01KSHAREPID"))
+        when(recordShareService.listByRecordPid(7L, "crm_lead_common", "01KSHAREPID"))
                 .thenReturn(List.of(share));
 
         RecordShareController controller =
                 new RecordShareController(recordShareService, dynamicDataService, userPermissionService);
-        ApiResponse<List<RecordShare>> response = controller.listShares("crm_lead", "01KSHAREPID");
+        ApiResponse<List<RecordShare>> response = controller.listShares("crm_lead_common", "01KSHAREPID");
 
         assertThat(response.isSuccess()).isTrue();
         assertThat(response.getData()).extracting(RecordShare::getRecordPid).containsExactly("01KSHAREPID");
-        verify(recordShareService).listByRecordPid(7L, "crm_lead", "01KSHAREPID");
+        verify(recordShareService).listByRecordPid(7L, "crm_lead_common", "01KSHAREPID");
         verify(recordShareService, never()).listByRecord(org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyLong());
     }
@@ -61,7 +61,7 @@ class RecordShareControllerPidContractTest {
         MetaContext.setContext(7L, 5L, "caller-pid", "caller");
         when(userPermissionService.hasPermission(5L, MetaPermission.RECORD_SHARE_MANAGE)).thenReturn(true);
         RecordShareController.RecordShareRequest request = new RecordShareController.RecordShareRequest();
-        request.setResourceCode("crm_lead");
+        request.setResourceCode("crm_lead_common");
         request.setRecordPid("01KSHAREPID");
         request.setSubjectType("member");
         request.setSubjectPid("01KMEMBERPID");
@@ -75,7 +75,7 @@ class RecordShareControllerPidContractTest {
         assertThat(response.isSuccess()).isTrue();
         verify(recordShareService).shareRecordByPid(
                 7L,
-                "crm_lead",
+                "crm_lead_common",
                 "01KSHAREPID",
                 "member",
                 null,
