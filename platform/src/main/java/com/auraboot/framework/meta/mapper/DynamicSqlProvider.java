@@ -162,7 +162,11 @@ public class DynamicSqlProvider {
 
         StringBuilder sql = new StringBuilder();
         sql.append("UPDATE ").append(tableName).append(" SET ")
-           .append(counterCol).append(" = COALESCE(").append(counterCol).append(", 0) + #{delta}")
+           .append(counterCol).append(" = COALESCE(").append(counterCol).append(", 0) + #{delta}");
+        if (tableName.startsWith(com.auraboot.framework.meta.constant.SystemFieldConstants.DYNAMIC_TABLE_PREFIX)) {
+            sql.append(", row_version = row_version + 1");
+        }
+        sql
            .append(", updated_at = now()")
            .append(", updated_by = #{currentUserId}")
            .append(" WHERE ").append(pkColumn).append(" = #{recordId}")

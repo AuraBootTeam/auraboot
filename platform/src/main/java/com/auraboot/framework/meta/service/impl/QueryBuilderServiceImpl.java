@@ -648,7 +648,7 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
             return List.of("*");
         }
 
-        return modelDefinition.getFields().stream()
+        List<String> selectFields = modelDefinition.getFields().stream()
                 .filter(f -> !f.isTransientField()) // Skip transient fields from SELECT
                 .map(field -> {
                     if (field.isJsonbVirtual()) {
@@ -662,6 +662,15 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
                     return field.getColumnName();
                 })
                 .collect(Collectors.toList());
+        // row_version is a platform-owned physical column, not a business MetaField binding.
+        // Always project it so every list/detail record can supply the exact optimistic token
+        // required by high-risk commands. PublicRecordSanitizer intentionally preserves it.
+        if (modelDefinition.getTableName() != null
+                && modelDefinition.getTableName().startsWith(SystemFieldConstants.DYNAMIC_TABLE_PREFIX)
+                && !selectFields.contains("row_version")) {
+            selectFields.add("row_version");
+        }
+        return selectFields;
     }
 
     private String resolveColumnName(ModelDefinition modelDefinition, String fieldName) {

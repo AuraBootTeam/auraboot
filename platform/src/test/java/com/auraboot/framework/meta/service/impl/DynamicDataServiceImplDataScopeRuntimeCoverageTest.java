@@ -290,6 +290,7 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
         assertThat(sqlCaptor.getValue())
                 .contains("UPDATE mt_phase_one_model SET")
                 .containsPattern("name = #\\{params\\.set\\d+}")
+                .contains("row_version = row_version + 1")
                 .contains("WHERE pid = #{params.recordId}")
                 .contains("tenant_id = #{params.tenantId}")
                 .contains("created_by = 20")

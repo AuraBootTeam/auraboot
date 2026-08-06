@@ -30,11 +30,12 @@ public final class SystemFieldConstants {
 
     /** DDL infrastructure columns for mt_* */
     public static final Set<String> ALL_INFRASTRUCTURE = Set.of(
-        "id", "pid", "created_at", "created_by", "updated_at", "updated_by", "tenant_id");
+            "id", "pid", "created_at", "created_by", "updated_at", "updated_by", "tenant_id",
+            "row_version");
 
     /** Columns transparent to query - not modeled as MetaField, skip code-to-column mapping */
     public static final Set<String> QUERY_TRANSPARENT = Set.of(
-        "tenant_id", "created_at", "created_by", "updated_at", "updated_by");
+            "tenant_id", "created_at", "created_by", "updated_at", "updated_by", "row_version");
 
     /** Pre-seeded fields auto-bound on model creation */
     public static final Set<String> AUTO_BIND = Set.of("id", "pid", "created_at", "updated_at");
@@ -44,7 +45,8 @@ public final class SystemFieldConstants {
 
     /** All system fields for validation (infrastructure + version) */
     public static final Set<String> VALIDATION_SYSTEM = Set.of(
-        "id", "pid", "created_at", "created_by", "updated_at", "updated_by", "tenant_id", "version");
+            "id", "pid", "created_at", "created_by", "updated_at", "updated_by", "tenant_id",
+            "row_version", "version");
 
     /**
      * Check if a field code is a system field (infrastructure + soft-delete + version).

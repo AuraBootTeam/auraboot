@@ -25,6 +25,47 @@ class QueryBuilderKeywordSearchTest {
     }
 
     @Test
+    @DisplayName("physical dynamic reads always project the optimistic row version")
+    void defaultSelectIncludesRowVersionOutsideBusinessFieldMetadata() {
+        ModelDefinition model = ModelDefinition.builder()
+                .code("test_quote")
+                .tableName("mt_test_quote")
+                .fields(List.of(
+                    FieldDefinition.builder()
+                        .code("name")
+                        .columnName("name")
+                        .dataType("text")
+                        .build()
+                ))
+                .build();
+
+        String sql = queryBuilderService.buildConditionQuery(model, List.of()).getSql();
+
+        assertTrue(sql.matches("(?is).*select\\s+name,\\s*row_version\\s+from\\s+mt_test_quote.*"), sql);
+    }
+
+    @Test
+    @DisplayName("external system tables retain their own version contract")
+    void defaultSelectDoesNotProjectDynamicRowVersionForExternalTable() {
+        ModelDefinition model = ModelDefinition.builder()
+                .code("mission")
+                .tableName("ab_mission")
+                .fields(List.of(
+                    FieldDefinition.builder()
+                        .code("title")
+                        .columnName("title")
+                        .dataType("text")
+                        .build()
+                ))
+                .build();
+
+        String sql = queryBuilderService.buildConditionQuery(model, List.of()).getSql();
+
+        assertTrue(sql.matches("(?is).*select\\s+title\\s+from\\s+ab_mission.*"), sql);
+        assertFalse(sql.contains("row_version"), sql);
+    }
+
+    @Test
     @DisplayName("explicit searchable numeric fields are cast to text for keyword search")
     void explicitSearchableNumericFieldsAreCastToText() {
         ModelDefinition model = ModelDefinition.builder()

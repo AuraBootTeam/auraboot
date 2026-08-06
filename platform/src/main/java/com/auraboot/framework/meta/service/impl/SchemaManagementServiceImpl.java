@@ -239,6 +239,9 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
         if (!existingColumns.contains("tenant_id")) {
             columnDefinitions.add("    tenant_id BIGINT NOT NULL");
         }
+        if (!existingColumns.contains("row_version")) {
+            columnDefinitions.add("    row_version INTEGER NOT NULL DEFAULT 1");
+        }
         // Soft-delete marker: models with extension.softDelete=true get a physical
         // deleted_flag column so command `type:delete` flags-and-hides instead of
         // physically deleting, and QueryBuilder can filter it out. Tables imported
@@ -1014,6 +1017,9 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                     missingColumns.add(columnName);
                 }
             }
+            if (!tableMetadataService.columnExists(tableName, "row_version")) {
+                missingColumns.add("row_version");
+            }
             
             // 4. 比较索引
             List<String> missingIndexes = new ArrayList<>();
@@ -1149,6 +1155,12 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
 
         // Tracks columns added in this sync so their indexes are not duplicated at the end
         Set<String> newlyAddedColumns = new HashSet<>();
+
+        if (!tableMetadataService.columnExists(tableName, "row_version")) {
+            ddlStatements.add("ALTER TABLE " + tableName
+                    + " ADD COLUMN IF NOT EXISTS row_version INTEGER NOT NULL DEFAULT 1");
+            newlyAddedColumns.add("row_version");
+        }
 
         for (FieldDefinition field : model.getFields()) {
             // Skip JSONB virtual fields — they are stored inside a host JSONB column

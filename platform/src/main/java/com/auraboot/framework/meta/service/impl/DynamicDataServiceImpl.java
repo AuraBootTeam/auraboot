@@ -1657,11 +1657,6 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     ? primaryKey.getColumnName()
                     : primaryKey.getCode();
 
-            // If expectedVersion provided, add optimistic lock condition
-            if (expectedVersion != null) {
-                columnData.put("row_version", ((Number) expectedVersion).intValue() + 1);
-            }
-
             // Execute update with tenant and DataScope guards in the write SQL itself.
             Set<String> jsonbColumns = JsonbFieldHelper.getJsonbHostColumns(model);
             int result = executeScopedUpdate(
@@ -1829,6 +1824,16 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
             params.put(paramName, parameterValue);
             index++;
+        }
+        if (tableName.startsWith(SystemFieldConstants.DYNAMIC_TABLE_PREFIX)) {
+            if (index > 0) {
+                sql.append(", ");
+            }
+            // Every successful dynamic-model mutation advances the public optimistic token,
+            // including legacy callers that do not yet submit an expectedVersion. When a trusted
+            // expectedVersion is present the WHERE predicate below additionally turns this into
+            // compare-and-swap. Externally managed ab_* tables retain their own version contracts.
+            sql.append("row_version = row_version + 1");
         }
 
         params.put("recordId", recordId);
