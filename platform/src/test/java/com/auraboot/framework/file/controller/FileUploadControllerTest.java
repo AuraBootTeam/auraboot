@@ -3,7 +3,12 @@ package com.auraboot.framework.file.controller;
 import com.auraboot.framework.file.entity.FileEntity;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
+import com.auraboot.framework.meta.service.DataAccessAuthorizationHelper;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import java.io.ByteArrayInputStream;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +20,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -30,13 +40,22 @@ class FileUploadControllerTest {
     @Mock
     private StorageProvider storageProvider;
 
+    @Mock
+    private DynamicDataService dynamicDataService;
+
+    @Mock
+    private DataAccessAuthorizationHelper dataAccessAuthorizationHelper;
+
     private MockMvc mvc;
+    private FileUploadController controller;
 
     @BeforeEach
     void setUp() {
-        FileUploadController controller = new FileUploadController();
+        controller = new FileUploadController();
         ReflectionTestUtils.setField(controller, "fileService", fileService);
         ReflectionTestUtils.setField(controller, "storageProvider", storageProvider);
+        ReflectionTestUtils.setField(controller, "dynamicDataService", dynamicDataService);
+        ReflectionTestUtils.setField(controller, "dataAccessAuthorizationHelper", dataAccessAuthorizationHelper);
         mvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -98,6 +117,47 @@ class FileUploadControllerTest {
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"E1-V1.3-BOM-20240429.xlsx\"; filename*=UTF-8''%E5%8E%9F%E5%A7%8B-E1-V1.3-BOM-20240429.xlsx"))
                 .andExpect(content().string("xlsx"));
+    }
+
+    @Test
+    void endpoints_declare_separate_leastPrivilegeFileCapabilities() throws Exception {
+        assertPermission("uploadFile", MetaPermission.SYS_FILE_UPLOAD,
+                org.springframework.web.multipart.MultipartFile.class, Long.class);
+        assertPermission("getFile", MetaPermission.SYS_FILE_READ, String.class);
+        assertPermission("downloadFile", MetaPermission.SYS_FILE_READ, String.class);
+        assertPermission("deleteFile", MetaPermission.SYS_FILE_DELETE, String.class, Long.class);
+        assertPermission("createFileRelation", MetaPermission.SYS_FILE_RELATION_MANAGE,
+                com.auraboot.framework.file.dto.FileRelationRequestDTO.class, Long.class);
+    }
+
+    @Test
+    void createRelation_authorizesTheTargetRecordBeforeWriting() {
+        com.auraboot.framework.file.dto.FileRelationRequestDTO request =
+                new com.auraboot.framework.file.dto.FileRelationRequestDTO();
+        request.setEntityType("crm_customer_request_common");
+        request.setEntityId("request-pid");
+        request.setFieldName("source_files");
+        request.setFileIds(new String[]{"file-pid"});
+        when(dataAccessAuthorizationHelper.authorizeRecordId(
+                eq("crm_customer_request_common"), eq("update"), eq("request-pid"), any()))
+                .thenReturn(true);
+        when(fileService.createFileRelation(request, 42L)).thenReturn(true);
+
+        controller.createFileRelation(request, 42L);
+
+        var ordered = inOrder(dataAccessAuthorizationHelper, fileService);
+        ordered.verify(dataAccessAuthorizationHelper).authorizeRecordId(
+                eq("crm_customer_request_common"), eq("update"), eq("request-pid"), any());
+        ordered.verify(fileService).createFileRelation(request, 42L);
+        verify(fileService).createFileRelation(request, 42L);
+    }
+
+    private static void assertPermission(String methodName, String expected, Class<?>... parameterTypes)
+            throws NoSuchMethodException {
+        Method method = FileUploadController.class.getDeclaredMethod(methodName, parameterTypes);
+        RequirePermission annotation = method.getAnnotation(RequirePermission.class);
+        assertThat(annotation).isNotNull();
+        assertThat(annotation.value()).isEqualTo(expected);
     }
 
     private FileEntity storedFile(String originalName, String mimeType, String localPath) {

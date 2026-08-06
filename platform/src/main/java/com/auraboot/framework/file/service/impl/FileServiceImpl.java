@@ -1,5 +1,6 @@
 package com.auraboot.framework.file.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.file.constant.StorageType;
 import com.auraboot.framework.file.constant.UploadStatus;
@@ -20,6 +21,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -86,7 +89,7 @@ public class FileServiceImpl implements FileService {
      */
     private static final Set<String> TRUSTED_EXTENSIONS = Set.of(
             "zip", "rar", "7z", "pcb",
-            "gbr", "gtl", "gbl", "gto", "gbo", "gts", "gbs", "gko",
+            "gbr", "ger", "gerber", "gtl", "gbl", "gto", "gbo", "gts", "gbs", "gko",
             "gm", "gm1", "gbp", "gdd", "gd1", "g1", "g2",
             "pho", "art", "drl", "xln", "drr", "rep", "extrep",
             "ldp", "apr", "apr_lib", "rul", "pos", "cpl"
@@ -103,18 +106,6 @@ public class FileServiceImpl implements FileService {
         QueryWrapper<FileEntity> queryWrapper = new QueryWrapper<>();
         queryWrapper.lambda().eq(FileEntity::getPid, pid);
         return fileMapper.selectOne(queryWrapper);
-    }
-
-    @Override
-    public boolean existsStorageKeyInOtherTenants(String storageKey, Long tenantId) {
-        return StringUtils.hasText(storageKey)
-                && tenantId != null
-                && fileMapper.countByFileNameInOtherTenants(storageKey, tenantId) > 0;
-    }
-
-    @Override
-    public void saveMetadata(FileEntity fileEntity) {
-        fileMapper.insert(fileEntity);
     }
 
     @Override
@@ -200,27 +191,32 @@ public class FileServiceImpl implements FileService {
     @Override
     @Transactional
     public boolean deleteFile(String fileId, Long userId) {
-        FileEntity fileEntity = findByPid(fileId);
-        if (fileEntity == null && isNumericId(fileId)) {
-            fileEntity = fileMapper.selectById(fileId);
-        }
+        requireActiveMutationTransaction();
+        Long tenantId = requireTenantId();
+        FileEntity fileEntity = lockFileForDeletion(tenantId, fileId);
         if (fileEntity == null) {
             throw new BusinessException("File not found: " + fileId);
         }
-        if (!fileEntity.getCreatedBy().equals(userId)) {
+        if (fileEntity.getCreatedBy() == null || !fileEntity.getCreatedBy().equals(userId)) {
             throw new BusinessException("You don't have permission to delete this file");
         }
-
-        // Delete physical file from storage
-        try {
-            storageProvider.delete(fileEntity.getFileName());
-        } catch (Exception e) {
-            log.warn("Failed to delete physical file: key={}, error={}", fileEntity.getFileName(), e.getMessage());
+        if (Boolean.TRUE.equals(fileEntity.getRetentionLocked())) {
+            throw new BusinessException("File is retention locked and cannot be deleted");
         }
 
-        fileEntity.setStatus(UploadStatus.DELETED.getCode());
-        fileMapper.updateById(fileEntity);
-        return fileMapper.deleteById(fileEntity.getId()) > 0;
+        int fenced = fileMapper.markDeletedIfUnlocked(
+                tenantId, fileEntity.getId(), Instant.now());
+        if (fenced != 1) {
+            throw new BusinessException(
+                    "File deletion lost the retention arbitration: " + fileId);
+        }
+
+        // Never delete bytes before the database deletion fence commits. If the transaction rolls
+        // back, the file remains readable and retainable. If object deletion later fails, the
+        // metadata stays tombstoned and the orphan can be retried without creating a dangling
+        // released reference.
+        schedulePhysicalDeleteAfterCommit(fileEntity.getFileName());
+        return true;
     }
 
     @Override
@@ -237,12 +233,51 @@ public class FileServiceImpl implements FileService {
 
     @Override
     @Transactional
-    public boolean createFileRelation(FileRelationRequestDTO request) {
+    public boolean lockRetention(String fileId) {
+        if (!StringUtils.hasText(fileId)) {
+            throw new IllegalArgumentException("fileId is required");
+        }
+        requireActiveMutationTransaction();
+        String canonicalFileId = fileId.trim();
+        if (!canonicalFileId.equals(fileId)) {
+            throw new IllegalArgumentException("A canonical public file pid is required");
+        }
+        Long tenantId = requireTenantId();
+        FileEntity file = fileMapper.selectActiveByPidForUpdate(tenantId, canonicalFileId);
+        if (file == null || !fileId.equals(file.getPid())
+                || Boolean.TRUE.equals(file.getDeletedFlag())
+                || !UploadStatus.SUCCESS.getCode().equalsIgnoreCase(file.getStatus())) {
+            throw new BusinessException("Finalized public file not found: " + fileId);
+        }
+        if (Boolean.TRUE.equals(file.getRetentionLocked())) {
+            return true;
+        }
+        int locked = fileMapper.lockRetentionIfFinal(tenantId, file.getId(), Instant.now());
+        if (locked != 1) {
+            throw new BusinessException(
+                    "File retention lost the deletion arbitration: " + fileId);
+        }
+        return true;
+    }
+
+    @Override
+    @Transactional
+    public boolean createFileRelation(FileRelationRequestDTO request, Long userId) {
         removeFileRelation(request.getEntityType(), request.getEntityId(), request.getFieldName());
 
         for (int i = 0; i < request.getFileIds().length; i++) {
+            String publicFileId = request.getFileIds()[i];
+            FileEntity file = findByPid(publicFileId);
+            if (file == null || !publicFileId.equals(file.getPid())
+                    || Boolean.TRUE.equals(file.getDeletedFlag())
+                    || UploadStatus.DELETED.getCode().equalsIgnoreCase(file.getStatus())) {
+                throw new BusinessException("Active public file not found: " + publicFileId);
+            }
+            if (file.getCreatedBy() == null || !file.getCreatedBy().equals(userId)) {
+                throw new BusinessException("Only the file owner can create a relation");
+            }
             FileRelationEntity relation = new FileRelationEntity();
-            relation.setFileId(request.getFileIds()[i]);
+            relation.setFileId(String.valueOf(file.getId()));
             relation.setEntityType(request.getEntityType());
             relation.setEntityId(request.getEntityId());
             relation.setFieldName(request.getFieldName());
@@ -332,6 +367,7 @@ public class FileServiceImpl implements FileService {
         fileEntity.setCreatedTime(Instant.now());
         fileEntity.setUpdatedTime(Instant.now());
         fileEntity.setDeletedFlag(false);
+        fileEntity.setRetentionLocked(false);
 
         return fileEntity;
     }
@@ -473,5 +509,53 @@ public class FileServiceImpl implements FileService {
 
     private boolean isNumericId(String value) {
         return StringUtils.hasText(value) && value.chars().allMatch(Character::isDigit);
+    }
+
+    private FileEntity lockFileForDeletion(Long tenantId, String fileId) {
+        if (!StringUtils.hasText(fileId) || !fileId.equals(fileId.trim())) {
+            throw new IllegalArgumentException("A canonical file id is required");
+        }
+        FileEntity file = fileMapper.selectActiveByPidForUpdate(tenantId, fileId);
+        if (file != null || !isNumericId(fileId)) {
+            return file;
+        }
+        try {
+            return fileMapper.selectActiveByIdForUpdate(tenantId, Long.parseLong(fileId));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Long requireTenantId() {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new IllegalStateException("File mutation requires a tenant context");
+        }
+        return tenantId;
+    }
+
+    private void requireActiveMutationTransaction() {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()
+                || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new IllegalStateException(
+                    "File retention and deletion require an active transaction");
+        }
+    }
+
+    private void schedulePhysicalDeleteAfterCommit(String storageKey) {
+        if (!StringUtils.hasText(storageKey)) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    storageProvider.delete(storageKey);
+                } catch (Exception e) {
+                    log.warn("Failed to delete tombstoned physical file: key={}, error={}",
+                            storageKey, e.getMessage());
+                }
+            }
+        });
     }
 }

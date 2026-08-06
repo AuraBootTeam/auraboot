@@ -41,11 +41,14 @@ public interface FileService {
      * 批量删除文件
      */
     boolean deleteFiles(String[] fileIds, Long userId);
+
+    /** Permanently prevent deletion of released/auditable file bytes. */
+    boolean lockRetention(String fileId);
     
     /**
      * 建立文件关联关系
      */
-    boolean createFileRelation(FileRelationRequestDTO request);
+    boolean createFileRelation(FileRelationRequestDTO request, Long userId);
     
     /**
      * 获取实体关联的文件列表
@@ -74,13 +77,4 @@ public interface FileService {
      */
     FileEntity findByPid(String pid);
 
-    /**
-     * Whether the storage key is already registered by another tenant.
-     */
-    boolean existsStorageKeyInOtherTenants(String storageKey, Long tenantId);
-
-    /**
-     * Persist file metadata that was produced outside the multipart upload flow.
-     */
-    void saveMetadata(FileEntity fileEntity);
 }

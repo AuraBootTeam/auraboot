@@ -347,11 +347,41 @@
     {
       "code": "sys.file.upload",
       "name": "文件上传",
-      "description": "文件上传、下载和管理操作",
+      "description": "通过平台受控上传流程上传文件",
       "type": "function",
       "module": "system",
       "resource": "sys:file",
       "action": "upload",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.file.read",
+      "name": "文件读取",
+      "description": "读取租户内可见的文件元数据与内容",
+      "type": "function",
+      "module": "system",
+      "resource": "sys:file",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.file.delete",
+      "name": "文件删除",
+      "description": "删除本人上传且未被发布留存锁定的文件",
+      "type": "function",
+      "module": "system",
+      "resource": "sys:file",
+      "action": "delete",
+      "resourceType": "function"
+    },
+    {
+      "code": "sys.file.relation.manage",
+      "name": "文件关联管理",
+      "description": "在有权访问的业务记录上管理文件关联",
+      "type": "function",
+      "module": "system",
+      "resource": "sys:file",
+      "action": "manage",
       "resourceType": "function"
     },
     {

@@ -95,7 +95,7 @@ public class BpmAttachmentController {
         relation.setEntityType(entityType);
         relation.setEntityId(entityId);
         relation.setFieldName(FIELD_NAME);
-        fileService.createFileRelation(relation);
+        fileService.createFileRelation(relation, userId);
 
         log.info("BPM attachment uploaded: entityType={}, entityId={}, fileId={}",
                 entityType, entityId, uploaded.getFileId());

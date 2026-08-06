@@ -6,7 +6,9 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -16,18 +18,43 @@ import java.util.List;
 public interface FileMapper extends BaseMapper<FileEntity> {
 
     /**
-     * Count active files whose storage key ({@code file_name}) is already owned by a
-     * DIFFERENT tenant. Used to reject a client from registering (via /api/file/create)
-     * a storage key that belongs to another tenant, which would otherwise become a
-     * cross-tenant object-read primitive (the object-read sinks download by file_name).
-     * Bypasses the tenant line interceptor on purpose to look across tenants.
+     * Lock one tenant-owned public file row before retention/deletion arbitration.
+     * Tenant interception is bypassed only because the SQL carries the mandatory tenant predicate.
      */
     @InterceptorIgnore(tenantLine = "true")
-    @Select("SELECT COUNT(*) FROM ab_file WHERE file_name = #{fileName} "
-            + "AND tenant_id <> #{tenantId} AND deleted_flag = false")
-    int countByFileNameInOtherTenants(@Param("fileName") String fileName,
-                                      @Param("tenantId") Long tenantId);
-    
+    @Select("SELECT * FROM ab_file WHERE tenant_id = #{tenantId} AND pid = #{pid} "
+            + "AND deleted_flag = false FOR UPDATE")
+    FileEntity selectActiveByPidForUpdate(@Param("tenantId") Long tenantId,
+                                          @Param("pid") String pid);
+
+    /** Legacy numeric-id variant of {@link #selectActiveByPidForUpdate(Long, String)}. */
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("SELECT * FROM ab_file WHERE tenant_id = #{tenantId} AND id = #{id} "
+            + "AND deleted_flag = false FOR UPDATE")
+    FileEntity selectActiveByIdForUpdate(@Param("tenantId") Long tenantId,
+                                         @Param("id") Long id);
+
+    /**
+     * Acquire the deletion fence while the row is locked. A retention lock always wins and makes
+     * this update affect zero rows. Physical deletion is scheduled only after this update commits.
+     */
+    @InterceptorIgnore(tenantLine = "true")
+    @Update("UPDATE ab_file SET status = 'deleted', deleted_flag = true, updated_time = #{updatedAt} "
+            + "WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted_flag = false "
+            + "AND retention_locked = false")
+    int markDeletedIfUnlocked(@Param("tenantId") Long tenantId,
+                              @Param("id") Long id,
+                              @Param("updatedAt") Instant updatedAt);
+
+    /** Finalized multipart uploads may be retained exactly once; the flag is monotonic. */
+    @InterceptorIgnore(tenantLine = "true")
+    @Update("UPDATE ab_file SET retention_locked = true, updated_time = #{updatedAt} "
+            + "WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted_flag = false "
+            + "AND status = 'success' AND retention_locked = false")
+    int lockRetentionIfFinal(@Param("tenantId") Long tenantId,
+                             @Param("id") Long id,
+                             @Param("updatedAt") Instant updatedAt);
+
     /**
      * 根据创建用户ID查询文件列表
      */

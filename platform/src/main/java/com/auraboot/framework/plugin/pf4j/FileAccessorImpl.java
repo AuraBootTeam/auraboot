@@ -31,12 +31,9 @@ public class FileAccessorImpl implements FileAccessor {
 
     @Override
     public InputStream open(String fileId) {
-        if (!StringUtils.hasText(fileId)) {
-            throw new IllegalArgumentException("fileId is required");
-        }
-        FileEntity entity = fileService.getFileById(fileId);
-        if (entity == null) {
-            throw new IllegalArgumentException("File not found: " + fileId);
+        FileEntity entity = requirePublicFile(fileId);
+        if (!"success".equalsIgnoreCase(entity.getStatus())) {
+            throw new IllegalArgumentException("File upload is not finalized: " + fileId);
         }
         String storageKey = firstText(entity.getFileName(), entity.getLocalPath());
         if (!StringUtils.hasText(storageKey)) {
@@ -70,6 +67,12 @@ public class FileAccessorImpl implements FileAccessor {
             return false;
         }
         return related.stream().anyMatch(entity -> fileId.equals(entity.getPid()));
+    }
+
+    @Override
+    public boolean retain(String fileId) {
+        requirePublicFile(fileId);
+        return fileService.lockRetention(fileId);
     }
 
     @Override
