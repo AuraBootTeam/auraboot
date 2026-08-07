@@ -1,7 +1,7 @@
 {
   "pluginId": "com.auraboot.crm",
   "namespace": "crm",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "dslVersion": 1,
   "pluginType": "hybrid",
   "displayName": "Customer Relationship Management",
@@ -13,7 +13,7 @@
   "minPlatformVersion": "1.0.0",
   "dependencies": [],
   "backend": {
-    "jarPath": "backend/build/libs/crm-plugin-1.1.0.jar",
+    "jarPath": "backend/build/libs/crm-plugin-1.2.0.jar",
     "entryClass": "com.auraboot.plugins.crm.CrmPlugin"
   },
   "provides": [
@@ -104,6 +104,34 @@
     {
       "type": "model",
       "code": "crm_qdp_revision_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_requirement_version_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_file_package_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_customer_confirmation_common"
+    },
+    {
+      "type": "command",
+      "code": "crm:prepare_qdp_draft"
+    },
+    {
+      "type": "command",
+      "code": "crm:compile_qdp_revision"
+    },
+    {
+      "type": "command",
+      "code": "crm:submit_qdp_review"
+    },
+    {
+      "type": "command",
+      "code": "crm:publish_qdp_revision"
     },
     {
       "type": "command",

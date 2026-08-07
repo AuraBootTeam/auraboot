@@ -1,0 +1,10 @@
+[
+  { "modelCode": "crm_file_package_common", "fieldCode": "crm_fp_code", "sequence": 1, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_file_package_common", "fieldCode": "crm_fp_customer_request_id", "sequence": 2, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_file_package_common", "fieldCode": "crm_fp_package_hash", "sequence": 3, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_file_package_common", "fieldCode": "crm_fp_manifest", "sequence": 4, "required": true, "visible": false, "editable": false },
+  { "modelCode": "crm_file_package_common", "fieldCode": "crm_fp_file_count", "sequence": 5, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_file_package_common", "fieldCode": "crm_fp_status", "sequence": 6, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_file_package_common", "fieldCode": "crm_fp_created_at", "sequence": 7, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_file_package_common", "fieldCode": "crm_fp_created_by", "sequence": 8, "required": true, "visible": true, "editable": false }
+]

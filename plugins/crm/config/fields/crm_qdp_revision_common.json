@@ -1,297 +1,56 @@
 [
-  {
-    "code": "crm_qdp_code",
-    "displayName:zh-CN": "QDP 版本编号",
-    "displayName:en": "QDP Revision Code",
-    "dataType": "string",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true,
-      "maxLength": 64
-    },
-    "feature": {
-      "searchable": true,
-      "sortable": true
-    }
-  },
-  {
-    "code": "crm_qdp_customer_request_id",
-    "displayName:zh-CN": "客户需求",
-    "displayName:en": "Customer Request",
-    "dataType": "reference",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "referenceModelCode": "crm_customer_request_common",
-    "refTarget": {
-      "targetModel": "crm_customer_request_common",
-      "targetField": "crm_cr_code"
-    },
-    "constraints": {
-      "required": true
-    },
-    "feature": {
-      "searchable": true
-    }
-  },
-  {
-    "code": "crm_qdp_revision_no",
-    "displayName:zh-CN": "版本序号",
-    "displayName:en": "Revision Number",
-    "dataType": "integer",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true,
-      "min": 1
-    },
-    "feature": {
-      "sortable": true
-    }
-  },
-  {
-    "code": "crm_qdp_schema_version",
-    "displayName:zh-CN": "快照 Schema 版本",
-    "displayName:en": "Snapshot Schema Version",
-    "dataType": "integer",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true,
-      "min": 1
-    }
-  },
-  {
-    "code": "crm_qdp_expected_request_version",
-    "displayName:zh-CN": "客户需求期望版本",
-    "displayName:en": "Expected Customer Request Version",
-    "description": "Server-owned Customer Request row_version accepted by the command target boundary; payload version values are ignored.",
-    "dataType": "string",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true,
-      "maxLength": 100
-    },
-    "feature": {
-      "searchable": true
-    }
-  },
-  {
-    "code": "crm_qdp_source_revision",
-    "displayName:zh-CN": "来源版本",
-    "displayName:en": "Source Revision",
-    "description": "Frozen CRM Customer Request aggregate row_version. PCBA sidecar revision strings are not concurrency tokens.",
-    "dataType": "string",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "maxLength": 100
-    },
-    "feature": {
-      "searchable": true
-    }
-  },
-  {
-    "code": "crm_qdp_qualification_verdict",
-    "displayName:zh-CN": "资格判定",
-    "displayName:en": "Qualification Verdict",
-    "dataType": "string",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true,
-      "maxLength": 32
-    },
-    "feature": {
-      "searchable": true
-    }
-  },
-  {
-    "code": "crm_qdp_qualification_evidence_refs",
-    "displayName:zh-CN": "资格证据引用",
-    "displayName:en": "Qualification Evidence References",
-    "dataType": "json",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ]
-  },
-  {
-    "code": "crm_qdp_content_hash",
-    "displayName:zh-CN": "内容哈希",
-    "displayName:en": "Content Hash",
-    "dataType": "string",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true,
-      "minLength": 64,
-      "maxLength": 64,
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "feature": {
-      "searchable": true
-    }
-  },
-  {
-    "code": "crm_qdp_request_snapshot",
-    "displayName:zh-CN": "需求快照",
-    "displayName:en": "Request Snapshot",
-    "dataType": "json",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true
-    }
-  },
-  {
-    "code": "crm_qdp_file_manifest",
-    "displayName:zh-CN": "文件引用清单",
-    "displayName:en": "File Reference Manifest",
-    "dataType": "json",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true
-    }
-  },
-  {
-    "code": "crm_qdp_primary_file_id",
-    "displayName:zh-CN": "主交付文件",
-    "displayName:en": "Primary Delivery File",
-    "dataType": "file",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true
-    }
-  },
-  {
-    "code": "crm_qdp_primary_filename",
-    "displayName:zh-CN": "主文件名",
-    "displayName:en": "Primary Filename",
-    "dataType": "string",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true,
-      "maxLength": 255
-    }
-  },
-  {
-    "code": "crm_qdp_file_names",
-    "displayName:zh-CN": "交付文件名",
-    "displayName:en": "Delivery Filenames",
-    "description": "Server-authoritative delivery filenames for safe history display without exposing raw file pids.",
-    "dataType": "text",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true,
-      "maxLength": 2000
-    }
-  },
-  {
-    "code": "crm_qdp_client_request_id",
-    "displayName:zh-CN": "客户端请求标识",
-    "displayName:en": "Client Request Identity",
-    "description": "Server-owned command boundary identity; payload values are ignored.",
-    "dataType": "string",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true,
-      "maxLength": 128
-    },
-    "feature": {
-      "searchable": false
-    }
-  },
-  {
-    "code": "crm_qdp_owner_scope",
-    "displayName:zh-CN": "文件所有权范围",
-    "displayName:en": "File Owner Scope",
-    "dataType": "string",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true,
-      "maxLength": 200
-    }
-  },
-  {
-    "code": "crm_qdp_status",
-    "displayName:zh-CN": "发布状态",
-    "displayName:en": "Release Status",
-    "dataType": "string",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true,
-      "maxLength": 32
-    },
-    "feature": {
-      "searchable": true,
-      "sortable": true
-    }
-  },
-  {
-    "code": "crm_qdp_release_note",
-    "displayName:zh-CN": "发布说明",
-    "displayName:en": "Release Note",
-    "dataType": "text",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "maxLength": 2000
-    }
-  },
-  {
-    "code": "crm_qdp_released_at",
-    "displayName:zh-CN": "发布时间",
-    "displayName:en": "Released At",
-    "dataType": "datetime",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true
-    },
-    "feature": {
-      "sortable": true
-    }
-  },
-  {
-    "code": "crm_qdp_released_by",
-    "displayName:zh-CN": "发布人",
-    "displayName:en": "Released By",
-    "dataType": "string",
-    "allowedWriterCommands": [
-      "crm:release_qdp"
-    ],
-    "constraints": {
-      "required": true,
-      "maxLength": 100
-    },
-    "feature": {
-      "searchable": true
-    }
-  }
+  { "code": "crm_qdp_code", "displayName:zh-CN": "QDP 版本编号", "displayName:en": "QDP Revision Code", "dataType": "string", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "required": true, "maxLength": 64 }, "feature": { "searchable": true, "sortable": true } },
+  { "code": "crm_qdp_customer_request_id", "displayName:zh-CN": "客户需求", "displayName:en": "Customer Request", "dataType": "reference", "referenceModelCode": "crm_customer_request_common", "refTarget": { "targetModel": "crm_customer_request_common", "targetField": "crm_cr_code" }, "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "required": true }, "feature": { "searchable": true } },
+  { "code": "crm_qdp_revision_no", "displayName:zh-CN": "版本序号", "displayName:en": "Revision Number", "dataType": "integer", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "required": true, "min": 1 }, "feature": { "sortable": true } },
+  { "code": "crm_qdp_schema_version", "displayName:zh-CN": "快照 Schema 版本", "displayName:en": "Snapshot Schema Version", "dataType": "integer", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "required": true, "min": 1 } },
+  { "code": "crm_qdp_expected_request_version", "displayName:zh-CN": "客户需求期望版本", "displayName:en": "Expected Customer Request Version", "description": "Server-owned Customer Request row_version accepted by the command target boundary.", "dataType": "string", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "required": true, "maxLength": 100 }, "feature": { "searchable": true } },
+  { "code": "crm_qdp_source_revision", "displayName:zh-CN": "来源版本", "displayName:en": "Source Revision", "dataType": "string", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "maxLength": 100 }, "feature": { "searchable": true } },
+  { "code": "crm_qdp_requirement_version_id", "displayName:zh-CN": "需求版本对象", "displayName:en": "Requirement Version Object", "dataType": "reference", "referenceModelCode": "crm_requirement_version_common", "refTarget": { "targetModel": "crm_requirement_version_common", "targetField": "crm_reqv_code" }, "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"] },
+  { "code": "crm_qdp_requirement_version", "displayName:zh-CN": "客户需求版本", "displayName:en": "Customer Requirement Version", "dataType": "string", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "maxLength": 64 }, "feature": { "searchable": true } },
+  { "code": "crm_qdp_file_package_id", "displayName:zh-CN": "文件包对象", "displayName:en": "File Package Object", "dataType": "reference", "referenceModelCode": "crm_file_package_common", "refTarget": { "targetModel": "crm_file_package_common", "targetField": "crm_fp_code" }, "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"] },
+  { "code": "crm_qdp_file_package_hash", "displayName:zh-CN": "文件包 Hash", "displayName:en": "File Package Hash", "dataType": "string", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$" }, "feature": { "searchable": true } },
+  { "code": "crm_qdp_customer_confirmation_id", "displayName:zh-CN": "客户确认对象", "displayName:en": "Customer Confirmation Object", "dataType": "reference", "referenceModelCode": "crm_customer_confirmation_common", "refTarget": { "targetModel": "crm_customer_confirmation_common", "targetField": "crm_cc_code" }, "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"] },
+  { "code": "crm_qdp_customer_confirmation_ref", "displayName:zh-CN": "客户确认证据", "displayName:en": "Customer Confirmation Evidence", "dataType": "string", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "maxLength": 128 }, "feature": { "searchable": true } },
+  { "code": "crm_qdp_customer_confirmed_hash", "displayName:zh-CN": "客户确认文件包 Hash", "displayName:en": "Customer-confirmed File Package Hash", "dataType": "string", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$" } },
+  { "code": "crm_qdp_customer_confirmed_at", "displayName:zh-CN": "客户确认时间", "displayName:en": "Customer Confirmed At", "dataType": "datetime", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"] },
+  { "code": "crm_qdp_customer_confirmed_by", "displayName:zh-CN": "客户确认人", "displayName:en": "Customer Confirmed By", "dataType": "string", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "maxLength": 128 } },
+  { "code": "crm_qdp_qualification_verdict", "displayName:zh-CN": "资格判定", "displayName:en": "Qualification Verdict", "dataType": "string", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "required": true, "maxLength": 32 }, "feature": { "searchable": true } },
+  { "code": "crm_qdp_qualification_evidence_refs", "displayName:zh-CN": "资格证据引用", "displayName:en": "Qualification Evidence References", "dataType": "json", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"] },
+  { "code": "crm_qdp_content_hash", "displayName:zh-CN": "内容 Hash", "displayName:en": "Content Hash", "dataType": "string", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "required": true, "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$" }, "feature": { "searchable": true } },
+  { "code": "crm_qdp_request_snapshot", "displayName:zh-CN": "需求快照", "displayName:en": "Request Snapshot", "dataType": "json", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "required": true } },
+  { "code": "crm_qdp_file_manifest", "displayName:zh-CN": "文件引用清单", "displayName:en": "File Reference Manifest", "dataType": "json", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "required": true } },
+  { "code": "crm_qdp_primary_file_id", "displayName:zh-CN": "主交付文件", "displayName:en": "Primary Delivery File", "dataType": "file", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "required": true } },
+  { "code": "crm_qdp_primary_filename", "displayName:zh-CN": "主文件名", "displayName:en": "Primary Filename", "dataType": "string", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "required": true, "maxLength": 255 } },
+  { "code": "crm_qdp_file_names", "displayName:zh-CN": "交付文件名", "displayName:en": "Delivery Filenames", "dataType": "text", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "required": true, "maxLength": 2000 } },
+  { "code": "crm_qdp_pack_set", "displayName:zh-CN": "Pack Set", "displayName:en": "Pack Set", "dataType": "json", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"] },
+  { "code": "crm_qdp_pack_set_summary", "displayName:zh-CN": "Pack Set 摘要", "displayName:en": "Pack Set Summary", "dataType": "text", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "maxLength": 2000 } },
+  { "code": "crm_qdp_downstream_impact", "displayName:zh-CN": "下游影响", "displayName:en": "Downstream Impact", "dataType": "json", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"] },
+  { "code": "crm_qdp_downstream_impact_summary", "displayName:zh-CN": "下游影响摘要", "displayName:en": "Downstream Impact Summary", "dataType": "text", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "maxLength": 2000 } },
+  { "code": "crm_qdp_assumptions", "displayName:zh-CN": "假设", "displayName:en": "Assumptions", "dataType": "json", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"] },
+  { "code": "crm_qdp_approved_exceptions", "displayName:zh-CN": "批准例外", "displayName:en": "Approved Exceptions", "dataType": "json", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"] },
+  { "code": "crm_qdp_version_diff", "displayName:zh-CN": "版本差异", "displayName:en": "Version Diff", "dataType": "json", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"] },
+  { "code": "crm_qdp_version_diff_summary", "displayName:zh-CN": "版本差异摘要", "displayName:en": "Version Diff Summary", "dataType": "text", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "maxLength": 2000 } },
+  { "code": "crm_qdp_client_request_id", "displayName:zh-CN": "客户端请求标识", "displayName:en": "Client Request Identity", "dataType": "string", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "required": true, "maxLength": 128 } },
+  { "code": "crm_qdp_owner_scope", "displayName:zh-CN": "文件所有权范围", "displayName:en": "File Owner Scope", "dataType": "string", "immutable": true, "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:release_qdp"], "constraints": { "required": true, "maxLength": 200 } },
+  { "code": "crm_qdp_status", "displayName:zh-CN": "生命周期", "displayName:en": "Lifecycle", "dataType": "string", "dictCode": "crm_qdp_lifecycle", "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:compile_qdp_revision", "crm:submit_qdp_review", "crm:publish_qdp_revision", "crm:release_qdp"], "constraints": { "required": true, "maxLength": 32 }, "feature": { "searchable": true, "sortable": true } },
+  { "code": "crm_qdp_gate_verdict", "displayName:zh-CN": "GT-D04 判定", "displayName:en": "GT-D04 Verdict", "dataType": "string", "dictCode": "crm_qdp_gate_verdict", "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:compile_qdp_revision", "crm:submit_qdp_review", "crm:publish_qdp_revision"], "constraints": { "maxLength": 64 }, "feature": { "searchable": true } },
+  { "code": "crm_qdp_release_note", "displayName:zh-CN": "发布说明", "displayName:en": "Release Note", "dataType": "text", "allowedWriterCommands": ["crm:prepare_qdp_draft", "crm:publish_qdp_revision", "crm:release_qdp"], "constraints": { "maxLength": 2000 } },
+  { "code": "crm_qdp_prepared_at", "displayName:zh-CN": "草稿形成时间", "displayName:en": "Prepared At", "dataType": "datetime", "allowedWriterCommands": ["crm:prepare_qdp_draft"] },
+  { "code": "crm_qdp_prepared_by", "displayName:zh-CN": "草稿形成操作人", "displayName:en": "Prepared By", "dataType": "string", "allowedWriterCommands": ["crm:prepare_qdp_draft"], "constraints": { "maxLength": 100 } },
+  { "code": "crm_qdp_review_submitted_at", "displayName:zh-CN": "送审时间", "displayName:en": "Review Submitted At", "dataType": "datetime", "allowedWriterCommands": ["crm:submit_qdp_review"] },
+  { "code": "crm_qdp_review_submitted_by", "displayName:zh-CN": "送审操作人", "displayName:en": "Review Submitted By", "dataType": "string", "allowedWriterCommands": ["crm:submit_qdp_review"], "constraints": { "maxLength": 100 } },
+  { "code": "crm_qdp_released_at", "displayName:zh-CN": "发布时间", "displayName:en": "Released At", "dataType": "datetime", "allowedWriterCommands": ["crm:publish_qdp_revision", "crm:release_qdp"], "feature": { "sortable": true } },
+  { "code": "crm_qdp_released_by", "displayName:zh-CN": "发布人", "displayName:en": "Released By", "dataType": "string", "allowedWriterCommands": ["crm:publish_qdp_revision", "crm:release_qdp"], "constraints": { "maxLength": 100 }, "feature": { "searchable": true } },
+  { "code": "crm_qdp_superseded_at", "displayName:zh-CN": "被取代时间", "displayName:en": "Superseded At", "dataType": "datetime", "allowedWriterCommands": ["crm:publish_qdp_revision"] },
+  { "code": "crm_qdp_superseded_by", "displayName:zh-CN": "取代操作人", "displayName:en": "Superseded By", "dataType": "string", "allowedWriterCommands": ["crm:publish_qdp_revision"], "constraints": { "maxLength": 100 } },
+  { "code": "crm_qdp_superseded_by_revision_id", "displayName:zh-CN": "后继 QDP 版本", "displayName:en": "Superseding QDP Revision", "dataType": "reference", "referenceModelCode": "crm_qdp_revision_common", "refTarget": { "targetModel": "crm_qdp_revision_common", "targetField": "crm_qdp_code" }, "allowedWriterCommands": ["crm:publish_qdp_revision"] },
+  { "code": "crm_qdp_compilation_stage", "displayName:zh-CN": "编制阶段", "displayName:en": "Compilation Stage", "dataType": "string", "dictCode": "crm_qdp_compilation_stage", "allowedWriterCommands": ["crm:compile_qdp_revision"], "constraints": { "maxLength": 64 } },
+  { "code": "crm_qdp_compilation_progress", "displayName:zh-CN": "编制进度", "displayName:en": "Compilation Progress", "dataType": "integer", "allowedWriterCommands": ["crm:compile_qdp_revision"], "constraints": { "min": 0, "max": 100 } },
+  { "code": "crm_qdp_compilation_outcome", "displayName:zh-CN": "编制结果", "displayName:en": "Compilation Outcome", "dataType": "string", "dictCode": "crm_qdp_compilation_outcome", "allowedWriterCommands": ["crm:compile_qdp_revision"], "constraints": { "maxLength": 32 }, "feature": { "searchable": true } },
+  { "code": "crm_qdp_compilation_summary", "displayName:zh-CN": "编制结果摘要", "displayName:en": "Compilation Result Summary", "dataType": "text", "allowedWriterCommands": ["crm:compile_qdp_revision"], "constraints": { "maxLength": 2000 } },
+  { "code": "crm_qdp_validation_failure_summary", "displayName:zh-CN": "校验失败与恢复提示", "displayName:en": "Validation Failure and Recovery", "dataType": "text", "allowedWriterCommands": ["crm:compile_qdp_revision"], "constraints": { "maxLength": 2000 } },
+  { "code": "crm_qdp_compilation_started_at", "displayName:zh-CN": "编制开始时间", "displayName:en": "Compilation Started At", "dataType": "datetime", "allowedWriterCommands": ["crm:compile_qdp_revision"] },
+  { "code": "crm_qdp_compilation_started_by", "displayName:zh-CN": "编制发起人", "displayName:en": "Compilation Started By", "dataType": "string", "allowedWriterCommands": ["crm:compile_qdp_revision"], "constraints": { "maxLength": 100 } },
+  { "code": "crm_qdp_compiled_at", "displayName:zh-CN": "编制完成时间", "displayName:en": "Compilation Completed At", "dataType": "datetime", "allowedWriterCommands": ["crm:compile_qdp_revision"] },
+  { "code": "crm_qdp_compiled_by", "displayName:zh-CN": "编制操作人", "displayName:en": "Compiled By", "dataType": "string", "allowedWriterCommands": ["crm:compile_qdp_revision"], "constraints": { "maxLength": 100 } }
 ]

@@ -208,8 +208,8 @@
       "id": "crm_cr_qdp_history",
       "blockType": "sub-table",
       "title": {
-        "zh-CN": "QDP 发布历史",
-        "en-US": "QDP Release History"
+        "zh-CN": "QDP 版本与发布状态",
+        "en-US": "QDP Revisions and Release Status"
       },
       "subTable": {
         "childModel": "crm_qdp_revision_common",
@@ -225,23 +225,29 @@
             "width": 90
           },
           {
+            "field": "crm_qdp_status",
+            "width": 140,
+            "renderType": "tag",
+            "dictCode": "crm_qdp_lifecycle"
+          },
+          {
+            "field": "crm_qdp_requirement_version",
+            "width": 180
+          },
+          {
             "field": "crm_qdp_qualification_verdict",
             "width": 140
           },
           {
-            "field": "crm_qdp_content_hash",
+            "field": "crm_qdp_file_package_hash",
             "width": 260
           },
           {
-            "field": "crm_qdp_file_names",
+            "field": "crm_qdp_pack_set_summary",
             "width": 220
           },
           {
-            "field": "crm_qdp_released_by",
-            "width": 140
-          },
-          {
-            "field": "crm_qdp_released_at",
+            "field": "crm_qdp_prepared_at",
             "width": 180
           }
         ]
@@ -252,41 +258,100 @@
       "blockType": "toolbar",
       "buttons": [
         {
-          "code": "release_qdp",
+          "code": "prepare_qdp_draft",
           "primary": true,
-          "icon": "PackageCheck",
-          "permissionCode": "crm.qdp.release",
+          "icon": "PackagePlus",
+          "permissionCode": "crm.qdp.prepare",
           "visibleWhen": "(record.crm_cr_status === 'routed' || record.crm_cr_status === 'in_progress') && record.crm_cr_route_status === 'routed' && record.crm_cr_routed_package === 'pcba-crm' && record.crm_cr_routed_object_type === 'crm_customer_request_pcba_rfq' && record.crm_cr_routed_object_id != null && record.crm_cr_routed_object_id !== ''",
           "label": {
-            "zh-CN": "发布 QDP",
-            "en-US": "Release QDP"
-          },
-          "promptUpload": {
-            "key": "crm_qdp_primary_file_id",
-            "accept": ".zip,.xlsx,.xls,.csv,.pdf,.gbr,.ger,.drl"
+            "zh-CN": "形成 QDP 草稿",
+            "en-US": "Prepare QDP Draft"
           },
           "action": {
             "type": "command",
-            "command": "crm:release_qdp",
+            "command": "crm:prepare_qdp_draft",
             "operationType": "update",
             "targetRecordPid": "${record.pid}",
             "payload": {
               "crm_qdp_customer_request_id": "${record.pid}"
             },
             "inputFieldsTitle": {
-              "zh-CN": "QDP 发布信息",
-              "en-US": "QDP Release Information"
+              "zh-CN": "QDP 草稿与客户确认",
+              "en-US": "QDP Draft and Customer Confirmation"
             },
             "inputFieldsSubmitLabel": {
-              "zh-CN": "发布",
-              "en-US": "Release"
+              "zh-CN": "形成草稿",
+              "en-US": "Prepare Draft"
             },
             "inputFields": [
               {
+                "field": "crm_qdp_primary_file_id",
+                "label": { "zh-CN": "主交付文件", "en-US": "Primary Delivery File" },
+                "type": "file",
+                "required": true,
+                "accept": ".zip,.xlsx,.xls,.csv,.pdf,.gbr,.ger,.drl",
+                "fileNameField": "crm_qdp_primary_filename"
+              },
+              {
+                "field": "crm_qdp_requirement_version",
+                "label": { "zh-CN": "客户需求版本", "en-US": "Customer Requirement Version" },
+                "type": "text",
+                "required": true,
+                "placeholder": { "zh-CN": "例如 RV-2026-08-06-A", "en-US": "For example RV-2026-08-06-A" }
+              },
+              {
+                "field": "crm_qdp_customer_confirmation_ref",
+                "label": { "zh-CN": "客户确认证据编号", "en-US": "Customer Confirmation Evidence" },
+                "type": "text",
+                "required": true,
+                "placeholder": { "zh-CN": "邮件、门户确认或签署记录编号", "en-US": "Email, portal or signature evidence reference" }
+              },
+              {
+                "field": "crm_qdp_customer_confirmed_by",
+                "label": { "zh-CN": "客户确认人", "en-US": "Confirmed By Customer" },
+                "type": "text",
+                "required": true
+              },
+              {
+                "field": "crm_qdp_customer_confirmed_at",
+                "label": { "zh-CN": "客户确认时间（含时区）", "en-US": "Customer Confirmation Time (with timezone)" },
+                "type": "text",
+                "required": true,
+                "placeholder": { "zh-CN": "2026-08-06T10:00:00+08:00", "en-US": "2026-08-06T10:00:00+08:00" }
+              },
+              {
+                "field": "crm_qdp_pack_set",
+                "label": { "zh-CN": "Pack Set（每项含 packCode/version/contentHash）", "en-US": "Pack Set (packCode/version/contentHash per item)" },
+                "type": "textarea",
+                "required": true,
+                "placeholder": { "zh-CN": "输入已批准 Pack 清单", "en-US": "Enter the approved Pack Set" }
+              },
+              {
+                "field": "crm_qdp_downstream_impact",
+                "label": { "zh-CN": "下游影响与责任（对象清单）", "en-US": "Downstream Impact and Responsibility" },
+                "type": "textarea",
+                "required": true,
+                "placeholder": { "zh-CN": "输入下游对象、影响、责任人与处置", "en-US": "Enter downstream objects, impacts, owners and dispositions" }
+              },
+              {
+                "field": "crm_qdp_assumptions",
+                "label": { "zh-CN": "假设清单（无则填 []）", "en-US": "Assumptions (use [] when none)" },
+                "type": "textarea",
+                "required": true,
+                "defaultValue": "[]"
+              },
+              {
+                "field": "crm_qdp_approved_exceptions",
+                "label": { "zh-CN": "批准例外（无则填 []）", "en-US": "Approved Exceptions (use [] when none)" },
+                "type": "textarea",
+                "required": true,
+                "defaultValue": "[]"
+              },
+              {
                 "field": "crm_qdp_release_note",
                 "label": {
-                  "zh-CN": "发布说明",
-                  "en-US": "Release Note"
+                  "zh-CN": "版本说明",
+                  "en-US": "Revision Note"
                 },
                 "type": "textarea",
                 "required": false

@@ -539,6 +539,20 @@
     "module": "crm"
   },
   {
+    "code": "crm.qdp.prepare",
+    "name:zh-CN": "形成 QDP 草稿",
+    "name:en": "Prepare QDP Draft",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
+    "code": "crm.qdp.review",
+    "name:zh-CN": "评审 QDP",
+    "name:en": "Review QDP",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
     "code": "crm.qdp.release",
     "name:zh-CN": "发布 QDP",
     "name:en": "Release QDP",
@@ -556,6 +570,27 @@
     "code": "model.crm_qdp_revision_common.read",
     "name:zh-CN": "查看 QDP 发布版本数据",
     "name:en": "Read QDP Release Revision Model",
+    "resourceType": "data",
+    "module": "crm"
+  },
+  {
+    "code": "model.crm_requirement_version_common.read",
+    "name:zh-CN": "查看需求版本数据",
+    "name:en": "Read Requirement Version Model",
+    "resourceType": "data",
+    "module": "crm"
+  },
+  {
+    "code": "model.crm_file_package_common.read",
+    "name:zh-CN": "查看文件包数据",
+    "name:en": "Read File Package Model",
+    "resourceType": "data",
+    "module": "crm"
+  },
+  {
+    "code": "model.crm_customer_confirmation_common.read",
+    "name:zh-CN": "查看客户确认数据",
+    "name:en": "Read Customer Confirmation Model",
     "resourceType": "data",
     "module": "crm"
   }

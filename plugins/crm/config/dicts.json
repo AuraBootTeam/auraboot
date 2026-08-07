@@ -3970,5 +3970,56 @@
         }
       }
     ]
+  },
+  {
+    "code": "crm_qdp_lifecycle",
+    "name": "QDP Lifecycle",
+    "name:zh-CN": "QDP 生命周期",
+    "dictType": "static",
+    "items": [
+      { "value": "draft", "label": "Draft", "label:zh-CN": "草稿", "sortNo": 10, "status": "enabled", "extension": { "color": "gray" } },
+      { "value": "compiling", "label": "Compiling", "label:zh-CN": "编制中", "sortNo": 20, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "validation_failed", "label": "Validation Failed", "label:zh-CN": "校验失败", "sortNo": 30, "status": "enabled", "extension": { "color": "red" } },
+      { "value": "ready_for_review", "label": "Ready for Review", "label:zh-CN": "待评审", "sortNo": 40, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "released", "label": "Released", "label:zh-CN": "已发布", "sortNo": 50, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "superseded", "label": "Superseded", "label:zh-CN": "已取代", "sortNo": 60, "status": "enabled", "extension": { "color": "purple" } }
+    ]
+  },
+  {
+    "code": "crm_qdp_gate_verdict",
+    "name": "QDP GT-D04 Verdict",
+    "name:zh-CN": "QDP GT-D04 判定",
+    "dictType": "static",
+    "items": [
+      { "value": "pending_review", "label": "Pending Review", "label:zh-CN": "待评审", "sortNo": 10, "status": "enabled", "extension": { "color": "gray" } },
+      { "value": "ready", "label": "Ready", "label:zh-CN": "完整可发布", "sortNo": 20, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "ready_with_approved_exception", "label": "Ready with Approved Exception", "label:zh-CN": "含批准例外可发布", "sortNo": 30, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "blocked", "label": "Blocked", "label:zh-CN": "已阻断", "sortNo": 40, "status": "enabled", "extension": { "color": "red" } }
+    ]
+  },
+  {
+    "code": "crm_qdp_compilation_stage",
+    "name": "QDP Compilation Stage",
+    "name:zh-CN": "QDP 编制阶段",
+    "dictType": "static",
+    "items": [
+      { "value": "validating_confirmation", "label": "Validating Confirmation", "label:zh-CN": "校验客户确认", "sortNo": 10, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "validating_gate", "label": "Validating GT-D04", "label:zh-CN": "校验 GT-D04", "sortNo": 20, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "assembling_result", "label": "Assembling Result", "label:zh-CN": "汇总编制结果", "sortNo": 30, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "completed", "label": "Completed", "label:zh-CN": "已完成", "sortNo": 40, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "validation_failed", "label": "Validation Failed", "label:zh-CN": "校验失败", "sortNo": 50, "status": "enabled", "extension": { "color": "red" } }
+    ]
+  },
+  {
+    "code": "crm_qdp_compilation_outcome",
+    "name": "QDP Compilation Outcome",
+    "name:zh-CN": "QDP 编制结果",
+    "dictType": "static",
+    "items": [
+      { "value": "running", "label": "Running", "label:zh-CN": "执行中", "sortNo": 10, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "success", "label": "Success", "label:zh-CN": "成功", "sortNo": 20, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "partial_success", "label": "Partial Success", "label:zh-CN": "部分成功", "sortNo": 30, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "validation_failed", "label": "Validation Failed", "label:zh-CN": "校验失败", "sortNo": 40, "status": "enabled", "extension": { "color": "red" } }
+    ]
   }
 ]

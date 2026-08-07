@@ -1,5 +1,82 @@
 [
   {
+    "code": "crm:prepare_qdp_draft",
+    "displayName:zh-CN": "形成 QDP 草稿",
+    "displayName:en": "Prepare QDP Draft",
+    "description": "Verify platform file bytes and create one immutable File Package, Requirement Version, Customer Confirmation binding and QDP Draft in the Customer Request transaction.",
+    "type": "custom",
+    "modelCode": "crm_customer_request_common",
+    "handler": "crm:release_qdp",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.qdp.prepare"],
+    "concurrencyKey": "crm:qdp:${payload.crm_qdp_customer_request_id}",
+    "lockTimeoutMs": 8000,
+    "idempotent": true,
+    "agent_hint": "Prepare a QDP Draft only from the exact Customer Request target. The server computes File Package Hash from platform bytes and binds it to a new Requirement Version and customer confirmation evidence. expectedVersion and clientRequestId must come from the command envelope.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:compile_qdp_revision",
+    "displayName:zh-CN": "编制并校验 QDP",
+    "displayName:en": "Compile and Validate QDP",
+    "description": "Run the QDP compiler on the platform async-task queue, persist Compiling progress, and finish as Ready for Review or Validation Failed with an actionable result summary.",
+    "type": "custom",
+    "modelCode": "crm_qdp_revision_common",
+    "handler": "crm:release_qdp",
+    "handlerParams": {
+      "dslPersistence": false,
+      "async": true,
+      "taskPresentation": {
+        "title": { "zh-CN": "QDP 编制与校验", "en": "QDP Compilation and Validation" },
+        "completedMessage": { "zh-CN": "QDP 编制完成", "en": "QDP compilation completed" },
+        "metrics": [
+          { "field": "passedChecks", "label": { "zh-CN": "通过检查", "en": "Passed checks" }, "tone": "success" },
+          { "field": "warningCount", "label": { "zh-CN": "批准例外", "en": "Approved exceptions" }, "tone": "warning" },
+          { "field": "failedChecks", "label": { "zh-CN": "失败检查", "en": "Failed checks" }, "tone": "danger" },
+          { "field": "outcomeLabel", "label": { "zh-CN": "编制结果", "en": "Compilation outcome" } }
+        ]
+      }
+    },
+    "permissions": ["crm.qdp.review"],
+    "concurrencyKey": "crm:qdp:${payload.crm_qdp_customer_request_id}",
+    "lockTimeoutMs": 8000,
+    "idempotent": false,
+    "agent_hint": "Compile one exact Draft or Validation Failed QDP revision asynchronously. The server uses the trusted target, expectedVersion, tenant and permission envelope, persists progress, and revalidates confirmation/hash plus GT-D04 completeness before returning Ready for Review, Partial Success with approved exceptions, or Validation Failed.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:submit_qdp_review",
+    "displayName:zh-CN": "提交 QDP 评审",
+    "displayName:en": "Submit QDP for Review",
+    "description": "Validate GT-D04 completeness and advance a Draft QDP revision to Ready for Review under optimistic concurrency.",
+    "type": "custom",
+    "modelCode": "crm_qdp_revision_common",
+    "handler": "crm:release_qdp",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.qdp.review"],
+    "concurrencyKey": "crm:qdp:${payload.crm_qdp_customer_request_id}",
+    "lockTimeoutMs": 8000,
+    "idempotent": false,
+    "agent_hint": "Submit only a Draft or Validation Failed QDP revision. Exact target pid, Customer Request pid and expectedVersion are mandatory; confirmation/hash, Pack Set and downstream responsibility are re-read server-side.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:publish_qdp_revision",
+    "displayName:zh-CN": "发布 QDP 版本",
+    "displayName:en": "Publish QDP Revision",
+    "description": "Release an exact Ready for Review QDP revision, revalidate confirmation/hash/qualification/file retention, supersede the previous release and link only the new revision pid to the PCBA sidecar.",
+    "type": "custom",
+    "modelCode": "crm_qdp_revision_common",
+    "handler": "crm:release_qdp",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.qdp.release"],
+    "concurrencyKey": "crm:qdp:${payload.crm_qdp_customer_request_id}",
+    "lockTimeoutMs": 8000,
+    "idempotent": false,
+    "agent_hint": "Release only a Ready for Review QDP revision. The command revalidates the exact Requirement Version + File Package Hash customer confirmation, current Customer Request version, PCBA qualification and retained file set. Content is never patched after preparation.",
+    "cmd_risk_level": "L2"
+  },
+  {
     "code": "crm:release_qdp",
     "displayName:zh-CN": "发布 QDP",
     "displayName:en": "Release QDP",

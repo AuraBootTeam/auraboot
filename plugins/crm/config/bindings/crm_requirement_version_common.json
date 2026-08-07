@@ -1,0 +1,13 @@
+[
+  { "modelCode": "crm_requirement_version_common", "fieldCode": "crm_reqv_code", "sequence": 1, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_requirement_version_common", "fieldCode": "crm_reqv_customer_request_id", "sequence": 2, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_requirement_version_common", "fieldCode": "crm_reqv_version_no", "sequence": 3, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_requirement_version_common", "fieldCode": "crm_reqv_version_label", "sequence": 4, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_requirement_version_common", "fieldCode": "crm_reqv_request_row_version", "sequence": 5, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_requirement_version_common", "fieldCode": "crm_reqv_request_snapshot", "sequence": 6, "required": true, "visible": false, "editable": false },
+  { "modelCode": "crm_requirement_version_common", "fieldCode": "crm_reqv_file_package_id", "sequence": 7, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_requirement_version_common", "fieldCode": "crm_reqv_file_package_hash", "sequence": 8, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_requirement_version_common", "fieldCode": "crm_reqv_status", "sequence": 9, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_requirement_version_common", "fieldCode": "crm_reqv_created_at", "sequence": 10, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_requirement_version_common", "fieldCode": "crm_reqv_created_by", "sequence": 11, "required": true, "visible": true, "editable": false }
+]
