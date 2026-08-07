@@ -14999,7 +14999,8 @@ CREATE TABLE public.mt_crm_complaint (
     created_by bigint,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false NOT NULL
+    deleted_flag boolean DEFAULT false NOT NULL,
+    row_version integer DEFAULT 1 NOT NULL
 );
 
 
@@ -15037,7 +15038,8 @@ CREATE TABLE public.mt_dk_document (
     created_by bigint,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false NOT NULL
+    deleted_flag boolean DEFAULT false NOT NULL,
+    row_version integer DEFAULT 1 NOT NULL
 );
 
 
@@ -15075,7 +15077,8 @@ CREATE TABLE public.mt_dk_knowledge_article (
     created_by bigint,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false NOT NULL
+    deleted_flag boolean DEFAULT false NOT NULL,
+    row_version integer DEFAULT 1 NOT NULL
 );
 
 
@@ -15116,7 +15119,8 @@ CREATE TABLE public.mt_org_department (
     created_by bigint,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false NOT NULL
+    deleted_flag boolean DEFAULT false NOT NULL,
+    row_version integer DEFAULT 1 NOT NULL
 );
 
 
@@ -15162,7 +15166,8 @@ CREATE TABLE public.mt_org_employee (
     created_by bigint,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false NOT NULL
+    deleted_flag boolean DEFAULT false NOT NULL,
+    row_version integer DEFAULT 1 NOT NULL
 );
 
 
@@ -15218,7 +15223,8 @@ CREATE TABLE public.mt_tax_einvoice (
     tax_ei_remarks text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    deleted_flag boolean DEFAULT false NOT NULL
+    deleted_flag boolean DEFAULT false NOT NULL,
+    row_version integer DEFAULT 1 NOT NULL
 );
 
 
@@ -15262,7 +15268,8 @@ CREATE TABLE public.mt_tax_einvoice_line (
     tax_eil_vat_amount numeric(18,2),
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    deleted_flag boolean DEFAULT false NOT NULL
+    deleted_flag boolean DEFAULT false NOT NULL,
+    row_version integer DEFAULT 1 NOT NULL
 );
 
 
@@ -15304,7 +15311,8 @@ CREATE TABLE public.mt_tax_vat_rate (
     tax_vr_is_active boolean DEFAULT true,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    deleted_flag boolean DEFAULT false NOT NULL
+    deleted_flag boolean DEFAULT false NOT NULL,
+    row_version integer DEFAULT 1 NOT NULL
 );
 
 

@@ -180,6 +180,7 @@ class SchemaManagementServiceIntegrationTest extends BaseIntegrationTest {
         assertTrue(columnExists(tableName, nameFieldCode), "Column '" + nameFieldCode + "' should exist");
         assertTrue(columnExists(tableName, statusFieldCode), "Column '" + statusFieldCode + "' should exist");
         assertTrue(columnExists(tableName, "tenant_id"), "Column 'tenant_id' should exist");
+        assertTrue(columnExists(tableName, "row_version"), "Column 'row_version' should exist");
         assertTrue(columnExists(tableName, "created_at"), "Column 'created_at' should exist");
         assertTrue(columnExists(tableName, "updated_at"), "Column 'updated_at' should exist");
         log.info("Verified all columns exist");

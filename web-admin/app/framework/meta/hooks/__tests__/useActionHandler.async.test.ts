@@ -977,6 +977,66 @@ describe('useActionHandler - handlerParams.async polling', () => {
     expect(reload).toHaveBeenCalledWith(['rfqSourceAttachments']);
   });
 
+  it('resolves promptUpload payload templates from the clicked detail record', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { qdpRevisionId: 'QDP-3' } });
+    vi.spyOn(promptUpload, 'pickFile').mockResolvedValueOnce(
+      new File(['item,revision\nqdp,true-stack'], 'qdp-release.csv'),
+    );
+    vi.spyOn(promptUpload, 'uploadCommandFile').mockResolvedValueOnce('FILE-QDP-1');
+
+    const loadData = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: vi.fn() as any,
+        tableName: 'crm_customer_request_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: { loadData } as any,
+      }),
+    );
+
+    const button = {
+      code: 'release_qdp',
+      label: 'Release QDP',
+      promptUpload: { key: 'crm_qdp_primary_file_id', accept: '.csv' },
+      action: {
+        type: 'command',
+        command: 'crm:release_qdp',
+        operationType: 'update',
+        targetRecordPid: '${record.pid}',
+        payload: {
+          crm_qdp_customer_request_id: '${record.pid}',
+        },
+      },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button, {
+        pid: 'REQUEST-1',
+        row_version: 4,
+      });
+    });
+
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/crm:release_qdp',
+      expect.objectContaining({
+        method: 'post',
+        params: expect.objectContaining({
+          targetRecordPid: 'REQUEST-1',
+          expectedVersion: 4,
+          operationType: 'UPDATE',
+          payload: expect.objectContaining({
+            crm_qdp_customer_request_id: 'REQUEST-1',
+            crm_qdp_primary_file_id: 'FILE-QDP-1',
+            crm_qdp_primary_filename: 'qdp-release.csv',
+          }),
+        }),
+      }),
+    );
+    expect(loadData).toHaveBeenCalled();
+  });
+
   it('infers DELETE operation for row command actions with delete semantics', async () => {
     fetchResultMock.mockResolvedValueOnce({ code: '0', data: { deleted: 1 } });
 

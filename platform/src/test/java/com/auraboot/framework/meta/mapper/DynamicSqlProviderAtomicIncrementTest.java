@@ -28,6 +28,7 @@ class DynamicSqlProviderAtomicIncrementTest {
 
         assertThat(sql).startsWith("UPDATE mt_cr_crawl_job SET");
         assertThat(sql).contains("cr_cj_discovered_count = COALESCE(cr_cj_discovered_count, 0) + #{delta}");
+        assertThat(sql).contains("row_version = row_version + 1");
         assertThat(sql).contains("updated_at = now()");
         assertThat(sql).contains("updated_by = #{currentUserId}");
         assertThat(sql).contains("WHERE pid = #{recordId}");

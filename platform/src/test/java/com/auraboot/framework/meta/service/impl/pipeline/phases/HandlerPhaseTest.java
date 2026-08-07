@@ -447,6 +447,7 @@ class HandlerPhaseTest {
         assertThat(sqlCaptor.getValue())
                 .contains("UPDATE " + tableName + " SET")
                 .containsPattern("cr_cj_seed_urls = #\\{params\\.set\\d+,jdbcType=OTHER,typeHandler=.*JsonbStringTypeHandler}::jsonb")
+                .contains("row_version = row_version + 1")
                 .contains("WHERE id = #{params.recordId}")
                 .contains("tenant_id = #{params.tenantId}")
                 .contains("created_by = 2")

@@ -397,7 +397,7 @@ public class CommandFieldMapExecutor {
             params.put(paramName, parameterValue);
             index++;
         }
-        if (expectedVersion != null) {
+        if (tableName.startsWith(com.auraboot.framework.meta.constant.SystemFieldConstants.DYNAMIC_TABLE_PREFIX)) {
             sql.append(", row_version = row_version + 1");
         }
 

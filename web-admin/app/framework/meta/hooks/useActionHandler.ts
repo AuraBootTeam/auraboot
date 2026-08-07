@@ -137,10 +137,7 @@ function resolveCommandTargetRecordId(
   record: Record<string, any> | undefined,
   context: Record<string, any>,
 ): string | undefined {
-  const explicitTarget = resolveRuntimeTemplate(
-    actionDef.targetRecordPid ?? actionDef.targetRecordPid,
-    runtimeContext,
-  );
+  const explicitTarget = resolveRuntimeTemplate(actionDef.targetRecordPid, runtimeContext);
   return (
     toNonBlankString(explicitTarget) ||
     getLegacyCompatibleRecordPid(record) ||
@@ -607,9 +604,17 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               if (!confirmed) return;
             }
             const runtimeContext = (runtime?.getContext?.() ?? {}) as Record<string, unknown>;
+            const actionRecord = record || context.record || context.data;
+            const actionRuntimeContext = actionRecord
+              ? {
+                  ...runtimeContext,
+                  record: actionRecord,
+                  row: actionRecord,
+                }
+              : runtimeContext;
             const targetRecordPid = resolveCommandTargetRecordId(
               actionDef as unknown as Record<string, unknown>,
-              runtimeContext,
+              actionRuntimeContext,
               record,
               context,
             );
@@ -617,7 +622,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               ...(record || context.data || {}),
               ...resolveCommandPayload(
                 actionDef as unknown as Record<string, unknown>,
-                runtimeContext,
+                actionRuntimeContext,
               ),
             };
             const inputFields = Array.isArray((actionDef as any).inputFields)
@@ -1003,6 +1008,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       executeCommand,
       resolveNavigateTo,
       showConfirmDialog,
+      surfaceTemporaryPassword,
     ],
   );
 

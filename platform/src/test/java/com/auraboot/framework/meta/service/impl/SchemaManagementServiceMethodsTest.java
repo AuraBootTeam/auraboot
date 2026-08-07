@@ -12,6 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -96,6 +97,7 @@ class SchemaManagementServiceMethodsTest {
         when(ddlDialectProvider.getDialect()).thenReturn(ddlDialect);
         when(ddlDialect.mapDataType(any())).thenReturn("VARCHAR(255)");
         when(ddlDialect.formatDefaultValue(any(), any())).thenReturn("'default'");
+        when(tableMetadataService.columnExists("tb_test", "row_version")).thenReturn(true);
     }
 
     @Test
@@ -130,6 +132,45 @@ class SchemaManagementServiceMethodsTest {
         assertEquals("Externally managed table; schema sync skipped", result.getMessage());
         verify(dynamicDataMapper, never()).createTable(anyString());
         verify(dynamicDataMapper, never()).alterTable(anyString());
+    }
+
+    @Test
+    @DisplayName("createTableByModel - dynamic tables include a mandatory row_version")
+    void testCreateTableByModel_IncludesRowVersion() {
+        when(metaModelService.getModelDefinitionFromDb("test_model"))
+                .thenReturn(Optional.of(testModel));
+        when(tableMetadataService.tableExists("tb_test")).thenReturn(false);
+        when(ddlDialect.getTimestampType()).thenReturn("TIMESTAMP");
+        when(ddlDialect.getVarcharType(anyInt())).thenReturn("VARCHAR(255)");
+        when(ddlDialect.getTableSuffix()).thenReturn("");
+
+        SchemaOperationResult result = schemaManagementService.createTableByModel("test_model");
+
+        assertTrue(result.getSuccess());
+        ArgumentCaptor<String> ddlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(dynamicDataMapper).createTable(ddlCaptor.capture());
+        assertTrue(ddlCaptor.getValue().contains("row_version INTEGER NOT NULL DEFAULT 1"),
+                ddlCaptor.getValue());
+    }
+
+    @Test
+    @DisplayName("syncModelToTable - existing dynamic tables receive row_version")
+    void testSyncModelToTable_AddsMissingRowVersion() {
+        when(metaModelService.getModelDefinitionFromDb("test_model"))
+                .thenReturn(Optional.of(testModel));
+        when(tableMetadataService.tableExists("tb_test")).thenReturn(true);
+        when(tableMetadataService.columnExists("tb_test", "row_version")).thenReturn(false);
+        when(tableMetadataService.columnExists("tb_test", "test_column")).thenReturn(true);
+        when(tableMetadataService.getColumnTypeDefinition("tb_test", "test_column"))
+                .thenReturn("VARCHAR(255)");
+        when(tableMetadataService.isColumnNullable("tb_test", "test_column")).thenReturn(true);
+
+        SchemaOperationResult result = schemaManagementService.syncModelToTable("test_model", null);
+
+        assertTrue(result.getSuccess());
+        assertNotNull(result.getExecutedDDL());
+        assertTrue(result.getExecutedDDL().contains(
+                "ALTER TABLE tb_test ADD COLUMN IF NOT EXISTS row_version INTEGER NOT NULL DEFAULT 1"));
     }
 
     // ==================== addFieldToModel 测试 ====================
