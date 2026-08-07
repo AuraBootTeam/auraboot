@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5157';
@@ -13,7 +14,8 @@ const SIDECAR_PID = requiredEnv('QDP_PCBA_RFQ_PID');
 const STALE_QDP_PID = requiredEnv('QDP_STALE_QDP_PID');
 const RELEASED_QDP_PID = requiredEnv('QDP_RELEASED_QDP_PID');
 const RELEASED_PACK_SUMMARY = process.env.QDP_RELEASED_PACK_SUMMARY || 'PCBA-MFG@3.0';
-const EVIDENCE_DIR = process.env.QDP_EVIDENCE_DIR || '/tmp/qdp-release-center-evidence';
+const EVIDENCE_DIR =
+  process.env.QDP_EVIDENCE_DIR || mkdtempSync(path.join(tmpdir(), 'qdp-release-center-evidence-'));
 const ADMIN_EMAIL = 'admin@auraboot.com';
 const PASSWORD = 'Test2026x';
 const RELEASE_MANAGER_EMAIL = `qdp-release-manager-${RUN}@example.test`;
