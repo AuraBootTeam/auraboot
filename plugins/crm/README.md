@@ -30,7 +30,7 @@ node scripts/check-dsl-actions.mjs plugins/crm
 ```
 
 The generated JAR is written to
-`plugins/crm/backend/build/libs/crm-plugin-1.0.0.jar`, matching `plugin.json`.
+`plugins/crm/backend/build/libs/crm-plugin-1.1.0.jar`, matching `plugin.json`.
 
 ## Licensing
 

@@ -1,0 +1,194 @@
+[
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_code",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_customer_request_id",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_revision_no",
+    "sequence": 3,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_schema_version",
+    "sequence": 4,
+    "required": true,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_expected_request_version",
+    "sequence": 5,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_source_revision",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_qualification_verdict",
+    "sequence": 7,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_qualification_evidence_refs",
+    "sequence": 8,
+    "required": false,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_content_hash",
+    "sequence": 9,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_request_snapshot",
+    "sequence": 10,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_file_manifest",
+    "sequence": 11,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_primary_file_id",
+    "sequence": 12,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_primary_filename",
+    "sequence": 13,
+    "required": true,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_file_names",
+    "sequence": 14,
+    "required": true,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_client_request_id",
+    "sequence": 15,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_owner_scope",
+    "sequence": 16,
+    "required": true,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_status",
+    "sequence": 17,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_release_note",
+    "sequence": 18,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_released_at",
+    "sequence": 19,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "crm_qdp_revision_common",
+    "fieldCode": "crm_qdp_released_by",
+    "sequence": 20,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true
+    }
+  }
+]

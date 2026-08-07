@@ -671,5 +671,29 @@
     "domain_category": "crm",
     "data_sensitivity": "internal",
     "lifecycle_description": "pending -> awaiting_customer -> customer_replied -> resolved / cancelled"
+  },
+  {
+    "code": "crm_qdp_revision_common",
+    "displayName:zh-CN": "QDP 发布版本",
+    "displayName:en": "QDP Release Revision",
+    "description": "Immutable QDP release revision owned by the CRM Customer Request aggregate",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "immutable": true,
+    "commandOnlyCreate": true,
+    "extension": {
+      "icon": "FileArchive",
+      "category": "crm",
+      "titleField": "crm_qdp_code",
+      "subtitleField": "crm_qdp_content_hash",
+      "dataScope": {
+        "ownerField": "created_by",
+        "departmentField": null
+      }
+    },
+    "semantic_description": "An immutable released QDP revision under a stable CRM Customer Request. The record freezes a deterministic content hash, a request snapshot and platform file references; industry plugins may retain only this revision pid plus their own sidecar facts.",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "Append-only immutable release history. Each successful content change creates a new numbered revision; an existing revision is never updated or deleted."
   }
 ]

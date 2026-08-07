@@ -1,0 +1,79 @@
+{
+  "pageKey": "crm_qdp_revision_common_form",
+  "name:zh-CN": "QDP 发布版本只读表单",
+  "name:en": "QDP Release Revision Read-only Form",
+  "modelCode": "crm_qdp_revision_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 16
+  },
+  "blocks": [
+    {
+      "id": "crm_qdp_read_only_fields",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "已发布内容（不可编辑）",
+        "en-US": "Released Content (Read-only)"
+      },
+      "layout": {
+        "colSpan": 12
+      },
+      "columns": 2,
+      "fields": [
+        {
+          "field": "crm_qdp_code",
+          "readOnly": true
+        },
+        {
+          "field": "crm_qdp_status",
+          "readOnly": true
+        },
+        {
+          "field": "crm_qdp_customer_request_id",
+          "readOnly": true
+        },
+        {
+          "field": "crm_qdp_revision_no",
+          "readOnly": true
+        },
+        {
+          "field": "crm_qdp_content_hash",
+          "readOnly": true,
+          "span": 2
+        },
+        {
+          "field": "crm_qdp_primary_filename",
+          "readOnly": true
+        },
+        {
+          "field": "crm_qdp_released_by",
+          "readOnly": true
+        },
+        {
+          "field": "crm_qdp_released_at",
+          "readOnly": true
+        }
+      ]
+    },
+    {
+      "id": "crm_qdp_form_buttons",
+      "blockType": "form-buttons",
+      "layout": {
+        "colSpan": 12
+      },
+      "buttons": [
+        {
+          "code": "back",
+          "label": "$i18n:common.button.cancel",
+          "action": {
+            "type": "builtin",
+            "name": "back"
+          }
+        }
+      ]
+    }
+  ]
+}

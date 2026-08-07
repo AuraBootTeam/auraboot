@@ -1,7 +1,7 @@
 {
   "pluginId": "com.auraboot.crm",
   "namespace": "crm",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "dslVersion": 1,
   "pluginType": "hybrid",
   "displayName": "Customer Relationship Management",
@@ -13,7 +13,7 @@
   "minPlatformVersion": "1.0.0",
   "dependencies": [],
   "backend": {
-    "jarPath": "backend/build/libs/crm-plugin-1.0.0.jar",
+    "jarPath": "backend/build/libs/crm-plugin-1.1.0.jar",
     "entryClass": "com.auraboot.plugins.crm.CrmPlugin"
   },
   "provides": [
@@ -100,6 +100,14 @@
     {
       "type": "page",
       "code": "crm_lead_conversion"
+    },
+    {
+      "type": "model",
+      "code": "crm_qdp_revision_common"
+    },
+    {
+      "type": "command",
+      "code": "crm:release_qdp"
     }
   ],
   "requires": [],
