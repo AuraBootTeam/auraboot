@@ -5,7 +5,7 @@
 export const TEST_ACCOUNTS = {
   admin: {
     email: 'admin@auraboot.com',
-    password: 'Test2026x',
+    password: process.env.PW_ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD ?? 'Test2026x',
     name: 'Admin',
   },
 } as const;

@@ -1213,6 +1213,39 @@ export async function seedBomWorkbench(
       created.rows,
     );
 
+    // V3 deliberately projects the standard and canonical rows with one shared PID.
+    // Confirmation writes an append-only decision and updates both projections, so the
+    // browser fixture must reproduce that real conversion invariant instead of seeding
+    // only the legacy standard row.
+    created.canonicalLineId = await dynamicCreate(
+      page,
+      'req_requirement_line_pcba_bom',
+      {
+        pid: created.standardLineId,
+        bom_cl_task_id: created.taskId,
+        bom_cl_line_no: 1,
+        bom_cl_level: 1,
+        bom_cl_line_type: 'component',
+        bom_cl_current_standard_code: '',
+        bom_cl_material_name: '10K resistor canonical',
+        bom_cl_display_spec: '10K 1% 0603',
+        bom_cl_match_spec: '10K 1% 0603',
+        bom_cl_unit: 'PCS',
+        bom_cl_qty: 2,
+        bom_cl_refdes: 'R1,R2',
+        bom_cl_brand: 'Yageo',
+        bom_cl_mpn: 'RC0603FR-0710KL',
+        bom_cl_category: 'resistor',
+        bom_cl_review_status: 'pending',
+        bom_cl_review_tone: 'yellow',
+        bom_cl_reason_code: 'match_multi_candidate',
+        bom_cl_projection_version: 1,
+        bom_cl_visibility_status: 'committed',
+      },
+      created.rows,
+    );
+    expect(created.canonicalLineId).toBe(created.standardLineId);
+
     created.directLineId = await dynamicCreate(
       page,
       'bom_standard_line_pcba',
@@ -1271,7 +1304,7 @@ export async function seedBomWorkbench(
       'bom_match_evidence',
       {
         bom_me_task_id: created.taskId,
-        bom_me_canonical_line_id: created.standardLineId,
+        bom_me_canonical_line_id: created.canonicalLineId,
         bom_me_material_code: created.candidateCode,
         bom_me_candidate_source: 'item_master',
         bom_me_status_color: 'yellow',
@@ -1302,7 +1335,7 @@ export async function seedBomWorkbench(
       'bom_match_evidence',
       {
         bom_me_task_id: created.taskId,
-        bom_me_canonical_line_id: created.standardLineId,
+        bom_me_canonical_line_id: created.canonicalLineId,
         bom_me_material_code: created.secondaryCandidateCode,
         bom_me_candidate_source: 'item_master',
         bom_me_status_color: 'yellow',
