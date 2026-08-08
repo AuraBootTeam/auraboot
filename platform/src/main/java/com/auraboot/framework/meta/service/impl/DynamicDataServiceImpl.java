@@ -2995,7 +2995,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             try {
                 data = fieldMaskService.applyMaskingForExport(modelCode, data, userId);
             } catch (Exception e) {
-                log.warn("Failed to apply export masking for model {}: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
+                log.error("Failed to apply configurable masking in export for model {} — denying access",
+                        logSafe(modelCode), e);
+                throw new MetaServiceException(
+                        "Configurable field masking failed for export: " + modelCode, e);
             }
 
             // Resolve reference display names so the export shows names, not pids (same as list/detail).

@@ -29,12 +29,17 @@
   {
     "code": "crm.cap.account_contact_full",
     "group": "客户管理",
-    "name:zh-CN": "查看完整联系方式(手机/邮箱)",
-    "name:en": "View Unmasked Account Contact",
-    "description": "未授予时客户电话显示为 138****1234",
+    "name:zh-CN": "查看完整客户联系方式(电话/邮箱)",
+    "name:en": "View Unmasked CRM Contact Channels",
+    "description": "查看客户、联系人及线索的完整电话和邮箱；未授予时列表、详情与导出均保持脱敏",
     "sensitive": true,
     "unmasksFields": [
-      "crm_account_common.crm_acc_phone"
+      "crm_account_common.crm_acc_phone",
+      "crm_contact_common.crm_ct_email",
+      "crm_contact_common.crm_ct_phone",
+      "crm_contact_common.crm_ct_mobile",
+      "crm_lead_common.crm_lead_contact_phone",
+      "crm_lead_common.crm_lead_contact_email"
     ],
     "includes": [
       "crm.account.contact_unmask"
