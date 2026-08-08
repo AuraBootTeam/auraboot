@@ -1,9 +1,11 @@
 package com.auraboot.framework.permission.engine.evaluator;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
 import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
 import com.auraboot.framework.permission.service.DataScopeService;
+import com.auraboot.framework.permission.service.RecordShareService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +24,7 @@ public class DataScopeEvaluator {
     private static final String NAME = "DataScope";
 
     private final DataScopeService dataScopeService;
+    private final RecordShareService recordShareService;
 
     /**
      * Evaluate whether the member can access a specific record based on data scope.
@@ -92,7 +95,23 @@ public class DataScopeEvaluator {
             // The RBAC layer is still responsible for overall access control.
             return DataScopeCondition.all();
         }
-        return condition;
+        if ("all".equals(condition.scopeType()) || !MetaContext.exists()) {
+            return condition;
+        }
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null || memberId == null) {
+            return condition;
+        }
+
+        return condition.withSharedRecords(
+                recordShareService.getSharedRecordIds(tenantId, resource, memberId, action),
+                recordShareService.getSharedRecordPids(
+                        tenantId,
+                        resource,
+                        memberId,
+                        MetaContext.getCurrentUserPid(),
+                        action));
     }
 
     // ========================================================================

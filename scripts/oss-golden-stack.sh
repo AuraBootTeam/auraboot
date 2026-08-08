@@ -85,6 +85,86 @@ web_admin_node_modules_seed() {
   return 1
 }
 
+# Resolve hybrid packages from the requested import profile/explicit plugin list,
+# build their PF4J jars from THIS checkout, and stage them before the backend starts.
+# Import-time handler validation is intentionally fail-closed: importing the DSL
+# first and hot-loading a jar later leaves a hybrid package impossible to install.
+stage_requested_hybrid_jars() {
+  local sd="$1" runtime_name="$2" plugin_profile="$3"; shift 3
+  local hybrid_specs=()
+
+  while IFS='|' read -r plugin_name jar_rel; do
+    [ -n "$plugin_name" ] && hybrid_specs+=("$plugin_name|$jar_rel")
+  done < <(node - "$REPO_ROOT" "$plugin_profile" "$@" <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+
+const [repoRoot, profile, ...explicit] = process.argv.slice(2);
+const profiles = JSON.parse(
+  fs.readFileSync(path.join(repoRoot, 'scripts/dev/plugin-import-profiles.json'), 'utf8'),
+);
+const selected = [];
+if (profile && profile !== 'none') {
+  const configured = profiles[profile];
+  if (!Array.isArray(configured)) {
+    process.stderr.write(`Unknown plugin profile: ${profile}\n`);
+    process.exit(2);
+  }
+  selected.push(...configured);
+}
+selected.push(...explicit);
+
+for (const pluginName of [...new Set(selected)]) {
+  const manifestPath = path.join(repoRoot, 'plugins', pluginName, 'plugin.json');
+  if (!fs.existsSync(manifestPath)) continue;
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  if (manifest.pluginType !== 'hybrid') continue;
+  const jarPath = manifest.backend?.jarPath;
+  if (!jarPath || typeof jarPath !== 'string') {
+    process.stderr.write(`Hybrid plugin ${pluginName} has no backend.jarPath\n`);
+    process.exit(2);
+  }
+  process.stdout.write(`${pluginName}|${jarPath}\n`);
+}
+NODE
+  )
+
+  [ "${#hybrid_specs[@]}" -gt 0 ] || return 0
+
+  log "4.5/9 build and stage ${#hybrid_specs[@]} hybrid PF4J jar(s) from current source"
+  local maven_repo gradle_home
+  maven_repo="$(runtime_env "$runtime_name" MAVEN_REPO_LOCAL)"
+  gradle_home="$(runtime_env "$runtime_name" GRADLE_USER_HOME)"
+  [ -n "$maven_repo" ] || die "runtime Maven repository is missing for $runtime_name"
+  [ -n "$gradle_home" ] || die "runtime Gradle home is missing for $runtime_name"
+  mkdir -p "$maven_repo" "$gradle_home"
+  ( cd "$REPO_ROOT/platform" \
+    && GRADLE_USER_HOME="$gradle_home" ./gradlew --no-daemon --no-build-cache \
+      -Dmaven.repo.local="$maven_repo" :platform-plugin-api:publishToMavenLocal --console=plain \
+  ) >"$sd/plugin-api-publish.log" 2>&1 \
+    || die "platform-plugin-api publish failed — see $sd/plugin-api-publish.log"
+
+  mkdir -p "$sd/pf4j-plugins"
+  local spec plugin_name jar_rel backend_dir jar_path
+  for spec in "${hybrid_specs[@]}"; do
+    plugin_name="${spec%%|*}"
+    jar_rel="${spec#*|}"
+    backend_dir="$REPO_ROOT/plugins/$plugin_name/backend"
+    jar_path="$REPO_ROOT/plugins/$plugin_name/$jar_rel"
+    [ -d "$backend_dir" ] || die "hybrid backend missing for $plugin_name: $backend_dir"
+    ( cd "$backend_dir" && GRADLE_USER_HOME="$gradle_home" gradle --no-daemon \
+      -Dmaven.repo.local="$maven_repo" clean jar --console=plain ) \
+      >"$sd/${plugin_name}-jar.log" 2>&1 \
+      || die "hybrid jar build failed for $plugin_name — see $sd/${plugin_name}-jar.log"
+    [ -f "$jar_path" ] || die "hybrid jar missing after build for $plugin_name: $jar_path"
+    unzip -p "$jar_path" META-INF/extensions.idx 2>/dev/null \
+      | grep -qE '^[^#[:space:]]' \
+      || die "hybrid jar has no registered PF4J extensions: $jar_path"
+    cp "$jar_path" "$sd/pf4j-plugins/"
+    log "    staged $plugin_name ($(shasum -a 256 "$jar_path" | awk '{print substr($1,1,12)}'))"
+  done
+}
+
 poll_http() {  # poll_http <url> <pattern> <timeout-s> <label>
   local url="$1" pat="$2" timeout="$3" label="$4" i=0
   while [ "$i" -lt "$timeout" ]; do
@@ -271,6 +351,14 @@ cmd_up() {
     || die "bootJar build failed — see $sd/bootjar.log"
   local jar; jar="$(ls "$REPO_ROOT"/platform/build/libs/*-boot.jar 2>/dev/null | head -1)"
   [ -n "$jar" ] || die "boot jar not found after build"
+
+  if [ "${#import_plugins[@]}" -gt 0 ]; then
+    stage_requested_hybrid_jars "$sd" "$name" "${plugin_profile:-none}" "${import_plugins[@]}"
+  else
+    # macOS Bash 3.2 + `set -u` treats an expansion of an empty array as an
+    # unbound variable even when it was declared above.
+    stage_requested_hybrid_jars "$sd" "$name" "${plugin_profile:-none}"
+  fi
 
   log "5/9 start backend (java -jar) on $server_port"
   mkdir -p "$sd/pf4j-plugins"

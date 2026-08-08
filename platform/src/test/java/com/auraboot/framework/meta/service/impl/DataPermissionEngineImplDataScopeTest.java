@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper;
 import com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator;
+import com.auraboot.framework.permission.engine.evaluator.RecordShareEvaluator;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
 import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
@@ -38,13 +39,17 @@ class DataPermissionEngineImplDataScopeTest {
     @Mock
     private DataScopeEvaluator dataScopeEvaluator;
 
+    @Mock
+    private RecordShareEvaluator recordShareEvaluator;
+
     private DataPermissionEngineImpl engine;
 
     @BeforeEach
     void setUp() {
         MetaContext.setContext(TENANT_ID, USER_ID, "user-pid", "tester");
         MetaContext.setMemberId(MEMBER_ID);
-        engine = new DataPermissionEngineImpl(policyMapper, dataScopeEvaluator, new ObjectMapper());
+        engine = new DataPermissionEngineImpl(
+                policyMapper, dataScopeEvaluator, recordShareEvaluator, new ObjectMapper());
     }
 
     @AfterEach
@@ -77,6 +82,19 @@ class DataPermissionEngineImplDataScopeTest {
                 .thenReturn(new EvaluationStep("DataScope", EvaluationVerdict.ALLOW, "delete owner"));
 
         boolean allowed = engine.canAccessRecord(TENANT_ID, MODEL_CODE, "delete", USER_ID, record);
+
+        assertThat(allowed).isTrue();
+    }
+
+    @Test
+    @DisplayName("explicit record share bypasses a denying role data scope for the same action")
+    void canAccessRecord_shareBypassesDataScopeDeny() {
+        Map<String, Object> record = Map.of("pid", "rec-1", "created_by", 99L);
+        when(policyMapper.findEffectivePolicies(TENANT_ID, MODEL_CODE, MEMBER_ID)).thenReturn(List.of());
+        when(recordShareEvaluator.evaluate(MEMBER_ID, MODEL_CODE, "read", record))
+                .thenReturn(new EvaluationStep("RecordShare", EvaluationVerdict.ALLOW, "shared for read"));
+
+        boolean allowed = engine.canAccessRecord(TENANT_ID, MODEL_CODE, "read", USER_ID, record);
 
         assertThat(allowed).isTrue();
     }
@@ -203,5 +221,32 @@ class DataPermissionEngineImplDataScopeTest {
                 "self", "created_by", null, null, List.of(), List.of());
         assertThat((String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", self))
                 .isEqualTo("1 = 0");
+    }
+
+    @Test
+    @DisplayName("dataScopeConditionToSql combines owner scope with explicit ID and PID shares")
+    void dataScopeSql_combinesOwnerAndSharedRecords() {
+        DataScopeCondition selfWithShares = new DataScopeCondition(
+                "self",
+                "owner_pid",
+                "owner-1",
+                null,
+                List.of(),
+                List.of(42L, 42L),
+                List.of("rec'a", "rec-b"));
+
+        assertThat((String) ReflectionTestUtils.invokeMethod(
+                engine, "dataScopeConditionToSql", selfWithShares))
+                .isEqualTo("(owner_pid = 'owner-1' OR (id IN (42) OR pid IN ('rec''a','rec-b')))");
+    }
+
+    @Test
+    @DisplayName("explicit shares remain visible even when the resolved scope is none")
+    void dataScopeSql_shareOverridesNoneScope() {
+        DataScopeCondition noneWithShare = DataScopeCondition.none()
+                .withSharedRecords(List.of(), List.of("rec-allowed"));
+
+        assertThat((String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", noneWithShare))
+                .isEqualTo("pid IN ('rec-allowed')");
     }
 }

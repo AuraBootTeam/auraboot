@@ -14,6 +14,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 
 import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 
@@ -42,7 +43,7 @@ public class RecordShareServiceImpl implements RecordShareService {
         share.setRecordId(recordId);
         share.setSubjectType(subjectType);
         share.setSubjectId(subjectId);
-        share.setPermissionMask(permissionMask);
+        share.setPermissionMask(normalizePermissionMask(permissionMask));
         share.setExpiresAt(expiresAt);
         share.setCreatedAt(Instant.now());
         share.setCreatedBy(MetaContext.getCurrentUserId());
@@ -71,7 +72,7 @@ public class RecordShareServiceImpl implements RecordShareService {
         share.setSubjectType(subjectType);
         share.setSubjectId(subjectId);
         share.setSubjectPid(normalizePid(subjectPid));
-        share.setPermissionMask(permissionMask);
+        share.setPermissionMask(normalizePermissionMask(permissionMask));
         share.setExpiresAt(expiresAt);
         share.setCreatedAt(Instant.now());
         share.setCreatedBy(MetaContext.getCurrentUserId());
@@ -92,12 +93,14 @@ public class RecordShareServiceImpl implements RecordShareService {
     }
 
     @Override
-    public boolean isShared(Long tenantId, String resourceCode, Long recordId, Long memberId) {
+    public boolean isShared(
+            Long tenantId, String resourceCode, Long recordId, Long memberId, String action) {
         Instant now = Instant.now();
+        String normalizedAction = normalizeAction(action);
 
         // Check direct member share
         int directCount = recordShareMapper.countByRecordAndUser(
-                tenantId, resourceCode, recordId, memberId, now);
+                tenantId, resourceCode, recordId, memberId, normalizedAction, now);
         if (directCount > 0) {
             return true;
         }
@@ -109,22 +112,30 @@ public class RecordShareServiceImpl implements RecordShareService {
         }
 
         int roleCount = recordShareMapper.countByRecordAndRoles(
-                tenantId, resourceCode, recordId, roleIds, now);
+                tenantId, resourceCode, recordId, roleIds, normalizedAction, now);
         return roleCount > 0;
     }
 
     @Override
-    public boolean isSharedByPid(Long tenantId, String resourceCode, String recordPid, Long memberId, String memberPid) {
+    public boolean isSharedByPid(
+            Long tenantId,
+            String resourceCode,
+            String recordPid,
+            Long memberId,
+            String memberPid,
+            String action) {
         if (!StringUtils.hasText(recordPid)) {
             return false;
         }
         Instant now = Instant.now();
         String normalizedRecordPid = recordPid.trim();
         String normalizedMemberPid = normalizePid(memberPid);
+        String normalizedAction = normalizeAction(action);
 
         if (StringUtils.hasText(normalizedMemberPid)) {
             int directPidCount = recordShareMapper.countByRecordPidAndSubjectPid(
-                    tenantId, resourceCode, normalizedRecordPid, "member", normalizedMemberPid, now);
+                    tenantId, resourceCode, normalizedRecordPid, "member", normalizedMemberPid,
+                    normalizedAction, now);
             if (directPidCount > 0) {
                 return true;
             }
@@ -135,7 +146,7 @@ public class RecordShareServiceImpl implements RecordShareService {
         }
 
         int directLegacyCount = recordShareMapper.countByRecordPidAndUser(
-                tenantId, resourceCode, normalizedRecordPid, memberId, now);
+                tenantId, resourceCode, normalizedRecordPid, memberId, normalizedAction, now);
         if (directLegacyCount > 0) {
             return true;
         }
@@ -146,7 +157,7 @@ public class RecordShareServiceImpl implements RecordShareService {
         }
 
         int roleCount = recordShareMapper.countByRecordPidAndRoles(
-                tenantId, resourceCode, normalizedRecordPid, roleIds, now);
+                tenantId, resourceCode, normalizedRecordPid, roleIds, normalizedAction, now);
         return roleCount > 0;
     }
 
@@ -156,6 +167,25 @@ public class RecordShareServiceImpl implements RecordShareService {
         return recordShareMapper.findSharedRecordIds(
                 tenantId, resourceCode, memberId,
                 roleIds != null ? roleIds : List.of(),
+                normalizeAction(action),
+                Instant.now());
+    }
+
+    @Override
+    public List<String> getSharedRecordPids(
+            Long tenantId,
+            String resourceCode,
+            Long memberId,
+            String memberPid,
+            String action) {
+        List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
+        return recordShareMapper.findSharedRecordPids(
+                tenantId,
+                resourceCode,
+                memberId,
+                normalizePid(memberPid),
+                roleIds != null ? roleIds : List.of(),
+                normalizeAction(action),
                 Instant.now());
     }
 
@@ -199,5 +229,16 @@ public class RecordShareServiceImpl implements RecordShareService {
 
     private String normalizePid(String pid) {
         return StringUtils.hasText(pid) ? pid.trim() : null;
+    }
+
+    private String normalizeAction(String action) {
+        return StringUtils.hasText(action) ? action.trim().toLowerCase(Locale.ROOT) : "read";
+    }
+
+    private String normalizePermissionMask(String permissionMask) {
+        if (!StringUtils.hasText(permissionMask)) {
+            return "read";
+        }
+        return permissionMask.trim().toLowerCase(Locale.ROOT).replace(" ", "");
     }
 }

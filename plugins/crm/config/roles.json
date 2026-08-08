@@ -4,6 +4,7 @@
     "name:zh-CN": "CRM 管理员",
     "name:en": "CRM Administrator",
     "description": "Full access to all CRM modules",
+    "defaultDataScopeType": "all",
     "permissions": [
       "meta.command.execute",
       "data.datasource.read",
@@ -83,6 +84,7 @@
     "name:zh-CN": "销售代表",
     "name:en": "Sales Representative",
     "description": "Manage accounts, contacts, leads, opportunities, and activities",
+    "defaultDataScopeType": "self",
     "permissions": [
       "meta.command.execute",
       "data.datasource.read",
@@ -141,6 +143,7 @@
     "name:zh-CN": "销售经理",
     "name:en": "Sales Manager",
     "description": "Sales manager: manages team accounts, opportunities, quotes and orders; basis for commission attribution and approvals (extended in ICM milestones)",
+    "defaultDataScopeType": "all",
     "permissions": [
       "meta.command.execute",
       "data.datasource.read",
@@ -207,6 +210,7 @@
     "name:zh-CN": "客服人员",
     "name:en": "Service Agent",
     "description": "Manage complaints and activities, view accounts and contacts",
+    "defaultDataScopeType": "all",
     "permissions": [
       "meta.command.execute",
       "data.datasource.read",
@@ -249,6 +253,7 @@
     "name:zh-CN": "CRM 只读用户",
     "name:en": "CRM Viewer",
     "description": "Read-only access to CRM data and analytics",
+    "defaultDataScopeType": "all",
     "permissions": [
       "data.datasource.read",
       "meta.query.read",

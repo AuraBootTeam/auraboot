@@ -49,15 +49,8 @@
     "simple-inventory",
     "workflow-demo"
   ],
-  "internal_test_plugins": [
-    "test-fixtures"
-  ],
-  "tooling_dirs": [
-    "acp-showcase",
-    "cli",
-    "schemas",
-    "scripts"
-  ],
+  "internal_test_plugins": ["test-fixtures"],
+  "tooling_dirs": ["acp-showcase", "cli", "schemas", "scripts"],
   "test_paths": [
     "tests/e2e/auth/**",
     "tests/e2e/permission/**",
@@ -106,6 +99,7 @@
     "tests/e2e/crm/crm-m4-forecast.spec.ts",
     "tests/e2e/crm/crm-m4-lead-engine.spec.ts",
     "tests/e2e/crm/crm-opportunity-kanban.spec.ts",
+    "tests/e2e/crm/crm-ownership-sharing.spec.ts",
     "tests/e2e/cross-module/**",
     "tests/e2e/bpm-smoke/**",
     "tests/e2e/bpm-designer/**",

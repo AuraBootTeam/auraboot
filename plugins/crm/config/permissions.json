@@ -151,126 +151,162 @@
     "name:zh-CN": "查看客户模型",
     "name:en": "Read Account Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_account_common",
+    "action": "read"
   },
   {
     "code": "model.crm_contact_common.read",
     "name:zh-CN": "查看联系人模型",
     "name:en": "Read Contact Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_contact_common",
+    "action": "read"
   },
   {
     "code": "model.crm_lead_common.read",
     "name:zh-CN": "查看线索模型",
     "name:en": "Read Lead Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_lead_common",
+    "action": "read"
   },
   {
     "code": "model.crm_opportunity_common.read",
     "name:zh-CN": "查看商机模型",
     "name:en": "Read Opportunity Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_opportunity_common",
+    "action": "read"
   },
   {
     "code": "model.crm_customer_request_common.read",
     "name:zh-CN": "查看客户需求模型",
     "name:en": "Read Customer Request Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_customer_request_common",
+    "action": "read"
   },
   {
     "code": "model.crm_quote_summary_common.read",
     "name:zh-CN": "查看报价摘要模型",
     "name:en": "Read Quote Summary Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_quote_summary_common",
+    "action": "read"
   },
   {
     "code": "model.crm_opportunity_contact_common.read",
     "name:zh-CN": "查看商机联系人模型",
     "name:en": "Read Opportunity Contact Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_opportunity_contact_common",
+    "action": "read"
   },
   {
     "code": "model.crm_opportunity_line_common.read",
     "name:zh-CN": "查看商机行项模型",
     "name:en": "Read Opportunity Line Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_opportunity_line_common",
+    "action": "read"
   },
   {
     "code": "model.crm_activity_common.read",
     "name:zh-CN": "查看活动模型",
     "name:en": "Read Activity Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_activity_common",
+    "action": "read"
   },
   {
     "code": "model.crm_activity_relation_common.read",
     "name:zh-CN": "查看活动关联模型",
     "name:en": "Read Activity Relation Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_activity_relation_common",
+    "action": "read"
   },
   {
     "code": "model.crm_complaint.read",
     "name:zh-CN": "查看投诉模型",
     "name:en": "Read Complaint Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_complaint",
+    "action": "read"
   },
   {
     "code": "model.crm_campaign.read",
     "name:zh-CN": "查看营销活动模型",
     "name:en": "Read Campaign Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_campaign",
+    "action": "read"
   },
   {
     "code": "model.crm_campaign_member.read",
     "name:zh-CN": "查看活动成员模型",
     "name:en": "Read Campaign Member Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_campaign_member",
+    "action": "read"
   },
   {
     "code": "model.crm_campaign_metric.read",
     "name:zh-CN": "查看活动指标模型",
     "name:en": "Read Campaign Metric Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_campaign_metric",
+    "action": "read"
   },
   {
     "code": "model.crm_sla_policy.read",
     "name:zh-CN": "查看SLA策略模型",
     "name:en": "Read SLA Policy Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_sla_policy",
+    "action": "read"
   },
   {
     "code": "model.crm_sla_breach.read",
     "name:zh-CN": "查看SLA违规模型",
     "name:en": "Read SLA Breach Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_sla_breach",
+    "action": "read"
   },
   {
     "code": "model.crm_email_template.read",
     "name:zh-CN": "查看邮件模板模型",
     "name:en": "Read Email Template Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_email_template",
+    "action": "read"
   },
   {
     "code": "model.crm_email_log.read",
     "name:zh-CN": "查看邮件记录模型",
     "name:en": "Read Email Log Model",
     "resourceType": "model",
-    "module": "crm"
+    "module": "crm",
+    "resourceCode": "crm_email_log",
+    "action": "read"
   },
   {
     "code": "crm.lead_score_rule.manage",
@@ -304,15 +340,19 @@
     "code": "model.crm_lead_score_rule.read",
     "name:zh-CN": "查看线索评分规则模型",
     "name:en": "View Lead Score Rule Model",
-    "resourceType": "data",
-    "module": "crm"
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_lead_score_rule",
+    "action": "read"
   },
   {
     "code": "model.crm_assignment_rule.read",
     "name:zh-CN": "查看线索分配规则模型",
     "name:en": "View Lead Assignment Rule Model",
-    "resourceType": "data",
-    "module": "crm"
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_assignment_rule",
+    "action": "read"
   },
   {
     "code": "crm.forecast.manage",
@@ -472,8 +512,10 @@
     "code": "model.crm_approval_case_common.read",
     "name:zh-CN": "查看审批事项数据",
     "name:en": "Read Approval Case Model",
-    "resourceType": "data",
-    "module": "crm"
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_approval_case_common",
+    "action": "read"
   },
   {
     "code": "crm.review.manage",
@@ -493,8 +535,10 @@
     "code": "model.crm_review_common.read",
     "name:zh-CN": "查看评审数据",
     "name:en": "Read Review Model",
-    "resourceType": "data",
-    "module": "crm"
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_review_common",
+    "action": "read"
   },
   {
     "code": "crm.risk.manage",
@@ -514,8 +558,10 @@
     "code": "model.crm_risk_common.read",
     "name:zh-CN": "查看风险项数据",
     "name:en": "Read Risk Model",
-    "resourceType": "data",
-    "module": "crm"
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_risk_common",
+    "action": "read"
   },
   {
     "code": "crm.clarification.manage",
@@ -535,8 +581,10 @@
     "code": "model.crm_clarification_common.read",
     "name:zh-CN": "查看澄清项数据",
     "name:en": "Read Clarification Model",
-    "resourceType": "data",
-    "module": "crm"
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_clarification_common",
+    "action": "read"
   },
   {
     "code": "crm.qdp.prepare",
@@ -570,28 +618,36 @@
     "code": "model.crm_qdp_revision_common.read",
     "name:zh-CN": "查看 QDP 发布版本数据",
     "name:en": "Read QDP Release Revision Model",
-    "resourceType": "data",
-    "module": "crm"
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_qdp_revision_common",
+    "action": "read"
   },
   {
     "code": "model.crm_requirement_version_common.read",
     "name:zh-CN": "查看需求版本数据",
     "name:en": "Read Requirement Version Model",
-    "resourceType": "data",
-    "module": "crm"
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_requirement_version_common",
+    "action": "read"
   },
   {
     "code": "model.crm_file_package_common.read",
     "name:zh-CN": "查看文件包数据",
     "name:en": "Read File Package Model",
-    "resourceType": "data",
-    "module": "crm"
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_file_package_common",
+    "action": "read"
   },
   {
     "code": "model.crm_customer_confirmation_common.read",
     "name:zh-CN": "查看客户确认数据",
     "name:en": "Read Customer Confirmation Model",
-    "resourceType": "data",
-    "module": "crm"
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_customer_confirmation_common",
+    "action": "read"
   }
 ]

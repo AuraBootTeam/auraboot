@@ -14,6 +14,7 @@ import com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator;
+import com.auraboot.framework.permission.engine.evaluator.RecordShareEvaluator;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
 import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
@@ -91,6 +92,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
 
     private final DataPermissionPolicyMapper policyMapper;
     private final DataScopeEvaluator dataScopeEvaluator;
+    private final RecordShareEvaluator recordShareEvaluator;
     private final ObjectMapper objectMapper;
 
     // Stateless compilers/evaluators for AST-based custom scopes (B2). Not Spring beans — pure.
@@ -100,9 +102,10 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     // ==================== Row-Level Filtering ====================
 
     @Override
-    @Cacheable(value = "dataPermissionRowFilter",
-            key = "#tenantId + ':' + #modelCode + ':' + #userId")
     public String buildRowFilter(Long tenantId, String modelCode, Long userId) {
+        // Record-share grants can be created, revoked, or expire at any time. Keep the row
+        // filter command-local (DynamicDataQueryScope already deduplicates repeated reads)
+        // instead of caching concrete shared record IDs/PIDs across requests.
         return buildRowFilter(tenantId, modelCode, "read", userId);
     }
 
@@ -363,6 +366,10 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
      */
     private boolean dataScopeAllows(Long memberId, String modelCode, String actionCode, Map<String, Object> record) {
         String resolvedAction = actionCode != null && !actionCode.isBlank() ? actionCode : "read";
+        EvaluationStep shareStep = recordShareEvaluator.evaluate(memberId, modelCode, resolvedAction, record);
+        if (shareStep != null && shareStep.verdict() == EvaluationVerdict.ALLOW) {
+            return true;
+        }
         EvaluationStep step = dataScopeEvaluator.evaluate(memberId, modelCode, resolvedAction, record);
         return step == null || step.verdict() != EvaluationVerdict.DENY;
     }
@@ -374,6 +381,21 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         if (condition == null || "all".equals(condition.scopeType())) {
             return null;
         }
+        String scopePredicate = dataScopePredicate(condition);
+        String sharedPredicate = sharedRecordPredicate(condition);
+        if (sharedPredicate == null) {
+            return scopePredicate;
+        }
+        if (scopePredicate == null || "1 = 0".equals(scopePredicate)) {
+            return sharedPredicate;
+        }
+        return "(" + scopePredicate + " OR " + sharedPredicate + ")";
+    }
+
+    /**
+     * Build the owner/department part of a data-scope predicate.
+     */
+    private String dataScopePredicate(DataScopeCondition condition) {
         if ("none".equals(condition.scopeType())) {
             return "1 = 0";
         }
@@ -411,6 +433,39 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
             return condition.deptField() + " IN (" + pidList + ")";
         }
         return null;
+    }
+
+    /**
+     * Build the explicit ReBAC exception for list queries using fixed system columns only.
+     */
+    private String sharedRecordPredicate(DataScopeCondition condition) {
+        List<String> predicates = new ArrayList<>(2);
+        if (!condition.sharedRecordIds().isEmpty()) {
+            String ids = condition.sharedRecordIds().stream()
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(","));
+            if (!ids.isBlank()) {
+                predicates.add("id IN (" + ids + ")");
+            }
+        }
+        if (!condition.sharedRecordPids().isEmpty()) {
+            String pids = condition.sharedRecordPids().stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(pid -> !pid.isEmpty())
+                    .distinct()
+                    .map(pid -> "'" + pid.replace("'", "''") + "'")
+                    .collect(Collectors.joining(","));
+            if (!pids.isBlank()) {
+                predicates.add("pid IN (" + pids + ")");
+            }
+        }
+        if (predicates.isEmpty()) {
+            return null;
+        }
+        return predicates.size() == 1 ? predicates.getFirst() : "(" + String.join(" OR ", predicates) + ")";
     }
 
     // ==================== Private: Row Filter SQL Generation ====================

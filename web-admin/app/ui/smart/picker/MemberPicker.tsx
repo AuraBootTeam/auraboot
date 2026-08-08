@@ -5,7 +5,7 @@
  * Supports single and multi-select modes with avatar chips and search popup.
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Search, X, Plus, Loader2, Users } from 'lucide-react';
 import { cn } from '~/utils/cn';
 import { ResultHelper } from '~/utils/type';
@@ -17,6 +17,18 @@ export interface MemberOption {
   email?: string;
   avatar?: string;
   department?: string;
+}
+
+interface TenantMemberSearchRecord {
+  displayName?: string;
+  departmentName?: string;
+  user?: {
+    pid?: string;
+    username?: string | null;
+    email?: string | null;
+    realName?: string | null;
+    avatar?: string | null;
+  };
 }
 
 export interface MemberPickerProps {
@@ -76,7 +88,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Selected IDs
-  const selectedIds = Array.isArray(value) ? value : value ? [value] : [];
+  const selectedIds = useMemo(() => (Array.isArray(value) ? value : value ? [value] : []), [value]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -101,24 +113,42 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
   const searchUsers = useCallback(async (keyword: string) => {
     setLoading(true);
     try {
-      // NOTE: the unauthenticated /api/users/search endpoint was removed during the 2026-04
-      // security review. The tenant-scoped replacement lives under /api/admin/users/search —
-      // it is callable by any tenant member and only returns users within the caller's tenant.
-      const response = await fetch(
-        `/api/admin/users/search?keyword=${encodeURIComponent(keyword)}&size=20`,
-      );
+      // Record collaborators are ordinary tenant members, not tenant administrators.
+      // Keep discovery tenant-scoped without routing the picker through an admin-only API.
+      const response = await fetch('/api/tenant/members/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pageNum: 1,
+          pageSize: 20,
+          status: 'active',
+          ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+        }),
+      });
       if (response.ok) {
         const result = await response.json();
         if (ResultHelper.isSuccess(result) && result.data) {
-          const users = (result.data.content || result.data || []).map(
-            (u: Record<string, unknown>) => ({
-              id: String(u.pid || u.id),
-              name: String(u.displayName || u.name || u.email || ''),
-              email: String(u.email || ''),
-              avatar: u.avatar ? String(u.avatar) : undefined,
-              department: u.department ? String(u.department) : undefined,
-            }),
-          );
+          const records: TenantMemberSearchRecord[] = Array.isArray(result.data)
+            ? result.data
+            : result.data.records || result.data.content || [];
+          const users = records.flatMap((record): MemberOption[] => {
+            const userPid = record.user?.pid;
+            if (!userPid) return [];
+            return [
+              {
+                id: userPid,
+                name:
+                  record.displayName ||
+                  record.user?.realName ||
+                  record.user?.username ||
+                  record.user?.email ||
+                  userPid,
+                email: record.user?.email || undefined,
+                avatar: record.user?.avatar || undefined,
+                department: record.departmentName,
+              },
+            ];
+          });
           setOptions(users);
         }
       }
