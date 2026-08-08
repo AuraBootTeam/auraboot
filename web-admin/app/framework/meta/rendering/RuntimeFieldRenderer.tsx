@@ -328,6 +328,11 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
     context,
     ...localizedProps, // 合并字段配置的其他 props
   };
+  // Governance-only metadata is occasionally nested under `props` by legacy
+  // schema projections. Keep it available on the field definition, but do not
+  // leak it through SmartInput to the underlying DOM node.
+  delete componentProps.immutableWhen;
+  delete componentProps.allowedWriterCommands;
 
   // 如果有 dictCode 且没有 dataSource，自动生成字典数据源配置
   if (field.dictCode && !field.dataSource) {

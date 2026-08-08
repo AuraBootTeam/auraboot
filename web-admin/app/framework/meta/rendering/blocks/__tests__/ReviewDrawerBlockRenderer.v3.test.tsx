@@ -52,7 +52,7 @@ describe('ReviewDrawerBlockRenderer V3 contract', () => {
         mpn: '',
         packageCode: '0603',
         attributes: {
-          capacitance: '1nF',
+          capacitance_farads: '1nF',
           voltage: '25V',
           tolerance_pct: '5%',
           dielectric: 'X7R',
@@ -233,6 +233,7 @@ describe('ReviewDrawerBlockRenderer V3 contract', () => {
                         label: { 'zh-CN': '容值' },
                         sourceField: 'bom_me_candidate_snapshot_json',
                         field: 'attributes.capacitance',
+                        fallbackFields: ['attributes.capacitance_farads'],
                         comparisonGroup: 'parameters',
                         comparisonKey: 'capacitance',
                       },
@@ -301,6 +302,10 @@ describe('ReviewDrawerBlockRenderer V3 contract', () => {
     const capacitance = screen.getByTestId('review-drawer-candidate-candidate-1-field-capacitance');
     expect(capacitance).toHaveAttribute('data-comparison-status', 'matched');
     expect(capacitance).toHaveClass('border-emerald-200');
+    expect(capacitance).toHaveTextContent('1nF');
+    expect(screen.getByTestId('review-drawer-candidate-D510000914600-score')).toHaveTextContent(
+      '59.33',
+    );
     expect(screen.queryByTestId('review-drawer-decision-status')).toBeNull();
     expect(screen.queryByTestId('review-drawer-decision-panel')).toBeNull();
 

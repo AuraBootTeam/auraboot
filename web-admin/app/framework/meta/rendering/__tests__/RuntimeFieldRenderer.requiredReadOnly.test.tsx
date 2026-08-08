@@ -64,4 +64,22 @@ describe('RuntimeFieldRenderer required vs read-only', () => {
     expect(captured.props.readOnly).toBeFalsy();
     expect(captured.props.required).toBe(true);
   });
+
+  it('does not forward field-governance metadata to the rendered control', async () => {
+    const captured = await renderField(
+      {
+        field: 'quote_code',
+        component: 'SmartInput',
+        props: {
+          immutableWhen: { field: 'formal', in: [true] },
+          allowedWriterCommands: ['quote:publish'],
+          placeholder: 'Quote code',
+        },
+      } as any,
+      undefined,
+    );
+    expect(captured.props).not.toHaveProperty('immutableWhen');
+    expect(captured.props).not.toHaveProperty('allowedWriterCommands');
+    expect(captured.props.placeholder).toBe('Quote code');
+  });
 });

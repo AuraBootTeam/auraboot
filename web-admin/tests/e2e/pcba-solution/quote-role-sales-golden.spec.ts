@@ -959,7 +959,11 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       const singleSearchRequest = singleSearchRequests[0];
       expect(singleSearchRequest, JSON.stringify(mockRequestsBody).slice(0, 1200)).toBeTruthy();
       expect(singleSearchRequest?.form?.keyword).toEqual([REPRICE_MPN]);
-      expect(singleSearchRequest?.form?.is_exact_match).toEqual(['1']);
+      // Yunhan's upstream exact mode can return an empty set for a valid MPN. The
+      // connector therefore requests wide recall and applies its own strict MPN
+      // equality filter; the preview/final-line assertions below prove that a
+      // substitute cannot be accepted as the requested part.
+      expect(singleSearchRequest?.form?.is_exact_match).toEqual(['0']);
       await testInfo.attach('ordinary-sales-reprice-preview-response.json', {
         body: JSON.stringify(previewBody, null, 2),
         contentType: 'application/json',

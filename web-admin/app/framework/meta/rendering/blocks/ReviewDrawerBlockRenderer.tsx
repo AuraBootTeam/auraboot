@@ -342,7 +342,14 @@ export function safeExternalUrl(value: unknown): string | null {
 function readFieldValue(record: any, config: any, fallbackRecord?: any): unknown {
   if (Object.prototype.hasOwnProperty.call(config, 'value')) return config.value;
   const source = config.sourceField ? readPath(record, config.sourceField) : record;
-  const value = readPath(parseJsonValue(source), config.field || config.valueField);
+  const parsedSource = parseJsonValue(source);
+  let value = readPath(parsedSource, config.field || config.valueField);
+  if (isEmptyValue(value) && Array.isArray(config.fallbackFields)) {
+    for (const fallbackField of config.fallbackFields) {
+      value = readPath(parsedSource, fallbackField);
+      if (!isEmptyValue(value)) break;
+    }
+  }
   if (!isEmptyValue(value) || !config.fallbackField || !fallbackRecord) return value;
   const fallbackSource = config.fallbackSourceField
     ? readPath(fallbackRecord, config.fallbackSourceField)
@@ -2482,6 +2489,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                 ) : (
                   candidates.map((candidate: any, index: number) => {
                     const rowKey = candidateKey(candidate, index);
+                    const scoreKey = String(
+                      candidate?.bom_me_material_code ?? candidate?.materialCode ?? rowKey,
+                    );
                     const active = rowKey === selectedCandidateKey;
                     const item = candidatesConfig.item || {};
                     const titleText = formatValue(readPath(candidate, item.titleField), rowKey);
@@ -2634,6 +2644,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           </div>
                           {score !== undefined && (
                             <span
+                              data-testid={`review-drawer-candidate-${scoreKey}-score`}
                               className={`rounded-pill px-1.5 py-0.5 text-xs font-semibold ${scoreToneClass(
                                 scoreColor,
                               )}`}

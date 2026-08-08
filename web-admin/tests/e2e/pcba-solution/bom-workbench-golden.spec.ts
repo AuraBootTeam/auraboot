@@ -278,7 +278,7 @@ test.describe('BOM standardization workbench golden', () => {
         /多候选|Multiple/i,
       );
       await expect(page.getByTestId('review-drawer-tab-compare')).toContainText(/原始|Raw/i);
-      await expect(page.getByTestId('review-drawer-tab-source')).toHaveCount(0);
+      await expect(page.getByTestId('review-drawer-tab-source')).toContainText(/Profile|LLM/i);
       await expect(page.getByTestId('review-drawer-tab-candidates')).toContainText(
         '10K resistor candidate A',
       );

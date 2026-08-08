@@ -295,9 +295,8 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
       expect(decisions.map((d) => d.bom_rd_decision_type).sort()).toEqual(['manual_confirm', 'undo']);
 
       // 5. regenerate + download the standard BOM as the role; parse the workbook.
-      // V3 keeps export as a workbench-level action. Close the modal review drawer first
-      // when it does not expose its own regenerate action; clicking through the overlay is
-      // not a user-realistic path and Playwright correctly rejects it.
+      // The drawer is still open (modal) — use its own regenerate-and-download action,
+      // which drives the same bom:regenerate_export command.
       step = 'download export';
       const downloadPromise = page.waitForEvent('download', { timeout: 45_000 });
       const regeneratePromise = page.waitForResponse(
@@ -309,13 +308,8 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
       const drawerRegenerate = page
         .getByTestId('review-drawer')
         .getByRole('button', { name: /重新生成并下载|Regenerate/ });
-      if (await drawerRegenerate.count()) {
-        await drawerRegenerate.first().click();
-      } else {
-        await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/ }).click();
-        await expect(page.getByTestId('review-drawer')).toBeHidden();
-        await page.getByTestId('workbench-action-download_new_bom').click();
-      }
+      await expect(drawerRegenerate).toBeVisible();
+      await drawerRegenerate.click();
       const regenBody = await (await regeneratePromise).json().catch(() => ({}));
       expect(String((regenBody as { code?: unknown }).code)).toBe('0');
       const download = await downloadPromise;
