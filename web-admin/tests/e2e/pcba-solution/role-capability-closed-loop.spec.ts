@@ -93,18 +93,15 @@ async function searchList(page: Page, listPath: string, marker: string): Promise
   return rows.count();
 }
 
-async function pickFirstComboboxOptions(page: Page, maxCount: number): Promise<void> {
-  const combos = page.getByRole('combobox');
-  const n = await combos.count();
-  for (let i = 0; i < Math.min(n, maxCount); i++) {
-    try {
-      await combos.nth(i).click();
-      await expect.poll(async () => page.getByRole('option').count()).toBeGreaterThan(0);
-      await page.getByRole('option').first().click();
-    } catch {
-      // Some DSL comboboxes are optional or not interactable for this role.
-    }
-  }
+async function pickRequiredSelectOption(page: Page, fieldCode: string): Promise<void> {
+  const trigger = page.getByTestId(`select-trigger-${fieldCode}`);
+  await expect(trigger, `${fieldCode} select trigger`).toBeVisible({ timeout: 10_000 });
+  await trigger.click();
+  const option = page.getByRole('option').first();
+  await expect(option, `${fieldCode} must expose at least one option`).toBeVisible({
+    timeout: 10_000,
+  });
+  await option.click();
 }
 
 test.describe('Role × capability 真机闭环 @smoke', () => {
@@ -169,8 +166,10 @@ test.describe('Role × capability 真机闭环 @smoke', () => {
         // 3. 新建项目真机闭环 (references the just-created customer + quality level)
         const projMarker = `ZKHPROJ${uid}${r.key}`.slice(0, 28);
         const projOk = await createClosedLoop(page, MENU.project, 'bom_project_name', projMarker, 'bom:create_project', async (p) => {
-          // 客户* reference + 质量等级* — pick first option of each remaining combobox
-          await pickFirstComboboxOptions(p, 2);
+          // Select both required fields explicitly. Positional combobox guessing can
+          // silently choose only quality level and leave customer validation red.
+          await pickRequiredSelectOption(p, 'bom_project_customer_id');
+          await pickRequiredSelectOption(p, 'bom_project_quality_level');
         });
         expect(projOk, `${r.roleCode} BOM project created and visible in list`).toBe(true);
 

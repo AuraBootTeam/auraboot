@@ -16,6 +16,14 @@ import {
   collectSemanticResolutionTraces,
   SemanticResolutionEvidence,
 } from './SemanticResolutionEvidence';
+import {
+  comparisonStatusFieldClass,
+  comparisonStatusForField,
+  normalizeComparisonRecord,
+  resolveCandidateFieldColumns,
+  resolveProfiledFieldColumns,
+  resolveProfiledFieldGroups,
+} from './ReviewDrawerCandidateFields';
 
 export { collectSemanticResolutionTraces } from './SemanticResolutionEvidence';
 
@@ -33,6 +41,21 @@ type PointerState = {
   top?: number;
   width?: number;
   height?: number;
+};
+
+type RawColumnItem = {
+  index: number;
+  header: string;
+  normalizedHeader?: string;
+  systemField?: string;
+  value: unknown;
+};
+
+type RawColumnGroup = {
+  key: string;
+  config: any;
+  columns: RawColumnItem[];
+  legacyTestId?: boolean;
 };
 
 type DrawerLayoutState = {
@@ -213,6 +236,70 @@ function isEmptyValue(value: unknown): boolean {
   return value === undefined || value === null || value === '';
 }
 
+function readFirstPathValue(source: unknown, paths: string[]): unknown {
+  for (const path of paths) {
+    const value = readPath(source, path);
+    if (!isEmptyValue(value)) return value;
+  }
+  return undefined;
+}
+
+function resolveRawColumnItems(record: any, config: any): RawColumnItem[] {
+  if (!config || config.enabled === false) return [];
+  const source = config.sourceField ? readPath(record, config.sourceField) : record;
+  const parsedSource = parseJsonValue(source);
+  const path = config.path || '__raw_columns';
+  const rawColumns = path ? readPath(parsedSource, path) : parsedSource;
+  if (!Array.isArray(rawColumns)) return [];
+
+  const headerField = String(config.headerField || 'header');
+  const normalizedHeaderField = String(config.normalizedHeaderField || 'normalizedHeader');
+  const systemFieldField = String(config.systemFieldField || 'systemField');
+  const valueField = String(config.valueField || 'value');
+
+  return rawColumns.map((column, index) => {
+    if (!column || typeof column !== 'object' || Array.isArray(column)) {
+      return { index, header: `#${index + 1}`, value: column };
+    }
+    const header = readFirstPathValue(column, [headerField, 'name', 'key']);
+    const normalizedHeader = readFirstPathValue(column, [normalizedHeaderField, 'normalized']);
+    const systemField = readFirstPathValue(column, [systemFieldField, 'field']);
+    return {
+      index,
+      header: formatValue(header, `#${index + 1}`),
+      normalizedHeader: isEmptyValue(normalizedHeader) ? undefined : formatValue(normalizedHeader),
+      systemField: isEmptyValue(systemField) ? undefined : formatValue(systemField),
+      value: readPath(column, valueField),
+    };
+  });
+}
+
+function resolveRawColumnGroups(record: any, compareConfig: any): RawColumnGroup[] {
+  const groups: RawColumnGroup[] = [];
+  const primaryColumns = resolveRawColumnItems(record, compareConfig?.rawColumns);
+  if (primaryColumns.length > 0) {
+    groups.push({
+      key: 'source_columns',
+      config: compareConfig.rawColumns,
+      columns: primaryColumns,
+      legacyTestId: true,
+    });
+  }
+  const groupConfigs = Array.isArray(compareConfig?.rawColumnGroups)
+    ? compareConfig.rawColumnGroups
+    : [];
+  groupConfigs.forEach((groupConfig: any, index: number) => {
+    const columns = resolveRawColumnItems(record, groupConfig);
+    if (columns.length === 0) return;
+    groups.push({
+      key: String(groupConfig.key || groupConfig.id || `group_${index}`),
+      config: groupConfig,
+      columns,
+    });
+  });
+  return groups;
+}
+
 /** One rung of a supplier price ladder, as projected by the named query. */
 interface LadderRung {
   qty: string | number;
@@ -255,7 +342,14 @@ export function safeExternalUrl(value: unknown): string | null {
 function readFieldValue(record: any, config: any, fallbackRecord?: any): unknown {
   if (Object.prototype.hasOwnProperty.call(config, 'value')) return config.value;
   const source = config.sourceField ? readPath(record, config.sourceField) : record;
-  const value = readPath(parseJsonValue(source), config.field || config.valueField);
+  const parsedSource = parseJsonValue(source);
+  let value = readPath(parsedSource, config.field || config.valueField);
+  if (isEmptyValue(value) && Array.isArray(config.fallbackFields)) {
+    for (const fallbackField of config.fallbackFields) {
+      value = readPath(parsedSource, fallbackField);
+      if (!isEmptyValue(value)) break;
+    }
+  }
   if (!isEmptyValue(value) || !config.fallbackField || !fallbackRecord) return value;
   const fallbackSource = config.fallbackSourceField
     ? readPath(fallbackRecord, config.fallbackSourceField)
@@ -307,6 +401,7 @@ function comparisonStatusLabel(
   const labels: Record<string, { 'zh-CN': string; en: string }> = {
     matched: { 'zh-CN': '一致', en: 'Matched' },
     mismatch: { 'zh-CN': '不一致', en: 'Mismatch' },
+    missing: { 'zh-CN': '证据缺失', en: 'Evidence Missing' },
     missing_source: { 'zh-CN': '原始缺失', en: 'Source Missing' },
     missing_candidate: { 'zh-CN': '候选缺失', en: 'Candidate Missing' },
     missing_both: { 'zh-CN': '双方缺失', en: 'Both Missing' },
@@ -383,6 +478,117 @@ function ComparisonList({
           </section>
         );
       })}
+    </div>
+  );
+}
+
+const comparisonFieldLabels: Record<string, { 'zh-CN': string; en: string }> = {
+  brand: { 'zh-CN': '品牌', en: 'Brand' },
+  mpn: { 'zh-CN': 'MPN', en: 'MPN' },
+  package: { 'zh-CN': '封装', en: 'Package' },
+  packageCode: { 'zh-CN': '封装', en: 'Package' },
+  capacitance: { 'zh-CN': '容值', en: 'Capacitance' },
+  resistance: { 'zh-CN': '阻值', en: 'Resistance' },
+  voltage: { 'zh-CN': '耐压', en: 'Voltage' },
+  tolerance: { 'zh-CN': '误差', en: 'Tolerance' },
+  dielectric: { 'zh-CN': '介质', en: 'Dielectric' },
+  frequency: { 'zh-CN': '频率', en: 'Frequency' },
+};
+
+function humanizeComparisonField(
+  value: unknown,
+  locale: string,
+  t: (key: string) => string,
+): string {
+  const text = String(value ?? '');
+  return text ? getLocalizedText(comparisonFieldLabels[text] || text, locale, t) : '';
+}
+
+function collectEvidenceComparisons(candidate: any): Record<string, unknown>[] {
+  const evidence = parseJsonValue(readPath(candidate, 'bom_me_evidence_json'));
+  const groups = readPath(evidence, 'groups');
+  const comparisons: Record<string, unknown>[] = [];
+  if (groups && typeof groups === 'object' && !Array.isArray(groups)) {
+    for (const groupKey of ['brand', 'mpn', 'package', 'parameters', 'other']) {
+      const groupComparisons = readPath(groups, `${groupKey}.comparisons`);
+      if (Array.isArray(groupComparisons)) comparisons.push(...groupComparisons);
+    }
+  }
+  const fallbackComparisons = readPath(evidence, 'comparisons');
+  if (comparisons.length === 0 && Array.isArray(fallbackComparisons)) {
+    comparisons.push(...fallbackComparisons);
+  }
+  return comparisons.map(normalizeComparisonRecord);
+}
+
+function buildEvidenceSummary(
+  candidate: any,
+  locale: string,
+  t: (key: string) => string,
+): string[] {
+  return collectEvidenceComparisons(candidate)
+    .filter((comparison) => String(comparison.status || '') !== 'matched')
+    .map((comparison) => {
+      const field = humanizeComparisonField(comparison.label ?? comparison.key, locale, t);
+      const status = String(comparison.status || '');
+      const sourceValue = formatValue(comparison.sourceValue, '-');
+      const candidateValue = formatValue(comparison.candidateValue, '-');
+      if (status === 'mismatch') {
+        return localized(
+          locale,
+          t,
+          `${field}不一致（原始 ${sourceValue} / 候选 ${candidateValue}）`,
+          `${field} differs (source ${sourceValue} / candidate ${candidateValue})`,
+        );
+      }
+      if (status === 'missing_candidate') {
+        return localized(locale, t, `${field}候选缺失`, `${field} missing on candidate`);
+      }
+      if (status === 'missing_source') {
+        return localized(locale, t, `${field}原始缺失`, `${field} missing on source`);
+      }
+      if (status === 'missing_both' || status === 'missing') {
+        return localized(locale, t, `${field}证据缺失`, `${field} evidence missing`);
+      }
+      return localized(
+        locale,
+        t,
+        `${field}${comparisonStatusLabel(status, locale, t)}`,
+        `${field} ${status}`,
+      );
+    });
+}
+
+function EvidenceSummary({
+  candidate,
+  locale,
+  t,
+}: {
+  candidate: any;
+  locale: string;
+  t: (key: string) => string;
+}) {
+  const issues = buildEvidenceSummary(candidate, locale, t);
+  const visibleIssues = issues.slice(0, 4);
+  const overflowCount = Math.max(issues.length - visibleIssues.length, 0);
+  return (
+    <div
+      data-testid="review-drawer-evidence-summary"
+      className="rounded-control border-status-amber bg-status-amber-bg text-status-amber border px-3 py-2 text-xs"
+    >
+      <span className="font-semibold">{localized(locale, t, '需复核：', 'Review: ')}</span>
+      {visibleIssues.length > 0 ? (
+        <>
+          <span>{visibleIssues.join('；')}</span>
+          {overflowCount > 0 && (
+            <span>
+              {localized(locale, t, `；另有 ${overflowCount} 项`, `; ${overflowCount} more`)}
+            </span>
+          )}
+        </>
+      ) : (
+        <span>{localized(locale, t, '关键属性一致', 'Key attributes match')}</span>
+      )}
     </div>
   );
 }
@@ -650,6 +856,126 @@ function Badge({
   );
 }
 
+function configuredTone(config: any, rawValue: unknown): Tone {
+  const rawKey = String(rawValue ?? '');
+  const mappedTone = config?.toneMap?.[rawKey];
+  return (mappedTone || config?.tone || 'gray') as Tone;
+}
+
+function CandidateFieldTable({
+  rowKey,
+  candidate,
+  fields,
+  badges,
+  locale,
+  t,
+}: {
+  rowKey: string;
+  candidate: any;
+  fields: any[];
+  badges: any[];
+  locale: string;
+  t: (key: string) => string;
+}) {
+  const hasUsableLadder = fields.some((field: any) => {
+    if (field.format !== 'ladder') return false;
+    const rungs = parseLadderRungs(readFieldValue(candidate, field));
+    return Boolean(rungs && rungs.length >= 2);
+  });
+
+  return (
+    <div className="mt-2 space-y-2">
+      {badges.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {badges.map((badge: any) => {
+            const key = String(badge.key || badge.field || badge.label);
+            const rawValue = readFieldValue(candidate, badge);
+            if (badge.hideWhenEmpty && isEmptyValue(rawValue)) return null;
+            const value = formatConfiguredValue(rawValue, badge, locale, t);
+            const tone = configuredTone(badge, rawValue);
+            return (
+              <span
+                key={key}
+                data-testid={`review-drawer-candidate-${rowKey}-badge-${key}`}
+                className={`rounded-pill inline-flex max-w-full border px-2 py-0.5 text-[11px] font-semibold ${
+                  toneClass[tone] || toneClass.gray
+                }`}
+                title={value}
+              >
+                <span className="truncate">{value}</span>
+              </span>
+            );
+          })}
+        </div>
+      )}
+      <dl className="grid gap-x-3 gap-y-1.5 text-xs sm:grid-cols-2 xl:grid-cols-4">
+        {fields.map((field: any) => {
+          const key = String(field.key || field.field || field.label);
+          const label = getLocalizedText(field.label || key, locale, t);
+          const rawValue = readFieldValue(candidate, field);
+          const ladder = field.format === 'ladder' ? parseLadderRungs(rawValue) : null;
+          if (field.format === 'price-comparison' && hasUsableLadder) return null;
+          if (field.format === 'ladder' && (!ladder || ladder.length < 2)) return null;
+          if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
+          const value = formatConfiguredValue(rawValue, field, locale, t);
+          const comparisonStatus = comparisonStatusForField(candidate, field);
+          const comparisonClass = comparisonStatusFieldClass(comparisonStatus);
+          return (
+            <div
+              key={key}
+              data-testid={`review-drawer-candidate-${rowKey}-field-${key}`}
+              data-comparison-status={comparisonStatus ? String(comparisonStatus) : undefined}
+              className={`min-w-0 ${comparisonClass}`}
+              title={
+                comparisonStatus ? comparisonStatusLabel(comparisonStatus, locale, t) : undefined
+              }
+            >
+              <dt className="text-text-2 min-w-0 truncate" title={label}>
+                {label}
+              </dt>
+              <dd className="text-text min-w-0 font-medium" title={value}>
+                {field.format === 'price-comparison' ? (
+                  <PriceComparison
+                    original={rawValue}
+                    factored={readFieldValue(candidate, { field: field.factoredField })}
+                    factor={readFieldValue(candidate, { field: field.factorField })}
+                    locale={locale}
+                    t={t}
+                  />
+                ) : field.format === 'ladder' && ladder ? (
+                  <PriceLadder
+                    rowKey={rowKey}
+                    rungs={ladder}
+                    factor={readFieldValue(candidate, { field: field.factorField })}
+                    locale={locale}
+                    t={t}
+                  />
+                ) : field.format === 'link' && safeExternalUrl(rawValue) ? (
+                  <a
+                    href={safeExternalUrl(rawValue) as string}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent underline underline-offset-2"
+                    data-testid={`review-drawer-candidate-${rowKey}-link-${key}`}
+                  >
+                    {getLocalizedText(
+                      field.linkLabel || { 'zh-CN': '查看', en: 'Open' },
+                      locale,
+                      t,
+                    )}
+                  </a>
+                ) : (
+                  <span className="block truncate">{value}</span>
+                )}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+    </div>
+  );
+}
+
 function FieldRows({
   fields,
   record,
@@ -767,6 +1093,78 @@ function FieldRows({
         );
       })}
     </div>
+  );
+}
+
+function RawColumnsPanel({
+  columns,
+  config,
+  panelKey,
+  locale,
+  t,
+}: {
+  columns: RawColumnItem[];
+  config: any;
+  panelKey?: string;
+  locale: string;
+  t: (key: string) => string;
+}) {
+  if (columns.length === 0) return null;
+  const title = getLocalizedText(
+    config?.title || { 'zh-CN': '源 Excel 全列', en: 'Source Excel Columns' },
+    locale,
+    t,
+  );
+  const showSystemField = config?.showSystemField !== false;
+  return (
+    <section
+      data-testid={panelKey ? `review-drawer-raw-columns-${panelKey}` : 'review-drawer-raw-columns'}
+      className="border-border border-t"
+    >
+      <header className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+        <h4 className="text-text text-xs font-semibold">{title}</h4>
+        <span className="rounded-pill border-border bg-subtle text-text-2 border px-2 py-0.5 text-[11px] font-medium">
+          {localized(locale, t, `${columns.length} 列`, `${columns.length} columns`)}
+        </span>
+      </header>
+      <div className="divide-border max-h-80 divide-y overflow-auto">
+        {columns.map((column) => {
+          const value = formatValue(column.value, config?.emptyText || '-');
+          const showNormalizedHeader =
+            column.normalizedHeader && column.normalizedHeader !== column.header;
+          return (
+            <div
+              key={`${column.header}-${column.index}`}
+              data-testid={
+                panelKey
+                  ? `review-drawer-raw-column-${panelKey}-${column.index}`
+                  : `review-drawer-raw-column-${column.index}`
+              }
+              className="grid grid-cols-[minmax(118px,0.36fr)_minmax(0,1fr)] gap-3 px-3 py-2.5 text-sm"
+            >
+              <div className="min-w-0 space-y-1">
+                <div className="text-text min-w-0 text-xs font-semibold break-words">
+                  {column.header}
+                </div>
+                {showNormalizedHeader && (
+                  <div className="text-text-2 min-w-0 text-[11px] break-words">
+                    {column.normalizedHeader}
+                  </div>
+                )}
+                {showSystemField && column.systemField && (
+                  <span className="rounded-pill border-status-blue bg-status-blue-bg text-status-blue inline-flex max-w-full border px-1.5 py-0.5 text-[10px] font-medium">
+                    <span className="min-w-0 truncate">{column.systemField}</span>
+                  </span>
+                )}
+              </div>
+              <div className="text-text min-w-0 overflow-x-auto [overflow-wrap:anywhere] break-words whitespace-pre-wrap">
+                {value}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -1285,6 +1683,12 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     : Array.isArray(candidatesConfig.groups)
       ? candidatesConfig.groups
       : [];
+  const shouldShowDecisionStatus = candidatesConfig.showDecisionStatus !== false;
+  const usesSummaryEvidence = candidatesConfig.selectedEvidenceMode === 'summary';
+  const blockLayoutMode = String((block as any).layoutMode || '');
+  const compareLayoutMode = String(compareConfig.layoutMode || '');
+  const isCompactReview = blockLayoutMode === 'compact-review';
+  const isStackedCompare = isCompactReview || compareLayoutMode === 'stacked';
   const layoutStorageKey = drawerLayoutStorageKey(runtime, block, context);
   const initialLayoutRef = useRef<DrawerLayoutState | null>(null);
   if (initialLayoutRef.current === null) {
@@ -1484,13 +1888,38 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const sourceRecord = sourceRecordConfig.dataSource
     ? findRelatedRecord(runtime, sourceRecordConfig, record)
     : record;
-  const sourceSummaryItems = Array.isArray(sourceConfig.summary?.items)
-    ? sourceConfig.summary.items
-    : [];
+  const sourceSummaryItems =
+    sourceConfig.showInMain !== false && Array.isArray(sourceConfig.summary?.items)
+      ? sourceConfig.summary.items
+      : [];
   const rawFields = Array.isArray(compareConfig.rawFields) ? compareConfig.rawFields : [];
+  const rawColumnGroups = resolveRawColumnGroups(rawRecord, compareConfig);
   const canonicalFields = Array.isArray(compareConfig.canonicalFields)
     ? compareConfig.canonicalFields
     : [];
+  const resolvedCanonicalGroups = compareConfig.canonicalFieldProfiles
+    ? resolveProfiledFieldGroups({
+        item: {
+          fieldColumns: canonicalFields,
+          fieldProfiles: compareConfig.canonicalFieldProfiles,
+        },
+        record: canonicalRecord,
+        referenceRecord: record,
+      })
+    : [];
+  const resolvedCanonicalFields =
+    resolvedCanonicalGroups.length > 0
+      ? resolvedCanonicalGroups.flatMap((group) => group.fields)
+      : compareConfig.canonicalFieldProfiles
+        ? resolveProfiledFieldColumns({
+            item: {
+              fieldColumns: canonicalFields,
+              fieldProfiles: compareConfig.canonicalFieldProfiles,
+            },
+            record: canonicalRecord,
+            referenceRecord: record,
+          })
+        : canonicalFields;
   const sourceCards = Array.isArray(sourceConfig.cards) ? sourceConfig.cards : [];
   const sourcePolicies = Array.isArray(sourceConfig.policies) ? sourceConfig.policies : [];
   const sourceResolutions = collectSemanticResolutionTraces(
@@ -1508,14 +1937,17 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const summaryBadges = Array.isArray((block as any).summaryBadges)
     ? (block as any).summaryBadges
     : [];
-  const hasComparePanel = rawFields.length > 0 || canonicalFields.length > 0;
+  const hasRawComparePanel = rawFields.length > 0 || rawColumnGroups.length > 0;
+  const hasComparePanel = hasRawComparePanel || resolvedCanonicalFields.length > 0;
   const hasSourceDetails =
-    sourceResolutions.length > 0 ||
-    sourceCards.length > 0 ||
-    sourcePolicies.length > 0 ||
-    sourceJsonFields.length > 0 ||
-    Boolean(sourceConfig.jsonField);
-  const hasExportDetails = exportFields.length > 0 || exportRows.length > 0;
+    sourceConfig.showInMain !== false &&
+    (sourceResolutions.length > 0 ||
+      sourceCards.length > 0 ||
+      sourcePolicies.length > 0 ||
+      sourceJsonFields.length > 0 ||
+      Boolean(sourceConfig.jsonField));
+  const hasExportDetails =
+    exportConfig.showInMain !== false && (exportFields.length > 0 || exportRows.length > 0);
   const hasLeftRail =
     hasComparePanel || sourceSummaryItems.length > 0 || hasSourceDetails || hasExportDetails;
 
@@ -1651,13 +2083,19 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
 
       <div
         data-testid="review-drawer-content-grid"
+        data-layout-mode={isCompactReview ? 'compact-review' : 'default'}
         className={`bg-subtle min-h-0 max-w-full overflow-hidden p-4 ${
           isEditFormOpen ? 'hidden' : ''
         }`}
       >
         <div
+          data-testid="review-drawer-content-layout"
           className={`grid h-full min-h-0 min-w-0 gap-3 ${
-            hasLeftRail ? 'xl:grid-cols-[minmax(0,1fr)_minmax(380px,440px)]' : 'grid-cols-1'
+            hasLeftRail && hasCandidatesConfig
+              ? isCompactReview
+                ? 'xl:grid-cols-[minmax(320px,0.34fr)_minmax(0,1fr)]'
+                : 'xl:grid-cols-[minmax(0,1fr)_minmax(380px,440px)]'
+              : 'grid-cols-1'
           }`}
         >
           {hasLeftRail && (
@@ -1665,10 +2103,14 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
               {hasComparePanel && (
                 <div
                   data-testid="review-drawer-tab-compare"
-                  className="grid min-w-0 gap-3 lg:grid-cols-2"
+                  data-layout-mode={isStackedCompare ? 'stacked' : 'side-by-side'}
+                  className={`grid min-w-0 gap-3 ${isStackedCompare ? '' : 'lg:grid-cols-2'}`}
                 >
-                  {rawFields.length > 0 && (
-                    <section className="rounded-card border-border bg-panel overflow-hidden border">
+                  {hasRawComparePanel && (
+                    <section
+                      data-testid="review-drawer-raw-panel"
+                      className="rounded-card border-border bg-panel overflow-hidden border"
+                    >
                       <header className="border-border bg-panel text-text-2 flex items-center justify-between gap-3 border-b px-3 py-2 text-sm font-semibold">
                         {sectionLabel(
                           compareConfig.rawTitle ? { title: compareConfig.rawTitle } : null,
@@ -1680,11 +2122,26 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           {localized(locale, t, '只读证据', 'Read-only evidence')}
                         </span>
                       </header>
-                      <FieldRows fields={rawFields} record={rawRecord} locale={locale} t={t} />
+                      {rawFields.length > 0 && (
+                        <FieldRows fields={rawFields} record={rawRecord} locale={locale} t={t} />
+                      )}
+                      {rawColumnGroups.map((group) => (
+                        <RawColumnsPanel
+                          key={group.key}
+                          columns={group.columns}
+                          config={group.config}
+                          panelKey={group.legacyTestId ? undefined : group.key}
+                          locale={locale}
+                          t={t}
+                        />
+                      ))}
                     </section>
                   )}
-                  {canonicalFields.length > 0 && (
-                    <section className="rounded-card border-border bg-panel overflow-hidden border">
+                  {resolvedCanonicalFields.length > 0 && (
+                    <section
+                      data-testid="review-drawer-canonical-panel"
+                      className="rounded-card border-border bg-panel overflow-hidden border"
+                    >
                       <header className="border-border bg-panel text-text-2 flex items-center justify-between gap-3 border-b px-3 py-2 text-sm font-semibold">
                         {sectionLabel(
                           compareConfig.canonicalTitle
@@ -1698,13 +2155,23 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           {localized(locale, t, '转换结果', 'Canonical result')}
                         </span>
                       </header>
-                      <FieldRows
-                        fields={canonicalFields}
-                        record={canonicalRecord}
-                        fallbackRecord={record}
-                        locale={locale}
-                        t={t}
-                      />
+                      {resolvedCanonicalGroups.length > 0 ? (
+                        <FieldGroups
+                          groups={resolvedCanonicalGroups}
+                          record={canonicalRecord}
+                          fallbackRecord={record}
+                          locale={locale}
+                          t={t}
+                        />
+                      ) : (
+                        <FieldRows
+                          fields={resolvedCanonicalFields}
+                          record={canonicalRecord}
+                          fallbackRecord={record}
+                          locale={locale}
+                          t={t}
+                        />
+                      )}
                     </section>
                   )}
                 </div>
@@ -2022,6 +2489,9 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                 ) : (
                   candidates.map((candidate: any, index: number) => {
                     const rowKey = candidateKey(candidate, index);
+                    const scoreKey = String(
+                      candidate?.bom_me_material_code ?? candidate?.materialCode ?? rowKey,
+                    );
                     const active = rowKey === selectedCandidateKey;
                     const item = candidatesConfig.item || {};
                     const titleText = formatValue(readPath(candidate, item.titleField), rowKey);
@@ -2031,14 +2501,22 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                     const scoreColor = item.statusColorField
                       ? readPath(candidate, item.statusColorField)
                       : undefined;
-                    const detailFields: any[] = Array.isArray(item.detailFields)
-                      ? item.detailFields
-                      : [];
-                    const hasUsableLadder = detailFields.some((field: any) => {
+                    const fieldColumns = resolveCandidateFieldColumns({
+                      item,
+                      candidate,
+                      referenceRecord: {
+                        ...(record || {}),
+                        ...(canonicalRecord || {}),
+                      },
+                    });
+                    const hasUsableLadder = fieldColumns.some((field: any) => {
                       if (field.format !== 'ladder') return false;
                       const rungs = parseLadderRungs(readFieldValue(candidate, field));
                       return Boolean(rungs && rungs.length >= 2);
                     });
+                    const badgeFields = Array.isArray(item.badgeFields) ? item.badgeFields : [];
+                    const usesFieldTable =
+                      candidatesConfig.layout === 'fieldTable' || item.layout === 'fieldTable';
                     return (
                       <button
                         key={rowKey}
@@ -2064,88 +2542,109 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                             >
                               {titleText}
                             </div>
-                            <dl className="mt-2 grid gap-x-3 gap-y-1.5 text-xs sm:grid-cols-2">
-                              {detailFields.map((field: any) => {
-                                const key = String(field.key || field.field || field.label);
-                                const label = getLocalizedText(field.label || key, locale, t);
-                                const rawValue = readFieldValue(candidate, field);
-                                const ladder =
-                                  field.format === 'ladder' ? parseLadderRungs(rawValue) : null;
-                                if (field.format === 'price-comparison' && hasUsableLadder)
-                                  return null;
-                                if (field.format === 'ladder' && (!ladder || ladder.length < 2))
-                                  return null;
-                                if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
-                                const value = formatConfiguredValue(rawValue, field, locale, t);
-                                return (
-                                  <div
-                                    key={key}
-                                    data-testid={`review-drawer-candidate-${rowKey}-field-${key}`}
-                                    className={`min-w-0 ${
-                                      field.span === 2 ? 'sm:col-span-2' : ''
-                                    } grid grid-cols-[72px_minmax(0,1fr)] gap-2 ${
-                                      // A ladder is a multi-row card, so align its label to the top of
-                                      // the card and give the card room below it instead of letting the
-                                      // next field sit tight against it.
-                                      field.format === 'ladder'
-                                        ? 'items-start pb-1'
-                                        : 'items-baseline'
-                                    }`}
-                                  >
-                                    <dt className="text-text-2 min-w-0 break-words" title={label}>
-                                      {label}
-                                    </dt>
-                                    <dd
-                                      className="text-text min-w-0 break-words whitespace-normal"
-                                      title={value}
+                            {usesFieldTable ? (
+                              <CandidateFieldTable
+                                rowKey={rowKey}
+                                candidate={candidate}
+                                fields={fieldColumns}
+                                badges={badgeFields}
+                                locale={locale}
+                                t={t}
+                              />
+                            ) : (
+                              <dl className="mt-2 grid gap-x-3 gap-y-1.5 text-xs sm:grid-cols-2">
+                                {fieldColumns.map((field: any) => {
+                                  const key = String(field.key || field.field || field.label);
+                                  const label = getLocalizedText(field.label || key, locale, t);
+                                  const rawValue = readFieldValue(candidate, field);
+                                  const ladder =
+                                    field.format === 'ladder' ? parseLadderRungs(rawValue) : null;
+                                  if (field.format === 'price-comparison' && hasUsableLadder)
+                                    return null;
+                                  if (field.format === 'ladder' && (!ladder || ladder.length < 2))
+                                    return null;
+                                  if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
+                                  const value = formatConfiguredValue(rawValue, field, locale, t);
+                                  const comparisonStatus = comparisonStatusForField(
+                                    candidate,
+                                    field,
+                                  );
+                                  const comparisonClass =
+                                    comparisonStatusFieldClass(comparisonStatus);
+                                  return (
+                                    <div
+                                      key={key}
+                                      data-testid={`review-drawer-candidate-${rowKey}-field-${key}`}
+                                      data-comparison-status={
+                                        comparisonStatus ? String(comparisonStatus) : undefined
+                                      }
+                                      className={`min-w-0 ${comparisonClass} ${
+                                        field.span === 2 ? 'sm:col-span-2' : ''
+                                      } grid grid-cols-[72px_minmax(0,1fr)] gap-2 ${
+                                        // A ladder is a multi-row card, so align its label to the top of
+                                        // the card and give the card room below it instead of letting the
+                                        // next field sit tight against it.
+                                        field.format === 'ladder'
+                                          ? 'items-start pb-1'
+                                          : 'items-baseline'
+                                      }`}
                                     >
-                                      {field.format === 'price-comparison' ? (
-                                        <PriceComparison
-                                          original={rawValue}
-                                          factored={readFieldValue(candidate, {
-                                            field: field.factoredField,
-                                          })}
-                                          factor={readFieldValue(candidate, {
-                                            field: field.factorField,
-                                          })}
-                                          locale={locale}
-                                          t={t}
-                                        />
-                                      ) : field.format === 'ladder' && ladder ? (
-                                        <PriceLadder
-                                          rowKey={rowKey}
-                                          rungs={ladder}
-                                          factor={readFieldValue(candidate, {
-                                            field: field.factorField,
-                                          })}
-                                          locale={locale}
-                                          t={t}
-                                        />
-                                      ) : field.format === 'link' && safeExternalUrl(rawValue) ? (
-                                        <a
-                                          href={safeExternalUrl(rawValue) as string}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-accent underline underline-offset-2"
-                                          data-testid={`review-drawer-candidate-${rowKey}-link-${key}`}
-                                        >
-                                          {getLocalizedText(
-                                            field.linkLabel || { 'zh-CN': '查看', en: 'Open' },
-                                            locale,
-                                            t,
-                                          )}
-                                        </a>
-                                      ) : (
-                                        value
-                                      )}
-                                    </dd>
-                                  </div>
-                                );
-                              })}
-                            </dl>
+                                      <dt className="text-text-2 min-w-0 break-words" title={label}>
+                                        {label}
+                                      </dt>
+                                      <dd
+                                        className="text-text min-w-0 break-words whitespace-normal"
+                                        title={value}
+                                      >
+                                        {field.format === 'price-comparison' ? (
+                                          <PriceComparison
+                                            original={rawValue}
+                                            factored={readFieldValue(candidate, {
+                                              field: field.factoredField,
+                                            })}
+                                            factor={readFieldValue(candidate, {
+                                              field: field.factorField,
+                                            })}
+                                            locale={locale}
+                                            t={t}
+                                          />
+                                        ) : field.format === 'ladder' && ladder ? (
+                                          <PriceLadder
+                                            rowKey={rowKey}
+                                            rungs={ladder}
+                                            factor={readFieldValue(candidate, {
+                                              field: field.factorField,
+                                            })}
+                                            locale={locale}
+                                            t={t}
+                                          />
+                                        ) : field.format === 'link' && safeExternalUrl(rawValue) ? (
+                                          <a
+                                            href={safeExternalUrl(rawValue) as string}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-accent underline underline-offset-2"
+                                            data-testid={`review-drawer-candidate-${rowKey}-link-${key}`}
+                                          >
+                                            {getLocalizedText(
+                                              field.linkLabel || { 'zh-CN': '查看', en: 'Open' },
+                                              locale,
+                                              t,
+                                            )}
+                                          </a>
+                                        ) : (
+                                          value
+                                        )}
+                                      </dd>
+                                    </div>
+                                  );
+                                })}
+                              </dl>
+                            )}
                           </div>
                           {score !== undefined && (
                             <span
+                              data-testid={`review-drawer-candidate-${scoreKey}-score`}
                               className={`rounded-pill px-1.5 py-0.5 text-xs font-semibold ${scoreToneClass(
                                 scoreColor,
                               )}`}
@@ -2159,92 +2658,111 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                   })
                 )}
               </div>
-              <section
-                data-testid="review-drawer-decision-panel"
-                className="bg-subtle border-border max-h-[48%] shrink-0 overflow-auto border-t p-2.5"
-              >
-                <h3 className="text-text text-sm font-semibold">
-                  {getLocalizedText(
-                    candidatesConfig.decisionTitle || { 'zh-CN': '当前决策状态', en: 'Decision' },
-                    locale,
-                    t,
-                  )}
-                </h3>
-                <dl className="mt-2 space-y-1.5 text-sm">
-                  {decisionFields.length > 0 ? (
-                    decisionFields.map((field: any) => {
-                      const key = String(field.key || field.field || field.label);
-                      const label = getLocalizedText(field.label || key, locale, t);
-                      const rawValue = readFieldValue(record, field);
-                      if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
-                      const value = formatConfiguredValue(rawValue, field, locale, t);
-                      return (
-                        <div key={key} className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
-                          <dt className="text-text-2 text-xs">{label}</dt>
-                          <dd className="text-text break-words">{value}</dd>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <>
-                      <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
-                        <dt className="text-text-2 text-xs">
-                          {localized(locale, t, '标准编码', 'Standard Code')}
-                        </dt>
-                        <dd className="text-text font-mono">
-                          {formatValue(
-                            readPath(record, 'bom_std_material_code'),
-                            localized(locale, t, '确认候选后写入', 'Pending confirmation'),
-                          )}
-                        </dd>
-                      </div>
-                      <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
-                        <dt className="text-text-2 text-xs">
-                          {localized(locale, t, '当前状态', 'Reason')}
-                        </dt>
-                        <dd className="text-text break-words">
-                          {formatConfiguredValue(
-                            readPath(record, 'bom_std_reason_code'),
-                            candidatesConfig.reasonField || {},
-                            locale,
-                            t,
-                          )}
-                        </dd>
-                      </div>
-                    </>
-                  )}
-                </dl>
-                {selectedCandidate &&
-                  (selectedCandidateFields.length > 0 || selectedCandidateGroups.length > 0) && (
-                    <section className="rounded-control border-border bg-panel mt-3 border">
-                      <header className="border-border text-text-2 border-b px-3 py-1.5 text-xs font-semibold">
+              {(shouldShowDecisionStatus ||
+                (selectedCandidate &&
+                  (selectedCandidateFields.length > 0 || selectedCandidateGroups.length > 0))) && (
+                <section
+                  data-testid="review-drawer-decision-panel"
+                  className="bg-subtle border-border max-h-[48%] shrink-0 overflow-auto border-t p-2.5"
+                >
+                  {shouldShowDecisionStatus && (
+                    <section data-testid="review-drawer-decision-status">
+                      <h3 className="text-text text-sm font-semibold">
                         {getLocalizedText(
-                          candidatesConfig.selectedTitle || {
-                            'zh-CN': '匹配证据',
-                            en: 'Match Evidence',
+                          candidatesConfig.decisionTitle || {
+                            'zh-CN': '当前决策状态',
+                            en: 'Decision',
                           },
                           locale,
                           t,
                         )}
-                      </header>
-                      {selectedCandidateGroups.length > 0 ? (
-                        <FieldGroups
-                          groups={selectedCandidateGroups}
-                          record={selectedCandidate}
-                          locale={locale}
-                          t={t}
-                        />
-                      ) : (
-                        <FieldRows
-                          fields={selectedCandidateFields}
-                          record={selectedCandidate}
-                          locale={locale}
-                          t={t}
-                        />
-                      )}
+                      </h3>
+                      <dl className="mt-2 space-y-1.5 text-sm">
+                        {decisionFields.length > 0 ? (
+                          decisionFields.map((field: any) => {
+                            const key = String(field.key || field.field || field.label);
+                            const label = getLocalizedText(field.label || key, locale, t);
+                            const rawValue = readFieldValue(record, field);
+                            if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
+                            const value = formatConfiguredValue(rawValue, field, locale, t);
+                            return (
+                              <div key={key} className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
+                                <dt className="text-text-2 text-xs">{label}</dt>
+                                <dd className="text-text break-words">{value}</dd>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
+                              <dt className="text-text-2 text-xs">
+                                {localized(locale, t, '标准编码', 'Standard Code')}
+                              </dt>
+                              <dd className="text-text font-mono">
+                                {formatValue(
+                                  readPath(record, 'bom_std_material_code'),
+                                  localized(locale, t, '确认候选后写入', 'Pending confirmation'),
+                                )}
+                              </dd>
+                            </div>
+                            <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
+                              <dt className="text-text-2 text-xs">
+                                {localized(locale, t, '当前状态', 'Reason')}
+                              </dt>
+                              <dd className="text-text break-words">
+                                {formatConfiguredValue(
+                                  readPath(record, 'bom_std_reason_code'),
+                                  candidatesConfig.reasonField || {},
+                                  locale,
+                                  t,
+                                )}
+                              </dd>
+                            </div>
+                          </>
+                        )}
+                      </dl>
                     </section>
                   )}
-              </section>
+                  {selectedCandidate &&
+                    (selectedCandidateFields.length > 0 || selectedCandidateGroups.length > 0) && (
+                      <section
+                        className={`rounded-control border-border bg-panel border ${
+                          shouldShowDecisionStatus ? 'mt-3' : ''
+                        }`}
+                      >
+                        <header className="border-border text-text-2 border-b px-3 py-1.5 text-xs font-semibold">
+                          {getLocalizedText(
+                            candidatesConfig.selectedTitle || {
+                              'zh-CN': '匹配证据',
+                              en: 'Match Evidence',
+                            },
+                            locale,
+                            t,
+                          )}
+                        </header>
+                        {usesSummaryEvidence ? (
+                          <div className="space-y-2 p-2.5">
+                            <EvidenceSummary candidate={selectedCandidate} locale={locale} t={t} />
+                          </div>
+                        ) : selectedCandidateGroups.length > 0 ? (
+                          <FieldGroups
+                            groups={selectedCandidateGroups}
+                            record={selectedCandidate}
+                            locale={locale}
+                            t={t}
+                          />
+                        ) : (
+                          <FieldRows
+                            fields={selectedCandidateFields}
+                            record={selectedCandidate}
+                            locale={locale}
+                            t={t}
+                          />
+                        )}
+                      </section>
+                    )}
+                </section>
+              )}
               {/*
               The actions live outside the decision panel on purpose. Inside it they were the last
               child of a max-h-[48%] overflow-auto section, so "确认此报价" scrolled out of sight

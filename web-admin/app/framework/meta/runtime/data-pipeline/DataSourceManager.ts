@@ -1025,6 +1025,17 @@ export class DataSourceManager {
     }
 
     const segments = path.split('.');
+    // A detail-page identity is a scope boundary, not an optional search term. During the
+    // initial record fetch `form` exists as `{}`; treating an absent `form.pid` as "ready"
+    // drops that filter and briefly loads tenant-wide child rows. Apart from wasting work, a
+    // user can select one of those rows before the scoped reload wins the race. Keep optional
+    // leaf state such as `state.keyword` fetchable, but defer identity-bound sources until the
+    // parent record is present.
+    const requiresIdentity =
+      path === 'form.pid' ||
+      path === 'record.pid' ||
+      path === 'row.pid' ||
+      path === '$page.recordPid';
     let value: any = this.getContext() as any;
     for (let index = 0; index < segments.length; index += 1) {
       if (value === undefined || value === null) {
@@ -1033,7 +1044,10 @@ export class DataSourceManager {
       value = value[segments[index]];
       const isLastSegment = index === segments.length - 1;
       const isNestedDependency = segments.length > 2;
-      if ((value === undefined || value === null) && (!isLastSegment || isNestedDependency)) {
+      if (
+        (value === undefined || value === null || (requiresIdentity && value === '')) &&
+        (!isLastSegment || isNestedDependency || requiresIdentity)
+      ) {
         return { matched: true, missingParent: true, value: undefined };
       }
     }

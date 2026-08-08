@@ -4,7 +4,7 @@ import { createHash } from 'crypto';
 import { fileURLToPath } from 'url';
 import type { Browser, BrowserContext, Response } from '@playwright/test';
 import { test, expect, type Page } from '../../fixtures';
-import { ensureSidebarExpanded, findRowInPaginatedList, waitForDynamicPageLoad } from '../helpers';
+import { ensureSidebarExpanded, waitForDynamicPageLoad } from '../helpers';
 import { loginViaUI } from '../../helpers/wd-fixtures';
 import {
   dynamicCreate,
@@ -306,6 +306,10 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
         )
         .toBe('completed');
       expect(engTaskNo, 'completed task has task number').toBeTruthy();
+      // The workbench intentionally ellipsizes long task numbers in rendered
+      // cell text. Keep API assertions on the complete identifier, while browser
+      // assertions use a unique prefix that remains visible in the DOM.
+      const engTaskUiToken = engTaskNo.slice(0, 12);
       expect(
         JSON.stringify(engTask),
         'completed incident task has no ambiguity warning',
@@ -335,8 +339,12 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
       await engSidebar.locator(`a[href="${WORKBENCH_HREF}"]`).first().click();
       await waitForDynamicPageLoad(engPage, 20_000);
       // own task visible
-      const engRow = await findRowInPaginatedList(engPage, engTaskNo, 25_000);
-      await expect(engRow).toContainText(engTaskNo);
+      // This task has just been created and the workbench defaults to newest
+      // first, so assert the unfiltered first-page rendering directly. Using
+      // the generic search helper here can open the app-wide search dialog,
+      // because task number is not a keyword-searchable workbench column.
+      const engRow = engPage.locator('tbody tr', { hasText: engTaskUiToken }).first();
+      await expect(engRow).toContainText(engTaskUiToken, { timeout: 25_000 });
       // admin task NOT rendered anywhere in eng's scoped list
       step = 'eng workbench hides admin task';
       const engMain = await engPage
@@ -363,8 +371,8 @@ test.describe('BOM workbench self-scope real-browser golden @smoke', () => {
       await ensureSidebarExpanded(adminPage);
       await adminPage.getByTestId('sidebar').locator(`a[href="${WORKBENCH_HREF}"]`).first().click();
       await waitForDynamicPageLoad(adminPage, 20_000);
-      const adminRow = await findRowInPaginatedList(adminPage, engTaskNo, 25_000);
-      await expect(adminRow).toContainText(engTaskNo);
+      const adminRow = adminPage.locator('tbody tr', { hasText: engTaskUiToken }).first();
+      await expect(adminRow).toContainText(engTaskUiToken, { timeout: 25_000 });
 
       // 5. hard gates for the eng session: no 403 (scope must filter, not forbid) / no 5xx
       expect(

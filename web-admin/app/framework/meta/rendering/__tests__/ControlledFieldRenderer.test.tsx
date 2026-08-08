@@ -859,6 +859,44 @@ describe('ControlledFieldRenderer', () => {
     expect(selectProps).not.toHaveProperty('helpText');
   });
 
+  it('does not forward field-governance metadata to the rendered control', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({ componentName, props }: any) => {
+        capturedPropsSpy({ componentName, props });
+        return <div data-testid="component-loader-governance">{componentName}</div>;
+      },
+    }));
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+
+    render(
+      <ControlledFieldRenderer
+        field={
+          {
+            field: 'quote_code',
+            component: 'SmartInput',
+            props: {
+              immutableWhen: { field: 'formal', in: [true] },
+              allowedWriterCommands: ['quote:publish'],
+              placeholder: 'Quote code',
+            },
+          } as any
+        }
+        value="Q-1"
+        onChange={vi.fn()}
+        context={{ locale: 'zh-CN', t: (key: string) => key } as any}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('component-loader-governance')).toBeInTheDocument();
+    });
+    const controlProps = capturedPropsSpy.mock.calls[0]?.[0]?.props;
+    expect(controlProps).not.toHaveProperty('immutableWhen');
+    expect(controlProps).not.toHaveProperty('allowedWriterCommands');
+    expect(controlProps?.placeholder).toBe('Quote code');
+  });
+
   it('renders the field error once when the control also renders its own FieldBase error', async () => {
     vi.resetModules();
     const { FieldBase } = await import('~/ui/ui/field-base');
