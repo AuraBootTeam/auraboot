@@ -71,12 +71,37 @@ public interface RecordShareService {
      * @param memberId     member (user) ID
      * @return true if the record is shared with this member
      */
-    boolean isShared(Long tenantId, String resourceCode, Long recordId, Long memberId);
+    default boolean isShared(Long tenantId, String resourceCode, Long recordId, Long memberId) {
+        return isShared(tenantId, resourceCode, recordId, memberId, "read");
+    }
 
     /**
-     * Check if a PID-addressed record is shared with a member by subject PID or legacy IDs.
+     * Check whether the exact action is granted by the record share permission mask.
      */
-    boolean isSharedByPid(Long tenantId, String resourceCode, String recordPid, Long memberId, String memberPid);
+    boolean isShared(Long tenantId, String resourceCode, Long recordId, Long memberId, String action);
+
+    /**
+     * Check whether read access to a PID-addressed record is shared with a member.
+     */
+    default boolean isSharedByPid(
+            Long tenantId,
+            String resourceCode,
+            String recordPid,
+            Long memberId,
+            String memberPid) {
+        return isSharedByPid(tenantId, resourceCode, recordPid, memberId, memberPid, "read");
+    }
+
+    /**
+     * Check whether the exact action on a PID-addressed record is shared with a member.
+     */
+    boolean isSharedByPid(
+            Long tenantId,
+            String resourceCode,
+            String recordPid,
+            Long memberId,
+            String memberPid,
+            String action);
 
     /**
      * Get all record IDs shared with a member (directly or via their roles).
@@ -84,10 +109,20 @@ public interface RecordShareService {
      * @param tenantId     tenant ID
      * @param resourceCode model/resource code
      * @param memberId     member (user) ID
-     * @param action       action (currently unused, reserved for permission_mask filtering)
+     * @param action       action that must be present in the share permission mask
      * @return list of record IDs
      */
     List<Long> getSharedRecordIds(Long tenantId, String resourceCode, Long memberId, String action);
+
+    /**
+     * Get all public record PIDs shared directly with a member or through one of their roles.
+     */
+    List<String> getSharedRecordPids(
+            Long tenantId,
+            String resourceCode,
+            Long memberId,
+            String memberPid,
+            String action);
 
     /**
      * List all shares for a specific record.

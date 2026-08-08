@@ -76,7 +76,7 @@ class RecordShareServiceImplTest {
     }
 
     @Test
-    void shareRecordByPidStoresRecordAndSubjectPidAliases() {
+    void shareRecordByPidStoresPublicRecordAndSubjectPids() {
         Instant expires = Instant.now().plusSeconds(3600);
 
         service.shareRecordByPid(100L, "model.user", "rec_10", "member", "mem_5", "read", expires);
@@ -100,6 +100,16 @@ class RecordShareServiceImplTest {
     }
 
     @Test
+    void shareRecordDefaultsBlankPermissionMaskToRead() {
+        service.shareRecord(100L, "model.user", 10L, "member", 5L, "  ", null);
+
+        ArgumentCaptor<RecordShare> captor = ArgumentCaptor.forClass(RecordShare.class);
+        verify(recordShareMapper).insert(captor.capture());
+
+        assertThat(captor.getValue().getPermissionMask()).isEqualTo("read");
+    }
+
+    @Test
     void unshareRecordDelegatesToMapper() {
         when(recordShareMapper.deleteShare(100L, "model.user", 10L, "member", 5L)).thenReturn(1);
 
@@ -110,10 +120,11 @@ class RecordShareServiceImplTest {
 
     @Test
     void isSharedReturnsTrueWhenDirectShareExists() {
-        when(recordShareMapper.countByRecordAndUser(eq(100L), eq("model.user"), eq(10L), eq(5L), any()))
+        when(recordShareMapper.countByRecordAndUser(
+                eq(100L), eq("model.user"), eq(10L), eq(5L), eq("read"), any()))
                 .thenReturn(1);
 
-        boolean result = service.isShared(100L, "model.user", 10L, 5L);
+        boolean result = service.isShared(100L, "model.user", 10L, 5L, "READ");
 
         assertThat(result).isTrue();
         verify(userRoleService, never()).getRoleIdsByMemberIdAndTenantId(anyLong(), anyLong());
@@ -122,10 +133,10 @@ class RecordShareServiceImplTest {
     @Test
     void isSharedByPidReturnsTrueWhenDirectSubjectPidShareExists() {
         when(recordShareMapper.countByRecordPidAndSubjectPid(
-                eq(100L), eq("model.user"), eq("rec_10"), eq("member"), eq("mem_5"), any()))
+                eq(100L), eq("model.user"), eq("rec_10"), eq("member"), eq("mem_5"), eq("read"), any()))
                 .thenReturn(1);
 
-        boolean result = service.isSharedByPid(100L, "model.user", "rec_10", 5L, "mem_5");
+        boolean result = service.isSharedByPid(100L, "model.user", "rec_10", 5L, "mem_5", "read");
 
         assertThat(result).isTrue();
         verify(userRoleService, never()).getRoleIdsByMemberIdAndTenantId(anyLong(), anyLong());
@@ -133,38 +144,44 @@ class RecordShareServiceImplTest {
 
     @Test
     void isSharedFallsBackToRolesWhenNoDirectShare() {
-        when(recordShareMapper.countByRecordAndUser(eq(100L), eq("model.user"), eq(10L), eq(5L), any()))
+        when(recordShareMapper.countByRecordAndUser(
+                eq(100L), eq("model.user"), eq(10L), eq(5L), eq("update"), any()))
                 .thenReturn(0);
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of(7L, 8L));
-        when(recordShareMapper.countByRecordAndRoles(eq(100L), eq("model.user"), eq(10L), eq(List.of(7L, 8L)), any()))
+        when(recordShareMapper.countByRecordAndRoles(
+                eq(100L), eq("model.user"), eq(10L), eq(List.of(7L, 8L)), eq("update"), any()))
                 .thenReturn(1);
 
-        assertThat(service.isShared(100L, "model.user", 10L, 5L)).isTrue();
+        assertThat(service.isShared(100L, "model.user", 10L, 5L, "update")).isTrue();
     }
 
     @Test
     void isSharedReturnsFalseWhenNoDirectAndNoRoles() {
-        when(recordShareMapper.countByRecordAndUser(anyLong(), anyString(), anyLong(), anyLong(), any()))
+        when(recordShareMapper.countByRecordAndUser(
+                anyLong(), anyString(), anyLong(), anyLong(), anyString(), any()))
                 .thenReturn(0);
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of());
 
-        assertThat(service.isShared(100L, "model.user", 10L, 5L)).isFalse();
-        verify(recordShareMapper, never()).countByRecordAndRoles(anyLong(), anyString(), anyLong(), anyList(), any());
+        assertThat(service.isShared(100L, "model.user", 10L, 5L, "read")).isFalse();
+        verify(recordShareMapper, never()).countByRecordAndRoles(
+                anyLong(), anyString(), anyLong(), anyList(), anyString(), any());
     }
 
     @Test
     void isSharedReturnsFalseWhenRolesNull() {
-        when(recordShareMapper.countByRecordAndUser(anyLong(), anyString(), anyLong(), anyLong(), any()))
+        when(recordShareMapper.countByRecordAndUser(
+                anyLong(), anyString(), anyLong(), anyLong(), anyString(), any()))
                 .thenReturn(0);
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(5L, 100L)).thenReturn(null);
 
-        assertThat(service.isShared(100L, "model.user", 10L, 5L)).isFalse();
+        assertThat(service.isShared(100L, "model.user", 10L, 5L, "read")).isFalse();
     }
 
     @Test
     void getSharedRecordIdsPassesEmptyListWhenNoRoles() {
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(5L, 100L)).thenReturn(null);
-        when(recordShareMapper.findSharedRecordIds(eq(100L), eq("model.user"), eq(5L), eq(List.of()), any()))
+        when(recordShareMapper.findSharedRecordIds(
+                eq(100L), eq("model.user"), eq(5L), eq(List.of()), eq("read"), any()))
                 .thenReturn(List.of(1L, 2L));
 
         List<Long> ids = service.getSharedRecordIds(100L, "model.user", 5L, "read");
@@ -175,10 +192,22 @@ class RecordShareServiceImplTest {
     @Test
     void getSharedRecordIdsPassesRolesWhenAvailable() {
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of(7L));
-        when(recordShareMapper.findSharedRecordIds(eq(100L), eq("model.user"), eq(5L), eq(List.of(7L)), any()))
+        when(recordShareMapper.findSharedRecordIds(
+                eq(100L), eq("model.user"), eq(5L), eq(List.of(7L)), eq("read"), any()))
                 .thenReturn(List.of(3L));
 
         assertThat(service.getSharedRecordIds(100L, "model.user", 5L, "read")).containsExactly(3L);
+    }
+
+    @Test
+    void getSharedRecordPidsIncludesDirectPidAndRoleGrantsForRequestedAction() {
+        when(userRoleService.getRoleIdsByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of(7L));
+        when(recordShareMapper.findSharedRecordPids(
+                eq(100L), eq("model.user"), eq(5L), eq("mem_5"), eq(List.of(7L)), eq("update"), any()))
+                .thenReturn(List.of("rec_3"));
+
+        assertThat(service.getSharedRecordPids(100L, "model.user", 5L, " mem_5 ", "UPDATE"))
+                .containsExactly("rec_3");
     }
 
     @Test

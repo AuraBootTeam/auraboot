@@ -15,6 +15,7 @@ import java.util.List;
  * @param deptField       field name for department filtering on target model
  * @param deptPids        list of department PIDs within scope (string-based, from dynamic tables)
  * @param sharedRecordIds record IDs explicitly shared via ReBAC
+ * @param sharedRecordPids public record PIDs explicitly shared via ReBAC
  */
 public record DataScopeCondition(
         String scopeType,
@@ -22,21 +23,56 @@ public record DataScopeCondition(
         Object ownerValue,
         String deptField,
         List<String> deptPids,
-        List<Long> sharedRecordIds
+        List<Long> sharedRecordIds,
+        List<String> sharedRecordPids
 ) {
+
+    public DataScopeCondition {
+        deptPids = immutableList(deptPids);
+        sharedRecordIds = immutableList(sharedRecordIds);
+        sharedRecordPids = immutableList(sharedRecordPids);
+    }
+
+    /**
+     * Convenience constructor for scope producers that do not attach public PID shares.
+     */
+    public DataScopeCondition(
+            String scopeType,
+            String ownerField,
+            Object ownerValue,
+            String deptField,
+            List<String> deptPids,
+            List<Long> sharedRecordIds) {
+        this(scopeType, ownerField, ownerValue, deptField, deptPids, sharedRecordIds, Collections.emptyList());
+    }
+
+    public DataScopeCondition withSharedRecords(List<Long> recordIds, List<String> recordPids) {
+        return new DataScopeCondition(
+                scopeType,
+                ownerField,
+                ownerValue,
+                deptField,
+                deptPids,
+                recordIds,
+                recordPids);
+    }
 
     /**
      * Full access — no filtering applied.
      */
     public static DataScopeCondition all() {
-        return new DataScopeCondition("all", null, null, null, Collections.emptyList(), Collections.emptyList());
+        return new DataScopeCondition(
+                "all", null, null, null,
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
 
     /**
      * No access — all records filtered out.
      */
     public static DataScopeCondition none() {
-        return new DataScopeCondition("none", null, null, null, Collections.emptyList(), Collections.emptyList());
+        return new DataScopeCondition(
+                "none", null, null, null,
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
 
     /**
@@ -49,6 +85,12 @@ public record DataScopeCondition(
      * because no data scope restriction was configured for the model.
      */
     public static DataScopeCondition notConfigured() {
-        return new DataScopeCondition("not_configured", null, null, null, Collections.emptyList(), Collections.emptyList());
+        return new DataScopeCondition(
+                "not_configured", null, null, null,
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+    }
+
+    private static <T> List<T> immutableList(List<T> values) {
+        return values == null || values.isEmpty() ? Collections.emptyList() : List.copyOf(values);
     }
 }

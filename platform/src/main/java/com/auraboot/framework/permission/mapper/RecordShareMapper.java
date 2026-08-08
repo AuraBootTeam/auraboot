@@ -100,6 +100,9 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
           AND record_id = #{recordId}
           AND subject_type = 'member'
           AND subject_id = #{userId}
+          AND LOWER(#{action}) = ANY (
+            string_to_array(LOWER(REPLACE(permission_mask, ' ', '')), ',')
+          )
           AND (expires_at IS NULL OR expires_at > #{now})
         """)
     int countByRecordAndUser(
@@ -107,6 +110,7 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("resourceCode") String resourceCode,
             @Param("recordId") Long recordId,
             @Param("userId") Long userId,
+            @Param("action") String action,
             @Param("now") Instant now);
 
     /**
@@ -119,6 +123,9 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
           AND record_pid = #{recordPid}
           AND subject_type = #{subjectType}
           AND subject_pid = #{subjectPid}
+          AND LOWER(#{action}) = ANY (
+            string_to_array(LOWER(REPLACE(permission_mask, ' ', '')), ',')
+          )
           AND (expires_at IS NULL OR expires_at > #{now})
         """)
     int countByRecordPidAndSubjectPid(
@@ -127,6 +134,7 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("recordPid") String recordPid,
             @Param("subjectType") String subjectType,
             @Param("subjectPid") String subjectPid,
+            @Param("action") String action,
             @Param("now") Instant now);
 
     /**
@@ -139,6 +147,9 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
           AND record_pid = #{recordPid}
           AND subject_type = 'member'
           AND subject_id = #{userId}
+          AND LOWER(#{action}) = ANY (
+            string_to_array(LOWER(REPLACE(permission_mask, ' ', '')), ',')
+          )
           AND (expires_at IS NULL OR expires_at > #{now})
         """)
     int countByRecordPidAndUser(
@@ -146,6 +157,7 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("resourceCode") String resourceCode,
             @Param("recordPid") String recordPid,
             @Param("userId") Long userId,
+            @Param("action") String action,
             @Param("now") Instant now);
 
     /**
@@ -162,6 +174,9 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
           <foreach item='id' collection='roleIds' open='(' separator=',' close=')'>
             #{id}
           </foreach>
+          AND LOWER(#{action}) = ANY (
+            string_to_array(LOWER(REPLACE(permission_mask, ' ', '')), ',')
+          )
           AND (expires_at IS NULL OR expires_at > #{now})
         </script>
         """)
@@ -170,6 +185,7 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("resourceCode") String resourceCode,
             @Param("recordId") Long recordId,
             @Param("roleIds") List<Long> roleIds,
+            @Param("action") String action,
             @Param("now") Instant now);
 
     /**
@@ -186,6 +202,9 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
           <foreach item='id' collection='roleIds' open='(' separator=',' close=')'>
             #{id}
           </foreach>
+          AND LOWER(#{action}) = ANY (
+            string_to_array(LOWER(REPLACE(permission_mask, ' ', '')), ',')
+          )
           AND (expires_at IS NULL OR expires_at > #{now})
         </script>
         """)
@@ -194,6 +213,7 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("resourceCode") String resourceCode,
             @Param("recordPid") String recordPid,
             @Param("roleIds") List<Long> roleIds,
+            @Param("action") String action,
             @Param("now") Instant now);
 
     /**
@@ -222,6 +242,10 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
         SELECT DISTINCT record_id FROM ab_record_share
         WHERE tenant_id = #{tenantId}
           AND resource_code = #{resourceCode}
+          AND record_id IS NOT NULL
+          AND LOWER(#{action}) = ANY (
+            string_to_array(LOWER(REPLACE(permission_mask, ' ', '')), ',')
+          )
           AND (expires_at IS NULL OR expires_at > #{now})
           AND (
             (subject_type = 'member' AND subject_id = #{userId})
@@ -240,5 +264,43 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("resourceCode") String resourceCode,
             @Param("userId") Long userId,
             @Param("roleIds") List<Long> roleIds,
+            @Param("action") String action,
+            @Param("now") Instant now);
+
+    /**
+     * Get all public record PIDs shared with a member (directly by member PID/ID or via roles).
+     */
+    @Select("""
+        <script>
+        SELECT DISTINCT record_pid FROM ab_record_share
+        WHERE tenant_id = #{tenantId}
+          AND resource_code = #{resourceCode}
+          AND record_pid IS NOT NULL
+          AND LOWER(#{action}) = ANY (
+            string_to_array(LOWER(REPLACE(permission_mask, ' ', '')), ',')
+          )
+          AND (expires_at IS NULL OR expires_at > #{now})
+          AND (
+            (subject_type = 'member' AND subject_id = #{userId})
+            <if test="memberPid != null and memberPid != ''">
+            OR (subject_type = 'member' AND subject_pid = #{memberPid})
+            </if>
+            <if test="roleIds != null and roleIds.size() > 0">
+            OR (subject_type = 'role' AND subject_id IN
+              <foreach item='id' collection='roleIds' open='(' separator=',' close=')'>
+                #{id}
+              </foreach>
+            )
+            </if>
+          )
+        </script>
+        """)
+    List<String> findSharedRecordPids(
+            @Param("tenantId") Long tenantId,
+            @Param("resourceCode") String resourceCode,
+            @Param("userId") Long userId,
+            @Param("memberPid") String memberPid,
+            @Param("roleIds") List<Long> roleIds,
+            @Param("action") String action,
             @Param("now") Instant now);
 }

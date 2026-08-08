@@ -194,6 +194,25 @@ test('plugin import profiles use explicit semantic names and deprecate default',
   }
 });
 
+test('OSS golden stack stages current-source hybrid jars before import', () => {
+  const golden = read('scripts/oss-golden-stack.sh');
+
+  assert.match(golden, /stage_requested_hybrid_jars\(\)/);
+  assert.match(golden, /:platform-plugin-api:publishToMavenLocal/);
+  assert.match(golden, /GRADLE_USER_HOME="\$gradle_home" gradle --no-daemon/);
+  assert.match(golden, /-Dmaven\.repo\.local="\$maven_repo" clean jar/);
+  assert.match(golden, /runtime_env "\$runtime_name" MAVEN_REPO_LOCAL/);
+  assert.match(golden, /runtime_env "\$runtime_name" GRADLE_USER_HOME/);
+  assert.match(golden, /-Dmaven\.repo\.local="\$maven_repo"/);
+  assert.match(golden, /META-INF\/extensions\.idx/);
+  assert.match(golden, /AURA_PLUGINS_DIR="\$sd\/pf4j-plugins"/);
+  assert.ok(
+    golden.indexOf('stage_requested_hybrid_jars "$sd"') <
+      golden.indexOf('log "5/9 start backend'),
+    'hybrid jars must be staged before the PF4J host starts',
+  );
+});
+
 test('Docker bootstrap entrypoints preserve plugin dependency order', () => {
   for (const path of ['scripts/quickstart.sh', 'scripts/docker-bootstrap.sh']) {
     const script = read(path);

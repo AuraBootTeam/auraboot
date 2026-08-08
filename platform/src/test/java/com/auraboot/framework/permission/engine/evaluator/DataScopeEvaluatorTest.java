@@ -1,9 +1,12 @@
 package com.auraboot.framework.permission.engine.evaluator;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
 import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
 import com.auraboot.framework.permission.service.DataScopeService;
+import com.auraboot.framework.permission.service.RecordShareService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -20,7 +23,13 @@ import static org.mockito.Mockito.when;
 class DataScopeEvaluatorTest {
 
     @Mock private DataScopeService dataScopeService;
+    @Mock private RecordShareService recordShareService;
     @InjectMocks private DataScopeEvaluator evaluator;
+
+    @AfterEach
+    void clearMetaContext() {
+        MetaContext.clear();
+    }
 
     @Test
     void notConfiguredReturnsNotApplicable() {
@@ -127,6 +136,23 @@ class DataScopeEvaluatorTest {
         DataScopeCondition self = new DataScopeCondition("self", "owner_id", 1L, null, List.of(), List.of());
         when(dataScopeService.resolveScope(1L, "M", "view")).thenReturn(self);
         assertSame(self, evaluator.getCondition(1L, "M", "view"));
+    }
+
+    @Test
+    void getCondition_attachesActionScopedRecordShares() {
+        MetaContext.setContext(99L, 7L, "user_pid_7", "user");
+        DataScopeCondition self = new DataScopeCondition(
+                "self", "owner_id", 7L, null, List.of(), List.of());
+        when(dataScopeService.resolveScope(1L, "M", "read")).thenReturn(self);
+        when(recordShareService.getSharedRecordIds(99L, "M", 1L, "read"))
+                .thenReturn(List.of(10L));
+        when(recordShareService.getSharedRecordPids(99L, "M", 1L, "user_pid_7", "read"))
+                .thenReturn(List.of("rec_11"));
+
+        DataScopeCondition condition = evaluator.getCondition(1L, "M", "read");
+
+        assertEquals(List.of(10L), condition.sharedRecordIds());
+        assertEquals(List.of("rec_11"), condition.sharedRecordPids());
     }
 
     // ---- SELF owner value typing (2026-06-28 Quote/BOM varchar/ULID owner incident) ----

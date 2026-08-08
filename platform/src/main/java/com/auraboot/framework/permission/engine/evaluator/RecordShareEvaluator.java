@@ -45,7 +45,7 @@ public class RecordShareEvaluator {
         if (StringUtils.hasText(recordPid)) {
             Long tenantId = MetaContext.getCurrentTenantId();
             boolean shared = recordShareService.isSharedByPid(
-                    tenantId, resource, recordPid, memberId, MetaContext.getCurrentUserPid());
+                    tenantId, resource, recordPid, memberId, MetaContext.getCurrentUserPid(), action);
             if (shared) {
                 return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,
                         "Record is shared with member — access granted (bypasses DataScope)");
@@ -61,7 +61,7 @@ public class RecordShareEvaluator {
         }
 
         Long tenantId = MetaContext.getCurrentTenantId();
-        boolean shared = recordShareService.isShared(tenantId, resource, recordId, memberId);
+        boolean shared = recordShareService.isShared(tenantId, resource, recordId, memberId, action);
 
         if (shared) {
             return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,

@@ -57,32 +57,33 @@ class RecordShareEvaluatorTest {
 
     @Test
     void recordIdAsNumberSharedReturnsAllow() {
-        when(recordShareService.isShared(99L, "User", 5L, 1L)).thenReturn(true);
-        EvaluationStep s = evaluator.evaluate(1L, "User", "view", Map.of("id", 5));
+        when(recordShareService.isShared(99L, "User", 5L, 1L, "read")).thenReturn(true);
+        EvaluationStep s = evaluator.evaluate(1L, "User", "read", Map.of("id", 5));
         assertEquals(EvaluationVerdict.ALLOW, s.verdict());
     }
 
     @Test
     void recordIdAsStringSharedReturnsAllow() {
-        when(recordShareService.isShared(99L, "User", 7L, 1L)).thenReturn(true);
-        EvaluationStep s = evaluator.evaluate(1L, "User", "view", Map.of("id", "7"));
+        when(recordShareService.isShared(99L, "User", 7L, 1L, "read")).thenReturn(true);
+        EvaluationStep s = evaluator.evaluate(1L, "User", "read", Map.of("id", "7"));
         assertEquals(EvaluationVerdict.ALLOW, s.verdict());
     }
 
     @Test
     void recordPidSharedReturnsAllow() {
-        when(recordShareService.isSharedByPid(99L, "User", "rec_7", 1L, "p")).thenReturn(true);
+        when(recordShareService.isSharedByPid(99L, "User", "rec_7", 1L, "p", "update")).thenReturn(true);
 
-        EvaluationStep s = evaluator.evaluate(1L, "User", "view", Map.of("pid", "rec_7"));
+        EvaluationStep s = evaluator.evaluate(1L, "User", "update", Map.of("pid", "rec_7"));
 
         assertEquals(EvaluationVerdict.ALLOW, s.verdict());
-        verify(recordShareService, never()).isShared(anyLong(), anyString(), anyLong(), anyLong());
+        verify(recordShareService, never()).isShared(
+                anyLong(), anyString(), anyLong(), anyLong(), anyString());
     }
 
     @Test
     void recordNotSharedReturnsNotApplicable() {
-        when(recordShareService.isShared(99L, "User", 5L, 1L)).thenReturn(false);
-        EvaluationStep s = evaluator.evaluate(1L, "User", "view", Map.of("id", 5L));
+        when(recordShareService.isShared(99L, "User", 5L, 1L, "delete")).thenReturn(false);
+        EvaluationStep s = evaluator.evaluate(1L, "User", "delete", Map.of("id", 5L));
         assertEquals(EvaluationVerdict.NOT_APPLICABLE, s.verdict());
     }
 
