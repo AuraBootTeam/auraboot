@@ -87,7 +87,7 @@ class FieldMaskExemptByPermissionIT {
     }
 
     @Test
-    @DisplayName("Holder of crm.account.contact_unmask sees the unmasked phone (list + detail)")
+    @DisplayName("Holder of crm.account.contact_unmask sees the unmasked phone (list + detail + export)")
     void holderSeesUnmasked() {
         when(userPermissionService.getUserPermissionCodes(42L)).thenReturn(Set.of(UNMASK_PERM));
 
@@ -95,6 +95,8 @@ class FieldMaskExemptByPermissionIT {
                 fieldMaskService.applyMaskingForList(model, List.of(phoneRecord()), 42L).get(0).get("phone"));
         assertEquals("13812345678",
                 fieldMaskService.applyMaskingForDetail(model, phoneRecord(), 42L).get("phone"));
+        assertEquals("13812345678",
+                fieldMaskService.applyMaskingForExport(model, List.of(phoneRecord()), 42L).get(0).get("phone"));
     }
 
     @Test

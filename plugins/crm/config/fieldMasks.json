@@ -8,5 +8,55 @@
     "applyToExport": true,
     "enabled": true,
     "exemptPermissionCodes": "crm.account.contact_unmask"
+  },
+  {
+    "modelCode": "crm_contact_common",
+    "fieldCode": "crm_ct_email",
+    "maskType": "EMAIL",
+    "applyToList": true,
+    "applyToDetail": true,
+    "applyToExport": true,
+    "enabled": true,
+    "exemptPermissionCodes": "crm.account.contact_unmask"
+  },
+  {
+    "modelCode": "crm_contact_common",
+    "fieldCode": "crm_ct_phone",
+    "maskType": "PHONE",
+    "applyToList": true,
+    "applyToDetail": true,
+    "applyToExport": true,
+    "enabled": true,
+    "exemptPermissionCodes": "crm.account.contact_unmask"
+  },
+  {
+    "modelCode": "crm_contact_common",
+    "fieldCode": "crm_ct_mobile",
+    "maskType": "PHONE",
+    "applyToList": true,
+    "applyToDetail": true,
+    "applyToExport": true,
+    "enabled": true,
+    "exemptPermissionCodes": "crm.account.contact_unmask"
+  },
+  {
+    "modelCode": "crm_lead_common",
+    "fieldCode": "crm_lead_contact_phone",
+    "maskType": "PHONE",
+    "applyToList": true,
+    "applyToDetail": true,
+    "applyToExport": true,
+    "enabled": true,
+    "exemptPermissionCodes": "crm.account.contact_unmask"
+  },
+  {
+    "modelCode": "crm_lead_common",
+    "fieldCode": "crm_lead_contact_email",
+    "maskType": "EMAIL",
+    "applyToList": true,
+    "applyToDetail": true,
+    "applyToExport": true,
+    "enabled": true,
+    "exemptPermissionCodes": "crm.account.contact_unmask"
   }
 ]
