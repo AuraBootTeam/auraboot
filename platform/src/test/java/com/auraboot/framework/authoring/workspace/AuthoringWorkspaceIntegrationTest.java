@@ -36,11 +36,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -52,9 +54,12 @@ import java.sql.Connection;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -65,6 +70,9 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private AuthoringWorkspaceService workspaceService;
+
+    @MockitoSpyBean
+    private AuthoringWorkspaceRepository workspaceRepository;
 
     @Autowired
     private AuthoringHandoffService handoffService;
@@ -959,6 +967,21 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         assertThat(unchanged.publishState()).isEqualTo("READY");
         assertThat(unchanged.state()).isEqualTo("READ_ONLY");
         assertThat(countPublishAudits(opened.changeSetPid())).isZero();
+        assertThat(countFailedPublishAudits(opened.changeSetPid())).isEqualTo(1);
+        Map<String, Object> failureAudit = jdbcTemplate.queryForMap("""
+                SELECT result, reason_code, resource_pid, metadata::text AS metadata
+                FROM ab_authoring_audit_event
+                WHERE change_set_pid = ? AND event_type = 'RELEASE_PUBLISH_FAILED'
+                """, opened.changeSetPid());
+        assertThat(failureAudit.get("result")).isEqualTo("FAIL");
+        assertThat(failureAudit.get("reason_code"))
+                .isEqualTo("PUBLISH_PERSISTENCE_FAILED");
+        assertThat(failureAudit.get("resource_pid")).isEqualTo(page.getPid());
+        assertThat((String) failureAudit.get("metadata"))
+                .contains("\"expectedRevision\": 2")
+                .contains("\"failureCategory\": \"PERSISTENCE\"")
+                .doesNotContain("injected")
+                .doesNotContain("channel");
     }
 
     @Test
@@ -1012,6 +1035,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         assertThat(unchanged.publishState()).isEqualTo("READY");
         assertThat(unchanged.state()).isEqualTo("READ_ONLY");
         assertThat(countPublishAudits(second.changeSetPid())).isZero();
+        assertThat(countFailedPublishAudits(second.changeSetPid())).isEqualTo(1);
     }
 
     @Test
@@ -1026,22 +1050,10 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         SessionView second = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
         patchDensity(second, "comfortable");
         prepareAndSubmit(second.sessionPid(), new RevisionRequest(2));
-        jdbcTemplate.execute("""
-                CREATE OR REPLACE FUNCTION pg_temp.fail_authoring_publish_audit()
-                RETURNS trigger LANGUAGE plpgsql AS $$
-                BEGIN
-                    IF NEW.event_type = 'RELEASE_PUBLISHED' THEN
-                        RAISE EXCEPTION 'injected authoring publish audit failure';
-                    END IF;
-                    RETURN NEW;
-                END;
-                $$
-                """);
-        jdbcTemplate.execute("""
-                CREATE TRIGGER trg_test_fail_authoring_publish_audit
-                BEFORE INSERT ON ab_authoring_audit_event
-                FOR EACH ROW EXECUTE FUNCTION pg_temp.fail_authoring_publish_audit()
-                """);
+        doThrow(new DataIntegrityViolationException(
+                "injected authoring publish audit failure"))
+                .when(workspaceRepository)
+                .audit(argThat(entry -> "RELEASE_PUBLISHED".equals(entry.eventType())));
 
         assertThatThrownBy(() -> publishInNestedTransaction(second.changeSetPid(), 2))
                 .isInstanceOf(DataAccessException.class)
@@ -1065,6 +1077,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         assertThat(unchanged.publishState()).isEqualTo("READY");
         assertThat(unchanged.state()).isEqualTo("READ_ONLY");
         assertThat(countPublishAudits(second.changeSetPid())).isZero();
+        assertThat(countFailedPublishAudits(second.changeSetPid())).isEqualTo(1);
     }
 
     @Test
@@ -1650,6 +1663,18 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 opened.changeSetPid(), new RevisionRequest(3)))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("authoring.workflow.invalid-state");
+        Map<String, Object> rejectedAudit = jdbcTemplate.queryForMap("""
+                SELECT result, reason_code, metadata::text AS metadata
+                FROM ab_authoring_audit_event
+                WHERE change_set_pid = ? AND event_type = 'RELEASE_PUBLISH_FAILED'
+                ORDER BY created_at DESC, id DESC LIMIT 1
+                """, opened.changeSetPid());
+        assertThat(rejectedAudit.get("result")).isEqualTo("FAIL");
+        assertThat(rejectedAudit.get("reason_code"))
+                .isEqualTo("AUTHORING_WORKFLOW_INVALID_STATE");
+        assertThat((String) rejectedAudit.get("metadata"))
+                .contains("\"failureCategory\": \"REJECTED\"")
+                .doesNotContain("authoring.workflow.invalid-state");
         SessionView resumed = workspaceService.get(opened.sessionPid());
         assertThat(resumed.state()).isEqualTo("ACTIVE");
         assertThat(resumed.revision()).isEqualTo(3);
@@ -2037,6 +2062,14 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         Integer value = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM ab_authoring_audit_event
                 WHERE change_set_pid = ? AND event_type = 'RELEASE_PUBLISHED'
+                """, Integer.class, changeSetPid);
+        return value == null ? 0 : value;
+    }
+
+    private int countFailedPublishAudits(String changeSetPid) {
+        Integer value = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_audit_event
+                WHERE change_set_pid = ? AND event_type = 'RELEASE_PUBLISH_FAILED'
                 """, Integer.class, changeSetPid);
         return value == null ? 0 : value;
     }

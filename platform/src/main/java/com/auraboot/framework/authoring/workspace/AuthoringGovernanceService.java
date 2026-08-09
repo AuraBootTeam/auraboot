@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -36,6 +37,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static org.springframework.http.HttpStatus.CONFLICT;
@@ -60,6 +62,7 @@ public class AuthoringGovernanceService {
     private final AuthoringDraftValidator draftValidator;
     private final AuthoringImpactAnalyzer impactAnalyzer;
     private final AuthoringWorkspaceViewMapper viewMapper;
+    private final AuthoringAuditService auditService;
     private final ObjectMapper objectMapper;
 
     public AuthoringGovernanceService(
@@ -73,6 +76,7 @@ public class AuthoringGovernanceService {
             AuthoringDraftValidator draftValidator,
             AuthoringImpactAnalyzer impactAnalyzer,
             AuthoringWorkspaceViewMapper viewMapper,
+            AuthoringAuditService auditService,
             ObjectMapper objectMapper) {
         this.governanceRepository = governanceRepository;
         this.workspaceRepository = workspaceRepository;
@@ -84,6 +88,7 @@ public class AuthoringGovernanceService {
         this.draftValidator = draftValidator;
         this.impactAnalyzer = impactAnalyzer;
         this.viewMapper = viewMapper;
+        this.auditService = auditService;
         this.objectMapper = objectMapper;
     }
 
@@ -299,26 +304,32 @@ public class AuthoringGovernanceService {
     @Transactional(noRollbackFor = AuthoringStaleStateException.class)
     public ReleaseView publish(String changeSetPid, RevisionRequest request) {
         Identity identity = identity();
-        GovernanceRow row = requireChangeSet(identity, changeSetPid, true);
-        governanceValidator.requireRevision(row, request.expectedRevision());
-        governanceValidator.requireStatus(row, "APPROVED");
-        governanceValidator.requireFresh(row);
-        governanceValidator.requirePublishable(row);
+        GovernanceRow row = null;
+        try {
+            row = requireChangeSet(identity, changeSetPid, true);
+            governanceValidator.requireRevision(row, request.expectedRevision());
+            governanceValidator.requireStatus(row, "APPROVED");
+            governanceValidator.requireFresh(row);
+            governanceValidator.requirePublishable(row);
 
-        ObjectNode runtimeSnapshot = runtimeSanitizer.sanitize(row.snapshot());
-        ChannelRow channel = governanceRepository.lockChannel(row);
-        String releasePid = UniqueIdGenerator.generate();
-        ObjectNode manifest = releaseManifest(row, channel, releasePid, runtimeSnapshot);
-        String manifestChecksum = snapshotFactory.checksum(manifest);
-        ReleaseRow release = governanceRepository.activateRelease(
-                row, channel, releasePid, UniqueIdGenerator.generate(),
-                UniqueIdGenerator.generate(), manifest, manifestChecksum,
-                runtimeSnapshot, snapshotFactory.checksum(runtimeSnapshot), identity.userId());
-        audit(identity, row, null, "RELEASE_PUBLISHED", "ALLOW", "ATOMIC_CHANNEL_SWITCH",
-                objectMapper.valueToTree(Map.of(
-                        "releasePid", release.releasePid(),
-                        "channelVersion", release.channelVersion())));
-        return releaseView(release);
+            ObjectNode runtimeSnapshot = runtimeSanitizer.sanitize(row.snapshot());
+            ChannelRow channel = governanceRepository.lockChannel(row);
+            String releasePid = UniqueIdGenerator.generate();
+            ObjectNode manifest = releaseManifest(row, channel, releasePid, runtimeSnapshot);
+            String manifestChecksum = snapshotFactory.checksum(manifest);
+            ReleaseRow release = governanceRepository.activateRelease(
+                    row, channel, releasePid, UniqueIdGenerator.generate(),
+                    UniqueIdGenerator.generate(), manifest, manifestChecksum,
+                    runtimeSnapshot, snapshotFactory.checksum(runtimeSnapshot), identity.userId());
+            audit(identity, row, null, "RELEASE_PUBLISHED", "ALLOW", "ATOMIC_CHANNEL_SWITCH",
+                    objectMapper.valueToTree(Map.of(
+                            "releasePid", release.releasePid(),
+                            "channelVersion", release.channelVersion())));
+            return releaseView(release);
+        } catch (RuntimeException failure) {
+            recordPublishFailure(identity, row, changeSetPid, request, failure);
+            throw failure;
+        }
     }
 
     @Transactional
@@ -543,6 +554,62 @@ public class AuthoringGovernanceService {
                 reasonCode, "PAGE_SCHEMA", row.resourcePid(), null, null,
                 MetaContext.getOtelTraceId(),
                 metadata == null ? objectMapper.createObjectNode() : metadata));
+    }
+
+    private void recordPublishFailure(
+            Identity identity,
+            GovernanceRow row,
+            String changeSetPid,
+            RevisionRequest request,
+            RuntimeException failure) {
+        ObjectNode metadata = objectMapper.createObjectNode();
+        if (request != null) {
+            metadata.put("expectedRevision", request.expectedRevision());
+        }
+        metadata.put("failureCategory", publishFailureCategory(failure));
+        AuditEntry entry = new AuditEntry(
+                UniqueIdGenerator.generate(), identity.tenantId(), identity.envId(),
+                identity.userId(), changeSetPid, null,
+                "RELEASE_PUBLISH_FAILED", "FAIL", publishFailureReason(failure),
+                "PAGE_SCHEMA", row == null ? null : row.resourcePid(), null, null,
+                MetaContext.getOtelTraceId(), metadata);
+        try {
+            auditService.recordDenied(entry);
+        } catch (RuntimeException auditFailure) {
+            failure.addSuppressed(auditFailure);
+        }
+    }
+
+    private String publishFailureReason(RuntimeException failure) {
+        if (failure instanceof AuthoringStaleStateException) {
+            return "PUBLISH_STALE";
+        }
+        if (failure instanceof ResponseStatusException response) {
+            if (response.getReason() == null) {
+                return "PUBLISH_REJECTED";
+            }
+            String reason = response.getReason().toUpperCase(Locale.ROOT)
+                    .replace('.', '_')
+                    .replace('-', '_');
+            return reason.length() <= 80 ? reason : "PUBLISH_REJECTED";
+        }
+        if (failure instanceof DataAccessException) {
+            return "PUBLISH_PERSISTENCE_FAILED";
+        }
+        return "PUBLISH_FAILED";
+    }
+
+    private String publishFailureCategory(RuntimeException failure) {
+        if (failure instanceof AuthoringStaleStateException) {
+            return "STALE";
+        }
+        if (failure instanceof ResponseStatusException) {
+            return "REJECTED";
+        }
+        if (failure instanceof DataAccessException) {
+            return "PERSISTENCE";
+        }
+        return "UNEXPECTED";
     }
 
     private ResponseStatusException conflict(String reason) {

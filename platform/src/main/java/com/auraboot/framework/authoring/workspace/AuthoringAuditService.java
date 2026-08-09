@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Persists rejected attempts independently from the rejected write transaction. */
+/** Persists rejected or failed attempts independently from the write transaction. */
 @Service
 public class AuthoringAuditService {
 
