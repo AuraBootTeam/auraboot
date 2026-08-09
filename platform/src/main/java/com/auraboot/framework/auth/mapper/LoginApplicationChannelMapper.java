@@ -1,12 +1,12 @@
 package com.auraboot.framework.auth.mapper;
 
+import com.auraboot.framework.auth.dto.LoginContextRef;
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
-import com.auraboot.framework.auth.dto.LoginContextRef;
 
 @Mapper
 public interface LoginApplicationChannelMapper {
@@ -50,4 +50,41 @@ public interface LoginApplicationChannelMapper {
             @Param("applicationCode") String applicationCode,
             @Param("channelCode") String channelCode,
             @Param("tenantId") Long tenantId);
+
+    @Select("""
+            SELECT EXISTS (
+                SELECT 1
+                  FROM ab_login_application a
+                  JOIN ab_login_channel c ON c.application_id = a.id
+                 WHERE a.id = #{applicationId}
+                   AND c.id = #{loginChannelId}
+                   AND (c.tenant_id = #{tenantId} OR c.tenant_id IS NULL)
+                   AND a.status = 'active'
+                   AND c.status = 'active'
+            )
+            """)
+    @InterceptorIgnore(tenantLine = "true")
+    boolean isActiveLoginContext(
+            @Param("tenantId") Long tenantId,
+            @Param("applicationId") Long applicationId,
+            @Param("loginChannelId") Long loginChannelId);
+
+    @Select("""
+            SELECT jsonb_array_elements_text(
+                       COALESCE(c.settings -> 'allowedPartyCapabilities', '[]'::jsonb)
+                   ) AS capability_code
+              FROM ab_login_application a
+              JOIN ab_login_channel c ON c.application_id = a.id
+             WHERE a.id = #{applicationId}
+               AND c.id = #{loginChannelId}
+               AND (c.tenant_id = #{tenantId} OR c.tenant_id IS NULL)
+               AND a.status = 'active'
+               AND c.status = 'active'
+             ORDER BY capability_code
+            """)
+    @InterceptorIgnore(tenantLine = "true")
+    List<String> findAllowedPartyCapabilities(
+            @Param("tenantId") Long tenantId,
+            @Param("applicationId") Long applicationId,
+            @Param("loginChannelId") Long loginChannelId);
 }

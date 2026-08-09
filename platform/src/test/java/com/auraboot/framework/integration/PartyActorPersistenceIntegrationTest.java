@@ -12,9 +12,11 @@ import com.auraboot.framework.party.mapper.ActorPreferenceMapper;
 import com.auraboot.framework.party.mapper.PartyMapper;
 import com.auraboot.framework.party.mapper.PartyMemberRoleMapper;
 import com.auraboot.framework.party.mapper.PartyMembershipMapper;
+import com.auraboot.framework.party.service.ActorCandidateResolver;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.service.RoleService;
 import org.junit.jupiter.api.Test;
+import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -34,9 +36,13 @@ class PartyActorPersistenceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private LoginApplicationChannelMapper loginApplicationChannelMapper;
     @Autowired
+    private ActorCandidateResolver actorCandidateResolver;
+    @Autowired
     private RoleService roleService;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private SqlSessionTemplate sqlSessionTemplate;
 
     @Test
     void partyTablesRemainTenantFilteredWhileLoginRoutingAndActorCvWorkOnPostgres() {
@@ -108,16 +114,69 @@ class PartyActorPersistenceIntegrationTest extends BaseIntegrationTest {
         assertThat(preference.getContextVersion()).isEqualTo(2);
         assertThat(preference.getLastPartyId()).isEqualTo(party.getId());
 
-        MetaContext.setContext(Long.MAX_VALUE, testUser.getId(), testUser.getPid(), testUser.getUserName());
-        assertThat(partyMembershipMapper.findActiveActor(
-                testTenant.getId(), testTenantMember.getId(), party.getId()))
-                .as("Party tables must keep the MyBatis tenant interceptor")
-                .isNull();
         LoginContextRef loginContext = loginApplicationChannelMapper.resolveLoginContext(
                 "business-web", "default-business-web", testTenant.getId());
         assertThat(loginContext).isNotNull();
         assertThat(loginContext.getApplicationId()).isNotNull();
         assertThat(loginContext.getLoginChannelId()).isNotNull();
+
+        jdbcTemplate.update(
+                "UPDATE ab_login_channel SET tenant_id = ? WHERE id = ?",
+                testTenant.getId(), loginContext.getLoginChannelId());
+        sqlSessionTemplate.clearCache();
+        assertThat(loginApplicationChannelMapper.isActiveLoginContext(
+                testTenant.getId(), loginContext.getApplicationId(), loginContext.getLoginChannelId()))
+                .isTrue();
+        assertThat(loginApplicationChannelMapper.isActiveLoginContext(
+                Long.MAX_VALUE, loginContext.getApplicationId(), loginContext.getLoginChannelId()))
+                .as("a tenant-owned login channel must fail closed for another tenant")
+                .isFalse();
+
+        assertThat(actorCandidateResolver.resolveActiveCandidate(
+                testTenant.getId(), testTenantMember.getId(), party.getId(),
+                loginContext.getApplicationId(), loginContext.getLoginChannelId()))
+                .as("an unrestricted business channel accepts any active Party capability set")
+                .isNotNull();
+        jdbcTemplate.update(
+                """
+                UPDATE ab_login_channel
+                   SET settings = jsonb_build_object(
+                       'allowedPartyCapabilities', jsonb_build_array('supplier'))
+                 WHERE id = ?
+                """,
+                loginContext.getLoginChannelId());
+        // Fixture writes use JdbcTemplate while the policy is read through MyBatis. Clear the
+        // transaction-local first-level cache so the next mapper call observes the fixture write.
+        sqlSessionTemplate.clearCache();
+        assertThat(actorCandidateResolver.resolveActiveCandidate(
+                testTenant.getId(), testTenantMember.getId(), party.getId(),
+                loginContext.getApplicationId(), loginContext.getLoginChannelId()))
+                .as("a supplier-only portal rejects a Party without active supplier capability")
+                .isNull();
+        jdbcTemplate.update(
+                """
+                INSERT INTO ab_party_capability (
+                    pid, tenant_id, party_id, capability_code, status, effective_at, granted_by
+                ) VALUES (?, ?, ?, 'supplier', 'active', CURRENT_TIMESTAMP, ?)
+                """,
+                UniqueIdGenerator.generate(), testTenant.getId(), party.getId(), testUser.getId());
+        sqlSessionTemplate.clearCache();
+        assertThat(actorCandidateResolver.resolveActiveCandidate(
+                testTenant.getId(), testTenantMember.getId(), party.getId(),
+                loginContext.getApplicationId(), loginContext.getLoginChannelId()))
+                .as("the same portal accepts the Party after its supplier capability is active")
+                .isNotNull();
+
+        jdbcTemplate.update(
+                "UPDATE ab_login_channel SET tenant_id = NULL WHERE id = ?",
+                loginContext.getLoginChannelId());
+        sqlSessionTemplate.clearCache();
+
+        MetaContext.setContext(Long.MAX_VALUE, testUser.getId(), testUser.getPid(), testUser.getUserName());
+        assertThat(partyMembershipMapper.findActiveActor(
+                testTenant.getId(), testTenantMember.getId(), party.getId()))
+                .as("Party tables must keep the MyBatis tenant interceptor")
+                .isNull();
         assertThat(loginApplicationChannelMapper.findEnabledAuthMethods(
                 "business-web", "default-business-web", null))
                 .as("anonymous pre-auth routing must support a typed null tenant on PostgreSQL")

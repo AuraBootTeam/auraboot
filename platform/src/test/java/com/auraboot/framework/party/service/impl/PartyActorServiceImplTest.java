@@ -13,11 +13,11 @@ import com.auraboot.framework.party.entity.Party;
 import com.auraboot.framework.party.entity.PartyMembership;
 import com.auraboot.framework.party.entity.PartyLifecycleTransition;
 import com.auraboot.framework.party.mapper.ActorPreferenceMapper;
-import com.auraboot.framework.party.mapper.PartyCapabilityMapper;
 import com.auraboot.framework.party.mapper.PartyLifecycleTransitionMapper;
 import com.auraboot.framework.party.mapper.PartyMapper;
 import com.auraboot.framework.party.mapper.PartyMemberRoleMapper;
 import com.auraboot.framework.party.mapper.PartyMembershipMapper;
+import com.auraboot.framework.party.service.ActorCandidateResolver;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.saas.constant.PartyCreationPolicy;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
@@ -48,7 +48,6 @@ import static org.mockito.Mockito.when;
 class PartyActorServiceImplTest {
     @Mock PartyMapper partyMapper;
     @Mock PartyMembershipMapper partyMembershipMapper;
-    @Mock PartyCapabilityMapper partyCapabilityMapper;
     @Mock PartyMemberRoleMapper partyMemberRoleMapper;
     @Mock PartyLifecycleTransitionMapper lifecycleTransitionMapper;
     @Mock ActorPreferenceMapper actorPreferenceMapper;
@@ -57,6 +56,7 @@ class PartyActorServiceImplTest {
     @Mock UserService userService;
     @Mock JwtUtil jwtUtil;
     @Mock SessionManagementService sessionManagementService;
+    @Mock ActorCandidateResolver actorCandidateResolver;
 
     @InjectMocks PartyActorServiceImpl service;
 
@@ -131,7 +131,8 @@ class PartyActorServiceImplTest {
         actor.setPartyMembershipId(404L);
         actor.setLifecycleStatus("active");
         actor.setMembershipStatus("active");
-        when(partyMembershipMapper.findActiveActor(101L, 202L, 303L)).thenReturn(actor);
+        when(actorCandidateResolver.resolveActiveCandidate(101L, 202L, 303L, 11L, 12L))
+                .thenReturn(actor);
         User user = new User();
         user.setId(7L);
         user.setPid("user-pid");
@@ -165,7 +166,10 @@ class PartyActorServiceImplTest {
     @Test
     void actorSwitchRejectsInactiveMembershipWithoutMintingToken() {
         when(systemModeService.isActorSwitchEnabled()).thenReturn(true);
-        when(partyMembershipMapper.findActiveActor(101L, 202L, 303L)).thenReturn(null);
+        when(jwtUtil.extractApplicationId("old-token")).thenReturn(11L);
+        when(jwtUtil.extractLoginChannelId("old-token")).thenReturn(12L);
+        when(actorCandidateResolver.resolveActiveCandidate(101L, 202L, 303L, 11L, 12L))
+                .thenReturn(null);
 
         assertThatThrownBy(() -> service.switchActor(303L, "old-token", null, null))
                 .isInstanceOf(BusinessException.class)

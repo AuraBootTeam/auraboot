@@ -19,11 +19,11 @@ import com.auraboot.framework.party.entity.Party;
 import com.auraboot.framework.party.entity.PartyLifecycleTransition;
 import com.auraboot.framework.party.entity.PartyMembership;
 import com.auraboot.framework.party.mapper.ActorPreferenceMapper;
-import com.auraboot.framework.party.mapper.PartyCapabilityMapper;
 import com.auraboot.framework.party.mapper.PartyLifecycleTransitionMapper;
 import com.auraboot.framework.party.mapper.PartyMapper;
 import com.auraboot.framework.party.mapper.PartyMemberRoleMapper;
 import com.auraboot.framework.party.mapper.PartyMembershipMapper;
+import com.auraboot.framework.party.service.ActorCandidateResolver;
 import com.auraboot.framework.party.service.PartyActorService;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.saas.constant.PartyCreationPolicy;
@@ -46,7 +46,6 @@ import java.util.Locale;
 public class PartyActorServiceImpl implements PartyActorService {
     private final PartyMapper partyMapper;
     private final PartyMembershipMapper partyMembershipMapper;
-    private final PartyCapabilityMapper partyCapabilityMapper;
     private final PartyMemberRoleMapper partyMemberRoleMapper;
     private final PartyLifecycleTransitionMapper lifecycleTransitionMapper;
     private final ActorPreferenceMapper actorPreferenceMapper;
@@ -55,17 +54,19 @@ public class PartyActorServiceImpl implements PartyActorService {
     private final UserService userService;
     private final JwtUtil jwtUtil;
     private final SessionManagementService sessionManagementService;
+    private final ActorCandidateResolver actorCandidateResolver;
 
     @Override
     public List<PartyActorOption> listActors() {
         Context context = requireActiveTenantMember();
-        List<PartyActorOption> options = partyMembershipMapper.findActorOptions(
-                context.tenantId(), context.tenantMemberId());
+        List<PartyActorOption> options = actorCandidateResolver.resolveCandidates(
+                context.tenantId(),
+                context.tenantMemberId(),
+                MetaContext.getCurrentApplicationId(),
+                MetaContext.getCurrentLoginChannelId());
         options.forEach(option -> {
             option.setCurrent(option.getPartyId().equals(MetaContext.getCurrentActorPartyId())
                     && option.getPartyMembershipId().equals(MetaContext.getCurrentPartyMembershipId()));
-            option.setCapabilityCodes(partyCapabilityMapper.findActiveCodes(
-                    context.tenantId(), option.getPartyId()));
             option.setPartyRoleCodes(partyMemberRoleMapper.findActiveRoleCodes(
                     context.tenantId(), option.getPartyMembershipId()));
         });
@@ -147,8 +148,11 @@ public class PartyActorServiceImpl implements PartyActorService {
             throw new BusinessException(ResponseCode.FORBIDDEN, "Actor switching is disabled");
         }
         Context context = requireActiveTenantMember();
-        PartyActorOption actor = partyMembershipMapper.findActiveActor(
-                context.tenantId(), context.tenantMemberId(), partyId);
+        Long applicationId = jwtUtil.extractApplicationId(currentToken);
+        Long loginChannelId = jwtUtil.extractLoginChannelId(currentToken);
+        PartyActorOption actor = actorCandidateResolver.resolveActiveCandidate(
+                context.tenantId(), context.tenantMemberId(), partyId,
+                applicationId, loginChannelId);
         if (actor == null) {
             throw new BusinessException(ResponseCode.FORBIDDEN,
                     "No active Party membership for the selected Actor");
@@ -169,8 +173,8 @@ public class PartyActorServiceImpl implements PartyActorService {
         SessionTokenContext tokenContext = new SessionTokenContext(
                 context.tenantId(),
                 context.tenantMemberId(),
-                jwtUtil.extractApplicationId(currentToken),
-                jwtUtil.extractLoginChannelId(currentToken),
+                applicationId,
+                loginChannelId,
                 ExecutionScope.PARTY,
                 actor.getPartyId(),
                 actor.getPartyMembershipId(),

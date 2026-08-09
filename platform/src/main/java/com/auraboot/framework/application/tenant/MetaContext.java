@@ -190,6 +190,16 @@ public class MetaContext {
         return SESSION_CONTEXT.get();
     }
 
+    public static Long getCurrentApplicationId() {
+        SessionContext context = SESSION_CONTEXT.get();
+        return context == null ? null : context.applicationId();
+    }
+
+    public static Long getCurrentLoginChannelId() {
+        SessionContext context = SESSION_CONTEXT.get();
+        return context == null ? null : context.loginChannelId();
+    }
+
     public static String getCurrentExecutionScope() {
         SessionContext context = SESSION_CONTEXT.get();
         return context == null ? null : context.executionScope();

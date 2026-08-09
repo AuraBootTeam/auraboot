@@ -15,6 +15,7 @@ import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.permission.service.AutoPermissionAssignmentService;
+import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.tenant.dao.entity.Invitation;
 import com.auraboot.framework.tenant.dao.entity.Tenant;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
@@ -81,6 +82,9 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
     
     @Autowired
     private TenantBootstrapService tenantBootstrapService;
+
+    @Autowired
+    private SystemModeService systemModeService;
 
     @Autowired
     private com.auraboot.framework.plugin.service.BuiltinPluginImportService builtinPluginImportService;
@@ -167,6 +171,10 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
 
     @Override
     public TenantSelectionResponse createTenantForUser(TenantSelectionRequest request, User user) {
+        if (!systemModeService.isTenantSelfProvisioningAllowed()) {
+            throw new RootUnCheckedException(ResponseCode.FORBIDDEN,
+                    "Tenant self-provisioning is disabled for this deployment");
+        }
         TenantSelectionResponse response = new TenantSelectionResponse();
 
         // Reject duplicate tenant name
@@ -253,6 +261,10 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
 
     @Override
     public TenantSelectionResponse joinTenantByInviteCode(TenantSelectionRequest request, User user) {
+        if (systemModeService.isSingleTenant()) {
+            throw new RootUnCheckedException(ResponseCode.FORBIDDEN,
+                    "Tenant joining is disabled in single business tenant mode");
+        }
         TenantSelectionResponse response = new TenantSelectionResponse();
 
         // 验证邀请码
