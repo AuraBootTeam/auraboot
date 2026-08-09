@@ -13,7 +13,7 @@ import {
   InformationCircleIcon,
   SparklesIcon,
 } from '@heroicons/react/24/outline';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData } from '~/root-data';
 import { COMMUNITY_BRANDING } from '~/config/branding';
 import { useTheme } from '~/contexts/ThemeContext';
 import { useI18n } from '~/contexts/I18nContext';
@@ -46,6 +46,7 @@ export default function Header({
   const rootData = useRootLoaderData();
   const user = rootData?.user ?? null;
   const branding = rootData?.branding ?? COMMUNITY_BRANDING;
+  const hasMenus = (rootData?.menus?.length ?? 0) > 0;
   const { theme, setTheme, isDark } = useTheme();
   const { t, locale, setLocale } = useI18n();
   const st = useSmartText();
@@ -185,10 +186,10 @@ export default function Header({
       data-print="hide"
       data-hydrated={hydrated ? 'true' : 'false'}
     >
-      <div className="flex h-14 items-center justify-between bg-gradient-to-r from-white/50 to-gray-50/50 px-4 sm:px-6 lg:px-8 dark:from-gray-800/50 dark:to-gray-900/50">
+      <div className="flex h-14 items-center justify-between bg-gradient-to-r from-white/50 to-gray-50/50 px-2 sm:px-6 lg:px-8 dark:from-gray-800/50 dark:to-gray-900/50">
         {/* Left: logo and menu button */}
-        <div className="flex items-center">
-          {showSidebar && (
+        <div className="flex min-w-0 items-center">
+          {showSidebar && hasMenus && (
             <button
               type="button"
               aria-controls="app-sidebar"
@@ -202,15 +203,22 @@ export default function Header({
             </button>
           )}
 
-          <Link to="/" className="ms-4 flex items-center lg:ms-0">
-            <img className="h-8 w-8 rounded-lg" src={branding.logoUrl} alt={branding.productName} />
-            <span className="ms-3 text-xl font-bold text-gray-900 dark:text-white">
+          <Link to="/" className="ms-2 flex shrink-0 items-center sm:ms-4 lg:ms-0">
+            <img
+              className="h-7 w-7 rounded-lg sm:h-8 sm:w-8"
+              src={branding.logoUrl}
+              alt={branding.productName}
+            />
+            <span
+              data-testid="header-brand-name"
+              className="ms-3 hidden text-xl font-bold text-gray-900 xl:inline dark:text-white"
+            >
               {branding.productName}
             </span>
             {envChipLabel && (
               <span
                 data-testid="header-env-chip"
-                className="ml-2 hidden rounded bg-[#f6f9fc] px-1.5 py-0.5 text-[11px] font-medium text-gray-500 sm:inline-flex dark:bg-gray-700 dark:text-gray-300"
+                className="ml-2 hidden rounded bg-[#f6f9fc] px-1.5 py-0.5 text-[11px] font-medium text-gray-500 xl:inline-flex dark:bg-gray-700 dark:text-gray-300"
               >
                 {envChipLabel}
               </span>
@@ -219,7 +227,7 @@ export default function Header({
 
           {/* Current tenant name — hidden when env chip already encodes it (avoids "AuraBoot [Dev] · AuraBoot Dev") */}
           {!simplified && user?.tenantName && !tenantDuplicatesChip && (
-            <span className="ms-3 hidden items-center text-sm text-gray-400 sm:flex dark:text-gray-500">
+            <span className="ms-3 hidden items-center text-sm text-gray-400 2xl:flex dark:text-gray-500">
               <span className="mx-2">·</span>
               <span data-testid="current-tenant-name">{user.tenantName}</span>
             </span>
@@ -227,7 +235,7 @@ export default function Header({
         </div>
 
         {/* Right: toolbar */}
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           {/* Global search Cmd+K */}
           {!simplified && <CommandPalette />}
 

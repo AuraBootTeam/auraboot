@@ -13,7 +13,7 @@ const rootLoaderData = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('~/root', () => ({
+vi.mock('~/root-data', () => ({
   useRootLoaderData: () => rootLoaderData.value,
 }));
 

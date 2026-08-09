@@ -3,7 +3,7 @@ import { MemoryRouter, useParams } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import SharedViewPage from '../share.$token';
 
-vi.mock('~/root', () => ({
+vi.mock('~/root-data', () => ({
   useRootLoaderData: () => ({
     branding: {
       productName: 'AuraBoot',

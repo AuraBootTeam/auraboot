@@ -6,7 +6,7 @@ import {
   Mail,
   Scale,
 } from 'lucide-react';
-import { useRootLoaderData, type RootLoaderData } from '~/root';
+import { useRootLoaderData, type RootLoaderData } from '~/root-data';
 import { useI18n } from '~/contexts/I18nContext';
 import { COMMUNITY_BRANDING } from '~/config/branding';
 

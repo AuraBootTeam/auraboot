@@ -6,7 +6,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { getRecentVisits, fetchRecentVisits, type RecentVisit } from './useRecentVisits';
 import { useI18n } from '~/contexts/I18nContext';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData } from '~/root-data';
 
 interface RecentWidgetProps {
   title?: string;

@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData } from '~/root-data';
 import { COMMUNITY_BRANDING } from '~/config/branding';
 
 interface SharedViewData {

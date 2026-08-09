@@ -25,35 +25,16 @@ import {
   getRuntimeProfileFromPathname,
   isAnonymousRuntimeProfile,
   shouldBootCorePlugins,
-  type RuntimeProfile,
 } from '@auraboot/runtime-kernel';
 import { useFederationStore } from '~/plugins/FederationManager';
-import { resolveIcpComplianceConfig, type IcpComplianceConfig } from '~/config/icpCompliance';
+import { resolveIcpComplianceConfig } from '~/config/icpCompliance';
 import {
   COMMUNITY_BRANDING,
   resolveBrandDisplayName,
   resolveBuildIdentity,
   type BrandingConfig,
-  type BuildIdentity,
 } from '~/config/branding';
-
-export interface RootLoaderData {
-  runtimeProfile: RuntimeProfile;
-  user: any;
-  permissions: any;
-  preferences: any;
-  menus: any[];
-  i18n: Record<string, string>;
-  locale: string;
-  initialTimezone?: string;
-  skipTenantPreferences?: boolean;
-  edition: string;
-  spaces: any[];
-  bootstrapStatus: BootstrapStatus | null;
-  icpCompliance: IcpComplianceConfig;
-  branding: BrandingConfig;
-  buildIdentity: BuildIdentity;
-}
+import { useRootLoaderData, type RootLoaderData } from '~/root-data';
 
 import '~/app.css';
 import '~/styles/print.css';
@@ -75,7 +56,7 @@ import { EntitlementProvider, useEntitlement } from '~/contexts/EntitlementConte
 import { DslRegistryProvider } from '~/contexts/DslRegistryContext';
 import { AuraBotProvider } from '~/plugins/core-aurabot/components-shell';
 import { QueryProvider } from '~/providers/QueryProvider';
-import { fetchBootstrapStatus, type BootstrapStatus } from '~/services/bootstrapStatus';
+import { fetchBootstrapStatus } from '~/services/bootstrapStatus';
 import { BootstrapBanner } from '~/components/BootstrapBanner';
 import { BootstrapNotReady } from '~/components/BootstrapNotReady';
 import { AuthSessionRevalidator } from '~/components/AuthSessionRevalidator';
@@ -240,10 +221,6 @@ export const meta = ({ data }: { data?: RootLoaderData }) => [
       : COMMUNITY_BRANDING.productName,
   },
 ];
-
-export function useRootLoaderData(): RootLoaderData | undefined {
-  return useRouteLoaderData<typeof loader>('root') as RootLoaderData | undefined;
-}
 
 export function resolveBrandingDocumentLinks(branding: BrandingConfig) {
   return [

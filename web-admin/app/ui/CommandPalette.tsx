@@ -15,7 +15,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData } from '~/root-data';
 import { useI18n } from '~/contexts/I18nContext';
 import { useHydrated } from '~/hooks/useHydrated';
 import { fetchResult } from '~/shared/services/http-client';
@@ -395,7 +395,7 @@ export function CommandPalette() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-control border-border-strong bg-panel text-body text-text-2 hover:bg-subtle hidden h-[var(--ds-control-field)] w-[360px] items-center gap-2 border px-3 transition-colors sm:flex dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-400 dark:hover:bg-gray-700"
+        className="rounded-control border-border-strong bg-panel text-body text-text-2 hover:bg-subtle hidden h-[var(--ds-control-field)] w-9 shrink-0 items-center justify-center gap-2 border px-0 transition-colors sm:flex md:w-48 md:justify-start md:px-3 lg:w-64 xl:w-[360px] dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-400 dark:hover:bg-gray-700"
         data-testid="header-search-trigger"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

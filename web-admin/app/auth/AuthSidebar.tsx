@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router';
 import { QrCodeIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData } from '~/root-data';
 import { COMMUNITY_BRANDING } from '~/config/branding';
 
 interface AuthSidebarProps {

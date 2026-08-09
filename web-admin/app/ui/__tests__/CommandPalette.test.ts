@@ -8,7 +8,7 @@ vi.mock('react-router', async (importOriginal) => {
   };
 });
 
-vi.mock('~/root', () => ({
+vi.mock('~/root-data', () => ({
   useRootLoaderData: () => ({ menus: [] }),
 }));
 
