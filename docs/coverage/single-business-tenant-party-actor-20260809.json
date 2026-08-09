@@ -4,7 +4,7 @@
     "target": "SINGLE Business Tenant + Party Actor foundation",
     "sot": "../auraboot-enterprise/docs/standards/decisions/DDR-2026-08-09-single-business-tenant-party-actor.md",
     "runtime": "auraboot-party-actor-long",
-    "commit": "cd1ea6c7+working-tree",
+    "commit": "c4933a381",
     "fix_rounds": 3
   },
   "groups": [
