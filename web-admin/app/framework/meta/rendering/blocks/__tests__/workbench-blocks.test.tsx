@@ -734,28 +734,28 @@ describe('WorkbenchActionBarBlockRenderer', () => {
         {
           code: 'convert_lead',
           label: 'Convert',
+          resultReceipt: {
+            title: 'Conversion completed',
+            links: [
+              {
+                key: 'account',
+                label: 'Open account',
+                resultField: 'accountId',
+                to: '/p/crm_account_common/view/${value}',
+              },
+              {
+                key: 'opportunity',
+                label: 'Open opportunity',
+                resultField: 'opportunityId',
+                to: '/p/crm_opportunity_common/view/${value}',
+              },
+            ],
+          },
           onClick: {
             action: 'command.execute',
             args: {
               command: 'crm:convert_lead',
               targetRecordPid: 'LEAD-1',
-              resultReceipt: {
-                title: 'Conversion completed',
-                links: [
-                  {
-                    key: 'account',
-                    label: 'Open account',
-                    resultField: 'accountId',
-                    to: '/p/crm_account_common/view/${value}',
-                  },
-                  {
-                    key: 'opportunity',
-                    label: 'Open opportunity',
-                    resultField: 'opportunityId',
-                    to: '/p/crm_opportunity_common/view/${value}',
-                  },
-                ],
-              },
             },
           },
         },

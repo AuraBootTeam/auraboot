@@ -56,8 +56,8 @@ test('CRM workbenches expose business owner labels and a lead conversion receipt
   assert.ok(leadQueue.columns.some((column) => column.field === 'owner_name'));
   const leadActions = findBlock(leadDesk.blocks, 'crm_lead_lifecycle_actions');
   const convert = leadActions.actions.find((action) => action.code === 'convert_lead');
-  assert.equal(convert.onClick.args.resultReceipt?.title?.['zh-CN'], '线索转化完成');
-  assert.equal(convert.onClick.args.resultReceipt?.links?.length, 4);
+  assert.equal(convert.resultReceipt?.title?.['zh-CN'], '线索转化完成');
+  assert.equal(convert.resultReceipt?.links?.length, 4);
 
   const opportunityOwner = findBlock(opportunityWorkspace.blocks, 'crm_opportunity_attention')
     .summaryFields.find((field) => field.label?.['zh-CN'] === '负责人');

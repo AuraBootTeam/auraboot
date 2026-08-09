@@ -105,7 +105,7 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
       setRunningAction(code);
       try {
         const result = await executeSimpleWorkbenchAction(runtime, actionConfig.onClick);
-        const receiptConfig = actionConfig.onClick?.args?.resultReceipt;
+        const receiptConfig = actionConfig.resultReceipt;
         if (receiptConfig && result && result.success !== false && result.applied !== false) {
           setResultReceipt({ config: receiptConfig, data: result });
         }

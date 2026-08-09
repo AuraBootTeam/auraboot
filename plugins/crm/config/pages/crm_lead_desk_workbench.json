@@ -216,6 +216,16 @@
           "variant": "primary",
           "visibleWhen": "state.selectedLead != null && state.selectedLead.crm_lead_status == 'qualified'",
           "confirm": { "zh-CN": "将原子创建客户、联系人、商机和客户需求。确认转化吗？", "en": "This atomically creates an account, contact, opportunity and customer request. Continue?" },
+          "resultReceipt": {
+            "title": { "zh-CN": "线索转化完成", "en": "Lead Conversion Completed" },
+            "description": { "zh-CN": "客户、联系人、商机和客户需求已经创建，可直接进入下一步。", "en": "The account, contact, opportunity, and customer request are ready." },
+            "links": [
+              { "key": "account", "label": { "zh-CN": "打开客户", "en": "Open Account" }, "resultField": "accountId", "to": "/p/crm_account_common/view/${value}" },
+              { "key": "contact", "label": { "zh-CN": "打开联系人", "en": "Open Contact" }, "resultField": "contactId", "to": "/p/crm_contact_common/view/${value}" },
+              { "key": "opportunity", "label": { "zh-CN": "打开商机", "en": "Open Opportunity" }, "resultField": "opportunityId", "to": "/p/crm_opportunity_common/view/${value}" },
+              { "key": "request", "label": { "zh-CN": "打开客户需求", "en": "Open Customer Request" }, "resultField": "customerRequestId", "to": "/p/crm_customer_request_common/view/${value}" }
+            ]
+          },
           "onClick": {
             "action": "command.execute",
             "args": {
@@ -226,16 +236,6 @@
               "feedback": {
                 "successMessage": { "zh-CN": "线索已完成原子转化", "en": "Lead conversion completed" },
                 "errorMessage": { "zh-CN": "线索转化失败，未写入部分结果", "en": "Lead conversion failed without partial writes" }
-              },
-              "resultReceipt": {
-                "title": { "zh-CN": "线索转化完成", "en": "Lead Conversion Completed" },
-                "description": { "zh-CN": "客户、联系人、商机和客户需求已经创建，可直接进入下一步。", "en": "The account, contact, opportunity, and customer request are ready." },
-                "links": [
-                  { "key": "account", "label": { "zh-CN": "打开客户", "en": "Open Account" }, "resultField": "accountId", "to": "/p/crm_account_common/view/${value}" },
-                  { "key": "contact", "label": { "zh-CN": "打开联系人", "en": "Open Contact" }, "resultField": "contactId", "to": "/p/crm_contact_common/view/${value}" },
-                  { "key": "opportunity", "label": { "zh-CN": "打开商机", "en": "Open Opportunity" }, "resultField": "opportunityId", "to": "/p/crm_opportunity_common/view/${value}" },
-                  { "key": "request", "label": { "zh-CN": "打开客户需求", "en": "Open Customer Request" }, "resultField": "customerRequestId", "to": "/p/crm_customer_request_common/view/${value}" }
-                ]
               }
             }
           }
