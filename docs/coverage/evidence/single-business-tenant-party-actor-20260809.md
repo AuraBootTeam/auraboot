@@ -1,3 +1,9 @@
+---
+type: artifact
+status: active
+created: 2026-08-09
+---
+
 # SINGLE Business Tenant + Party Actor 验收证据（2026-08-09）
 
 ## Scope / environment

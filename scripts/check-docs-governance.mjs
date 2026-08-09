@@ -57,6 +57,7 @@ const DIR_TYPE_RULES = [
   { prefix: 'retro', types: ['retro'] },
   { prefix: 'plans', types: ['plan-design', 'plan-impl'] },
   { prefix: 'backlog', types: ['backlog', 'retro'] },
+  { prefix: 'coverage/evidence', types: ['artifact'] },
   { prefix: 'superpowers', types: ['run-log', 'plan-design', 'plan-impl', 'artifact'] },
   { prefix: 'decisions', types: ['ddr'] }, // lite profile
   // Conventional public / product-documentation dirs (open-source doc-site

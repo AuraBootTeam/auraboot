@@ -2,9 +2,7 @@
   "run": {
     "id": "single-business-tenant-party-actor-20260809",
     "target": "SINGLE Business Tenant + Party Actor + federated identity foundation",
-    "sot": "../auraboot-enterprise/docs/standards/decisions/DDR-2026-08-09-single-business-tenant-party-actor.md",
     "runtime": "auraboot-party-actor-long",
-    "commit": "2104153bd",
     "fix_rounds": 4
   },
   "groups": [
