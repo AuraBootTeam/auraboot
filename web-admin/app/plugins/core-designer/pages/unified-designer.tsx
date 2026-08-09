@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { usePermission } from '~/contexts/AuthContext';
 import { UnifiedDesignerWorkbench } from '../components/unified-designer/workbench/UnifiedDesignerWorkbench';
@@ -26,6 +26,8 @@ import {
   takeoverAuthoringWriterLease,
 } from '~/framework/meta/authoring/authoringService';
 import { AuthoringWriterLeaseNotice } from '~/framework/meta/authoring/AuthoringWriterLeaseNotice';
+import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
+import { AuthoringConflictResolutionPanel } from '../components/unified-designer/AuthoringConflictResolutionPanel';
 import type {
   AuthoringSession,
   CapabilityRegistry,
@@ -33,12 +35,24 @@ import type {
 } from '~/framework/meta/authoring/types';
 import {
   authoringSnapshotToPageSchemaV3,
+  buildStudioThreeWayMerge,
   planStudioAuthoringPatches,
+  resolveStudioThreeWayMerge,
   studioEditablePropertyPaths,
   studioReorderableBlockTypes,
+  type StudioMergeResolution,
+  type StudioThreeWayMerge,
 } from '../components/unified-designer/persistence/contextualAuthoringAdapter';
 
 const LOCAL_STORAGE_KEY = 'auraboot.unified-designer.sample';
+
+interface StudioConflictState {
+  baseRevision: number;
+  baseDocument: PageSchemaV3;
+  mineDocument: PageSchemaV3;
+  latestSession: AuthoringSession;
+  merge: StudioThreeWayMerge;
+}
 
 export default function UnifiedDesignerPage() {
   const canAdministerDesigner = usePermission('meta.designer.admin');
@@ -48,18 +62,26 @@ export default function UnifiedDesignerPage() {
   const contextId = searchParams.get('contextId');
   const resumeSessionPid = searchParams.get('authoringSession');
   const observedChangeSetPid = searchParams.get('changeSetId');
-  const hasAuthoringContext = Boolean(contextId || resumeSessionPid || observedChangeSetPid);
+  const conflictContextId = searchParams.get('conflictContext');
+  const hasAuthoringContext = Boolean(
+    contextId || resumeSessionPid || observedChangeSetPid || conflictContextId,
+  );
   const [handoff, setHandoff] = useState<HandoffContext | null>(null);
   const [authoringSession, setAuthoringSession] = useState<AuthoringSession | null>(null);
   const [authoringCapabilities, setAuthoringCapabilities] = useState<CapabilityRegistry | null>(null);
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [leaseTakeoverPending, setLeaseTakeoverPending] = useState(false);
   const [leaseTakeoverError, setLeaseTakeoverError] = useState<string | null>(null);
+  const [studioConflict, setStudioConflict] = useState<StudioConflictState | null>(null);
+  const [conflictPending, setConflictPending] = useState(false);
+  const [conflictError, setConflictError] = useState<string | null>(null);
+  const [workbenchGeneration, setWorkbenchGeneration] = useState(0);
   const [document, setDocument] = useState<PageSchemaV3 | null>(null);
   const [source, setSource] = useState<PageSchemaV3Source>({ type: 'local' });
   const [published, setPublished] = useState(false);
   const [modelFieldsByModel, setModelFieldsByModel] = useState<ModelFieldsByModel>({});
   const [error, setError] = useState<string | null>(null);
+  const documentBaselineRef = useRef<AuthoringSession | null>(null);
   const modelCodeKey = document ? collectModelCodesFromDocument(document).join('|') : '';
   const documentId = document?.id ?? null;
   const resolvingHandoff = Boolean(
@@ -68,6 +90,7 @@ export default function UnifiedDesignerPage() {
       (!handoff || !authoringSession || !authoringCapabilities || !document),
   );
   const activeAuthoringSessionPid = authoringSession?.sessionPid;
+  const activeAuthoringRevision = authoringSession?.revision;
 
   useEffect(() => {
     if (!hasAuthoringContext) {
@@ -76,6 +99,9 @@ export default function UnifiedDesignerPage() {
       setAuthoringCapabilities(null);
       setHandoffError(null);
       setLeaseTakeoverError(null);
+      setStudioConflict(null);
+      setConflictError(null);
+      documentBaselineRef.current = null;
       return;
     }
     let cancelled = false;
@@ -85,6 +111,9 @@ export default function UnifiedDesignerPage() {
     setAuthoringCapabilities(null);
     setHandoffError(null);
     setLeaseTakeoverError(null);
+    setStudioConflict(null);
+    setConflictError(null);
+    documentBaselineRef.current = null;
     const resolveContext = contextId
       ? consumeAuthoringHandoff(contextId).then(async (consumed) => {
           const [session, capabilities] = await Promise.all([
@@ -119,10 +148,38 @@ export default function UnifiedDesignerPage() {
     void resolveContext
       .then(({ handoff: resolvedHandoff, session, capabilities }) => {
         if (!cancelled) {
-          const isolatedDocument = authoringSnapshotToPageSchemaV3(session.snapshot);
+          let isolatedDocument = authoringSnapshotToPageSchemaV3(session.snapshot);
+          if (conflictContextId) {
+            const transfer = consumeAuthoringConflictTransfer(conflictContextId, {
+              sessionPid: session.sessionPid,
+              changeSetPid: session.changeSetPid,
+              pagePid: session.pagePid,
+            });
+            if (transfer.baseRevision >= session.revision) {
+              throw new Error('三方冲突上下文的 Base 修订不早于 Latest');
+            }
+            const baseDocument = authoringSnapshotToPageSchemaV3(transfer.baseSnapshot);
+            const mineDocument = authoringSnapshotToPageSchemaV3(transfer.mineSnapshot);
+            const merge = buildStudioThreeWayMerge(
+              baseDocument,
+              mineDocument,
+              isolatedDocument,
+              capabilities,
+            );
+            isolatedDocument = mineDocument;
+            setStudioConflict({
+              baseRevision: transfer.baseRevision,
+              baseDocument,
+              mineDocument,
+              latestSession: session,
+              merge,
+            });
+            replaceAuthoringContextUrl('conflictContext', session.sessionPid);
+          }
           setHandoff(resolvedHandoff);
           setAuthoringSession(session);
           setAuthoringCapabilities(capabilities);
+          documentBaselineRef.current = session;
           setDocument(isolatedDocument);
           setSource({
             type: 'page',
@@ -144,7 +201,13 @@ export default function UnifiedDesignerPage() {
     return () => {
       cancelled = true;
     };
-  }, [contextId, hasAuthoringContext, observedChangeSetPid, resumeSessionPid]);
+  }, [
+    conflictContextId,
+    contextId,
+    hasAuthoringContext,
+    observedChangeSetPid,
+    resumeSessionPid,
+  ]);
 
   useEffect(() => {
     if (!activeAuthoringSessionPid) return;
@@ -152,7 +215,9 @@ export default function UnifiedDesignerPage() {
     const interval = window.setInterval(() => {
       void loadAuthoringSession(activeAuthoringSessionPid)
         .then((latest) => {
-          if (!cancelled) setAuthoringSession(latest);
+          if (!cancelled && latest.revision >= (activeAuthoringRevision ?? -1)) {
+            setAuthoringSession(latest);
+          }
         })
         .catch(() => {
           // Keep the current isolated document and foreground error state on poll failure.
@@ -162,7 +227,7 @@ export default function UnifiedDesignerPage() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [activeAuthoringSessionPid]);
+  }, [activeAuthoringRevision, activeAuthoringSessionPid]);
 
   useEffect(() => {
     let cancelled = false;
@@ -246,26 +311,16 @@ export default function UnifiedDesignerPage() {
     setDocument(nextDocument);
   };
 
-  const handleContextualStudioSave = async (
+  const persistContextualStudioDocument = async (
     nextDocument: PageSchemaV3,
-  ): Promise<PageSchemaV3> => {
-    if (!handoff || !authoringSession || !authoringCapabilities) {
-      throw new Error('现场配置会话尚未就绪');
-    }
-    if (!canAdministerDesigner) {
-      throw new Error('缺少应用设计中心高级配置权限');
-    }
-    if (authoringSession.state !== 'ACTIVE') {
-      throw new Error(`当前 ChangeSet 会话状态为 ${authoringSession.state}，不能继续编辑`);
-    }
-
-    const baseline = authoringSnapshotToPageSchemaV3(authoringSession.snapshot);
+    startingSession: AuthoringSession,
+  ): Promise<AuthoringSession> => {
+    if (!authoringCapabilities) throw new Error('应用设计中心能力清单尚未就绪');
+    const baseline = authoringSnapshotToPageSchemaV3(startingSession.snapshot);
     const plan = planStudioAuthoringPatches(baseline, nextDocument, authoringCapabilities);
-    if (plan.unsupported.length > 0) {
-      throw new Error(plan.unsupported.join('；'));
-    }
+    if (plan.unsupported.length > 0) throw new Error(plan.unsupported.join('；'));
 
-    let workingSession = authoringSession;
+    let workingSession = startingSession;
     for (const move of plan.moves) {
       const result = await moveAuthoringStudioBlock(
         workingSession.sessionPid,
@@ -290,10 +345,142 @@ export default function UnifiedDesignerPage() {
       workingSession = result.session;
       setAuthoringSession(workingSession);
     }
+    return workingSession;
+  };
 
-    const canonicalDocument = authoringSnapshotToPageSchemaV3(workingSession.snapshot);
-    setDocument(canonicalDocument);
-    return canonicalDocument;
+  const openStudioConflict = (
+    baseSession: AuthoringSession,
+    mineDocument: PageSchemaV3,
+    latestSession: AuthoringSession,
+  ) => {
+    if (!authoringCapabilities) throw new Error('应用设计中心能力清单尚未就绪');
+    const baseDocument = authoringSnapshotToPageSchemaV3(baseSession.snapshot);
+    const merge = buildStudioThreeWayMerge(
+      baseDocument,
+      mineDocument,
+      authoringSnapshotToPageSchemaV3(latestSession.snapshot),
+      authoringCapabilities,
+    );
+    setAuthoringSession(latestSession);
+    setStudioConflict({
+      baseRevision: baseSession.revision,
+      baseDocument,
+      mineDocument,
+      latestSession,
+      merge,
+    });
+    setConflictError(null);
+  };
+
+  const handleContextualStudioSave = async (nextDocument: PageSchemaV3): Promise<PageSchemaV3> => {
+    if (!handoff || !authoringSession || !authoringCapabilities) {
+      throw new Error('现场配置会话尚未就绪');
+    }
+    if (!canAdministerDesigner) {
+      throw new Error('缺少应用设计中心高级配置权限');
+    }
+    if (authoringSession.state !== 'ACTIVE') {
+      throw new Error(`当前 ChangeSet 会话状态为 ${authoringSession.state}，不能继续编辑`);
+    }
+    if (!hasOwnedWriterLease(authoringSession)) {
+      throw new Error('当前会话不再持有 Writer lease，不能继续编辑');
+    }
+
+    const baseSession = documentBaselineRef.current ?? authoringSession;
+    if (authoringSession.revision !== baseSession.revision) {
+      openStudioConflict(baseSession, nextDocument, authoringSession);
+      throw new Error('服务器已有更新，已进入 Base / Mine / Latest 三方冲突裁决');
+    }
+
+    try {
+      const savedSession = await persistContextualStudioDocument(nextDocument, baseSession);
+      const canonicalDocument = authoringSnapshotToPageSchemaV3(savedSession.snapshot);
+      documentBaselineRef.current = savedSession;
+      setAuthoringSession(savedSession);
+      setDocument(canonicalDocument);
+      setStudioConflict(null);
+      return canonicalDocument;
+    } catch (saveError) {
+      let latestSession: AuthoringSession | null = null;
+      try {
+        latestSession = await loadAuthoringSession(baseSession.sessionPid);
+      } catch {
+        // Preserve the original save error when the conflict probe cannot refresh.
+      }
+      if (
+        latestSession &&
+        latestSession.revision > baseSession.revision &&
+        hasOwnedWriterLease(latestSession)
+      ) {
+        openStudioConflict(baseSession, nextDocument, latestSession);
+        throw new Error('旧修订未写入；已进入 Base / Mine / Latest 三方冲突裁决');
+      }
+      throw saveError;
+    }
+  };
+
+  const handleConflictResolution = async (
+    resolutions: Record<string, StudioMergeResolution>,
+  ) => {
+    if (!studioConflict || conflictPending) return;
+    setConflictPending(true);
+    setConflictError(null);
+    const baseSession = studioConflict.latestSession;
+    try {
+      const resolvedDocument = resolveStudioThreeWayMerge(studioConflict.merge, resolutions);
+      const savedSession = await persistContextualStudioDocument(resolvedDocument, baseSession);
+      const canonicalDocument = authoringSnapshotToPageSchemaV3(savedSession.snapshot);
+      documentBaselineRef.current = savedSession;
+      setAuthoringSession(savedSession);
+      setDocument(canonicalDocument);
+      setStudioConflict(null);
+      setWorkbenchGeneration((current) => current + 1);
+    } catch (resolutionError) {
+      try {
+        const newerSession = await loadAuthoringSession(baseSession.sessionPid);
+        if (
+          newerSession.revision > baseSession.revision &&
+          hasOwnedWriterLease(newerSession)
+        ) {
+          const resolvedDocument = resolveStudioThreeWayMerge(studioConflict.merge, resolutions);
+          openStudioConflict(baseSession, resolvedDocument, newerSession);
+          setConflictError('裁决期间服务器再次更新，请基于新的 Latest 复核');
+          return;
+        }
+      } catch {
+        // Surface the original resolution error when the refresh probe also fails.
+      }
+      setConflictError(
+        resolutionError instanceof Error ? resolutionError.message : '无法保存三方冲突裁决',
+      );
+    } finally {
+      setConflictPending(false);
+    }
+  };
+
+  const handleUseLatest = async () => {
+    if (!studioConflict || conflictPending) return;
+    setConflictError(null);
+    setConflictPending(true);
+    try {
+      const refreshed = await loadAuthoringSession(studioConflict.latestSession.sessionPid);
+      const latestSession =
+        refreshed.revision >= studioConflict.latestSession.revision
+          ? refreshed
+          : studioConflict.latestSession;
+      const latestDocument = authoringSnapshotToPageSchemaV3(latestSession.snapshot);
+      documentBaselineRef.current = latestSession;
+      setAuthoringSession(latestSession);
+      setDocument(latestDocument);
+      setStudioConflict(null);
+      setWorkbenchGeneration((current) => current + 1);
+    } catch (latestError) {
+      setConflictError(
+        latestError instanceof Error ? latestError.message : '无法读取服务器 Latest',
+      );
+    } finally {
+      setConflictPending(false);
+    }
   };
 
   const handleWriterLeaseTakeover = async (reason: string) => {
@@ -307,8 +494,27 @@ export default function UnifiedDesignerPage() {
         reason,
       );
       const canonicalDocument = authoringSnapshotToPageSchemaV3(taken.snapshot);
+      documentBaselineRef.current = taken;
       setAuthoringSession(taken);
-      setDocument(canonicalDocument);
+      if (studioConflict && authoringCapabilities) {
+        setDocument(studioConflict.mineDocument);
+        setStudioConflict({
+          ...studioConflict,
+          latestSession: taken,
+          merge: buildStudioThreeWayMerge(
+            studioConflict.baseDocument,
+            studioConflict.mineDocument,
+            canonicalDocument,
+            authoringCapabilities,
+          ),
+        });
+        setConflictError('已取得编辑权；请基于接管后的 Latest 重新复核冲突');
+      } else {
+        setDocument(canonicalDocument);
+        setStudioConflict(null);
+        setConflictError(null);
+      }
+      setWorkbenchGeneration((current) => current + 1);
       setHandoff((current) =>
         current
           ? { ...current, sessionPid: taken.sessionPid, revision: taken.revision }
@@ -374,7 +580,7 @@ export default function UnifiedDesignerPage() {
   }
 
   const workbenchKey = handoff
-    ? `authoring:${handoff.sessionPid}`
+    ? `authoring:${handoff.sessionPid}:${workbenchGeneration}`
     : getWorkbenchKey(document, source);
   const contextualEditablePropertyPaths =
     handoff
@@ -390,7 +596,8 @@ export default function UnifiedDesignerPage() {
     handoff &&
       (!canAdministerDesigner ||
         authoringSession?.state !== 'ACTIVE' ||
-        !hasOwnedWriterLease(authoringSession)),
+        !hasOwnedWriterLease(authoringSession) ||
+        Boolean(studioConflict)),
   );
 
   const workbench = (
@@ -427,7 +634,7 @@ export default function UnifiedDesignerPage() {
         {contextualReadOnly ? (
           <span className="ml-2" data-testid="studio-handoff-read-only-reason">
             ChangeSet {handoff.changeSetPid} · 修订 r{authoringSession?.revision ?? handoff.revision} ·
-            {studioReadOnlyReason(authoringSession, canAdministerDesigner)}，当前仅可查看隔离草稿。
+            {studioReadOnlyReason(authoringSession, canAdministerDesigner, Boolean(studioConflict))}，当前仅可查看隔离草稿。
           </span>
         ) : (
           <span className="ml-2" data-testid="studio-handoff-editable-reason">
@@ -449,6 +656,18 @@ export default function UnifiedDesignerPage() {
           </div>
         ) : null}
       </div>
+      {studioConflict ? (
+        <AuthoringConflictResolutionPanel
+          key={`${studioConflict.baseRevision}:${studioConflict.latestSession.revision}`}
+          merge={studioConflict.merge}
+          baseRevision={studioConflict.baseRevision}
+          latestRevision={studioConflict.latestSession.revision}
+          pending={conflictPending}
+          error={conflictError}
+          onResolve={handleConflictResolution}
+          onUseLatest={handleUseLatest}
+        />
+      ) : null}
       <div className="min-h-0 flex-1">{workbench}</div>
     </div>
   );
@@ -489,7 +708,10 @@ function resumeHandoffFromSession(session: AuthoringSession): HandoffContext {
   };
 }
 
-function replaceAuthoringContextUrl(parameter: 'contextId' | 'changeSetId', sessionPid: string): void {
+function replaceAuthoringContextUrl(
+  parameter: 'contextId' | 'changeSetId' | 'conflictContext',
+  sessionPid: string,
+): void {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
   url.searchParams.delete(parameter);
@@ -511,8 +733,10 @@ function hasOwnedWriterLease(session: AuthoringSession | null): boolean {
 function studioReadOnlyReason(
   session: AuthoringSession | null,
   canAdministerDesigner: boolean,
+  hasConflict: boolean,
 ): string {
   if (!canAdministerDesigner) return '缺少高级设计权限';
+  if (hasConflict) return '存在待裁决的 Base / Mine / Latest 三方冲突';
   if (session?.writerLease?.status === 'EXPIRED') return 'Writer lease 已过期';
   if (session?.writerLease && session.writerLease.status !== 'OWNED') {
     return 'Writer lease 由其他会话持有';

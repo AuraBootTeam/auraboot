@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContextualAuthoringSurface } from '../ContextualAuthoringSurface';
@@ -14,6 +14,7 @@ import {
 } from '../authoringService';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 import type { AuthoringSession } from '../types';
+import { storeAuthoringConflictTransfer } from '../authoringConflictTransfer';
 
 const permissionMock = vi.hoisted(() => ({
   canRead: true,
@@ -42,6 +43,10 @@ vi.mock('../authoringService', () => ({
   submitAuthoringSession: vi.fn(),
   createAuthoringHandoff: vi.fn(),
   takeoverAuthoringWriterLease: vi.fn(),
+}));
+
+vi.mock('../authoringConflictTransfer', () => ({
+  storeAuthoringConflictTransfer: vi.fn(() => 'a'.repeat(32)),
 }));
 
 const schema: UnifiedSchema = {
@@ -161,6 +166,7 @@ describe('ContextualAuthoringSurface', () => {
         },
       }),
     );
+    vi.mocked(storeAuthoringConflictTransfer).mockReturnValue('a'.repeat(32));
   });
 
   it('enters from the runtime page, separates modes and exposes independent counters', async () => {
@@ -295,6 +301,89 @@ describe('ContextualAuthoringSurface', () => {
     );
     expect(await screen.findByText('0 项未保存')).toBeInTheDocument();
     expect(screen.getByText('1 项草稿变更')).toBeInTheDocument();
+  });
+
+  it('stops stale inline writes and transfers only an opaque conflict context to Studio', async () => {
+    vi.mocked(applyAuthoringPatch).mockRejectedValueOnce(new Error('authoring.revision.conflict'));
+    vi.mocked(loadAuthoringSession).mockResolvedValueOnce(
+      createAuthoringSession({
+        revision: 2,
+        snapshot: {
+          ...schema,
+          pid: 'page-1',
+          blocks: [{ ...schema.blocks[0], title: 'Latest 订单标题' }],
+        },
+      }),
+    );
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+    await screen.findByTestId('contextual-authoring-surface');
+    fireEvent.click(screen.getByTestId('runtime-write'));
+    fireEvent.change(screen.getByLabelText(/标题/), { target: { value: 'Mine 订单标题' } });
+    fireEvent.click(screen.getByText('保存'));
+
+    expect(await screen.findByTestId('contextual-authoring-conflict')).toHaveTextContent(
+      'Base r1 / Latest r2',
+    );
+    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+      'data-read-only',
+      'true',
+    );
+    expect(screen.getByText('保存')).toBeDisabled();
+    expect(applyAuthoringPatch).toHaveBeenCalledTimes(1);
+    expect(storeAuthoringConflictTransfer).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('contextual-authoring-conflict-studio'));
+
+    expect(storeAuthoringConflictTransfer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionPid: 'session-1',
+        changeSetPid: 'changeset-1',
+        pagePid: 'page-1',
+        baseRevision: 1,
+        baseSnapshot: expect.objectContaining({
+          blocks: [expect.objectContaining({ title: '订单表格' })],
+        }),
+        mineSnapshot: expect.objectContaining({
+          blocks: [expect.objectContaining({ title: 'Mine 订单标题' })],
+        }),
+      }),
+    );
+  });
+
+  it('freezes the original page as soon as polling detects a conflicting Latest value', async () => {
+    let poll: (() => void) | undefined;
+    const interval = vi.spyOn(window, 'setInterval').mockImplementation((handler) => {
+      if (typeof handler === 'function') poll = handler;
+      return 1;
+    });
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+    await screen.findByTestId('contextual-authoring-surface');
+    fireEvent.click(screen.getByTestId('runtime-write'));
+    fireEvent.change(screen.getByLabelText(/标题/), { target: { value: 'Mine 订单标题' } });
+    vi.mocked(loadAuthoringSession).mockResolvedValueOnce(
+      createAuthoringSession({
+        revision: 2,
+        snapshot: {
+          ...schema,
+          pid: 'page-1',
+          blocks: [{ ...schema.blocks[0], title: 'Latest 订单标题' }],
+        },
+      }),
+    );
+
+    await act(async () => {
+      poll?.();
+      await Promise.resolve();
+    });
+
+    expect(await screen.findByTestId('contextual-authoring-conflict')).toHaveTextContent(
+      'Base r1 / Latest r2',
+    );
+    expect(screen.getByText('保存')).toBeDisabled();
+    expect(applyAuthoringPatch).not.toHaveBeenCalled();
+    interval.mockRestore();
   });
 
   it('turns an active session read-only when permission is revoked and preserves local edits', async () => {

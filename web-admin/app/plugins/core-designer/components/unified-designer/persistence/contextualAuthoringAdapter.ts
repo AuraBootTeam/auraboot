@@ -30,6 +30,26 @@ export interface StudioAuthoringPatchPlan {
   unsupported: string[];
 }
 
+export type StudioMergeResolution = 'MINE' | 'LATEST';
+
+export interface StudioMergeConflict {
+  id: string;
+  kind: 'PROPERTY' | 'ORDER';
+  blockId: string;
+  blockType?: string;
+  propertyPath: string;
+  baseValue: unknown;
+  mineValue: unknown;
+  latestValue: unknown;
+}
+
+export interface StudioThreeWayMerge {
+  autoMergedDocument: PageSchemaV3;
+  conflicts: StudioMergeConflict[];
+  autoMergedChanges: number;
+  unsupported: string[];
+}
+
 export const STUDIO_REORDER_WITHIN_PARENT_PATH = '/$structure/order';
 
 interface IndexedBlock {
@@ -170,6 +190,146 @@ export function planStudioAuthoringPatches(
   return { patches, moves, unsupported: [...new Set(unsupported)] };
 }
 
+/**
+ * Build a stable-ID three-way merge without ever applying an unresolved
+ * conflict. Non-overlapping declared changes are rebased onto Latest; paths
+ * changed differently by Mine and Latest remain on Latest until a user makes
+ * an explicit per-item decision in Studio.
+ */
+export function buildStudioThreeWayMerge(
+  base: PageSchemaV3,
+  mine: PageSchemaV3,
+  latest: PageSchemaV3,
+  capabilities: CapabilityRegistry,
+): StudioThreeWayMerge {
+  const minePlan = planStudioAuthoringPatches(base, mine, capabilities);
+  const unsupported = [...minePlan.unsupported];
+  const autoMergedDocument = cloneJson(latest);
+  const baseIndex = indexBlocks(base.blocks);
+  const mineIndex = indexBlocks(mine.blocks);
+  const latestIndex = indexBlocks(latest.blocks);
+  const mergedIndex = indexBlocks(autoMergedDocument.blocks);
+  const conflicts: StudioMergeConflict[] = [];
+  let autoMergedChanges = 0;
+
+  if (!sameKeys(baseIndex, latestIndex)) {
+    unsupported.push('Latest 包含区块新增或删除，必须先完成结构变更裁决');
+  }
+
+  minePlan.patches.forEach((patch) => {
+    const baseBlock = baseIndex.get(patch.blockId)?.block;
+    const mineBlock = mineIndex.get(patch.blockId)?.block;
+    const latestBlock = latestIndex.get(patch.blockId)?.block;
+    const mergedBlock = mergedIndex.get(patch.blockId)?.block;
+    if (!baseBlock || !mineBlock || !latestBlock || !mergedBlock) {
+      unsupported.push(`区块 ${patch.blockId} 无法进行稳定 ID 三方合并`);
+      return;
+    }
+    const baseValue = readPointer(
+      baseBlock as unknown as Record<string, unknown>,
+      patch.propertyPath,
+    );
+    const mineValue = readPointer(
+      mineBlock as unknown as Record<string, unknown>,
+      patch.propertyPath,
+    );
+    const latestValue = readPointer(
+      latestBlock as unknown as Record<string, unknown>,
+      patch.propertyPath,
+    );
+    const latestChanged = !deepEqual(baseValue, latestValue);
+    if (latestChanged && !deepEqual(mineValue, latestValue)) {
+      conflicts.push({
+        id: `PROPERTY:${patch.blockId}:${patch.propertyPath}`,
+        kind: 'PROPERTY',
+        blockId: patch.blockId,
+        blockType: baseBlock.blockType,
+        propertyPath: patch.propertyPath,
+        baseValue: cloneJson(baseValue),
+        mineValue: cloneJson(mineValue),
+        latestValue: cloneJson(latestValue),
+      });
+      return;
+    }
+    autoMergedChanges += 1;
+    if (!latestChanged) {
+      applyPointer(
+        mergedBlock as unknown as Record<string, unknown>,
+        patch.propertyPath,
+        mineValue,
+        mineValue === undefined,
+      );
+    }
+  });
+
+  const baseOrders = siblingOrders(base);
+  const mineOrders = siblingOrders(mine);
+  const latestOrders = siblingOrders(latest);
+  baseOrders.forEach((baseOrder, parentId) => {
+    const mineOrder = mineOrders.get(parentId);
+    if (!mineOrder || deepEqual(baseOrder, mineOrder)) return;
+    const latestOrder = latestOrders.get(parentId);
+    if (!latestOrder || !sameStringMembers(baseOrder, latestOrder)) {
+      unsupported.push(`父级 ${parentId} 的 Latest 子区块集合已变化，不能自动合并顺序`);
+      return;
+    }
+    const latestChanged = !deepEqual(baseOrder, latestOrder);
+    if (latestChanged && !deepEqual(mineOrder, latestOrder)) {
+      conflicts.push({
+        id: `ORDER:${parentId}`,
+        kind: 'ORDER',
+        blockId: parentId,
+        propertyPath: STUDIO_REORDER_WITHIN_PARENT_PATH,
+        baseValue: [...baseOrder],
+        mineValue: [...mineOrder],
+        latestValue: [...latestOrder],
+      });
+      return;
+    }
+    autoMergedChanges += 1;
+    if (!latestChanged) applySiblingOrder(autoMergedDocument, parentId, mineOrder);
+  });
+
+  return {
+    autoMergedDocument,
+    conflicts,
+    autoMergedChanges,
+    unsupported: [...new Set(unsupported)],
+  };
+}
+
+export function resolveStudioThreeWayMerge(
+  merge: StudioThreeWayMerge,
+  resolutions: Record<string, StudioMergeResolution>,
+): PageSchemaV3 {
+  const unresolved = merge.conflicts.filter((conflict) => !resolutions[conflict.id]);
+  if (unresolved.length > 0) {
+    throw new Error(`仍有 ${unresolved.length} 个三方冲突未裁决`);
+  }
+  if (merge.unsupported.length > 0) {
+    throw new Error(merge.unsupported.join('；'));
+  }
+
+  const resolved = cloneJson(merge.autoMergedDocument);
+  const resolvedIndex = indexBlocks(resolved.blocks);
+  merge.conflicts.forEach((conflict) => {
+    if (resolutions[conflict.id] !== 'MINE') return;
+    if (conflict.kind === 'ORDER') {
+      applySiblingOrder(resolved, conflict.blockId, conflict.mineValue as string[]);
+      return;
+    }
+    const block = resolvedIndex.get(conflict.blockId)?.block;
+    if (!block) throw new Error(`区块 ${conflict.blockId} 已不存在，不能应用 Mine`);
+    applyPointer(
+      block as unknown as Record<string, unknown>,
+      conflict.propertyPath,
+      conflict.mineValue,
+      conflict.mineValue === undefined,
+    );
+  });
+  return resolved;
+}
+
 export function studioEditablePropertyPaths(
   capabilities: CapabilityRegistry,
 ): Record<string, string[]> {
@@ -238,6 +398,36 @@ function indexBlocks(blocks: DslBlockV3[]): Map<string, IndexedBlock> {
   };
   visit(blocks, null);
   return index;
+}
+
+function siblingOrders(document: PageSchemaV3): Map<string, string[]> {
+  const orders = new Map<string, string[]>();
+  const visit = (blocks: DslBlockV3[], parentId: string) => {
+    orders.set(parentId, blocks.map((block) => block.id));
+    blocks.forEach((block) => visit(block.blocks ?? [], block.id));
+  };
+  visit(document.blocks, '$page-root');
+  return orders;
+}
+
+function applySiblingOrder(
+  document: PageSchemaV3,
+  parentId: string,
+  order: string[],
+): void {
+  const siblings = parentId === '$page-root'
+    ? document.blocks
+    : indexBlocks(document.blocks).get(parentId)?.block.blocks;
+  if (!siblings || !sameStringMembers(siblings.map((block) => block.id), order)) {
+    throw new Error(`父级 ${parentId} 的子区块集合已变化，不能应用顺序裁决`);
+  }
+  const byId = new Map(siblings.map((block) => [block.id, block]));
+  const reordered = order.map((id) => byId.get(id)!);
+  siblings.splice(0, siblings.length, ...reordered);
+}
+
+function sameStringMembers(left: string[], right: string[]): boolean {
+  return deepEqual([...left].sort(), [...right].sort());
 }
 
 function sameKeys(left: Map<string, unknown>, right: Map<string, unknown>): boolean {

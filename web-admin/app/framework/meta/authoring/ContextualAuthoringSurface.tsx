@@ -33,6 +33,7 @@ import {
   takeoverAuthoringWriterLease,
 } from './authoringService';
 import { AuthoringWriterLeaseNotice } from './AuthoringWriterLeaseNotice';
+import { storeAuthoringConflictTransfer } from './authoringConflictTransfer';
 import type {
   AuthoringMode,
   AuthoringNode,
@@ -52,6 +53,14 @@ interface ExplainState {
   title: string;
   reason: string;
   propertyPath?: string;
+}
+
+interface ContextualConflictState {
+  baseRevision: number;
+  latestSession: AuthoringSession;
+  baseSnapshot: Record<string, unknown>;
+  mineSnapshot: Record<string, unknown>;
+  pendingCount: number;
 }
 
 export function ContextualAuthoringSurface({
@@ -86,6 +95,9 @@ export function ContextualAuthoringSurface({
   const [handoffPending, setHandoffPending] = useState(false);
   const [writeBlocked, setWriteBlocked] = useState(false);
   const [leaseTakeoverPending, setLeaseTakeoverPending] = useState(false);
+  const [contextualConflict, setContextualConflict] = useState<ContextualConflictState | null>(
+    null,
+  );
   const runtimeRootRef = useRef<HTMLDivElement | null>(null);
   const entryScrollRef = useRef({ x: 0, y: 0 });
   const returnResumeAttemptedRef = useRef(false);
@@ -102,8 +114,10 @@ export function ContextualAuthoringSurface({
     () => new Map(capabilities?.manifests.map((manifest) => [manifest.blockType, manifest]) ?? []),
     [capabilities],
   );
-  const authoringReadOnly = !isAuthoringSessionWritable(session, canConfigure);
+  const authoringReadOnly =
+    Boolean(contextualConflict) || !isAuthoringSessionWritable(session, canConfigure);
   const activeSessionPid = session?.sessionPid;
+  const activeSessionRevision = session?.revision;
 
   useEffect(() => {
     if (returnResumeAttemptedRef.current) return;
@@ -137,6 +151,7 @@ export function ContextualAuthoringSurface({
         setWorkingSchema(restoredSchema);
         setPendingEdits(new Map());
         setStale(false);
+        setContextualConflict(null);
         setCapabilities(registry);
         setSelectedId(selected ?? schema.id);
         setOutlineOpen(true);
@@ -180,6 +195,7 @@ export function ContextualAuthoringSurface({
       setWorkingSchema(schemaFromSnapshot(schema, opened.snapshot));
       setPendingEdits(new Map());
       setStale(false);
+      setContextualConflict(null);
       setCapabilities(registry);
       setSelectedId(schema.id);
     } catch (enterError) {
@@ -194,6 +210,7 @@ export function ContextualAuthoringSurface({
     setWorkingSchema(schema);
     setPendingEdits(new Map());
     setStale(false);
+    setContextualConflict(null);
     setCapabilities(null);
     setExplain(null);
     setError(null);
@@ -216,9 +233,21 @@ export function ContextualAuthoringSurface({
     const interval = window.setInterval(() => {
       void loadAuthoringSession(activeSessionPid)
         .then((latest) => {
-          if (cancelled) return;
+          if (cancelled || latest.revision < (activeSessionRevision ?? -1)) return;
           setSession(latest);
           setWorkingSchema(materializePendingSchema(schema, latest.snapshot, pendingEdits));
+          const conflicts = conflictingPendingEdits(latest.snapshot, pendingEdits);
+          if (conflicts.length > 0) {
+            setContextualConflict(
+              createContextualConflictState(
+                latest,
+                pendingEdits,
+                Math.min(...conflicts.map((edit) => edit.baseRevision)),
+              ),
+            );
+            setStale(true);
+            setError(null);
+          }
         })
         .catch(() => {
           // Background lease/revision refresh must not replace the foreground error state.
@@ -228,7 +257,7 @@ export function ContextualAuthoringSurface({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [activeSessionPid, pendingEdits, schema]);
+  }, [activeSessionPid, activeSessionRevision, pendingEdits, schema]);
 
   useEffect(() => {
     if (!session) return;
@@ -343,7 +372,13 @@ export function ContextualAuthoringSurface({
   };
 
   const createHandoff = async () => {
-    if (!isAuthoringSessionWritable(session, canConfigure) || !explain || handoffPending) return;
+    if (
+      contextualConflict ||
+      !isAuthoringSessionWritable(session, canConfigure) ||
+      !explain ||
+      handoffPending
+    )
+      return;
     setHandoffPending(true);
     setError(null);
     try {
@@ -365,7 +400,7 @@ export function ContextualAuthoringSurface({
 
   const stageEdit = useCallback(
     (node: AuthoringNode, property: PropertyCapability, value: unknown, remove = false) => {
-      if (!isAuthoringSessionWritable(session, canConfigure)) return;
+      if (contextualConflict || !isAuthoringSessionWritable(session, canConfigure)) return;
       const manifestChecksum = manifestByType.get(node.blockType)?.checksum;
       if (!manifestChecksum) {
         setError(`未找到 ${node.blockType} 的能力清单，无法保存该变更`);
@@ -376,24 +411,25 @@ export function ContextualAuthoringSurface({
         node.sourceId,
         property.propertyPath,
       );
-      const operation = remove ? 'REMOVE' : previousValue === undefined ? 'ADD' : 'REPLACE';
       const key = `${node.sourceId}:${property.propertyPath}`;
       setPendingEdits((current) => {
         const next = new Map(current);
-        if (
-          (remove && previousValue === undefined) ||
-          (!remove && valuesEqual(value, previousValue))
-        ) {
+        const existing = current.get(key);
+        const baseValue = existing?.previousValue ?? previousValue;
+        const baseRevision = existing?.baseRevision ?? session.revision;
+        const operation = remove ? 'REMOVE' : baseValue === undefined ? 'ADD' : 'REPLACE';
+        if ((remove && baseValue === undefined) || (!remove && valuesEqual(value, baseValue))) {
           next.delete(key);
         } else {
           next.set(key, {
             key,
+            baseRevision,
             blockId: node.sourceId,
             blockLabel: node.label,
             manifestChecksum,
             property,
             operation,
-            previousValue,
+            previousValue: baseValue,
             value,
           });
         }
@@ -403,12 +439,13 @@ export function ContextualAuthoringSurface({
       setError(null);
       setStale(false);
     },
-    [canConfigure, manifestByType, schema, session],
+    [canConfigure, contextualConflict, manifestByType, schema, session],
   );
 
   const saveChanges = useCallback(async () => {
     if (
       !isAuthoringSessionWritable(session, canConfigure) ||
+      contextualConflict ||
       saving ||
       pendingEdits.size === 0 ||
       session.state !== 'ACTIVE'
@@ -419,7 +456,31 @@ export function ContextualAuthoringSurface({
     let currentSession = session;
     const remaining = new Map(pendingEdits);
     try {
+      const conflictingEdits = conflictingPendingEdits(currentSession.snapshot, remaining);
+      if (conflictingEdits.length > 0) {
+        setContextualConflict(
+          createContextualConflictState(
+            currentSession,
+            remaining,
+            Math.min(...conflictingEdits.map((edit) => edit.baseRevision)),
+          ),
+        );
+        setStale(true);
+        setError(null);
+        return;
+      }
       for (const edit of pendingEdits.values()) {
+        const latestValue = readSnapshotProperty(
+          currentSession.snapshot,
+          edit.blockId,
+          edit.property.propertyPath,
+        );
+        const mineValue = edit.operation === 'REMOVE' ? undefined : edit.value;
+        if (valuesEqual(latestValue, mineValue)) {
+          remaining.delete(edit.key);
+          setPendingEdits(new Map(remaining));
+          continue;
+        }
         const result = await applyAuthoringPatch(
           currentSession.sessionPid,
           currentSession.revision,
@@ -437,22 +498,61 @@ export function ContextualAuthoringSurface({
       setWorkingSchema(schemaFromSnapshot(schema, currentSession.snapshot));
       setStale(false);
     } catch (saveFailure) {
-      setSession(currentSession);
       setPendingEdits(new Map(remaining));
       setWorkingSchema(materializePendingSchema(schema, currentSession.snapshot, remaining));
       setStale(true);
-      setError(
-        saveFailure instanceof Error
-          ? `${saveFailure.message}；本地未保存变更已保留`
-          : '保存失败；本地未保存变更已保留',
-      );
+      let latestSession: AuthoringSession | null = null;
+      try {
+        latestSession = await loadAuthoringSession(currentSession.sessionPid);
+      } catch {
+        // Keep the original failure when the conflict probe cannot refresh.
+      }
+      if (
+        latestSession &&
+        latestSession.revision > currentSession.revision &&
+        (!latestSession.writerLease || latestSession.writerLease.status === 'OWNED')
+      ) {
+        setSession(latestSession);
+        setContextualConflict(
+          createContextualConflictState(
+            latestSession,
+            remaining,
+            remaining.size > 0
+              ? Math.min(...[...remaining.values()].map((edit) => edit.baseRevision))
+              : currentSession.revision,
+          ),
+        );
+        setError(null);
+      } else {
+        setSession(currentSession);
+        setError(
+          saveFailure instanceof Error
+            ? `${saveFailure.message}；本地未保存变更已保留`
+            : '保存失败；本地未保存变更已保留',
+        );
+      }
     } finally {
       setSaving(false);
     }
-  }, [canConfigure, pendingEdits, saving, schema, session]);
+  }, [canConfigure, contextualConflict, pendingEdits, saving, schema, session]);
+
+  const continueConflictInStudio = useCallback(() => {
+    if (!contextualConflict) return;
+    const contextId = storeAuthoringConflictTransfer({
+      sessionPid: contextualConflict.latestSession.sessionPid,
+      changeSetPid: contextualConflict.latestSession.changeSetPid,
+      pagePid: contextualConflict.latestSession.pagePid,
+      baseRevision: contextualConflict.baseRevision,
+      baseSnapshot: contextualConflict.baseSnapshot,
+      mineSnapshot: contextualConflict.mineSnapshot,
+    });
+    navigate(
+      `/unified-designer?authoringSession=${encodeURIComponent(contextualConflict.latestSession.sessionPid)}&conflictContext=${encodeURIComponent(contextId)}`,
+    );
+  }, [contextualConflict, navigate]);
 
   const refreshDraft = useCallback(async () => {
-    if (!canConfigure || !session) return;
+    if (!canConfigure || !session || contextualConflict) return;
     setError(null);
     try {
       const latest = await loadAuthoringSession(session.sessionPid);
@@ -462,11 +562,12 @@ export function ContextualAuthoringSurface({
     } catch (refreshFailure) {
       setError(refreshFailure instanceof Error ? refreshFailure.message : '无法刷新配置草稿');
     }
-  }, [canConfigure, pendingEdits, schema, session]);
+  }, [canConfigure, contextualConflict, pendingEdits, schema, session]);
 
   const submitForReview = useCallback(async () => {
     if (
       !isAuthoringSessionWritable(session, canConfigure) ||
+      contextualConflict ||
       pendingEdits.size > 0 ||
       submitting ||
       session.state !== 'ACTIVE'
@@ -484,7 +585,7 @@ export function ContextualAuthoringSurface({
     } finally {
       setSubmitting(false);
     }
-  }, [canConfigure, pendingEdits.size, schema, session, submitting]);
+  }, [canConfigure, contextualConflict, pendingEdits.size, schema, session, submitting]);
 
   const takeoverWriterLease = useCallback(
     async (reason: string) => {
@@ -499,7 +600,19 @@ export function ContextualAuthoringSurface({
         );
         setSession(taken);
         setWorkingSchema(materializePendingSchema(schema, taken.snapshot, pendingEdits));
-        setStale(false);
+        if (pendingEdits.size > 0 && taken.revision > session.revision) {
+          setContextualConflict(
+            createContextualConflictState(
+              taken,
+              pendingEdits,
+              Math.min(...[...pendingEdits.values()].map((edit) => edit.baseRevision)),
+            ),
+          );
+          setStale(true);
+        } else {
+          setContextualConflict(null);
+          setStale(false);
+        }
       } catch (takeoverFailure) {
         setError(
           takeoverFailure instanceof Error ? takeoverFailure.message : '无法接管 ChangeSet 编辑权',
@@ -597,6 +710,33 @@ export function ContextualAuthoringSurface({
           />
         </div>
       ) : null}
+      {contextualConflict ? (
+        <div
+          className="border-status-amber bg-status-amber-bg text-status-amber mx-3 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border px-3 py-3 text-sm"
+          data-testid="contextual-authoring-conflict"
+          role="alert"
+        >
+          <div className="flex min-w-0 items-start gap-2">
+            <GitCompare className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <div className="font-semibold">并发变更必须在应用设计中心裁决</div>
+              <div className="mt-1 text-xs">
+                Base r{contextualConflict.baseRevision} / Latest r
+                {contextualConflict.latestSession.revision}；已保留{' '}
+                {contextualConflict.pendingCount} 项 Mine。原地配置不会刷新后直接覆盖 Latest。
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={continueConflictInStudio}
+            className="min-h-9 rounded-md bg-amber-700 px-3 text-sm font-semibold text-white hover:bg-amber-800"
+            data-testid="contextual-authoring-conflict-studio"
+          >
+            查看 Base / Mine / Latest
+          </button>
+        </div>
+      ) : null}
       {error ? (
         <div
           role="alert"
@@ -686,7 +826,7 @@ export function ContextualAuthoringSurface({
         submitting={submitting}
         stale={stale}
         readOnly={authoringReadOnly}
-        readOnlyLabel={authoringReadOnlyLabel(session, canConfigure)}
+        readOnlyLabel={authoringReadOnlyLabel(session, canConfigure, Boolean(contextualConflict))}
         onDiff={() => setDiffOpen(true)}
         onSave={saveChanges}
         onRefresh={refreshDraft}
@@ -1156,7 +1296,7 @@ function ChangeDock({
           </span>
         ) : null}
       </div>
-      {stale ? (
+      {stale && !readOnly ? (
         <button
           type="button"
           onClick={onRefresh}
@@ -1205,8 +1345,13 @@ function isAuthoringSessionWritable(
   );
 }
 
-function authoringReadOnlyLabel(session: AuthoringSession, canConfigure: boolean): string {
+function authoringReadOnlyLabel(
+  session: AuthoringSession,
+  canConfigure: boolean,
+  hasConflict: boolean,
+): string {
   if (!canConfigure) return '权限已收回，当前只读';
+  if (hasConflict) return '并发冲突待专业裁决';
   if (session.writerLease?.status === 'EXPIRED') return '编辑租约已过期';
   if (session.writerLease && session.writerLease.status !== 'OWNED') return '编辑权由其他会话持有';
   if (session.state === 'READ_ONLY') return '已冻结，当前只读';
@@ -1738,6 +1883,72 @@ function materializePendingSchema(
       edit.property.propertyPath,
       edit.operation === 'REMOVE' ? undefined : edit.value,
       edit.operation === 'REMOVE',
+    );
+  });
+  return result;
+}
+
+function materializePendingSnapshot(
+  snapshot: Record<string, unknown>,
+  edits: Map<string, PendingAuthoringEdit>,
+): Record<string, unknown> {
+  const result = cloneJson(snapshot);
+  edits.forEach((edit) => {
+    const block = findObjectById(result, edit.blockId);
+    if (!block) return;
+    applyPointer(
+      block,
+      edit.property.propertyPath,
+      edit.operation === 'REMOVE' ? undefined : edit.value,
+      edit.operation === 'REMOVE',
+    );
+  });
+  return result;
+}
+
+function conflictingPendingEdits(
+  latestSnapshot: Record<string, unknown>,
+  edits: Map<string, PendingAuthoringEdit>,
+): PendingAuthoringEdit[] {
+  return [...edits.values()].filter((edit) => {
+    const latestValue = readSnapshotProperty(
+      latestSnapshot,
+      edit.blockId,
+      edit.property.propertyPath,
+    );
+    const mineValue = edit.operation === 'REMOVE' ? undefined : edit.value;
+    return !valuesEqual(latestValue, edit.previousValue) && !valuesEqual(latestValue, mineValue);
+  });
+}
+
+function createContextualConflictState(
+  latestSession: AuthoringSession,
+  edits: Map<string, PendingAuthoringEdit>,
+  baseRevision: number,
+): ContextualConflictState {
+  const baseSnapshot = reconstructPendingBaseSnapshot(latestSession.snapshot, edits);
+  return {
+    baseRevision,
+    latestSession,
+    baseSnapshot,
+    mineSnapshot: materializePendingSnapshot(baseSnapshot, edits),
+    pendingCount: edits.size,
+  };
+}
+
+function reconstructPendingBaseSnapshot(
+  latestSnapshot: Record<string, unknown>,
+  edits: Map<string, PendingAuthoringEdit>,
+): Record<string, unknown> {
+  const result = cloneJson(latestSnapshot);
+  edits.forEach((edit) => {
+    const block = findObjectById(result, edit.blockId);
+    if (!block) return;
+    applyPointer(
+      block,
+      edit.property.propertyPath,
+      edit.previousValue,
+      edit.previousValue === undefined,
     );
   });
   return result;

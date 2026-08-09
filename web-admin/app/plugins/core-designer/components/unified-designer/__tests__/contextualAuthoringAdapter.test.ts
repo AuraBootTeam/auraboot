@@ -3,7 +3,9 @@ import type { CapabilityRegistry } from '~/framework/meta/authoring/types';
 import type { PageSchemaV3 } from '../types';
 import {
   authoringSnapshotToPageSchemaV3,
+  buildStudioThreeWayMerge,
   planStudioAuthoringPatches,
+  resolveStudioThreeWayMerge,
 } from '../persistence/contextualAuthoringAdapter';
 
 const capabilities: CapabilityRegistry = {
@@ -146,6 +148,106 @@ describe('contextualAuthoringAdapter', () => {
     expect(plan.moves).toEqual([]);
     expect(plan.patches).toEqual([]);
     expect(plan.unsupported.join(' ')).toContain('跨父级移动');
+  });
+
+  it('rebases disjoint edits and requires an explicit Mine or Latest decision for conflicts', () => {
+    const baseline: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'list',
+      id: 'orders_list',
+      blocks: [
+        {
+          id: 'table-1',
+          blockType: 'table',
+          title: 'Orders',
+          dataSource: { model: 'orders' },
+        },
+      ],
+    };
+    const mine: PageSchemaV3 = {
+      ...baseline,
+      blocks: [{ ...baseline.blocks[0], dataSource: { model: 'payments' } }],
+    };
+    const disjointLatest: PageSchemaV3 = {
+      ...baseline,
+      blocks: [{ ...baseline.blocks[0], title: 'Latest orders' }],
+    };
+
+    const disjoint = buildStudioThreeWayMerge(
+      baseline,
+      mine,
+      disjointLatest,
+      capabilities,
+    );
+
+    expect(disjoint.conflicts).toEqual([]);
+    expect(disjoint.autoMergedChanges).toBe(1);
+    expect(disjoint.autoMergedDocument.blocks[0]).toMatchObject({
+      title: 'Latest orders',
+      dataSource: { model: 'payments' },
+    });
+
+    const conflictingLatest: PageSchemaV3 = {
+      ...baseline,
+      blocks: [{ ...baseline.blocks[0], dataSource: { model: 'refunds' } }],
+    };
+    const conflict = buildStudioThreeWayMerge(
+      baseline,
+      mine,
+      conflictingLatest,
+      capabilities,
+    );
+
+    expect(conflict.conflicts).toEqual([
+      expect.objectContaining({
+        id: 'PROPERTY:table-1:/dataSource',
+        baseValue: { model: 'orders' },
+        mineValue: { model: 'payments' },
+        latestValue: { model: 'refunds' },
+      }),
+    ]);
+    expect(() => resolveStudioThreeWayMerge(conflict, {})).toThrow('1 个三方冲突未裁决');
+    expect(
+      resolveStudioThreeWayMerge(conflict, {
+        'PROPERTY:table-1:/dataSource': 'MINE',
+      }).blocks[0],
+    ).toMatchObject({ dataSource: { model: 'payments' } });
+    expect(
+      resolveStudioThreeWayMerge(conflict, {
+        'PROPERTY:table-1:/dataSource': 'LATEST',
+      }).blocks[0],
+    ).toMatchObject({ dataSource: { model: 'refunds' } });
+  });
+
+  it('treats divergent stable-ID sibling order as one parent-level conflict', () => {
+    const baseline: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'list',
+      id: 'orders_list',
+      blocks: [
+        { id: 'table-a', blockType: 'table' },
+        { id: 'table-b', blockType: 'table' },
+        { id: 'table-c', blockType: 'table' },
+      ],
+    };
+    const mine = { ...baseline, blocks: [baseline.blocks[1], baseline.blocks[0], baseline.blocks[2]] };
+    const latest = { ...baseline, blocks: [baseline.blocks[0], baseline.blocks[2], baseline.blocks[1]] };
+
+    const merge = buildStudioThreeWayMerge(baseline, mine, latest, capabilities);
+
+    expect(merge.conflicts).toEqual([
+      expect.objectContaining({
+        id: 'ORDER:$page-root',
+        baseValue: ['table-a', 'table-b', 'table-c'],
+        mineValue: ['table-b', 'table-a', 'table-c'],
+        latestValue: ['table-a', 'table-c', 'table-b'],
+      }),
+    ]);
+    expect(
+      resolveStudioThreeWayMerge(merge, { 'ORDER:$page-root': 'MINE' }).blocks.map(
+        (block) => block.id,
+      ),
+    ).toEqual(['table-b', 'table-a', 'table-c']);
   });
 });
 

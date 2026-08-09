@@ -113,6 +113,7 @@ export interface PatchResult {
 
 export interface PendingAuthoringEdit {
   key: string;
+  baseRevision: number;
   blockId: string;
   blockLabel: string;
   manifestChecksum: string;

@@ -20,6 +20,7 @@ import type {
   CapabilityRegistry,
   HandoffContext,
 } from '~/framework/meta/authoring/types';
+import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
 
 const permissionMock = vi.hoisted(() => ({ canAdministerDesigner: vi.fn(() => true) }));
 
@@ -53,6 +54,10 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   takeoverAuthoringWriterLease: vi.fn(),
 }));
 
+vi.mock('~/framework/meta/authoring/authoringConflictTransfer', () => ({
+  consumeAuthoringConflictTransfer: vi.fn(),
+}));
+
 describe('UnifiedDesignerPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -68,6 +73,7 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(moveAuthoringStudioBlock).mockReset();
     vi.mocked(observeAuthoringChangeSet).mockReset();
     vi.mocked(takeoverAuthoringWriterLease).mockReset();
+    vi.mocked(consumeAuthoringConflictTransfer).mockReset();
     permissionMock.canAdministerDesigner.mockReturnValue(true);
   });
 
@@ -258,6 +264,65 @@ describe('UnifiedDesignerPage', () => {
     replaceState.mockRestore();
   });
 
+  it('consumes an opaque same-tab conflict transfer and opens the professional three-way panel', async () => {
+    const conflictContextId = 'a'.repeat(32);
+    setSearch(`?authoringSession=session_1&conflictContext=${conflictContextId}`);
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+    const baseline = createDocument('document_one', 'Isolated Draft');
+    const mine = createDocument('document_one', 'Isolated Draft');
+    const mineList = findBlock(mine.blocks, 'list_customer');
+    if (!mineList) throw new Error('list_customer fixture missing');
+    mineList.dataSource = { model: 'payment' };
+    const latest = createDocument('document_one', 'Isolated Draft');
+    const latestList = findBlock(latest.blocks, 'list_customer');
+    if (!latestList) throw new Error('list_customer fixture missing');
+    latestList.dataSource = { model: 'refund' };
+    const latestSession = createAuthoringSession(latest, 4);
+    const refreshedLatest = createDocument('document_one', 'Isolated Draft');
+    const refreshedLatestList = findBlock(refreshedLatest.blocks, 'list_customer');
+    if (!refreshedLatestList) throw new Error('list_customer fixture missing');
+    refreshedLatestList.dataSource = { model: 'invoice' };
+    vi.mocked(loadAuthoringSession)
+      .mockResolvedValueOnce(latestSession)
+      .mockResolvedValueOnce(createAuthoringSession(refreshedLatest, 5));
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(consumeAuthoringConflictTransfer).mockReturnValue({
+      version: 1,
+      createdAt: Date.now(),
+      sessionPid: 'session_1',
+      changeSetPid: 'changeset_1',
+      pagePid: 'page_1',
+      baseRevision: 3,
+      baseSnapshot: baseline as unknown as Record<string, unknown>,
+      mineSnapshot: mine as unknown as Record<string, unknown>,
+    });
+
+    render(<UnifiedDesignerPage />);
+
+    expect(await screen.findByTestId('authoring-conflict-panel')).toHaveTextContent(
+      'Base / Mine / Latest',
+    );
+    expect(consumeAuthoringConflictTransfer).toHaveBeenCalledWith(conflictContextId, {
+      sessionPid: 'session_1',
+      changeSetPid: 'changeset_1',
+      pagePid: 'page_1',
+    });
+    expect(screen.getByTestId('designer-save')).toBeDisabled();
+    expect(String(replaceState.mock.calls.at(-1)?.[2])).toContain(
+      'authoringSession=session_1',
+    );
+    expect(String(replaceState.mock.calls.at(-1)?.[2])).not.toContain('conflictContext');
+
+    fireEvent.click(screen.getByTestId('authoring-conflict-use-latest'));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('authoring-conflict-panel')).not.toBeInTheDocument(),
+    );
+    expect(loadAuthoringSession).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r5');
+    replaceState.mockRestore();
+  });
+
   it('saves a manifest-backed Studio edit into the same ChangeSet without touching PageSchema', async () => {
     setSearch('?contextId=ctx_secure_once');
     const handoff = createHandoff('list_customer', '/dataSource');
@@ -326,6 +391,80 @@ describe('UnifiedDesignerPage', () => {
     expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4');
     expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('已保存');
     expect(savePageSchemaV3).not.toHaveBeenCalled();
+  });
+
+  it('stops a stale Studio save and requires an explicit Base Mine Latest resolution', async () => {
+    setSearch('?contextId=ctx_secure_once');
+    const handoff = createHandoff('list_customer', '/dataSource');
+    const baseline = createDocument('document_one', 'Isolated Draft');
+    const latest = createDocument('document_one', 'Isolated Draft');
+    const latestList = findBlock(latest.blocks, 'list_customer');
+    if (!latestList) throw new Error('list_customer fixture missing');
+    latestList.dataSource = { model: 'refund' };
+    const saved = createDocument('document_one', 'Isolated Draft');
+    const savedList = findBlock(saved.blocks, 'list_customer');
+    if (!savedList) throw new Error('list_customer fixture missing');
+    savedList.dataSource = { model: 'payment' };
+
+    vi.mocked(consumeAuthoringHandoff).mockResolvedValue(handoff);
+    vi.mocked(loadAuthoringSession)
+      .mockResolvedValueOnce(createAuthoringSession(baseline, 3))
+      .mockResolvedValueOnce(createAuthoringSession(latest, 4));
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(applyAuthoringStudioPatch)
+      .mockRejectedValueOnce(new Error('authoring.revision.conflict'))
+      .mockResolvedValueOnce({
+        session: createAuthoringSession(saved, 5, 'L3', 'HANDOFF_STUDIO'),
+        changeItemPid: 'item_conflict_resolution',
+        decision: {
+          route: 'HANDOFF_STUDIO',
+          risk: 'L3',
+          publishPolicy: 'STUDIO_APPROVAL',
+          reason: 'CAPABILITY_ALLOWED',
+          manifestChecksum: 'list-checksum',
+          rolePreviewRequired: true,
+        },
+        previousValue: { model: 'refund' },
+        savedValue: { model: 'payment' },
+      });
+
+    render(<UnifiedDesignerPage />);
+
+    await screen.findByTestId('studio-handoff-context');
+    await waitFor(() =>
+      expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('list_customer'),
+    );
+    fireEvent.change(screen.getByTestId('inspector-field-dataSource.model-manual'), {
+      target: { value: 'payment' },
+    });
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    expect(await screen.findByTestId('authoring-conflict-panel')).toHaveTextContent(
+      'Base / Mine / Latest',
+    );
+    expect(screen.getByTestId('authoring-conflict-0')).toHaveTextContent('customer');
+    expect(screen.getByTestId('authoring-conflict-0')).toHaveTextContent('payment');
+    expect(screen.getByTestId('authoring-conflict-0')).toHaveTextContent('refund');
+    expect(screen.getByTestId('designer-save')).toBeDisabled();
+    expect(applyAuthoringStudioPatch).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByLabelText('保留 Mine'));
+    fireEvent.click(screen.getByTestId('authoring-conflict-apply'));
+
+    await waitFor(() => expect(applyAuthoringStudioPatch).toHaveBeenCalledTimes(2));
+    expect(applyAuthoringStudioPatch).toHaveBeenLastCalledWith(
+      'session_1',
+      4,
+      'list_customer',
+      '/dataSource',
+      'REPLACE',
+      { model: 'payment' },
+      'list-checksum',
+    );
+    await waitFor(() =>
+      expect(screen.queryByTestId('authoring-conflict-panel')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r5');
   });
 
   it('preserves an unsaved Studio edit but blocks writes when admin permission is revoked', async () => {
