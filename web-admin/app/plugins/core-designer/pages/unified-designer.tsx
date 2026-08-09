@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { usePermission } from '~/contexts/AuthContext';
 import { UnifiedDesignerWorkbench } from '../components/unified-designer/workbench/UnifiedDesignerWorkbench';
 import { sampleModelFieldsByModel } from '../components/unified-designer/fixtures/sampleModelFields';
 import { samplePageSchemaV3 } from '../components/unified-designer/fixtures/samplePageSchemaV3';
@@ -15,17 +16,34 @@ import {
   loadModelFieldsByModelCodes,
 } from '../components/unified-designer/persistence/modelFieldsRepository';
 import type { ModelFieldsByModel, PageSchemaV3 } from '../components/unified-designer/types';
-import { consumeAuthoringHandoff } from '~/framework/meta/authoring/authoringService';
-import type { HandoffContext } from '~/framework/meta/authoring/types';
+import {
+  applyAuthoringStudioPatch,
+  consumeAuthoringHandoff,
+  loadAuthoringCapabilities,
+  loadAuthoringSession,
+} from '~/framework/meta/authoring/authoringService';
+import type {
+  AuthoringSession,
+  CapabilityRegistry,
+  HandoffContext,
+} from '~/framework/meta/authoring/types';
+import {
+  authoringSnapshotToPageSchemaV3,
+  planStudioAuthoringPatches,
+  studioEditablePropertyPaths,
+} from '../components/unified-designer/persistence/contextualAuthoringAdapter';
 
 const LOCAL_STORAGE_KEY = 'auraboot.unified-designer.sample';
 
 export default function UnifiedDesignerPage() {
+  const canAdministerDesigner = usePermission('meta.designer.admin');
   const [searchParams] = useSearchParams();
   const requestedPageId = searchParams.get('pageId') || searchParams.get('pid');
   const pageKey = searchParams.get('pageKey');
   const contextId = searchParams.get('contextId');
   const [handoff, setHandoff] = useState<HandoffContext | null>(null);
+  const [authoringSession, setAuthoringSession] = useState<AuthoringSession | null>(null);
+  const [authoringCapabilities, setAuthoringCapabilities] = useState<CapabilityRegistry | null>(null);
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [document, setDocument] = useState<PageSchemaV3 | null>(null);
   const [source, setSource] = useState<PageSchemaV3Source>({ type: 'local' });
@@ -34,20 +52,46 @@ export default function UnifiedDesignerPage() {
   const [error, setError] = useState<string | null>(null);
   const modelCodeKey = document ? collectModelCodesFromDocument(document).join('|') : '';
   const documentId = document?.id ?? null;
-  const pageId = handoff?.pagePid || requestedPageId;
-  const resolvingHandoff = Boolean(contextId && !handoff && !handoffError);
+  const resolvingHandoff = Boolean(
+    contextId &&
+      !handoffError &&
+      (!handoff || !authoringSession || !authoringCapabilities || !document),
+  );
 
   useEffect(() => {
     if (!contextId) {
       setHandoff(null);
+      setAuthoringSession(null);
+      setAuthoringCapabilities(null);
       setHandoffError(null);
       return;
     }
     let cancelled = false;
+    setDocument(null);
+    setHandoff(null);
+    setAuthoringSession(null);
+    setAuthoringCapabilities(null);
     setHandoffError(null);
     void consumeAuthoringHandoff(contextId)
-      .then((consumed) => {
-        if (!cancelled) setHandoff(consumed);
+      .then(async (consumed) => {
+        const [session, capabilities] = await Promise.all([
+          loadAuthoringSession(consumed.sessionPid),
+          loadAuthoringCapabilities(),
+        ]);
+        assertHandoffMatchesSession(consumed, session);
+        if (!cancelled) {
+          const isolatedDocument = authoringSnapshotToPageSchemaV3(session.snapshot);
+          setHandoff(consumed);
+          setAuthoringSession(session);
+          setAuthoringCapabilities(capabilities);
+          setDocument(isolatedDocument);
+          setSource({
+            type: 'page',
+            pid: session.pagePid,
+            pageKey: isolatedDocument.pageKey,
+          });
+          setPublished(false);
+        }
       })
       .catch((consumeError) => {
         if (!cancelled) {
@@ -67,9 +111,9 @@ export default function UnifiedDesignerPage() {
     let cancelled = false;
 
     async function loadDocument() {
-      if (resolvingHandoff) return;
+      if (contextId) return;
       setError(null);
-      if (!pageId && !pageKey) {
+      if (!requestedPageId && !pageKey) {
         const localDocument = readLocalDocument();
         if (!cancelled) {
           setDocument(localDocument ?? samplePageSchemaV3);
@@ -79,7 +123,7 @@ export default function UnifiedDesignerPage() {
       }
 
       try {
-        const loaded = await loadPageSchemaV3({ pageId, pageKey });
+        const loaded = await loadPageSchemaV3({ pageId: requestedPageId, pageKey });
         if (!cancelled) {
           setDocument(loaded.document);
           setSource(loaded.source);
@@ -97,7 +141,7 @@ export default function UnifiedDesignerPage() {
     return () => {
       cancelled = true;
     };
-  }, [pageId, pageKey, resolvingHandoff]);
+  }, [contextId, pageKey, requestedPageId]);
 
   useEffect(() => {
     if (!modelCodeKey) {
@@ -143,6 +187,45 @@ export default function UnifiedDesignerPage() {
     }
     setSource(result.source);
     setDocument(nextDocument);
+  };
+
+  const handleContextualStudioSave = async (
+    nextDocument: PageSchemaV3,
+  ): Promise<PageSchemaV3> => {
+    if (!handoff || !authoringSession || !authoringCapabilities) {
+      throw new Error('现场配置会话尚未就绪');
+    }
+    if (!canAdministerDesigner) {
+      throw new Error('缺少应用设计中心高级配置权限');
+    }
+    if (authoringSession.state !== 'ACTIVE') {
+      throw new Error(`当前 ChangeSet 会话状态为 ${authoringSession.state}，不能继续编辑`);
+    }
+
+    const baseline = authoringSnapshotToPageSchemaV3(authoringSession.snapshot);
+    const plan = planStudioAuthoringPatches(baseline, nextDocument, authoringCapabilities);
+    if (plan.unsupported.length > 0) {
+      throw new Error(plan.unsupported.join('；'));
+    }
+
+    let workingSession = authoringSession;
+    for (const patch of plan.patches) {
+      const result = await applyAuthoringStudioPatch(
+        workingSession.sessionPid,
+        workingSession.revision,
+        patch.blockId,
+        patch.propertyPath,
+        patch.operation,
+        patch.value,
+        patch.manifestChecksum,
+      );
+      workingSession = result.session;
+      setAuthoringSession(workingSession);
+    }
+
+    const canonicalDocument = authoringSnapshotToPageSchemaV3(workingSession.snapshot);
+    setDocument(canonicalDocument);
+    return canonicalDocument;
   };
 
   const handlePublish = async (pid: string): Promise<boolean> => {
@@ -194,7 +277,18 @@ export default function UnifiedDesignerPage() {
     );
   }
 
-  const workbenchKey = getWorkbenchKey(document, source);
+  const workbenchKey = handoff
+    ? `authoring:${handoff.sessionPid}`
+    : getWorkbenchKey(document, source);
+  const contextualEditablePropertyPaths =
+    handoff
+      ? canAdministerDesigner && authoringCapabilities
+        ? studioEditablePropertyPaths(authoringCapabilities)
+        : {}
+      : undefined;
+  const contextualReadOnly = Boolean(
+    handoff && (!canAdministerDesigner || authoringSession?.state !== 'ACTIVE'),
+  );
 
   const workbench = (
     <UnifiedDesignerWorkbench
@@ -202,14 +296,15 @@ export default function UnifiedDesignerPage() {
       initialDocument={document}
       modelFieldsByModel={modelFieldsByModel}
       returnHref={handoff?.returnTo || (source.type === 'page' ? '/p/page_schema' : undefined)}
-      onSave={handoff ? undefined : handleSave}
-      pageId={source.type === 'page' ? source.pid : undefined}
+      onSave={handoff ? handleContextualStudioSave : handleSave}
+      pageId={!handoff && source.type === 'page' ? source.pid : undefined}
       initialPublished={source.type === 'page' ? published : false}
       onPublish={source.type === 'page' && !handoff ? handlePublish : undefined}
       onUnpublish={source.type === 'page' && !handoff ? handleUnpublish : undefined}
       onReloadDocument={source.type === 'page' && !handoff ? handleReloadDocument : undefined}
       initialSelectedBlockId={handoff?.blockId || undefined}
-      contextualReadOnly={Boolean(handoff)}
+      contextualReadOnly={contextualReadOnly}
+      contextualEditablePropertyPaths={contextualEditablePropertyPaths}
     />
   );
 
@@ -219,13 +314,34 @@ export default function UnifiedDesignerPage() {
     <div className="flex min-h-[calc(100vh-4rem)] flex-col" data-testid="studio-handoff-context">
       <div className="border-b border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
         <strong>已从现场配置安全移交</strong>
-        <span className="ml-2">
-          ChangeSet {handoff.changeSetPid} · 修订 r{handoff.revision} · 当前只读，避免绕过统一变更治理。
-        </span>
+        {contextualReadOnly ? (
+          <span className="ml-2" data-testid="studio-handoff-read-only-reason">
+            ChangeSet {handoff.changeSetPid} · 修订 r{authoringSession?.revision ?? handoff.revision} ·
+            缺少高级设计权限或会话不可编辑，当前仅可查看隔离草稿。
+          </span>
+        ) : (
+          <span className="ml-2" data-testid="studio-handoff-editable-reason">
+            ChangeSet {handoff.changeSetPid} · 修订 r{authoringSession?.revision ?? handoff.revision} ·
+            高级属性将写回同一隔离草稿；结构操作需通过后续 typed patch，不会直接修改线上页面。
+          </span>
+        )}
       </div>
       <div className="min-h-0 flex-1">{workbench}</div>
     </div>
   );
+}
+
+function assertHandoffMatchesSession(
+  handoff: HandoffContext,
+  session: AuthoringSession,
+): void {
+  if (
+    handoff.sessionPid !== session.sessionPid ||
+    handoff.changeSetPid !== session.changeSetPid ||
+    handoff.pagePid !== session.pagePid
+  ) {
+    throw new Error('配置移交上下文与隔离会话不一致');
+  }
 }
 
 function readLocalDocument(): PageSchemaV3 | null {

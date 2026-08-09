@@ -52,6 +52,7 @@ interface CanvasHostProps {
   activeDrag: DragData | null;
   activeDropIntent: ActiveDropIntent;
   rootAccepts: boolean;
+  structuralReadOnly?: boolean;
   onSelect: CanvasSelectHandler;
   onMoveBefore: (movingBlockId: string, targetBlockId: string) => void;
   onPatchBlock: (blockId: string, updater: (block: DslBlockV3) => DslBlockV3) => void;
@@ -79,6 +80,7 @@ export function CanvasHost({
   activeDrag,
   activeDropIntent,
   rootAccepts,
+  structuralReadOnly = false,
   onSelect,
   onMoveBefore,
   onPatchBlock,
@@ -157,6 +159,7 @@ export function CanvasHost({
               activeDrag={activeDrag}
               activeDropIntent={activeDropIntent}
               locale={locale}
+              structuralReadOnly={structuralReadOnly}
               onSelect={onSelect}
               onMoveBefore={onMoveBefore}
               onMoveWidget={patchWidgetLayout}
@@ -376,6 +379,7 @@ interface BlockFrameProps {
   activeDropIntent: ActiveDropIntent;
   locale: string;
   dashboardSiblings?: DslBlockV3[];
+  structuralReadOnly?: boolean;
   onSelect: CanvasSelectHandler;
   onMoveBefore: (movingBlockId: string, targetBlockId: string) => void;
   onMoveWidget: (blockId: string, layoutPatch: Record<string, number>) => void;
@@ -396,6 +400,7 @@ function BlockFrame(props: BlockFrameProps) {
     activeDropIntent,
     locale,
     dashboardSiblings,
+    structuralReadOnly = false,
     onSelect,
     onMoveBefore,
     onMoveWidget,
@@ -448,7 +453,7 @@ function BlockFrame(props: BlockFrameProps) {
   } = useDraggable({
     id: canvasDraggableId(block.id),
     data: { kind: 'canvas-block', blockId: block.id },
-    disabled: isDashboardWidget,
+    disabled: isDashboardWidget || structuralReadOnly,
   });
   const setRefs = (node: HTMLElement | null) => {
     setDropRef(node);
@@ -473,6 +478,7 @@ function BlockFrame(props: BlockFrameProps) {
         onSelect(block.id, { additive });
       }}
       onPointerDown={(event) => {
+        if (structuralReadOnly) return;
         if (!isDashboardWidget) return;
         if (mode !== 'layout') return;
         handleWidgetMovePointerDown(
@@ -509,7 +515,7 @@ function BlockFrame(props: BlockFrameProps) {
       <div className="border-b border-slate-100 px-3 py-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-start gap-1.5">
-            {!isDashboardWidget ? (
+            {!isDashboardWidget && !structuralReadOnly ? (
               <button
                 type="button"
                 aria-label={`Drag ${getBlockLabel(block, locale)}`}
@@ -542,7 +548,7 @@ function BlockFrame(props: BlockFrameProps) {
               <div className="truncate font-mono text-[11px] text-slate-400">{block.blockType}</div>
             </div>
           </div>
-          {mode === 'layout' && !isDashboardWidget ? (
+          {mode === 'layout' && !isDashboardWidget && !structuralReadOnly ? (
             <BlockOrderControls
               blockId={block.id}
               previousBlockId={previousSibling?.id}
@@ -552,7 +558,7 @@ function BlockFrame(props: BlockFrameProps) {
             />
           ) : null}
         </div>
-        {mode === 'layout' && !isDashboardWidget ? (
+        {mode === 'layout' && !isDashboardWidget && !structuralReadOnly ? (
           <div className="mt-2">
             <SpanQuickControls blockId={block.id} currentSpan={span} onResizeSpan={onResizeSpan} />
           </div>
@@ -585,6 +591,7 @@ function BlockFrame(props: BlockFrameProps) {
         activeDrag={activeDrag}
         activeDropIntent={activeDropIntent}
         locale={locale}
+        structuralReadOnly={structuralReadOnly}
         onSelect={onSelect}
         onMoveBefore={onMoveBefore}
         onMoveWidget={onMoveWidget}
@@ -593,7 +600,7 @@ function BlockFrame(props: BlockFrameProps) {
         canDeleteBlock={canDeleteBlock}
         onDeleteBlock={onDeleteBlock}
       />
-      {mode === 'layout' && isDashboardWidget ? (
+      {mode === 'layout' && isDashboardWidget && !structuralReadOnly ? (
         <button
           type="button"
           aria-label={`Resize ${getBlockLabel(block, locale)}`}

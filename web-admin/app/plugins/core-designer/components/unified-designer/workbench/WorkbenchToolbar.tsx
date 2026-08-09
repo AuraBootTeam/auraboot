@@ -54,6 +54,7 @@ interface WorkbenchToolbarProps {
    */
   onOpenVersions?: () => void;
   readOnly?: boolean;
+  contextualRestricted?: boolean;
 }
 
 // C4 — localized labels for the switchable page kinds.
@@ -90,6 +91,7 @@ export function WorkbenchToolbar({
   onOpenAiCopilot,
   onOpenVersions,
   readOnly = false,
+  contextualRestricted = false,
 }: WorkbenchToolbarProps) {
   const { locale } = useI18n();
   const saveDisabled = readOnly || !isDirty || saveStatus === 'saving' || saveStatus === 'invalid';
@@ -260,8 +262,19 @@ export function WorkbenchToolbar({
           {getStatusLabel(saveStatus, validationErrorCount, locale)}
         </span>
         {readOnly ? (
-          <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-            Contextual read-only
+          <span
+            className="rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700"
+            data-testid="designer-contextual-read-only"
+          >
+            现场上下文只读
+          </span>
+        ) : null}
+        {contextualRestricted && !readOnly ? (
+          <span
+            className="rounded-md bg-violet-50 px-2 py-1 text-xs font-medium text-violet-700"
+            data-testid="designer-contextual-restricted"
+          >
+            同一 ChangeSet · 属性受限
           </span>
         ) : null}
         {saveError ? (
@@ -274,88 +287,88 @@ export function WorkbenchToolbar({
           </span>
         ) : null}
         {/* Export / import — pure client-side JSON round-trip, no backend. */}
-        <div className="ml-2 grid grid-cols-2 rounded-md border border-slate-200 bg-white">
-          <button
-            type="button"
-            data-testid="designer-export"
-            aria-label={resolveDesignerText(DESIGNER_I18N.unified.exportPage, locale)}
-            title={resolveDesignerText(DESIGNER_I18N.unified.exportPage, locale)}
-            onClick={onExport}
-            className="inline-flex h-8 w-8 items-center justify-center border-r border-slate-200 text-slate-600 hover:bg-slate-50"
-          >
-            <Download className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            data-testid="designer-import"
-            aria-label={resolveDesignerText(DESIGNER_I18N.unified.importPage, locale)}
-            title={resolveDesignerText(DESIGNER_I18N.unified.importPage, locale)}
-            onClick={() => importInputRef.current?.click()}
-            disabled={readOnly}
-            className="inline-flex h-8 w-8 items-center justify-center text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
-          >
-            <Upload className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
-        <input
-          ref={importInputRef}
-          type="file"
-          accept="application/json,.json"
-          data-testid="designer-import-input"
-          className="hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            // Reset the value so selecting the same file twice re-fires change.
-            event.target.value = '';
-            if (file) onImportFile?.(file);
-          }}
-        />
+        {onExport || onImportFile ? (
+          <>
+            <div className="ml-2 grid grid-cols-2 rounded-md border border-slate-200 bg-white">
+              <button
+                type="button"
+                data-testid="designer-export"
+                aria-label={resolveDesignerText(DESIGNER_I18N.unified.exportPage, locale)}
+                title={resolveDesignerText(DESIGNER_I18N.unified.exportPage, locale)}
+                onClick={onExport}
+                disabled={!onExport}
+                className="inline-flex h-8 w-8 items-center justify-center border-r border-slate-200 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                <Download className="h-4 w-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                data-testid="designer-import"
+                aria-label={resolveDesignerText(DESIGNER_I18N.unified.importPage, locale)}
+                title={resolveDesignerText(DESIGNER_I18N.unified.importPage, locale)}
+                onClick={() => importInputRef.current?.click()}
+                disabled={readOnly || !onImportFile}
+                className="inline-flex h-8 w-8 items-center justify-center text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                <Upload className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              data-testid="designer-import-input"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                // Reset the value so selecting the same file twice re-fires change.
+                event.target.value = '';
+                if (file) onImportFile?.(file);
+              }}
+            />
+          </>
+        ) : null}
         {/* Version history — only for a saved page (GET/POST /api/pages/{pid}/versions). */}
-        <button
-          type="button"
-          data-testid="designer-versions"
-          aria-label={resolveDesignerText(DESIGNER_I18N.unified.versionHistory, locale)}
-          title={
-            !pageId
-              ? resolveDesignerText(DESIGNER_I18N.unified.versionsSaveFirst, locale)
-              : resolveDesignerText(DESIGNER_I18N.unified.versionHistory, locale)
-          }
-          disabled={readOnly || !pageId}
-          onClick={onOpenVersions}
-          className={`ml-2 inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 ${
-            !readOnly && pageId
-              ? 'text-slate-600 hover:bg-slate-50'
-              : 'cursor-not-allowed text-slate-300'
-          }`}
-        >
-          <History className="h-4 w-4" aria-hidden="true" />
-        </button>
+        {onOpenVersions ? (
+          <button
+            type="button"
+            data-testid="designer-versions"
+            aria-label={resolveDesignerText(DESIGNER_I18N.unified.versionHistory, locale)}
+            title={resolveDesignerText(DESIGNER_I18N.unified.versionHistory, locale)}
+            disabled={readOnly || !pageId}
+            onClick={onOpenVersions}
+            className={`ml-2 inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 ${
+              !readOnly && pageId
+                ? 'text-slate-600 hover:bg-slate-50'
+                : 'cursor-not-allowed text-slate-300'
+            }`}
+          >
+            <History className="h-4 w-4" aria-hidden="true" />
+          </button>
+        ) : null}
         {/* Publish — only for a saved, clean page (POST /api/pages/{pid}/publish). */}
-        <button
-          type="button"
-          data-testid="designer-publish"
-          disabled={publishDisabled}
-          title={
-            !pageId
-              ? resolveDesignerText(DESIGNER_I18N.unified.publishSaveFirst, locale)
-              : undefined
-          }
-          onClick={onPublish}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-            publishDisabled
-              ? 'cursor-not-allowed bg-slate-200 text-slate-500'
-              : 'bg-emerald-600 text-white hover:bg-emerald-700'
-          }`}
-        >
-          {resolveDesignerText(
-            publishStatus === 'publishing'
-              ? DESIGNER_I18N.unified.publishing
-              : isPublished
-                ? DESIGNER_I18N.unified.published
-                : DESIGNER_I18N.unified.publish,
-            locale,
-          )}
-        </button>
+        {onPublish ? (
+          <button
+            type="button"
+            data-testid="designer-publish"
+            disabled={publishDisabled}
+            onClick={onPublish}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+              publishDisabled
+                ? 'cursor-not-allowed bg-slate-200 text-slate-500'
+                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+            }`}
+          >
+            {resolveDesignerText(
+              publishStatus === 'publishing'
+                ? DESIGNER_I18N.unified.publishing
+                : isPublished
+                  ? DESIGNER_I18N.unified.published
+                  : DESIGNER_I18N.unified.publish,
+              locale,
+            )}
+          </button>
+        ) : null}
         {isPublished || publishStatus === 'unpublishing' ? (
           <button
             type="button"

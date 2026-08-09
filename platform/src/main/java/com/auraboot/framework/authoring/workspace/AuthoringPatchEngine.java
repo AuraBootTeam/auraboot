@@ -48,7 +48,7 @@ public class AuthoringPatchEngine {
         this.patchApplier = patchApplier;
     }
 
-    public PreparedPatch prepare(
+    public PreparedPatch prepareInline(
             JsonNode sourceSnapshot,
             String blockId,
             String propertyPath,
@@ -56,6 +56,31 @@ public class AuthoringPatchEngine {
             JsonNode proposedValue,
             String manifestChecksum,
             ResourceScope resourceScope) {
+        return prepare(sourceSnapshot, blockId, propertyPath, operation, proposedValue,
+                manifestChecksum, resourceScope, false);
+    }
+
+    public PreparedPatch prepareStudio(
+            JsonNode sourceSnapshot,
+            String blockId,
+            String propertyPath,
+            PatchOperation operation,
+            JsonNode proposedValue,
+            String manifestChecksum,
+            ResourceScope resourceScope) {
+        return prepare(sourceSnapshot, blockId, propertyPath, operation, proposedValue,
+                manifestChecksum, resourceScope, true);
+    }
+
+    private PreparedPatch prepare(
+            JsonNode sourceSnapshot,
+            String blockId,
+            String propertyPath,
+            PatchOperation operation,
+            JsonNode proposedValue,
+            String manifestChecksum,
+            ResourceScope resourceScope,
+            boolean studioRoute) {
         DraftTarget target = targetResolver.resolve(sourceSnapshot, blockId);
         CapabilityManifest manifest = registry.find(target.blockType()).orElse(null);
         PropertyCapability capability = manifest == null
@@ -70,7 +95,7 @@ public class AuthoringPatchEngine {
                 capability != null,
                 protectedSemanticValid(capability, target.block(), propertyPath, proposedValue),
                 manifestChecksum));
-        requireInlineDecision(decision);
+        requireAllowedDecision(decision, studioRoute);
 
         JsonNode savedValue = operation == PatchOperation.REMOVE
                 ? null
@@ -100,11 +125,11 @@ public class AuthoringPatchEngine {
                     || semanticValidator.isValid(block, propertyPath, proposedValue));
     }
 
-    private void requireInlineDecision(BoundaryDecision decision) {
+    private void requireAllowedDecision(BoundaryDecision decision, boolean studioRoute) {
         if (decision.route() == Route.DENY) {
             throw invalid("authoring.policy." + decision.reason().name().toLowerCase(Locale.ROOT));
         }
-        if (decision.route() == Route.HANDOFF_STUDIO) {
+        if (decision.route() == Route.HANDOFF_STUDIO && !studioRoute) {
             throw new ResponseStatusException(CONFLICT,
                     "authoring.handoff." + decision.reason().name().toLowerCase(Locale.ROOT));
         }

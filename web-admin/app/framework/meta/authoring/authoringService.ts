@@ -69,6 +69,32 @@ export async function applyAuthoringPatch(
   return requireData(result, '无法保存配置变更');
 }
 
+export async function applyAuthoringStudioPatch(
+  sessionPid: string,
+  revision: number,
+  blockId: string,
+  propertyPath: string,
+  operation: PatchOperation,
+  value: unknown,
+  manifestChecksum: string,
+): Promise<PatchResult> {
+  const result = await fetchResult<PatchResult>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/studio-patches`,
+    {
+      method: 'patch',
+      params: {
+        expectedRevision: revision,
+        blockId,
+        propertyPath,
+        operation,
+        ...(operation === 'REMOVE' ? {} : { value }),
+        manifestChecksum,
+      },
+    },
+  );
+  return requireData(result, '无法保存应用设计中心变更');
+}
+
 export async function submitAuthoringSession(sessionPid: string, revision: number): Promise<void> {
   const result = await fetchResult<unknown>(
     `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/submit`,

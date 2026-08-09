@@ -318,6 +318,43 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void studioPatchRequiresAdminPermission() throws Exception {
+        grantDesignerManage();
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+
+        mockMvc.perform(patch("/api/authoring/sessions/{sessionPid}/studio-patches",
+                        opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(studioPatchBody(opened)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void studioPatchPersistsIntoTheSameChangeSetWithoutChangingLegacyPage() throws Exception {
+        grantDesignerAdmin();
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+
+        mockMvc.perform(patch("/api/authoring/sessions/{sessionPid}/studio-patches",
+                        opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(studioPatchBody(opened)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.changeSetPid").value(opened.changeSetPid()))
+                .andExpect(jsonPath("$.data.session.revision").value(2))
+                .andExpect(jsonPath("$.data.session.riskLevel").value("L3"))
+                .andExpect(jsonPath("$.data.session.route").value("HANDOFF_STUDIO"))
+                .andExpect(jsonPath("$.data.session.publishPolicy").value("STUDIO_APPROVAL"))
+                .andExpect(jsonPath("$.data.session.snapshot.blocks[0].dataSource.model")
+                        .value("payments"));
+
+        applyTestMetaContext();
+        PageSchema unchanged = pageSchemaMapper.selectByPid(page.getPid());
+        assertThat(unchanged.getBlocks()).doesNotContain("payments");
+    }
+
+    @Test
     void controllerAllowsReviewPermissionButStillRejectsPublish() throws Exception {
         PageSchema page = insertPage("normal");
         long environmentId = MetaContext.getCurrentEnvironmentId();
@@ -762,6 +799,21 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 capabilityRegistry.find("table").orElseThrow().checksum());
     }
 
+    private String studioPatchBody(SessionView opened) {
+        return """
+                {
+                  "expectedRevision":%d,
+                  "blockId":"table-1",
+                  "propertyPath":"/dataSource",
+                  "operation":"ADD",
+                  "value":{"model":"payments"},
+                  "manifestChecksum":"%s"
+                }
+                """.formatted(
+                opened.revision(),
+                capabilityRegistry.find("table").orElseThrow().checksum());
+    }
+
     private PatchResult patchDensity(SessionView opened, String density) {
         return workspaceService.apply(opened.sessionPid(), new ApplyPatchRequest(
                 opened.revision(), "table-1", "/props/density", PatchOperation.REPLACE,
@@ -786,6 +838,16 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 "designer",
                 "update",
                 "Page Designer Manage");
+        userPermissionService.evictUserPermissions(getTestUser().getId());
+    }
+
+    private void grantDesignerAdmin() {
+        grantCommittedPermissionToTestRole(
+                MetaPermission.PAGE_DESIGNER_ADMIN,
+                "meta",
+                "designer",
+                "admin",
+                "Page Designer Admin");
         userPermissionService.evictUserPermissions(getTestUser().getId());
     }
 

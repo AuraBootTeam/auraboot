@@ -80,7 +80,7 @@ export interface UnifiedDesignerWorkbenchProps {
   initialDocument: PageSchemaV3;
   modelFieldsByModel?: ModelFieldsByModel;
   returnHref?: string;
-  onSave?: (document: PageSchemaV3) => Promise<void> | void;
+  onSave?: (document: PageSchemaV3) => Promise<PageSchemaV3 | void> | PageSchemaV3 | void;
   /**
    * The persisted page id (pid) when the document is page-bound. Required to
    * enable the publish / unpublish action points (a local/new document has none).
@@ -111,6 +111,7 @@ export interface UnifiedDesignerWorkbenchProps {
   aiCopilot?: boolean | { domainGuidance?: string };
   initialSelectedBlockId?: string;
   contextualReadOnly?: boolean;
+  contextualEditablePropertyPaths?: Record<string, string[]>;
 }
 
 export function UnifiedDesignerWorkbench({
@@ -126,6 +127,7 @@ export function UnifiedDesignerWorkbench({
   aiCopilot,
   initialSelectedBlockId,
   contextualReadOnly = false,
+  contextualEditablePropertyPaths,
 }: UnifiedDesignerWorkbenchProps) {
   const { locale } = useI18n();
   const initialSnapshot = serializeDocument(initialDocument);
@@ -156,6 +158,7 @@ export function UnifiedDesignerWorkbench({
   } = useDesignerSelection();
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
+  const contextualRestricted = contextualEditablePropertyPaths !== undefined;
 
   React.useEffect(() => {
     if (initialSelectedBlockId) setSelectedBlockId(initialSelectedBlockId);
@@ -211,7 +214,7 @@ export function UnifiedDesignerWorkbench({
   // to the target kind's root (e.g. detail → form), keeping all children. The
   // whole switch is one undoable step.
   const handleSwitchKind = (targetKind: PageSchemaV3['kind']) => {
-    if (contextualReadOnly) return;
+    if (contextualReadOnly || contextualRestricted) return;
     if (targetKind === document.kind) return;
     if (!canSwitchToKind(document.blocks, targetKind)) return;
     const rootBlockType = getKindPolicy(targetKind).rootBlockType;
@@ -229,7 +232,7 @@ export function UnifiedDesignerWorkbench({
   // D6 — apply a scenario template: replace the page's blocks (and title) with a
   // fresh tree built by the registered template, then clear the selection.
   const applyTemplate = (templateId: string) => {
-    if (contextualReadOnly) return;
+    if (contextualReadOnly || contextualRestricted) return;
     const template = getPageTemplate(templateId);
     if (!template) return;
     updateDocument((current) => ({
@@ -243,6 +246,15 @@ export function UnifiedDesignerWorkbench({
   const updateSelectedBlock = (path: string, value: unknown) => {
     if (contextualReadOnly) return;
     if (!selectedBlockId) return;
+    if (
+      contextualRestricted &&
+      !isDotPathAllowed(
+        path,
+        contextualEditablePropertyPaths?.[selectedBlock?.blockType ?? ''] ?? [],
+      )
+    ) {
+      return;
+    }
     updateDocument((current) => ({
       ...current,
       blocks: updateBlockById(current.blocks, selectedBlockId, (block) => {
@@ -277,7 +289,7 @@ export function UnifiedDesignerWorkbench({
   };
 
   const handleMoveBefore = (movingBlockId: string, targetBlockId: string) => {
-    if (contextualReadOnly) return;
+    if (contextualReadOnly || contextualRestricted) return;
     updateDocument((current) => ({
       ...current,
       blocks: moveBlockBefore(current.blocks, movingBlockId, targetBlockId),
@@ -285,7 +297,7 @@ export function UnifiedDesignerWorkbench({
   };
 
   const handleMoveToParent = (movingBlockId: string, parentBlockId: string) => {
-    if (contextualReadOnly) return;
+    if (contextualReadOnly || contextualRestricted) return;
     updateDocument((current) => ({
       ...current,
       blocks: moveBlockToParent(current.blocks, movingBlockId, parentBlockId),
@@ -296,12 +308,13 @@ export function UnifiedDesignerWorkbench({
   // The single top-level kind container (form/list/detail/dashboard root) defines
   // the page; it cannot be deleted, only its descendants can.
   const canDeleteBlock = (blockId: string) => {
+    if (contextualReadOnly || contextualRestricted) return false;
     const result = findBlockById(document.blocks, blockId);
     return Boolean(result) && result!.path.length > 1;
   };
 
   const handleDeleteBlock = (blockId: string) => {
-    if (contextualReadOnly) return;
+    if (contextualReadOnly || contextualRestricted) return;
     if (!canDeleteBlock(blockId)) return;
     updateDocument((current) => ({
       ...current,
@@ -321,7 +334,7 @@ export function UnifiedDesignerWorkbench({
   // history step (one updateDocument → one undo). Undeletable blocks (the root
   // kind container) are silently skipped. Selection is cleared afterwards.
   const handleDeleteMultiSelected = () => {
-    if (contextualReadOnly) return;
+    if (contextualReadOnly || contextualRestricted) return;
     const deletableIds = [...multiSelectedIds].filter((id) => canDeleteBlock(id));
     if (deletableIds.length === 0) {
       clearMultiSelection();
@@ -340,7 +353,7 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canAddBlock = (blockType: string) => {
-    if (contextualReadOnly) return false;
+    if (contextualReadOnly || contextualRestricted) return false;
     const definition = blockRegistry.get(blockType);
     if (!definition) return false;
     if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
@@ -646,7 +659,7 @@ export function UnifiedDesignerWorkbench({
     blockId: string,
     updater: (block: PageSchemaV3['blocks'][number]) => PageSchemaV3['blocks'][number],
   ) => {
-    if (contextualReadOnly) return;
+    if (contextualReadOnly || contextualRestricted) return;
     updateDocument((current) => ({
       ...current,
       blocks: updateBlockById(current.blocks, blockId, updater),
@@ -721,8 +734,10 @@ export function UnifiedDesignerWorkbench({
     setValidationErrorCount(0);
     setSaveStatus('saving');
     try {
-      await onSave?.(document);
-      const snapshot = serializeDocument(document);
+      const savedDocument = await onSave?.(document);
+      const canonicalDocument = savedDocument ?? document;
+      if (savedDocument) documentKernel.reset(savedDocument);
+      const snapshot = serializeDocument(canonicalDocument);
       savedSnapshotRef.current = snapshot;
       setSavedSnapshot(snapshot);
       setSaveStatus('saved');
@@ -809,7 +824,7 @@ export function UnifiedDesignerWorkbench({
   // any parse/shape failure the document is left untouched and an inline error
   // is shown via the existing save-error channel.
   const handleImportFile = (file: File) => {
-    if (contextualReadOnly) return;
+    if (contextualReadOnly || contextualRestricted) return;
     setSaveError(null);
     const reader = new FileReader();
     reader.onload = () => {
@@ -829,7 +844,7 @@ export function UnifiedDesignerWorkbench({
     reader.readAsText(file);
   };
 
-  const aiCopilotEnabled = !!aiCopilot;
+  const aiCopilotEnabled = !!aiCopilot && !contextualRestricted;
   const aiDomainGuidance =
     typeof aiCopilot === 'object' && aiCopilot ? aiCopilot.domainGuidance : undefined;
   const aiKindPolicy = getKindPolicy(document.kind);
@@ -868,7 +883,7 @@ export function UnifiedDesignerWorkbench({
   ]);
 
   const handleApplyAiDesign = (parsed: ParsedDesign) => {
-    if (contextualReadOnly) return;
+    if (contextualReadOnly || contextualRestricted) return;
     updateDocument((current) =>
       applyDesignBlocks(current, parsed, getKindPolicy(current.kind).rootBlockType),
     );
@@ -896,19 +911,22 @@ export function UnifiedDesignerWorkbench({
         publishStatus={publishStatus}
         publishError={publishError}
         onModeChange={setMode}
-        onSwitchKind={handleSwitchKind}
+        onSwitchKind={contextualRestricted ? undefined : handleSwitchKind}
         onUndo={handleUndo}
         onRedo={handleRedo}
         onSave={handleSave}
         onPublish={onPublish ? handlePublish : undefined}
         onUnpublish={onUnpublish ? handleUnpublish : undefined}
-        onExport={handleExport}
-        onImportFile={handleImportFile}
+        onExport={contextualRestricted ? undefined : handleExport}
+        onImportFile={contextualRestricted ? undefined : handleImportFile}
         onOpenAiCopilot={() => setAiDialogOpen(true)}
-        onOpenVersions={pageId ? () => setVersionPanelOpen(true) : undefined}
+        onOpenVersions={
+          pageId && !contextualRestricted ? () => setVersionPanelOpen(true) : undefined
+        }
         readOnly={contextualReadOnly}
+        contextualRestricted={contextualRestricted}
       />
-      {pageId ? (
+      {pageId && !contextualRestricted ? (
         <VersionHistoryPanel
           pid={pageId}
           open={versionPanelOpen}
@@ -973,7 +991,7 @@ export function UnifiedDesignerWorkbench({
           onDragEnd={handleDragEnd}
           onDragCancel={clearActiveDrag}
         >
-          {!contextualReadOnly && getPageTemplates().length > 0 ? (
+          {!contextualReadOnly && !contextualRestricted && getPageTemplates().length > 0 ? (
             <div
               className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2"
               data-testid="designer-template-bar"
@@ -996,7 +1014,7 @@ export function UnifiedDesignerWorkbench({
               </select>
             </div>
           ) : null}
-          {!contextualReadOnly && multiSelectedIds.size >= 2 ? (
+          {!contextualReadOnly && !contextualRestricted && multiSelectedIds.size >= 2 ? (
             <div
               className="flex items-center gap-3 border-b border-blue-200 bg-blue-50 px-4 py-2"
               data-testid="multi-select-bar"
@@ -1050,6 +1068,7 @@ export function UnifiedDesignerWorkbench({
               activeDrag={activeDrag}
               activeDropIntent={activeDropIntent}
               rootAccepts={Boolean(rootAccepts)}
+              structuralReadOnly={contextualRestricted}
               onSelect={handleCanvasSelect}
               onMoveBefore={handleMoveBefore}
               onPatchBlock={patchBlock}
@@ -1063,6 +1082,11 @@ export function UnifiedDesignerWorkbench({
             <InspectorHost
               selectedBlock={selectedBlock}
               modelFields={selectedModelFields}
+              editablePropertyPaths={
+                contextualRestricted
+                  ? (contextualEditablePropertyPaths?.[selectedBlock?.blockType ?? ''] ?? [])
+                  : undefined
+              }
               onChange={updateSelectedBlock}
             />
           </div>
@@ -1252,4 +1276,15 @@ function compactObject<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(
     Object.entries(value).filter(([, item]) => item !== undefined),
   ) as T;
+}
+
+function isDotPathAllowed(dotPath: string, capabilityPointers: string[]): boolean {
+  const pointer = `/${dotPath
+    .split('.')
+    .map((segment) => segment.replace(/~/g, '~0').replace(/\//g, '~1'))
+    .join('/')}`;
+  return capabilityPointers.some(
+    (capabilityPointer) =>
+      pointer === capabilityPointer || pointer.startsWith(`${capabilityPointer}/`),
+  );
 }

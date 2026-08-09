@@ -44,7 +44,7 @@ class AuthoringPatchEngineTest {
                 {"id":"table-1","blockType":"table","props":{"density":"normal"}}
                 """);
 
-        AuthoringPatchEngine.PreparedPatch patch = engine.prepare(
+        AuthoringPatchEngine.PreparedPatch patch = engine.prepareInline(
                 source,
                 "table-1",
                 "/props/density",
@@ -64,7 +64,7 @@ class AuthoringPatchEngineTest {
                 {"id":"table-1","blockType":"table","dataSource":"orders"}
                 """);
 
-        assertThatThrownBy(() -> engine.prepare(
+        assertThatThrownBy(() -> engine.prepareInline(
                 source,
                 "table-1",
                 "/dataSource",
@@ -77,12 +77,32 @@ class AuthoringPatchEngineTest {
     }
 
     @Test
+    void studioRouteCanPersistDeclaredDataBindingIntoIsolatedDraft() throws Exception {
+        ObjectNode source = snapshot("""
+                {"id":"table-1","blockType":"table","dataSource":{"model":"orders"}}
+                """);
+
+        AuthoringPatchEngine.PreparedPatch patch = engine.prepareStudio(
+                source,
+                "table-1",
+                "/dataSource",
+                PatchOperation.REPLACE,
+                objectMapper.readTree("{\"model\":\"payments\"}"),
+                checksum("table"), ResourceScope.CURRENT_PAGE);
+
+        assertThat(patch.decision().route()).isEqualTo(Route.HANDOFF_STUDIO);
+        assertThat(patch.snapshot().at("/blocks/0/dataSource/model").asText())
+                .isEqualTo("payments");
+        assertThat(source.at("/blocks/0/dataSource/model").asText()).isEqualTo("orders");
+    }
+
+    @Test
     void sharedResourceCannotUseInlineRouteEvenForPresentationPatch() throws Exception {
         ObjectNode source = snapshot("""
                 {"id":"table-1","blockType":"table","props":{"density":"normal"}}
                 """);
 
-        assertThatThrownBy(() -> engine.prepare(
+        assertThatThrownBy(() -> engine.prepareInline(
                 source,
                 "table-1",
                 "/props/density",
@@ -100,7 +120,7 @@ class AuthoringPatchEngineTest {
                 {"id":"field-1","blockType":"field","props":{"label":"Name"}}
                 """);
 
-        assertThatThrownBy(() -> engine.prepare(
+        assertThatThrownBy(() -> engine.prepareInline(
                 source,
                 "field-1",
                 "/props/permission",
@@ -109,7 +129,7 @@ class AuthoringPatchEngineTest {
                 checksum("field"), ResourceScope.CURRENT_PAGE))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("capability_unknown");
-        assertThatThrownBy(() -> engine.prepare(
+        assertThatThrownBy(() -> engine.prepareInline(
                 source,
                 "field-1",
                 "/id",
@@ -126,7 +146,7 @@ class AuthoringPatchEngineTest {
                 {"id":"field-1","blockType":"field","props":{"label":"Name"}}
                 """);
 
-        assertThatThrownBy(() -> engine.prepare(
+        assertThatThrownBy(() -> engine.prepareInline(
                 source,
                 "field-1",
                 "/props/label",
@@ -144,7 +164,7 @@ class AuthoringPatchEngineTest {
                 {"id":"desc-1","blockType":"description","props":{"content":"old"}}
                 """);
 
-        AuthoringPatchEngine.PreparedPatch patch = engine.prepare(
+        AuthoringPatchEngine.PreparedPatch patch = engine.prepareInline(
                 source,
                 "desc-1",
                 "/props/content",
@@ -164,7 +184,7 @@ class AuthoringPatchEngineTest {
                 {"id":"action-1","blockType":"action","props":{"targetPage":"/orders"}}
                 """);
 
-        assertThatThrownBy(() -> engine.prepare(
+        assertThatThrownBy(() -> engine.prepareInline(
                 source,
                 "action-1",
                 "/props/targetPage",
@@ -187,7 +207,7 @@ class AuthoringPatchEngineTest {
                 }}
                 """);
 
-        assertThatThrownBy(() -> engine.prepare(
+        assertThatThrownBy(() -> engine.prepareInline(
                 source,
                 "action-1",
                 "/props/label",
@@ -196,7 +216,7 @@ class AuthoringPatchEngineTest {
                 checksum("action"), ResourceScope.CURRENT_PAGE))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("protected_semantic_invalid");
-        assertThatThrownBy(() -> engine.prepare(
+        assertThatThrownBy(() -> engine.prepareInline(
                 source,
                 "action-1",
                 "/props/variant",

@@ -83,6 +83,14 @@ public class AuthoringWorkspaceController {
         return ApiResponse.success(workspaceService.apply(sessionPid, request));
     }
 
+    @PatchMapping("/sessions/{sessionPid}/studio-patches")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<PatchResult> applyStudio(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody ApplyPatchRequest request) {
+        return ApiResponse.success(workspaceService.applyStudio(sessionPid, request));
+    }
+
     @PostMapping("/sessions/{sessionPid}/submit")
     @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
     public ApiResponse<ChangeSetView> submit(

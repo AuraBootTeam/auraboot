@@ -140,20 +140,33 @@ public class AuthoringWorkspaceService {
 
     @Transactional
     public PatchResult apply(String sessionPid, ApplyPatchRequest request) {
+        return apply(sessionPid, request, false);
+    }
+
+    @Transactional
+    public PatchResult applyStudio(String sessionPid, ApplyPatchRequest request) {
+        return apply(sessionPid, request, true);
+    }
+
+    private PatchResult apply(
+            String sessionPid,
+            ApplyPatchRequest request,
+            boolean studioRoute) {
         Identity identity = identity();
         WorkspaceRow workspace = requireWorkspace(identity, sessionPid, true);
 
         PreparedPatch prepared;
         try {
             validateWritable(workspace, identity, request.expectedRevision());
-            prepared = patchEngine.prepare(
-                    workspace.snapshot(),
-                    request.blockId(),
-                    request.propertyPath(),
-                    request.operation(),
-                    request.value(),
-                    request.manifestChecksum(),
-                    snapshotFactory.resourceScope(workspace.snapshot()));
+            prepared = studioRoute
+                    ? patchEngine.prepareStudio(
+                            workspace.snapshot(), request.blockId(), request.propertyPath(),
+                            request.operation(), request.value(), request.manifestChecksum(),
+                            snapshotFactory.resourceScope(workspace.snapshot()))
+                    : patchEngine.prepareInline(
+                            workspace.snapshot(), request.blockId(), request.propertyPath(),
+                            request.operation(), request.value(), request.manifestChecksum(),
+                            snapshotFactory.resourceScope(workspace.snapshot()));
         } catch (ResponseStatusException exception) {
             auditService.recordDenied(audit(
                     identity,
@@ -167,7 +180,8 @@ public class AuthoringWorkspaceService {
                     request.propertyPath(),
                     objectMapper.valueToTree(Map.of(
                             "operation", request.operation().name(),
-                            "expectedRevision", request.expectedRevision()))));
+                            "expectedRevision", request.expectedRevision(),
+                            "authoringSurface", studioRoute ? "STUDIO" : "CONTEXTUAL"))));
             throw exception;
         }
 
@@ -203,7 +217,8 @@ public class AuthoringWorkspaceService {
                         "operation", request.operation().name(),
                         "resultRevision", request.expectedRevision() + 1,
                         "riskLevel", prepared.decision().risk().name(),
-                        "route", prepared.decision().route().name()))));
+                        "route", prepared.decision().route().name(),
+                        "authoringSurface", studioRoute ? "STUDIO" : "CONTEXTUAL"))));
 
         SessionView reloaded = viewMapper.toView(requireWorkspace(identity, sessionPid, false));
         return new PatchResult(reloaded, changeItemPid, prepared.decision(),
