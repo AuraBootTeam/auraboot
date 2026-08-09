@@ -1,6 +1,6 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { appendFile, copyFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   clearDeploymentBrandingCacheForTests,
@@ -8,6 +8,25 @@ import {
 } from '../branding.server';
 
 const tempDirectories: string[] = [];
+const licenseFixtureRoot = resolve(
+  process.cwd(),
+  '../platform/src/test/resources/branding/commercial-license',
+);
+
+function signedEnvironment(configPath: string) {
+  return {
+    EDITION: 'standard',
+    AURABOOT_BRANDING_CONFIG_PATH: configPath,
+    AURABOOT_WHITE_LABEL_ORDER_REFERENCE: 'SO-2026-001',
+    AURABOOT_COMMERCIAL_LICENSE_ENFORCEMENT: 'offline-signature',
+    AURABOOT_COMMERCIAL_LICENSE_PATH: join(licenseFixtureRoot, 'license.json'),
+    AURABOOT_COMMERCIAL_LICENSE_SIGNATURE_PATH: join(licenseFixtureRoot, 'license.sig'),
+    AURABOOT_COMMERCIAL_LICENSE_PUBLIC_KEY_PATH: join(licenseFixtureRoot, 'public.pem'),
+    AURABOOT_COMMERCIAL_LICENSE_KEY_ID: 'test-commercial-2026-01',
+    AURABOOT_COMMERCIAL_LICENSE_CUSTOMER: 'northstar',
+    AURABOOT_VERSION: '1.0.0',
+  };
+}
 
 async function writeBranding(overrides: Record<string, unknown> = {}): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), 'auraboot-branding-'));
@@ -65,8 +84,74 @@ describe('deployment branding server resolver', () => {
         EDITION: 'community',
         AURABOOT_BRANDING_CONFIG_PATH: configPath,
         AURABOOT_WHITE_LABEL_ORDER_REFERENCE: 'SO-2026-001',
+        AURABOOT_COMMERCIAL_LICENSE_ENFORCEMENT: 'offline-signature',
       }),
     ).resolves.toMatchObject({ mode: 'community', productName: 'AuraBoot' });
+  });
+
+  it('accepts the shared RS256 License fixture for Standard branding', async () => {
+    const configPath = await writeBranding();
+
+    await expect(resolveDeploymentBranding(signedEnvironment(configPath))).resolves.toMatchObject({
+      mode: 'commercial',
+      productName: 'Northstar',
+    });
+  });
+
+  it('fails closed for signed License tampering and deployment mismatches', async () => {
+    const configPath = await writeBranding();
+    const directory = await mkdtemp(join(tmpdir(), 'auraboot-license-tampered-'));
+    tempDirectories.push(directory);
+    const tamperedLicense = join(directory, 'license.json');
+    await copyFile(join(licenseFixtureRoot, 'license.json'), tamperedLicense);
+    await appendFile(tamperedLicense, ' ');
+
+    await expect(
+      resolveDeploymentBranding({
+        ...signedEnvironment(configPath),
+        AURABOOT_COMMERCIAL_LICENSE_PATH: tamperedLicense,
+      }),
+    ).rejects.toThrow(/SHA-256 digest does not match/);
+    await expect(
+      resolveDeploymentBranding({
+        ...signedEnvironment(configPath),
+        AURABOOT_COMMERCIAL_LICENSE_CUSTOMER: 'other-customer',
+      }),
+    ).rejects.toThrow(/customer does not match/);
+    await expect(
+      resolveDeploymentBranding({
+        ...signedEnvironment(configPath),
+        AURABOOT_VERSION: '2.0.0',
+      }),
+    ).rejects.toThrow(/platformVersion does not match/);
+  });
+
+  it('rejects a valid signed License that excludes white-label rights', async () => {
+    const configPath = await writeBranding();
+
+    await expect(
+      resolveDeploymentBranding({
+        ...signedEnvironment(configPath),
+        AURABOOT_COMMERCIAL_LICENSE_PATH: join(licenseFixtureRoot, 'license-no-white-label.json'),
+        AURABOOT_COMMERCIAL_LICENSE_SIGNATURE_PATH: join(
+          licenseFixtureRoot,
+          'license-no-white-label.sig',
+        ),
+      }),
+    ).rejects.toThrow(/does not grant required feature: white_label/);
+  });
+
+  it('rejects unsupported commercial License enforcement modes', async () => {
+    const configPath = await writeBranding();
+
+    await expect(
+      resolveDeploymentBranding({
+        EDITION: 'standard',
+        AURABOOT_BRANDING_CONFIG_PATH: configPath,
+        AURABOOT_WHITE_LABEL_ORDER_REFERENCE: 'SO-2026-001',
+        AURABOOT_COMMERCIAL_LICENSE_ENFORCEMENT: 'remote-server',
+      }),
+    ).rejects.toThrow(/Unsupported commercial License enforcement mode/);
   });
 
   it('fails closed when the order evidence is missing or mismatched', async () => {

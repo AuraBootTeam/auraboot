@@ -66,6 +66,8 @@ public class DeploymentBrandingProvider implements BrandingProvider {
             throw new IllegalStateException(
                     "AURABOOT_WHITE_LABEL_ORDER_REFERENCE is required when deployment branding is enabled.");
         }
+        CommercialLicenseVerifier.verifyIfRequired(
+                environment, objectMapper, edition, expectedOrder);
 
         JsonNode document;
         try {
