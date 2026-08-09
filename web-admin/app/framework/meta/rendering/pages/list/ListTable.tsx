@@ -547,9 +547,13 @@ export const ListTable = React.memo(function ListTable({
                 <tr>
                   <td
                     colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}
-                    className="text-text-2 px-6 py-6 text-center"
+                    className="text-text-2 py-6 text-center"
                   >
-                    <div className="flex items-center justify-center">
+                    <div
+                      className="sticky left-0 box-border flex items-center justify-center px-6"
+                      style={containerWidth > 0 ? { width: `${containerWidth}px` } : undefined}
+                      data-testid="loading-state-content"
+                    >
                       <span className="loading loading-spinner loading-md mr-2"></span>
                       {t('message.loading')}
                     </div>
@@ -560,10 +564,14 @@ export const ListTable = React.memo(function ListTable({
                 <tr>
                   <td
                     colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}
-                    className="text-text-2 px-6 py-10 text-center"
+                    className="text-text-2 py-10 text-center"
                     data-testid="empty-state"
                   >
-                    <div className="flex flex-col items-center gap-2">
+                    <div
+                      className="sticky left-0 box-border flex flex-col items-center gap-2 px-6"
+                      style={containerWidth > 0 ? { width: `${containerWidth}px` } : undefined}
+                      data-testid="empty-state-content"
+                    >
                       <span
                         className="border-border bg-subtle text-text-3 rounded-pill flex h-9 w-9 items-center justify-center border"
                         aria-hidden="true"

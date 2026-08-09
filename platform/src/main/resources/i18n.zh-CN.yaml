@@ -683,6 +683,9 @@ dashboard:
   goto_management: 前往仪表盘管理
   refresh: 刷新
   refreshed: 数据已刷新
+  retry: 重试
+  error:
+    access_forbidden: 无权访问仪表盘
 
 # AI Center — Colleagues & Settings
 ai:

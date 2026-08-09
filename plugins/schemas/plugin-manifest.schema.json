@@ -1029,6 +1029,20 @@
           "type": "object",
           "description": "Input schema defining command parameters"
         },
+        "handlerParams": {
+          "type": "object",
+          "description": "Parameters preserved for the selected runtime command handler"
+        },
+        "concurrencyKey": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Aggregate lock key template evaluated from the trusted command envelope"
+        },
+        "lockTimeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum time in milliseconds to wait for the aggregate command lock"
+        },
         "targetModels": {
           "type": "array",
           "description": "Target models affected by this command",

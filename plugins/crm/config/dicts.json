@@ -3982,7 +3982,7 @@
       { "value": "validation_failed", "label": "Validation Failed", "label:zh-CN": "校验失败", "sortNo": 30, "status": "enabled", "extension": { "color": "red" } },
       { "value": "ready_for_review", "label": "Ready for Review", "label:zh-CN": "待评审", "sortNo": 40, "status": "enabled", "extension": { "color": "amber" } },
       { "value": "released", "label": "Released", "label:zh-CN": "已发布", "sortNo": 50, "status": "enabled", "extension": { "color": "green" } },
-      { "value": "superseded", "label": "Superseded", "label:zh-CN": "已取代", "sortNo": 60, "status": "enabled", "extension": { "color": "purple" } }
+      { "value": "superseded", "label": "Superseded", "label:zh-CN": "已取代", "sortNo": 60, "status": "enabled", "extension": { "color": "gray" } }
     ]
   },
   {
@@ -4020,6 +4020,93 @@
       { "value": "success", "label": "Success", "label:zh-CN": "成功", "sortNo": 20, "status": "enabled", "extension": { "color": "green" } },
       { "value": "partial_success", "label": "Partial Success", "label:zh-CN": "部分成功", "sortNo": 30, "status": "enabled", "extension": { "color": "amber" } },
       { "value": "validation_failed", "label": "Validation Failed", "label:zh-CN": "校验失败", "sortNo": 40, "status": "enabled", "extension": { "color": "red" } }
+    ]
+  },
+  {
+    "code": "crm_customer_attention_reason",
+    "name": "Customer Attention Reason",
+    "name:zh-CN": "客户关注原因",
+    "dictType": "static",
+    "items": [
+      { "value": "service_risk", "label": "Service Risk", "label:zh-CN": "服务风险", "sortNo": 10, "status": "enabled", "extension": { "color": "red" } },
+      { "value": "health_risk", "label": "Health Risk", "label:zh-CN": "健康风险", "sortNo": 20, "status": "enabled", "extension": { "color": "red" } },
+      { "value": "pipeline", "label": "Open Pipeline", "label:zh-CN": "在途商机", "sortNo": 30, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "active", "label": "Active", "label:zh-CN": "关系正常", "sortNo": 40, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "watch", "label": "Watch", "label:zh-CN": "保持观察", "sortNo": 50, "status": "enabled", "extension": { "color": "gray" } }
+    ]
+  },
+  {
+    "code": "crm_lead_next_action",
+    "name": "Lead Next Action",
+    "name:zh-CN": "线索建议动作",
+    "dictType": "static",
+    "items": [
+      { "value": "assign_owner", "label": "Assign Owner", "label:zh-CN": "分配负责人", "sortNo": 10, "status": "enabled", "extension": { "color": "red" } },
+      { "value": "convert", "label": "Convert", "label:zh-CN": "转化商机", "sortNo": 20, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "qualify", "label": "Qualify", "label:zh-CN": "资格确认", "sortNo": 30, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "follow_up", "label": "Follow Up", "label:zh-CN": "立即跟进", "sortNo": 40, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "continue_nurture", "label": "Continue Nurture", "label:zh-CN": "继续培育", "sortNo": 50, "status": "enabled", "extension": { "color": "blue" } }
+    ]
+  },
+  {
+    "code": "crm_opportunity_next_action",
+    "name": "Opportunity Next Action",
+    "name:zh-CN": "商机建议动作",
+    "dictType": "static",
+    "items": [
+      { "value": "close_date_overdue", "label": "Close Date Overdue", "label:zh-CN": "关闭日期逾期", "sortNo": 10, "status": "enabled", "extension": { "color": "red" } },
+      { "value": "mitigate_risk", "label": "Mitigate Risk", "label:zh-CN": "处理风险", "sortNo": 20, "status": "enabled", "extension": { "color": "red" } },
+      { "value": "follow_up", "label": "Follow Up", "label:zh-CN": "恢复跟进", "sortNo": 30, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "prepare_quote", "label": "Prepare Quote", "label:zh-CN": "准备报价", "sortNo": 40, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "advance_stage", "label": "Advance Stage", "label:zh-CN": "推进阶段", "sortNo": 50, "status": "enabled", "extension": { "color": "blue" } }
+    ]
+  },
+  {
+    "code": "crm_forecast_status",
+    "name": "Forecast Status",
+    "name:zh-CN": "预测状态",
+    "dictType": "static",
+    "items": [
+      { "value": "draft", "label": "Draft", "label:zh-CN": "草稿", "sortNo": 10, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "submitted", "label": "Submitted", "label:zh-CN": "已提交", "sortNo": 20, "status": "enabled", "extension": { "color": "blue" } }
+    ]
+  },
+  {
+    "code": "crm_work_item_kind",
+    "name": "Work Item Kind",
+    "name:zh-CN": "工作项类型",
+    "dictType": "static",
+    "items": [
+      { "value": "task", "label": "Task", "label:zh-CN": "任务", "sortNo": 10, "status": "enabled" },
+      { "value": "complaint", "label": "Complaint", "label:zh-CN": "投诉", "sortNo": 20, "status": "enabled" }
+    ]
+  },
+  {
+    "code": "crm_work_item_status",
+    "name": "Work Item Status",
+    "name:zh-CN": "工作项状态",
+    "dictType": "static",
+    "items": [
+      { "value": "open", "label": "Open", "label:zh-CN": "待处理", "sortNo": 10, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "in_progress", "label": "In Progress", "label:zh-CN": "进行中", "sortNo": 20, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "investigating", "label": "Investigating", "label:zh-CN": "调查中", "sortNo": 30, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "resolved", "label": "Resolved", "label:zh-CN": "已解决", "sortNo": 40, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "done", "label": "Done", "label:zh-CN": "已完成", "sortNo": 50, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "closed", "label": "Closed", "label:zh-CN": "已关闭", "sortNo": 60, "status": "enabled", "extension": { "color": "gray" } }
+    ]
+  },
+  {
+    "code": "crm_work_attention_reason",
+    "name": "Work Attention Reason",
+    "name:zh-CN": "工作项关注原因",
+    "dictType": "static",
+    "items": [
+      { "value": "sla_breach", "label": "SLA Breach", "label:zh-CN": "SLA 违规", "sortNo": 10, "status": "enabled", "extension": { "color": "red" } },
+      { "value": "overdue", "label": "Overdue", "label:zh-CN": "已逾期", "sortNo": 20, "status": "enabled", "extension": { "color": "red" } },
+      { "value": "due_today", "label": "Due Today", "label:zh-CN": "今日到期", "sortNo": 30, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "service", "label": "Service Action", "label:zh-CN": "服务处理", "sortNo": 40, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "ready_to_close", "label": "Ready to Close", "label:zh-CN": "等待关闭", "sortNo": 50, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "task", "label": "Planned Task", "label:zh-CN": "计划任务", "sortNo": 60, "status": "enabled", "extension": { "color": "blue" } }
     ]
   }
 ]

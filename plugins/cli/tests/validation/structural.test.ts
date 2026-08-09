@@ -105,6 +105,31 @@ describe('validateStructural plugin manifest schema', () => {
     expect(result.errorCount).toBe(0);
   });
 
+  it('accepts runtime command handler parameters and aggregate concurrency controls', () => {
+    const plugin = pluginWithManifest({
+      pluginId: 'runtime-command-contract',
+      namespace: 'runtime_command_contract',
+      version: '1.0.0',
+    });
+    plugin.resourceFiles.set('commands', [{
+      code: 'crm:compile_qdp_revision',
+      modelCode: 'crm_qdp_revision_common',
+      type: 'custom',
+      handler: 'crm:release_qdp',
+      handlerParams: {
+        dslPersistence: false,
+        async: true,
+      },
+      concurrencyKey: 'crm:qdp:${payload.crm_qdp_customer_request_id}',
+      lockTimeoutMs: 8_000,
+    }]);
+
+    const result = validateStructural(plugin);
+
+    expect(result.messages.filter((message) => message.code === 'L1-RESOURCE')).toEqual([]);
+    expect(result.errorCount).toBe(0);
+  });
+
   it('rejects the removed top-level entryPoint field', () => {
     const result = validateStructural(
       pluginWithManifest({

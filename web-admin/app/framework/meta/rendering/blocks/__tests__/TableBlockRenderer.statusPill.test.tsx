@@ -29,8 +29,8 @@ vi.mock('react-router', () => ({
   useNavigate: () => vi.fn(),
 }));
 
-function makeRuntime(rows: Record<string, unknown>[]): SchemaRuntime {
-  const context: Record<string, unknown> = { locale: 'zh-CN', t: (key: string) => key, state: {} };
+function makeRuntime(rows: Record<string, unknown>[], locale = 'zh-CN'): SchemaRuntime {
+  const context: Record<string, unknown> = { locale, t: (key: string) => key, state: {} };
   return {
     getContext: () => context,
     getEvaluator: () => ({
@@ -91,5 +91,27 @@ describe('TableBlockRenderer status-pill renderType', () => {
     const pill = await screen.findByTestId('table-status-pill');
     expect(pill).toHaveTextContent('多候选待选择');
     expect(pill).toHaveClass('bg-status-amber-bg');
+  });
+
+  it('formats date and datetime cells with the runtime locale', () => {
+    const date = '2026-08-09T10:20:30Z';
+    const block = {
+      id: 'localized-dates',
+      blockType: 'table',
+      dataSource: 'rows',
+      columns: [
+        { field: 'dueDate', label: '日期', valueType: 'date' },
+        { field: 'updatedAt', label: '时间', valueType: 'datetime' },
+      ],
+    } as unknown as BlockConfig;
+    render(
+      <TableBlockRenderer
+        block={block}
+        runtime={makeRuntime([{ pid: 'r1', dueDate: date, updatedAt: date }], 'zh-CN')}
+      />,
+    );
+
+    expect(screen.getByText(new Date(date).toLocaleDateString('zh-CN'))).toBeInTheDocument();
+    expect(screen.getByText(new Date(date).toLocaleString('zh-CN'))).toBeInTheDocument();
   });
 });

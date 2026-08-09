@@ -17,6 +17,7 @@ import { WorkbenchActionBarBlockRenderer } from '../WorkbenchActionBarBlockRende
 import { EvidencePanelBlockRenderer } from '../EvidencePanelBlockRenderer';
 import { ArtifactTimelineBlockRenderer } from '../ArtifactTimelineBlockRenderer';
 import { StatusBannerBlockRenderer } from '../StatusBannerBlockRenderer';
+import { FiltersBlockRenderer } from '../FiltersBlockRenderer';
 import { useRuntimeStateSubscription } from '../workbenchBlockUtils';
 import { fetchResult } from '~/shared/services/http-client';
 
@@ -63,6 +64,29 @@ function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
   };
   return stub as unknown as SchemaRuntime;
 }
+
+describe('FiltersBlockRenderer', () => {
+  it('executes direct workbench search and reset actions without page-level handlers', async () => {
+    const runtime = makeRuntime() as any;
+    const block = {
+      id: 'queue_filters',
+      blockType: 'filters',
+      fields: [],
+      onSearch: { action: 'dataSource.reload', args: { dataSourceId: 'queue' } },
+      onReset: { action: 'state.set', args: { searchKeyword: '' } },
+    } as unknown as BlockConfig;
+
+    render(<FiltersBlockRenderer block={block} runtime={runtime} />);
+
+    fireEvent.click(screen.getByTestId('filter-btn-search'));
+    await waitFor(() => expect(runtime.__reload).toHaveBeenCalledWith('queue'));
+
+    fireEvent.click(screen.getByTestId('filter-btn-reset'));
+    await waitFor(() => expect(runtime.__updateState).toHaveBeenCalledWith(
+      'scope-1', 'searchKeyword', '',
+    ));
+  });
+});
 
 describe('MetricStripBlockRenderer', () => {
   it('renders a stable empty state when no metrics are configured', () => {
@@ -931,6 +955,29 @@ describe('WorkbenchActionBarBlockRenderer', () => {
 });
 
 describe('StatusBannerBlockRenderer', () => {
+  it('renders directly from a runtime-state context without a duplicate detail query', () => {
+    const runtime = makeRuntime() as any;
+    runtime.getContext().state.selectedQdp = {
+      crm_qdp_code: 'QDP-001',
+      crm_qdp_status: 'superseded',
+    };
+    const block: BlockConfig = {
+      id: 'qdp_status',
+      blockType: 'status-banner',
+      context: '${state.selectedQdp}',
+      statusField: 'crm_qdp_status',
+      titleMap: { superseded: 'Historical revision' },
+      summaryFields: [{ label: 'QDP Code', field: 'crm_qdp_code' }],
+    };
+
+    render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('status-banner-qdp_status')).toHaveTextContent(
+      'Historical revision',
+    );
+    expect(screen.getByTestId('status-banner-qdp_status')).toHaveTextContent('QDP-001');
+  });
+
   it('renders a running task banner and polls configured data sources', () => {
     vi.useFakeTimers();
     const reload = vi.fn().mockResolvedValue(undefined);

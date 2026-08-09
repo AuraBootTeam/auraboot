@@ -99,8 +99,13 @@ export function resolveRuntimeValue(runtime: SchemaRuntime, expression: unknown)
   if (typeof expression !== 'string') return expression;
   const trimmed = expression.trim();
   const match = trimmed.match(/^\$\{(.+)\}$/);
-  if (!match) return expression;
-  return readPath(runtime.getContext(), match[1]);
+  if (match) return readPath(runtime.getContext(), match[1]);
+
+  const context = runtime.getContext();
+  return expression.replace(/\$\{([^{}]+)\}/g, (_token, expressionPath: string) => {
+    const value = readPath(context, expressionPath.trim());
+    return value === undefined || value === null ? '' : String(value);
+  });
 }
 
 export function writeRuntimeState(runtime: SchemaRuntime, key: string, value: any): void {

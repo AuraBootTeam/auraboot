@@ -7,6 +7,7 @@ import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { FieldRenderer } from '~/framework/meta/rendering/FieldRenderer';
 import { useI18n } from '~/contexts/I18nContext';
+import { executeSimpleWorkbenchAction } from './workbenchBlockUtils';
 
 export interface FiltersBlockRendererProps {
   block: BlockConfig;
@@ -17,11 +18,20 @@ export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ bloc
   const { t } = useI18n();
   const fields = block.fields || [];
 
+  const executeFilterHandler = async (handler: unknown) => {
+    if (!handler) return;
+    if (typeof handler === 'string') {
+      await runtime.executeHandler(handler, {});
+      return;
+    }
+    await executeSimpleWorkbenchAction(runtime, handler);
+  };
+
   // 处理搜索
   const handleSearch = async () => {
     if (block.onSearch) {
       try {
-        await runtime.executeHandler(block.onSearch, {});
+        await executeFilterHandler(block.onSearch);
       } catch (err) {
         console.error('Search handler failed:', err);
       }
@@ -32,7 +42,7 @@ export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ bloc
   const handleReset = async () => {
     if (block.onReset) {
       try {
-        await runtime.executeHandler(block.onReset, {});
+        await executeFilterHandler(block.onReset);
       } catch (err) {
         console.error('Reset handler failed:', err);
       }

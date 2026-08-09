@@ -44,6 +44,16 @@ const HIDDEN_DEFAULT_TAB_CODES = new Set([
   'sc_workflow_dashboard',
   'sc_arsenal_dashboard',
 ]);
+const ACCESS_DENIED_PATTERN = /access forbidden|access denied|forbidden|permission denied|403/i;
+
+export function resolveDashboardErrorMessage(
+  message: string,
+  translate: (key: string) => string,
+): string {
+  return ACCESS_DENIED_PATTERN.test(message)
+    ? translate('dashboard.error.access_forbidden')
+    : message;
+}
 
 function getBrowserStorage(): Storage | null {
   if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
@@ -403,7 +413,7 @@ export default function DashboardViewerPage() {
 
         {!loading && error && (
           <div className="flex h-64 flex-col items-center justify-center text-red-500">
-            <p>{error}</p>
+            <p>{resolveDashboardErrorMessage(error, t)}</p>
             <button onClick={handleRefresh} className="mt-3 text-sm text-blue-600 hover:underline">
               {t('dashboard.retry')}
             </button>
