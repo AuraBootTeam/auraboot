@@ -19,11 +19,13 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.A
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.CreateWorkspace;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.CreateObserverSession;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.WorkspaceRow;
+import com.auraboot.framework.authoring.workspace.AuthoringOwnershipService.OwnershipContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -58,6 +60,7 @@ public class AuthoringWorkspaceService {
     private final AuthoringAggregatePolicyService aggregatePolicyService;
     private final AuthoringWorkspaceViewMapper viewMapper;
     private final AuthoringActiveReleaseResolver activeReleaseResolver;
+    private final AuthoringOwnershipService ownershipService;
 
     public AuthoringWorkspaceService(
             AuthoringCapabilityRegistry capabilityRegistry,
@@ -70,7 +73,8 @@ public class AuthoringWorkspaceService {
             AuthoringInteractionContextSanitizer interactionContextSanitizer,
             AuthoringAggregatePolicyService aggregatePolicyService,
             AuthoringWorkspaceViewMapper viewMapper,
-            AuthoringActiveReleaseResolver activeReleaseResolver) {
+            AuthoringActiveReleaseResolver activeReleaseResolver,
+            AuthoringOwnershipService ownershipService) {
         this.capabilityRegistry = capabilityRegistry;
         this.patchEngine = patchEngine;
         this.repository = repository;
@@ -82,6 +86,7 @@ public class AuthoringWorkspaceService {
         this.aggregatePolicyService = aggregatePolicyService;
         this.viewMapper = viewMapper;
         this.activeReleaseResolver = activeReleaseResolver;
+        this.ownershipService = ownershipService;
     }
 
     public CapabilityRegistryView capabilities() {
@@ -104,9 +109,19 @@ public class AuthoringWorkspaceService {
 
         ActiveRelease activeRelease = activeReleaseResolver.findByResource(
                 identity.tenantId(), identity.envId(), "PAGE_SCHEMA", page.getPid());
-        JsonNode snapshot = activeRelease == null
+        JsonNode sourceSnapshot = activeRelease == null
                 ? snapshotFactory.create(page)
                 : activeRelease.snapshot();
+        long baseVersion = activeRelease == null
+                ? snapshotFactory.baseVersion(page)
+                : activeRelease.channelVersion();
+        String baseChecksum = activeRelease == null
+                ? snapshotFactory.checksum(sourceSnapshot)
+                : activeRelease.snapshotChecksum();
+        OwnershipContext ownership = ownershipService.resolve(
+                page, identity.tenantId(), identity.envId(), identity.userId(),
+                baseVersion, baseChecksum);
+        JsonNode snapshot = ownershipService.decorate(sourceSnapshot, ownership);
         JsonNode interactionContext = interactionContextSanitizer.sanitize(request.interactionContext());
         String sessionPid = UniqueIdGenerator.generate();
         String changeSetPid = UniqueIdGenerator.generate();
@@ -121,21 +136,39 @@ public class AuthoringWorkspaceService {
                 UniqueIdGenerator.generate(),
                 page.getPid(),
                 snapshotFactory.title(page),
+                ownership.origin(),
+                ownership.ownershipScope(),
+                ownership.sourceOwnershipScope(),
+                ownership.sourceResourcePid(),
+                ownership.overridePid(),
                 activeRelease == null ? null : activeRelease.releasePid(),
-                activeRelease == null
-                        ? snapshotFactory.baseVersion(page)
-                        : activeRelease.channelVersion(),
-                activeRelease == null
-                        ? snapshotFactory.checksum(snapshot)
-                        : activeRelease.snapshotChecksum(),
+                baseVersion,
+                baseChecksum,
                 capabilityRegistry.checksum(),
                 snapshot,
                 interactionContext,
                 now.plus(SESSION_TTL),
                 now.plus(WRITER_LEASE)));
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("baseVersion", baseVersion);
+        metadata.put("ownershipScope", ownership.ownershipScope());
+        metadata.put("sourceOwnershipScope", ownership.sourceOwnershipScope());
+        metadata.put("sourceResourcePid", ownership.sourceResourcePid());
+        metadata.put("origin", ownership.origin());
+        metadata.put("overrideCreated", ownership.overrideCreated());
+        if (ownership.overridePid() != null) {
+            metadata.put("overridePid", ownership.overridePid());
+        }
         repository.audit(audit(identity, changeSetPid, sessionPid, "SESSION_OPENED", "ALLOW",
-                null, page.getPid(), null, null,
-                objectMapper.valueToTree(Map.of("baseVersion", snapshotFactory.baseVersion(page)))));
+                null, page.getPid(), null, null, metadata));
+        if (ownership.overridePid() != null) {
+            repository.audit(audit(
+                    identity, changeSetPid, sessionPid,
+                    ownership.overrideCreated()
+                            ? "TENANT_OVERRIDE_CREATED"
+                            : "TENANT_OVERRIDE_REUSED",
+                    "ALLOW", "SHARED_SOURCE_IMMUTABLE", page.getPid(), null, null, metadata));
+        }
         return viewMapper.toView(requireWorkspace(identity, sessionPid, false), identity.userId());
     }
 

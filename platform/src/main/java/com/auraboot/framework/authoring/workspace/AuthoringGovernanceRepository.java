@@ -40,7 +40,7 @@ public class AuthoringGovernanceRepository {
         return jdbcTemplate.query("""
                         SELECT cs.id AS change_set_id, cs.pid AS change_set_pid,
                                cs.tenant_id, cs.env_id, cs.owner_user_id, cs.title, cs.status,
-                               cs.revision, cs.risk_level, cs.route, cs.publish_policy,
+                               cs.origin, cs.revision, cs.risk_level, cs.route, cs.publish_policy,
                                cs.validation_state, cs.impact_state,
                                cs.approval_state, cs.publish_state,
                                cs.manifest_checksum, cs.base_release_pid,
@@ -49,7 +49,8 @@ public class AuthoringGovernanceRepository {
                                rd.id AS resource_draft_id, rd.pid AS resource_draft_pid,
                                rd.resource_pid, rd.base_version, rd.base_checksum,
                                rd.manifest_checksum AS draft_manifest_checksum,
-                               rd.snapshot::text,
+                               rd.snapshot::text, rd.ownership_scope,
+                               rd.source_ownership_scope, rd.source_resource_pid, rd.override_pid,
                                impact_run.dependency_checksum AS impact_dependency_checksum,
                                impact_run.dependencies::text AS impact_dependencies,
                                wl.session_id AS lease_session_id,
@@ -474,15 +475,15 @@ public class AuthoringGovernanceRepository {
         Long targetChangeSetId = jdbcTemplate.queryForObject("""
                 INSERT INTO ab_authoring_change_set (
                     pid, tenant_id, env_id, owner_user_id, title, status, revision,
-                    base_release_pid, manifest_checksum, risk_level, route, publish_policy,
+                    origin, base_release_pid, manifest_checksum, risk_level, route, publish_policy,
                     validation_state, approval_state, publish_state,
                     source_change_set_id, source_change_set_revision, lineage)
-                VALUES (?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?,
+                VALUES (?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?,
                         'UNVALIDATED', ?, 'DRAFT', ?, ?, ?::jsonb)
                 RETURNING id
                 """, Long.class,
                 command.targetChangeSetPid(), row.tenantId(), row.envId(), command.actorUserId(),
-                command.title(), targetRevision, row.baseReleasePid(), row.manifestChecksum(),
+                command.title(), targetRevision, row.origin(), row.baseReleasePid(), row.manifestChecksum(),
                 command.targetAggregate().riskLevel(), command.targetAggregate().route(),
                 command.targetAggregate().publishPolicy(), command.targetAggregate().approvalState(),
                 row.changeSetId(), row.revision(), json(command.lineage()));
@@ -493,13 +494,19 @@ public class AuthoringGovernanceRepository {
         Long targetDraftId = jdbcTemplate.queryForObject("""
                 INSERT INTO ab_authoring_resource_draft (
                     pid, tenant_id, env_id, change_set_id, resource_type, resource_pid,
+                    ownership_scope, source_ownership_scope, source_resource_pid, override_pid,
                     base_version, base_checksum, manifest_checksum, snapshot, revision,
                     validation_state)
-                VALUES (?, ?, ?, ?, 'PAGE_SCHEMA', ?, ?, ?, ?, ?::jsonb, ?, 'UNVALIDATED')
+                VALUES (
+                    ?, ?, ?, ?, 'PAGE_SCHEMA', ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?, ?::jsonb, ?,
+                    'UNVALIDATED')
                 RETURNING id
                 """, Long.class,
                 command.targetResourceDraftPid(), row.tenantId(), row.envId(), targetChangeSetId,
-                row.resourcePid(), row.baseVersion(), row.baseChecksum(),
+                row.resourcePid(), row.ownershipScope(), row.sourceOwnershipScope(),
+                row.sourceResourcePid(), row.overridePid(), row.baseVersion(), row.baseChecksum(),
                 row.draftManifestChecksum(), json(plan.targetSnapshot()), targetRevision);
         if (targetDraftId == null) {
             throw new ResponseStatusException(CONFLICT, "authoring.split.target-create-failed");
@@ -536,17 +543,19 @@ public class AuthoringGovernanceRepository {
                         pid, tenant_id, env_id, change_set_id, resource_draft_id, block_id,
                         property_path, operation, old_value, new_value, effect_tags,
                         risk_level, route, publish_policy, reversibility, manifest_checksum,
+                        ownership_scope, source_resource_pid, override_pid,
                         base_revision, result_revision, actor_user_id,
                         source_change_item_id, dependency_snapshot, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb,
-                            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)
+                            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)
                     RETURNING id
                     """, Long.class,
                     targetItemPid, row.tenantId(), row.envId(), targetChangeSetId, targetDraftId,
                     item.blockId(), item.propertyPath(), item.operation(),
                     nullableJson(item.oldValue()), nullableJson(item.newValue()),
                     json(item.effectTags()), item.riskLevel(), item.route(), item.publishPolicy(),
-                    item.reversibility(), item.manifestChecksum(), itemRevision, itemRevision + 1,
+                    item.reversibility(), item.manifestChecksum(), row.ownershipScope(),
+                    row.sourceResourcePid(), row.overridePid(), itemRevision, itemRevision + 1,
                     item.actorUserId(), item.id(), json(dependencies),
                     Timestamp.from(item.createdAt()));
             if (targetItemId == null) {
@@ -747,10 +756,12 @@ public class AuthoringGovernanceRepository {
         jdbcTemplate.update("""
                 INSERT INTO ab_authoring_release_item (
                     pid, tenant_id, env_id, release_id, resource_type, resource_pid,
+                    ownership_scope, source_resource_pid, override_pid,
                     source_version, snapshot, snapshot_checksum)
-                VALUES (?, ?, ?, ?, 'PAGE_SCHEMA', ?, ?, ?::jsonb, ?)
+                VALUES (?, ?, ?, ?, 'PAGE_SCHEMA', ?, ?, ?, ?, ?, ?::jsonb, ?)
                 """, releaseItemPid, row.tenantId(), row.envId(), releaseId,
-                row.resourcePid(), row.revision(), json(snapshot), snapshotChecksum);
+                row.resourcePid(), row.ownershipScope(), row.sourceResourcePid(), row.overridePid(),
+                row.revision(), json(snapshot), snapshotChecksum);
         long channelVersion = moveChannel(
                 row, channel, channelPid, releaseId, actorUserId);
         if (channel != null) {
@@ -909,7 +920,7 @@ public class AuthoringGovernanceRepository {
                 resultSet.getLong("change_set_id"), resultSet.getString("change_set_pid"),
                 resultSet.getLong("tenant_id"), resultSet.getLong("env_id"),
                 resultSet.getLong("owner_user_id"), resultSet.getString("title"),
-                resultSet.getString("status"),
+                resultSet.getString("status"), resultSet.getString("origin"),
                 resultSet.getLong("revision"), resultSet.getString("risk_level"),
                 resultSet.getString("route"), resultSet.getString("publish_policy"),
                 resultSet.getString("validation_state"),
@@ -926,6 +937,10 @@ public class AuthoringGovernanceRepository {
                 resultSet.getString("base_checksum"),
                 resultSet.getString("draft_manifest_checksum"),
                 parse(resultSet.getString("snapshot")),
+                resultSet.getString("ownership_scope"),
+                resultSet.getString("source_ownership_scope"),
+                resultSet.getString("source_resource_pid"),
+                resultSet.getString("override_pid"),
                 resultSet.getString("impact_dependency_checksum"),
                 nullableParse(resultSet.getString("impact_dependencies")),
                 resultSet.getLong("lease_session_id"),
@@ -987,6 +1002,7 @@ public class AuthoringGovernanceRepository {
             long ownerUserId,
             String title,
             String status,
+            String origin,
             long revision,
             String riskLevel,
             String route,
@@ -1007,6 +1023,10 @@ public class AuthoringGovernanceRepository {
             String baseChecksum,
             String draftManifestChecksum,
             JsonNode snapshot,
+            String ownershipScope,
+            String sourceOwnershipScope,
+            String sourceResourcePid,
+            String overridePid,
             String impactDependencyChecksum,
             JsonNode impactDependencies,
             long leaseSessionId,

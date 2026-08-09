@@ -36,6 +36,7 @@ import { AuthoringValidationNotice } from '~/framework/meta/authoring/AuthoringV
 import { AuthoringImpactNotice } from '~/framework/meta/authoring/AuthoringImpactNotice';
 import { AuthoringChangeSetSplitPanel } from '~/framework/meta/authoring/AuthoringChangeSetSplitPanel';
 import { AuthoringReleaseHistoryPanel } from '~/framework/meta/authoring/AuthoringReleaseHistoryPanel';
+import { AuthoringOwnershipNotice } from '~/framework/meta/authoring/AuthoringOwnershipNotice';
 import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
 import { AuthoringConflictResolutionPanel } from '../components/unified-designer/AuthoringConflictResolutionPanel';
 import type {
@@ -825,6 +826,8 @@ export default function UnifiedDesignerPage() {
         )}
       </div>
       <div className="px-4 pt-3">
+        <AuthoringOwnershipNotice ownership={authoringSession?.ownership} />
+        {authoringSession?.ownership?.tenantOverride ? <div className="h-2" /> : null}
         <AuthoringRiskSummary session={authoringSession!} />
         {authoringSession?.validationState === 'INVALID' ? (
           <div className="mt-2">

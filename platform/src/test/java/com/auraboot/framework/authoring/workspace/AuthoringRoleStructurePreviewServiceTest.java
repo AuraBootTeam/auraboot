@@ -158,6 +158,7 @@ class AuthoringRoleStructurePreviewServiceTest {
                 "session-1",
                 "changes-1",
                 "page-1",
+                null,
                 11L,
                 "DRAFT",
                 "AUTHORING",

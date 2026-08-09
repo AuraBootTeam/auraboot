@@ -3,6 +3,7 @@ package com.auraboot.framework.authoring.workspace;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ImpactDependencyView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ImpactSummaryView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OwnershipView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ValidationIssueView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ValidationSummaryView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.WriterLeaseView;
@@ -37,6 +38,16 @@ public class AuthoringWorkspaceViewMapper {
                 row.sessionPid(),
                 row.changeSetPid(),
                 row.pagePid(),
+                new OwnershipView(
+                        row.ownershipScope(),
+                        row.sourceOwnershipScope(),
+                        row.sourceResourcePid(),
+                        row.overridePid(),
+                        row.changeSetOrigin(),
+                        row.overridePid() != null,
+                        !"PLATFORM".equals(row.sourceOwnershipScope())
+                                && !"APPLICATION".equals(row.sourceOwnershipScope()),
+                        row.sourceOwnershipScope()),
                 row.changeSetOwnerUserId(),
                 row.changeSetStatus(),
                 row.workspaceMode(),

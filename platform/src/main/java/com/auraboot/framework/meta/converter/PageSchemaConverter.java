@@ -113,6 +113,8 @@ public abstract class PageSchemaConverter {
     @Mapping(target = "deletedFlag", constant = "false")
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "ownershipScope", ignore = true)
+    @Mapping(target = "ownershipRef", ignore = true)
     public abstract PageSchema toEntity(PageSchemaCreateRequest request);
 
     @AfterMapping
@@ -161,6 +163,8 @@ public abstract class PageSchemaConverter {
     @Mapping(target = "deletedFlag", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "ownershipScope", ignore = true)
+    @Mapping(target = "ownershipRef", ignore = true)
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     public abstract void updateEntity(@MappingTarget PageSchema target, PageSchemaUpdateRequest request);
 

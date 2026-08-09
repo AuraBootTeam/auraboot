@@ -39,6 +39,8 @@ public class AuthoringPageSnapshotFactory {
         put(snapshot, "profile", page.getProfile());
         putBoolean(snapshot, "isTemplate", page.getIsTemplate());
         put(snapshot, "pluginPid", page.getPluginPid());
+        put(snapshot, "ownershipScope", page.getOwnershipScope());
+        put(snapshot, "ownershipRef", page.getOwnershipRef());
         snapshot.set("title", parseOrDefault(page.getTitle(), objectMapper.createObjectNode()));
         snapshot.set("layout", parseOrDefault(page.getLayout(), objectMapper.createObjectNode()));
         snapshot.set("blocks", parseOrDefault(page.getBlocks(), objectMapper.createArrayNode()));
@@ -72,6 +74,9 @@ public class AuthoringPageSnapshotFactory {
     }
 
     public ResourceScope resourceScope(JsonNode snapshot) {
+        if ("TENANT".equals(snapshot.path("ownershipScope").asText())) {
+            return ResourceScope.CURRENT_PAGE;
+        }
         if (snapshot.path("isTemplate").asBoolean(false)
                 || !snapshot.path("pluginPid").asText("").isBlank()) {
             return ResourceScope.SHARED_PAGE;

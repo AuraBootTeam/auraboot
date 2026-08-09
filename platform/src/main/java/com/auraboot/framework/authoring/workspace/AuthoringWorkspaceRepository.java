@@ -34,23 +34,26 @@ public class AuthoringWorkspaceRepository {
         Long changeSetId = jdbcTemplate.queryForObject("""
                 INSERT INTO ab_authoring_change_set (
                     pid, tenant_id, env_id, owner_user_id, title, status, revision,
-                    base_release_pid, manifest_checksum, risk_level, route, publish_policy,
+                    origin, base_release_pid, manifest_checksum, risk_level, route, publish_policy,
                     validation_state, approval_state, publish_state)
-                VALUES (?, ?, ?, ?, ?, 'DRAFT', 1, ?, ?, 'L0', 'INLINE', 'DIRECT_ALLOWED',
+                VALUES (?, ?, ?, ?, ?, 'DRAFT', 1, ?, ?, ?, 'L0', 'INLINE', 'DIRECT_ALLOWED',
                         'UNVALIDATED', 'NOT_REQUIRED', 'DRAFT')
                 RETURNING id
                 """, Long.class,
                 command.changeSetPid(), command.tenantId(), command.envId(), command.actorUserId(),
-                command.title(), command.baseReleasePid(), command.registryChecksum());
+                command.title(), command.origin(), command.baseReleasePid(), command.registryChecksum());
         Long resourceDraftId = jdbcTemplate.queryForObject("""
                 INSERT INTO ab_authoring_resource_draft (
                     pid, tenant_id, env_id, change_set_id, resource_type, resource_pid,
+                    ownership_scope, source_ownership_scope, source_resource_pid, override_pid,
                     base_version, base_checksum, manifest_checksum, snapshot, revision)
-                VALUES (?, ?, ?, ?, 'PAGE_SCHEMA', ?, ?, ?, ?, ?::jsonb, 1)
+                VALUES (?, ?, ?, ?, 'PAGE_SCHEMA', ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, 1)
                 RETURNING id
                 """, Long.class,
                 command.resourceDraftPid(), command.tenantId(), command.envId(), changeSetId,
-                command.pagePid(), command.baseVersion(), command.baseChecksum(),
+                command.pagePid(), command.ownershipScope(), command.sourceOwnershipScope(),
+                command.sourceResourcePid(), command.overridePid(),
+                command.baseVersion(), command.baseChecksum(),
                 command.registryChecksum(), json(command.snapshot()));
         Long sessionId = jdbcTemplate.queryForObject("""
                 INSERT INTO ab_authoring_config_session (
@@ -85,6 +88,7 @@ public class AuthoringWorkspaceRepository {
                             cs.id AS change_set_id, cs.pid AS change_set_pid,
                             cs.owner_user_id AS change_set_owner_user_id,
                             cs.status AS change_set_status,
+                            cs.origin AS change_set_origin,
                             cs.revision AS change_set_revision, cs.risk_level, cs.route,
                             cs.publish_policy, cs.validation_state, cs.impact_state,
                             cs.approval_state,
@@ -104,6 +108,8 @@ public class AuthoringWorkspaceRepository {
                             impact_run.analyzed_at,
                             rd.id AS resource_draft_id, rd.pid AS resource_draft_pid,
                             rd.revision AS resource_revision, rd.snapshot::text,
+                            rd.ownership_scope, rd.source_ownership_scope,
+                            rd.source_resource_pid, rd.override_pid,
                             wl.id AS lease_id, wl.session_id AS lease_session_id,
                             wl.holder_user_id AS lease_holder_user_id,
                             wl.lease_revision, wl.leased_until
@@ -311,15 +317,18 @@ public class AuthoringWorkspaceRepository {
                     pid, tenant_id, env_id, change_set_id, resource_draft_id, block_id,
                     property_path, operation, old_value, new_value, effect_tags,
                     risk_level, route, publish_policy, reversibility, manifest_checksum,
+                    ownership_scope, source_resource_pid, override_pid,
                     base_revision, result_revision, actor_user_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb,
-                        ?, ?, ?, ?, ?, ?, ?, ?)
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 changeItemPid, workspace.tenantId(), workspace.envId(), workspace.changeSetId(),
                 workspace.resourceDraftId(), blockId, propertyPath, operation,
                 nullableJson(previousValue), nullableJson(savedValue), json(capability.effectTags()),
                 decision.risk().name(), decision.route().name(), decision.publishPolicy().name(),
-                capability.reversibility().name(), decision.manifestChecksum(), expectedRevision,
+                capability.reversibility().name(), decision.manifestChecksum(),
+                workspace.ownershipScope(), workspace.sourceResourcePid(), workspace.overridePid(),
+                expectedRevision,
                 expectedRevision + 1, actorUserId);
     }
 
@@ -411,6 +420,7 @@ public class AuthoringWorkspaceRepository {
                 resultSet.getString("change_set_pid"),
                 resultSet.getLong("change_set_owner_user_id"),
                 resultSet.getString("change_set_status"),
+                resultSet.getString("change_set_origin"),
                 resultSet.getLong("change_set_revision"),
                 resultSet.getString("risk_level"),
                 resultSet.getString("route"),
@@ -426,6 +436,10 @@ public class AuthoringWorkspaceRepository {
                 resultSet.getString("resource_draft_pid"),
                 resultSet.getLong("resource_revision"),
                 parse(resultSet.getString("snapshot")),
+                resultSet.getString("ownership_scope"),
+                resultSet.getString("source_ownership_scope"),
+                resultSet.getString("source_resource_pid"),
+                resultSet.getString("override_pid"),
                 resultSet.getLong("lease_id"),
                 resultSet.getLong("lease_session_id"),
                 resultSet.getLong("lease_holder_user_id"),
@@ -498,6 +512,11 @@ public class AuthoringWorkspaceRepository {
             String leasePid,
             String pagePid,
             String title,
+            String origin,
+            String ownershipScope,
+            String sourceOwnershipScope,
+            String sourceResourcePid,
+            String overridePid,
             String baseReleasePid,
             long baseVersion,
             String baseChecksum,
@@ -567,6 +586,7 @@ public class AuthoringWorkspaceRepository {
             String changeSetPid,
             long changeSetOwnerUserId,
             String changeSetStatus,
+            String changeSetOrigin,
             long changeSetRevision,
             String riskLevel,
             String route,
@@ -582,6 +602,10 @@ public class AuthoringWorkspaceRepository {
             String resourceDraftPid,
             long resourceRevision,
             JsonNode snapshot,
+            String ownershipScope,
+            String sourceOwnershipScope,
+            String sourceResourcePid,
+            String overridePid,
             long leaseId,
             long leaseSessionId,
             long leaseHolderUserId,

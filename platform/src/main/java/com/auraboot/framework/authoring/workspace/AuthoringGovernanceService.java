@@ -422,6 +422,12 @@ public class AuthoringGovernanceService {
         ObjectNode resource = resources.addObject();
         resource.put("resourceType", "PAGE_SCHEMA");
         resource.put("resourcePid", row.resourcePid());
+        resource.put("ownershipScope", row.ownershipScope());
+        resource.put("sourceOwnershipScope", row.sourceOwnershipScope());
+        resource.put("sourceResourcePid", row.sourceResourcePid());
+        if (row.overridePid() != null) {
+            resource.put("overridePid", row.overridePid());
+        }
         resource.put("snapshotChecksum", snapshotFactory.checksum(snapshot));
         resource.put("sourceRevision", row.revision());
         return manifest;

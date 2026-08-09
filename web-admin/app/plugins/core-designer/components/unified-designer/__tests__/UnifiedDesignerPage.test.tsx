@@ -227,6 +227,16 @@ describe('UnifiedDesignerPage', () => {
     permissionMock.canAdministerDesigner.mockReturnValue(false);
     const handoff = createHandoff('field_customer_name', '/props/label');
     const session = createAuthoringSession(createDocument('document_one', 'Isolated Draft'));
+    session.ownership = {
+      ownershipScope: 'TENANT',
+      sourceOwnershipScope: 'APPLICATION',
+      sourcePagePid: 'page_1',
+      overridePid: 'override_1',
+      origin: 'TENANT_OVERRIDE',
+      tenantOverride: true,
+      sourceMutable: false,
+      restoreTarget: 'APPLICATION',
+    };
     vi.mocked(consumeAuthoringHandoff).mockResolvedValue(handoff);
     vi.mocked(loadAuthoringSession).mockResolvedValue(session);
     vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
@@ -240,6 +250,12 @@ describe('UnifiedDesignerPage', () => {
     expect(loadAuthoringSession).toHaveBeenCalledWith('session_1');
     expect(loadPageSchemaV3).not.toHaveBeenCalled();
     expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('Isolated Draft');
+    expect(screen.getByTestId('authoring-ownership-notice')).toHaveTextContent(
+      '正在编辑租户派生层',
+    );
+    expect(screen.getByTestId('authoring-ownership-notice')).toHaveTextContent(
+      '来源页面 page_1保持不变',
+    );
     expect(screen.getByTestId('studio-handoff-read-only-reason')).toHaveTextContent(
       '缺少高级设计权限',
     );

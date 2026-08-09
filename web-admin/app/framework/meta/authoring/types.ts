@@ -4,10 +4,22 @@ import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 export type AuthoringMode = 'select' | 'interact';
 export type AuthoringNodeKind = 'page' | 'block' | 'field' | 'action';
 
+export interface AuthoringOwnership {
+  ownershipScope: 'TENANT';
+  sourceOwnershipScope: 'PLATFORM' | 'APPLICATION' | 'TENANT';
+  sourcePagePid: string;
+  overridePid?: string | null;
+  origin: 'DESIGN_STUDIO' | 'ENV_PROMOTION' | 'PRODUCTION_CONTEXTUAL_HOTFIX' | 'TENANT_OVERRIDE';
+  tenantOverride: boolean;
+  sourceMutable: boolean;
+  restoreTarget: 'PLATFORM' | 'APPLICATION' | 'TENANT';
+}
+
 export interface AuthoringSession {
   sessionPid: string;
   changeSetPid: string;
   pagePid: string;
+  ownership?: AuthoringOwnership;
   ownerUserId: number;
   changeSetStatus: string;
   workspaceMode: 'AUTHORING' | 'OBSERVER' | 'REVIEW';

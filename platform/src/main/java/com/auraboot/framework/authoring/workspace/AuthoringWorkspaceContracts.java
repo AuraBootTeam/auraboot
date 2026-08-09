@@ -165,10 +165,23 @@ public final class AuthoringWorkspaceContracts {
             Instant analyzedAt) {
     }
 
+    /** Effective authoring layer and immutable inherited-source lineage. */
+    public record OwnershipView(
+            String ownershipScope,
+            String sourceOwnershipScope,
+            String sourcePagePid,
+            String overridePid,
+            String origin,
+            boolean tenantOverride,
+            boolean sourceMutable,
+            String restoreTarget) {
+    }
+
     public record SessionView(
             String sessionPid,
             String changeSetPid,
             String pagePid,
+            OwnershipView ownership,
             long ownerUserId,
             String changeSetStatus,
             String workspaceMode,

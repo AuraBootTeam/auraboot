@@ -29,6 +29,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
             + "page_key, model_code, name, description, kind, schema_version, "
             + "profile, title, layout, blocks, meta_info, is_template, "
             + "template_category, sort_weight, published_at, tags, plugin_pid, "
+            + "ownership_scope, ownership_ref, "
             + "version, semver, row_version, created_at, updated_at, deleted_flag";
 
     // ==================== 幂等INSERT方法（统一使用） ====================
