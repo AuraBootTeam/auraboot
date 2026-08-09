@@ -392,6 +392,10 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     @Test
     void openAndPatchPersistsIsolatedRevisionedDraft() throws Exception {
         PageSchema page = insertPage("normal");
+        int outboxBefore = tableCount("ab_outbox");
+        int behaviorOutboxBefore = tableCount("ab_behavior_outcome_outbox");
+        int messageBefore = tableCount("ab_im_message");
+        int webhookBefore = tableCount("ab_webhook_delivery_log");
         ObjectNode context = objectMapper.createObjectNode();
         context.put("route", "/orders");
         context.put("recordPid", "record-1");
@@ -422,6 +426,10 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
 
         PageSchema unchanged = pageSchemaMapper.selectByPid(page.getPid());
         assertThat(unchanged.getBlocks()).contains("normal").doesNotContain("compact");
+        assertThat(tableCount("ab_outbox")).isEqualTo(outboxBefore);
+        assertThat(tableCount("ab_behavior_outcome_outbox")).isEqualTo(behaviorOutboxBefore);
+        assertThat(tableCount("ab_im_message")).isEqualTo(messageBefore);
+        assertThat(tableCount("ab_webhook_delivery_log")).isEqualTo(webhookBefore);
     }
 
     @Test
@@ -711,6 +719,20 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 "SELECT COUNT(*) FROM " + table + " WHERE pid = ?",
                 Integer.class,
                 pid);
+        return value == null ? 0 : value;
+    }
+
+    private int tableCount(String table) {
+        String sql = switch (table) {
+            case "ab_outbox" -> "SELECT COUNT(*) FROM ab_outbox";
+            case "ab_behavior_outcome_outbox" ->
+                    "SELECT COUNT(*) FROM ab_behavior_outcome_outbox";
+            case "ab_im_message" -> "SELECT COUNT(*) FROM ab_im_message";
+            case "ab_webhook_delivery_log" ->
+                    "SELECT COUNT(*) FROM ab_webhook_delivery_log";
+            default -> throw new IllegalArgumentException("Unexpected table");
+        };
+        Integer value = jdbcTemplate.queryForObject(sql, Integer.class);
         return value == null ? 0 : value;
     }
 

@@ -7,10 +7,12 @@ import {
   GitCompare,
   Layers3,
   LockKeyhole,
+  Loader2,
   MousePointer2,
   PanelLeft,
   PanelRight,
   Plus,
+  Save,
   Settings2,
   ShieldCheck,
   X,
@@ -22,9 +24,12 @@ import {
   AUTHORING_WRITE_BLOCKED_EVENT,
 } from '~/shared/services/http-client';
 import {
+  applyAuthoringPatch,
   createAuthoringHandoff,
+  loadAuthoringSession,
   loadAuthoringCapabilities,
   openAuthoringSession,
+  submitAuthoringSession,
 } from './authoringService';
 import type {
   AuthoringMode,
@@ -33,8 +38,10 @@ import type {
   CapabilityManifest,
   CapabilityRegistry,
   ContextualAuthoringSurfaceProps,
+  PendingAuthoringEdit,
   PropertyCapability,
 } from './types';
+import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 
 type HandoffIntent = 'PAGE_STRUCTURE' | 'NEW_PAGE' | 'MENU_STRUCTURE';
 
@@ -49,12 +56,21 @@ export function ContextualAuthoringSurface({
   schema,
   recordPid,
   children,
+  renderRuntime,
 }: ContextualAuthoringSurfaceProps) {
   const navigate = useNavigate();
   const canReadDesigner = usePermission('meta.designer.read');
   const canManageDesigner = usePermission('meta.designer.update');
   const canConfigure = canReadDesigner && canManageDesigner;
   const [session, setSession] = useState<AuthoringSession | null>(null);
+  const [workingSchema, setWorkingSchema] = useState<UnifiedSchema>(schema);
+  const [pendingEdits, setPendingEdits] = useState<Map<string, PendingAuthoringEdit>>(
+    () => new Map(),
+  );
+  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [diffOpen, setDiffOpen] = useState(false);
+  const [stale, setStale] = useState(false);
   const [capabilities, setCapabilities] = useState<CapabilityRegistry | null>(null);
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +85,7 @@ export function ContextualAuthoringSurface({
   const runtimeRootRef = useRef<HTMLDivElement | null>(null);
   const entryScrollRef = useRef({ x: 0, y: 0 });
 
-  const rootNode = useMemo(() => buildAuthoringTree(schema), [schema]);
+  const rootNode = useMemo(() => buildAuthoringTree(workingSchema), [workingSchema]);
   const nodeIndex = useMemo(() => indexTree(rootNode), [rootNode]);
   const selectedNode = nodeIndex.byId.get(selectedId) ?? rootNode;
   const effectiveMode: AuthoringMode = altPressed
@@ -94,6 +110,9 @@ export function ContextualAuthoringSurface({
         loadAuthoringCapabilities(),
       ]);
       setSession(opened);
+      setWorkingSchema(schemaFromSnapshot(schema, opened.snapshot));
+      setPendingEdits(new Map());
+      setStale(false);
       setCapabilities(registry);
       setSelectedId(schema.id);
     } catch (enterError) {
@@ -101,10 +120,13 @@ export function ContextualAuthoringSurface({
     } finally {
       setOpening(false);
     }
-  }, [canConfigure, opening, recordPid, schema.id]);
+  }, [canConfigure, opening, recordPid, schema]);
 
   const exit = useCallback(() => {
     setSession(null);
+    setWorkingSchema(schema);
+    setPendingEdits(new Map());
+    setStale(false);
     setCapabilities(null);
     setExplain(null);
     setError(null);
@@ -114,7 +136,7 @@ export function ContextualAuthoringSurface({
     requestAnimationFrame(() =>
       window.scrollTo(entryScrollRef.current.x, entryScrollRef.current.y),
     );
-  }, []);
+  }, [schema]);
 
   useEffect(() => {
     if (!session) return;
@@ -217,8 +239,10 @@ export function ContextualAuthoringSurface({
         '[data-authoring-node-id], [data-aura-block-id], [data-block-id]',
       );
       const sourceId =
-        element?.dataset.authoringNodeId || element?.dataset.auraBlockId || element?.dataset.blockId;
-      setSelectedId(sourceId ? nodeIndex.bySourceId.get(sourceId)?.id ?? schema.id : schema.id);
+        element?.dataset.authoringNodeId ||
+        element?.dataset.auraBlockId ||
+        element?.dataset.blockId;
+      setSelectedId(sourceId ? (nodeIndex.bySourceId.get(sourceId)?.id ?? schema.id) : schema.id);
       setInspectorOpen(true);
       return;
     }
@@ -252,6 +276,117 @@ export function ContextualAuthoringSurface({
     }
   };
 
+  const stageEdit = useCallback(
+    (node: AuthoringNode, property: PropertyCapability, value: unknown, remove = false) => {
+      if (!session || session.state !== 'ACTIVE') return;
+      const manifestChecksum = manifestByType.get(node.blockType)?.checksum;
+      if (!manifestChecksum) {
+        setError(`未找到 ${node.blockType} 的能力清单，无法保存该变更`);
+        return;
+      }
+      const previousValue = readSnapshotProperty(
+        session.snapshot,
+        node.sourceId,
+        property.propertyPath,
+      );
+      const operation = remove ? 'REMOVE' : previousValue === undefined ? 'ADD' : 'REPLACE';
+      const key = `${node.sourceId}:${property.propertyPath}`;
+      setPendingEdits((current) => {
+        const next = new Map(current);
+        if (
+          (remove && previousValue === undefined) ||
+          (!remove && valuesEqual(value, previousValue))
+        ) {
+          next.delete(key);
+        } else {
+          next.set(key, {
+            key,
+            blockId: node.sourceId,
+            blockLabel: node.label,
+            manifestChecksum,
+            property,
+            operation,
+            previousValue,
+            value,
+          });
+        }
+        setWorkingSchema(materializePendingSchema(schema, session.snapshot, next));
+        return next;
+      });
+      setError(null);
+      setStale(false);
+    },
+    [manifestByType, schema, session],
+  );
+
+  const saveChanges = useCallback(async () => {
+    if (!session || saving || pendingEdits.size === 0 || session.state !== 'ACTIVE') return;
+    setSaving(true);
+    setError(null);
+    let currentSession = session;
+    const remaining = new Map(pendingEdits);
+    try {
+      for (const edit of pendingEdits.values()) {
+        const result = await applyAuthoringPatch(
+          currentSession.sessionPid,
+          currentSession.revision,
+          edit.blockId,
+          edit.property.propertyPath,
+          edit.operation,
+          edit.value,
+          edit.manifestChecksum,
+        );
+        currentSession = result.session;
+        remaining.delete(edit.key);
+        setSession(currentSession);
+        setPendingEdits(new Map(remaining));
+      }
+      setWorkingSchema(schemaFromSnapshot(schema, currentSession.snapshot));
+      setStale(false);
+    } catch (saveFailure) {
+      setSession(currentSession);
+      setPendingEdits(new Map(remaining));
+      setWorkingSchema(materializePendingSchema(schema, currentSession.snapshot, remaining));
+      setStale(true);
+      setError(
+        saveFailure instanceof Error
+          ? `${saveFailure.message}；本地未保存变更已保留`
+          : '保存失败；本地未保存变更已保留',
+      );
+    } finally {
+      setSaving(false);
+    }
+  }, [pendingEdits, saving, schema, session]);
+
+  const refreshDraft = useCallback(async () => {
+    if (!session) return;
+    setError(null);
+    try {
+      const latest = await loadAuthoringSession(session.sessionPid);
+      setSession(latest);
+      setWorkingSchema(materializePendingSchema(schema, latest.snapshot, pendingEdits));
+      setStale(false);
+    } catch (refreshFailure) {
+      setError(refreshFailure instanceof Error ? refreshFailure.message : '无法刷新配置草稿');
+    }
+  }, [pendingEdits, schema, session]);
+
+  const submitForReview = useCallback(async () => {
+    if (!session || pendingEdits.size > 0 || submitting || session.state !== 'ACTIVE') return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await submitAuthoringSession(session.sessionPid, session.revision);
+      const latest = await loadAuthoringSession(session.sessionPid);
+      setSession(latest);
+      setWorkingSchema(schemaFromSnapshot(schema, latest.snapshot));
+    } catch (submitFailure) {
+      setError(submitFailure instanceof Error ? submitFailure.message : '无法提交评审');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [pendingEdits.size, schema, session, submitting]);
+
   if (!session) {
     return (
       <div className="relative" data-testid="contextual-authoring-runtime">
@@ -261,7 +396,7 @@ export function ContextualAuthoringSurface({
             type="button"
             onClick={enter}
             disabled={opening}
-            className="border-border-strong bg-panel text-text hover:bg-hover fixed bottom-6 right-6 z-30 inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-lg disabled:cursor-wait disabled:opacity-70"
+            className="border-border-strong bg-panel text-text hover:bg-hover fixed right-6 bottom-6 z-30 inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-lg disabled:cursor-wait disabled:opacity-70"
             data-testid="contextual-authoring-enter"
           >
             <Settings2 className="h-4 w-4" />
@@ -271,7 +406,7 @@ export function ContextualAuthoringSurface({
         {error ? (
           <div
             role="alert"
-            className="border-status-red bg-status-red-bg fixed bottom-20 right-6 z-30 max-w-sm rounded-lg border px-4 py-3 text-sm text-red-800 shadow-lg"
+            className="border-status-red bg-status-red-bg fixed right-6 bottom-20 z-30 max-w-sm rounded-lg border px-4 py-3 text-sm text-red-800 shadow-lg"
           >
             {error}
           </div>
@@ -316,7 +451,10 @@ export function ContextualAuthoringSurface({
         </div>
       ) : null}
       {error ? (
-        <div role="alert" className="border-status-red bg-status-red-bg mx-3 mt-3 rounded-md border px-3 py-2 text-sm text-red-800">
+        <div
+          role="alert"
+          className="border-status-red bg-status-red-bg mx-3 mt-3 rounded-md border px-3 py-2 text-sm text-red-800"
+        >
           {error}
         </div>
       ) : null}
@@ -348,7 +486,11 @@ export function ContextualAuthoringSurface({
                 {index > 0 ? <ChevronRight className="h-3.5 w-3.5" /> : null}
                 <button
                   type="button"
-                  className={node.id === selectedNode.id ? 'font-semibold text-blue-700' : 'hover:text-slate-900'}
+                  className={
+                    node.id === selectedNode.id
+                      ? 'font-semibold text-blue-700'
+                      : 'hover:text-slate-900'
+                  }
                   onClick={() => selectNode(node.id)}
                 >
                   {node.label}
@@ -367,7 +509,7 @@ export function ContextualAuthoringSurface({
             }}
             data-testid="contextual-authoring-canvas"
           >
-            {children}
+            {renderRuntime ? renderRuntime(workingSchema) : children}
           </div>
         </main>
 
@@ -385,10 +527,24 @@ export function ContextualAuthoringSurface({
               propertyPath: property?.propertyPath,
             })
           }
+          onEdit={stageEdit}
         />
       </div>
 
-      <ChangeDock session={session} />
+      <ChangeDock
+        session={session}
+        edits={[...pendingEdits.values()]}
+        saving={saving}
+        submitting={submitting}
+        stale={stale}
+        onDiff={() => setDiffOpen(true)}
+        onSave={saveChanges}
+        onRefresh={refreshDraft}
+        onSubmit={submitForReview}
+      />
+      {diffOpen ? (
+        <DiffDialog edits={[...pendingEdits.values()]} onClose={() => setDiffOpen(false)} />
+      ) : null}
       {explain ? (
         <ExplainDialog
           state={explain}
@@ -425,18 +581,31 @@ function AuthoringToolbar({
         <ShieldCheck className="h-5 w-5 shrink-0 text-blue-600" />
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-slate-900">配置模式</div>
-          <div className="truncate text-xs text-amber-700">当前为只读配置桥；不会写入业务数据</div>
+          <div className="truncate text-xs text-emerald-700">
+            安全编辑写入隔离 ChangeSet；不会写入业务数据
+          </div>
         </div>
       </div>
-      <button type="button" className="border-border inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm text-slate-700 hover:bg-slate-50 lg:hidden" onClick={onOutline}>
-        <PanelLeft className="h-4 w-4" />大纲
+      <button
+        type="button"
+        className="border-border inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm text-slate-700 hover:bg-slate-50 lg:hidden"
+        onClick={onOutline}
+      >
+        <PanelLeft className="h-4 w-4" />
+        大纲
       </button>
-      <div className="border-border flex rounded-md border bg-slate-50 p-0.5" role="group" aria-label="配置模式">
+      <div
+        className="border-border flex rounded-md border bg-slate-50 p-0.5"
+        role="group"
+        aria-label="配置模式"
+      >
         <ModeButton active={mode === 'select'} onClick={() => onModeChange('select')}>
-          <MousePointer2 className="h-4 w-4" />选择
+          <MousePointer2 className="h-4 w-4" />
+          选择
         </ModeButton>
         <ModeButton active={mode === 'interact'} onClick={() => onModeChange('interact')}>
-          <Eye className="h-4 w-4" />交互预览
+          <Eye className="h-4 w-4" />
+          交互预览
         </ModeButton>
       </div>
       {temporaryMode ? <span className="text-xs text-blue-700">Alt 临时切换</span> : null}
@@ -447,27 +616,52 @@ function AuthoringToolbar({
       >
         <option value="current">当前角色结构</option>
       </select>
-      <button type="button" className="border-border inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm text-slate-700 hover:bg-slate-50" onClick={onNewPage}>
-        <Plus className="h-4 w-4" />新页面 / 菜单
+      <button
+        type="button"
+        className="border-border inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm text-slate-700 hover:bg-slate-50"
+        onClick={onNewPage}
+      >
+        <Plus className="h-4 w-4" />
+        新页面 / 菜单
       </button>
-      <button type="button" className="border-border inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm text-slate-700 hover:bg-slate-50 lg:hidden" onClick={onInspector}>
-        <PanelRight className="h-4 w-4" />属性
+      <button
+        type="button"
+        className="border-border inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm text-slate-700 hover:bg-slate-50 lg:hidden"
+        onClick={onInspector}
+      >
+        <PanelRight className="h-4 w-4" />
+        属性
       </button>
-      <button type="button" className="border-border inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm text-slate-700 hover:bg-slate-50" onClick={onExit}>
-        <X className="h-4 w-4" />退出
+      <button
+        type="button"
+        className="border-border inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm text-slate-700 hover:bg-slate-50"
+        onClick={onExit}
+      >
+        <X className="h-4 w-4" />
+        退出
       </button>
     </header>
   );
 }
 
-function ModeButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function ModeButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       type="button"
       aria-pressed={active}
       onClick={onClick}
       className={`inline-flex min-h-8 items-center gap-1.5 rounded px-2.5 text-sm ${
-        active ? 'bg-white font-medium text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+        active
+          ? 'bg-white font-medium text-blue-700 shadow-sm'
+          : 'text-slate-500 hover:text-slate-900'
       }`}
     >
       {children}
@@ -504,21 +698,35 @@ function OutlinePanel({
   );
 }
 
-function OutlineNode({ node, selectedId, onSelect }: { node: AuthoringNode; selectedId: string; onSelect: (id: string) => void }) {
+function OutlineNode({
+  node,
+  selectedId,
+  onSelect,
+}: {
+  node: AuthoringNode;
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
   return (
     <div>
       <button
         type="button"
         onClick={() => onSelect(node.id)}
         className={`flex min-h-9 w-full items-center gap-2 rounded-md px-2 text-left text-sm ${
-          node.id === selectedId ? 'bg-blue-50 font-medium text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+          node.id === selectedId
+            ? 'bg-blue-50 font-medium text-blue-700'
+            : 'text-slate-700 hover:bg-slate-50'
         }`}
         style={{ paddingLeft: `${Math.min(node.depth * 14 + 8, 64)}px` }}
         data-testid={`authoring-outline-${node.id}`}
       >
-        {node.kind === 'page' ? <Layers3 className="h-4 w-4" /> : <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />}
+        {node.kind === 'page' ? (
+          <Layers3 className="h-4 w-4" />
+        ) : (
+          <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+        )}
         <span className="truncate">{node.label}</span>
-        <span className="ml-auto text-[10px] uppercase text-slate-400">{node.kind}</span>
+        <span className="ml-auto text-[10px] text-slate-400 uppercase">{node.kind}</span>
       </button>
       {node.children.map((child) => (
         <OutlineNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} />
@@ -534,6 +742,7 @@ function InspectorPanel({
   open,
   onClose,
   onHandoff,
+  onEdit,
 }: {
   node: AuthoringNode;
   manifest?: CapabilityManifest;
@@ -541,6 +750,12 @@ function InspectorPanel({
   open: boolean;
   onClose: () => void;
   onHandoff: (property?: PropertyCapability) => void;
+  onEdit: (
+    node: AuthoringNode,
+    property: PropertyCapability,
+    value: unknown,
+    remove?: boolean,
+  ) => void;
 }) {
   const properties = Object.values(manifest?.properties ?? {}).sort((left, right) =>
     left.propertyPath.localeCompare(right.propertyPath),
@@ -556,9 +771,11 @@ function InspectorPanel({
       <PanelHeader title="属性检查器" onClose={onClose} />
       <div className="space-y-4 p-4">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">当前对象</div>
+          <div className="text-xs font-semibold tracking-wide text-slate-400 uppercase">
+            当前对象
+          </div>
           <div className="mt-1 text-base font-semibold text-slate-900">{node.label}</div>
-          <div className="mt-1 break-all font-mono text-xs text-slate-500">{node.sourceId}</div>
+          <div className="mt-1 font-mono text-xs break-all text-slate-500">{node.sourceId}</div>
         </div>
         <div className="grid grid-cols-2 gap-2 text-xs">
           <StatusCell label="风险" value={session.riskLevel} />
@@ -567,32 +784,23 @@ function InspectorPanel({
           <StatusCell label="修订" value={`r${session.revision}`} />
         </div>
         <div className="border-status-amber bg-status-amber-bg rounded-md border p-3 text-xs text-amber-900">
-          M1 为只读配置桥。下列能力来自服务端可信清单；写态将在安全编辑切片启用。
+          下列能力来自服务端可信清单；就地修改先保存在浏览器，点击“保存”后仅写入隔离 ChangeSet。
         </div>
         <div>
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">可配置属性</div>
+          <div className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase">
+            可配置属性
+          </div>
           {properties.length ? (
             <div className="space-y-2">
               {properties.map((property) => (
-                <button
-                  type="button"
+                <PropertyEditor
                   key={property.propertyPath}
-                  onClick={() =>
-                    property.route === 'HANDOFF_STUDIO' ? onHandoff(property) : undefined
-                  }
-                  className={`border-border w-full rounded-md border p-2 text-left ${
-                    property.route === 'HANDOFF_STUDIO' ? 'hover:border-blue-300 hover:bg-blue-50' : ''
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <code className="min-w-0 flex-1 truncate text-xs text-slate-700">{property.propertyPath}</code>
-                    <RiskBadge risk={property.risk} />
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                    <span>{routeLabel(property.route)}</span>
-                    {property.route === 'HANDOFF_STUDIO' ? <span className="text-blue-700">高级设置 ↗</span> : null}
-                  </div>
-                </button>
+                  node={node}
+                  property={property}
+                  disabled={session.state !== 'ACTIVE'}
+                  onEdit={onEdit}
+                  onHandoff={() => onHandoff(property)}
+                />
               ))}
             </div>
           ) : (
@@ -606,40 +814,330 @@ function InspectorPanel({
           onClick={() => onHandoff()}
           className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
         >
-          <Settings2 className="h-4 w-4" />高级设置
+          <Settings2 className="h-4 w-4" />
+          高级设置
         </button>
       </div>
     </aside>
   );
 }
 
-function ChangeDock({ session }: { session: AuthoringSession }) {
+function PropertyEditor({
+  node,
+  property,
+  disabled,
+  onEdit,
+  onHandoff,
+}: {
+  node: AuthoringNode;
+  property: PropertyCapability;
+  disabled: boolean;
+  onEdit: (
+    node: AuthoringNode,
+    property: PropertyCapability,
+    value: unknown,
+    remove?: boolean,
+  ) => void;
+  onHandoff: () => void;
+}) {
+  const value = readPointer(node.source, property.propertyPath);
+  const editable = property.route === 'INLINE' || property.route === 'GUIDED_INLINE';
+  const kind = propertyEditorKind(property.propertyPath, value);
+  const fieldId = `authoring-property-${node.id}-${property.propertyPath}`.replace(
+    /[^A-Za-z0-9_-]/g,
+    '-',
+  );
+
+  if (!editable) {
+    return (
+      <button
+        type="button"
+        onClick={property.route === 'HANDOFF_STUDIO' ? onHandoff : undefined}
+        disabled={property.route !== 'HANDOFF_STUDIO'}
+        className={`border-border w-full rounded-md border p-2 text-left ${
+          property.route === 'HANDOFF_STUDIO'
+            ? 'hover:border-blue-300 hover:bg-blue-50'
+            : 'cursor-not-allowed opacity-70'
+        }`}
+      >
+        <PropertyHeader property={property} />
+        <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+          <span>{routeLabel(property.route)}</span>
+          {property.route === 'HANDOFF_STUDIO' ? (
+            <span className="text-blue-700">高级设置 ↗</span>
+          ) : null}
+        </div>
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className="border-border rounded-md border p-2"
+      data-testid={`authoring-property-${property.propertyPath}`}
+    >
+      <label htmlFor={fieldId} className="block">
+        <PropertyHeader property={property} />
+        <span className="mt-1 block text-[11px] text-slate-500">
+          {routeLabel(property.route)}
+          {property.rolePreviewRequired ? ' · 保存后需角色复核' : ''}
+        </span>
+      </label>
+      <div className="mt-2 flex items-start gap-2">
+        {kind === 'boolean' ? (
+          <select
+            id={fieldId}
+            value={value === true ? 'true' : value === false ? 'false' : ''}
+            disabled={disabled}
+            onChange={(event) => {
+              if (event.target.value === '') onEdit(node, property, undefined, true);
+              else onEdit(node, property, event.target.value === 'true');
+            }}
+            className="border-border min-h-9 min-w-0 flex-1 rounded-md border bg-white px-2 text-sm"
+          >
+            <option value="">未设置</option>
+            <option value="true">显示 / 是</option>
+            <option value="false">隐藏 / 否</option>
+          </select>
+        ) : kind === 'number' ? (
+          <input
+            id={fieldId}
+            type="number"
+            value={typeof value === 'number' ? value : ''}
+            disabled={disabled}
+            onChange={(event) => {
+              if (event.target.value === '') onEdit(node, property, undefined, true);
+              else onEdit(node, property, Number(event.target.value));
+            }}
+            className="border-border min-h-9 min-w-0 flex-1 rounded-md border px-2 text-sm"
+          />
+        ) : kind === 'json' ? (
+          <textarea
+            id={fieldId}
+            rows={3}
+            value={formatEditorValue(value)}
+            disabled={disabled}
+            onChange={(event) => {
+              const parsed = parseEditorJson(event.target.value);
+              if (parsed.ok) onEdit(node, property, parsed.value);
+            }}
+            className="border-border min-w-0 flex-1 rounded-md border px-2 py-1.5 font-mono text-xs"
+            aria-describedby={`${fieldId}-hint`}
+          />
+        ) : (
+          <input
+            id={fieldId}
+            type="text"
+            value={typeof value === 'string' ? value : ''}
+            disabled={disabled}
+            onChange={(event) => onEdit(node, property, event.target.value)}
+            className="border-border min-h-9 min-w-0 flex-1 rounded-md border px-2 text-sm"
+          />
+        )}
+        <button
+          type="button"
+          disabled={disabled || value === undefined}
+          onClick={() => onEdit(node, property, undefined, true)}
+          className="border-border min-h-9 rounded-md border px-2 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+        >
+          重置
+        </button>
+      </div>
+      {kind === 'json' ? (
+        <p id={`${fieldId}-hint`} className="mt-1 text-[11px] text-slate-500">
+          JSON 格式；无效输入不会进入待保存变更。
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function PropertyHeader({ property }: { property: PropertyCapability }) {
+  return (
+    <span className="flex items-center gap-2">
+      <code className="min-w-0 flex-1 truncate text-xs text-slate-700">
+        {propertyLabel(property.propertyPath)}
+      </code>
+      <RiskBadge risk={property.risk} />
+    </span>
+  );
+}
+
+function ChangeDock({
+  session,
+  edits,
+  saving,
+  submitting,
+  stale,
+  onDiff,
+  onSave,
+  onRefresh,
+  onSubmit,
+}: {
+  session: AuthoringSession;
+  edits: PendingAuthoringEdit[];
+  saving: boolean;
+  submitting: boolean;
+  stale: boolean;
+  onDiff: () => void;
+  onSave: () => void;
+  onRefresh: () => void;
+  onSubmit: () => void;
+}) {
+  const validationErrors = session.validationState === 'INVALID' ? 1 : 0;
+  const readonly = session.state !== 'ACTIVE';
   return (
     <footer className="border-border bg-panel sticky bottom-0 z-20 flex min-h-14 flex-wrap items-center gap-3 border-t px-3 py-2 text-sm">
       <div className="mr-auto flex flex-wrap items-center gap-3">
-        <strong className="text-slate-900">0 项未保存</strong>
+        <strong className="text-slate-900">{edits.length} 项未保存</strong>
         <span className="text-slate-600">{Math.max(0, session.revision - 1)} 项草稿变更</span>
-        <span className="text-slate-600">0 个校验错误</span>
+        <span className={validationErrors ? 'text-red-700' : 'text-slate-600'}>
+          {validationErrors} 个校验错误
+        </span>
+        {readonly ? (
+          <span className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+            {session.state === 'READ_ONLY' ? '已提交，当前只读' : session.state}
+          </span>
+        ) : null}
       </div>
-      <DockButton icon={<GitCompare className="h-4 w-4" />} label="差异" />
-      <DockButton label="保存" />
-      <DockButton icon={<Eye className="h-4 w-4" />} label="预览" />
-      <DockButton label="提交评审" />
-      <span className="w-full text-right text-[11px] text-slate-500 sm:w-auto">只读桥接阶段</span>
+      {stale ? (
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="border-status-amber text-status-amber inline-flex min-h-9 items-center gap-1.5 rounded-md border px-3 text-sm"
+        >
+          刷新基线并保留本地变更
+        </button>
+      ) : null}
+      <DockButton
+        icon={<GitCompare className="h-4 w-4" />}
+        label="差异"
+        disabled={edits.length === 0}
+        onClick={onDiff}
+      />
+      <DockButton
+        icon={saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+        label={saving ? '保存中…' : '保存'}
+        disabled={readonly || saving || edits.length === 0}
+        onClick={onSave}
+      />
+      <DockButton icon={<Eye className="h-4 w-4" />} label="实时预览" disabled />
+      <DockButton
+        label={submitting ? '提交中…' : '提交评审'}
+        disabled={
+          readonly ||
+          submitting ||
+          edits.length > 0 ||
+          validationErrors > 0 ||
+          session.revision <= 1
+        }
+        onClick={onSubmit}
+      />
     </footer>
   );
 }
 
-function DockButton({ icon, label }: { icon?: React.ReactNode; label: string }) {
+function DockButton({
+  icon,
+  label,
+  disabled = false,
+  onClick,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  disabled?: boolean;
+  onClick?: () => void;
+}) {
   return (
     <button
       type="button"
-      disabled
-      title="M1 只读配置桥暂不开放写入"
-      className="border-border inline-flex min-h-9 items-center gap-1.5 rounded-md border px-3 text-sm text-slate-400 disabled:cursor-not-allowed"
+      disabled={disabled}
+      onClick={onClick}
+      className="border-border inline-flex min-h-9 items-center gap-1.5 rounded-md border px-3 text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
     >
-      {icon}{label}
+      {icon}
+      {label}
     </button>
+  );
+}
+
+function DiffDialog({ edits, onClose }: { edits: PendingAuthoringEdit[]; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="authoring-diff-title"
+    >
+      <div className="bg-panel flex max-h-[80vh] w-full max-w-3xl flex-col rounded-xl border border-slate-200 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 p-4">
+          <div>
+            <h2 id="authoring-diff-title" className="font-semibold text-slate-900">
+              待保存差异
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              仅展示当前浏览器尚未写入 ChangeSet 的变更。
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="关闭差异"
+            className="rounded p-2 hover:bg-slate-100"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-4">
+          {edits.length ? (
+            <div className="space-y-3">
+              {edits.map((edit) => (
+                <div key={edit.key} className="border-border rounded-lg border p-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <strong>{edit.blockLabel}</strong>
+                    <code className="text-xs text-slate-500">{edit.property.propertyPath}</code>
+                    <RiskBadge risk={edit.property.risk} />
+                    <span className="ml-auto text-xs text-slate-500">{edit.operation}</span>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <DiffValue label="之前" value={edit.previousValue} tone="old" />
+                    <DiffValue
+                      label="之后"
+                      value={edit.operation === 'REMOVE' ? undefined : edit.value}
+                      tone="new"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed p-6 text-center text-sm text-slate-500">
+              没有待保存变更
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end border-t border-slate-200 p-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="border-border min-h-10 rounded-md border px-4 text-sm"
+          >
+            返回配置
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DiffValue({ label, value, tone }: { label: string; value: unknown; tone: 'old' | 'new' }) {
+  return (
+    <div className={tone === 'old' ? 'rounded bg-red-50 p-2' : 'rounded bg-emerald-50 p-2'}>
+      <div className="text-[11px] font-semibold text-slate-500 uppercase">{label}</div>
+      <pre className="mt-1 text-xs break-all whitespace-pre-wrap text-slate-700">
+        {formatDiffValue(value)}
+      </pre>
+    </div>
   );
 }
 
@@ -657,26 +1155,56 @@ function ExplainDialog({
   onContinue: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4" role="dialog" aria-modal="true" aria-labelledby="handoff-title">
+    <div
+      className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="handoff-title"
+    >
       <div className="bg-panel w-full max-w-lg rounded-xl border border-slate-200 shadow-2xl">
         <div className="flex items-start gap-3 border-b border-slate-200 p-5">
-          <div className="rounded-full bg-amber-100 p-2 text-amber-700"><AlertTriangle className="h-5 w-5" /></div>
+          <div className="rounded-full bg-amber-100 p-2 text-amber-700">
+            <AlertTriangle className="h-5 w-5" />
+          </div>
           <div>
-            <h2 id="handoff-title" className="font-semibold text-slate-900">{state.title}</h2>
+            <h2 id="handoff-title" className="font-semibold text-slate-900">
+              {state.title}
+            </h2>
             <p className="mt-1 text-sm text-slate-600">{state.reason}</p>
           </div>
         </div>
         <div className="space-y-3 p-5 text-sm">
           <div className="rounded-md bg-slate-50 p-3">
-            <div><span className="text-slate-500">目标对象：</span>{node.label}</div>
-            <div className="mt-1"><span className="text-slate-500">携带内容：</span>当前 ChangeSet、选择对象、返回位置</div>
-            <div className="mt-1"><span className="text-slate-500">安全方式：</span>10 分钟、本人/本租户/本环境绑定、一次性 contextId</div>
+            <div>
+              <span className="text-slate-500">目标对象：</span>
+              {node.label}
+            </div>
+            <div className="mt-1">
+              <span className="text-slate-500">携带内容：</span>当前 ChangeSet、选择对象、返回位置
+            </div>
+            <div className="mt-1">
+              <span className="text-slate-500">安全方式：</span>10
+              分钟、本人/本租户/本环境绑定、一次性 contextId
+            </div>
           </div>
-          <p className="text-xs text-slate-500">URL 不包含 pagePid、recordPid 或业务筛选；应用设计中心会重新检查权限。</p>
+          <p className="text-xs text-slate-500">
+            URL 不包含 pagePid、recordPid 或业务筛选；应用设计中心会重新检查权限。
+          </p>
         </div>
         <div className="flex justify-end gap-2 border-t border-slate-200 p-4">
-          <button type="button" onClick={onCancel} className="border-border min-h-10 rounded-md border px-4 text-sm text-slate-700 hover:bg-slate-50">取消</button>
-          <button type="button" onClick={onContinue} disabled={pending} className="min-h-10 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="border-border min-h-10 rounded-md border px-4 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            onClick={onContinue}
+            disabled={pending}
+            className="min-h-10 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          >
             {pending ? '正在建立安全上下文…' : '继续到应用设计中心'}
           </button>
         </div>
@@ -689,17 +1217,36 @@ function PanelHeader({ title, onClose }: { title: string; onClose: () => void })
   return (
     <div className="border-border flex min-h-12 items-center justify-between border-b px-4">
       <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-      <button type="button" onClick={onClose} className="rounded p-1 text-slate-500 hover:bg-slate-100 lg:hidden" aria-label={`关闭${title}`}><X className="h-4 w-4" /></button>
+      <button
+        type="button"
+        onClick={onClose}
+        className="rounded p-1 text-slate-500 hover:bg-slate-100 lg:hidden"
+        aria-label={`关闭${title}`}
+      >
+        <X className="h-4 w-4" />
+      </button>
     </div>
   );
 }
 
 function StatusCell({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-md bg-slate-50 p-2"><div className="text-slate-400">{label}</div><div className="mt-0.5 font-semibold text-slate-700">{value}</div></div>;
+  return (
+    <div className="rounded-md bg-slate-50 p-2">
+      <div className="text-slate-400">{label}</div>
+      <div className="mt-0.5 font-semibold text-slate-700">{value}</div>
+    </div>
+  );
 }
 
 function RiskBadge({ risk }: { risk: string }) {
-  const tone = risk === 'L0' ? 'bg-emerald-100 text-emerald-700' : risk === 'L1' ? 'bg-blue-100 text-blue-700' : risk === 'L2' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700';
+  const tone =
+    risk === 'L0'
+      ? 'bg-emerald-100 text-emerald-700'
+      : risk === 'L1'
+        ? 'bg-blue-100 text-blue-700'
+        : risk === 'L2'
+          ? 'bg-amber-100 text-amber-700'
+          : 'bg-red-100 text-red-700';
   return <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${tone}`}>{risk}</span>;
 }
 
@@ -760,20 +1307,33 @@ function buildBlockNode(
     }
   });
   addLeafNodes(node, 'field', listValues(block.fields));
-  const table = block.table && typeof block.table === 'object' ? (block.table as Record<string, unknown>) : null;
-  addLeafNodes(node, 'field', listValues(block.columns).length ? listValues(block.columns) : listValues(table?.columns));
+  const table =
+    block.table && typeof block.table === 'object'
+      ? (block.table as Record<string, unknown>)
+      : null;
+  addLeafNodes(
+    node,
+    'field',
+    listValues(block.columns).length ? listValues(block.columns) : listValues(table?.columns),
+  );
   addLeafNodes(node, 'action', listValues(block.buttons));
   addLeafNodes(node, 'action', listValues(block.rowActions));
   addLeafNodes(node, 'action', listValues(table?.rowActions));
   listValues(block.tabs).forEach((tab, tabIndex) => {
     listValues(tab.blocks).forEach((child, childIndex) => {
-      node.children.push(buildBlockNode(child, node.id, depth + 1, `tab-${tabIndex}-${childIndex}`));
+      node.children.push(
+        buildBlockNode(child, node.id, depth + 1, `tab-${tabIndex}-${childIndex}`),
+      );
     });
   });
   return node;
 }
 
-function addLeafNodes(parent: AuthoringNode, kind: 'field' | 'action', values: Record<string, unknown>[]) {
+function addLeafNodes(
+  parent: AuthoringNode,
+  kind: 'field' | 'action',
+  values: Record<string, unknown>[],
+) {
   values.forEach((value, index) => {
     const identity = String(value.id || value.field || value.code || `${kind}-${index}`);
     parent.children.push({
@@ -792,7 +1352,9 @@ function addLeafNodes(parent: AuthoringNode, kind: 'field' | 'action', values: R
 
 function listValues(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value)
-    ? value.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+    ? value.filter((item): item is Record<string, unknown> =>
+        Boolean(item && typeof item === 'object'),
+      )
     : [];
 }
 
@@ -850,7 +1412,9 @@ function blockTypeLabel(blockType: string): string {
 }
 
 function isSafePreviewInteraction(target: HTMLElement): boolean {
-  const interactive = target.closest<HTMLElement>('button, a, input, select, textarea, [role="tab"], [role="button"]');
+  const interactive = target.closest<HTMLElement>(
+    'button, a, input, select, textarea, [role="tab"], [role="button"]',
+  );
   if (!interactive) return true;
   if (interactive.matches('a, input, select, textarea, [role="tab"]')) return true;
   const testId = interactive.dataset.testid || '';
@@ -870,11 +1434,191 @@ function explainHandoffReason(node: AuthoringNode, property?: PropertyCapability
 }
 
 function routeLabel(route: string): string {
-  return ({ INLINE: '可就地配置', GUIDED_INLINE: '引导式配置', HANDOFF_STUDIO: '应用设计中心', DENY: '禁止' } as Record<string, string>)[route] || route;
+  return (
+    (
+      {
+        INLINE: '可就地配置',
+        GUIDED_INLINE: '引导式配置',
+        HANDOFF_STUDIO: '应用设计中心',
+        DENY: '禁止',
+      } as Record<string, string>
+    )[route] || route
+  );
 }
 
 function publishLabel(policy: string): string {
-  return ({ DIRECT_ALLOWED: '可直发', DEFAULT_REVIEW: '默认评审', REQUIRED_REVIEW: '必须评审', STUDIO_APPROVAL: '专项审批', DENIED: '禁止' } as Record<string, string>)[policy] || policy;
+  return (
+    (
+      {
+        DIRECT_ALLOWED: '可直发',
+        DEFAULT_REVIEW: '默认评审',
+        REQUIRED_REVIEW: '必须评审',
+        STUDIO_APPROVAL: '专项审批',
+        DENIED: '禁止',
+      } as Record<string, string>
+    )[policy] || policy
+  );
+}
+
+function schemaFromSnapshot(
+  schema: UnifiedSchema,
+  snapshot: Record<string, unknown>,
+): UnifiedSchema {
+  if (!snapshot || typeof snapshot !== 'object') return schema;
+  return {
+    ...schema,
+    ...snapshot,
+    id: schema.id,
+    blocks: Array.isArray(snapshot.blocks) ? snapshot.blocks : schema.blocks,
+  } as UnifiedSchema;
+}
+
+function materializePendingSchema(
+  schema: UnifiedSchema,
+  snapshot: Record<string, unknown>,
+  edits: Map<string, PendingAuthoringEdit>,
+): UnifiedSchema {
+  const result = cloneJson(schemaFromSnapshot(schema, snapshot));
+  edits.forEach((edit) => {
+    const block = findObjectById(result as unknown, edit.blockId);
+    if (!block) return;
+    applyPointer(
+      block,
+      edit.property.propertyPath,
+      edit.operation === 'REMOVE' ? undefined : edit.value,
+      edit.operation === 'REMOVE',
+    );
+  });
+  return result;
+}
+
+function readSnapshotProperty(
+  snapshot: Record<string, unknown>,
+  blockId: string,
+  propertyPath: string,
+): unknown {
+  const block = findObjectById(snapshot, blockId);
+  return block ? readPointer(block, propertyPath) : undefined;
+}
+
+function findObjectById(value: unknown, id: string): Record<string, unknown> | null {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findObjectById(item, id);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!value || typeof value !== 'object') return null;
+  const object = value as Record<string, unknown>;
+  if (object.id === id) return object;
+  for (const child of Object.values(object)) {
+    const found = findObjectById(child, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+function readPointer(object: Record<string, unknown>, propertyPath: string): unknown {
+  const segments = pointerSegments(propertyPath);
+  let value: unknown = object;
+  for (const segment of segments) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    value = (value as Record<string, unknown>)[segment];
+  }
+  return value;
+}
+
+function applyPointer(
+  object: Record<string, unknown>,
+  propertyPath: string,
+  value: unknown,
+  remove: boolean,
+) {
+  const segments = pointerSegments(propertyPath);
+  if (segments.length === 0) return;
+  let parent = object;
+  for (const segment of segments.slice(0, -1)) {
+    const child = parent[segment];
+    if (!child || typeof child !== 'object' || Array.isArray(child)) {
+      parent[segment] = {};
+    }
+    parent = parent[segment] as Record<string, unknown>;
+  }
+  const leaf = segments[segments.length - 1];
+  if (remove) delete parent[leaf];
+  else parent[leaf] = value;
+}
+
+function pointerSegments(propertyPath: string): string[] {
+  if (!propertyPath.startsWith('/')) return [];
+  return propertyPath
+    .slice(1)
+    .split('/')
+    .map((part) => part.replace(/~1/g, '/').replace(/~0/g, '~'));
+}
+
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function valuesEqual(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function propertyEditorKind(
+  propertyPath: string,
+  value: unknown,
+): 'text' | 'number' | 'boolean' | 'json' {
+  if (typeof value === 'boolean' || /\/(visible|enabled)$/.test(propertyPath)) return 'boolean';
+  if (typeof value === 'number' || /\/(span|height|pageSize)$/.test(propertyPath)) return 'number';
+  if (
+    (value != null && typeof value === 'object') ||
+    /\/(defaultSort|defaultFilter|visibleWhen)$/.test(propertyPath)
+  ) {
+    return 'json';
+  }
+  return 'text';
+}
+
+function propertyLabel(propertyPath: string): string {
+  const labels: Record<string, string> = {
+    '/title': '标题',
+    '/layout/span': '布局跨度',
+    '/props/label': '显示名称',
+    '/props/visible': '是否显示',
+    '/props/icon': '图标',
+    '/props/variant': '按钮样式',
+    '/props/density': '表格密度',
+    '/props/pageSize': '每页条数',
+    '/props/defaultSort': '默认排序',
+    '/props/defaultFilter': '默认筛选',
+    '/props/content': '内容',
+    '/props/height': '高度',
+    '/props/defaultTab': '默认标签页',
+  };
+  return labels[propertyPath] || propertyPath;
+}
+
+function formatEditorValue(value: unknown): string {
+  if (value === undefined) return '';
+  if (typeof value === 'string') return value;
+  return JSON.stringify(value, null, 2);
+}
+
+function parseEditorJson(value: string): { ok: true; value: unknown } | { ok: false } {
+  if (!value.trim()) return { ok: true, value: null };
+  try {
+    return { ok: true, value: JSON.parse(value) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function formatDiffValue(value: unknown): string {
+  if (value === undefined) return '（未设置）';
+  if (typeof value === 'string') return value || '（空字符串）';
+  return JSON.stringify(value, null, 2);
 }
 
 function cssEscape(value: string): string {
@@ -882,4 +1626,8 @@ function cssEscape(value: string): string {
   return value.replace(/["\\]/g, '\\$&');
 }
 
-export const contextualAuthoringTestUtils = { buildAuthoringTree, indexTree, isSafePreviewInteraction };
+export const contextualAuthoringTestUtils = {
+  buildAuthoringTree,
+  indexTree,
+  isSafePreviewInteraction,
+};

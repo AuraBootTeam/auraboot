@@ -79,8 +79,39 @@ export interface HandoffContext {
   expiresAt: string;
 }
 
+export type PatchOperation = 'ADD' | 'REPLACE' | 'REMOVE';
+
+export interface BoundaryDecision {
+  route: string;
+  risk: string;
+  publishPolicy: string;
+  reason: string;
+  manifestChecksum: string;
+  rolePreviewRequired: boolean;
+}
+
+export interface PatchResult {
+  session: AuthoringSession;
+  changeItemPid: string;
+  decision: BoundaryDecision;
+  previousValue: unknown;
+  savedValue: unknown;
+}
+
+export interface PendingAuthoringEdit {
+  key: string;
+  blockId: string;
+  blockLabel: string;
+  manifestChecksum: string;
+  property: PropertyCapability;
+  operation: PatchOperation;
+  previousValue: unknown;
+  value: unknown;
+}
+
 export interface ContextualAuthoringSurfaceProps {
   schema: UnifiedSchema;
   recordPid?: string;
   children: React.ReactNode;
+  renderRuntime?: (schema: UnifiedSchema) => React.ReactNode;
 }

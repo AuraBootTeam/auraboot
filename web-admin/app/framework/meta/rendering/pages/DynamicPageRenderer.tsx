@@ -123,7 +123,18 @@ export function DynamicPageRenderer({
         <ProfileProvider value={profile}>
           <div data-testid={`dynamic-page-${pageType}`}>
             <Suspense fallback={fallback}>
-              <ContextualAuthoringSurface schema={schema} recordPid={recordPid}>
+              <ContextualAuthoringSurface
+                schema={schema}
+                recordPid={recordPid}
+                renderRuntime={(runtimeSchema) => (
+                  <PageContent
+                    schema={runtimeSchema}
+                    tableName={tableName}
+                    recordPid={recordPid}
+                    token={token}
+                  />
+                )}
+              >
                 <PageContent
                   schema={schema}
                   tableName={tableName}

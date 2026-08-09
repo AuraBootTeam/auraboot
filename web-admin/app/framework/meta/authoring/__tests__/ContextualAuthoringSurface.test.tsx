@@ -4,9 +4,11 @@ import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContextualAuthoringSurface } from '../ContextualAuthoringSurface';
 import {
+  applyAuthoringPatch,
   createAuthoringHandoff,
   loadAuthoringCapabilities,
   openAuthoringSession,
+  submitAuthoringSession,
 } from '../authoringService';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 
@@ -17,6 +19,9 @@ vi.mock('~/contexts/AuthContext', () => ({
 vi.mock('../authoringService', () => ({
   openAuthoringSession: vi.fn(),
   loadAuthoringCapabilities: vi.fn(),
+  loadAuthoringSession: vi.fn(),
+  applyAuthoringPatch: vi.fn(),
+  submitAuthoringSession: vi.fn(),
   createAuthoringHandoff: vi.fn(),
 }));
 
@@ -55,7 +60,7 @@ describe('ContextualAuthoringSurface', () => {
       approvalState: 'NOT_REQUIRED',
       publishState: 'DRAFT',
       manifestChecksum: 'registry-1',
-      snapshot: {},
+      snapshot: { ...schema, pid: 'page-1' },
       interactionContext: {},
       expiresAt: '2026-08-09T12:00:00Z',
     });
@@ -98,6 +103,41 @@ describe('ContextualAuthoringSurface', () => {
       targetRoute: '/unified-designer',
       expiresAt: '2026-08-09T12:00:00Z',
     });
+    vi.mocked(applyAuthoringPatch).mockResolvedValue({
+      session: {
+        sessionPid: 'session-1',
+        changeSetPid: 'changeset-1',
+        pagePid: 'page-1',
+        state: 'ACTIVE',
+        revision: 2,
+        riskLevel: 'L1',
+        route: 'INLINE',
+        publishPolicy: 'DIRECT_ALLOWED',
+        validationState: 'VALID',
+        approvalState: 'NOT_REQUIRED',
+        publishState: 'DRAFT',
+        manifestChecksum: 'registry-1',
+        snapshot: {
+          ...schema,
+          pid: 'page-1',
+          blocks: [{ ...schema.blocks[0], title: '生产订单' }],
+        },
+        interactionContext: {},
+        expiresAt: '2026-08-09T12:00:00Z',
+      },
+      changeItemPid: 'item-1',
+      decision: {
+        route: 'INLINE',
+        risk: 'L1',
+        publishPolicy: 'DIRECT_ALLOWED',
+        reason: 'CAPABILITY_ALLOWED',
+        manifestChecksum: 'table-1',
+        rolePreviewRequired: false,
+      },
+      previousValue: '订单表格',
+      savedValue: '生产订单',
+    });
+    vi.mocked(submitAuthoringSession).mockResolvedValue(undefined);
   });
 
   it('enters from the runtime page, separates modes and exposes independent counters', async () => {
@@ -152,6 +192,35 @@ describe('ContextualAuthoringSurface', () => {
       ),
     );
   });
+
+  it('stages an inline property, shows a diff and saves it into the ChangeSet', async () => {
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+    await screen.findByTestId('contextual-authoring-surface');
+    fireEvent.click(screen.getByTestId('runtime-write'));
+
+    fireEvent.change(screen.getByLabelText(/标题/), { target: { value: '生产订单' } });
+    expect(screen.getByText('1 项未保存')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('差异'));
+    expect(screen.getByRole('dialog')).toHaveTextContent('订单表格');
+    expect(screen.getByRole('dialog')).toHaveTextContent('生产订单');
+    fireEvent.click(screen.getByLabelText('关闭差异'));
+
+    fireEvent.click(screen.getByText('保存'));
+    await waitFor(() =>
+      expect(applyAuthoringPatch).toHaveBeenCalledWith(
+        'session-1',
+        1,
+        'table-1',
+        '/title',
+        'REPLACE',
+        '生产订单',
+        'table-1',
+      ),
+    );
+    expect(await screen.findByText('0 项未保存')).toBeInTheDocument();
+    expect(screen.getByText('1 项草稿变更')).toBeInTheDocument();
+  });
 });
 
 function renderSurface(unsafeAction: () => void, safeTab: () => void) {
@@ -159,8 +228,12 @@ function renderSurface(unsafeAction: () => void, safeTab: () => void) {
     <MemoryRouter initialEntries={['/orders?tab=open']}>
       <ContextualAuthoringSurface schema={schema} recordPid="record-1">
         <div data-aura-block-id="table-1">
-          <button type="button" data-testid="runtime-write" onClick={unsafeAction}>批准订单</button>
-          <button type="button" role="tab" data-testid="runtime-tab" onClick={safeTab}>详情</button>
+          <button type="button" data-testid="runtime-write" onClick={unsafeAction}>
+            批准订单
+          </button>
+          <button type="button" role="tab" data-testid="runtime-tab" onClick={safeTab}>
+            详情
+          </button>
         </div>
       </ContextualAuthoringSurface>
     </MemoryRouter>,

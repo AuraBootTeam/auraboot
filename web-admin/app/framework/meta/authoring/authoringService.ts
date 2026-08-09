@@ -5,6 +5,8 @@ import type {
   CapabilityRegistry,
   HandoffContext,
   HandoffCreated,
+  PatchOperation,
+  PatchResult,
 } from './types';
 
 export interface InteractionContext {
@@ -32,6 +34,49 @@ export async function openAuthoringSession(
 export async function loadAuthoringCapabilities(): Promise<CapabilityRegistry> {
   const result = await fetchResult<CapabilityRegistry>('/api/authoring/capabilities');
   return requireData(result, '无法加载页面配置能力');
+}
+
+export async function loadAuthoringSession(sessionPid: string): Promise<AuthoringSession> {
+  const result = await fetchResult<AuthoringSession>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}`,
+  );
+  return requireData(result, '无法刷新配置草稿');
+}
+
+export async function applyAuthoringPatch(
+  sessionPid: string,
+  revision: number,
+  blockId: string,
+  propertyPath: string,
+  operation: PatchOperation,
+  value: unknown,
+  manifestChecksum: string,
+): Promise<PatchResult> {
+  const result = await fetchResult<PatchResult>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/patches`,
+    {
+      method: 'patch',
+      params: {
+        expectedRevision: revision,
+        blockId,
+        propertyPath,
+        operation,
+        ...(operation === 'REMOVE' ? {} : { value }),
+        manifestChecksum,
+      },
+    },
+  );
+  return requireData(result, '无法保存配置变更');
+}
+
+export async function submitAuthoringSession(sessionPid: string, revision: number): Promise<void> {
+  const result = await fetchResult<unknown>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/submit`,
+    { method: 'post', params: { expectedRevision: revision } },
+  );
+  if (!ResultHelper.isSuccess(result)) {
+    throw new Error(result.message || result.desc || '无法提交评审');
+  }
 }
 
 export async function createAuthoringHandoff(

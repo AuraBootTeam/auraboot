@@ -68,7 +68,11 @@ describe('HttpClient integration', () => {
         method: 'post',
         params: { expectedRevision: 1 },
       });
-      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+      await fetchResult('/api/authoring/sessions/session-1/patches', {
+        method: 'patch',
+        params: { expectedRevision: 1 },
+      });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(3);
 
       deactivate();
       window.removeEventListener(AUTHORING_WRITE_BLOCKED_EVENT, blockedEvents);

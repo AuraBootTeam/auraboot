@@ -3,7 +3,8 @@ import type { FetchOptions, Result } from './types';
 export const AUTHORING_WRITE_BLOCKED_EVENT = 'auraboot:authoring-write-blocked';
 
 const activeSessions = new Set<string>();
-const SAFE_POST_PATHS = ['/api/authoring/', '/api/datasource/', '/api/pages/batch'];
+const AUTHORING_PATH = '/api/authoring/';
+const SAFE_QUERY_POST_PATHS = ['/api/datasource/batch', '/api/pages/batch'];
 
 export function activateAuthoringPreviewGuard(sessionPid: string): () => void {
   activeSessions.add(sessionPid);
@@ -39,9 +40,10 @@ export function authoringPreviewBlockedResult<T>(
 
 function isSafeRequest(path: string, options: FetchOptions): boolean {
   const method = (options.method || 'get').toLowerCase();
+  if (path.startsWith(AUTHORING_PATH)) return true;
   if (method === 'get' || method === 'options') return true;
   if (method === 'post') {
-    return SAFE_POST_PATHS.some((prefix) => path.startsWith(prefix));
+    return SAFE_QUERY_POST_PATHS.some((safePath) => path === safePath);
   }
   return false;
 }
