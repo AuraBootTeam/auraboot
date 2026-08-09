@@ -1,0 +1,1043 @@
+{
+  "schemaVersion": 1,
+  "release": "AuraBoot CRM RG-1 through RG-4",
+  "generatedBy": "plugins/crm/scripts/verify_release_coverage.mjs",
+  "scope": {
+    "semanticActionDenominator": 26,
+    "axes": [
+      "semanticActions",
+      "commands",
+      "pages",
+      "permissions",
+      "queries"
+    ],
+    "excluded": [
+      "RG-5 licensing and entitlement",
+      "data migration"
+    ]
+  },
+  "goals": [
+    {
+      "id": "RG-1",
+      "verdict": "pass",
+      "note": "26/26 semantic actions and five workbenches have real-stack browser evidence."
+    },
+    {
+      "id": "RG-2",
+      "verdict": "pass",
+      "note": "QDP release and order commitment have true-stack and browser evidence."
+    },
+    {
+      "id": "RG-3",
+      "verdict": "partial",
+      "note": "Clean-room automation passes; independent non-developer human sign-off is still pending."
+    },
+    {
+      "id": "RG-4",
+      "verdict": "pass",
+      "note": "This committed manifest is freshness-gated and mutation-falsifiable."
+    }
+  ],
+  "axes": {
+    "semanticActions": [
+      {
+        "id": "open_customer_record",
+        "pageKey": "crm_customer_360_workbench",
+        "blockId": "crm_customer_actions",
+        "targetType": "route",
+        "target": "/p/crm_account_common/view/${state.selectedAccount.pid}",
+        "permissionCode": "crm.account.read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "create_customer",
+        "pageKey": "crm_customer_360_workbench",
+        "blockId": "crm_customer_actions",
+        "targetType": "route",
+        "target": "/p/crm_account_common/new",
+        "permissionCode": "crm.account.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "open_lead_record",
+        "pageKey": "crm_lead_desk_workbench",
+        "blockId": "crm_lead_desk_header_actions",
+        "targetType": "route",
+        "target": "/p/crm_lead_common/view/${state.selectedLead.pid}",
+        "permissionCode": "crm.lead.read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "create_lead",
+        "pageKey": "crm_lead_desk_workbench",
+        "blockId": "crm_lead_desk_header_actions",
+        "targetType": "route",
+        "target": "/p/crm_lead_common/new",
+        "permissionCode": "crm.lead.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "contact_lead",
+        "pageKey": "crm_lead_desk_workbench",
+        "blockId": "crm_lead_lifecycle_actions",
+        "targetType": "command",
+        "target": "crm:contact_lead",
+        "permissionCode": "crm.lead.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "qualify_lead",
+        "pageKey": "crm_lead_desk_workbench",
+        "blockId": "crm_lead_lifecycle_actions",
+        "targetType": "command",
+        "target": "crm:qualify_lead",
+        "permissionCode": "crm.lead.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "convert_lead",
+        "pageKey": "crm_lead_desk_workbench",
+        "blockId": "crm_lead_lifecycle_actions",
+        "targetType": "command",
+        "target": "crm:convert_lead",
+        "permissionCode": "crm.lead.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "lose_lead",
+        "pageKey": "crm_lead_desk_workbench",
+        "blockId": "crm_lead_lifecycle_actions",
+        "targetType": "command",
+        "target": "crm:lose_lead",
+        "permissionCode": "crm.lead.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "open_opportunity_record",
+        "pageKey": "crm_opportunity_workspace",
+        "blockId": "crm_opportunity_header_actions",
+        "targetType": "route",
+        "target": "/p/crm_opportunity_common/view/${state.selectedOpportunity.pid}",
+        "permissionCode": "crm.opportunity.read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "create_opportunity",
+        "pageKey": "crm_opportunity_workspace",
+        "blockId": "crm_opportunity_header_actions",
+        "targetType": "route",
+        "target": "/p/crm_opportunity_common/new",
+        "permissionCode": "crm.opportunity.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "qualify_opportunity",
+        "pageKey": "crm_opportunity_workspace",
+        "blockId": "crm_opportunity_stage_actions",
+        "targetType": "command",
+        "target": "crm:qualify_opportunity",
+        "permissionCode": "crm.opportunity.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "advance_to_proposal",
+        "pageKey": "crm_opportunity_workspace",
+        "blockId": "crm_opportunity_stage_actions",
+        "targetType": "command",
+        "target": "crm:advance_opp_to_proposal",
+        "permissionCode": "crm.opportunity.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "advance_to_negotiation",
+        "pageKey": "crm_opportunity_workspace",
+        "blockId": "crm_opportunity_stage_actions",
+        "targetType": "command",
+        "target": "crm:advance_opp_to_negotiation",
+        "permissionCode": "crm.opportunity.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "win_opportunity",
+        "pageKey": "crm_opportunity_workspace",
+        "blockId": "crm_opportunity_stage_actions",
+        "targetType": "command",
+        "target": "crm:win_opportunity",
+        "permissionCode": "crm.opportunity.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "lose_opportunity",
+        "pageKey": "crm_opportunity_workspace",
+        "blockId": "crm_opportunity_stage_actions",
+        "targetType": "command",
+        "target": "crm:lose_opportunity",
+        "permissionCode": "crm.opportunity.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "open_forecast_record",
+        "pageKey": "crm_forecast_cockpit",
+        "blockId": "crm_forecast_header_actions",
+        "targetType": "route",
+        "target": "/p/crm_forecast_submission/view/${state.selectedForecast.pid}",
+        "permissionCode": "crm.forecast.read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "create_forecast",
+        "pageKey": "crm_forecast_cockpit",
+        "blockId": "crm_forecast_header_actions",
+        "targetType": "route",
+        "target": "/p/crm_forecast_submission/new",
+        "permissionCode": "crm.forecast.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "submit_forecast",
+        "pageKey": "crm_forecast_cockpit",
+        "blockId": "crm_forecast_actions",
+        "targetType": "command",
+        "target": "crm:submit_forecast",
+        "permissionCode": "crm.forecast.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "open_task_record",
+        "pageKey": "crm_activity_service_desk",
+        "blockId": "crm_activity_service_header_actions",
+        "targetType": "route",
+        "target": "/p/crm_activity_common/view/${state.selectedWork.pid}",
+        "permissionCode": "crm.activity.read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "open_complaint_record",
+        "pageKey": "crm_activity_service_desk",
+        "blockId": "crm_activity_service_header_actions",
+        "targetType": "route",
+        "target": "/p/crm_complaint/view/${state.selectedWork.pid}",
+        "permissionCode": "crm.complaint.read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "create_task",
+        "pageKey": "crm_activity_service_desk",
+        "blockId": "crm_activity_service_header_actions",
+        "targetType": "route",
+        "target": "/p/crm_activity_common/new",
+        "permissionCode": "crm.activity.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "start_task",
+        "pageKey": "crm_activity_service_desk",
+        "blockId": "crm_activity_service_actions",
+        "targetType": "command",
+        "target": "crm:start_task",
+        "permissionCode": "crm.activity.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "complete_task",
+        "pageKey": "crm_activity_service_desk",
+        "blockId": "crm_activity_service_actions",
+        "targetType": "command",
+        "target": "crm:complete_task",
+        "permissionCode": "crm.activity.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "investigate_complaint",
+        "pageKey": "crm_activity_service_desk",
+        "blockId": "crm_activity_service_actions",
+        "targetType": "command",
+        "target": "crm:investigate_complaint",
+        "permissionCode": "crm.complaint.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "resolve_complaint",
+        "pageKey": "crm_activity_service_desk",
+        "blockId": "crm_activity_service_actions",
+        "targetType": "command",
+        "target": "crm:resolve_complaint",
+        "permissionCode": "crm.complaint.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "close_complaint",
+        "pageKey": "crm_activity_service_desk",
+        "blockId": "crm_activity_service_actions",
+        "targetType": "command",
+        "target": "crm:close_complaint",
+        "permissionCode": "crm.complaint.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      }
+    ],
+    "commands": [
+      {
+        "id": "crm:advance_opp_to_negotiation",
+        "goals": [
+          "RG-1"
+        ],
+        "permissionCodes": [
+          "crm.opportunity.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:advance_opp_to_proposal",
+        "goals": [
+          "RG-1"
+        ],
+        "permissionCodes": [
+          "crm.opportunity.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:close_complaint",
+        "goals": [
+          "RG-1"
+        ],
+        "permissionCodes": [
+          "crm.complaint.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:compile_qdp_revision",
+        "goals": [
+          "RG-2"
+        ],
+        "permissionCodes": [
+          "crm.qdp.review"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/qdp-release-center.golden.spec.ts",
+          "plugins/crm/scripts/it/qdp_release_center_true_stack.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:complete_task",
+        "goals": [
+          "RG-1"
+        ],
+        "permissionCodes": [
+          "crm.activity.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:contact_lead",
+        "goals": [
+          "RG-1",
+          "RG-3"
+        ],
+        "permissionCodes": [
+          "crm.lead.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/scripts/adoption_journey.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:convert_lead",
+        "goals": [
+          "RG-1",
+          "RG-3"
+        ],
+        "permissionCodes": [
+          "crm.lead.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/scripts/adoption_journey.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:create_activity",
+        "goals": [
+          "RG-3"
+        ],
+        "permissionCodes": [
+          "crm.activity.manage"
+        ],
+        "evidence": [
+          "plugins/crm/scripts/adoption_journey.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:create_lead",
+        "goals": [
+          "RG-3"
+        ],
+        "permissionCodes": [
+          "crm.lead.manage"
+        ],
+        "evidence": [
+          "plugins/crm/scripts/adoption_journey.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:investigate_complaint",
+        "goals": [
+          "RG-1"
+        ],
+        "permissionCodes": [
+          "crm.complaint.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:lose_lead",
+        "goals": [
+          "RG-1"
+        ],
+        "permissionCodes": [
+          "crm.lead.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:lose_opportunity",
+        "goals": [
+          "RG-1"
+        ],
+        "permissionCodes": [
+          "crm.opportunity.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:prepare_qdp_draft",
+        "goals": [
+          "RG-2"
+        ],
+        "permissionCodes": [
+          "crm.qdp.prepare"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/qdp-release-center.golden.spec.ts",
+          "plugins/crm/scripts/it/qdp_release_center_true_stack.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:publish_qdp_revision",
+        "goals": [
+          "RG-2"
+        ],
+        "permissionCodes": [
+          "crm.qdp.release"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/qdp-release-center.golden.spec.ts",
+          "plugins/crm/scripts/it/qdp_release_center_true_stack.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:qualify_lead",
+        "goals": [
+          "RG-1",
+          "RG-3"
+        ],
+        "permissionCodes": [
+          "crm.lead.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/scripts/adoption_journey.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:qualify_opportunity",
+        "goals": [
+          "RG-1"
+        ],
+        "permissionCodes": [
+          "crm.opportunity.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:record_order_commitment",
+        "goals": [
+          "RG-2"
+        ],
+        "permissionCodes": [
+          "crm.order_commitment.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/order-commitment.golden.spec.ts",
+          "plugins/crm/scripts/it/order_commitment_true_stack.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:resolve_complaint",
+        "goals": [
+          "RG-1"
+        ],
+        "permissionCodes": [
+          "crm.complaint.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:start_task",
+        "goals": [
+          "RG-1"
+        ],
+        "permissionCodes": [
+          "crm.activity.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:submit_forecast",
+        "goals": [
+          "RG-1"
+        ],
+        "permissionCodes": [
+          "crm.forecast.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:submit_qdp_review",
+        "goals": [
+          "RG-2"
+        ],
+        "permissionCodes": [
+          "crm.qdp.review"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/qdp-release-center.golden.spec.ts",
+          "plugins/crm/scripts/it/qdp_release_center_true_stack.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:win_opportunity",
+        "goals": [
+          "RG-1"
+        ],
+        "permissionCodes": [
+          "crm.opportunity.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      }
+    ],
+    "pages": [
+      {
+        "id": "crm_customer_360_workbench",
+        "goals": [
+          "RG-1"
+        ],
+        "kind": "detail",
+        "permissionCodes": [
+          "crm.account.read"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_lead_desk_workbench",
+        "goals": [
+          "RG-1",
+          "RG-3"
+        ],
+        "kind": "detail",
+        "permissionCodes": [
+          "crm.lead.read"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/scripts/adoption_journey.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_opportunity_workspace",
+        "goals": [
+          "RG-1"
+        ],
+        "kind": "detail",
+        "permissionCodes": [
+          "crm.opportunity.read"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_forecast_cockpit",
+        "goals": [
+          "RG-1"
+        ],
+        "kind": "detail",
+        "permissionCodes": [
+          "crm.forecast.read"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_activity_service_desk",
+        "goals": [
+          "RG-1"
+        ],
+        "kind": "detail",
+        "permissionCodes": [
+          "crm.activity.read"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_qdp_release_workbench",
+        "goals": [
+          "RG-2"
+        ],
+        "kind": "detail",
+        "permissionCodes": [
+          "crm.qdp.read"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_quote_summary_common_detail",
+        "goals": [
+          "RG-2"
+        ],
+        "kind": "detail",
+        "permissionCodes": [],
+        "evidence": [
+          "plugins/crm/e2e/order-commitment.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_qdp_revision_common_detail",
+        "goals": [
+          "RG-2"
+        ],
+        "kind": "detail",
+        "permissionCodes": [],
+        "evidence": [
+          "plugins/crm/e2e/order-commitment.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      }
+    ],
+    "permissions": [
+      {
+        "id": "crm.account.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.account.read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.activity.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/scripts/adoption_journey.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.activity.read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.complaint.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.complaint.read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.forecast.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.forecast.read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.lead.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/scripts/adoption_journey.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.lead.read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/scripts/adoption_journey.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.opportunity.manage",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.opportunity.read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.order_commitment.manage",
+        "evidence": [
+          "plugins/crm/e2e/order-commitment.golden.spec.ts",
+          "plugins/crm/scripts/it/order_commitment_true_stack.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.qdp.prepare",
+        "evidence": [
+          "plugins/crm/e2e/qdp-release-center.golden.spec.ts",
+          "plugins/crm/scripts/it/qdp_release_center_true_stack.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.qdp.read",
+        "evidence": [
+          "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.qdp.release",
+        "evidence": [
+          "plugins/crm/e2e/qdp-release-center.golden.spec.ts",
+          "plugins/crm/scripts/it/qdp_release_center_true_stack.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm.qdp.review",
+        "evidence": [
+          "plugins/crm/e2e/qdp-release-center.golden.spec.ts",
+          "plugins/crm/scripts/it/qdp_release_center_true_stack.py"
+        ],
+        "verdict": "pass"
+      }
+    ],
+    "queries": [
+      {
+        "id": "crm_activity_service_queue",
+        "resourceCode": "crm_activity_common",
+        "actionCode": "read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_activity_service_stats",
+        "resourceCode": null,
+        "actionCode": null,
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_customer_360_queue",
+        "resourceCode": "crm_account_common",
+        "actionCode": "read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_customer_360_stats",
+        "resourceCode": null,
+        "actionCode": null,
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_forecast_cockpit_stats",
+        "resourceCode": null,
+        "actionCode": null,
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_lead_desk_queue",
+        "resourceCode": "crm_lead_common",
+        "actionCode": "read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/scripts/adoption_journey.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_lead_desk_stats",
+        "resourceCode": null,
+        "actionCode": null,
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/scripts/adoption_journey.py"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_opportunity_workspace_queue",
+        "resourceCode": "crm_opportunity_common",
+        "actionCode": "read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_opportunity_workspace_stats",
+        "resourceCode": null,
+        "actionCode": null,
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_qdp_release_stats",
+        "resourceCode": null,
+        "actionCode": null,
+        "evidence": [
+          "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_sales_forecast_by_owner",
+        "resourceCode": null,
+        "actionCode": null,
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      }
+    ]
+  },
+  "runtimeEvidenceContracts": [
+    {
+      "id": "RG1-BROWSER",
+      "filePrefix": "crm-core-workbenches-core-wb-",
+      "expectedActions": 26,
+      "expectedScenarios": 5,
+      "minimumScreenshots": 20
+    },
+    {
+      "id": "RG2-QDP-STACK",
+      "filePrefix": "qdp-release-center-true-stack-",
+      "minimumChecks": 20
+    },
+    {
+      "id": "RG2-QDP-BROWSER",
+      "filePrefix": "qdp-release-center-browser-",
+      "minimumScenarios": 6,
+      "minimumScreenshots": 1
+    },
+    {
+      "id": "RG2-ORDER-STACK",
+      "filePrefix": "order-commitment-true-stack-",
+      "minimumChecks": 8
+    },
+    {
+      "id": "RG2-ORDER-BROWSER",
+      "filePrefix": "order-commitment-browser-",
+      "minimumScenarios": 3,
+      "minimumScreenshots": 2
+    },
+    {
+      "id": "RG3-CLEAN-ROOM",
+      "filePrefix": "crm-adoption-journey-",
+      "maximumElapsedSeconds": 1800,
+      "minimumCheckpoints": 6
+    }
+  ],
+  "untested": [
+    {
+      "id": "RG3-INDEPENDENT-HUMAN-ADOPTER",
+      "verdict": "untested",
+      "reason": "A developer-authored automation run cannot prove that a person who did not participate in development completed the browser journey."
+    }
+  ]
+}

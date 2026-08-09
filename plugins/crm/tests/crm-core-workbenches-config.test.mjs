@@ -21,6 +21,7 @@ const pages = new Map(
 const menus = new Map(readJson('menus.json').map((menu) => [menu.code, menu]));
 const dicts = new Map(readJson('dicts.json').map((dict) => [dict.code, dict]));
 const namedQueries = new Map(readJson('named-queries.json').map((query) => [query.code, query]));
+const roles = new Map(readJson('roles.json').map((role) => [role.code, role]));
 
 const commandDir = path.join(pluginRoot, 'config', 'commands');
 const commands = new Map(
@@ -114,22 +115,85 @@ test('five core workbenches are standalone DSL pages reachable from the primary 
   }
 });
 
+test('record queues declare the governed model/action used by role data scopes', () => {
+  const expected = {
+    crm_customer_360_queue: 'crm_account_common',
+    crm_lead_desk_queue: 'crm_lead_common',
+    crm_opportunity_workspace_queue: 'crm_opportunity_common',
+    crm_activity_service_queue: 'crm_activity_common',
+  };
+  for (const [queryCode, resourceCode] of Object.entries(expected)) {
+    const query = namedQueries.get(queryCode);
+    assert.equal(query.resourceCode, resourceCode, queryCode);
+    assert.equal(query.actionCode, 'read', queryCode);
+  }
+  assert.match(namedQueries.get('crm_activity_service_queue').fromSql, /AS crm_act_owner/,
+    'the unified queue must retain the governed task-owner column for outer DataScope filtering');
+});
+
 test('core workbench lifecycle buttons reference real CRM commands', () => {
   const referenced = new Set();
+  const actions = [];
   for (const expected of workbenches) {
     for (const block of allBlocks(pages.get(expected.pageKey))) {
       for (const action of block.actions ?? []) {
+        actions.push(action);
+        assert.ok(action.permissionCode, `${expected.pageKey}.${action.code} must be permission-gated`);
         const command = action.onClick?.action === 'command.execute'
           ? action.onClick?.args?.command
           : undefined;
-        if (command) referenced.add(command);
+        if (command) {
+          referenced.add(command);
+          assert.ok(
+            commands.get(command)?.permissions?.includes(action.permissionCode),
+            `${expected.pageKey}.${action.code} permission must match ${command}`,
+          );
+        }
       }
     }
   }
-  assert.ok(referenced.size >= 12, 'workbenches should drive the existing lifecycle engine');
+  assert.equal(actions.length, 26, 'RG-1 denominator must contain exactly 26 semantic actions');
+  assert.equal(referenced.size, 15, 'workbenches should drive every declared lifecycle command');
   for (const commandCode of referenced) {
     assert.ok(commands.has(commandCode), `${commandCode} must be declared by CRM`);
   }
+});
+
+test('formal CRM roles align the five workbench menu and action contracts', () => {
+  const required = {
+    crm_admin: [
+      'crm.account.manage', 'crm.lead.manage', 'crm.opportunity.manage',
+      'crm.forecast.manage', 'crm.activity.manage', 'crm.complaint.manage',
+    ],
+    crm_sales: [
+      'crm.account.manage', 'crm.lead.manage', 'crm.opportunity.manage',
+      'crm.forecast.manage', 'crm.activity.manage',
+    ],
+    crm_sales_manager: [
+      'crm.account.manage', 'crm.lead.manage', 'crm.opportunity.manage',
+      'crm.forecast.manage', 'crm.activity.manage',
+    ],
+    crm_qdp_release_manager: [
+      'crm.qdp.release', 'crm.qdp.read', 'crm.quote_summary.manage',
+      'crm.order_commitment.manage',
+    ],
+    crm_service: ['crm.account.read', 'crm.activity.manage', 'crm.complaint.manage'],
+    crm_viewer: [
+      'crm.account.read', 'crm.lead.read', 'crm.opportunity.read',
+      'crm.forecast.read', 'crm.activity.read', 'crm.complaint.read', 'crm.qdp.read',
+    ],
+  };
+  for (const [roleCode, permissions] of Object.entries(required)) {
+    const role = roles.get(roleCode);
+    assert.ok(role, `${roleCode} must exist`);
+    for (const permission of permissions) {
+      assert.ok(role.permissions.includes(permission), `${roleCode} is missing ${permission}`);
+    }
+  }
+  assert.ok(!roles.get('crm_viewer').permissions.some((permission) => permission.endsWith('.manage')),
+    'crm_viewer must stay read-only');
+  assert.ok(!roles.get('crm_service').permissions.includes('crm.forecast.read'),
+    'crm_service must not gain unrelated forecast access');
 });
 
 test('CRM navigation prioritizes workspaces and contains record breadth below secondary groups', () => {

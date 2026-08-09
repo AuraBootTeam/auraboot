@@ -88,9 +88,89 @@
       ]
     },
     {
+      "id": "crm_qs_order_commitment",
+      "blockType": "detail-section",
+      "visibleWhen": "record.crm_qs_committed_qdp_revision_id != null || record.crm_qs_status === 'ordered'",
+      "title": {
+        "zh-CN": "订单承诺与发布证据",
+        "en": "Order Commitment and Release Evidence"
+      },
+      "fields": [
+        { "field": "crm_qs_committed_qdp_revision_id", "colSpan": 6 },
+        { "field": "crm_qs_customer_confirmation_id", "colSpan": 6 },
+        { "field": "crm_qs_order_committed_at", "colSpan": 6 },
+        { "field": "crm_qs_order_committed_by", "colSpan": 6 }
+      ]
+    },
+    {
       "id": "crm_qs_detail_toolbar",
       "blockType": "toolbar",
       "buttons": [
+        {
+          "code": "record_order_commitment",
+          "primary": true,
+          "icon": "PackageCheck",
+          "permissionCode": "crm.order_commitment.manage",
+          "visibleWhen": "record.crm_qs_status === 'accepted' && record.crm_qs_committed_qdp_revision_id == null",
+          "label": {
+            "zh-CN": "登记订单承诺",
+            "en-US": "Record Order Commitment"
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:record_order_commitment",
+            "operationType": "update",
+            "targetRecordPid": "${record.pid}",
+            "payload": {
+              "crm_quote_summary_id": "${record.pid}"
+            },
+            "inputFieldsTitle": {
+              "zh-CN": "选择正式发布的 QDP",
+              "en-US": "Select Released QDP"
+            },
+            "inputFieldsSubmitLabel": {
+              "zh-CN": "确认订单承诺",
+              "en-US": "Confirm Order Commitment"
+            },
+            "inputFields": [
+              {
+                "field": "crm_qdp_revision_id",
+                "label": { "zh-CN": "已发布 QDP", "en-US": "Released QDP" },
+                "type": "select",
+                "required": true,
+                "searchable": true,
+                "dataSource": {
+                  "type": "api",
+                  "endpoint": "/api/dynamic/crm_qdp_revision_common/list",
+                  "params": {
+                    "pageNum": 1,
+                    "pageSize": 100,
+                    "filters": [
+                      { "fieldName": "crm_qdp_status", "operator": "EQ", "value": "released" }
+                    ]
+                  },
+                  "valueField": "pid",
+                  "labelField": "crm_qdp_code",
+                  "descriptionField": "crm_qdp_requirement_version"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "code": "open_committed_qdp",
+          "icon": "ExternalLink",
+          "permissionCode": "crm.qdp.read",
+          "visibleWhen": "record.crm_qs_committed_qdp_revision_id != null",
+          "label": {
+            "zh-CN": "打开承诺 QDP",
+            "en-US": "Open Committed QDP"
+          },
+          "action": {
+            "type": "navigate",
+            "to": "/p/crm_qdp_revision_common/view/{crm_qs_committed_qdp_revision_id}"
+          }
+        },
         {
           "code": "edit",
           "icon": "Edit",

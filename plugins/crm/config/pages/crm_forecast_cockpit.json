@@ -117,6 +117,7 @@
       "actions": [
         {
           "code": "open_forecast_record",
+          "permissionCode": "crm.forecast.read",
           "label": { "zh-CN": "打开预测档案", "en": "Open Forecast Record" },
           "variant": "secondary",
           "permissionCode": "crm.forecast.read",
@@ -125,6 +126,7 @@
         },
         {
           "code": "create_forecast",
+          "permissionCode": "crm.forecast.manage",
           "label": { "zh-CN": "新建预测", "en": "Create Forecast" },
           "variant": "primary",
           "permissionCode": "crm.forecast.manage",
@@ -221,6 +223,7 @@
       "actions": [
         {
           "code": "submit_forecast",
+          "permissionCode": "crm.forecast.manage",
           "label": { "zh-CN": "提交预测", "en": "Submit Forecast" },
           "variant": "primary",
           "permissionCode": "crm.forecast.manage",

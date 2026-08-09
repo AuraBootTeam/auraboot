@@ -414,6 +414,27 @@
                   }
                 }
               ]
+            },
+            {
+              "id": "crm_qdp_order_commitments",
+              "blockType": "sub-table",
+              "title": {
+                "zh-CN": "采用此版本的订单承诺",
+                "en-US": "Order Commitments Using This Revision"
+              },
+              "subTable": {
+                "childModel": "crm_quote_summary_common",
+                "parentField": "crm_qs_committed_qdp_revision_id",
+                "readOnly": true,
+                "columns": [
+                  { "field": "crm_qs_code", "width": 160 },
+                  { "field": "crm_qs_status", "width": 120, "renderType": "tag", "dictCode": "crm_quote_summary_status" },
+                  { "field": "crm_qs_customer_request_id", "width": 180 },
+                  { "field": "crm_qs_customer_confirmation_id", "width": 180 },
+                  { "field": "crm_qs_order_committed_at", "width": 180 },
+                  { "field": "crm_qs_order_committed_by", "width": 160 }
+                ]
+              }
             }
           ]
         }

@@ -12,7 +12,7 @@
       "titleField": "crm_acc_name",
       "subtitleField": "crm_acc_code",
       "dataScope": {
-        "ownerField": "created_by",
+        "ownerField": "crm_acc_owner",
         "departmentField": null
       }
     },
@@ -582,7 +582,7 @@
     "semantic_description": "A generic quote/proposal summary synchronized from a quote fact source such as QuoteOps PCBA quote. It exposes account, opportunity, customer request, amount, status and result to Customer 360 and pipeline reports while keeping line-level pricing facts in the industry quote package.",
     "domain_category": "crm",
     "data_sensitivity": "confidential",
-    "lifecycle_description": "draft / pricing / approval / sent / accepted / rejected / expired, synchronized from source quote"
+    "lifecycle_description": "draft / pricing / approval / sent / accepted / ordered / rejected / expired; ordered is recorded only through the released-QDP order-commitment command"
   },
   {
     "code": "crm_approval_case_common",

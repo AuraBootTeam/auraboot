@@ -286,7 +286,7 @@ def provision_release_manager(admin_jwt: str, tag: str) -> tuple[str, str, str]:
             "email": email,
             "displayName": f"QDP release manager {tag}",
             "initialPassword": PASSWORD,
-            "roleCodes": ["crm_admin", "pe_qdp_release_manager"],
+            "roleCodes": ["crm_qdp_release_manager", "pe_qdp_release_manager"],
             "sendInviteEmail": False,
         },
         admin_jwt,

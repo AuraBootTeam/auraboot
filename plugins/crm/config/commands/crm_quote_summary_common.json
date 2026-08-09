@@ -29,7 +29,7 @@
         "pattern": "QS-{yyyyMMdd}-{seq}"
       },
       "crm_qs_owner": {
-        "strategy": "current_username"
+        "strategy": "current_user_pid"
       }
     },
     "permissions": [
@@ -67,6 +67,26 @@
     ],
     "agent_hint": "Update a quote summary after the source quote changes.",
     "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:record_order_commitment",
+    "displayName:zh-CN": "登记订单承诺",
+    "displayName:en": "Record Order Commitment",
+    "description": "Validate the accepted quote against the one current released QDP and its exact Customer Confirmation chain, then stamp the authoritative Quote Summary as ordered without creating a shadow order record.",
+    "type": "custom",
+    "modelCode": "crm_quote_summary_common",
+    "handler": "crm:record_order_commitment",
+    "handlerParams": {
+      "dslPersistence": false
+    },
+    "permissions": [
+      "crm.order_commitment.manage"
+    ],
+    "concurrencyKey": "crm:order-commitment:${recordPid}",
+    "lockTimeoutMs": 8000,
+    "idempotent": false,
+    "agent_hint": "Record the only order commitment on an accepted Quote Summary. The exact released QDP and Customer Confirmation are reread server-side; expectedVersion and the command target are mandatory.",
+    "cmd_risk_level": "L2"
   },
   {
     "code": "crm:delete_quote_summary",

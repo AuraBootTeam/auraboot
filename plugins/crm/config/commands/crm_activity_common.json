@@ -27,7 +27,7 @@
     ],
     "autoSetFields": {
       "crm_act_owner": {
-        "strategy": "current_username"
+        "strategy": "current_user_pid"
       },
       "crm_act_date": {
         "strategy": "current_datetime"

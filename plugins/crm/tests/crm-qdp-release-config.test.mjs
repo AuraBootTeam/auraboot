@@ -285,6 +285,19 @@ test('role split keeps release on the explicit cross-owner composite duty role',
       assert.equal(granted.has(permission), false, `${code} must not receive ${permission}`);
     }
   }
+
+  const releaseManager = rolePermissions('crm_qdp_release_manager');
+  for (const permission of [
+    'crm.qdp.prepare',
+    'crm.qdp.review',
+    'crm.qdp.release',
+    'crm.qdp.read',
+    'crm.quote_summary.manage',
+    'crm.order_commitment.manage',
+  ]) {
+    assert.ok(releaseManager.has(permission),
+      `crm_qdp_release_manager should receive ${permission}`);
+  }
 });
 
 test('Customer Request and Release Center pages expose complete lifecycle feedback without raw JSON', () => {
