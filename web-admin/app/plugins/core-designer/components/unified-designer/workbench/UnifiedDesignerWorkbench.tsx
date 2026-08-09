@@ -22,7 +22,7 @@ import {
   removeBlockById,
   updateBlockById,
 } from '../utils/recursiveBlockWalker';
-import { setByPath } from '../utils/dotPath';
+import { getByPath, setByPath } from '../utils/dotPath';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
 import { useDesignerDocument, serializeDocument } from '../document/useDesignerDocument';
 import { useDesignerSelection } from '../selection/useDesignerSelection';
@@ -149,6 +149,9 @@ export interface UnifiedDesignerWorkbenchProps {
   contextualReadOnly?: boolean;
   contextualEditablePropertyPaths?: Record<string, string[]>;
   contextualReorderableBlockTypes?: string[];
+  contextualCreatableBlockTypes?: string[];
+  contextualRemovableBlockTypes?: string[];
+  contextualRelocatableBlockTypes?: string[];
   /** Active governed authoring session; enables target-role structure preview in Preview mode. */
   roleStructurePreviewSessionPid?: string;
   /** Security-admin capability for starting a short-lived, audited, read-only role simulation. */
@@ -171,6 +174,9 @@ export function UnifiedDesignerWorkbench({
   contextualReadOnly = false,
   contextualEditablePropertyPaths,
   contextualReorderableBlockTypes,
+  contextualCreatableBlockTypes,
+  contextualRemovableBlockTypes,
+  contextualRelocatableBlockTypes,
   roleStructurePreviewSessionPid,
   identitySimulationAllowed = false,
 }: UnifiedDesignerWorkbenchProps) {
@@ -233,6 +239,37 @@ export function UnifiedDesignerWorkbench({
     () => new Set(contextualReorderableBlockTypes ?? []),
     [contextualReorderableBlockTypes],
   );
+  const contextualCreatableTypes = useMemo(
+    () => new Set(contextualCreatableBlockTypes ?? []),
+    [contextualCreatableBlockTypes],
+  );
+  const contextualRemovableTypes = useMemo(
+    () => new Set(contextualRemovableBlockTypes ?? []),
+    [contextualRemovableBlockTypes],
+  );
+  const contextualRelocatableTypes = useMemo(
+    () => new Set(contextualRelocatableBlockTypes ?? []),
+    [contextualRelocatableBlockTypes],
+  );
+  const prepareCreatedBlock = (block: DslBlockV3): DslBlockV3 => {
+    if (!contextualRestricted) return block;
+    let projected = { id: block.id, blockType: block.blockType } as DslBlockV3;
+    for (const pointer of contextualEditablePropertyPaths?.[block.blockType] ?? []) {
+      const path = pointerToDotPath(pointer);
+      const value = getByPath(block as unknown as Record<string, unknown>, path);
+      if (value !== undefined) {
+        projected = setByPath(
+          projected as unknown as Record<string, unknown>,
+          path,
+          value,
+        ) as unknown as DslBlockV3;
+      }
+    }
+    if (block.blocks?.length) {
+      projected = { ...projected, blocks: block.blocks.map(prepareCreatedBlock) };
+    }
+    return projected;
+  };
 
   React.useEffect(() => {
     if (initialSelectedBlockId) setSelectedBlockId(initialSelectedBlockId);
@@ -535,7 +572,7 @@ export function UnifiedDesignerWorkbench({
 
   const handleMoveBefore = (movingBlockId: string, targetBlockId: string) => {
     if (contextualReadOnly) return;
-    if (contextualRestricted && !canContextualReorder(movingBlockId, targetBlockId)) return;
+    if (contextualRestricted && !canContextualMoveBefore(movingBlockId, targetBlockId)) return;
     updateDocument((current) => ({
       ...current,
       blocks: moveBlockBefore(current.blocks, movingBlockId, targetBlockId),
@@ -543,7 +580,8 @@ export function UnifiedDesignerWorkbench({
   };
 
   const handleMoveToParent = (movingBlockId: string, parentBlockId: string) => {
-    if (contextualReadOnly || contextualRestricted) return;
+    if (contextualReadOnly) return;
+    if (contextualRestricted && !canContextualRelocate(movingBlockId)) return;
     updateDocument((current) => ({
       ...current,
       blocks: moveBlockToParent(current.blocks, movingBlockId, parentBlockId),
@@ -554,13 +592,15 @@ export function UnifiedDesignerWorkbench({
   // The single top-level kind container (form/list/detail/dashboard root) defines
   // the page; it cannot be deleted, only its descendants can.
   const canDeleteBlock = (blockId: string) => {
-    if (contextualReadOnly || contextualRestricted) return false;
+    if (contextualReadOnly) return false;
     const result = findBlockById(document.blocks, blockId);
-    return Boolean(result) && result!.path.length > 1;
+    return Boolean(result)
+      && result!.path.length > 1
+      && (!contextualRestricted || contextualRemovableTypes.has(result!.block.blockType));
   };
 
   const handleDeleteBlock = (blockId: string) => {
-    if (contextualReadOnly || contextualRestricted) return;
+    if (contextualReadOnly) return;
     if (!canDeleteBlock(blockId)) return;
     updateDocument((current) => ({
       ...current,
@@ -580,7 +620,7 @@ export function UnifiedDesignerWorkbench({
   // history step (one updateDocument → one undo). Undeletable blocks (the root
   // kind container) are silently skipped. Selection is cleared afterwards.
   const handleDeleteMultiSelected = () => {
-    if (contextualReadOnly || contextualRestricted) return;
+    if (contextualReadOnly) return;
     const deletableIds = [...multiSelectedIds].filter((id) => canDeleteBlock(id));
     if (deletableIds.length === 0) {
       clearMultiSelection();
@@ -599,7 +639,8 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canAddBlock = (blockType: string) => {
-    if (contextualReadOnly || contextualRestricted) return false;
+    if (contextualReadOnly) return false;
+    if (contextualRestricted && !contextualCreatableTypes.has(blockType)) return false;
     const definition = blockRegistry.get(blockType);
     if (!definition) return false;
     if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
@@ -617,7 +658,9 @@ export function UnifiedDesignerWorkbench({
     const beforeTarget = selectedBlockId ? resolveBlockDropBeforeTarget(selectedBlockId, blockType) : null;
 
     if (selectedBlockId && selectedBlock && blockRegistry.canContain(selectedBlock.blockType, blockType)) {
-      const preparedBlock = applyParentPlacementDefaults(nextBlock, selectedBlock);
+      const preparedBlock = prepareCreatedBlock(
+        applyParentPlacementDefaults(nextBlock, selectedBlock),
+      );
       updateDocument((current) => ({
         ...current,
         blocks: updateBlockById(current.blocks, selectedBlockId, (block) => ({
@@ -626,9 +669,9 @@ export function UnifiedDesignerWorkbench({
         })),
       }));
     } else if (selectedBlockId && beforeTarget) {
-      const preparedBlock = beforeTarget.parentBlock
+      const preparedBlock = prepareCreatedBlock(beforeTarget.parentBlock
         ? applyParentPlacementDefaults(nextBlock, beforeTarget.parentBlock)
-        : nextBlock;
+        : nextBlock);
       updateDocument((current) => ({
         ...current,
         blocks: insertBlockBeforeTarget(
@@ -641,7 +684,7 @@ export function UnifiedDesignerWorkbench({
     } else {
       updateDocument((current) => ({
         ...current,
-        blocks: [...current.blocks, nextBlock],
+        blocks: [...current.blocks, prepareCreatedBlock(nextBlock)],
       }));
     }
 
@@ -649,18 +692,22 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canAddBlockToParent = (parentBlockId: string, blockType: string) => {
+    if (contextualReadOnly) return false;
+    if (contextualRestricted && !contextualCreatableTypes.has(blockType)) return false;
     if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
     const parentBlock = findBlockById(document.blocks, parentBlockId)?.block;
     return parentBlock ? blockRegistry.canContain(parentBlock.blockType, blockType) : false;
   };
 
   const canAddBlockBeforeTarget = (targetBlockId: string, blockType: string) => {
+    if (contextualReadOnly) return false;
+    if (contextualRestricted && !contextualCreatableTypes.has(blockType)) return false;
     if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
     return Boolean(resolveBlockDropBeforeTarget(targetBlockId, blockType));
   };
 
   const canMoveBlockBeforeTarget = (movingBlockId: string, targetBlockId: string) => {
-    if (contextualRestricted && !canContextualReorder(movingBlockId, targetBlockId)) return false;
+    if (contextualRestricted && !canContextualMoveBefore(movingBlockId, targetBlockId)) return false;
     return canMoveExistingBlockBeforeTarget({
       blocks: document.blocks,
       kind: document.kind,
@@ -671,7 +718,7 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canMoveBlockToParent = (movingBlockId: string, parentBlockId: string) => {
-    if (contextualRestricted) return false;
+    if (contextualRestricted && !canContextualRelocate(movingBlockId)) return false;
     return canMoveExistingBlockToParent({
       blocks: document.blocks,
       kind: document.kind,
@@ -681,14 +728,20 @@ export function UnifiedDesignerWorkbench({
     });
   };
 
-  const canContextualReorder = (movingBlockId: string, targetBlockId: string): boolean => {
+  const canContextualMoveBefore = (movingBlockId: string, targetBlockId: string): boolean => {
     const movingResult = findBlockById(document.blocks, movingBlockId);
     const targetResult = findBlockById(document.blocks, targetBlockId);
     if (!movingResult || !targetResult) return false;
-    if (!contextualReorderableTypes.has(movingResult.block.blockType)) return false;
     const movingParent = movingResult.path.at(-2)?.id ?? null;
     const targetParent = targetResult.path.at(-2)?.id ?? null;
-    return movingParent === targetParent;
+    return movingParent === targetParent
+      ? contextualReorderableTypes.has(movingResult.block.blockType)
+      : contextualRelocatableTypes.has(movingResult.block.blockType);
+  };
+
+  const canContextualRelocate = (movingBlockId: string): boolean => {
+    const block = findBlockById(document.blocks, movingBlockId)?.block;
+    return Boolean(block && contextualRelocatableTypes.has(block.blockType));
   };
 
   const canContextualResizeSpan = (blockId: string): boolean => {
@@ -698,6 +751,8 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canAddBlockToRoot = (blockType: string) => {
+    if (contextualReadOnly) return false;
+    if (contextualRestricted && !contextualCreatableTypes.has(blockType)) return false;
     if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
     const policy = getKindPolicy(document.kind);
     if (policy.rootBlockType) {
@@ -716,7 +771,7 @@ export function UnifiedDesignerWorkbench({
 
     updateDocument((current) => ({
       ...current,
-      blocks: [...current.blocks, nextBlock],
+      blocks: [...current.blocks, prepareCreatedBlock(nextBlock)],
     }));
     setSelectedBlockId(nextBlock.id);
   };
@@ -728,7 +783,7 @@ export function UnifiedDesignerWorkbench({
     if (!nextBlock) return;
     const parentBlock = findBlockById(document.blocks, parentBlockId)?.block;
     if (!parentBlock) return;
-    const preparedBlock = applyParentPlacementDefaults(nextBlock, parentBlock);
+    const preparedBlock = prepareCreatedBlock(applyParentPlacementDefaults(nextBlock, parentBlock));
 
     updateDocument((current) => ({
       ...current,
@@ -746,9 +801,9 @@ export function UnifiedDesignerWorkbench({
 
     const nextBlock = createBlockTemplate(blockType, collectBlockIds(document.blocks));
     if (!nextBlock) return;
-    const preparedBlock = resolution.parentBlock
+    const preparedBlock = prepareCreatedBlock(resolution.parentBlock
       ? applyParentPlacementDefaults(nextBlock, resolution.parentBlock)
-      : nextBlock;
+      : nextBlock);
 
     updateDocument((current) => ({
       ...current,
@@ -1824,7 +1879,11 @@ export function UnifiedDesignerWorkbench({
                 contextualRestricted
                   ? (blockId) => {
                       const block = findBlockById(document.blocks, blockId)?.block;
-                      return Boolean(block && contextualReorderableTypes.has(block.blockType));
+                      return Boolean(
+                        block
+                        && (contextualReorderableTypes.has(block.blockType)
+                          || contextualRelocatableTypes.has(block.blockType)),
+                      );
                     }
                   : undefined
               }
@@ -1874,6 +1933,14 @@ function DragGhost({ drag }: { drag: DragData }) {
       {label}
     </div>
   );
+}
+
+function pointerToDotPath(pointer: string): string {
+  return pointer
+    .replace(/^\//, '')
+    .split('/')
+    .map((segment) => segment.replace(/~1/g, '/').replace(/~0/g, '~'))
+    .join('.');
 }
 
 function localizedLabel(value: ModelFieldDefinition['label']): string {

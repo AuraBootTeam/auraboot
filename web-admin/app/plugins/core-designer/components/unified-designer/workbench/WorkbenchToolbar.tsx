@@ -279,7 +279,7 @@ export function WorkbenchToolbar({
             className="rounded-md bg-violet-50 px-2 py-1 text-xs font-medium text-violet-700"
             data-testid="designer-contextual-restricted"
           >
-            同一 ChangeSet · 属性受限
+            同一 ChangeSet · 受治理编辑
           </span>
         ) : null}
         {saveError ? (

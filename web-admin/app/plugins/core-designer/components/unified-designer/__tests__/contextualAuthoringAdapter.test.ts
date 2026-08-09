@@ -21,6 +21,9 @@ const capabilities: CapabilityRegistry = {
         '/title': property('/title', 'INLINE'),
         '/dataSource': property('/dataSource', 'HANDOFF_STUDIO'),
         '/$structure/order': property('/$structure/order', 'GUIDED_INLINE', ['MOVE']),
+        '/$structure/create': property('/$structure/create', 'HANDOFF_STUDIO', ['ADD']),
+        '/$structure/remove': property('/$structure/remove', 'HANDOFF_STUDIO', ['REMOVE']),
+        '/$structure/parent': property('/$structure/parent', 'HANDOFF_STUDIO', ['MOVE']),
       },
     },
   ],
@@ -101,7 +104,7 @@ describe('contextualAuthoringAdapter', () => {
     ]);
   });
 
-  it('fails closed for structural and undeclared property edits', () => {
+  it('translates declared creation but still fails closed for undeclared property edits', () => {
     const baseline: PageSchemaV3 = {
       schemaVersion: 3,
       kind: 'list',
@@ -119,11 +122,46 @@ describe('contextualAuthoringAdapter', () => {
     const plan = planStudioAuthoringPatches(baseline, candidate, capabilities);
 
     expect(plan.patches).toEqual([]);
-    expect(plan.unsupported.join(' ')).toContain('新增或删除区块');
+    expect(plan.creates).toEqual([
+      {
+        blockId: 'table-2',
+        blockType: 'table',
+        parentBlockId: null,
+        beforeBlockId: null,
+        manifestChecksum: 'table-1',
+      },
+    ]);
     expect(plan.unsupported.join(' ')).toContain('能力清单未声明');
   });
 
-  it('fails closed instead of translating a cross-parent move', () => {
+  it('persists declared initial properties after creating the server-owned block shell', () => {
+    const baseline: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'composite',
+      id: 'operations',
+      blocks: [],
+    };
+    const candidate: PageSchemaV3 = {
+      ...baseline,
+      blocks: [{ id: 'table-1', blockType: 'table', title: 'New table' }],
+    };
+
+    const plan = planStudioAuthoringPatches(baseline, candidate, capabilities);
+
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.creates).toHaveLength(1);
+    expect(plan.patches).toEqual([
+      {
+        blockId: 'table-1',
+        propertyPath: '/title',
+        operation: 'ADD',
+        value: 'New table',
+        manifestChecksum: 'table-1',
+      },
+    ]);
+  });
+
+  it('translates a declared cross-parent move as a Studio relocation', () => {
     const tableA = { id: 'table-a', blockType: 'table' } as const;
     const tableB = { id: 'table-b', blockType: 'table' } as const;
     const baseline: PageSchemaV3 = {
@@ -145,9 +183,43 @@ describe('contextualAuthoringAdapter', () => {
 
     const plan = planStudioAuthoringPatches(baseline, candidate, capabilities);
 
+    expect(plan.relocations).toEqual([
+      {
+        blockId: 'table-a',
+        targetParentBlockId: 'right',
+        beforeBlockId: null,
+        manifestChecksum: 'table-1',
+      },
+    ]);
     expect(plan.moves).toEqual([]);
     expect(plan.patches).toEqual([]);
-    expect(plan.unsupported.join(' ')).toContain('跨父级移动');
+    expect(plan.unsupported).toEqual([]);
+  });
+
+  it('collapses subtree deletion to one governed removal item', () => {
+    const baseline: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'composite',
+      id: 'operations',
+      blocks: [{
+        id: 'form-root',
+        blockType: 'form',
+        blocks: [{
+          id: 'table-a',
+          blockType: 'table',
+          blocks: [{ id: 'table-child', blockType: 'table' }],
+        }],
+      }],
+    };
+    const candidate: PageSchemaV3 = {
+      ...baseline,
+      blocks: [{ ...baseline.blocks[0], blocks: [] }],
+    };
+
+    const plan = planStudioAuthoringPatches(baseline, candidate, capabilities);
+
+    expect(plan.removes).toEqual([{ blockId: 'table-a', manifestChecksum: 'table-1' }]);
+    expect(plan.unsupported).toEqual([]);
   });
 
   it('rebases disjoint edits and requires an explicit Mine or Latest decision for conflicts', () => {

@@ -33,8 +33,15 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
     private static final String PLUGIN_VERSION = "0.1.0";
     private static final String MANIFEST_VERSION = "1";
     public static final String REORDER_WITHIN_PARENT_PATH = "/$structure/order";
+    public static final String CREATE_BLOCK_PATH = "/$structure/create";
+    public static final String REMOVE_BLOCK_PATH = "/$structure/remove";
+    public static final String RELOCATE_BLOCK_PATH = "/$structure/parent";
     private static final Set<PatchOperation> VALUE_OPERATIONS =
             Set.copyOf(EnumSet.of(PatchOperation.ADD, PatchOperation.REPLACE, PatchOperation.REMOVE));
+    private static final Set<String> SAFE_CREATABLE_BLOCK_TYPES = Set.of(
+            "form", "list", "detail", "dashboard", "form-section", "detail-section",
+            "tabs", "tab", "filter-bar", "action-bar", "table", "widget", "stat-card",
+            "description", "rich-text", "chart");
 
     private final Map<String, CapabilityManifest> manifests;
     private final String registryChecksum;
@@ -98,6 +105,15 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
         definitions.put("action-bar", layoutProperties());
         definitions.put("widget", layoutProperties());
         definitions.put("stat-card", layoutProperties());
+
+        definitions.replaceAll((blockType, propertyMap) -> {
+            if (!SAFE_CREATABLE_BLOCK_TYPES.contains(blockType)) {
+                return propertyMap;
+            }
+            Map<String, PropertyCapability> withCreate = new LinkedHashMap<>(propertyMap);
+            withCreate.put(CREATE_BLOCK_PATH, createBlock());
+            return Map.copyOf(withCreate);
+        });
 
         Map<String, CapabilityManifest> built = new LinkedHashMap<>();
         definitions.forEach((blockType, propertyMap) -> {
@@ -172,6 +188,30 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
                 false);
     }
 
+    private PropertyCapability createBlock() {
+        return structureCapability(CREATE_BLOCK_PATH, PatchOperation.ADD);
+    }
+
+    private PropertyCapability removeBlock() {
+        return structureCapability(REMOVE_BLOCK_PATH, PatchOperation.REMOVE);
+    }
+
+    private PropertyCapability relocateBlock() {
+        return structureCapability(RELOCATE_BLOCK_PATH, PatchOperation.MOVE);
+    }
+
+    private PropertyCapability structureCapability(String path, PatchOperation operation) {
+        return new PropertyCapability(
+                path,
+                Set.of(operation),
+                Route.HANDOFF_STUDIO,
+                RiskLevel.L3,
+                effects(EffectTag.PRESENTATION),
+                Reversibility.REVERSIBLE,
+                false,
+                false);
+    }
+
     private PropertyCapability property(
             String path,
             Route route,
@@ -190,6 +230,8 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
 
     private Map<String, PropertyCapability> properties(PropertyCapability... capabilities) {
         Map<String, PropertyCapability> result = new LinkedHashMap<>();
+        result.put(REMOVE_BLOCK_PATH, removeBlock());
+        result.put(RELOCATE_BLOCK_PATH, relocateBlock());
         for (PropertyCapability capability : capabilities) {
             result.put(capability.propertyPath(), capability);
         }

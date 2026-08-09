@@ -9,6 +9,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Ch
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ChangeSetView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateHandoffRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateAiPatchProposalRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateBlockRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffContextView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffCreatedView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.IdentitySimulationView;
@@ -19,6 +20,8 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Pa
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseHistoryView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RejectAiPatchProposalRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RelocateBlockRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RemoveBlockRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewWorkspaceView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RolePreviewTargetView;
@@ -208,6 +211,30 @@ public class AuthoringWorkspaceController {
             @PathVariable String sessionPid,
             @Valid @RequestBody MoveBlockRequest request) {
         return ApiResponse.success(workspaceService.moveStudioBlock(sessionPid, request));
+    }
+
+    @PostMapping("/sessions/{sessionPid}/studio-blocks")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<PatchResult> createStudioBlock(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody CreateBlockRequest request) {
+        return ApiResponse.success(workspaceService.createStudioBlock(sessionPid, request));
+    }
+
+    @PostMapping("/sessions/{sessionPid}/studio-block-removals")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<PatchResult> removeStudioBlock(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody RemoveBlockRequest request) {
+        return ApiResponse.success(workspaceService.removeStudioBlock(sessionPid, request));
+    }
+
+    @PatchMapping("/sessions/{sessionPid}/studio-relocations")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<PatchResult> relocateStudioBlock(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody RelocateBlockRequest request) {
+        return ApiResponse.success(workspaceService.relocateStudioBlock(sessionPid, request));
     }
 
     @PostMapping("/sessions/{sessionPid}/ai-patch-proposals")

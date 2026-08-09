@@ -594,6 +594,25 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void studioStructureCreateRequiresAdminPermission() throws Exception {
+        grantDesignerManage();
+        PageSchema page = insertStructurePage();
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+
+        mockMvc.perform(post("/api/authoring/sessions/{sessionPid}/studio-blocks", opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expectedRevision":1,"blockId":"middle","blockType":"form-section",
+                                 "parentBlockId":"form-root","manifestChecksum":"%s"}
+                                """.formatted(capabilityRegistry.find("form-section")
+                                        .orElseThrow().checksum())))
+                .andExpect(status().isForbidden());
+
+        applyTestMetaContext();
+        assertThat(workspaceService.get(opened.sessionPid()).revision()).isEqualTo(1);
+    }
+
+    @Test
     void studioPatchPersistsIntoTheSameChangeSetWithoutChangingLegacyPage() throws Exception {
         grantDesignerAdmin();
         PageSchema page = insertPage("normal");
@@ -653,6 +672,73 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
 
         PageSchema unchanged = pageSchemaMapper.selectByPid(page.getPid());
         assertThat(unchanged.getBlocks()).containsSubsequence("column-a", "column-b", "column-c");
+    }
+
+    @Test
+    void studioStructureAdaptersPersistCreateRelocateAndRemoveIntoOneIsolatedChangeSet() throws Exception {
+        grantDesignerAdmin();
+        PageSchema page = insertStructurePage();
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        String fieldChecksum = capabilityRegistry.find("field").orElseThrow().checksum();
+        String sectionChecksum = capabilityRegistry.find("form-section").orElseThrow().checksum();
+
+        mockMvc.perform(post("/api/authoring/sessions/{sessionPid}/studio-blocks", opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expectedRevision":1,"blockId":"middle","blockType":"form-section",
+                                 "parentBlockId":"form-root","manifestChecksum":"%s"}
+                                """.formatted(sectionChecksum)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.revision").value(2))
+                .andExpect(jsonPath("$.data.session.riskLevel").value("L3"))
+                .andExpect(jsonPath("$.data.session.route").value("HANDOFF_STUDIO"))
+                .andExpect(jsonPath("$.data.session.publishPolicy").value("STUDIO_APPROVAL"))
+                .andExpect(jsonPath("$.data.session.snapshot.blocks[0].blocks[2].id")
+                        .value("middle"));
+
+        mockMvc.perform(patch("/api/authoring/sessions/{sessionPid}/studio-relocations",
+                        opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expectedRevision":2,"blockId":"field-a",
+                                 "targetParentBlockId":"middle",
+                                 "manifestChecksum":"%s"}
+                                """.formatted(fieldChecksum)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.revision").value(3))
+                .andExpect(jsonPath("$.data.previousValue.parentBlockId").value("left"))
+                .andExpect(jsonPath("$.data.savedValue.parentBlockId").value("middle"));
+
+        mockMvc.perform(post("/api/authoring/sessions/{sessionPid}/studio-block-removals",
+                        opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expectedRevision":3,"blockId":"field-b","manifestChecksum":"%s"}
+                                """.formatted(fieldChecksum)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.revision").value(4))
+                .andExpect(jsonPath("$.data.session.snapshot.blocks[0].blocks[0].blocks.length()")
+                        .value(0))
+                .andExpect(jsonPath("$.data.session.snapshot.blocks[0].blocks[1].blocks.length()")
+                        .value(0))
+                .andExpect(jsonPath("$.data.session.snapshot.blocks[0].blocks[2].blocks[0].id")
+                        .value("field-a"));
+
+        applyTestMetaContext();
+        List<Map<String, Object>> items = jdbcTemplate.queryForList("""
+                SELECT property_path, operation FROM ab_authoring_change_item
+                WHERE tenant_id = ? AND env_id = ? AND change_set_id = (
+                    SELECT id FROM ab_authoring_change_set
+                    WHERE tenant_id = ? AND env_id = ? AND pid = ?)
+                ORDER BY result_revision, id
+                """, testTenant.getId(), MetaContext.getCurrentEnvironmentId(),
+                testTenant.getId(), MetaContext.getCurrentEnvironmentId(), opened.changeSetPid());
+        assertThat(items).extracting(item -> item.get("property_path"))
+                .containsExactly("/$structure/create", "/$structure/parent", "/$structure/remove");
+        assertThat(items).extracting(item -> item.get("operation"))
+                .containsExactly("ADD", "MOVE", "REMOVE");
+        assertThat(pageSchemaMapper.selectByPid(page.getPid()).getBlocks())
+                .contains("field-a", "field-b").doesNotContain("middle");
     }
 
     @Test
@@ -2063,6 +2149,24 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                   {"id":"column-a","blockType":"column"},
                   {"id":"column-b","blockType":"column"},
                   {"id":"column-c","blockType":"column"}
+                ]}]
+                """);
+        pageSchemaMapper.updateById(page);
+        return page;
+    }
+
+    private PageSchema insertStructurePage() {
+        PageSchema page = insertPage("normal");
+        page.setKind("form");
+        page.setSchemaVersion(3);
+        page.setBlocks("""
+                [{"id":"form-root","blockType":"form","blocks":[
+                  {"id":"left","blockType":"form-section","blocks":[
+                    {"id":"field-a","blockType":"field"}
+                  ]},
+                  {"id":"right","blockType":"form-section","blocks":[
+                    {"id":"field-b","blockType":"field"}
+                  ]}
                 ]}]
                 """);
         pageSchemaMapper.updateById(page);

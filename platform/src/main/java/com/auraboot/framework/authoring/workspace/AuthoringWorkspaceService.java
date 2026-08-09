@@ -7,10 +7,13 @@ import com.auraboot.framework.authoring.workspace.AuthoringPatchEngine.PreparedP
 import com.auraboot.framework.authoring.workspace.AuthoringActiveReleaseResolver.ActiveRelease;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ApplyPatchRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CapabilityRegistryView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateBlockRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.MoveBlockRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ObserveChangeSetRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RelocateBlockRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RemoveBlockRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewWorkspaceView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.TakeoverWriterLeaseRequest;
@@ -38,6 +41,9 @@ import java.util.Locale;
 import java.util.Map;
 
 import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.REORDER_WITHIN_PARENT_PATH;
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.CREATE_BLOCK_PATH;
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.RELOCATE_BLOCK_PATH;
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.REMOVE_BLOCK_PATH;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -369,6 +375,111 @@ public class AuthoringWorkspaceService {
                 prepared.savedValue());
     }
 
+    @Transactional
+    public PatchResult createStudioBlock(String sessionPid, CreateBlockRequest request) {
+        Identity identity = identity();
+        WorkspaceRow workspace = requireWorkspace(identity, sessionPid, true);
+        JsonNode metadata = structureMetadata(
+                "CREATE_BLOCK", request.expectedRevision(), request.parentBlockId(),
+                request.beforeBlockId(), null);
+        PreparedPatch prepared;
+        try {
+            validateWritable(workspace, identity, request.expectedRevision());
+            prepared = patchEngine.prepareStudioCreate(
+                    workspace.snapshot(), request.blockId(), request.blockType(),
+                    request.parentBlockId(), request.beforeBlockId(), request.manifestChecksum(),
+                    snapshotFactory.resourceScope(workspace.snapshot()));
+        } catch (ResponseStatusException exception) {
+            auditService.recordDenied(audit(
+                    identity, workspace.changeSetPid(), workspace.sessionPid(),
+                    "STRUCTURE_CREATE_DENIED", "DENY", reason(exception), workspace.pagePid(),
+                    request.blockId(), CREATE_BLOCK_PATH, metadata));
+            throw exception;
+        }
+        return persistStructure(
+                workspace, identity, prepared, request.blockId(), CREATE_BLOCK_PATH, "ADD",
+                "STRUCTURE_CREATE_SAVED", metadata);
+    }
+
+    @Transactional
+    public PatchResult removeStudioBlock(String sessionPid, RemoveBlockRequest request) {
+        Identity identity = identity();
+        WorkspaceRow workspace = requireWorkspace(identity, sessionPid, true);
+        JsonNode metadata = structureMetadata(
+                "REMOVE_BLOCK", request.expectedRevision(), null, null, null);
+        PreparedPatch prepared;
+        try {
+            validateWritable(workspace, identity, request.expectedRevision());
+            prepared = patchEngine.prepareStudioRemove(
+                    workspace.snapshot(), request.blockId(), request.manifestChecksum(),
+                    snapshotFactory.resourceScope(workspace.snapshot()));
+        } catch (ResponseStatusException exception) {
+            auditService.recordDenied(audit(
+                    identity, workspace.changeSetPid(), workspace.sessionPid(),
+                    "STRUCTURE_REMOVE_DENIED", "DENY", reason(exception), workspace.pagePid(),
+                    request.blockId(), REMOVE_BLOCK_PATH, metadata));
+            throw exception;
+        }
+        return persistStructure(
+                workspace, identity, prepared, request.blockId(), REMOVE_BLOCK_PATH, "REMOVE",
+                "STRUCTURE_REMOVE_SAVED", metadata);
+    }
+
+    @Transactional
+    public PatchResult relocateStudioBlock(String sessionPid, RelocateBlockRequest request) {
+        Identity identity = identity();
+        WorkspaceRow workspace = requireWorkspace(identity, sessionPid, true);
+        JsonNode metadata = structureMetadata(
+                "RELOCATE_BLOCK", request.expectedRevision(), request.targetParentBlockId(),
+                request.beforeBlockId(), null);
+        PreparedPatch prepared;
+        try {
+            validateWritable(workspace, identity, request.expectedRevision());
+            prepared = patchEngine.prepareStudioRelocate(
+                    workspace.snapshot(), request.blockId(), request.targetParentBlockId(),
+                    request.beforeBlockId(), request.manifestChecksum(),
+                    snapshotFactory.resourceScope(workspace.snapshot()));
+        } catch (ResponseStatusException exception) {
+            auditService.recordDenied(audit(
+                    identity, workspace.changeSetPid(), workspace.sessionPid(),
+                    "STRUCTURE_RELOCATE_DENIED", "DENY", reason(exception), workspace.pagePid(),
+                    request.blockId(), RELOCATE_BLOCK_PATH, metadata));
+            throw exception;
+        }
+        return persistStructure(
+                workspace, identity, prepared, request.blockId(), RELOCATE_BLOCK_PATH, "MOVE",
+                "STRUCTURE_RELOCATE_SAVED", metadata);
+    }
+
+    private PatchResult persistStructure(
+            WorkspaceRow workspace,
+            Identity identity,
+            PreparedPatch prepared,
+            String blockId,
+            String propertyPath,
+            String operation,
+            String eventType,
+            JsonNode metadata) {
+        String changeItemPid = UniqueIdGenerator.generate();
+        AggregatePolicy aggregate = aggregatePolicyService.aggregate(workspace, prepared.decision());
+        repository.persistPatch(
+                workspace, prepared.snapshot(), capabilityRegistry.checksum(), changeItemPid,
+                blockId, propertyPath, operation, prepared.previousValue(), prepared.savedValue(),
+                prepared.capability(), prepared.decision(), identity.userId(), aggregate,
+                Instant.now().plus(WRITER_LEASE));
+        ((ObjectNode) metadata).put("changeItemPid", changeItemPid);
+        ((ObjectNode) metadata).put("resultRevision", workspace.changeSetRevision() + 1);
+        repository.audit(audit(
+                identity, workspace.changeSetPid(), workspace.sessionPid(), eventType, "ALLOW",
+                prepared.decision().reason().name(), workspace.pagePid(), blockId, propertyPath,
+                metadata));
+        SessionView reloaded = viewMapper.toView(
+                requireWorkspace(identity, workspace.sessionPid(), false), identity.userId());
+        return new PatchResult(
+                reloaded, changeItemPid, prepared.decision(),
+                prepared.previousValue(), prepared.savedValue());
+    }
+
     private PatchResult apply(
             String sessionPid,
             ApplyPatchRequest request,
@@ -510,6 +621,33 @@ public class AuthoringWorkspaceService {
         if (changeItemPid != null) {
             metadata.put("changeItemPid", changeItemPid);
             metadata.put("resultRevision", request.expectedRevision() + 1);
+        }
+        return metadata;
+    }
+
+    private JsonNode structureMetadata(
+            String structureOperation,
+            long expectedRevision,
+            String parentBlockId,
+            String beforeBlockId,
+            String changeItemPid) {
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("authoringSurface", "STUDIO");
+        metadata.put("structureOperation", structureOperation);
+        metadata.put("expectedRevision", expectedRevision);
+        if (parentBlockId == null) {
+            metadata.putNull("parentBlockId");
+        } else {
+            metadata.put("parentBlockId", parentBlockId);
+        }
+        if (beforeBlockId == null) {
+            metadata.putNull("beforeBlockId");
+        } else {
+            metadata.put("beforeBlockId", beforeBlockId);
+        }
+        if (changeItemPid != null) {
+            metadata.put("changeItemPid", changeItemPid);
+            metadata.put("resultRevision", expectedRevision + 1);
         }
         return metadata;
     }

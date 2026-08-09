@@ -96,6 +96,54 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('canvas-block-dashboard_sales')).toBeInTheDocument();
   });
 
+  it('opens only server-declared structure actions in contextual Studio mode', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const document: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'governed-form',
+      blocks: [{
+        id: 'form-root',
+        blockType: 'form',
+        blocks: [{ id: 'section-existing', blockType: 'form-section', blocks: [] }],
+      }],
+    };
+
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={document}
+        onSave={onSave}
+        contextualEditablePropertyPaths={{
+          form: ['/title', '/layout/span'],
+          'form-section': ['/title', '/layout/span'],
+          field: ['/props/label', '/layout/span'],
+        }}
+        contextualReorderableBlockTypes={['form-section']}
+        contextualCreatableBlockTypes={['form-section']}
+        contextualRemovableBlockTypes={['form-section']}
+        contextualRelocatableBlockTypes={['form-section']}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('outline-item-form-root'));
+    fireEvent.click(screen.getByTestId('resource-tab-blocks'));
+    expect(screen.getByTestId('palette-add-form-section')).toBeEnabled();
+    expect(screen.queryByTestId('palette-add-field')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('palette-add-form-section'));
+    fireEvent.click(screen.getByTestId('block-delete-section-existing'));
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const savedDocument = onSave.mock.calls[0][0] as PageSchemaV3;
+    expect(findBlockById(savedDocument.blocks, 'section-existing')).toBeNull();
+    expect(findBlockById(savedDocument.blocks, 'form_section_new_section')?.block).toEqual({
+      id: 'form_section_new_section',
+      blockType: 'form-section',
+      title: { en: 'New section', 'zh-CN': '新分组' },
+      layout: { span: 12 },
+    });
+  });
+
   it('keeps selection in sync between outline, canvas, and inspector', () => {
     render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
 

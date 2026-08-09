@@ -114,6 +114,29 @@ public final class AuthoringWorkspaceContracts {
             @NotBlank String manifestChecksum) {
     }
 
+    public record CreateBlockRequest(
+            @Positive long expectedRevision,
+            @NotBlank @Size(max = 120) String blockId,
+            @NotBlank @Size(max = 120) String blockType,
+            @Size(min = 1, max = 120) String parentBlockId,
+            @Size(min = 1, max = 120) String beforeBlockId,
+            @NotBlank String manifestChecksum) {
+    }
+
+    public record RemoveBlockRequest(
+            @Positive long expectedRevision,
+            @NotBlank @Size(max = 120) String blockId,
+            @NotBlank String manifestChecksum) {
+    }
+
+    public record RelocateBlockRequest(
+            @Positive long expectedRevision,
+            @NotBlank @Size(max = 120) String blockId,
+            @NotBlank @Size(max = 120) String targetParentBlockId,
+            @Size(min = 1, max = 120) String beforeBlockId,
+            @NotBlank String manifestChecksum) {
+    }
+
     public record ObserveChangeSetRequest(
             JsonNode interactionContext) {
     }

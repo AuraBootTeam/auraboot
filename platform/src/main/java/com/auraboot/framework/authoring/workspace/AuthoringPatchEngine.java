@@ -20,6 +20,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Locale;
 
 import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.REORDER_WITHIN_PARENT_PATH;
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.CREATE_BLOCK_PATH;
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.RELOCATE_BLOCK_PATH;
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.REMOVE_BLOCK_PATH;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY;
 
@@ -107,6 +110,99 @@ public class AuthoringPatchEngine {
                 decision,
                 move.previousValue(),
                 move.savedValue());
+    }
+
+    public PreparedPatch prepareStudioCreate(
+            JsonNode sourceSnapshot,
+            String blockId,
+            String blockType,
+            String parentBlockId,
+            String beforeBlockId,
+            String manifestChecksum,
+            ResourceScope resourceScope) {
+        CapabilityManifest manifest = registry.find(blockType).orElse(null);
+        PropertyCapability capability = manifest == null
+                ? null
+                : manifest.properties().get(CREATE_BLOCK_PATH);
+        BoundaryDecision decision = structureDecision(
+                blockType, CREATE_BLOCK_PATH, PatchOperation.ADD,
+                capability, manifestChecksum, resourceScope);
+        requireAllowedDecision(decision, true);
+        AuthoringStableBlockTreeEditor.StructureResult result = blockTreeEditor.createBlock(
+                sourceSnapshot, blockId, blockType, parentBlockId, beforeBlockId);
+        return preparedStructure(result, capability, decision);
+    }
+
+    public PreparedPatch prepareStudioRemove(
+            JsonNode sourceSnapshot,
+            String blockId,
+            String manifestChecksum,
+            ResourceScope resourceScope) {
+        DraftTarget target = targetResolver.resolve(sourceSnapshot, blockId);
+        CapabilityManifest manifest = registry.find(target.blockType()).orElse(null);
+        PropertyCapability capability = manifest == null
+                ? null
+                : manifest.properties().get(REMOVE_BLOCK_PATH);
+        BoundaryDecision decision = structureDecision(
+                target.blockType(), REMOVE_BLOCK_PATH, PatchOperation.REMOVE,
+                capability, manifestChecksum, resourceScope);
+        requireAllowedDecision(decision, true);
+        return preparedStructure(
+                blockTreeEditor.removeBlock(target.snapshot(), blockId), capability, decision);
+    }
+
+    public PreparedPatch prepareStudioRelocate(
+            JsonNode sourceSnapshot,
+            String blockId,
+            String targetParentBlockId,
+            String beforeBlockId,
+            String manifestChecksum,
+            ResourceScope resourceScope) {
+        DraftTarget target = targetResolver.resolve(sourceSnapshot, blockId);
+        CapabilityManifest manifest = registry.find(target.blockType()).orElse(null);
+        PropertyCapability capability = manifest == null
+                ? null
+                : manifest.properties().get(RELOCATE_BLOCK_PATH);
+        BoundaryDecision decision = structureDecision(
+                target.blockType(), RELOCATE_BLOCK_PATH, PatchOperation.MOVE,
+                capability, manifestChecksum, resourceScope);
+        requireAllowedDecision(decision, true);
+        return preparedStructure(
+                blockTreeEditor.relocateBlock(
+                        target.snapshot(), blockId, targetParentBlockId, beforeBlockId),
+                capability,
+                decision);
+    }
+
+    private BoundaryDecision structureDecision(
+            String blockType,
+            String path,
+            PatchOperation operation,
+            PropertyCapability capability,
+            String manifestChecksum,
+            ResourceScope resourceScope) {
+        return boundaryPolicyService.evaluate(new BoundaryEvaluationInput(
+                blockType,
+                path,
+                operation,
+                resourceScope,
+                securityImpact(capability),
+                capability != null,
+                capability != null,
+                manifestChecksum));
+    }
+
+    private PreparedPatch preparedStructure(
+            AuthoringStableBlockTreeEditor.StructureResult result,
+            PropertyCapability capability,
+            BoundaryDecision decision) {
+        return new PreparedPatch(
+                result.snapshot(),
+                result.blockType(),
+                capability,
+                decision,
+                result.previousValue(),
+                result.savedValue());
     }
 
     private PreparedPatch prepare(

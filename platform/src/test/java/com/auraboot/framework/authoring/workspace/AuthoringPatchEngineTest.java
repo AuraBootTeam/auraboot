@@ -36,7 +36,7 @@ class AuthoringPatchEngineTest {
                 new AuthoringProtectedSemanticValidator(commandDefinitionMapper),
                 new AuthoringSnapshotTargetResolver(),
                 new AuthoringJsonObjectPatchApplier(),
-                new AuthoringStableBlockTreeEditor());
+                new AuthoringStableBlockTreeEditor(new CoreAuthoringStructurePolicy()));
     }
 
     @Test
@@ -151,6 +151,77 @@ class AuthoringPatchEngineTest {
                 ResourceScope.CURRENT_PAGE))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("no-op");
+    }
+
+    @Test
+    void studioStructureAdaptersCreateRemoveAndRelocateOnlyServerOwnedCoreNodes() throws Exception {
+        ObjectNode source = (ObjectNode) objectMapper.readTree("""
+                {"kind":"form","blocks":[{"id":"form-root","blockType":"form","blocks":[
+                  {"id":"left","blockType":"form-section","blocks":[
+                    {"id":"field-a","blockType":"field"}
+                  ]},
+                  {"id":"right","blockType":"form-section","blocks":[]}
+                ]}]}
+                """);
+
+        AuthoringPatchEngine.PreparedPatch created = engine.prepareStudioCreate(
+                source, "middle", "form-section", "form-root", null,
+                checksum("form-section"), ResourceScope.CURRENT_PAGE);
+        assertThat(created.decision().route()).isEqualTo(Route.HANDOFF_STUDIO);
+        assertThat(created.snapshot().at("/blocks/0/blocks/2/id").asText()).isEqualTo("middle");
+        assertThat(created.snapshot().at("/blocks/0/blocks/2/blocks").isEmpty()).isTrue();
+
+        AuthoringPatchEngine.PreparedPatch relocated = engine.prepareStudioRelocate(
+                created.snapshot(), "field-a", "right", null,
+                checksum("field"), ResourceScope.CURRENT_PAGE);
+        assertThat(relocated.snapshot().at("/blocks/0/blocks/0/blocks").isEmpty()).isTrue();
+        assertThat(relocated.snapshot().at("/blocks/0/blocks/1/blocks/0/id").asText())
+                .isEqualTo("field-a");
+        assertThat(relocated.previousValue().path("parentBlockId").asText()).isEqualTo("left");
+        assertThat(relocated.savedValue().path("parentBlockId").asText()).isEqualTo("right");
+
+        AuthoringPatchEngine.PreparedPatch removed = engine.prepareStudioRemove(
+                relocated.snapshot(), "middle", checksum("form-section"), ResourceScope.CURRENT_PAGE);
+        assertThat(removed.snapshot().at("/blocks/0/blocks").size()).isEqualTo(2);
+        assertThat(removed.previousValue().path("blockId").asText()).isEqualTo("middle");
+        assertThat(source.at("/blocks/0/blocks/0/blocks/0/id").asText()).isEqualTo("field-a");
+    }
+
+    @Test
+    void studioStructureAdaptersRejectUnknownContainmentRootsCyclesAndDuplicateIds() throws Exception {
+        ObjectNode source = (ObjectNode) objectMapper.readTree("""
+                {"kind":"form","blocks":[{"id":"form-root","blockType":"form","blocks":[
+                  {"id":"outer","blockType":"form-section","blocks":[
+                    {"id":"inner","blockType":"form-section","blocks":[]},
+                    {"id":"field-a","blockType":"field"}
+                  ]}
+                ]}]}
+                """);
+
+        assertThatThrownBy(() -> engine.prepareStudioCreate(
+                source, "outer", "form-section", "form-root", null,
+                checksum("form-section"), ResourceScope.CURRENT_PAGE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("block-id-exists");
+        assertThatThrownBy(() -> engine.prepareStudioCreate(
+                source, "chart-a", "chart", "outer", null,
+                checksum("chart"), ResourceScope.CURRENT_PAGE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("containment-denied");
+        assertThatThrownBy(() -> engine.prepareStudioRelocate(
+                source, "outer", "inner", null,
+                checksum("form-section"), ResourceScope.CURRENT_PAGE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("cycle-denied");
+        assertThatThrownBy(() -> engine.prepareStudioRemove(
+                source, "form-root", checksum("form"), ResourceScope.CURRENT_PAGE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("root-delete-denied");
+        assertThatThrownBy(() -> engine.prepareStudioCreate(
+                source, "plugin-a", "plugin-secret", "outer", null,
+                "untrusted", ResourceScope.CURRENT_PAGE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("capability_unknown");
     }
 
     @Test

@@ -25,7 +25,7 @@ class AuthoringChangeSetSplitterTest {
         splitter = new AuthoringChangeSetSplitter(
                 new AuthoringSnapshotTargetResolver(),
                 new AuthoringJsonObjectPatchApplier(),
-                new AuthoringStableBlockTreeEditor());
+                new AuthoringStableBlockTreeEditor(new CoreAuthoringStructurePolicy()));
     }
 
     @Test

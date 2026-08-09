@@ -19,6 +19,7 @@ import type { ModelFieldsByModel, PageSchemaV3 } from '../components/unified-des
 import {
   applyAuthoringStudioPatch,
   consumeAuthoringHandoff,
+  createAuthoringStudioBlock,
   loadAuthoringCapabilities,
   loadAuthoringReviewWorkspace,
   loadAuthoringSession,
@@ -26,6 +27,8 @@ import {
   openAuthoringReviewWorkspace,
   observeAuthoringChangeSet,
   publishAuthoringChangeSet,
+  relocateAuthoringStudioBlock,
+  removeAuthoringStudioBlock,
   takeoverAuthoringWriterLease,
   transitionAuthoringGovernance,
 } from '~/framework/meta/authoring/authoringService';
@@ -51,7 +54,10 @@ import {
   buildStudioThreeWayMerge,
   planStudioAuthoringPatches,
   resolveStudioThreeWayMerge,
+  studioCreatableBlockTypes,
   studioEditablePropertyPaths,
+  studioRelocatableBlockTypes,
+  studioRemovableBlockTypes,
   studioReorderableBlockTypes,
   type StudioMergeResolution,
   type StudioThreeWayMerge,
@@ -383,6 +389,41 @@ export default function UnifiedDesignerPage() {
     if (plan.unsupported.length > 0) throw new Error(plan.unsupported.join('；'));
 
     let workingSession = startingSession;
+    for (const create of plan.creates) {
+      const result = await createAuthoringStudioBlock(
+        workingSession.sessionPid,
+        workingSession.revision,
+        create.blockId,
+        create.blockType,
+        create.parentBlockId,
+        create.beforeBlockId,
+        create.manifestChecksum,
+      );
+      workingSession = result.session;
+      setAuthoringSession(workingSession);
+    }
+    for (const relocation of plan.relocations) {
+      const result = await relocateAuthoringStudioBlock(
+        workingSession.sessionPid,
+        workingSession.revision,
+        relocation.blockId,
+        relocation.targetParentBlockId,
+        relocation.beforeBlockId,
+        relocation.manifestChecksum,
+      );
+      workingSession = result.session;
+      setAuthoringSession(workingSession);
+    }
+    for (const remove of plan.removes) {
+      const result = await removeAuthoringStudioBlock(
+        workingSession.sessionPid,
+        workingSession.revision,
+        remove.blockId,
+        remove.manifestChecksum,
+      );
+      workingSession = result.session;
+      setAuthoringSession(workingSession);
+    }
     for (const move of plan.moves) {
       const result = await moveAuthoringStudioBlock(
         workingSession.sessionPid,
@@ -748,6 +789,18 @@ export default function UnifiedDesignerPage() {
     handoff && !reviewWorkspaceMode && canAdministerDesigner && authoringCapabilities
       ? studioReorderableBlockTypes(authoringCapabilities)
       : undefined;
+  const contextualCreatableBlockTypes =
+    handoff && !reviewWorkspaceMode && canAdministerDesigner && authoringCapabilities
+      ? studioCreatableBlockTypes(authoringCapabilities)
+      : undefined;
+  const contextualRemovableBlockTypes =
+    handoff && !reviewWorkspaceMode && canAdministerDesigner && authoringCapabilities
+      ? studioRemovableBlockTypes(authoringCapabilities)
+      : undefined;
+  const contextualRelocatableBlockTypes =
+    handoff && !reviewWorkspaceMode && canAdministerDesigner && authoringCapabilities
+      ? studioRelocatableBlockTypes(authoringCapabilities)
+      : undefined;
   const contextualReadOnly = Boolean(
     handoff &&
       (reviewWorkspaceMode ||
@@ -779,6 +832,9 @@ export default function UnifiedDesignerPage() {
       contextualReadOnly={contextualReadOnly}
       contextualEditablePropertyPaths={contextualEditablePropertyPaths}
       contextualReorderableBlockTypes={contextualReorderableBlockTypes}
+      contextualCreatableBlockTypes={contextualCreatableBlockTypes}
+      contextualRemovableBlockTypes={contextualRemovableBlockTypes}
+      contextualRelocatableBlockTypes={contextualRelocatableBlockTypes}
       governedAiCopilot={
         handoff &&
         !contextualReadOnly &&

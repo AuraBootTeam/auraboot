@@ -247,6 +247,72 @@ export async function moveAuthoringStudioBlock(
   return requireData(result, '无法保存区块顺序变更');
 }
 
+export async function createAuthoringStudioBlock(
+  sessionPid: string,
+  revision: number,
+  blockId: string,
+  blockType: string,
+  parentBlockId: string | null,
+  beforeBlockId: string | null,
+  manifestChecksum: string,
+): Promise<PatchResult> {
+  const result = await fetchResult<PatchResult>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/studio-blocks`,
+    {
+      method: 'post',
+      params: {
+        expectedRevision: revision,
+        blockId,
+        blockType,
+        parentBlockId,
+        beforeBlockId,
+        manifestChecksum,
+      },
+    },
+  );
+  return requireData(result, '无法创建受治理区块');
+}
+
+export async function removeAuthoringStudioBlock(
+  sessionPid: string,
+  revision: number,
+  blockId: string,
+  manifestChecksum: string,
+): Promise<PatchResult> {
+  const result = await fetchResult<PatchResult>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/studio-block-removals`,
+    {
+      method: 'post',
+      params: { expectedRevision: revision, blockId, manifestChecksum },
+    },
+  );
+  return requireData(result, '无法删除受治理区块');
+}
+
+export async function relocateAuthoringStudioBlock(
+  sessionPid: string,
+  revision: number,
+  blockId: string,
+  targetParentBlockId: string,
+  beforeBlockId: string | null,
+  manifestChecksum: string,
+): Promise<PatchResult> {
+  const result = await fetchResult<PatchResult>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/studio-relocations`,
+    {
+      method: 'patch',
+      params: {
+        expectedRevision: revision,
+        blockId,
+        targetParentBlockId,
+        beforeBlockId,
+        manifestChecksum,
+      },
+    },
+  );
+  return requireData(result, '无法跨父级移动受治理区块');
+}
+
 export async function createAuthoringAiPatchProposal(
   sessionPid: string,
   revision: number,
