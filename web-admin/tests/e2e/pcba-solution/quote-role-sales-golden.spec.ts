@@ -301,10 +301,28 @@ async function generateAndValidateWorkbook(
   const drawerClose = page.getByRole('button', {
     name: /关闭复核浮层|Close review drawer/,
   });
-  if (await drawerClose.isVisible().catch(() => false)) {
-    await drawerClose.click();
-    await expect(page.getByTestId('review-drawer')).toBeHidden();
+  const drawer = page.getByTestId('review-drawer');
+  // A completed reprice triggers an asynchronous row refresh. The refresh can
+  // briefly rebind the same selected line after the first close, reopening the
+  // drawer and intercepting the next tab click. Require a stable hidden window;
+  // do not force-click through a visible overlay, because that would hide a real
+  // user-facing obstruction.
+  const closeDeadline = Date.now() + 10_000;
+  let hiddenSince = 0;
+  while (Date.now() < closeDeadline) {
+    if (await drawer.isVisible().catch(() => false)) {
+      await expect(drawerClose).toBeVisible({ timeout: 2_000 });
+      await drawerClose.click();
+      await expect(drawer).toBeHidden({ timeout: 2_000 });
+      hiddenSince = 0;
+    } else if (hiddenSince === 0) {
+      hiddenSince = Date.now();
+    } else if (Date.now() - hiddenSince >= 1_000) {
+      break;
+    }
+    await page.waitForTimeout(200);
   }
+  await expect(drawer).toBeHidden({ timeout: 2_000 });
   await page.getByRole('tab', { name: /报价Excel|Quote Excel/ }).click();
   const action = page.getByTestId('workbench-action-generate_quote_excel');
   await expect(action).toBeVisible({ timeout: 15_000 });
@@ -941,7 +959,11 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       const singleSearchRequest = singleSearchRequests[0];
       expect(singleSearchRequest, JSON.stringify(mockRequestsBody).slice(0, 1200)).toBeTruthy();
       expect(singleSearchRequest?.form?.keyword).toEqual([REPRICE_MPN]);
-      expect(singleSearchRequest?.form?.is_exact_match).toEqual(['1']);
+      // Yunhan's upstream exact mode can return an empty set for a valid MPN. The
+      // connector therefore requests wide recall and applies its own strict MPN
+      // equality filter; the preview/final-line assertions below prove that a
+      // substitute cannot be accepted as the requested part.
+      expect(singleSearchRequest?.form?.is_exact_match).toEqual(['0']);
       await testInfo.attach('ordinary-sales-reprice-preview-response.json', {
         body: JSON.stringify(previewBody, null, 2),
         contentType: 'application/json',
@@ -981,7 +1003,9 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       await expect(page.getByTestId('review-drawer')).toBeHidden();
       await page.getByTestId(`table-row-${lineId}`).click();
       await expect(page.getByTestId('review-drawer')).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByTestId('review-drawer-content-grid')).not.toHaveClass(/hidden/);
+      await expect(page.getByTestId('review-drawer-content-grid')).not.toHaveClass(
+        /(^|\s)hidden(\s|$)/,
+      );
       await expect(page.getByTestId('review-drawer-edit-open')).toBeVisible();
 
       // Recreate the preview once so the explicit inner Cancel contract remains covered as well.

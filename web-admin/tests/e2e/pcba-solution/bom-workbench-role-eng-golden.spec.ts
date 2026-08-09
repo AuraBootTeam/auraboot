@@ -308,11 +308,8 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
       const drawerRegenerate = page
         .getByTestId('review-drawer')
         .getByRole('button', { name: /重新生成并下载|Regenerate/ });
-      if (await drawerRegenerate.count()) {
-        await drawerRegenerate.first().click();
-      } else {
-        await page.getByTestId('workbench-action-download_new_bom').click();
-      }
+      await expect(drawerRegenerate).toBeVisible();
+      await drawerRegenerate.click();
       const regenBody = await (await regeneratePromise).json().catch(() => ({}));
       expect(String((regenBody as { code?: unknown }).code)).toBe('0');
       const download = await downloadPromise;

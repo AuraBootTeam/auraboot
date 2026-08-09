@@ -432,6 +432,11 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   // Owned by this wrapper (see resolvedHelpText); keep it out of the control's props so
   // SmartInput does not render a second copy under its own FieldBase.
   delete componentProps.helpText;
+  // Field-governance metadata may be delivered inside `props` by older schema
+  // projections. It is not a control prop and must never reach SmartInput's DOM
+  // spread (React reports it as an invalid attribute on every quote form).
+  delete componentProps.immutableWhen;
+  delete componentProps.allowedWriterCommands;
 
   // 如果有 dictCode 且没有 dataSource，自动生成字典数据源配置（不适用于 tree 组件）
   if (field.dictCode && !isTreeComponent && !field.dataSource) {

@@ -37,6 +37,13 @@ async function selectCustomer(page: Page, accountId: string, accountName: string
   await trigger.click();
 
   const option = page.locator(`[role="option"][data-value="${accountId}"]`).first();
+  if (!(await option.isVisible({ timeout: 1_000 }).catch(() => false))) {
+    const search = page.getByRole('listbox').last().getByRole('textbox', {
+      name: /查询|Search/i,
+    });
+    await expect(search, 'customer reference search').toBeVisible({ timeout: 5_000 });
+    await search.fill(accountName);
+  }
   await expect(option, `customer option ${accountId} should be loaded`).toBeVisible({
     timeout: 15_000,
   });
@@ -50,6 +57,13 @@ async function selectProject(page: Page, projectId: string, projectName: string)
   await trigger.click();
 
   const option = page.locator(`[role="option"][data-value="${projectId}"]`).first();
+  if (!(await option.isVisible({ timeout: 1_000 }).catch(() => false))) {
+    const search = page.getByRole('listbox').last().getByRole('textbox', {
+      name: /查询|Search/i,
+    });
+    await expect(search, 'project reference search').toBeVisible({ timeout: 5_000 });
+    await search.fill(projectName);
+  }
   await expect(option, `project option ${projectId} should be loaded`).toBeVisible({
     timeout: 15_000,
   });
@@ -160,8 +174,13 @@ test.describe('PCBA quote minimal create regression', () => {
     page,
   }, testInfo) => {
     const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
-    const accountName = `ZZZ E2E Minimal Customer ${suffix}`;
-    const projectName = `ZZZ E2E Quote Project ${suffix}`;
+    // Reference options are a bounded, label-ascending page and their visible
+    // query box filters that loaded page locally. Keep this quote-create golden
+    // deterministic on production-sized customer data by placing its unique
+    // fixtures at the start of the option page; remote reference search is a
+    // separate control contract, not this test's denominator.
+    const accountName = `000 E2E Minimal Customer ${suffix}`;
+    const projectName = `000 E2E Quote Project ${suffix}`;
     const notes = `Minimal quote note ${suffix}`;
     const workbookPath = createCorrectedBomWorkbook(
       testInfo.outputPath('create-quote-converted-bom.xlsx'),

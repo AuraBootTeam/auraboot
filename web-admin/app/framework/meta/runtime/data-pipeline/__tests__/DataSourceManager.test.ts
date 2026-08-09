@@ -16,6 +16,50 @@ describe('DataSourceManager', () => {
     mockedFetchResult.mockReset();
   });
 
+  it('defers detail child data sources until form.pid is available', async () => {
+    mockedFetchResult.mockResolvedValue({
+      code: '0',
+      data: { records: [], total: 0, current: 1, pageSize: 500 },
+    } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({ form: {}, state: {} } as any),
+    );
+    manager.register('standardLines', {
+      type: 'api',
+      endpoint: '/api/dynamic/bom_standard_line_pcba/list',
+      method: 'get',
+      adaptor: 'table',
+      autoFetch: false,
+      params: {
+        pageNum: 1,
+        pageSize: 500,
+        filters: [
+          {
+            fieldName: 'bom_std_task_id',
+            operator: 'EQ',
+            value: '${form.pid}',
+          },
+        ],
+      },
+      dependOn: ['form.pid'],
+    });
+
+    await manager.fetch('standardLines');
+    expect(mockedFetchResult).not.toHaveBeenCalled();
+
+    manager.updateContext(
+      createExpressionContext({ form: { pid: 'task-1' }, state: {} } as any),
+    );
+    await manager.fetch('standardLines');
+
+    expect(mockedFetchResult).toHaveBeenCalledTimes(1);
+    const params = mockedFetchResult.mock.calls[0][1]?.params as Record<string, any>;
+    expect(JSON.parse(params.filters)).toEqual([
+      { fieldName: 'bom_std_task_id', operator: 'EQ', value: 'task-1' },
+    ]);
+  });
+
   it('evaluates object params against runtime record and state context', async () => {
     mockedFetchResult.mockResolvedValueOnce({
       code: '0',
