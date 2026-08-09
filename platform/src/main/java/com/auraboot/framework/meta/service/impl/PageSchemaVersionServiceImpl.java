@@ -680,6 +680,8 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
 
         Map<String, Map<String, Object>> sourceById = indexBlocks(source);
         Map<String, Map<String, Object>> targetById = indexBlocks(target);
+        Map<String, Integer> sourcePositions = indexBlockPositions(source);
+        Map<String, Integer> targetPositions = indexBlockPositions(target);
 
         Set<String> allIds = new LinkedHashSet<>();
         allIds.addAll(sourceById.keySet());
@@ -699,6 +701,13 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
                 out.add(buildBlockDiff(blockPath, PageSchemaVersionComparisonDTO.DifferenceType.REMOVED,
                         blockSummary(sourceBlock), null, "删除块: " + blockLabel(sourceBlock)));
                 continue;
+            }
+
+            Integer sourceIndex = sourcePositions.get(id);
+            Integer targetIndex = targetPositions.get(id);
+            if (!id.startsWith("#") && !Objects.equals(sourceIndex, targetIndex)) {
+                out.add(buildBlockDiff(blockPath, PageSchemaVersionComparisonDTO.DifferenceType.MOVED,
+                        sourceIndex, targetIndex, null));
             }
 
             // Both present — diff the block's own top-level props (excluding the
@@ -760,6 +769,16 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
             byId.put(key, block);
         }
         return byId;
+    }
+
+    private Map<String, Integer> indexBlockPositions(List<Map<String, Object>> blocks) {
+        Map<String, Integer> positions = new LinkedHashMap<>();
+        for (int i = 0; i < blocks.size(); i++) {
+            Object id = blocks.get(i).get("id");
+            String key = (id instanceof String && !((String) id).isBlank()) ? (String) id : ("#" + i);
+            positions.put(key, i);
+        }
+        return positions;
     }
 
     /** A small, readable summary of a block ({id, blockType}) for the diff value. */
@@ -824,7 +843,7 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         PageSchemaVersionComparisonDTO.ComparisonSummary summary = new PageSchemaVersionComparisonDTO.ComparisonSummary();
         summary.setTotalDifferences(differences.size());
         
-        int addedCount = 0, removedCount = 0, modifiedCount = 0;
+        int addedCount = 0, removedCount = 0, modifiedCount = 0, movedCount = 0;
         Map<String, Integer> changesByCategory = new HashMap<>();
         
         for (PageSchemaVersionComparisonDTO.FieldDifference diff : differences) {
@@ -838,6 +857,9 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
                 case MODIFIED:
                     modifiedCount++;
                     break;
+                case MOVED:
+                    movedCount++;
+                    break;
             }
             
             // 按字段类别统计
@@ -848,6 +870,7 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         summary.setAddedFields(addedCount);
         summary.setRemovedFields(removedCount);
         summary.setModifiedFields(modifiedCount);
+        summary.setMovedFields(movedCount);
         summary.setChangesByCategory(changesByCategory);
         
         // 判断是否有重大变更

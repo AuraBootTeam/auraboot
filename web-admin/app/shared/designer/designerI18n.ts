@@ -446,9 +446,10 @@ export const DESIGNER_I18N = {
     versionDiffAdded: { 'zh-CN': '新增', 'en-US': 'Added' } as L,
     versionDiffRemoved: { 'zh-CN': '删除', 'en-US': 'Removed' } as L,
     versionDiffModified: { 'zh-CN': '修改', 'en-US': 'Modified' } as L,
+    versionDiffMoved: { 'zh-CN': '移动', 'en-US': 'Moved' } as L,
     versionDiffSummary: {
-      'zh-CN': '{added} 新增 / {removed} 删除 / {modified} 修改',
-      'en-US': '{added} added / {removed} removed / {modified} modified',
+      'zh-CN': '{added} 新增 / {removed} 删除 / {modified} 修改 / {moved} 移动',
+      'en-US': '{added} added / {removed} removed / {modified} modified / {moved} moved',
     } as L,
     versionDiffNoChanges: {
       'zh-CN': '两个版本之间没有差异',
