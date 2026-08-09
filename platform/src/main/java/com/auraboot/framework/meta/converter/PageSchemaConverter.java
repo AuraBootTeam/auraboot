@@ -56,6 +56,7 @@ public abstract class PageSchemaConverter {
     @Mapping(target = "extension", source = "extension", qualifiedByName = "extensionBeanToMap")
     @Mapping(target = "dataSources", ignore = true)
     @Mapping(target = "mobileUx", ignore = true)
+    @Mapping(target = "runtime", ignore = true)
     @Mapping(target = "deletedFlag", source = "deletedFlag")
     @Mapping(target = "createdAt", source = "createdAt")
     @Mapping(target = "updatedAt", source = "updatedAt")

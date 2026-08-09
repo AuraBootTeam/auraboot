@@ -12,7 +12,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HexFormat;
+import java.util.List;
 
 /** Builds immutable authoring bases from the current PageSchema resource. */
 @Component
@@ -44,11 +47,28 @@ public class AuthoringPageSnapshotFactory {
 
     public String checksum(JsonNode value) {
         try {
-            byte[] bytes = objectMapper.writeValueAsBytes(value);
+            byte[] bytes = objectMapper.writeValueAsBytes(canonicalize(value));
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         } catch (JsonProcessingException | NoSuchAlgorithmException e) {
             throw new IllegalStateException("Unable to checksum authoring snapshot", e);
         }
+    }
+
+    private JsonNode canonicalize(JsonNode value) {
+        if (value.isObject()) {
+            ObjectNode result = objectMapper.createObjectNode();
+            List<String> fields = new ArrayList<>();
+            value.fieldNames().forEachRemaining(fields::add);
+            Collections.sort(fields);
+            fields.forEach(field -> result.set(field, canonicalize(value.get(field))));
+            return result;
+        }
+        if (value.isArray()) {
+            var result = objectMapper.createArrayNode();
+            value.forEach(item -> result.add(canonicalize(item)));
+            return result;
+        }
+        return value;
     }
 
     public ResourceScope resourceScope(JsonNode snapshot) {

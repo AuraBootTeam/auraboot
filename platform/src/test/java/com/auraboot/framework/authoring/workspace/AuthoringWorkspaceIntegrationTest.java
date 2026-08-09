@@ -17,6 +17,7 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
+import com.auraboot.framework.meta.service.PageSchemaService;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,6 +35,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.context.WebApplicationContext;
+
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -59,6 +62,9 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private PageSchemaMapper pageSchemaMapper;
+
+    @Autowired
+    private PageSchemaService pageSchemaService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -416,6 +422,61 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void runtimeEndpointsExposeOnlyPublishedActiveReleaseSnapshot() throws Exception {
+        grantPageSchemaRead();
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        patchDensity(opened, "compact");
+        governanceService.submit(opened.sessionPid(), new RevisionRequest(2));
+        ReleaseView release = governanceService.publish(
+                opened.changeSetPid(), new RevisionRequest(2));
+
+        mockMvc.perform(get("/api/pages/key/{pageKey}", page.getPageKey()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.blocks[0].props.density").value("compact"))
+                .andExpect(jsonPath("$.data.runtime.source").value("AUTHORING_RELEASE"))
+                .andExpect(jsonPath("$.data.runtime.releasePid").value(release.releasePid()))
+                .andExpect(jsonPath("$.data.runtime.channelVersion").value(1))
+                .andExpect(jsonPath("$.data.runtime.snapshotChecksum").isNotEmpty())
+                .andExpect(jsonPath("$.data.runtime.cacheKey")
+                        .value(org.hamcrest.Matchers.startsWith("authoring-release:")));
+        mockMvc.perform(get("/api/pages/runtime/{pid}", page.getPid()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.runtime.releasePid").value(release.releasePid()))
+                .andExpect(jsonPath("$.data.blocks[0].props.density").value("compact"));
+        mockMvc.perform(post("/api/pages/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pageKeys\":[\"" + page.getPageKey() + "\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].runtime.releasePid").value(release.releasePid()))
+                .andExpect(jsonPath("$.data[0].blocks[0].props.density").value("compact"));
+
+        applyTestMetaContext();
+        var mobileVersion = pageSchemaService.getVersionsSince(Instant.now().minusSeconds(60))
+                .stream()
+                .filter(version -> page.getPageKey().equals(version.getPageKey()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(mobileVersion.getRuntime().releasePid()).isEqualTo(release.releasePid());
+        assertThat(mobileVersion.getRuntime().channelVersion()).isEqualTo(1);
+        assertThat(pageSchemaMapper.selectByPid(page.getPid()).getBlocks())
+                .contains("normal").doesNotContain("compact");
+    }
+
+    @Test
+    void runtimeEndpointDoesNotExposeManagementDraft() throws Exception {
+        grantPageSchemaRead();
+        PageSchema page = insertPage("normal");
+        page.setStatus("draft");
+        pageSchemaMapper.updateById(page);
+
+        mockMvc.perform(get("/api/pages/key/{pageKey}", page.getPageKey()))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/pages/runtime/{pid}", page.getPid()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void reviewedChangeRequiresDifferentApproverBoundToExactRevision() {
         PageSchema page = insertPage("normal");
         SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
@@ -611,6 +672,16 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 "publish",
                 "admin",
                 "Page ChangeSet Publish Admin");
+        userPermissionService.evictUserPermissions(getTestUser().getId());
+    }
+
+    private void grantPageSchemaRead() {
+        grantCommittedPermissionToTestRole(
+                MetaPermission.PAGE_SCHEMA_READ,
+                "meta",
+                "page-schema",
+                "read",
+                "Page Schema Runtime Read");
         userPermissionService.evictUserPermissions(getTestUser().getId());
     }
 }

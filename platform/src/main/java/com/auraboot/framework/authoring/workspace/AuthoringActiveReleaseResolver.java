@@ -14,14 +14,17 @@ public class AuthoringActiveReleaseResolver {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final AuthoringRuntimeSnapshotSanitizer runtimeSanitizer;
+    private final AuthoringPageSnapshotFactory snapshotFactory;
 
     public AuthoringActiveReleaseResolver(
             JdbcTemplate jdbcTemplate,
             ObjectMapper objectMapper,
-            AuthoringRuntimeSnapshotSanitizer runtimeSanitizer) {
+            AuthoringRuntimeSnapshotSanitizer runtimeSanitizer,
+            AuthoringPageSnapshotFactory snapshotFactory) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         this.runtimeSanitizer = runtimeSanitizer;
+        this.snapshotFactory = snapshotFactory;
     }
 
     public ActiveRelease findByResource(
@@ -46,14 +49,32 @@ public class AuthoringActiveReleaseResolver {
                           AND c.resource_type = ? AND c.resource_pid = ?
                         """,
                 resultSet -> resultSet.next()
-                        ? new ActiveRelease(
+                        ? activeRelease(
                             resultSet.getString("release_pid"),
                             resultSet.getLong("row_version"),
                             resultSet.getLong("source_version"),
                             resultSet.getString("snapshot_checksum"),
-                            runtimeSanitizer.sanitize(parse(resultSet.getString("snapshot"))))
+                            resultSet.getString("snapshot"))
                         : null,
                 tenantId, envId, resourceType, resourcePid);
+    }
+
+    private ActiveRelease activeRelease(
+            String releasePid,
+            long channelVersion,
+            long sourceVersion,
+            String storedChecksum,
+            String serializedSnapshot) {
+        JsonNode snapshot = parse(serializedSnapshot);
+        if (!storedChecksum.equals(snapshotFactory.checksum(snapshot))) {
+            throw new DataRetrievalFailureException("Authoring release snapshot checksum mismatch");
+        }
+        return new ActiveRelease(
+                releasePid,
+                channelVersion,
+                sourceVersion,
+                storedChecksum,
+                runtimeSanitizer.sanitize(snapshot));
     }
 
     private JsonNode parse(String value) {
