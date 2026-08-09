@@ -12,6 +12,7 @@ import { cn } from '~/utils/cn';
 interface ColumnDef {
   field: string;
   label: string;
+  mandatory?: boolean;
 }
 
 export interface ColumnSettingsPanelProps {
@@ -38,10 +39,19 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
   t = (k) => k,
 }) => {
   // Build initial state from viewColumns or allColumns
-  const [columns, setColumns] = useState<Array<ViewColumnConfig & { label: string }>>([]);
+  const [columns, setColumns] = useState<
+    Array<ViewColumnConfig & { label: string; mandatory: boolean }>
+  >([]);
   const [saving, setSaving] = useState(false);
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
+  const translate = useCallback(
+    (key: string, fallback: string) => {
+      const value = t(key);
+      return value && value !== key ? value : fallback;
+    },
+    [t],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -53,7 +63,8 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
       return {
         fieldCode: col.field,
         label: col.label,
-        visible: isSys ? vc?.visible === true : vc?.visible !== false,
+        mandatory: col.mandatory === true,
+        visible: col.mandatory ? true : isSys ? vc?.visible === true : vc?.visible !== false,
         width: vc?.width,
         order: vc?.order ?? (isSys ? 900 + idx : idx),
       };
@@ -64,7 +75,9 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
 
   const toggleVisibility = useCallback((fieldCode: string) => {
     setColumns((prev) =>
-      prev.map((col) => (col.fieldCode === fieldCode ? { ...col, visible: !col.visible } : col)),
+      prev.map((col) =>
+        col.fieldCode === fieldCode && !col.mandatory ? { ...col, visible: !col.visible } : col,
+      ),
     );
   }, []);
 
@@ -121,7 +134,7 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
   }, []);
 
   const handleDeselectAll = useCallback(() => {
-    setColumns((prev) => prev.map((col) => ({ ...col, visible: false })));
+    setColumns((prev) => prev.map((col) => ({ ...col, visible: col.mandatory ? true : false })));
   }, []);
 
   if (!open) return null;
@@ -181,7 +194,7 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
             const businessCols = columns.filter((c) => !sysFields.has(c.fieldCode));
             const systemCols = columns.filter((c) => sysFields.has(c.fieldCode));
 
-            const renderColumn = (col: (typeof columns)[0], index: number) => (
+            const renderColumn = (col: (typeof columns)[0]) => (
               <div
                 key={col.fieldCode}
                 data-testid={`column-settings-row-${col.fieldCode}`}
@@ -206,9 +219,18 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
                 <input
                   type="checkbox"
                   checked={col.visible}
+                  disabled={col.mandatory}
                   onChange={() => toggleVisibility(col.fieldCode)}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
                   data-testid={`column-settings-visible-${col.fieldCode}`}
+                  title={
+                    col.mandatory
+                      ? translate(
+                          'common.saved_view_mandatory_field_reason',
+                          'Required fields cannot be hidden in a personal view',
+                        )
+                      : undefined
+                  }
                 />
                 <span
                   className={cn(
@@ -218,6 +240,11 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
                 >
                   {col.label}
                 </span>
+                {col.mandatory && (
+                  <span className="bg-accent-weak text-accent rounded px-1.5 py-0.5 text-[10px] font-medium">
+                    {translate('common.saved_view_mandatory', 'Required')}
+                  </span>
+                )}
                 <input
                   type="number"
                   value={col.width ?? ''}
@@ -233,7 +260,7 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
 
             return (
               <>
-                {businessCols.map((col, idx) => renderColumn(col, idx))}
+                {businessCols.map((col) => renderColumn(col))}
                 {systemCols.length > 0 && (
                   <>
                     <div className="mt-3 mb-1 flex items-center gap-2 px-2">
@@ -243,7 +270,7 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
                       </span>
                       <div className="h-px flex-1 bg-gray-200" />
                     </div>
-                    {systemCols.map((col, idx) => renderColumn(col, idx))}
+                    {systemCols.map((col) => renderColumn(col))}
                   </>
                 )}
               </>

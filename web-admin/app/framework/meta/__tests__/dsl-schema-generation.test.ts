@@ -90,13 +90,7 @@ describe('DSL Generated Schema', () => {
     const kindProp = defs.DslSchema.properties?.kind;
     expect(kindProp?.type).toBe('string');
     expect(kindProp?.enum).toEqual(
-      expect.arrayContaining([
-        'page',
-        'list',
-        'form',
-        'detail',
-        'page_layout',
-      ]),
+      expect.arrayContaining(['page', 'list', 'form', 'detail', 'page_layout']),
     );
   });
 
@@ -115,6 +109,11 @@ describe('DSL Generated Schema', () => {
   it('ColumnConfig.editable should be boolean type', () => {
     const editable = defs.ColumnConfig.properties?.editable;
     expect(editable?.type).toBe('boolean');
+  });
+
+  it('personalization mandatory flags should be explicit booleans', () => {
+    expect(defs.ColumnConfig.properties?.mandatory?.type).toBe('boolean');
+    expect(defs.ButtonConfig.properties?.mandatory?.type).toBe('boolean');
   });
 
   it('ColumnConfig.valueType should be string enum with known values', () => {

@@ -339,6 +339,24 @@ public class ViewConfig {
         private String originViewPid;
         private String originPresetKey;
         private String capabilityStatus;
+        /** Runtime overlay replay state: CURRENT, REBASED, STALE, or UNTRACKED. */
+        private String overlayStatus;
+        /** Stable server-owned reasons explaining replay/degradation. */
+        private List<String> overlayReasonCodes;
+        /** Metadata-only paths ignored or restored while replaying the overlay. */
+        private List<String> overlayStalePaths;
+        /** Page identity against which this overlay was last saved. */
+        private String basePagePid;
+        /** Immutable authoring release identity, null for legacy PageSchema baselines. */
+        private String baseReleasePid;
+        /** Active channel version observed when the overlay was saved. */
+        private Long baseChannelVersion;
+        /** Runtime snapshot checksum observed when the overlay was saved. */
+        private String baseSnapshotChecksum;
+        /** Server-derived field identities used for upgrade-safe replay. */
+        private List<String> baseFieldCodes;
+        /** Server-derived action identities used for upgrade-safe replay. */
+        private List<String> baseActionCodes;
         /** When true, this view is pinned as a one-click quick-filter chip. */
         private Boolean pinnedAsQuickFilter;
         /** Icon (emoji or known token) rendered on the quick-filter chip. */

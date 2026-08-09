@@ -57,12 +57,20 @@ class SavedViewServiceImplTest {
     @Mock TeamMapper teamMapper;
     @Mock AuditTrailService auditTrailService;
     @Mock UserService userService;
+    @Mock SavedViewOverlayPolicy savedViewOverlayPolicy;
 
     @InjectMocks SavedViewServiceImpl service;
 
     @BeforeEach
     void setUp() {
         MetaContext.setContext(100L, 7L, "user_pid", "alice");
+        when(savedViewOverlayPolicy.validateAndStamp(any(), any()))
+                .thenAnswer(invocation -> {
+                    ViewConfig config = invocation.getArgument(1);
+                    return config == null ? new ViewConfig() : config;
+                });
+        when(savedViewOverlayPolicy.replay(any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
     }
 
     @AfterEach
@@ -1135,6 +1143,7 @@ class SavedViewServiceImplTest {
         existing.setId(1L); existing.setPid("imp"); existing.setOwnerId("user_pid");
         existing.setViewConfig(new ViewConfig());
         when(savedViewMapper.findImplicitView("m", "k", "user_pid")).thenReturn(existing);
+        when(pageSchemaMapper.selectAnyByPageKey("k")).thenReturn(new PageSchema());
 
         AutoSaveViewRequest req = new AutoSaveViewRequest();
         req.setModelCode("m"); req.setPageKey("k");
@@ -1150,6 +1159,7 @@ class SavedViewServiceImplTest {
     @Test
     void autoSave_noExisting_createsImplicit_andClearsDefaults() {
         when(savedViewMapper.findImplicitView(any(), any(), any())).thenReturn(null);
+        when(pageSchemaMapper.selectAnyByPageKey("k")).thenReturn(new PageSchema());
         AutoSaveViewRequest req = new AutoSaveViewRequest();
         req.setModelCode("m"); req.setPageKey("k");
         req.setViewConfig(new ViewConfig());

@@ -16,6 +16,7 @@ export interface ActionConfigPanelProps {
   buttons: ButtonConfig[];
   currentConfig?: ToolbarActionConfig[];
   resolveLabel: (button: ButtonConfig) => string;
+  t?: (key: string) => string;
   /** Called on every change (toggle, drag reorder) — auto-saves immediately */
   onChange: (config: ToolbarActionConfig[]) => void;
   onClose: () => void;
@@ -35,12 +36,14 @@ interface ActionItem {
   visible: boolean;
   pinned: boolean;
   isBuiltin?: boolean;
+  mandatory?: boolean;
 }
 
 export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
   buttons,
   currentConfig,
   resolveLabel,
+  t = (key) => key,
   onChange,
   onClose,
 }) => {
@@ -49,6 +52,13 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
   const dragSection = useRef<'pinned' | 'overflow' | null>(null);
+  const translate = useCallback(
+    (key: string, fallback: string) => {
+      const value = t(key);
+      return value && value !== key ? value : fallback;
+    },
+    [t],
+  );
 
   // Initialize from currentConfig or build defaults (DSL + built-in actions)
   useEffect(() => {
@@ -61,9 +71,10 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
       return {
         code: btn.code,
         label: resolveLabel(btn),
-        visible: cfg?.visible ?? true,
+        visible: btn.mandatory ? true : (cfg?.visible ?? true),
         pinned: cfg?.pinned ?? (isPrimary || idx < 2),
         isBuiltin: false,
+        mandatory: btn.mandatory === true,
       };
     });
 
@@ -121,7 +132,7 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
     (code: string) => {
       setItems((prev) => {
         const next = prev.map((item) =>
-          item.code === code ? { ...item, visible: !item.visible } : item,
+          item.code === code && !item.mandatory ? { ...item, visible: !item.visible } : item,
         );
         emitChange(next);
         return next;
@@ -215,6 +226,11 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         {item.isBuiltin && (
           <span className="text-text-3 ml-1.5 text-[10px] font-normal">(built-in)</span>
         )}
+        {item.mandatory && (
+          <span className="bg-accent-weak text-accent ml-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium">
+            {translate('common.saved_view_mandatory', 'Required')}
+          </span>
+        )}
       </span>
 
       {/* Pin/unpin toggle — explicit move between sections */}
@@ -257,13 +273,23 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         type="button"
         data-testid={`action-config-visible-${item.code}`}
         onClick={() => toggleVisible(item.code)}
+        disabled={item.mandatory}
         className={cn(
           'rounded p-1 transition-colors',
           item.visible
             ? 'text-status-green hover:bg-status-green-bg'
             : 'text-text-3 hover:bg-hover',
         )}
-        title={item.visible ? 'Hide button' : 'Show button'}
+        title={
+          item.mandatory
+            ? translate(
+                'common.saved_view_mandatory_action_reason',
+                'Required actions cannot be hidden in a personal view',
+              )
+            : item.visible
+              ? 'Hide button'
+              : 'Show button'
+        }
       >
         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           {item.visible ? (

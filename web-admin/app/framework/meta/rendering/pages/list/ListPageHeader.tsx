@@ -35,6 +35,7 @@ export interface ListPageHeaderProps {
   onAction: (button: ButtonConfig) => void;
   onToolbarConfigChange: (config: ToolbarActionConfig[]) => void;
   resolveLabel: (button: ButtonConfig) => string;
+  t?: (key: string) => string;
   evaluateVisible: (button: ButtonConfig) => boolean;
   onImport: () => void;
   onExport: (format: 'xlsx' | 'csv') => void;
@@ -67,6 +68,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   onAction,
   onToolbarConfigChange,
   resolveLabel,
+  t,
   evaluateVisible,
   onImport,
   onExport,
@@ -131,6 +133,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
             onAction={onAction}
             onConfigChange={onToolbarConfigChange}
             resolveLabel={resolveLabel}
+            t={t}
             evaluateVisible={evaluateVisible}
             onImport={onImport}
             onExport={onExport}

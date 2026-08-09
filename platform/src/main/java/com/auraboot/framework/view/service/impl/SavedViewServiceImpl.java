@@ -5,8 +5,6 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.permission.constants.MetaPermission;
-import com.auraboot.framework.organization.dto.TeamResponse;
-import com.auraboot.framework.organization.service.TeamService;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.organization.mapper.TeamMapper;
 import com.auraboot.framework.organization.entity.Team;
@@ -24,7 +22,6 @@ import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
-import com.auraboot.framework.meta.entity.AuditTrail;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.AuditTrailService;
 import com.auraboot.framework.user.dto.UserSearchDTO;
@@ -99,6 +96,7 @@ public class SavedViewServiceImpl implements SavedViewService {
     private final TeamMapper teamMapper;
     private final AuditTrailService auditTrailService;
     private final UserService userService;
+    private final SavedViewOverlayPolicy savedViewOverlayPolicy;
 
     @Override
     public SavedViewDTO create(SavedViewCreateRequest request) {
@@ -113,6 +111,7 @@ public class SavedViewServiceImpl implements SavedViewService {
         }
         String viewType = StringUtils.hasText(request.getViewType()) ? request.getViewType() : "table";
         ViewConfig viewConfig = request.getViewConfig() != null ? request.getViewConfig() : new ViewConfig();
+        viewConfig = savedViewOverlayPolicy.validateAndStamp(request.getPageKey(), viewConfig);
         validateViewTypeConfig(request.getModelCode(), viewType, viewConfig);
 
         String currentUserPid = MetaContext.getCurrentUserPid();
@@ -229,6 +228,8 @@ public class SavedViewServiceImpl implements SavedViewService {
                 validateCollaboratorAcl(savedView.getScope(), nextConfig);
                 changedFields.add("collaborators");
             }
+            nextConfig = savedViewOverlayPolicy.validateAndStamp(
+                    savedView.getPageKey(), nextConfig);
             savedView.setViewConfig(nextConfig);
             changedFields.add("viewConfig");
         }
@@ -496,6 +497,9 @@ public class SavedViewServiceImpl implements SavedViewService {
     public SavedViewDTO autoSave(AutoSaveViewRequest request) {
         String currentUserPid = MetaContext.getCurrentUserPid();
         Long tenantId = MetaContext.getCurrentTenantId();
+        if (StringUtils.hasText(request.getPageKey())) {
+            validatePageKeyExists(request.getPageKey());
+        }
 
         // Look for existing implicit view for this user/model/page
         SavedView existing = savedViewMapper.findImplicitView(
@@ -506,16 +510,35 @@ public class SavedViewServiceImpl implements SavedViewService {
             ViewConfig merged = existing.getViewConfig() != null ? existing.getViewConfig() : new ViewConfig();
             ViewConfig incoming = request.getViewConfig();
             if (incoming != null) {
-                if (incoming.getColumns() != null) merged.setColumns(incoming.getColumns());
-                if (incoming.getSorts() != null) merged.setSorts(incoming.getSorts());
-                if (incoming.getFilters() != null) merged.setFilters(incoming.getFilters());
-                if (incoming.getGroupBy() != null) merged.setGroupBy(incoming.getGroupBy());
-                if (incoming.getPagination() != null) merged.setPagination(incoming.getPagination());
-                if (incoming.getDensity() != null) merged.setDensity(incoming.getDensity());
-                if (incoming.getRowHeight() != null) merged.setRowHeight(incoming.getRowHeight());
-                if (incoming.getConditionalFormats() != null) merged.setConditionalFormats(incoming.getConditionalFormats());
-                if (incoming.getToolbarActions() != null) merged.setToolbarActions(incoming.getToolbarActions());
+                if (incoming.getColumns() != null) {
+                    merged.setColumns(incoming.getColumns());
+                }
+                if (incoming.getSorts() != null) {
+                    merged.setSorts(incoming.getSorts());
+                }
+                if (incoming.getFilters() != null) {
+                    merged.setFilters(incoming.getFilters());
+                }
+                if (incoming.getGroupBy() != null) {
+                    merged.setGroupBy(incoming.getGroupBy());
+                }
+                if (incoming.getPagination() != null) {
+                    merged.setPagination(incoming.getPagination());
+                }
+                if (incoming.getDensity() != null) {
+                    merged.setDensity(incoming.getDensity());
+                }
+                if (incoming.getRowHeight() != null) {
+                    merged.setRowHeight(incoming.getRowHeight());
+                }
+                if (incoming.getConditionalFormats() != null) {
+                    merged.setConditionalFormats(incoming.getConditionalFormats());
+                }
+                if (incoming.getToolbarActions() != null) {
+                    merged.setToolbarActions(incoming.getToolbarActions());
+                }
             }
+            merged = savedViewOverlayPolicy.validateAndStamp(request.getPageKey(), merged);
             existing.setViewConfig(merged);
             existing.setUpdatedAt(Instant.now());
             existing.setUpdatedBy(currentUserPid);
@@ -533,7 +556,8 @@ public class SavedViewServiceImpl implements SavedViewService {
         savedView.setScope("personal");
         savedView.setViewType("table");
         savedView.setOwnerId(currentUserPid);
-        savedView.setViewConfig(request.getViewConfig() != null ? request.getViewConfig() : new ViewConfig());
+        savedView.setViewConfig(savedViewOverlayPolicy.validateAndStamp(
+                request.getPageKey(), request.getViewConfig()));
         savedView.setAllowFullModel(false);
         savedView.setIsDefault(true);
         savedView.setIsImplicit(true);
@@ -579,7 +603,8 @@ public class SavedViewServiceImpl implements SavedViewService {
         if (page == null) {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "[S-SAVED-VIEW] pageKey '" + pageKey + "' does not exist in ab_page_schema; "
-                            + "define it as config/pages/" + pageKey + ".json in your plugin before creating a SavedView");
+                            + "define it as config/pages/" + pageKey
+                            + ".json in your plugin before creating a SavedView");
         }
     }
 
@@ -1360,7 +1385,8 @@ public class SavedViewServiceImpl implements SavedViewService {
                 .viewType(entity.getViewType())
                 .ownerId(entity.getOwnerId())
                 .teamId(entity.getTeamId())
-                .viewConfig(entity.getViewConfig())
+                .viewConfig(savedViewOverlayPolicy.replay(
+                        entity.getPageKey(), entity.getViewConfig()))
                 .allowFullModel(entity.getAllowFullModel())
                 .isDefault(entity.getIsDefault())
                 .isImplicit(entity.getIsImplicit())

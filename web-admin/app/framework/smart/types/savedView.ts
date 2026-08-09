@@ -232,6 +232,24 @@ export interface ViewConfigMeta {
   quickFilterOrder?: number;
   /** Per-view collaborator ACL for shared team views */
   collaborators?: ViewCollaboratorAcl[];
+  /** Server-evaluated compatibility of this overlay against the current page baseline. */
+  overlayStatus?: 'CURRENT' | 'REBASED' | 'STALE' | 'UNTRACKED';
+  /** Stable machine-readable reasons for rebasing or fail-safe degradation. */
+  overlayReasonCodes?: string[];
+  /** Invalid overlay paths ignored while replaying against the current baseline. */
+  overlayStalePaths?: string[];
+  /** Public page identity this overlay was last validated against. */
+  basePagePid?: string;
+  /** Immutable authoring release identity, when the page is release-backed. */
+  baseReleasePid?: string;
+  /** Release-channel compare-and-set version captured at validation time. */
+  baseChannelVersion?: number;
+  /** Runtime baseline checksum captured at validation time. */
+  baseSnapshotChecksum?: string;
+  /** Stable field identities present in the validated baseline. */
+  baseFieldCodes?: string[];
+  /** Stable action identities present in the validated baseline. */
+  baseActionCodes?: string[];
 }
 
 export interface ViewCollaboratorAcl {

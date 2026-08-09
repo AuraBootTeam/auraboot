@@ -27,6 +27,7 @@ export interface ToolbarActionGroupProps {
   onAction: (button: ButtonConfig) => void;
   onConfigChange: (config: ToolbarActionConfig[]) => void;
   resolveLabel: (button: ButtonConfig) => string;
+  t?: (key: string) => string;
   evaluateVisible: (button: ButtonConfig) => boolean;
   onImport: () => void;
   onExport: (format: 'xlsx' | 'csv') => void;
@@ -66,8 +67,9 @@ export function mergeConfig(
 
   // First: existing config items (in their saved order)
   for (const c of config) {
-    if (buttons.some((b) => b.code === c.code)) {
-      merged.push(c);
+    const button = buttons.find((b) => b.code === c.code);
+    if (button) {
+      merged.push(button.mandatory ? { ...c, visible: true } : c);
     }
   }
 
@@ -93,6 +95,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
   onAction,
   onConfigChange,
   resolveLabel,
+  t,
   evaluateVisible,
   onImport,
   onExport,
@@ -472,6 +475,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
           buttons={buttons}
           currentConfig={toolbarActions}
           resolveLabel={resolveLabel}
+          t={t}
           onChange={(config) => onConfigChange(config)}
           onClose={() => setConfigPanelOpen(false)}
         />

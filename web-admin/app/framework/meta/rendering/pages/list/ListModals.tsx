@@ -71,7 +71,7 @@ export interface ListModalsProps {
   // ColumnSettingsPanel
   columnSettingsOpen: boolean;
   onColumnSettingsClose: () => void;
-  allColumnDefs: Array<{ field: string; label: string }>;
+  allColumnDefs: Array<{ field: string; label: string; mandatory?: boolean }>;
   viewColumns?: ViewColumnConfig[];
   onColumnSettingsSave: (columns: ViewColumnConfig[]) => Promise<void>;
   t: (key: string) => string;
@@ -327,6 +327,7 @@ export function ListModals({
           onFilterByColumn={onFilterByColumn}
           onGroupBy={onGroupBy}
           onClose={onContextMenuClose}
+          t={t}
         />
       )}
 

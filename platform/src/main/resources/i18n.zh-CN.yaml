@@ -75,6 +75,23 @@ common:
   saved_view_save_current: 保存到当前视图
   saved_view_save_as_personal: 另存为新视图
   saved_view_current_saved: 当前视图已保存
+  saved_view_overlay_rebased_title: 个人视图已适配新版页面
+  saved_view_overlay_rebased_description: 字段、动作身份保持兼容，你的设置已自动重放。
+  saved_view_overlay_stale_title: 个人视图已安全降级
+  saved_view_overlay_stale_description_prefix: 页面结构已更新，
+  saved_view_overlay_stale_description_suffix: 项失效设置已忽略；业务页面仍可正常使用。
+  saved_view_overlay_affected_some: 部分
+  saved_view_overlay_mandatory_restored: 必显项已自动恢复。
+  saved_view_overlay_repairing: 修复中…
+  saved_view_overlay_repair: 清理失效设置
+  saved_view_overlay_read_only: 当前视图只读，请联系视图管理员修复。
+  saved_view_overlay_pending_draft: 请先保存或放弃当前视图的本地变更。
+  saved_view_overlay_repair_success: 失效设置已清理，个人视图已适配当前页面。
+  saved_view_overlay_repair_failed: 个人视图修复失败
+  saved_view_mandatory: 必显
+  saved_view_mandatory_field_reason: 必显字段不能在个人视图中隐藏
+  saved_view_mandatory_action_reason: 必显动作不能在个人视图中隐藏
+  saved_view_mandatory_column: 必显字段
   saved_view_save_filters: 保存筛选到当前视图
   saved_view_personal_quota: "个人视图：{count}/{limit}"
   saved_view_personal_quota_reached: 已达到 10 个个人视图上限，请删除或复用已有视图

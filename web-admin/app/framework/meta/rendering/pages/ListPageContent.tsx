@@ -89,6 +89,7 @@ import {
 import { assembleQuickFilterChips, type QuickFilterChip } from './list/quickFilterChips';
 import { resolveListRowClickMode } from './list/rowClickNavigation';
 import { SelectAllMatchingBanner } from './list/SelectAllMatchingBanner';
+import { SavedViewOverlayStatusBanner } from './list/SavedViewOverlayStatusBanner';
 import {
   type SelectionState,
   createSelectionModel,
@@ -1140,6 +1141,7 @@ function ListPageContentInner(props: PageContentProps) {
   const [pendingViewConfig, setPendingViewConfig] = useState<Partial<ViewConfig> | null>(null);
   const [savingViewDraft, setSavingViewDraft] = useState(false);
   const [copyingViewDraft, setCopyingViewDraft] = useState(false);
+  const [repairingViewOverlay, setRepairingViewOverlay] = useState(false);
   const savedViewPersistenceMode = getSavedViewPersistenceMode(currentView);
   const isCurrentViewLockedPreset = isSavedViewLockedPreset(currentView);
   const canCopyCurrentView = canCopySavedView(currentView);
@@ -1191,6 +1193,48 @@ function ListPageContentInner(props: PageContentProps) {
     },
     [t],
   );
+  const overlayMeta = currentView?.viewConfig?.meta;
+  const overlayCanWrite =
+    Boolean(currentView) &&
+    (savedViewPersistenceMode !== 'shared-draft' || canSaveSharedView) &&
+    !isCurrentViewLockedPreset;
+  const canRepairViewOverlay = overlayCanWrite && !hasPendingViewConfig;
+  const repairViewOverlayUnavailableReason = hasPendingViewConfig
+    ? translateCommon(
+        'common.saved_view_overlay_pending_draft',
+        '请先保存或放弃当前视图的本地变更。',
+      )
+    : undefined;
+
+  const handleRepairViewOverlay = useCallback(async () => {
+    if (!currentView?.viewConfig || !canRepairViewOverlay) return;
+
+    setRepairingViewOverlay(true);
+    try {
+      await updateView({ viewConfig: currentView.viewConfig });
+      showSuccessToast(
+        translateCommon(
+          'common.saved_view_overlay_repair_success',
+          '失效设置已清理，个人视图已适配当前页面。',
+        ),
+      );
+    } catch (err) {
+      showErrorToast(
+        err instanceof Error
+          ? err.message
+          : translateCommon('common.saved_view_overlay_repair_failed', '个人视图修复失败'),
+      );
+    } finally {
+      setRepairingViewOverlay(false);
+    }
+  }, [
+    canRepairViewOverlay,
+    currentView,
+    showErrorToast,
+    showSuccessToast,
+    translateCommon,
+    updateView,
+  ]);
   useEffect(() => {
     setPendingViewConfig(null);
   }, [currentView?.pid]);
@@ -1755,7 +1799,8 @@ function ListPageContentInner(props: PageContentProps) {
     // full-page "加载失败" ErrorAlert (which is reserved for data/schema load failures), forcing a
     // reload to recover. Blocking a single row's action should never blank the table.
     onError: (err) => {
-      if (import.meta.env?.DEV) console.warn('[ListPageContent] action error (shown via toast):', err.message);
+      if (import.meta.env?.DEV)
+        console.warn('[ListPageContent] action error (shown via toast):', err.message);
     },
   });
 
@@ -3056,6 +3101,7 @@ function ListPageContentInner(props: PageContentProps) {
       .filter((c) => !c.isActionColumn)
       .map((col) => ({
         field: col.field,
+        mandatory: col.mandatory === true,
         label: col.label
           ? typeof col.label === 'string'
             ? col.label
@@ -3082,6 +3128,7 @@ function ListPageContentInner(props: PageContentProps) {
     const sysDefs = SYSTEM_FIELD_DEFS.map((sf) => ({
       field: sf.field,
       label: typeof sf.label === 'string' ? sf.label : sf.field,
+      mandatory: false,
     }));
     return [...dslCols, ...sysDefs];
   }, [tableBlock, locale, t, tableName, schema?.modelCode]);
@@ -4037,6 +4084,16 @@ function ListPageContentInner(props: PageContentProps) {
               </button>
             </div>
           )}
+          <SavedViewOverlayStatusBanner
+            status={overlayMeta?.overlayStatus}
+            reasonCodes={overlayMeta?.overlayReasonCodes}
+            stalePaths={overlayMeta?.overlayStalePaths}
+            canRepair={canRepairViewOverlay}
+            repairing={repairingViewOverlay}
+            onRepair={handleRepairViewOverlay}
+            repairUnavailableReason={repairViewOverlayUnavailableReason}
+            t={translateCommon}
+          />
           {/* Page title, view selector, and action buttons */}
           <ListPageHeader
             title={
@@ -4076,6 +4133,7 @@ function ListPageContentInner(props: PageContentProps) {
             onAction={handleAction}
             onToolbarConfigChange={handleToolbarConfigChange}
             resolveLabel={resolveButtonLabel}
+            t={t}
             evaluateVisible={evaluateButtonVisible}
             onImport={() => setImportOpen(true)}
             onExport={handleExport}

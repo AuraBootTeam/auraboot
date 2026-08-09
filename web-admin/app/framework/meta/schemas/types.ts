@@ -203,6 +203,8 @@ export interface EventConfig {
 export interface ColumnConfig {
   field: string;
   label?: string | LocalizedText; // optional: resolved by i18n Resolver from model displayName
+  /** Runtime personalization may reorder but never hide this baseline field. */
+  mandatory?: boolean;
 
   // Layout
   align?: 'left' | 'center' | 'right';
@@ -326,6 +328,8 @@ export type ActionDef =
 // Button 配置
 export interface ButtonConfig {
   code: string;
+  /** Runtime personalization may reorder but never hide this baseline action. */
+  mandatory?: boolean;
   /** Designer-authored shorthand for common toolbar buttons. */
   preset?: string;
   /** @deprecated Use `label` for i18n display text. Kept for backward compatibility. */
