@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchResult, get, post, put, del, patch } from '../HttpClient';
+import {
+  activateAuthoringPreviewGuard,
+  AUTHORING_WRITE_BLOCKED_EVENT,
+  resetAuthoringPreviewGuardForTests,
+} from '../AuthoringPreviewGuard';
 
 // Mock session module to prevent SSR session resolution errors
 vi.mock('~/shared/services/session', () => ({
@@ -31,12 +36,44 @@ describe('HttpClient integration', () => {
   });
 
   afterEach(() => {
+    resetAuthoringPreviewGuardForTests();
     globalThis.fetch = originalFetch;
     window.sessionStorage.clear();
     window.localStorage.clear();
   });
 
   describe('fetchResult', () => {
+    it('blocks business writes during authoring preview but allows reads and authoring APIs', async () => {
+      mockFetchSuccess({ ok: true });
+      const blockedEvents = vi.fn();
+      window.addEventListener(AUTHORING_WRITE_BLOCKED_EVENT, blockedEvents);
+      const deactivate = activateAuthoringPreviewGuard('session-1');
+
+      const command = await fetchResult('/api/meta/commands/execute/order:update', {
+        method: 'post',
+        params: { payload: { pid: 'record-1' } },
+      });
+      const mutation = await fetchResult('/api/dynamic/order/record-1', {
+        method: 'put',
+        params: { status: 'APPROVED' },
+      });
+
+      expect(command.code).toBe('authoring_preview_write_blocked');
+      expect(mutation.code).toBe('authoring_preview_write_blocked');
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(blockedEvents).toHaveBeenCalledTimes(2);
+
+      await fetchResult('/api/dynamic/order/list');
+      await fetchResult('/api/authoring/sessions/session-1/handoffs', {
+        method: 'post',
+        params: { expectedRevision: 1 },
+      });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+
+      deactivate();
+      window.removeEventListener(AUTHORING_WRITE_BLOCKED_EVENT, blockedEvents);
+    });
+
     it('should make a GET request by default', async () => {
       mockFetchSuccess({ users: [] });
 

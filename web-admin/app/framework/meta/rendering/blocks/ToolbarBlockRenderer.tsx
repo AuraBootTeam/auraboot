@@ -133,6 +133,7 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
         return (
           <button
             key={button.code}
+            data-authoring-node-id={(button as any).id || button.code}
             data-testid={`toolbar-btn-${button.code}`}
             onClick={() => handleButtonClick(button)}
             disabled={isDisabled}

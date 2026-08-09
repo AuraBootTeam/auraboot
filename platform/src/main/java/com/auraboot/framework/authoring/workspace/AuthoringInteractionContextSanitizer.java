@@ -73,7 +73,7 @@ public class AuthoringInteractionContextSanitizer {
                 && !value.contains("\\")
                 && !value.contains("..")
                 && !value.matches("(?i)^[a-z][a-z0-9+.-]*:.*")
-                && value.matches("[A-Za-z0-9_/?&=.#:-]+");
+                && value.matches("[A-Za-z0-9_/%?&=.#:-]+");
     }
 
     private ResponseStatusException invalid(String reason) {

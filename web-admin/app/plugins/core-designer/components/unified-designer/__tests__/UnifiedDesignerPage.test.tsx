@@ -6,6 +6,7 @@ import { samplePageSchemaV3 } from '../fixtures/samplePageSchemaV3';
 import { loadModelFieldsByModelCodes } from '../persistence/modelFieldsRepository';
 import { loadPageSchemaV3, savePageSchemaV3 } from '../persistence/pageSchemaV3Repository';
 import type { PageSchemaV3 } from '../types';
+import { consumeAuthoringHandoff } from '~/framework/meta/authoring/authoringService';
 
 vi.mock('../persistence/pageSchemaV3Repository', () => ({
   loadPageSchemaV3: vi.fn(),
@@ -23,6 +24,10 @@ vi.mock('../persistence/modelFieldsRepository', async () => {
   };
 });
 
+vi.mock('~/framework/meta/authoring/authoringService', () => ({
+  consumeAuthoringHandoff: vi.fn(),
+}));
+
 describe('UnifiedDesignerPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -31,6 +36,7 @@ describe('UnifiedDesignerPage', () => {
       ok: true,
       source: { type: 'page', pid: 'page_1', pageKey: 'document_one' },
     });
+    vi.mocked(consumeAuthoringHandoff).mockReset();
   });
 
   it('loads a pageId document and saves edits through the V3 repository', async () => {
@@ -103,6 +109,51 @@ describe('UnifiedDesignerPage', () => {
 
     expect(await screen.findByText('Document Two')).toBeInTheDocument();
     expect(screen.queryByText('Document One')).not.toBeInTheDocument();
+  });
+
+  it('consumes an opaque contextual handoff and keeps the legacy studio path read-only', async () => {
+    setSearch('?contextId=ctx_secure_once');
+    vi.mocked(consumeAuthoringHandoff).mockResolvedValue({
+      pagePid: 'page_1',
+      changeSetPid: 'changeset_1',
+      sessionPid: 'session_1',
+      revision: 3,
+      intent: 'PAGE_STRUCTURE',
+      targetRoute: '/unified-designer',
+      returnTo: '/orders?tab=open',
+      blockId: 'field_customer_name',
+      propertyPath: '/props/label',
+      interactionContext: { route: '/orders?tab=open' },
+      expiresAt: '2026-08-09T12:00:00Z',
+    });
+    vi.mocked(loadPageSchemaV3).mockResolvedValue({
+      document: createDocument('document_one', 'Document One'),
+      source: { type: 'page', pid: 'page_1', pageKey: 'document_one' },
+      published: true,
+    });
+
+    render(<UnifiedDesignerPage />);
+
+    expect(await screen.findByTestId('studio-handoff-context')).toHaveTextContent(
+      'ChangeSet changeset_1',
+    );
+    expect(consumeAuthoringHandoff).toHaveBeenCalledWith('ctx_secure_once');
+    expect(loadPageSchemaV3).toHaveBeenCalledWith({ pageId: 'page_1', pageKey: null });
+    expect(screen.getByTestId('designer-return-link')).toHaveAttribute(
+      'href',
+      '/orders?tab=open',
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_customer_name'),
+    );
+    expect(screen.getByTestId('designer-save')).toBeDisabled();
+    expect(screen.getByTestId('designer-publish')).toBeDisabled();
+
+    fireEvent.change(screen.getByTestId('inspector-field-props.label'), {
+      target: { value: 'Must not persist' },
+    });
+    expect(screen.getByTestId('designer-save')).toBeDisabled();
+    expect(savePageSchemaV3).not.toHaveBeenCalled();
   });
 });
 

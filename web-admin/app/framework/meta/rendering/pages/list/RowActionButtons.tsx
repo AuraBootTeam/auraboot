@@ -78,6 +78,7 @@ function DropdownMenu({
           type="button"
           key={btn.code}
           data-testid={`row-action-${btn.code}`}
+          data-authoring-node-id={(btn as any).id || btn.code}
           onClick={(e) => {
             e.stopPropagation();
             setOpen(false);
@@ -150,6 +151,7 @@ export function RowActionButtons({
             key={btn.code}
             type="button"
             data-testid={`row-action-${btn.code}`}
+            data-authoring-node-id={(btn as any).id || btn.code}
             title={label}
             onClick={(e) => {
               e.stopPropagation();

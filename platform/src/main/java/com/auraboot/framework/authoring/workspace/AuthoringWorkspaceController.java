@@ -3,6 +3,9 @@ package com.auraboot.framework.authoring.workspace;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ApplyPatchRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CapabilityRegistryView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ChangeSetView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateHandoffRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffContextView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffCreatedView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseView;
@@ -29,12 +32,15 @@ public class AuthoringWorkspaceController {
 
     private final AuthoringWorkspaceService workspaceService;
     private final AuthoringGovernanceService governanceService;
+    private final AuthoringHandoffService handoffService;
 
     public AuthoringWorkspaceController(
             AuthoringWorkspaceService workspaceService,
-            AuthoringGovernanceService governanceService) {
+            AuthoringGovernanceService governanceService,
+            AuthoringHandoffService handoffService) {
         this.workspaceService = workspaceService;
         this.governanceService = governanceService;
+        this.handoffService = handoffService;
     }
 
     @GetMapping("/capabilities")
@@ -53,6 +59,20 @@ public class AuthoringWorkspaceController {
     @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
     public ApiResponse<SessionView> get(@PathVariable String sessionPid) {
         return ApiResponse.success(workspaceService.get(sessionPid));
+    }
+
+    @PostMapping("/sessions/{sessionPid}/handoffs")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
+    public ApiResponse<HandoffCreatedView> createHandoff(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody CreateHandoffRequest request) {
+        return ApiResponse.success(handoffService.create(sessionPid, request));
+    }
+
+    @PostMapping("/handoffs/{contextId}/consume")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
+    public ApiResponse<HandoffContextView> consumeHandoff(@PathVariable String contextId) {
+        return ApiResponse.success(handoffService.consume(contextId));
     }
 
     @PatchMapping("/sessions/{sessionPid}/patches")

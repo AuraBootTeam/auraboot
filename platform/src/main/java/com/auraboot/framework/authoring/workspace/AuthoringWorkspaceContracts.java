@@ -55,6 +55,43 @@ public final class AuthoringWorkspaceContracts {
             Instant expiresAt) {
     }
 
+    public enum StudioIntent {
+        PAGE_STRUCTURE,
+        NEW_PAGE,
+        MENU_STRUCTURE,
+        DATA_MODEL,
+        PERMISSION,
+        WORKFLOW,
+        INTEGRATION
+    }
+
+    public record CreateHandoffRequest(
+            @Positive long expectedRevision,
+            @NotNull StudioIntent intent,
+            @Size(max = 120) String blockId,
+            @Size(max = 240) String propertyPath) {
+    }
+
+    public record HandoffCreatedView(
+            String contextId,
+            String targetRoute,
+            Instant expiresAt) {
+    }
+
+    public record HandoffContextView(
+            String pagePid,
+            String changeSetPid,
+            String sessionPid,
+            long revision,
+            StudioIntent intent,
+            String targetRoute,
+            String returnTo,
+            String blockId,
+            String propertyPath,
+            JsonNode interactionContext,
+            Instant expiresAt) {
+    }
+
     public record PatchResult(
             SessionView session,
             String changeItemPid,

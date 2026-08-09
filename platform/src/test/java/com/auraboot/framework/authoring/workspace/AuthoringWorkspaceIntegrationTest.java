@@ -6,6 +6,9 @@ import com.auraboot.framework.authoring.policy.AuthoringCapabilityRegistry;
 import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.PatchOperation;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ApplyPatchRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ChangeSetView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateHandoffRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffContextView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffCreatedView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseView;
@@ -13,6 +16,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Re
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RevisionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RollbackRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.StudioIntent;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.entity.PageSchema;
@@ -50,6 +54,9 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private AuthoringWorkspaceService workspaceService;
+
+    @Autowired
+    private AuthoringHandoffService handoffService;
 
     @Autowired
     private AuthoringGovernanceService governanceService;
@@ -115,6 +122,12 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(post("/api/authoring/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"pagePid\":\"hidden\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/sessions/missing/handoffs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":1,\"intent\":\"PAGE_STRUCTURE\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/handoffs/ctx_abcdefghijklmnopqrstuvwxyz123456/consume"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/authoring/change-sets/missing/approve")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -188,6 +201,105 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
 
         applyTestMetaContext();
         assertThat(authoringSessionCount()).isEqualTo(before);
+    }
+
+    @Test
+    void handoffContextIsOpaqueActorBoundOneTimeAndFixedRoute() throws Exception {
+        grantDesignerManage();
+        PageSchema page = insertPage("normal");
+        ObjectNode interactionContext = objectMapper.createObjectNode();
+        interactionContext.put("route", "/orders");
+        interactionContext.put("recordPid", "record-1");
+        SessionView opened = workspaceService.open(
+                new OpenSessionRequest(page.getPid(), interactionContext));
+
+        String createBody = mockMvc.perform(post(
+                        "/api/authoring/sessions/{sessionPid}/handoffs", opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedRevision":1,
+                                  "intent":"PAGE_STRUCTURE",
+                                  "blockId":"table-1",
+                                  "propertyPath":"/props/dataSource",
+                                  "targetRoute":"https://evil.example/steal"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.contextId")
+                        .value(org.hamcrest.Matchers.matchesPattern(
+                                "ctx_[A-Za-z0-9_-]{32,80}")))
+                .andExpect(jsonPath("$.data.targetRoute").value("/unified-designer"))
+                .andReturn().getResponse().getContentAsString();
+        String contextId = objectMapper.readTree(createBody).at("/data/contextId").asText();
+
+        String storedHash = jdbcTemplate.queryForObject(
+                "SELECT nonce_hash FROM ab_authoring_handoff_context WHERE change_set_id = "
+                        + "(SELECT id FROM ab_authoring_change_set WHERE pid = ?)",
+                String.class,
+                opened.changeSetPid());
+        assertThat(storedHash).hasSize(64).doesNotContain(contextId);
+
+        mockMvc.perform(post("/api/authoring/handoffs/{contextId}/consume", contextId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pagePid").value(page.getPid()))
+                .andExpect(jsonPath("$.data.changeSetPid").value(opened.changeSetPid()))
+                .andExpect(jsonPath("$.data.sessionPid").value(opened.sessionPid()))
+                .andExpect(jsonPath("$.data.targetRoute").value("/unified-designer"))
+                .andExpect(jsonPath("$.data.returnTo").value("/orders"))
+                .andExpect(jsonPath("$.data.blockId").value("table-1"))
+                .andExpect(jsonPath("$.data.propertyPath").value("/props/dataSource"))
+                .andExpect(jsonPath("$.data.interactionContext.recordPid").value("record-1"));
+
+        mockMvc.perform(post("/api/authoring/handoffs/{contextId}/consume", contextId))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/authoring/handoffs/{contextId}/consume", contextId + "x"))
+                .andExpect(status().isNotFound());
+        applyTestMetaContext();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_authoring_audit_event WHERE session_pid = ? "
+                        + "AND event_type IN ('HANDOFF_CREATED', 'HANDOFF_CONSUMED')",
+                Integer.class,
+                opened.sessionPid())).isEqualTo(2);
+    }
+
+    @Test
+    void handoffRejectsExpiredAndCrossTenantContextsWithoutDisclosure() {
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        HandoffCreatedView expired = handoffService.create(
+                opened.sessionPid(),
+                new CreateHandoffRequest(1, StudioIntent.PAGE_STRUCTURE, "table-1", "/props/title"));
+        jdbcTemplate.update("UPDATE ab_authoring_handoff_context SET expires_at = ? "
+                        + "WHERE nonce_hash IS NOT NULL AND change_set_id = "
+                        + "(SELECT id FROM ab_authoring_change_set WHERE pid = ?)",
+                java.sql.Timestamp.from(Instant.now().minusSeconds(1)),
+                opened.changeSetPid());
+        assertThatThrownBy(() -> handoffService.consume(expired.contextId()))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("authoring.handoff.expired");
+
+        HandoffCreatedView tenantBound = handoffService.create(
+                opened.sessionPid(),
+                new CreateHandoffRequest(1, StudioIntent.PERMISSION, null, null));
+        long originalEnvironment = MetaContext.getCurrentEnvironmentId();
+        try {
+            MetaContext.setContext(
+                    testTenant.getId() + 100_000,
+                    testUser.getId(),
+                    testUser.getPid(),
+                    testUser.getUserName());
+            MetaContext.setEnvironmentId(originalEnvironment);
+            assertThatThrownBy(() -> handoffService.consume(tenantBound.contextId()))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .hasMessageContaining("authoring.handoff.not-found");
+        } finally {
+            applyTestMetaContext();
+        }
+
+        HandoffContextView consumed = handoffService.consume(tenantBound.contextId());
+        assertThat(consumed.intent()).isEqualTo(StudioIntent.PERMISSION);
+        assertThat(consumed.returnTo()).isEqualTo("/");
     }
 
     @Test

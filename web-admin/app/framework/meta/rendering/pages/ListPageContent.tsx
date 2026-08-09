@@ -4408,13 +4408,15 @@ function ListPageContentInner(props: PageContentProps) {
 
           {/* List Tabs */}
           {listTabsBlock?.tabs && (listTabsBlock.tabs as any[]).length > 0 && (
-            <ListTabs
-              tabs={listTabsBlock.tabs as any[]}
-              activeTab={activeTab}
-              onTabChange={handleTabChange}
-              locale={locale}
-              t={t}
-            />
+            <div data-aura-block-id={listTabsBlock.id} data-aura-element-id={listTabsBlock.id}>
+              <ListTabs
+                tabs={listTabsBlock.tabs as any[]}
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+                locale={locale}
+                t={t}
+              />
+            </div>
           )}
 
           {/* Filter area - Using Smart Components with collapse/expand (hidden in print) */}
@@ -4424,6 +4426,8 @@ function ListPageContentInner(props: PageContentProps) {
             filterBlock.fields.length > 0 && (
               <div
                 data-testid="search-area"
+                data-aura-block-id={filterBlock.id}
+                data-aura-element-id={filterBlock.id}
                 data-ab-testid={deriveTestId('list', modelCode, 'filters')}
                 className="print-hide border-border bg-subtle border-b px-6 py-4"
                 data-print="hide"
@@ -4444,6 +4448,7 @@ function ListPageContentInner(props: PageContentProps) {
                   {filterBlock.fields.map((field: FieldConfig) => (
                     <div
                       key={field.field}
+                      data-authoring-node-id={(field as any).id || field.field}
                       className="min-w-0"
                       style={{
                         gridColumn: `span ${Math.min(Math.max(field.layout?.colSpan || 4, 1), 12)}`,
@@ -4542,6 +4547,7 @@ function ListPageContentInner(props: PageContentProps) {
                           type="button"
                           key={button.code}
                           data-testid={`filter-btn-${button.code}`}
+                          data-authoring-node-id={(button as any).id || button.code}
                           onClick={() => handleAction(button)}
                           className={`rounded-control px-4 py-2 ${
                             button.primary || button.variant === 'primary'
@@ -4595,7 +4601,11 @@ function ListPageContentInner(props: PageContentProps) {
               </div>
             )
           ) : activeViewType === 'table' ? (
-            <>
+            <div
+              className="relative"
+              data-aura-block-id={tableBlock?.id}
+              data-aura-element-id={tableBlock?.id}
+            >
               {miscBlocksPosition === 'beforeTable' && miscListBlocks.length > 0 && runtime && (
                 <div className="flex flex-col gap-4 p-4" data-testid="list-misc-blocks">
                   {miscListBlocks.map((block: any, idx: number) => (
@@ -4795,28 +4805,30 @@ function ListPageContentInner(props: PageContentProps) {
                 resolveBulkActionLabel={resolveButtonLabel}
                 onClearSelection={clearAllSelection}
               />
-            </>
+            </div>
           ) : (
-            <SmartViewRenderer
-              view={
-                {
-                  ...(currentView || {}),
-                  modelCode,
-                  viewType: activeViewType,
-                  viewConfig: effectiveViewConfig || {},
-                } as any
-              }
-              onGanttTaskClick={navigateToRecordView}
-              onOpenViewConfig={() => setViewManageOpen(true)}
-              onSwitchToTableView={() => setActiveViewType('table')}
-              onCardClick={(card) => navigateToRecordView(getLegacyCompatibleRecordPid(card))}
-              onEventClick={navigateToRecordView}
-              onGalleryCardClick={navigateToRecordView}
-              onTreeNodeClick={navigateToRecordView}
-              onDataRefresh={() => loadData({ page: 0, size: pagination.pageSize })}
-              linkageFilters={[]}
-              pageKey={pageKey}
-            />
+            <div data-aura-block-id={tableBlock?.id} data-aura-element-id={tableBlock?.id}>
+              <SmartViewRenderer
+                view={
+                  {
+                    ...(currentView || {}),
+                    modelCode,
+                    viewType: activeViewType,
+                    viewConfig: effectiveViewConfig || {},
+                  } as any
+                }
+                onGanttTaskClick={navigateToRecordView}
+                onOpenViewConfig={() => setViewManageOpen(true)}
+                onSwitchToTableView={() => setActiveViewType('table')}
+                onCardClick={(card) => navigateToRecordView(getLegacyCompatibleRecordPid(card))}
+                onEventClick={navigateToRecordView}
+                onGalleryCardClick={navigateToRecordView}
+                onTreeNodeClick={navigateToRecordView}
+                onDataRefresh={() => loadData({ page: 0, size: pagination.pageSize })}
+                linkageFilters={[]}
+                pageKey={pageKey}
+              />
+            </div>
           )}
 
           <ListModals

@@ -109,6 +109,8 @@ export interface UnifiedDesignerWorkbenchProps {
    * specific surface (e.g. a QR scan-landing page).
    */
   aiCopilot?: boolean | { domainGuidance?: string };
+  initialSelectedBlockId?: string;
+  contextualReadOnly?: boolean;
 }
 
 export function UnifiedDesignerWorkbench({
@@ -122,6 +124,8 @@ export function UnifiedDesignerWorkbench({
   onUnpublish,
   onReloadDocument,
   aiCopilot,
+  initialSelectedBlockId,
+  contextualReadOnly = false,
 }: UnifiedDesignerWorkbenchProps) {
   const { locale } = useI18n();
   const initialSnapshot = serializeDocument(initialDocument);
@@ -152,6 +156,10 @@ export function UnifiedDesignerWorkbench({
   } = useDesignerSelection();
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
+
+  React.useEffect(() => {
+    if (initialSelectedBlockId) setSelectedBlockId(initialSelectedBlockId);
+  }, [initialSelectedBlockId, setSelectedBlockId]);
 
   // Toolbar save indicator follows the live document snapshot; wired into the
   // document kernel's onChange so every edit / undo / redo refreshes it.
@@ -203,6 +211,7 @@ export function UnifiedDesignerWorkbench({
   // to the target kind's root (e.g. detail → form), keeping all children. The
   // whole switch is one undoable step.
   const handleSwitchKind = (targetKind: PageSchemaV3['kind']) => {
+    if (contextualReadOnly) return;
     if (targetKind === document.kind) return;
     if (!canSwitchToKind(document.blocks, targetKind)) return;
     const rootBlockType = getKindPolicy(targetKind).rootBlockType;
@@ -220,6 +229,7 @@ export function UnifiedDesignerWorkbench({
   // D6 — apply a scenario template: replace the page's blocks (and title) with a
   // fresh tree built by the registered template, then clear the selection.
   const applyTemplate = (templateId: string) => {
+    if (contextualReadOnly) return;
     const template = getPageTemplate(templateId);
     if (!template) return;
     updateDocument((current) => ({
@@ -231,6 +241,7 @@ export function UnifiedDesignerWorkbench({
   };
 
   const updateSelectedBlock = (path: string, value: unknown) => {
+    if (contextualReadOnly) return;
     if (!selectedBlockId) return;
     updateDocument((current) => ({
       ...current,
@@ -266,6 +277,7 @@ export function UnifiedDesignerWorkbench({
   };
 
   const handleMoveBefore = (movingBlockId: string, targetBlockId: string) => {
+    if (contextualReadOnly) return;
     updateDocument((current) => ({
       ...current,
       blocks: moveBlockBefore(current.blocks, movingBlockId, targetBlockId),
@@ -273,6 +285,7 @@ export function UnifiedDesignerWorkbench({
   };
 
   const handleMoveToParent = (movingBlockId: string, parentBlockId: string) => {
+    if (contextualReadOnly) return;
     updateDocument((current) => ({
       ...current,
       blocks: moveBlockToParent(current.blocks, movingBlockId, parentBlockId),
@@ -288,6 +301,7 @@ export function UnifiedDesignerWorkbench({
   };
 
   const handleDeleteBlock = (blockId: string) => {
+    if (contextualReadOnly) return;
     if (!canDeleteBlock(blockId)) return;
     updateDocument((current) => ({
       ...current,
@@ -307,6 +321,7 @@ export function UnifiedDesignerWorkbench({
   // history step (one updateDocument → one undo). Undeletable blocks (the root
   // kind container) are silently skipped. Selection is cleared afterwards.
   const handleDeleteMultiSelected = () => {
+    if (contextualReadOnly) return;
     const deletableIds = [...multiSelectedIds].filter((id) => canDeleteBlock(id));
     if (deletableIds.length === 0) {
       clearMultiSelection();
@@ -325,6 +340,7 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canAddBlock = (blockType: string) => {
+    if (contextualReadOnly) return false;
     const definition = blockRegistry.get(blockType);
     if (!definition) return false;
     if (!isBlockTypeAllowedForKind(document.kind, blockType)) return false;
@@ -630,6 +646,7 @@ export function UnifiedDesignerWorkbench({
     blockId: string,
     updater: (block: PageSchemaV3['blocks'][number]) => PageSchemaV3['blocks'][number],
   ) => {
+    if (contextualReadOnly) return;
     updateDocument((current) => ({
       ...current,
       blocks: updateBlockById(current.blocks, blockId, updater),
@@ -691,6 +708,7 @@ export function UnifiedDesignerWorkbench({
   });
 
   const handleSave = async () => {
+    if (contextualReadOnly) return;
     const validation = validatePageSchemaV3(document);
     setSaveError(null);
     if (!validation.valid) {
@@ -791,6 +809,7 @@ export function UnifiedDesignerWorkbench({
   // any parse/shape failure the document is left untouched and an inline error
   // is shown via the existing save-error channel.
   const handleImportFile = (file: File) => {
+    if (contextualReadOnly) return;
     setSaveError(null);
     const reader = new FileReader();
     reader.onload = () => {
@@ -849,6 +868,7 @@ export function UnifiedDesignerWorkbench({
   ]);
 
   const handleApplyAiDesign = (parsed: ParsedDesign) => {
+    if (contextualReadOnly) return;
     updateDocument((current) =>
       applyDesignBlocks(current, parsed, getKindPolicy(current.kind).rootBlockType),
     );
@@ -886,6 +906,7 @@ export function UnifiedDesignerWorkbench({
         onImportFile={handleImportFile}
         onOpenAiCopilot={() => setAiDialogOpen(true)}
         onOpenVersions={pageId ? () => setVersionPanelOpen(true) : undefined}
+        readOnly={contextualReadOnly}
       />
       {pageId ? (
         <VersionHistoryPanel
@@ -952,7 +973,7 @@ export function UnifiedDesignerWorkbench({
           onDragEnd={handleDragEnd}
           onDragCancel={clearActiveDrag}
         >
-          {getPageTemplates().length > 0 ? (
+          {!contextualReadOnly && getPageTemplates().length > 0 ? (
             <div
               className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2"
               data-testid="designer-template-bar"
@@ -975,7 +996,7 @@ export function UnifiedDesignerWorkbench({
               </select>
             </div>
           ) : null}
-          {multiSelectedIds.size >= 2 ? (
+          {!contextualReadOnly && multiSelectedIds.size >= 2 ? (
             <div
               className="flex items-center gap-3 border-b border-blue-200 bg-blue-50 px-4 py-2"
               data-testid="multi-select-bar"

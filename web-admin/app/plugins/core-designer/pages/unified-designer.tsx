@@ -15,13 +15,18 @@ import {
   loadModelFieldsByModelCodes,
 } from '../components/unified-designer/persistence/modelFieldsRepository';
 import type { ModelFieldsByModel, PageSchemaV3 } from '../components/unified-designer/types';
+import { consumeAuthoringHandoff } from '~/framework/meta/authoring/authoringService';
+import type { HandoffContext } from '~/framework/meta/authoring/types';
 
 const LOCAL_STORAGE_KEY = 'auraboot.unified-designer.sample';
 
 export default function UnifiedDesignerPage() {
   const [searchParams] = useSearchParams();
-  const pageId = searchParams.get('pageId') || searchParams.get('pid');
+  const requestedPageId = searchParams.get('pageId') || searchParams.get('pid');
   const pageKey = searchParams.get('pageKey');
+  const contextId = searchParams.get('contextId');
+  const [handoff, setHandoff] = useState<HandoffContext | null>(null);
+  const [handoffError, setHandoffError] = useState<string | null>(null);
   const [document, setDocument] = useState<PageSchemaV3 | null>(null);
   const [source, setSource] = useState<PageSchemaV3Source>({ type: 'local' });
   const [published, setPublished] = useState(false);
@@ -29,11 +34,40 @@ export default function UnifiedDesignerPage() {
   const [error, setError] = useState<string | null>(null);
   const modelCodeKey = document ? collectModelCodesFromDocument(document).join('|') : '';
   const documentId = document?.id ?? null;
+  const pageId = handoff?.pagePid || requestedPageId;
+  const resolvingHandoff = Boolean(contextId && !handoff && !handoffError);
+
+  useEffect(() => {
+    if (!contextId) {
+      setHandoff(null);
+      setHandoffError(null);
+      return;
+    }
+    let cancelled = false;
+    setHandoffError(null);
+    void consumeAuthoringHandoff(contextId)
+      .then((consumed) => {
+        if (!cancelled) setHandoff(consumed);
+      })
+      .catch((consumeError) => {
+        if (!cancelled) {
+          setHandoffError(
+            consumeError instanceof Error
+              ? consumeError.message
+              : '配置上下文已过期、已使用或无权访问',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [contextId]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadDocument() {
+      if (resolvingHandoff) return;
       setError(null);
       if (!pageId && !pageKey) {
         const localDocument = readLocalDocument();
@@ -63,7 +97,7 @@ export default function UnifiedDesignerPage() {
     return () => {
       cancelled = true;
     };
-  }, [pageId, pageKey]);
+  }, [pageId, pageKey, resolvingHandoff]);
 
   useEffect(() => {
     if (!modelCodeKey) {
@@ -140,37 +174,57 @@ export default function UnifiedDesignerPage() {
     return loaded.document;
   };
 
-  if (error) {
+  if (handoffError || error) {
     return (
       <div className="grid min-h-[420px] place-items-center bg-slate-100 p-6 text-sm text-red-700">
-        {error}
+        <div className="max-w-lg rounded-lg border border-red-200 bg-white p-5 shadow-sm">
+          <div className="font-semibold">无法恢复现场配置上下文</div>
+          <div className="mt-2">{handoffError || error}</div>
+          <a href="/" className="mt-4 inline-flex text-blue-700 hover:underline">返回首页</a>
+        </div>
       </div>
     );
   }
 
-  if (!document) {
+  if (resolvingHandoff || !document) {
     return (
       <div className="grid min-h-[420px] place-items-center bg-slate-100 p-6 text-sm text-slate-500">
-        Loading unified designer...
+        {resolvingHandoff ? '正在验证一次性配置上下文…' : 'Loading unified designer...'}
       </div>
     );
   }
 
   const workbenchKey = getWorkbenchKey(document, source);
 
-  return (
+  const workbench = (
     <UnifiedDesignerWorkbench
       key={workbenchKey}
       initialDocument={document}
       modelFieldsByModel={modelFieldsByModel}
-      returnHref={source.type === 'page' ? '/p/page_schema' : undefined}
-      onSave={handleSave}
+      returnHref={handoff?.returnTo || (source.type === 'page' ? '/p/page_schema' : undefined)}
+      onSave={handoff ? undefined : handleSave}
       pageId={source.type === 'page' ? source.pid : undefined}
       initialPublished={source.type === 'page' ? published : false}
-      onPublish={source.type === 'page' ? handlePublish : undefined}
-      onUnpublish={source.type === 'page' ? handleUnpublish : undefined}
-      onReloadDocument={source.type === 'page' ? handleReloadDocument : undefined}
+      onPublish={source.type === 'page' && !handoff ? handlePublish : undefined}
+      onUnpublish={source.type === 'page' && !handoff ? handleUnpublish : undefined}
+      onReloadDocument={source.type === 'page' && !handoff ? handleReloadDocument : undefined}
+      initialSelectedBlockId={handoff?.blockId || undefined}
+      contextualReadOnly={Boolean(handoff)}
     />
+  );
+
+  if (!handoff) return workbench;
+
+  return (
+    <div className="flex min-h-[calc(100vh-4rem)] flex-col" data-testid="studio-handoff-context">
+      <div className="border-b border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <strong>已从现场配置安全移交</strong>
+        <span className="ml-2">
+          ChangeSet {handoff.changeSetPid} · 修订 r{handoff.revision} · 当前只读，避免绕过统一变更治理。
+        </span>
+      </div>
+      <div className="min-h-0 flex-1">{workbench}</div>
+    </div>
   );
 }
 

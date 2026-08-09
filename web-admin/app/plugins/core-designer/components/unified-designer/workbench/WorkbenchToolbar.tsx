@@ -53,6 +53,7 @@ interface WorkbenchToolbarProps {
    * server-side version history.
    */
   onOpenVersions?: () => void;
+  readOnly?: boolean;
 }
 
 // C4 — localized labels for the switchable page kinds.
@@ -88,9 +89,10 @@ export function WorkbenchToolbar({
   onImportFile,
   onOpenAiCopilot,
   onOpenVersions,
+  readOnly = false,
 }: WorkbenchToolbarProps) {
   const { locale } = useI18n();
-  const saveDisabled = !isDirty || saveStatus === 'saving' || saveStatus === 'invalid';
+  const saveDisabled = readOnly || !isDirty || saveStatus === 'saving' || saveStatus === 'invalid';
   const [showLeaveWarning, setShowLeaveWarning] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -100,7 +102,7 @@ export function WorkbenchToolbar({
   // button is disabled to prevent double submits.
   const publishBusy = publishStatus === 'publishing' || publishStatus === 'unpublishing';
   const isPublished = publishStatus === 'published';
-  const publishDisabled = !pageId || isDirty || publishBusy;
+  const publishDisabled = readOnly || !pageId || isDirty || publishBusy;
 
   useEffect(() => {
     if (!isDirty) setShowLeaveWarning(false);
@@ -128,6 +130,7 @@ export function WorkbenchToolbar({
             <select
               data-testid="designer-kind-switch"
               value={KIND_SWITCH_TARGETS.includes(document.kind) ? document.kind : ''}
+              disabled={readOnly}
               onChange={(event) => {
                 const next = event.target.value as PageSchemaV3['kind'];
                 if (next) onSwitchKind(next);
@@ -174,7 +177,7 @@ export function WorkbenchToolbar({
             {resolveDesignerText(DESIGNER_I18N.unified.pages, locale)}
           </a>
         ) : null}
-        {aiCopilotEnabled ? (
+        {aiCopilotEnabled && !readOnly ? (
           <button
             type="button"
             data-testid="designer-ai-copilot"
@@ -202,10 +205,10 @@ export function WorkbenchToolbar({
             data-testid="designer-undo"
             aria-label={resolveDesignerText(DESIGNER_I18N.unified.undo, locale)}
             title={resolveDesignerText(DESIGNER_I18N.unified.undo, locale)}
-            disabled={!canUndo}
+            disabled={readOnly || !canUndo}
             onClick={onUndo}
             className={`inline-flex h-8 w-8 items-center justify-center border-r border-slate-200 ${
-              canUndo
+              !readOnly && canUndo
                 ? 'text-slate-600 hover:bg-slate-50'
                 : 'cursor-not-allowed text-slate-300'
             }`}
@@ -217,10 +220,10 @@ export function WorkbenchToolbar({
             data-testid="designer-redo"
             aria-label={resolveDesignerText(DESIGNER_I18N.unified.redo, locale)}
             title={resolveDesignerText(DESIGNER_I18N.unified.redo, locale)}
-            disabled={!canRedo}
+            disabled={readOnly || !canRedo}
             onClick={onRedo}
             className={`inline-flex h-8 w-8 items-center justify-center ${
-              canRedo
+              !readOnly && canRedo
                 ? 'text-slate-600 hover:bg-slate-50'
                 : 'cursor-not-allowed text-slate-300'
             }`}
@@ -256,6 +259,11 @@ export function WorkbenchToolbar({
         >
           {getStatusLabel(saveStatus, validationErrorCount, locale)}
         </span>
+        {readOnly ? (
+          <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+            Contextual read-only
+          </span>
+        ) : null}
         {saveError ? (
           <span
             className="max-w-[320px] truncate rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700"
@@ -283,7 +291,8 @@ export function WorkbenchToolbar({
             aria-label={resolveDesignerText(DESIGNER_I18N.unified.importPage, locale)}
             title={resolveDesignerText(DESIGNER_I18N.unified.importPage, locale)}
             onClick={() => importInputRef.current?.click()}
-            className="inline-flex h-8 w-8 items-center justify-center text-slate-600 hover:bg-slate-50"
+            disabled={readOnly}
+            className="inline-flex h-8 w-8 items-center justify-center text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
           >
             <Upload className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -311,10 +320,10 @@ export function WorkbenchToolbar({
               ? resolveDesignerText(DESIGNER_I18N.unified.versionsSaveFirst, locale)
               : resolveDesignerText(DESIGNER_I18N.unified.versionHistory, locale)
           }
-          disabled={!pageId}
+          disabled={readOnly || !pageId}
           onClick={onOpenVersions}
           className={`ml-2 inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 ${
-            pageId
+            !readOnly && pageId
               ? 'text-slate-600 hover:bg-slate-50'
               : 'cursor-not-allowed text-slate-300'
           }`}
@@ -351,10 +360,10 @@ export function WorkbenchToolbar({
           <button
             type="button"
             data-testid="designer-unpublish"
-            disabled={publishBusy || isDirty || !pageId}
+            disabled={readOnly || publishBusy || isDirty || !pageId}
             onClick={onUnpublish}
             className={`rounded-md border px-3 py-1.5 text-sm font-medium ${
-              publishBusy || isDirty || !pageId
+              readOnly || publishBusy || isDirty || !pageId
                 ? 'cursor-not-allowed border-slate-200 text-slate-400'
                 : 'border-slate-300 text-slate-700 hover:bg-slate-50'
             }`}

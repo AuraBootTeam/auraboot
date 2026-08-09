@@ -106,6 +106,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
       <th
         className="border-border bg-subtle text-text-2 sticky right-0 z-20 w-px border-l px-2 py-3 text-xs font-medium tracking-wider uppercase shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]"
         data-testid={`table-header-${column.field}`}
+        data-authoring-node-id={(column as any).id || column.field}
       >
         {label}
       </th>
@@ -131,6 +132,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
       style={style}
       onContextMenu={handleContextMenu}
       data-testid={`table-header-${column.field}`}
+      data-authoring-node-id={(column as any).id || column.field}
     >
       <div className="flex items-center gap-1">
         {/* Drag handle — visible on hover */}

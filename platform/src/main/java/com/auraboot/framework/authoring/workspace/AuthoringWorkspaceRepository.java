@@ -14,6 +14,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 
 import static org.springframework.http.HttpStatus.CONFLICT;
 
@@ -211,6 +212,63 @@ public class AuthoringWorkspaceRepository {
                 audit.propertyPath(), audit.traceId(), json(audit.metadata()));
     }
 
+    public void createHandoff(CreateHandoff command) {
+        jdbcTemplate.update("""
+                INSERT INTO ab_authoring_handoff_context (
+                    pid, tenant_id, env_id, actor_user_id, change_set_id, nonce_hash,
+                    target_route, context_payload, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)
+                """,
+                command.pid(), command.tenantId(), command.envId(), command.actorUserId(),
+                command.changeSetId(), command.nonceHash(), command.targetRoute(),
+                json(command.contextPayload()), Timestamp.from(command.expiresAt()));
+    }
+
+    public HandoffRow findHandoff(
+            long tenantId,
+            long envId,
+            long actorUserId,
+            String nonceHash,
+            boolean lock) {
+        String lockClause = lock ? " FOR UPDATE" : "";
+        List<HandoffRow> rows = jdbcTemplate.query("""
+                        SELECT h.id, h.pid, h.tenant_id, h.env_id, h.actor_user_id,
+                               h.change_set_id, cs.pid AS change_set_pid, h.target_route,
+                               h.context_payload::text, h.expires_at, h.consumed_at
+                        FROM ab_authoring_handoff_context h
+                        JOIN ab_authoring_change_set cs ON cs.id = h.change_set_id
+                          AND cs.tenant_id = h.tenant_id AND cs.env_id = h.env_id
+                        WHERE h.tenant_id = ? AND h.env_id = ? AND h.actor_user_id = ?
+                          AND h.nonce_hash = ?
+                        """ + lockClause,
+                (resultSet, rowNum) -> new HandoffRow(
+                        resultSet.getLong("id"),
+                        resultSet.getString("pid"),
+                        resultSet.getLong("tenant_id"),
+                        resultSet.getLong("env_id"),
+                        resultSet.getLong("actor_user_id"),
+                        resultSet.getLong("change_set_id"),
+                        resultSet.getString("change_set_pid"),
+                        resultSet.getString("target_route"),
+                        parse(resultSet.getString("context_payload")),
+                        resultSet.getTimestamp("expires_at").toInstant(),
+                        resultSet.getTimestamp("consumed_at") == null
+                                ? null
+                                : resultSet.getTimestamp("consumed_at").toInstant()),
+                tenantId, envId, actorUserId, nonceHash);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public boolean consumeHandoff(HandoffRow handoff) {
+        return jdbcTemplate.update("""
+                UPDATE ab_authoring_handoff_context
+                SET consumed_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND tenant_id = ? AND env_id = ? AND actor_user_id = ?
+                  AND consumed_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+                """,
+                handoff.id(), handoff.tenantId(), handoff.envId(), handoff.actorUserId()) == 1;
+    }
+
     private WorkspaceRow mapWorkspace(ResultSet resultSet) throws SQLException {
         return new WorkspaceRow(
                 resultSet.getLong("session_id"),
@@ -288,6 +346,32 @@ public class AuthoringWorkspaceRepository {
     }
 
     public record CreatedWorkspace(long changeSetId, long resourceDraftId, long sessionId) {
+    }
+
+    public record CreateHandoff(
+            String pid,
+            long tenantId,
+            long envId,
+            long actorUserId,
+            long changeSetId,
+            String nonceHash,
+            String targetRoute,
+            JsonNode contextPayload,
+            Instant expiresAt) {
+    }
+
+    public record HandoffRow(
+            long id,
+            String pid,
+            long tenantId,
+            long envId,
+            long actorUserId,
+            long changeSetId,
+            String changeSetPid,
+            String targetRoute,
+            JsonNode contextPayload,
+            Instant expiresAt,
+            Instant consumedAt) {
     }
 
     public record WorkspaceRow(
