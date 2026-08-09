@@ -304,6 +304,41 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
     }
 
     @Test
+    @DisplayName("compareAndSet keeps tenant, DataScope, and expected-value guards in one write")
+    void compareAndSet_appliesScopedExpectedValueGuard() {
+        ModelDefinition model = physicalModelWithStatus(MODEL_CODE, "mt_phase_one_model");
+        wireModel(model);
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID))
+                .thenReturn("AND created_by = 20");
+        when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("AND domain_id = 7");
+        when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
+
+        assertThat(service.compareAndSet(
+                MODEL_CODE, RECORD_ID, "status", "accepted", "superseded"))
+                .isTrue();
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String, Object>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).updateByQuery(sqlCaptor.capture(), paramsCaptor.capture());
+        assertThat(sqlCaptor.getValue())
+                .contains("UPDATE mt_phase_one_model SET")
+                .containsPattern("status = #\\{params\\.set\\d+}")
+                .contains("row_version = row_version + 1")
+                .contains("WHERE pid = #{params.recordId}")
+                .contains("tenant_id = #{params.tenantId}")
+                .contains("status IS NOT DISTINCT FROM #{params.compareValue}")
+                .contains("created_by = 20")
+                .contains("domain_id = 7");
+        assertThat(paramsCaptor.getValue())
+                .containsEntry("recordId", RECORD_ID)
+                .containsEntry("tenantId", TENANT_ID)
+                .containsEntry("compareValue", "accepted")
+                .containsValue("superseded");
+        verify(dynamicDataMapper, never()).selectByQuery(anyString(), anyMap());
+        verify(virtualFieldEngine, never()).materialize(anyString(), anyString(), anyList());
+    }
+
+    @Test
     @DisplayName("delete write SQL keeps tenant and DataScope guards")
     void delete_appliesScopedSqlGuardsToWrite() {
         ModelDefinition model = physicalModel(MODEL_CODE, "mt_phase_one_model");
@@ -423,7 +458,8 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
         lenient().when(fieldMaskService.applyMaskingForDetail(eq(model.getCode()), anyMap(), eq(USER_ID)))
                 .thenAnswer(invocation -> invocation.getArgument(1));
         lenient().when(fieldPermissionService.getFieldPermissions(MEMBER_ID, model.getCode()))
-                .thenReturn(FieldPermissionSet.allAllowed(java.util.Set.of("pid", "name", "created_by")));
+                .thenReturn(FieldPermissionSet.allAllowed(
+                        java.util.Set.of("pid", "name", "status", "created_by")));
         lenient().when(changeTracker.diff(any(), any(), eq(model.getCode()))).thenReturn(List.of());
     }
 
@@ -454,6 +490,21 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
                         FieldDefinition.builder()
                                 .code("name")
                                 .columnName("name")
+                                .dataType("string")
+                                .build()))
+                .build();
+    }
+
+    private ModelDefinition physicalModelWithStatus(String code, String tableName) {
+        return ModelDefinition.builder()
+                .code(code)
+                .tableName(tableName)
+                .sourceType("physical")
+                .fields(List.of(
+                        primaryKey(),
+                        FieldDefinition.builder()
+                                .code("status")
+                                .columnName("status")
                                 .dataType("string")
                                 .build()))
                 .build();

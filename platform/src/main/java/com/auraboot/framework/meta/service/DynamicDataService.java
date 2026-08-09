@@ -60,6 +60,17 @@ public interface DynamicDataService {
     Map<String, Object> update(String modelCode, String recordId, Map<String, Object> data);
 
     /**
+     * Atomic, tenant/data-scope-guarded field transition for mechanical ledger/control state.
+     * Unlike the general update path it intentionally skips materialization, automation and the
+     * generic change-log tail; the owning domain ledger remains the audit authority.
+     */
+    boolean compareAndSet(String modelCode,
+                          String recordId,
+                          String fieldCode,
+                          Object expectedValue,
+                          Object nextValue);
+
+    /**
      * 删除数据
      * @param modelCode 模型编码
      * @param recordId 记录ID

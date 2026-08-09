@@ -121,6 +121,17 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     }
 
     @Override
+    public boolean compareAndSet(String modelCode,
+                                 String recordId,
+                                 String fieldCode,
+                                 Object expectedValue,
+                                 Object nextValue) {
+        log.debug("Plugin DataAccessor: compareAndSet({}, {}, {})", modelCode, recordId, fieldCode);
+        return withCommandAuthority(() -> dynamicDataService.compareAndSet(
+                modelCode, recordId, fieldCode, expectedValue, nextValue));
+    }
+
+    @Override
     public List<Map<String, Object>> batchCreate(String modelCode, List<Map<String, Object>> dataList) {
         log.debug("Plugin DataAccessor: batchCreate({}, {} records)", modelCode, dataList != null ? dataList.size() : 0);
         var response = withCommandAuthority(() -> dynamicDataService.batchCreate(modelCode, dataList));
@@ -140,6 +151,25 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     public void delete(String modelCode, String recordId) {
         log.debug("Plugin DataAccessor: delete({}, {})", modelCode, recordId);
         withCommandAuthority(() -> { dynamicDataService.delete(modelCode, recordId); return null; });
+    }
+
+    @Override
+    public void batchDelete(String modelCode, Collection<String> recordIds) {
+        List<String> ids = recordIds == null
+                ? List.of()
+                : recordIds.stream()
+                        .filter(java.util.Objects::nonNull)
+                        .filter(id -> !id.isBlank())
+                        .distinct()
+                        .toList();
+        if (ids.isEmpty()) {
+            return;
+        }
+        log.debug("Plugin DataAccessor: batchDelete({}, {} records)", modelCode, ids.size());
+        withCommandAuthority(() -> {
+            dynamicDataService.batchDelete(modelCode, ids);
+            return null;
+        });
     }
 
     @Override

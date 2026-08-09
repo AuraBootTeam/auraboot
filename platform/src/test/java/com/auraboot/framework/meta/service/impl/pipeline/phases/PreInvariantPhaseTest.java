@@ -100,4 +100,49 @@ class PreInvariantPhaseTest {
         assertThat(ctx.isHasPluginHandler()).isTrue();
         assertThat(ctx.isPluginRequiresDslPersistence()).isTrue();
     }
+
+    @Test
+    void execute_skipsTargetStateReadWhenPluginHandlerOwnsPersistence() {
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setTargetRecordId("line-1");
+
+        CommandDefinition command = new CommandDefinition();
+        command.setCode("quote:preview");
+        command.setModelCode("quote_line");
+
+        Map<String, Object> execConfig = new HashMap<>(Map.of(
+                "type", "custom",
+                "handler", "quote:preview",
+                "handlerParams", Map.of("dslPersistence", false)
+        ));
+
+        CommandPipelineContext ctx = CommandPipelineContext.builder()
+                .commandCode(command.getCode())
+                .request(request)
+                .tenantId(1L)
+                .userId(2L)
+                .startTime(System.currentTimeMillis())
+                .command(command)
+                .payload(new HashMap<>())
+                .execConfig(execConfig)
+                .build();
+
+        when(extensionRegistry.getCommandHandler("quote:preview"))
+                .thenReturn(Optional.of(pluginHandler));
+        when(pluginHandler.requiresDslPersistence("quote:preview", execConfig, request))
+                .thenReturn(false);
+        when(invariantEngine.evaluatePreInvariants(
+                eq(1L), eq("quote:preview"), eq("quote_line"),
+                same(ctx.getPayload()), eq("line-1"), eq(null)))
+                .thenReturn(List.of());
+        when(metaModelService.getModelDefinition("quote_line")).thenReturn(Optional.empty());
+
+        phase.execute(ctx);
+
+        verify(stateCheckExecutor, never()).getStateFieldForModel("quote_line");
+        verify(stateCheckExecutor, never()).readCurrentState(
+                eq(1L), eq("quote_line"), eq("line-1"), eq("quote_line_status"));
+        assertThat(ctx.isHasPluginHandler()).isTrue();
+        assertThat(ctx.isPluginRequiresDslPersistence()).isFalse();
+    }
 }

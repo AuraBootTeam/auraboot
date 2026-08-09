@@ -46,12 +46,35 @@ class DataAccessorTest {
                 .hasMessageContaining("fieldName");
     }
 
+    @Test
+    void batchDelete_defaultFallbackDeletesDistinctNonBlankIds() {
+        InMemoryAccessor accessor = new InMemoryAccessor();
+
+        accessor.batchDelete("m", Arrays.asList("A", "B", "A", null, ""));
+
+        assertThat(accessor.deletes).containsExactly("A", "B");
+    }
+
+    @Test
+    void compareAndSet_defaultFallbackUpdatesOnlyTheExpectedValue() {
+        InMemoryAccessor accessor = new InMemoryAccessor();
+        accessor.current = new java.util.HashMap<>(Map.of("status", "accepted"));
+
+        assertThat(accessor.compareAndSet("m", "A", "status", "pending", "superseded"))
+                .isFalse();
+        assertThat(accessor.compareAndSet("m", "A", "status", "accepted", "superseded"))
+                .isTrue();
+        assertThat(accessor.current).containsEntry("status", "superseded");
+    }
+
     private static final class InMemoryAccessor implements DataAccessor {
         final List<Map<String, Object>> queries = new ArrayList<>();
+        final List<String> deletes = new ArrayList<>();
+        Map<String, Object> current;
 
         @Override
         public Map<String, Object> getById(String modelCode, String recordId) {
-            return null;
+            return current;
         }
 
         @Override
@@ -67,6 +90,7 @@ class DataAccessorTest {
 
         @Override
         public Map<String, Object> update(String modelCode, String recordId, Map<String, Object> data) {
+            if (current != null) current.putAll(data);
             return data;
         }
 
@@ -77,6 +101,7 @@ class DataAccessorTest {
 
         @Override
         public void delete(String modelCode, String recordId) {
+            deletes.add(recordId);
         }
     }
 }
