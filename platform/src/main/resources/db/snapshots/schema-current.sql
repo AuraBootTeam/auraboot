@@ -197,6 +197,43 @@ $$;
 
 
 --
+-- Name: ab_authoring_guard_release_update(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_authoring_guard_release_update() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF ROW(
+        NEW.pid, NEW.tenant_id, NEW.env_id, NEW.change_set_id,
+        NEW.change_set_revision, NEW.previous_release_pid,
+        NEW.manifest, NEW.manifest_checksum, NEW.created_by, NEW.created_at
+    ) IS DISTINCT FROM ROW(
+        OLD.pid, OLD.tenant_id, OLD.env_id, OLD.change_set_id,
+        OLD.change_set_revision, OLD.previous_release_pid,
+        OLD.manifest, OLD.manifest_checksum, OLD.created_by, OLD.created_at
+    ) THEN
+        RAISE EXCEPTION 'authoring release content is immutable';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: ab_authoring_reject_history_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_authoring_reject_history_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RAISE EXCEPTION 'authoring history is append-only: %', TG_TABLE_NAME;
+END;
+$$;
+
+
+--
 -- Name: ab_guard_immutable_agent_release(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -27812,6 +27849,41 @@ CREATE TRIGGER trg_agent_definition_initial_release AFTER INSERT ON public.ab_ag
 --
 
 CREATE TRIGGER trg_agent_release_immutable BEFORE DELETE OR UPDATE ON public.ab_agent_release FOR EACH ROW EXECUTE FUNCTION public.ab_guard_immutable_agent_release();
+
+
+--
+-- Name: ab_authoring_audit_event trg_authoring_audit_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_audit_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_audit_event FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_authoring_change_item trg_authoring_change_item_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_change_item_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_change_item FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_authoring_release trg_authoring_release_immutable_delete; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_release_immutable_delete BEFORE DELETE ON public.ab_authoring_release FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_authoring_release trg_authoring_release_immutable_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_release_immutable_update BEFORE UPDATE ON public.ab_authoring_release FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_guard_release_update();
+
+
+--
+-- Name: ab_authoring_release_item trg_authoring_release_item_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_release_item_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_release_item FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
 
 
 --

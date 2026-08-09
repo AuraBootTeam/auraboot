@@ -2,8 +2,13 @@ package com.auraboot.framework.authoring.workspace;
 
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ApplyPatchRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CapabilityRegistryView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ChangeSetView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RevisionRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RollbackRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -23,9 +28,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthoringWorkspaceController {
 
     private final AuthoringWorkspaceService workspaceService;
+    private final AuthoringGovernanceService governanceService;
 
-    public AuthoringWorkspaceController(AuthoringWorkspaceService workspaceService) {
+    public AuthoringWorkspaceController(
+            AuthoringWorkspaceService workspaceService,
+            AuthoringGovernanceService governanceService) {
         this.workspaceService = workspaceService;
+        this.governanceService = governanceService;
     }
 
     @GetMapping("/capabilities")
@@ -52,5 +61,45 @@ public class AuthoringWorkspaceController {
             @PathVariable String sessionPid,
             @Valid @RequestBody ApplyPatchRequest request) {
         return ApiResponse.success(workspaceService.apply(sessionPid, request));
+    }
+
+    @PostMapping("/sessions/{sessionPid}/submit")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
+    public ApiResponse<ChangeSetView> submit(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody RevisionRequest request) {
+        return ApiResponse.success(governanceService.submit(sessionPid, request));
+    }
+
+    @PostMapping("/change-sets/{changeSetPid}/approve")
+    @RequirePermission(MetaPermission.PAGE_PUBLISH_MANAGE)
+    public ApiResponse<ChangeSetView> approve(
+            @PathVariable String changeSetPid,
+            @Valid @RequestBody ReviewRequest request) {
+        return ApiResponse.success(governanceService.approve(changeSetPid, request));
+    }
+
+    @PostMapping("/change-sets/{changeSetPid}/reject")
+    @RequirePermission(MetaPermission.PAGE_PUBLISH_MANAGE)
+    public ApiResponse<ChangeSetView> reject(
+            @PathVariable String changeSetPid,
+            @Valid @RequestBody ReviewRequest request) {
+        return ApiResponse.success(governanceService.reject(changeSetPid, request));
+    }
+
+    @PostMapping("/change-sets/{changeSetPid}/publish")
+    @RequirePermission(MetaPermission.PAGE_PUBLISH_ADMIN)
+    public ApiResponse<ReleaseView> publish(
+            @PathVariable String changeSetPid,
+            @Valid @RequestBody RevisionRequest request) {
+        return ApiResponse.success(governanceService.publish(changeSetPid, request));
+    }
+
+    @PostMapping("/releases/{releasePid}/rollback")
+    @RequirePermission(MetaPermission.PAGE_PUBLISH_ADMIN)
+    public ApiResponse<ReleaseView> rollback(
+            @PathVariable String releasePid,
+            @Valid @RequestBody RollbackRequest request) {
+        return ApiResponse.success(governanceService.rollback(releasePid, request));
     }
 }

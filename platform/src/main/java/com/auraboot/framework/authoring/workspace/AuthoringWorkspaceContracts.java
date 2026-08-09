@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 import java.util.List;
@@ -60,5 +61,44 @@ public final class AuthoringWorkspaceContracts {
             BoundaryDecision decision,
             JsonNode previousValue,
             JsonNode savedValue) {
+    }
+
+    public record RevisionRequest(@Positive long expectedRevision) {
+    }
+
+    public record ReviewRequest(
+            @Positive long expectedRevision,
+            @Size(max = 1000) String reason) {
+    }
+
+    public record RollbackRequest(
+            @Positive long expectedChannelVersion,
+            @NotBlank @Size(max = 1000) String reason) {
+    }
+
+    public record ChangeSetView(
+            String changeSetPid,
+            String pagePid,
+            long ownerUserId,
+            String status,
+            long revision,
+            String riskLevel,
+            String route,
+            String publishPolicy,
+            String validationState,
+            String approvalState,
+            String publishState,
+            String manifestChecksum) {
+    }
+
+    public record ReleaseView(
+            String releasePid,
+            String changeSetPid,
+            long changeSetRevision,
+            String previousReleasePid,
+            String status,
+            String manifestChecksum,
+            long channelVersion,
+            Instant activatedAt) {
     }
 }

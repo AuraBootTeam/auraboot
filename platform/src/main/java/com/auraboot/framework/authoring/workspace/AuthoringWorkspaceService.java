@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.authoring.policy.AuthoringCapabilityRegistry;
 import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.CapabilityManifest;
 import com.auraboot.framework.authoring.workspace.AuthoringPatchEngine.PreparedPatch;
+import com.auraboot.framework.authoring.workspace.AuthoringActiveReleaseResolver.ActiveRelease;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ApplyPatchRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CapabilityRegistryView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
@@ -49,6 +50,7 @@ public class AuthoringWorkspaceService {
     private final AuthoringInteractionContextSanitizer interactionContextSanitizer;
     private final AuthoringAggregatePolicyService aggregatePolicyService;
     private final AuthoringWorkspaceViewMapper viewMapper;
+    private final AuthoringActiveReleaseResolver activeReleaseResolver;
 
     public AuthoringWorkspaceService(
             AuthoringCapabilityRegistry capabilityRegistry,
@@ -60,7 +62,8 @@ public class AuthoringWorkspaceService {
             AuthoringPageSnapshotFactory snapshotFactory,
             AuthoringInteractionContextSanitizer interactionContextSanitizer,
             AuthoringAggregatePolicyService aggregatePolicyService,
-            AuthoringWorkspaceViewMapper viewMapper) {
+            AuthoringWorkspaceViewMapper viewMapper,
+            AuthoringActiveReleaseResolver activeReleaseResolver) {
         this.capabilityRegistry = capabilityRegistry;
         this.patchEngine = patchEngine;
         this.repository = repository;
@@ -71,6 +74,7 @@ public class AuthoringWorkspaceService {
         this.interactionContextSanitizer = interactionContextSanitizer;
         this.aggregatePolicyService = aggregatePolicyService;
         this.viewMapper = viewMapper;
+        this.activeReleaseResolver = activeReleaseResolver;
     }
 
     public CapabilityRegistryView capabilities() {
@@ -91,7 +95,11 @@ public class AuthoringWorkspaceService {
             throw new ResponseStatusException(NOT_FOUND, "authoring.page.not-found");
         }
 
-        JsonNode snapshot = snapshotFactory.create(page);
+        ActiveRelease activeRelease = activeReleaseResolver.findByResource(
+                identity.tenantId(), identity.envId(), "PAGE_SCHEMA", page.getPid());
+        JsonNode snapshot = activeRelease == null
+                ? snapshotFactory.create(page)
+                : activeRelease.snapshot();
         JsonNode interactionContext = interactionContextSanitizer.sanitize(request.interactionContext());
         String sessionPid = UniqueIdGenerator.generate();
         String changeSetPid = UniqueIdGenerator.generate();
@@ -106,8 +114,13 @@ public class AuthoringWorkspaceService {
                 UniqueIdGenerator.generate(),
                 page.getPid(),
                 snapshotFactory.title(page),
-                snapshotFactory.baseVersion(page),
-                snapshotFactory.checksum(snapshot),
+                activeRelease == null ? null : activeRelease.releasePid(),
+                activeRelease == null
+                        ? snapshotFactory.baseVersion(page)
+                        : activeRelease.channelVersion(),
+                activeRelease == null
+                        ? snapshotFactory.checksum(snapshot)
+                        : activeRelease.snapshotChecksum(),
                 capabilityRegistry.checksum(),
                 snapshot,
                 interactionContext,

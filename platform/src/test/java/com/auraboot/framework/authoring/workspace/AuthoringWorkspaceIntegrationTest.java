@@ -5,8 +5,13 @@ import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.authoring.policy.AuthoringCapabilityRegistry;
 import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.PatchOperation;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ApplyPatchRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ChangeSetView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RevisionRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RollbackRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
@@ -42,6 +47,12 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private AuthoringWorkspaceService workspaceService;
+
+    @Autowired
+    private AuthoringGovernanceService governanceService;
+
+    @Autowired
+    private AuthoringActiveReleaseResolver activeReleaseResolver;
 
     @Autowired
     private AuthoringCapabilityRegistry capabilityRegistry;
@@ -98,6 +109,18 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(post("/api/authoring/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"pagePid\":\"hidden\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/change-sets/missing/approve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":1}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/change-sets/missing/publish")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":1}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/releases/missing/rollback")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedChannelVersion\":1,\"reason\":\"test\"}"))
                 .andExpect(status().isForbidden());
     }
 
@@ -174,6 +197,61 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
 
         applyTestMetaContext();
         assertThat(workspaceService.get(opened.sessionPid()).revision()).isEqualTo(1);
+    }
+
+    @Test
+    void controllerAllowsReviewPermissionButStillRejectsPublish() throws Exception {
+        PageSchema page = insertPage("normal");
+        long environmentId = MetaContext.getCurrentEnvironmentId();
+        SessionView opened;
+        try {
+            MetaContext.setContext(
+                    testTenant.getId(), testUser.getId() + 100_000,
+                    "author", "author");
+            MetaContext.setEnvironmentId(environmentId);
+            opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+            workspaceService.apply(opened.sessionPid(), new ApplyPatchRequest(
+                    1, "table-1", "/props/pageSize", PatchOperation.ADD,
+                    objectMapper.getNodeFactory().numberNode(20),
+                    capabilityRegistry.find("table").orElseThrow().checksum()));
+            governanceService.submit(opened.sessionPid(), new RevisionRequest(2));
+        } finally {
+            applyTestMetaContext();
+        }
+
+        grantPublisherManage();
+        assertThat(userPermissionService.hasPermission(
+                testUser.getId(), MetaPermission.PAGE_PUBLISH_MANAGE)).isTrue();
+        mockMvc.perform(post("/api/authoring/change-sets/{changeSetPid}/approve",
+                        opened.changeSetPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":2,\"reason\":\"reviewed\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("APPROVED"));
+        mockMvc.perform(post("/api/authoring/change-sets/{changeSetPid}/publish",
+                        opened.changeSetPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":2}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void controllerAllowsPublishOnlyWithPublishAdminPermission() throws Exception {
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        patchDensity(opened, "compact");
+        governanceService.submit(opened.sessionPid(), new RevisionRequest(2));
+
+        grantPublisherAdmin();
+        assertThat(userPermissionService.hasPermission(
+                testUser.getId(), MetaPermission.PAGE_PUBLISH_ADMIN)).isTrue();
+        mockMvc.perform(post("/api/authoring/change-sets/{changeSetPid}/publish",
+                        opened.changeSetPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":2}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.channelVersion").value(1));
     }
 
     @Test
@@ -301,6 +379,130 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         }
     }
 
+    @Test
+    void directSubmissionPublishesImmutableReleaseWithoutLeakingDraft() {
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        patchDensity(opened, "compact");
+
+        ChangeSetView submitted = governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(2));
+        assertThat(submitted.status()).isEqualTo("APPROVED");
+        assertThat(submitted.validationState()).isEqualTo("VALID");
+        assertThat(submitted.approvalState()).isEqualTo("NOT_REQUIRED");
+        assertThat(submitted.publishState()).isEqualTo("READY");
+
+        ReleaseView release = governanceService.publish(
+                opened.changeSetPid(), new RevisionRequest(2));
+        assertThat(release.status()).isEqualTo("ACTIVE");
+        assertThat(release.previousReleasePid()).isNull();
+        assertThat(release.channelVersion()).isEqualTo(1);
+
+        AuthoringActiveReleaseResolver.ActiveRelease active =
+                activeReleaseResolver.findByResource(
+                        testTenant.getId(), MetaContext.getCurrentEnvironmentId(),
+                        "PAGE_SCHEMA", page.getPid());
+        assertThat(active).isNotNull();
+        assertThat(active.releasePid()).isEqualTo(release.releasePid());
+        assertThat(active.snapshot().at("/blocks/0/props/density").asText())
+                .isEqualTo("compact");
+        assertThat(pageSchemaMapper.selectByPid(page.getPid()).getBlocks())
+                .contains("normal").doesNotContain("compact");
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "UPDATE ab_authoring_release SET manifest = '{}'::jsonb WHERE pid = ?",
+                release.releasePid()))
+                .hasMessageContaining("authoring release content is immutable");
+    }
+
+    @Test
+    void reviewedChangeRequiresDifferentApproverBoundToExactRevision() {
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        String checksum = capabilityRegistry.find("table").orElseThrow().checksum();
+        workspaceService.apply(opened.sessionPid(), new ApplyPatchRequest(
+                1, "table-1", "/props/pageSize", PatchOperation.ADD,
+                objectMapper.getNodeFactory().numberNode(20), checksum));
+
+        ChangeSetView submitted = governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(2));
+        assertThat(submitted.status()).isEqualTo("IN_REVIEW");
+        assertThat(submitted.approvalState()).isEqualTo("PENDING");
+        assertThatThrownBy(() -> governanceService.approve(
+                opened.changeSetPid(), new ReviewRequest(2, "self approval")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("four-eyes-required");
+
+        long environmentId = MetaContext.getCurrentEnvironmentId();
+        try {
+            MetaContext.setContext(
+                    testTenant.getId(), testUser.getId() + 100_000,
+                    "reviewer", "reviewer");
+            MetaContext.setEnvironmentId(environmentId);
+            ChangeSetView approved = governanceService.approve(
+                    opened.changeSetPid(), new ReviewRequest(2, "reviewed"));
+            assertThat(approved.status()).isEqualTo("APPROVED");
+            assertThat(approved.approvalState()).isEqualTo("APPROVED");
+            assertThat(approved.publishState()).isEqualTo("READY");
+        } finally {
+            applyTestMetaContext();
+        }
+
+        ReleaseView release = governanceService.publish(
+                opened.changeSetPid(), new RevisionRequest(2));
+        assertThat(release.changeSetRevision()).isEqualTo(2);
+    }
+
+    @Test
+    void activeReleaseMakesConcurrentLegacyBaseStale() {
+        PageSchema page = insertPage("normal");
+        SessionView first = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        SessionView concurrent = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        patchDensity(first, "compact");
+        patchDensity(concurrent, "comfortable");
+
+        governanceService.submit(first.sessionPid(), new RevisionRequest(2));
+        governanceService.publish(first.changeSetPid(), new RevisionRequest(2));
+
+        assertThatThrownBy(() -> governanceService.submit(
+                concurrent.sessionPid(), new RevisionRequest(2)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("base-release-stale");
+        assertThat(workspaceService.get(concurrent.sessionPid()).revision()).isEqualTo(2);
+    }
+
+    @Test
+    void secondReleaseUsesActiveBaseAndRollbackAtomicallyRestoresPriorSnapshot() {
+        PageSchema page = insertPage("normal");
+        SessionView first = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        patchDensity(first, "compact");
+        governanceService.submit(first.sessionPid(), new RevisionRequest(2));
+        ReleaseView releaseOne = governanceService.publish(
+                first.changeSetPid(), new RevisionRequest(2));
+
+        SessionView second = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        assertThat(second.snapshot().at("/blocks/0/props/density").asText())
+                .isEqualTo("compact");
+        patchDensity(second, "comfortable");
+        governanceService.submit(second.sessionPid(), new RevisionRequest(2));
+        ReleaseView releaseTwo = governanceService.publish(
+                second.changeSetPid(), new RevisionRequest(2));
+        assertThat(releaseTwo.previousReleasePid()).isEqualTo(releaseOne.releasePid());
+        assertThat(releaseTwo.channelVersion()).isEqualTo(2);
+
+        ReleaseView restored = governanceService.rollback(
+                releaseTwo.releasePid(), new RollbackRequest(2, "regression"));
+        assertThat(restored.releasePid()).isEqualTo(releaseOne.releasePid());
+        assertThat(restored.channelVersion()).isEqualTo(3);
+        AuthoringActiveReleaseResolver.ActiveRelease active =
+                activeReleaseResolver.findByResource(
+                        testTenant.getId(), MetaContext.getCurrentEnvironmentId(),
+                        "PAGE_SCHEMA", page.getPid());
+        assertThat(active.releasePid()).isEqualTo(releaseOne.releasePid());
+        assertThat(active.snapshot().at("/blocks/0/props/density").asText())
+                .isEqualTo("compact");
+    }
+
     private PageSchema insertPage(String density) {
         String pid = UniqueIdGenerator.generate();
         PageSchema page = new PageSchema();
@@ -365,6 +567,13 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 capabilityRegistry.find("table").orElseThrow().checksum());
     }
 
+    private PatchResult patchDensity(SessionView opened, String density) {
+        return workspaceService.apply(opened.sessionPid(), new ApplyPatchRequest(
+                opened.revision(), "table-1", "/props/density", PatchOperation.REPLACE,
+                objectMapper.getNodeFactory().textNode(density),
+                capabilityRegistry.find("table").orElseThrow().checksum()));
+    }
+
     private void grantDesignerRead() {
         grantCommittedPermissionToTestRole(
                 MetaPermission.PAGE_DESIGNER_READ,
@@ -382,6 +591,26 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 "designer",
                 "update",
                 "Page Designer Manage");
+        userPermissionService.evictUserPermissions(getTestUser().getId());
+    }
+
+    private void grantPublisherManage() {
+        grantCommittedPermissionToTestRole(
+                MetaPermission.PAGE_PUBLISH_MANAGE,
+                "meta",
+                "publish",
+                "review",
+                "Page ChangeSet Review");
+        userPermissionService.evictUserPermissions(getTestUser().getId());
+    }
+
+    private void grantPublisherAdmin() {
+        grantCommittedPermissionToTestRole(
+                MetaPermission.PAGE_PUBLISH_ADMIN,
+                "meta",
+                "publish",
+                "admin",
+                "Page ChangeSet Publish Admin");
         userPermissionService.evictUserPermissions(getTestUser().getId());
     }
 }

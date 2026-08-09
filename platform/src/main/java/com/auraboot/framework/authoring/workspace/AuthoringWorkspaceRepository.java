@@ -33,14 +33,14 @@ public class AuthoringWorkspaceRepository {
         Long changeSetId = jdbcTemplate.queryForObject("""
                 INSERT INTO ab_authoring_change_set (
                     pid, tenant_id, env_id, owner_user_id, title, status, revision,
-                    manifest_checksum, risk_level, route, publish_policy,
+                    base_release_pid, manifest_checksum, risk_level, route, publish_policy,
                     validation_state, approval_state, publish_state)
-                VALUES (?, ?, ?, ?, ?, 'DRAFT', 1, ?, 'L0', 'INLINE', 'DIRECT_ALLOWED',
+                VALUES (?, ?, ?, ?, ?, 'DRAFT', 1, ?, ?, 'L0', 'INLINE', 'DIRECT_ALLOWED',
                         'UNVALIDATED', 'NOT_REQUIRED', 'DRAFT')
                 RETURNING id
                 """, Long.class,
                 command.changeSetPid(), command.tenantId(), command.envId(), command.actorUserId(),
-                command.title(), command.registryChecksum());
+                command.title(), command.baseReleasePid(), command.registryChecksum());
         Long resourceDraftId = jdbcTemplate.queryForObject("""
                 INSERT INTO ab_authoring_resource_draft (
                     pid, tenant_id, env_id, change_set_id, resource_type, resource_pid,
@@ -277,6 +277,7 @@ public class AuthoringWorkspaceRepository {
             String leasePid,
             String pagePid,
             String title,
+            String baseReleasePid,
             long baseVersion,
             String baseChecksum,
             String registryChecksum,
