@@ -35,6 +35,7 @@ import {
 } from './authoringService';
 import { AuthoringGovernanceNotice } from './AuthoringGovernanceNotice';
 import { AuthoringRiskSummary } from './AuthoringRiskSummary';
+import { AuthoringValidationNotice } from './AuthoringValidationNotice';
 import { AuthoringWriterLeaseNotice } from './AuthoringWriterLeaseNotice';
 import { storeAuthoringConflictTransfer } from './authoringConflictTransfer';
 import type {
@@ -740,6 +741,11 @@ export function ContextualAuthoringSurface({
       <div className="mx-3 mt-3">
         <AuthoringRiskSummary session={session} />
       </div>
+      {session.validationState === 'INVALID' ? (
+        <div className="mx-3 mt-3">
+          <AuthoringValidationNotice session={session} maxVisibleIssues={8} />
+        </div>
+      ) : null}
       {['IN_REVIEW', 'APPROVED', 'REJECTED'].includes(session.changeSetStatus) ? (
         <div className="mx-3 mt-3">
           <AuthoringGovernanceNotice
@@ -1334,7 +1340,8 @@ function ChangeDock({
   onRefresh: () => void;
   onSubmit: () => void;
 }) {
-  const validationErrors = session.validationState === 'INVALID' ? 1 : 0;
+  const validationErrors =
+    session.validationState === 'INVALID' ? (session.validation?.errorCount ?? 1) : 0;
   return (
     <footer className="border-border bg-panel sticky bottom-0 z-20 flex min-h-14 flex-wrap items-center gap-3 border-t px-3 py-2 text-sm">
       <div className="mr-auto flex flex-wrap items-center gap-3">

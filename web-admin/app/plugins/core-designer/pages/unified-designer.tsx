@@ -31,6 +31,7 @@ import {
 import { AuthoringWriterLeaseNotice } from '~/framework/meta/authoring/AuthoringWriterLeaseNotice';
 import { AuthoringGovernanceNotice } from '~/framework/meta/authoring/AuthoringGovernanceNotice';
 import { AuthoringRiskSummary } from '~/framework/meta/authoring/AuthoringRiskSummary';
+import { AuthoringValidationNotice } from '~/framework/meta/authoring/AuthoringValidationNotice';
 import { AuthoringChangeSetSplitPanel } from '~/framework/meta/authoring/AuthoringChangeSetSplitPanel';
 import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
 import { AuthoringConflictResolutionPanel } from '../components/unified-designer/AuthoringConflictResolutionPanel';
@@ -763,6 +764,11 @@ export default function UnifiedDesignerPage() {
       </div>
       <div className="px-4 pt-3">
         <AuthoringRiskSummary session={authoringSession!} />
+        {authoringSession?.validationState === 'INVALID' ? (
+          <div className="mt-2">
+            <AuthoringValidationNotice session={authoringSession} />
+          </div>
+        ) : null}
         <div className="mt-2">
           <AuthoringGovernanceNotice
             session={authoringSession!}

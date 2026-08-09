@@ -3,6 +3,7 @@ package com.auraboot.framework.authoring.workspace;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.authoring.workspace.AuthoringChangeSetSplitter.ChangeItem;
 import com.auraboot.framework.authoring.workspace.AuthoringChangeSetSplitter.SplitPlan;
+import com.auraboot.framework.authoring.workspace.AuthoringDraftValidator.ValidationResult;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.ChannelRow;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.GovernanceRow;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.ReleaseRow;
@@ -54,6 +55,7 @@ public class AuthoringGovernanceService {
     private final AuthoringRuntimeSnapshotSanitizer runtimeSanitizer;
     private final AuthoringChangeSetSplitter changeSetSplitter;
     private final AuthoringAggregatePolicyService aggregatePolicyService;
+    private final AuthoringDraftValidator draftValidator;
     private final AuthoringWorkspaceViewMapper viewMapper;
     private final ObjectMapper objectMapper;
 
@@ -65,6 +67,7 @@ public class AuthoringGovernanceService {
             AuthoringRuntimeSnapshotSanitizer runtimeSanitizer,
             AuthoringChangeSetSplitter changeSetSplitter,
             AuthoringAggregatePolicyService aggregatePolicyService,
+            AuthoringDraftValidator draftValidator,
             AuthoringWorkspaceViewMapper viewMapper,
             ObjectMapper objectMapper) {
         this.governanceRepository = governanceRepository;
@@ -74,6 +77,7 @@ public class AuthoringGovernanceService {
         this.runtimeSanitizer = runtimeSanitizer;
         this.changeSetSplitter = changeSetSplitter;
         this.aggregatePolicyService = aggregatePolicyService;
+        this.draftValidator = draftValidator;
         this.viewMapper = viewMapper;
         this.objectMapper = objectMapper;
     }
@@ -87,8 +91,26 @@ public class AuthoringGovernanceService {
         governanceValidator.requireRevision(row, request.expectedRevision());
         governanceValidator.requireStatus(row, "DRAFT", "REJECTED");
         governanceValidator.requireFresh(row);
-        if (governanceRepository.countItems(row) == 0) {
+        List<ChangeItem> items = governanceRepository.findActiveItems(row);
+        if (items.isEmpty()) {
             throw conflict("authoring.submit.empty");
+        }
+        ValidationResult validation = draftValidator.validate(row.snapshot(), items);
+        String validationRunPid = UniqueIdGenerator.generate();
+        governanceRepository.recordValidation(
+                row, validation, validationRunPid, snapshotFactory.checksum(row.snapshot()),
+                identity.userId());
+        ObjectNode validationMetadata = objectMapper.createObjectNode();
+        validationMetadata.put("validationRunPid", validationRunPid);
+        validationMetadata.put("validatedRevision", row.revision());
+        validationMetadata.put("errorCount", validation.errorCount());
+        audit(identity, row, sessionPid,
+                validation.valid() ? "CHANGE_SET_VALIDATED" : "CHANGE_SET_VALIDATION_FAILED",
+                validation.valid() ? "ALLOW" : "DENY",
+                validation.valid() ? "REVISION_VALID" : "REVISION_INVALID",
+                validationMetadata);
+        if (!validation.valid()) {
+            return view(requireChangeSet(identity, row.changeSetPid(), false));
         }
         boolean approvalRequired = governanceValidator.approvalRequired(row);
         governanceRepository.submit(row, approvalRequired, identity.userId());

@@ -88,6 +88,12 @@ public class AuthoringWorkspaceRepository {
                             cs.revision AS change_set_revision, cs.risk_level, cs.route,
                             cs.publish_policy, cs.validation_state, cs.approval_state,
                             cs.publish_state, cs.manifest_checksum,
+                            validation_run.validation_run_pid,
+                            validation_run.validation_revision,
+                            validation_run.validation_status,
+                            validation_run.validation_error_count,
+                            validation_run.validation_issues,
+                            validation_run.validated_at,
                             rd.id AS resource_draft_id, rd.pid AS resource_draft_pid,
                             rd.revision AS resource_revision, rd.snapshot::text,
                             wl.id AS lease_id, wl.session_id AS lease_session_id,
@@ -98,6 +104,21 @@ public class AuthoringWorkspaceRepository {
                         JOIN ab_authoring_resource_draft rd ON rd.change_set_id = cs.id
                             AND rd.resource_type = 'PAGE_SCHEMA' AND rd.resource_pid = s.page_pid
                         JOIN ab_authoring_writer_lease wl ON wl.change_set_id = cs.id
+                        LEFT JOIN LATERAL (
+                            SELECT vr.pid AS validation_run_pid,
+                                   vr.change_set_revision AS validation_revision,
+                                   vr.status AS validation_status,
+                                   vr.error_count AS validation_error_count,
+                                   vr.issues::text AS validation_issues,
+                                   vr.created_at AS validated_at
+                            FROM ab_authoring_validation_run vr
+                            WHERE vr.tenant_id = cs.tenant_id
+                              AND vr.env_id = cs.env_id
+                              AND vr.change_set_id = cs.id
+                              AND vr.change_set_revision = cs.revision
+                            ORDER BY vr.created_at DESC, vr.id DESC
+                            LIMIT 1
+                        ) validation_run ON TRUE
                         WHERE s.tenant_id = ? AND s.env_id = ? AND s.pid = ?
                           AND cs.tenant_id = ? AND cs.env_id = ? AND cs.deleted_flag = FALSE
                           AND rd.tenant_id = ? AND rd.env_id = ?
@@ -369,6 +390,7 @@ public class AuthoringWorkspaceRepository {
                 resultSet.getString("route"),
                 resultSet.getString("publish_policy"),
                 resultSet.getString("validation_state"),
+                mapValidationSummary(resultSet),
                 resultSet.getString("approval_state"),
                 resultSet.getString("publish_state"),
                 resultSet.getString("manifest_checksum"),
@@ -381,6 +403,20 @@ public class AuthoringWorkspaceRepository {
                 resultSet.getLong("lease_holder_user_id"),
                 resultSet.getLong("lease_revision"),
                 resultSet.getTimestamp("leased_until").toInstant());
+    }
+
+    private ValidationRunSummary mapValidationSummary(ResultSet resultSet) throws SQLException {
+        String status = resultSet.getString("validation_status");
+        if (status == null) {
+            return null;
+        }
+        return new ValidationRunSummary(
+                resultSet.getString("validation_run_pid"),
+                resultSet.getLong("validation_revision"),
+                status,
+                resultSet.getInt("validation_error_count"),
+                parse(resultSet.getString("validation_issues")),
+                resultSet.getTimestamp("validated_at").toInstant());
     }
 
     private void requireOne(int rows, String reason) {
@@ -493,6 +529,7 @@ public class AuthoringWorkspaceRepository {
             String route,
             String publishPolicy,
             String validationState,
+            ValidationRunSummary validation,
             String approvalState,
             String publishState,
             String manifestChecksum,
@@ -505,6 +542,15 @@ public class AuthoringWorkspaceRepository {
             long leaseHolderUserId,
             long leaseRevision,
             Instant leasedUntil) {
+    }
+
+    public record ValidationRunSummary(
+            String validationRunPid,
+            long revision,
+            String status,
+            int errorCount,
+            JsonNode issues,
+            Instant validatedAt) {
     }
 
     public record AggregatePolicy(

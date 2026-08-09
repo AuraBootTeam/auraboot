@@ -17,6 +17,7 @@ export interface AuthoringSession {
   route: string;
   publishPolicy: string;
   validationState: string;
+  validation?: AuthoringValidationSummary | null;
   approvalState: string;
   publishState: string;
   manifestChecksum: string;
@@ -24,6 +25,24 @@ export interface AuthoringSession {
   interactionContext: Record<string, unknown>;
   writerLease?: AuthoringWriterLease;
   expiresAt: string;
+}
+
+export interface AuthoringValidationIssue {
+  code: string;
+  severity: string;
+  changeItemPid?: string | null;
+  blockId?: string | null;
+  propertyPath: string;
+  messageKey: string;
+}
+
+export interface AuthoringValidationSummary {
+  validationRunPid: string;
+  revision: number;
+  status: 'VALID' | 'INVALID';
+  errorCount: number;
+  issues: AuthoringValidationIssue[];
+  validatedAt: string;
 }
 
 export type AuthoringWriterLeaseStatus =

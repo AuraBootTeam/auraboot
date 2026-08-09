@@ -3933,6 +3933,66 @@ ALTER SEQUENCE public.ab_authoring_resource_draft_id_seq OWNED BY public.ab_auth
 
 
 --
+-- Name: ab_authoring_validation_run; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_validation_run (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    change_set_id bigint NOT NULL,
+    change_set_revision bigint NOT NULL,
+    resource_draft_id bigint NOT NULL,
+    status character varying(16) NOT NULL,
+    validator_version character varying(40) NOT NULL,
+    manifest_checksum character varying(64) NOT NULL,
+    snapshot_checksum character varying(64) NOT NULL,
+    error_count integer NOT NULL,
+    issues jsonb DEFAULT '[]'::jsonb NOT NULL,
+    actor_user_id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_authoring_validation_error_count CHECK (((error_count >= 0) AND ((((status)::text = 'VALID'::text) AND (error_count = 0)) OR (((status)::text = 'INVALID'::text) AND (error_count > 0))))),
+    CONSTRAINT chk_authoring_validation_issues CHECK ((jsonb_typeof(issues) = 'array'::text)),
+    CONSTRAINT chk_authoring_validation_revision CHECK ((change_set_revision > 0)),
+    CONSTRAINT chk_authoring_validation_status CHECK (((status)::text = ANY ((ARRAY['VALID'::character varying, 'INVALID'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_authoring_validation_run; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_validation_run IS 'Append-only server validation result bound to one immutable ChangeSet revision';
+
+
+--
+-- Name: COLUMN ab_authoring_validation_run.issues; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_authoring_validation_run.issues IS 'Location-only issue metadata; rejected values and business record data are not persisted';
+
+
+--
+-- Name: ab_authoring_validation_run_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_validation_run_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_validation_run_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_validation_run_id_seq OWNED BY public.ab_authoring_validation_run.id;
+
+
+--
 -- Name: ab_authoring_writer_lease; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -16849,6 +16909,13 @@ ALTER TABLE ONLY public.ab_authoring_resource_draft ALTER COLUMN id SET DEFAULT 
 
 
 --
+-- Name: ab_authoring_validation_run id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_validation_run ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_validation_run_id_seq'::regclass);
+
+
+--
 -- Name: ab_authoring_writer_lease id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -18306,6 +18373,22 @@ ALTER TABLE ONLY public.ab_authoring_resource_draft
 
 ALTER TABLE ONLY public.ab_authoring_resource_draft
     ADD CONSTRAINT ab_authoring_resource_draft_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_validation_run ab_authoring_validation_run_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_validation_run
+    ADD CONSTRAINT ab_authoring_validation_run_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_validation_run ab_authoring_validation_run_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_validation_run
+    ADD CONSTRAINT ab_authoring_validation_run_pkey PRIMARY KEY (id);
 
 
 --
@@ -24053,6 +24136,13 @@ CREATE INDEX idx_authoring_resource_draft_resource ON public.ab_authoring_resour
 
 
 --
+-- Name: idx_authoring_validation_revision; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_validation_revision ON public.ab_authoring_validation_run USING btree (tenant_id, env_id, change_set_id, change_set_revision, created_at DESC, id DESC);
+
+
+--
 -- Name: idx_authz_approval; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -28120,6 +28210,13 @@ CREATE TRIGGER trg_authoring_release_item_append_only BEFORE DELETE OR UPDATE ON
 
 
 --
+-- Name: ab_authoring_validation_run trg_authoring_validation_run_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_validation_run_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_validation_run FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
 -- Name: ab_subject_permission trg_check_group_logic_type_consistency; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -28580,6 +28677,30 @@ ALTER TABLE ONLY public.ab_authoring_resource_draft
 
 ALTER TABLE ONLY public.ab_authoring_resource_draft
     ADD CONSTRAINT fk_authoring_resource_draft_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_validation_run fk_authoring_validation_change_set; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_validation_run
+    ADD CONSTRAINT fk_authoring_validation_change_set FOREIGN KEY (change_set_id) REFERENCES public.ab_authoring_change_set(id);
+
+
+--
+-- Name: ab_authoring_validation_run fk_authoring_validation_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_validation_run
+    ADD CONSTRAINT fk_authoring_validation_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_validation_run fk_authoring_validation_resource_draft; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_validation_run
+    ADD CONSTRAINT fk_authoring_validation_resource_draft FOREIGN KEY (resource_draft_id) REFERENCES public.ab_authoring_resource_draft(id);
 
 
 --

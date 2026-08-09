@@ -1,11 +1,16 @@
 package com.auraboot.framework.authoring.workspace;
 
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ValidationIssueView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ValidationSummaryView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.WriterLeaseView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.ValidationRunSummary;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.WorkspaceRow;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.stream.StreamSupport;
 
 /** Maps the persisted aggregate to the client-safe session view. */
 @Component
@@ -38,6 +43,7 @@ public class AuthoringWorkspaceViewMapper {
                 row.route(),
                 row.publishPolicy(),
                 row.validationState(),
+                validation(row.validation()),
                 row.approvalState(),
                 row.publishState(),
                 row.manifestChecksum(),
@@ -45,5 +51,30 @@ public class AuthoringWorkspaceViewMapper {
                 row.interactionContext(),
                 new WriterLeaseView(leaseStatus, row.leaseRevision(), row.leasedUntil()),
                 row.expiresAt());
+    }
+
+    private ValidationSummaryView validation(ValidationRunSummary summary) {
+        if (summary == null) {
+            return null;
+        }
+        return new ValidationSummaryView(
+                summary.validationRunPid(),
+                summary.revision(),
+                summary.status(),
+                summary.errorCount(),
+                StreamSupport.stream(summary.issues().spliterator(), false)
+                        .map(issue -> new ValidationIssueView(
+                                issue.path("code").asText(),
+                                issue.path("severity").asText(),
+                                nullableText(issue.get("changeItemPid")),
+                                nullableText(issue.get("blockId")),
+                                issue.path("propertyPath").asText(),
+                                issue.path("messageKey").asText()))
+                        .toList(),
+                summary.validatedAt());
+    }
+
+    private String nullableText(JsonNode value) {
+        return value == null || value.isNull() ? null : value.asText();
     }
 }

@@ -1037,6 +1037,75 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void invalidRevisionStaysEditableAndAValidNewRevisionGetsItsOwnValidationFact() {
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult invalidPatch = workspaceService.apply(
+                opened.sessionPid(),
+                new ApplyPatchRequest(
+                        opened.revision(), "table-1", "/props/defaultFilter",
+                        PatchOperation.ADD,
+                        objectMapper.getNodeFactory().textNode("status = OPEN secret-value"),
+                        capabilityRegistry.find("table").orElseThrow().checksum()));
+
+        ChangeSetView invalid = governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(invalidPatch.session().revision()));
+
+        assertThat(invalid.status()).isEqualTo("DRAFT");
+        assertThat(invalid.validationState()).isEqualTo("INVALID");
+        assertThat(invalid.publishState()).isEqualTo("DRAFT");
+        SessionView invalidSession = workspaceService.get(opened.sessionPid());
+        assertThat(invalidSession.state()).isEqualTo("ACTIVE");
+        assertThat(invalidSession.validation()).isNotNull();
+        assertThat(invalidSession.validation().revision()).isEqualTo(2);
+        assertThat(invalidSession.validation().errorCount()).isEqualTo(1);
+        assertThat(invalidSession.validation().issues()).singleElement().satisfies(issue -> {
+            assertThat(issue.code()).isEqualTo("DEFAULT_FILTER_INVALID");
+            assertThat(issue.blockId()).isEqualTo("table-1");
+            assertThat(issue.propertyPath()).isEqualTo("/props/defaultFilter");
+        });
+        String invalidIssues = jdbcTemplate.queryForObject("""
+                SELECT issues::text FROM ab_authoring_validation_run
+                WHERE change_set_id = (
+                    SELECT id FROM ab_authoring_change_set WHERE pid = ?)
+                  AND change_set_revision = 2 AND status = 'INVALID'
+                """, String.class, opened.changeSetPid());
+        assertThat(invalidIssues).doesNotContain("secret-value");
+
+        ObjectNode structuredFilter = objectMapper.createObjectNode().put("status", "OPEN");
+        PatchResult fixed = workspaceService.apply(
+                opened.sessionPid(),
+                new ApplyPatchRequest(
+                        invalidSession.revision(), "table-1", "/props/defaultFilter",
+                        PatchOperation.REPLACE, structuredFilter,
+                        capabilityRegistry.find("table").orElseThrow().checksum()));
+        assertThat(fixed.session().validationState()).isEqualTo("UNVALIDATED");
+        assertThat(fixed.session().validation()).isNull();
+
+        ChangeSetView submitted = governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(fixed.session().revision()));
+        assertThat(submitted.status()).isEqualTo("IN_REVIEW");
+        assertThat(submitted.validationState()).isEqualTo("VALID");
+        SessionView reviewed = workspaceService.get(opened.sessionPid());
+        assertThat(reviewed.state()).isEqualTo("READ_ONLY");
+        assertThat(reviewed.validation().revision()).isEqualTo(3);
+        assertThat(reviewed.validation().status()).isEqualTo("VALID");
+        assertThat(reviewed.validation().errorCount()).isZero();
+        Integer runCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_validation_run
+                WHERE change_set_id = (
+                    SELECT id FROM ab_authoring_change_set WHERE pid = ?)
+                """, Integer.class, opened.changeSetPid());
+        assertThat(runCount).isEqualTo(2);
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                UPDATE ab_authoring_validation_run SET issues = '[]'::jsonb
+                WHERE change_set_id = (
+                    SELECT id FROM ab_authoring_change_set WHERE pid = ?)
+                """, opened.changeSetPid()))
+                .hasMessageContaining("authoring history is append-only");
+    }
+
+    @Test
     void ownerWithdrawalCreatesANewEditableRevisionAndStalesThePendingReview() {
         PageSchema page = insertPage("normal");
         SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));

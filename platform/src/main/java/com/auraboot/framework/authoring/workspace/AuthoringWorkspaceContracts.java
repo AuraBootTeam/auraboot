@@ -64,6 +64,24 @@ public final class AuthoringWorkspaceContracts {
             Instant leasedUntil) {
     }
 
+    public record ValidationIssueView(
+            String code,
+            String severity,
+            String changeItemPid,
+            String blockId,
+            String propertyPath,
+            String messageKey) {
+    }
+
+    public record ValidationSummaryView(
+            String validationRunPid,
+            long revision,
+            String status,
+            int errorCount,
+            List<ValidationIssueView> issues,
+            Instant validatedAt) {
+    }
+
     public record SessionView(
             String sessionPid,
             String changeSetPid,
@@ -77,6 +95,7 @@ public final class AuthoringWorkspaceContracts {
             String route,
             String publishPolicy,
             String validationState,
+            ValidationSummaryView validation,
             String approvalState,
             String publishState,
             String manifestChecksum,

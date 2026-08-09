@@ -2,6 +2,7 @@ package com.auraboot.framework.authoring.workspace;
 
 import com.auraboot.framework.authoring.workspace.AuthoringChangeSetSplitter.ChangeItem;
 import com.auraboot.framework.authoring.workspace.AuthoringChangeSetSplitter.SplitPlan;
+import com.auraboot.framework.authoring.workspace.AuthoringDraftValidator.ValidationResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.AggregatePolicy;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -67,19 +68,6 @@ public class AuthoringGovernanceRepository {
                 tenantId, envId, changeSetPid);
     }
 
-    public int countItems(GovernanceRow row) {
-        Integer count = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM ab_authoring_change_item ci
-                WHERE ci.tenant_id = ? AND ci.env_id = ? AND ci.change_set_id = ?
-                  AND NOT EXISTS (
-                      SELECT 1 FROM ab_authoring_change_item_split split_item
-                      WHERE split_item.tenant_id = ci.tenant_id
-                        AND split_item.env_id = ci.env_id
-                        AND split_item.source_change_item_id = ci.id)
-                """, Integer.class, row.tenantId(), row.envId(), row.changeSetId());
-        return count == null ? 0 : count;
-    }
-
     public List<ChangeItem> findActiveItems(GovernanceRow row) {
         return jdbcTemplate.query("""
                         SELECT ci.id, ci.pid, ci.block_id, ci.property_path, ci.operation,
@@ -124,6 +112,43 @@ public class AuthoringGovernanceRepository {
                         resultSet.getString("source_change_item_pid"),
                         parse(resultSet.getString("dependency_snapshot"))),
                 row.tenantId(), row.envId(), row.changeSetId());
+    }
+
+    public void recordValidation(
+            GovernanceRow row,
+            ValidationResult result,
+            String validationRunPid,
+            String snapshotChecksum,
+            long actorUserId) {
+        jdbcTemplate.update("""
+                INSERT INTO ab_authoring_validation_run (
+                    pid, tenant_id, env_id, change_set_id, change_set_revision,
+                    resource_draft_id, status, validator_version, manifest_checksum,
+                    snapshot_checksum, error_count, issues, actor_user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)
+                """,
+                validationRunPid, row.tenantId(), row.envId(), row.changeSetId(), row.revision(),
+                row.resourceDraftId(), result.status(), AuthoringDraftValidator.VALIDATOR_VERSION,
+                row.draftManifestChecksum(), snapshotChecksum, result.errorCount(),
+                json(objectMapper.valueToTree(result.issues())), actorUserId);
+        int changeSetUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_change_set
+                SET validation_state = ?,
+                    publish_state = CASE WHEN ? = 'INVALID' THEN 'DRAFT' ELSE publish_state END,
+                    stale_reason = NULL, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
+                  AND status IN ('DRAFT', 'REJECTED')
+                """,
+                result.status(), result.status(), row.changeSetId(), row.tenantId(), row.envId(),
+                row.revision());
+        requireOne(changeSetUpdated, "authoring.validation.revision-conflict");
+        int resourceUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_resource_draft
+                SET validation_state = ?, stale_reason = NULL, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
+                """,
+                result.status(), row.resourceDraftId(), row.tenantId(), row.envId(), row.revision());
+        requireOne(resourceUpdated, "authoring.validation.resource-revision-conflict");
     }
 
     public void submit(GovernanceRow row, boolean approvalRequired, long actorUserId) {
