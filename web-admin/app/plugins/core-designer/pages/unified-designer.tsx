@@ -30,6 +30,7 @@ import {
 } from '~/framework/meta/authoring/authoringService';
 import { AuthoringWriterLeaseNotice } from '~/framework/meta/authoring/AuthoringWriterLeaseNotice';
 import { AuthoringGovernanceNotice } from '~/framework/meta/authoring/AuthoringGovernanceNotice';
+import { AuthoringRiskSummary } from '~/framework/meta/authoring/AuthoringRiskSummary';
 import { AuthoringChangeSetSplitPanel } from '~/framework/meta/authoring/AuthoringChangeSetSplitPanel';
 import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
 import { AuthoringConflictResolutionPanel } from '../components/unified-designer/AuthoringConflictResolutionPanel';
@@ -761,15 +762,18 @@ export default function UnifiedDesignerPage() {
         )}
       </div>
       <div className="px-4 pt-3">
-        <AuthoringGovernanceNotice
-          session={authoringSession!}
-          currentUserId={user?.id}
-          canManage={!reviewWorkspaceMode && canManageDesigner}
-          canReview={reviewWorkspaceMode && canReviewAuthoring}
-          pendingAction={governancePending}
-          error={governanceError}
-          onAction={handleGovernanceAction}
-        />
+        <AuthoringRiskSummary session={authoringSession!} />
+        <div className="mt-2">
+          <AuthoringGovernanceNotice
+            session={authoringSession!}
+            currentUserId={user?.id}
+            canManage={!reviewWorkspaceMode && canManageDesigner}
+            canReview={reviewWorkspaceMode && canReviewAuthoring}
+            pendingAction={governancePending}
+            error={governanceError}
+            onAction={handleGovernanceAction}
+          />
+        </div>
         <AuthoringChangeSetSplitPanel
           session={authoringSession!}
           enabled={Boolean(

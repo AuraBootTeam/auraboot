@@ -97,6 +97,25 @@ class AuthoringBoundaryPolicyServiceTest {
     }
 
     @Test
+    void pageLocalCriticalPresentationCannotRequestDirectPublish() {
+        for (String path : new String[]{"/props/defaultSort", "/props/defaultFilter"}) {
+            BoundaryDecision decision = evaluate("table", path, ResourceScope.CURRENT_PAGE,
+                    SecurityImpact.NONE, true, true, currentChecksum("table"));
+            assertThat(decision.risk()).as(path).isEqualTo(RiskLevel.L2);
+            assertThat(decision.route()).as(path).isEqualTo(Route.GUIDED_INLINE);
+            assertThat(decision.publishPolicy()).as(path)
+                    .isEqualTo(PublishPolicy.REQUIRED_REVIEW);
+        }
+        for (String path : new String[]{"/props/variant", "/props/visibleWhen"}) {
+            BoundaryDecision decision = evaluate("action", path, ResourceScope.CURRENT_PAGE,
+                    SecurityImpact.NONE, true, true, currentChecksum("action"));
+            assertThat(decision.risk()).as(path).isEqualTo(RiskLevel.L2);
+            assertThat(decision.publishPolicy()).as(path)
+                    .isEqualTo(PublishPolicy.REQUIRED_REVIEW);
+        }
+    }
+
+    @Test
     void sharedResourceAndSecurityImpactCannotStayInline() {
         BoundaryDecision shared = evaluate("field", "/title", ResourceScope.SHARED_PAGE,
                 SecurityImpact.NONE, true, true, currentChecksum("field"));

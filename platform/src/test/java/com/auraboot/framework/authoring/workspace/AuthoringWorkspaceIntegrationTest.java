@@ -996,6 +996,47 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void pageLocalL2ChangeCannotBypassReviewOrBeDowngradedByLaterL0Items() {
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult lowRisk = patchDensity(opened, "compact");
+        ObjectNode defaultFilter = objectMapper.createObjectNode().put("status", "OPEN");
+        PatchResult pageLocal = workspaceService.apply(
+                opened.sessionPid(),
+                new ApplyPatchRequest(
+                        lowRisk.session().revision(), "table-1", "/props/defaultFilter",
+                        PatchOperation.ADD, defaultFilter,
+                        capabilityRegistry.find("table").orElseThrow().checksum()));
+
+        assertThat(pageLocal.session().riskLevel()).isEqualTo("L2");
+        assertThat(pageLocal.session().route()).isEqualTo("GUIDED_INLINE");
+        assertThat(pageLocal.session().publishPolicy()).isEqualTo("REQUIRED_REVIEW");
+        PatchResult laterLowRisk = workspaceService.apply(
+                opened.sessionPid(),
+                new ApplyPatchRequest(
+                        pageLocal.session().revision(), "table-1", "/layout/span",
+                        PatchOperation.ADD, objectMapper.getNodeFactory().numberNode(12),
+                        capabilityRegistry.find("table").orElseThrow().checksum()));
+        assertThat(laterLowRisk.session().riskLevel()).isEqualTo("L2");
+        assertThat(laterLowRisk.session().publishPolicy()).isEqualTo("REQUIRED_REVIEW");
+
+        ChangeSetView submitted = governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(laterLowRisk.session().revision()));
+        assertThat(submitted.status()).isEqualTo("IN_REVIEW");
+        assertThat(submitted.approvalState()).isEqualTo("PENDING");
+        assertThat(submitted.publishState()).isEqualTo("DRAFT");
+        assertThatThrownBy(() -> governanceService.approve(
+                opened.changeSetPid(),
+                new ReviewRequest(laterLowRisk.session().revision(), "owner bypass")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("authoring.approval.four-eyes-required");
+        assertThatThrownBy(() -> governanceService.publish(
+                opened.changeSetPid(), new RevisionRequest(laterLowRisk.session().revision())))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("authoring.workflow.invalid-state");
+    }
+
+    @Test
     void ownerWithdrawalCreatesANewEditableRevisionAndStalesThePendingReview() {
         PageSchema page = insertPage("normal");
         SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
@@ -1128,6 +1169,9 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         lowRisk.session().revision(), "table-1", "/dataSource",
                         PatchOperation.ADD, dataSource,
                         capabilityRegistry.find("table").orElseThrow().checksum()));
+
+        assertThat(highRisk.session().riskLevel()).isEqualTo("L3");
+        assertThat(highRisk.session().publishPolicy()).isEqualTo("STUDIO_APPROVAL");
 
         SplitChangeSetView split = governanceService.split(
                 opened.sessionPid(),

@@ -34,6 +34,7 @@ import {
   transitionAuthoringGovernance,
 } from './authoringService';
 import { AuthoringGovernanceNotice } from './AuthoringGovernanceNotice';
+import { AuthoringRiskSummary } from './AuthoringRiskSummary';
 import { AuthoringWriterLeaseNotice } from './AuthoringWriterLeaseNotice';
 import { storeAuthoringConflictTransfer } from './authoringConflictTransfer';
 import type {
@@ -736,6 +737,9 @@ export function ContextualAuthoringSurface({
           </span>
         </div>
       ) : null}
+      <div className="mx-3 mt-3">
+        <AuthoringRiskSummary session={session} />
+      </div>
       {['IN_REVIEW', 'APPROVED', 'REJECTED'].includes(session.changeSetStatus) ? (
         <div className="mx-3 mt-3">
           <AuthoringGovernanceNotice
