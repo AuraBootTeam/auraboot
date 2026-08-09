@@ -180,6 +180,55 @@ public final class AuthoringWorkspaceContracts {
             @NotBlank String manifestChecksum) {
     }
 
+    /** One atomic Studio save. Operation groups execute in document-reconstruction order. */
+    public record StudioBatchRequest(
+            @Positive long expectedRevision,
+            @NotNull @Size(max = 50) List<@Valid StudioCreateBlock> creates,
+            @NotNull @Size(max = 50) List<@Valid StudioRelocateBlock> relocations,
+            @NotNull @Size(max = 50) List<@Valid StudioRemoveBlock> removes,
+            @NotNull @Size(max = 50) List<@Valid StudioMoveBlock> moves,
+            @NotNull @Size(max = 100) List<@Valid StudioPropertyPatch> patches) {
+    }
+
+    public record StudioCreateBlock(
+            @NotBlank @Size(max = 120) String blockId,
+            @NotBlank @Size(max = 120) String blockType,
+            @Size(min = 1, max = 120) String parentBlockId,
+            @Size(min = 1, max = 120) String beforeBlockId,
+            @NotBlank String manifestChecksum) {
+    }
+
+    public record StudioRelocateBlock(
+            @NotBlank @Size(max = 120) String blockId,
+            @NotBlank @Size(max = 120) String targetParentBlockId,
+            @Size(min = 1, max = 120) String beforeBlockId,
+            @NotBlank String manifestChecksum) {
+    }
+
+    public record StudioRemoveBlock(
+            @NotBlank @Size(max = 120) String blockId,
+            @NotBlank String manifestChecksum) {
+    }
+
+    public record StudioMoveBlock(
+            @NotBlank @Size(max = 120) String blockId,
+            @Size(min = 1, max = 120) String beforeBlockId,
+            @NotBlank String manifestChecksum) {
+    }
+
+    public record StudioPropertyPatch(
+            @NotBlank @Size(max = 120) String blockId,
+            @NotBlank @Size(max = 240) String propertyPath,
+            @NotNull PatchOperation operation,
+            JsonNode value,
+            @NotBlank String manifestChecksum) {
+    }
+
+    public record StudioBatchResult(
+            SessionView session,
+            List<String> changeItemPids) {
+    }
+
     public record ObserveChangeSetRequest(
             JsonNode interactionContext) {
     }

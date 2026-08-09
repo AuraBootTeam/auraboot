@@ -52,6 +52,10 @@ import type {
   PropertyCapability,
 } from './types';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
+import {
+  canonicalizePageSchemaDto,
+  type PageSchemaDTO,
+} from '~/framework/meta/utils/canonicalizePageDsl';
 
 type HandoffIntent = 'PAGE_STRUCTURE' | 'NEW_PAGE' | 'MENU_STRUCTURE';
 
@@ -115,6 +119,10 @@ export function ContextualAuthoringSurface({
   const returnResumeAttemptedRef = useRef(false);
 
   const rootNode = useMemo(() => buildAuthoringTree(workingSchema), [workingSchema]);
+  const runtimeSchema = useMemo(
+    () => schemaForRuntimePreview(workingSchema),
+    [workingSchema],
+  );
   const nodeIndex = useMemo(() => indexTree(rootNode), [rootNode]);
   const selectedNode = nodeIndex.byId.get(selectedId) ?? rootNode;
   const effectiveMode: AuthoringMode = altPressed
@@ -875,7 +883,7 @@ export function ContextualAuthoringSurface({
             }}
             data-testid="contextual-authoring-canvas"
           >
-            {renderRuntime ? renderRuntime(workingSchema) : children}
+            {renderRuntime ? renderRuntime(runtimeSchema) : children}
           </div>
         </main>
 
@@ -1954,6 +1962,21 @@ function schemaFromSnapshot(
     id: schema.id,
     blocks: Array.isArray(snapshot.blocks) ? snapshot.blocks : schema.blocks,
   } as UnifiedSchema;
+}
+
+/**
+ * Keep the recursive server-owned tree in the authoring state so outline selection and structure
+ * edits use stable IDs. Existing page renderers consume the canonical flat runtime shape, so the
+ * preview passes through the same DTO canonicalizer used on first page load instead of dispatching
+ * kind roots such as `list`, `form`, or `detail` as if they were business blocks.
+ */
+function schemaForRuntimePreview(schema: UnifiedSchema): UnifiedSchema {
+  return canonicalizePageSchemaDto({
+    ...(schema as unknown as PageSchemaDTO),
+    pid: schema.id,
+    pageKey: schema.pageKey || schema.id,
+    kind: schema.kind,
+  });
 }
 
 function materializePendingSchema(

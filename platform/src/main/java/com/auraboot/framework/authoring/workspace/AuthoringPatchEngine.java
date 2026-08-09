@@ -226,7 +226,8 @@ public class AuthoringPatchEngine {
                 resourceScope,
                 securityImpact(capability),
                 capability != null,
-                protectedSemanticValid(capability, target.block(), propertyPath, proposedValue),
+                protectedSemanticValid(
+                        capability, sourceSnapshot, target.block(), propertyPath, proposedValue),
                 manifestChecksum));
         requireAllowedDecision(decision, studioRoute);
 
@@ -250,12 +251,14 @@ public class AuthoringPatchEngine {
 
     private boolean protectedSemanticValid(
             PropertyCapability capability,
+            JsonNode sourceSnapshot,
             ObjectNode block,
             String propertyPath,
             JsonNode proposedValue) {
         return capability != null
                 && (!capability.protectedSemantic()
-                    || semanticValidator.isValid(block, propertyPath, proposedValue));
+                    || semanticValidator.isValid(
+                            sourceSnapshot, block, propertyPath, proposedValue));
     }
 
     private void requireAllowedDecision(BoundaryDecision decision, boolean studioRoute) {

@@ -16,22 +16,19 @@ import {
   loadModelFieldsByModelCodes,
 } from '../components/unified-designer/persistence/modelFieldsRepository';
 import type { ModelFieldsByModel, PageSchemaV3 } from '../components/unified-designer/types';
+import { findBlockById } from '../components/unified-designer/utils/recursiveBlockWalker';
 import {
-  applyAuthoringStudioPatch,
+  applyAuthoringStudioBatch,
   consumeAuthoringHandoff,
   createAuthoringNewPageWorkspace,
-  createAuthoringStudioBlock,
   loadAuthoringCapabilities,
   loadAuthoringNewPageWorkspaceOptions,
   loadAuthoringReviewWorkspace,
   loadAuthoringSession,
-  moveAuthoringStudioBlock,
   openAuthoringReviewWorkspace,
   observeAuthoringChangeSet,
   prepareAuthoringSession,
   publishAuthoringChangeSet,
-  relocateAuthoringStudioBlock,
-  removeAuthoringStudioBlock,
   submitAuthoringSession,
   takeoverAuthoringWriterLease,
   transitionAuthoringGovernance,
@@ -427,67 +424,13 @@ export default function UnifiedDesignerPage() {
     const plan = planStudioAuthoringPatches(baseline, nextDocument, authoringCapabilities);
     if (plan.unsupported.length > 0) throw new Error(plan.unsupported.join('；'));
 
-    let workingSession = startingSession;
-    for (const create of plan.creates) {
-      const result = await createAuthoringStudioBlock(
-        workingSession.sessionPid,
-        workingSession.revision,
-        create.blockId,
-        create.blockType,
-        create.parentBlockId,
-        create.beforeBlockId,
-        create.manifestChecksum,
-      );
-      workingSession = result.session;
-      setAuthoringSession(workingSession);
-    }
-    for (const relocation of plan.relocations) {
-      const result = await relocateAuthoringStudioBlock(
-        workingSession.sessionPid,
-        workingSession.revision,
-        relocation.blockId,
-        relocation.targetParentBlockId,
-        relocation.beforeBlockId,
-        relocation.manifestChecksum,
-      );
-      workingSession = result.session;
-      setAuthoringSession(workingSession);
-    }
-    for (const remove of plan.removes) {
-      const result = await removeAuthoringStudioBlock(
-        workingSession.sessionPid,
-        workingSession.revision,
-        remove.blockId,
-        remove.manifestChecksum,
-      );
-      workingSession = result.session;
-      setAuthoringSession(workingSession);
-    }
-    for (const move of plan.moves) {
-      const result = await moveAuthoringStudioBlock(
-        workingSession.sessionPid,
-        workingSession.revision,
-        move.blockId,
-        move.beforeBlockId,
-        move.manifestChecksum,
-      );
-      workingSession = result.session;
-      setAuthoringSession(workingSession);
-    }
-    for (const patch of plan.patches) {
-      const result = await applyAuthoringStudioPatch(
-        workingSession.sessionPid,
-        workingSession.revision,
-        patch.blockId,
-        patch.propertyPath,
-        patch.operation,
-        patch.value,
-        patch.manifestChecksum,
-      );
-      workingSession = result.session;
-      setAuthoringSession(workingSession);
-    }
-    return workingSession;
+    const result = await applyAuthoringStudioBatch(
+      startingSession.sessionPid,
+      startingSession.revision,
+      plan,
+    );
+    setAuthoringSession(result.session);
+    return result.session;
   };
 
   const openStudioConflict = (
@@ -963,7 +906,13 @@ export default function UnifiedDesignerPage() {
       onPublish={source.type === 'page' && !handoff ? handlePublish : undefined}
       onUnpublish={source.type === 'page' && !handoff ? handleUnpublish : undefined}
       onReloadDocument={source.type === 'page' && !handoff ? handleReloadDocument : undefined}
-      initialSelectedBlockId={handoff?.blockId || undefined}
+      initialSelectedBlockId={
+        handoff
+          ? (handoff.blockId
+              ? findBlockById(document.blocks, handoff.blockId)?.block.id
+              : undefined) ?? document.blocks[0]?.id
+          : undefined
+      }
       contextualReadOnly={contextualReadOnly}
       contextualEditablePropertyPaths={contextualEditablePropertyPaths}
       contextualReorderableBlockTypes={contextualReorderableBlockTypes}
@@ -1012,7 +961,7 @@ export default function UnifiedDesignerPage() {
         ) : (
           <span className="ml-2" data-testid="studio-handoff-editable-reason">
             ChangeSet {handoff.changeSetPid} · 修订 r{authoringSession?.revision ?? handoff.revision} ·
-            高级属性和已声明的同级顺序调整将写回同一隔离草稿；跨父级、增删区块等治理操作仍不开放。
+            已声明的属性、区块增删、同级排序和跨父级移动将写回同一隔离草稿，并按最高风险统一校验、评审和发布。
           </span>
         )}
         {newResource ? (

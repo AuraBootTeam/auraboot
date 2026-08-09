@@ -1245,6 +1245,52 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
   });
 
+  it('projects a governed model column to server-declared creation properties', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={samplePageSchemaV3}
+        modelFieldsByModel={testModelFields}
+        onSave={onSave}
+        contextualEditablePropertyPaths={{
+          column: ['/field', '/props/label'],
+        }}
+        contextualCreatableBlockTypes={['column']}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('outline-item-table_customers'));
+    fireEvent.click(screen.getByTestId('resource-tab-fields'));
+    fireEvent.click(screen.getByTestId('model-field-email'));
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const saved = onSave.mock.calls[0][0] as PageSchemaV3;
+    const created = findBlockById(saved.blocks, 'column_email')?.block;
+    expect(created).toEqual({
+      id: 'column_email',
+      blockType: 'column',
+      field: 'email',
+      props: { label: 'Email' },
+    });
+  });
+
+  it('fails closed when the server capability registry does not allow model-field structure', () => {
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={samplePageSchemaV3}
+        modelFieldsByModel={testModelFields}
+        contextualEditablePropertyPaths={{ column: ['/field', '/props/label'] }}
+        contextualCreatableBlockTypes={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('outline-item-table_customers'));
+    fireEvent.click(screen.getByTestId('resource-tab-fields'));
+
+    expect(screen.getByTestId('model-field-email')).toBeDisabled();
+  });
+
   it('adds a model field before the selected compatible sibling from the field palette', () => {
     render(
       <UnifiedDesignerWorkbench

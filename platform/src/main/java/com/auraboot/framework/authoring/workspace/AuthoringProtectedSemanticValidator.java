@@ -2,6 +2,7 @@ package com.auraboot.framework.authoring.workspace;
 
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Component;
@@ -13,14 +14,25 @@ import java.util.Locale;
 public class AuthoringProtectedSemanticValidator {
 
     private final CommandDefinitionMapper commandDefinitionMapper;
+    private final MetaModelService metaModelService;
 
-    public AuthoringProtectedSemanticValidator(CommandDefinitionMapper commandDefinitionMapper) {
+    public AuthoringProtectedSemanticValidator(
+            CommandDefinitionMapper commandDefinitionMapper,
+            MetaModelService metaModelService) {
         this.commandDefinitionMapper = commandDefinitionMapper;
+        this.metaModelService = metaModelService;
     }
 
-    public boolean isValid(ObjectNode block, String propertyPath, JsonNode proposedValue) {
+    public boolean isValid(
+            JsonNode snapshot,
+            ObjectNode block,
+            String propertyPath,
+            JsonNode proposedValue) {
         if (proposedValue == null || proposedValue.isNull()) {
             return false;
+        }
+        if ("/field".equals(propertyPath)) {
+            return validModelField(snapshot, proposedValue);
         }
         String commandCode = block.path("props").path("commandCode").asText("");
         CommandDefinition command = commandCode.isBlank()
@@ -35,6 +47,19 @@ public class AuthoringProtectedSemanticValidator {
             return validLabel(commandCode, proposedValue);
         }
         return true;
+    }
+
+    private boolean validModelField(JsonNode snapshot, JsonNode proposedValue) {
+        if (!proposedValue.isTextual() || proposedValue.asText().isBlank()) {
+            return false;
+        }
+        String modelCode = snapshot.path("modelCode").asText("");
+        if (modelCode.isBlank()) {
+            return false;
+        }
+        String fieldCode = proposedValue.asText();
+        return metaModelService.getModelFields(modelCode).stream()
+                .anyMatch(field -> fieldCode.equals(field.getCode()));
     }
 
     private boolean validLabel(String commandCode, JsonNode proposedValue) {

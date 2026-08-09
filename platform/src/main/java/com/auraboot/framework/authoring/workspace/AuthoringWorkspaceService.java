@@ -27,6 +27,8 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Re
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RemoveBlockRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewWorkspaceView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.StudioBatchRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.StudioBatchResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.TakeoverWriterLeaseRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.AggregatePolicy;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.AuditEntry;
@@ -47,6 +49,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -143,7 +146,7 @@ public class AuthoringWorkspaceService {
                 identity.tenantId(), identity.envId(), "PAGE_SCHEMA", page.getPid());
         JsonNode sourceSnapshot = activeRelease == null
                 ? snapshotFactory.create(page)
-                : activeRelease.snapshot();
+                : snapshotFactory.normalizeForAuthoring(activeRelease.snapshot());
         long baseVersion = activeRelease == null
                 ? snapshotFactory.baseVersion(page)
                 : activeRelease.channelVersion();
@@ -300,7 +303,7 @@ public class AuthoringWorkspaceService {
         page.putObject("title").put("zh-CN", request.title().trim());
         page.putObject("layout").put("type", "stack");
         page.putArray("blocks");
-        return page;
+        return snapshotFactory.normalizeForAuthoring(page);
     }
 
     private ObjectNode newMenuDefinition(CreateNewPageWorkspaceRequest request) {
@@ -600,6 +603,73 @@ public class AuthoringWorkspaceService {
         return persistStructure(
                 workspace, identity, prepared, request.blockId(), RELOCATE_BLOCK_PATH, "MOVE",
                 "STRUCTURE_RELOCATE_SAVED", metadata);
+    }
+
+    /**
+     * Persists one Studio document save as a single database transaction. Public single-operation
+     * endpoints remain available for focused actions, while the workbench uses this batch boundary
+     * so a later semantic or policy rejection cannot leave an earlier structural half-save behind.
+     */
+    @Transactional(rollbackFor = Throwable.class)
+    public StudioBatchResult applyStudioBatch(String sessionPid, StudioBatchRequest request) {
+        WorkspaceRow workspace = requireWorkspace(identity(), sessionPid, true);
+        validateWritable(workspace, identity(), request.expectedRevision());
+        int total = request.creates().size()
+                + request.relocations().size()
+                + request.removes().size()
+                + request.moves().size()
+                + request.patches().size();
+        if (total == 0 || total > 200) {
+            throw new ResponseStatusException(
+                    UNPROCESSABLE_ENTITY, "authoring.studio-batch.size-invalid");
+        }
+
+        long revision = request.expectedRevision();
+        List<String> changeItemPids = new ArrayList<>(total);
+        for (var create : request.creates()) {
+            PatchResult result = createStudioBlock(sessionPid, new CreateBlockRequest(
+                    revision, create.blockId(), create.blockType(), create.parentBlockId(),
+                    create.beforeBlockId(), create.manifestChecksum()));
+            revision = result.session().revision();
+            changeItemPids.add(result.changeItemPid());
+        }
+        for (var relocation : request.relocations()) {
+            PatchResult result = relocateStudioBlock(sessionPid, new RelocateBlockRequest(
+                    revision, relocation.blockId(), relocation.targetParentBlockId(),
+                    relocation.beforeBlockId(), relocation.manifestChecksum()));
+            revision = result.session().revision();
+            changeItemPids.add(result.changeItemPid());
+        }
+        for (var remove : request.removes()) {
+            PatchResult result = removeStudioBlock(sessionPid, new RemoveBlockRequest(
+                    revision, remove.blockId(), remove.manifestChecksum()));
+            revision = result.session().revision();
+            changeItemPids.add(result.changeItemPid());
+        }
+        for (var move : request.moves()) {
+            PatchResult result = moveStudioBlock(sessionPid, new MoveBlockRequest(
+                    revision, move.blockId(), move.beforeBlockId(), move.manifestChecksum()));
+            revision = result.session().revision();
+            changeItemPids.add(result.changeItemPid());
+        }
+        for (var patch : request.patches()) {
+            PatchResult result = applyStudio(sessionPid, new ApplyPatchRequest(
+                    revision, patch.blockId(), patch.propertyPath(), patch.operation(),
+                    patch.value(), patch.manifestChecksum()));
+            revision = result.session().revision();
+            changeItemPids.add(result.changeItemPid());
+        }
+        return new StudioBatchResult(
+                requireSessionRevision(sessionPid, revision), List.copyOf(changeItemPids));
+    }
+
+    private SessionView requireSessionRevision(String sessionPid, long expectedRevision) {
+        SessionView session = viewMapper.toView(
+                requireWorkspace(identity(), sessionPid, false), identity().userId());
+        if (session.revision() != expectedRevision) {
+            throw new IllegalStateException("Studio batch revision drift");
+        }
+        return session;
     }
 
     private PatchResult persistStructure(

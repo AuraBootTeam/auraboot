@@ -90,7 +90,7 @@ export function authoringSnapshotToPageSchemaV3(
 ): PageSchemaV3 {
   const id = stringValue(snapshot.pageKey) || stringValue(snapshot.pid) || 'authoring-page';
   const blocks = Array.isArray(snapshot.blocks) ? snapshot.blocks : [];
-  if (Number(snapshot.schemaVersion) === 3) {
+  if (Number(snapshot.schemaVersion) === 3 || hasRecursiveKindRoot(blocks, snapshot.kind)) {
     return {
       schemaVersion: 3,
       kind: normalizeKind(snapshot.kind),
@@ -113,6 +113,12 @@ export function authoringSnapshotToPageSchemaV3(
     layout: objectValue(snapshot.layout),
     blocks: blocks as LegacyPageSchemaV2['blocks'],
   });
+}
+
+function hasRecursiveKindRoot(blocks: unknown[], kind: unknown): blocks is DslBlockV3[] {
+  if (blocks.length !== 1 || !blocks[0] || typeof blocks[0] !== 'object') return false;
+  const root = blocks[0] as Record<string, unknown>;
+  return root.blockType === normalizeKind(kind) && Array.isArray(root.blocks);
 }
 
 /**
@@ -680,5 +686,27 @@ function cloneJson<T>(value: T): T {
 }
 
 function deepEqual(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left)
+      && Array.isArray(right)
+      && left.length === right.length
+      && left.every((value, index) => deepEqual(value, right[index]));
+  }
+  if (
+    !left
+    || !right
+    || typeof left !== 'object'
+    || typeof right !== 'object'
+  ) {
+    return false;
+  }
+  const leftObject = left as Record<string, unknown>;
+  const rightObject = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftObject).sort();
+  const rightKeys = Object.keys(rightObject).sort();
+  return leftKeys.length === rightKeys.length
+    && leftKeys.every((key, index) => (
+      key === rightKeys[index] && deepEqual(leftObject[key], rightObject[key])
+    ));
 }

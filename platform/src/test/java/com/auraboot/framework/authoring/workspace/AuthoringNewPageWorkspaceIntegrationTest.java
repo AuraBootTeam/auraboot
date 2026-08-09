@@ -58,6 +58,10 @@ class AuthoringNewPageWorkspaceIntegrationTest extends BaseIntegrationTest {
         assertThat(created.snapshot().path("_authoringResource").path("lifecycle").asText())
                 .isEqualTo("NEW");
         assertThat(created.snapshot().path("modelCode").asText()).isEqualTo(fixture.modelCode());
+        assertThat(created.snapshot().at("/blocks/0/blockType").asText()).isEqualTo("list");
+        assertThat(created.snapshot().at("/blocks/0/dataSource/model").asText())
+                .isEqualTo(fixture.modelCode());
+        assertThat(created.snapshot().at("/blocks/0/blocks")).isEmpty();
         assertThat(countPage(fixture.pageKey())).isZero();
         assertThat(countMenu(fixture.menuCode())).isZero();
         assertThat(changeItemPaths(created.changeSetPid()))

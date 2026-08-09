@@ -11,6 +11,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.CREATE_BLOCK_PATH;
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.RELOCATE_BLOCK_PATH;
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.REMOVE_BLOCK_PATH;
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.REORDER_WITHIN_PARENT_PATH;
+
 /** Validates the current server-owned draft without executing page business behavior. */
 @Component
 public class AuthoringDraftValidator {
@@ -96,6 +101,10 @@ public class AuthoringDraftValidator {
             validateResourceChange(item, issues);
             return;
         }
+        if (item.propertyPath().startsWith("/$structure/")) {
+            validateStructureChange(item, blocksById, issues);
+            return;
+        }
         if ("MOVE".equals(item.operation()) || "REMOVE".equals(item.operation())) {
             return;
         }
@@ -115,6 +124,31 @@ public class AuthoringDraftValidator {
         if (code != null) {
             issues.add(issue(code, item.pid(), item.blockId(), item.propertyPath(),
                     "authoring.validation." + code.toLowerCase().replace('_', '-')));
+        }
+    }
+
+    private void validateStructureChange(
+            ChangeItem item,
+            Map<String, JsonNode> blocksById,
+            List<ValidationIssue> issues) {
+        String expectedOperation = switch (item.propertyPath()) {
+            case CREATE_BLOCK_PATH -> "ADD";
+            case REMOVE_BLOCK_PATH -> "REMOVE";
+            case RELOCATE_BLOCK_PATH, REORDER_WITHIN_PARENT_PATH -> "MOVE";
+            default -> null;
+        };
+        if (expectedOperation == null || !expectedOperation.equals(item.operation())) {
+            issues.add(issue("STRUCTURE_CHANGE_INVALID", item.pid(), item.blockId(),
+                    item.propertyPath(), "authoring.validation.structure-change-invalid"));
+            return;
+        }
+        // Structure paths are governance markers, not JSON pointers into the saved block. Validate
+        // their postcondition against the server-owned tree instead of looking up /$structure/*.
+        boolean targetMustExist = !REMOVE_BLOCK_PATH.equals(item.propertyPath());
+        boolean targetExists = blocksById.containsKey(item.blockId());
+        if (targetMustExist != targetExists) {
+            issues.add(issue("STRUCTURE_POSTCONDITION_INVALID", item.pid(), item.blockId(),
+                    item.propertyPath(), "authoring.validation.structure-postcondition-invalid"));
         }
     }
 

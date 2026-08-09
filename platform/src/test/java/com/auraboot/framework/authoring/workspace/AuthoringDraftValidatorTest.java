@@ -64,6 +64,42 @@ class AuthoringDraftValidatorTest {
                 .containsExactly("BLOCK_ID_DUPLICATE");
     }
 
+    @Test
+    void validatesStructureMarkersByTheirTreePostconditionInsteadOfAsJsonPointers()
+            throws Exception {
+        JsonNode snapshot = snapshot("""
+                [{"id":"root","blockType":"list","blocks":[
+                  {"id":"table-1","blockType":"table"}]}]
+                """);
+
+        ValidationResult result = validator.validate(snapshot, List.of(
+                item("create", "table-1", "/$structure/create", "ADD"),
+                item("move", "table-1", "/$structure/parent", "MOVE"),
+                item("order", "table-1", "/$structure/order", "MOVE"),
+                item("remove", "deleted-field", "/$structure/remove", "REMOVE")));
+
+        assertThat(result.valid()).isTrue();
+        assertThat(result.errorCount()).isZero();
+    }
+
+    @Test
+    void rejectsUnknownStructureMarkersAndUnsatisfiedPostconditions() throws Exception {
+        JsonNode snapshot = snapshot("""
+                [{"id":"root","blockType":"list"}]
+                """);
+
+        ValidationResult result = validator.validate(snapshot, List.of(
+                item("missing-create", "table-1", "/$structure/create", "ADD"),
+                item("present-remove", "root", "/$structure/remove", "REMOVE"),
+                item("unknown", "root", "/$structure/unknown", "MOVE")));
+
+        assertThat(result.issues()).extracting(issue -> issue.code())
+                .containsExactly(
+                        "STRUCTURE_POSTCONDITION_INVALID",
+                        "STRUCTURE_POSTCONDITION_INVALID",
+                        "STRUCTURE_CHANGE_INVALID");
+    }
+
     private JsonNode snapshot(String blocks) throws Exception {
         return objectMapper.readTree("""
                 {"pid":"page-1","blocks":%s}
@@ -71,8 +107,13 @@ class AuthoringDraftValidatorTest {
     }
 
     private ChangeItem item(String pid, String blockId, String propertyPath) {
+        return item(pid, blockId, propertyPath, "REPLACE");
+    }
+
+    private ChangeItem item(
+            String pid, String blockId, String propertyPath, String operation) {
         return new ChangeItem(
-                1, pid, blockId, propertyPath, "REPLACE",
+                1, pid, blockId, propertyPath, operation,
                 JsonNodeFactory.instance.nullNode(), JsonNodeFactory.instance.nullNode(),
                 JsonNodeFactory.instance.arrayNode(), "L2", "GUIDED_INLINE",
                 "REQUIRED_REVIEW", "REVERSIBLE", "manifest", 1, 2, 7,

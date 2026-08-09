@@ -8,7 +8,7 @@ import { loadPageSchemaV3, savePageSchemaV3 } from '../persistence/pageSchemaV3R
 import type { PageSchemaV3 } from '../types';
 import {
   applyAuthoringAiPatchProposal,
-  applyAuthoringStudioPatch,
+  applyAuthoringStudioBatch,
   consumeAuthoringHandoff,
   createAuthoringNewPageWorkspace,
   createAuthoringAiPatchProposal,
@@ -20,7 +20,6 @@ import {
   loadAuthoringRoleStructurePreview,
   loadAuthoringReviewWorkspace,
   loadAuthoringSession,
-  moveAuthoringStudioBlock,
   openAuthoringReviewWorkspace,
   observeAuthoringChangeSet,
   prepareAuthoringSession,
@@ -70,7 +69,7 @@ vi.mock('../persistence/modelFieldsRepository', async () => {
 vi.mock('~/framework/meta/authoring/authoringService', () => ({
   endAuthoringIdentitySimulation: vi.fn(),
   applyAuthoringAiPatchProposal: vi.fn(),
-  applyAuthoringStudioPatch: vi.fn(),
+  applyAuthoringStudioBatch: vi.fn(),
   consumeAuthoringHandoff: vi.fn(),
   createAuthoringNewPageWorkspace: vi.fn(),
   createAuthoringAiPatchProposal: vi.fn(),
@@ -84,7 +83,6 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   loadAuthoringSyntheticPreview: vi.fn(),
   loadAuthoringReviewWorkspace: vi.fn(),
   loadAuthoringSession: vi.fn(),
-  moveAuthoringStudioBlock: vi.fn(),
   observeAuthoringChangeSet: vi.fn(),
   prepareAuthoringSession: vi.fn(),
   publishAuthoringChangeSet: vi.fn(),
@@ -141,9 +139,8 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(loadAuthoringRoleStructurePreview).mockReset();
     vi.mocked(loadAuthoringReviewWorkspace).mockReset();
     vi.mocked(applyAuthoringAiPatchProposal).mockReset();
-    vi.mocked(applyAuthoringStudioPatch).mockReset();
+    vi.mocked(applyAuthoringStudioBatch).mockReset();
     vi.mocked(createAuthoringAiPatchProposal).mockReset();
-    vi.mocked(moveAuthoringStudioBlock).mockReset();
     vi.mocked(observeAuthoringChangeSet).mockReset();
     vi.mocked(prepareAuthoringSession).mockReset();
     vi.mocked(publishAuthoringChangeSet).mockReset();
@@ -285,7 +282,7 @@ describe('UnifiedDesignerPage', () => {
     expect(screen.getByText('此对象没有可由当前 Studio 适配器安全保存的属性。')).toBeInTheDocument();
     expect(screen.getByTestId('designer-save')).toBeDisabled();
     expect(savePageSchemaV3).not.toHaveBeenCalled();
-    expect(applyAuthoringStudioPatch).not.toHaveBeenCalled();
+    expect(applyAuthoringStudioBatch).not.toHaveBeenCalled();
     expect(String(replaceState.mock.calls.at(-1)?.[2])).toContain(
       'authoringSession=session_1',
     );
@@ -354,7 +351,9 @@ describe('UnifiedDesignerPage', () => {
     fireEvent.change(screen.getByLabelText('业务模型'), {
       target: { value: 'manufacturing_exception' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '创建并进入页面设计' }));
+    const createPageButton = screen.getByRole('button', { name: '创建并进入页面设计' });
+    await waitFor(() => expect(createPageButton).toBeEnabled());
+    fireEvent.click(createPageButton);
 
     await waitFor(() =>
       expect(createAuthoringNewPageWorkspace).toHaveBeenCalledWith('session_1', 3, {
@@ -766,19 +765,9 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(consumeAuthoringHandoff).mockResolvedValue(handoff);
     vi.mocked(loadAuthoringSession).mockResolvedValue(session);
     vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
-    vi.mocked(applyAuthoringStudioPatch).mockResolvedValue({
+    vi.mocked(applyAuthoringStudioBatch).mockResolvedValue({
       session: createAuthoringSession(saved, 4, 'L3', 'HANDOFF_STUDIO'),
-      changeItemPid: 'item_1',
-      decision: {
-        route: 'HANDOFF_STUDIO',
-        risk: 'L3',
-        publishPolicy: 'STUDIO_APPROVAL',
-        reason: 'CAPABILITY_ALLOWED',
-        manifestChecksum: 'list-checksum',
-        rolePreviewRequired: true,
-      },
-      previousValue: { model: 'customer' },
-      savedValue: { model: 'payment' },
+      changeItemPids: ['item_1'],
     });
 
     render(<UnifiedDesignerPage />);
@@ -809,14 +798,23 @@ describe('UnifiedDesignerPage', () => {
     fireEvent.click(screen.getByTestId('designer-save'));
 
     await waitFor(() =>
-      expect(applyAuthoringStudioPatch).toHaveBeenCalledWith(
+      expect(applyAuthoringStudioBatch).toHaveBeenCalledWith(
         'session_1',
         3,
-        'list_customer',
-        '/dataSource',
-        'REPLACE',
-        { model: 'payment' },
-        'list-checksum',
+        {
+          creates: [],
+          relocations: [],
+          removes: [],
+          moves: [],
+          patches: [{
+            blockId: 'list_customer',
+            propertyPath: '/dataSource',
+            operation: 'REPLACE',
+            value: { model: 'payment' },
+            manifestChecksum: 'list-checksum',
+          }],
+          unsupported: [],
+        },
       ),
     );
     expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4');
@@ -868,7 +866,7 @@ describe('UnifiedDesignerPage', () => {
     expect(screen.getByTestId('canvas-block-field_customer_name')).not.toHaveTextContent(
       'AI confirmed label',
     );
-    expect(applyAuthoringStudioPatch).not.toHaveBeenCalled();
+    expect(applyAuthoringStudioBatch).not.toHaveBeenCalled();
     expect(createAuthoringAiPatchProposal).toHaveBeenCalledWith(
       'session_1',
       3,
@@ -914,21 +912,11 @@ describe('UnifiedDesignerPage', () => {
       .mockResolvedValueOnce(createAuthoringSession(baseline, 3))
       .mockResolvedValueOnce(createAuthoringSession(latest, 4));
     vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
-    vi.mocked(applyAuthoringStudioPatch)
+    vi.mocked(applyAuthoringStudioBatch)
       .mockRejectedValueOnce(new Error('authoring.revision.conflict'))
       .mockResolvedValueOnce({
         session: createAuthoringSession(saved, 5, 'L3', 'HANDOFF_STUDIO'),
-        changeItemPid: 'item_conflict_resolution',
-        decision: {
-          route: 'HANDOFF_STUDIO',
-          risk: 'L3',
-          publishPolicy: 'STUDIO_APPROVAL',
-          reason: 'CAPABILITY_ALLOWED',
-          manifestChecksum: 'list-checksum',
-          rolePreviewRequired: true,
-        },
-        previousValue: { model: 'refund' },
-        savedValue: { model: 'payment' },
+        changeItemPids: ['item_conflict_resolution'],
       });
 
     render(<UnifiedDesignerPage />);
@@ -949,20 +937,24 @@ describe('UnifiedDesignerPage', () => {
     expect(screen.getByTestId('authoring-conflict-0')).toHaveTextContent('payment');
     expect(screen.getByTestId('authoring-conflict-0')).toHaveTextContent('refund');
     expect(screen.getByTestId('designer-save')).toBeDisabled();
-    expect(applyAuthoringStudioPatch).toHaveBeenCalledTimes(1);
+    expect(applyAuthoringStudioBatch).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByLabelText('保留 Mine'));
     fireEvent.click(screen.getByTestId('authoring-conflict-apply'));
 
-    await waitFor(() => expect(applyAuthoringStudioPatch).toHaveBeenCalledTimes(2));
-    expect(applyAuthoringStudioPatch).toHaveBeenLastCalledWith(
+    await waitFor(() => expect(applyAuthoringStudioBatch).toHaveBeenCalledTimes(2));
+    expect(applyAuthoringStudioBatch).toHaveBeenLastCalledWith(
       'session_1',
       4,
-      'list_customer',
-      '/dataSource',
-      'REPLACE',
-      { model: 'payment' },
-      'list-checksum',
+      expect.objectContaining({
+        patches: [expect.objectContaining({
+          blockId: 'list_customer',
+          propertyPath: '/dataSource',
+          operation: 'REPLACE',
+          value: { model: 'payment' },
+          manifestChecksum: 'list-checksum',
+        })],
+      }),
     );
     await waitFor(() =>
       expect(screen.queryByTestId('authoring-conflict-panel')).not.toBeInTheDocument(),
@@ -999,8 +991,7 @@ describe('UnifiedDesignerPage', () => {
     expect(screen.getByTestId('designer-save')).toBeDisabled();
     expect(screen.queryByTestId('inspector-field-dataSource.model-manual')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('designer-save'));
-    expect(applyAuthoringStudioPatch).not.toHaveBeenCalled();
-    expect(moveAuthoringStudioBlock).not.toHaveBeenCalled();
+    expect(applyAuthoringStudioBatch).not.toHaveBeenCalled();
     expect(savePageSchemaV3).not.toHaveBeenCalled();
 
     permissionMock.canAdministerDesigner.mockReturnValue(true);
@@ -1012,7 +1003,7 @@ describe('UnifiedDesignerPage', () => {
     expect(screen.getByTestId('inspector-field-dataSource.model-manual')).toHaveValue('payment');
   });
 
-  it('saves a declared same-parent block reorder through the typed Studio move endpoint', async () => {
+  it('saves a declared same-parent block reorder through the atomic Studio batch', async () => {
     setSearch('?contextId=ctx_secure_once');
     const handoff = createHandoff('field_customer_name', '/$structure/order');
     const baseline = createDocument('document_one', 'Isolated Draft');
@@ -1026,19 +1017,9 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(consumeAuthoringHandoff).mockResolvedValue(handoff);
     vi.mocked(loadAuthoringSession).mockResolvedValue(session);
     vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
-    vi.mocked(moveAuthoringStudioBlock).mockResolvedValue({
+    vi.mocked(applyAuthoringStudioBatch).mockResolvedValue({
       session: createAuthoringSession(saved, 4, 'L1', 'GUIDED_INLINE'),
-      changeItemPid: 'item_move_1',
-      decision: {
-        route: 'GUIDED_INLINE',
-        risk: 'L1',
-        publishPolicy: 'DEFAULT_REVIEW',
-        reason: 'CAPABILITY_ALLOWED',
-        manifestChecksum: 'field-checksum',
-        rolePreviewRequired: false,
-      },
-      previousValue: { beforeBlockId: rest[0]?.id ?? null },
-      savedValue: { beforeBlockId: name.id },
+      changeItemPids: ['item_move_1'],
     });
 
     render(<UnifiedDesignerPage />);
@@ -1049,15 +1030,19 @@ describe('UnifiedDesignerPage', () => {
     fireEvent.click(screen.getByTestId('designer-save'));
 
     await waitFor(() =>
-      expect(moveAuthoringStudioBlock).toHaveBeenCalledWith(
+      expect(applyAuthoringStudioBatch).toHaveBeenCalledWith(
         'session_1',
         3,
-        'field_customer_phone',
-        'field_customer_name',
-        'field-checksum',
+        expect.objectContaining({
+          patches: [],
+          moves: [{
+            blockId: 'field_customer_phone',
+            beforeBlockId: 'field_customer_name',
+            manifestChecksum: 'field-checksum',
+          }],
+        }),
       ),
     );
-    expect(applyAuthoringStudioPatch).not.toHaveBeenCalled();
     expect(savePageSchemaV3).not.toHaveBeenCalled();
     expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4');
   });

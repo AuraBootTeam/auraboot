@@ -625,6 +625,70 @@ describe('ContextualAuthoringSurface', () => {
       'false',
     );
   });
+
+  it('keeps recursive authoring roots for editing but canonicalizes them for runtime preview', async () => {
+    vi.mocked(openAuthoringSession).mockResolvedValue(
+      createAuthoringSession({
+        snapshot: {
+          ...schema,
+          pid: 'page-1',
+          schemaVersion: 4,
+          modelCode: 'orders',
+          blocks: [
+            {
+              id: 'list-orders-list',
+              blockType: 'list',
+              blocks: [
+                {
+                  id: 'table-orders',
+                  blockType: 'table',
+                  blocks: [
+                    {
+                      id: 'column-name',
+                      blockType: 'column',
+                      field: 'name',
+                      props: { label: '名称' },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+    const renderRuntime = vi.fn((runtimeSchema: UnifiedSchema) => (
+      <div data-testid="authoring-runtime-preview">
+        {runtimeSchema.blocks.map((block) => block.blockType).join(',')}
+      </div>
+    ));
+
+    render(
+      <MemoryRouter initialEntries={['/orders']}>
+        <ContextualAuthoringSurface schema={schema} renderRuntime={renderRuntime}>
+          <div>runtime</div>
+        </ContextualAuthoringSurface>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+
+    expect(await screen.findByTestId('authoring-runtime-preview')).toHaveTextContent('table');
+    const previewSchema = renderRuntime.mock.calls.at(-1)?.[0];
+    expect(previewSchema?.blocks).toEqual([
+      expect.objectContaining({
+        id: 'table-orders',
+        blockType: 'table',
+        columns: [
+          expect.objectContaining({
+            id: 'column-name',
+            field: 'name',
+            label: '名称',
+          }),
+        ],
+      }),
+    ]);
+    expect(screen.getByTestId('authoring-outline-list-orders-list')).toBeInTheDocument();
+  });
 });
 
 function renderSurface(unsafeAction: () => void, safeTab: () => void) {

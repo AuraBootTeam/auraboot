@@ -6,12 +6,16 @@ import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.Resource
 import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.Route;
 import com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry;
 import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,17 +27,19 @@ class AuthoringPatchEngineTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private CoreAuthoringCapabilityRegistry registry;
     private CommandDefinitionMapper commandDefinitionMapper;
+    private MetaModelService metaModelService;
     private AuthoringPatchEngine engine;
 
     @BeforeEach
     void setUp() {
         registry = new CoreAuthoringCapabilityRegistry();
         commandDefinitionMapper = mock(CommandDefinitionMapper.class);
+        metaModelService = mock(MetaModelService.class);
         engine = new AuthoringPatchEngine(
                 registry,
                 new AuthoringBoundaryPolicyService(registry),
                 new AuthoringContentSanitizer(),
-                new AuthoringProtectedSemanticValidator(commandDefinitionMapper),
+                new AuthoringProtectedSemanticValidator(commandDefinitionMapper, metaModelService),
                 new AuthoringSnapshotTargetResolver(),
                 new AuthoringJsonObjectPatchApplier(),
                 new AuthoringStableBlockTreeEditor(new CoreAuthoringStructurePolicy()));
@@ -185,6 +191,37 @@ class AuthoringPatchEngineTest {
         assertThat(removed.snapshot().at("/blocks/0/blocks").size()).isEqualTo(2);
         assertThat(removed.previousValue().path("blockId").asText()).isEqualTo("middle");
         assertThat(source.at("/blocks/0/blocks/0/blocks/0/id").asText()).isEqualTo("field-a");
+    }
+
+    @Test
+    void studioCanCreateAColumnOnlyWhenItsFieldBelongsToThePageModel() throws Exception {
+        when(metaModelService.getModelFields("production_exception"))
+                .thenReturn(List.of(FieldDefinition.builder().code("exception_no").build()));
+        ObjectNode source = (ObjectNode) objectMapper.readTree("""
+                {"modelCode":"production_exception","kind":"list","blocks":[
+                  {"id":"list-root","blockType":"list","blocks":[
+                    {"id":"table-1","blockType":"table","blocks":[]}
+                  ]}
+                ]}
+                """);
+
+        AuthoringPatchEngine.PreparedPatch created = engine.prepareStudioCreate(
+                source, "column-exception-no", "column", "table-1", null,
+                checksum("column"), ResourceScope.CURRENT_PAGE);
+        AuthoringPatchEngine.PreparedPatch bound = engine.prepareStudio(
+                created.snapshot(), "column-exception-no", "/field", PatchOperation.ADD,
+                objectMapper.getNodeFactory().textNode("exception_no"),
+                checksum("column"), ResourceScope.CURRENT_PAGE);
+
+        assertThat(bound.decision().route()).isEqualTo(Route.HANDOFF_STUDIO);
+        assertThat(bound.snapshot().at("/blocks/0/blocks/0/blocks/0/field").asText())
+                .isEqualTo("exception_no");
+        assertThatThrownBy(() -> engine.prepareStudio(
+                created.snapshot(), "column-exception-no", "/field", PatchOperation.ADD,
+                objectMapper.getNodeFactory().textNode("foreign_secret"),
+                checksum("column"), ResourceScope.CURRENT_PAGE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("protected_semantic_invalid");
     }
 
     @Test

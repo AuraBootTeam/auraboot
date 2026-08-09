@@ -818,11 +818,19 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canAddModelFieldToParent = (parentBlockId: string, field: ModelFieldDefinition) => {
-    return Boolean(resolveModelFieldDropTarget(parentBlockId, field));
+    const targetBlockType = resolveModelFieldDropTarget(parentBlockId, field);
+    return Boolean(
+      targetBlockType
+      && (!contextualRestricted || contextualCreatableTypes.has(targetBlockType)),
+    );
   };
 
   const canAddModelFieldBeforeTarget = (targetBlockId: string, field: ModelFieldDefinition) => {
-    return Boolean(resolveModelFieldDropBeforeTarget(targetBlockId, field));
+    const resolution = resolveModelFieldDropBeforeTarget(targetBlockId, field);
+    return Boolean(
+      resolution
+      && (!contextualRestricted || contextualCreatableTypes.has(resolution.targetBlockType)),
+    );
   };
 
   const handleAddModelFieldToParent = (parentBlockId: string, field: ModelFieldDefinition) => {
@@ -834,12 +842,13 @@ export function UnifiedDesignerWorkbench({
       targetBlockType,
       collectBlockIds(document.blocks),
     );
+    const preparedBlock = prepareCreatedBlock(nextBlock);
 
     updateDocument((current) => ({
       ...current,
       blocks: updateBlockById(current.blocks, parentBlockId, (block) => ({
         ...block,
-        blocks: [...(block.blocks ?? []), nextBlock],
+        blocks: [...(block.blocks ?? []), preparedBlock],
       })),
     }));
     setSelectedBlockId(nextBlock.id);
@@ -854,12 +863,13 @@ export function UnifiedDesignerWorkbench({
       resolution.targetBlockType,
       collectBlockIds(document.blocks),
     );
+    const preparedBlock = prepareCreatedBlock(nextBlock);
 
     updateDocument((current) => ({
       ...current,
       blocks: updateBlockById(current.blocks, resolution.parentBlock.id, (block) => ({
         ...block,
-        blocks: insertChildBlockBefore(block.blocks ?? [], targetBlockId, nextBlock),
+        blocks: insertChildBlockBefore(block.blocks ?? [], targetBlockId, preparedBlock),
       })),
     }));
     setSelectedBlockId(nextBlock.id);

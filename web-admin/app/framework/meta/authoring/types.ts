@@ -385,6 +385,40 @@ export interface PatchResult {
   savedValue: unknown;
 }
 
+export interface AuthoringStudioBatchPlan {
+  creates: Array<{
+    blockId: string;
+    blockType: string;
+    parentBlockId: string | null;
+    beforeBlockId: string | null;
+    manifestChecksum: string;
+  }>;
+  relocations: Array<{
+    blockId: string;
+    targetParentBlockId: string;
+    beforeBlockId: string | null;
+    manifestChecksum: string;
+  }>;
+  removes: Array<{ blockId: string; manifestChecksum: string }>;
+  moves: Array<{
+    blockId: string;
+    beforeBlockId: string | null;
+    manifestChecksum: string;
+  }>;
+  patches: Array<{
+    blockId: string;
+    propertyPath: string;
+    operation: PatchOperation;
+    value: unknown;
+    manifestChecksum: string;
+  }>;
+}
+
+export interface AuthoringStudioBatchResult {
+  session: AuthoringSession;
+  changeItemPids: string[];
+}
+
 export interface PendingAuthoringEdit {
   key: string;
   baseRevision: number;

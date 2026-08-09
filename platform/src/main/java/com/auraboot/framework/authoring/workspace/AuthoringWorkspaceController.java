@@ -35,6 +35,8 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Se
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.StartIdentitySimulationRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.StudioBatchRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.StudioBatchResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SyntheticPreviewView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.TakeoverWriterLeaseRequest;
 import com.auraboot.framework.common.dto.ApiResponse;
@@ -251,6 +253,14 @@ public class AuthoringWorkspaceController {
             @PathVariable String sessionPid,
             @Valid @RequestBody RelocateBlockRequest request) {
         return ApiResponse.success(workspaceService.relocateStudioBlock(sessionPid, request));
+    }
+
+    @PostMapping("/sessions/{sessionPid}/studio-batches")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<StudioBatchResult> applyStudioBatch(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody StudioBatchRequest request) {
+        return ApiResponse.success(workspaceService.applyStudioBatch(sessionPid, request));
     }
 
     @PostMapping("/sessions/{sessionPid}/ai-patch-proposals")

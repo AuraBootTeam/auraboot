@@ -29,6 +29,34 @@ const capabilities: CapabilityRegistry = {
   ],
 };
 
+const pageConstructionCapabilities: CapabilityRegistry = {
+  checksum: 'registry-construction',
+  manifests: [
+    {
+      blockType: 'table',
+      pluginCode: 'core.designer',
+      pluginVersion: '1',
+      manifestVersion: '1',
+      checksum: 'table-create',
+      properties: {
+        '/$structure/create': property('/$structure/create', 'HANDOFF_STUDIO', ['ADD']),
+      },
+    },
+    {
+      blockType: 'column',
+      pluginCode: 'core.designer',
+      pluginVersion: '1',
+      manifestVersion: '1',
+      checksum: 'column-create',
+      properties: {
+        '/field': property('/field', 'HANDOFF_STUDIO'),
+        '/props/label': property('/props/label', 'INLINE'),
+        '/$structure/create': property('/$structure/create', 'HANDOFF_STUDIO', ['ADD']),
+      },
+    },
+  ],
+};
+
 describe('contextualAuthoringAdapter', () => {
   it('materializes the isolated V3 snapshot and plans manifest-backed property patches', () => {
     const baseline = authoringSnapshotToPageSchemaV3({
@@ -67,6 +95,20 @@ describe('contextualAuthoringAdapter', () => {
         value: { model: 'payments' },
         manifestChecksum: 'table-1',
       },
+    ]);
+  });
+
+  it('preserves a recursive V4 authoring snapshot instead of synthesizing a phantom root', () => {
+    const baseline = authoringSnapshotToPageSchemaV3({
+      pid: 'page-1',
+      pageKey: 'orders_list',
+      schemaVersion: 4,
+      kind: 'list',
+      blocks: [{ id: 'server-list-root', blockType: 'list', blocks: [] }],
+    });
+
+    expect(baseline.blocks).toEqual([
+      { id: 'server-list-root', blockType: 'list', blocks: [] },
     ]);
   });
 
@@ -158,6 +200,58 @@ describe('contextualAuthoringAdapter', () => {
         value: 'New table',
         manifestChecksum: 'table-1',
       },
+    ]);
+  });
+
+  it('plans a nested table and model-backed column as governed structure plus typed patches', () => {
+    const baseline: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'list',
+      id: 'production_exception_list',
+      modelCode: 'production_exception',
+      blocks: [{ id: 'list-root', blockType: 'list', blocks: [] }],
+    };
+    const candidate: PageSchemaV3 = {
+      ...baseline,
+      blocks: [{
+        ...baseline.blocks[0],
+        blocks: [{
+          id: 'table-1',
+          blockType: 'table',
+          blocks: [{
+            id: 'column-exception-no',
+            blockType: 'column',
+            props: { label: 'Exception No.' },
+            // Deliberately after props: JSON object insertion order is not semantic,
+            // and server manifest maps may arrive in a different key order.
+            field: 'exception_no',
+          }],
+        }],
+      }],
+    };
+
+    const plan = planStudioAuthoringPatches(
+      baseline,
+      candidate,
+      pageConstructionCapabilities,
+    );
+
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.creates.map(({ blockId, parentBlockId }) => ({ blockId, parentBlockId }))).toEqual([
+      { blockId: 'table-1', parentBlockId: 'list-root' },
+      { blockId: 'column-exception-no', parentBlockId: 'table-1' },
+    ]);
+    expect(plan.patches).toEqual([
+      expect.objectContaining({
+        blockId: 'column-exception-no',
+        propertyPath: '/field',
+        value: 'exception_no',
+      }),
+      expect.objectContaining({
+        blockId: 'column-exception-no',
+        propertyPath: '/props/label',
+        value: 'Exception No.',
+      }),
     ]);
   });
 

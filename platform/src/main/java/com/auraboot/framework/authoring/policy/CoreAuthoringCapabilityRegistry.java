@@ -41,7 +41,7 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
     private static final Set<String> SAFE_CREATABLE_BLOCK_TYPES = Set.of(
             "form", "list", "detail", "dashboard", "form-section", "detail-section",
             "tabs", "tab", "filter-bar", "action-bar", "table", "widget", "stat-card",
-            "description", "rich-text", "chart");
+            "description", "rich-text", "chart", "field", "column", "filter-field");
 
     private final Map<String, CapabilityManifest> manifests;
     private final String registryChecksum;
@@ -50,7 +50,7 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
         Map<String, Map<String, PropertyCapability>> definitions = new LinkedHashMap<>();
 
         definitions.put("field", properties(
-                commonTitle(), commonSpan(), reorderWithinParent(),
+                commonTitle(), commonSpan(), reorderWithinParent(), fieldBinding(),
                 property("/props/label", Route.INLINE, RiskLevel.L1,
                         effects(EffectTag.PRESENTATION), Reversibility.REVERSIBLE, false, false),
                 property("/props/visible", Route.GUIDED_INLINE, RiskLevel.L2,
@@ -174,6 +174,11 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
     private PropertyCapability commonSpan() {
         return property("/layout/span", Route.INLINE, RiskLevel.L0,
                 effects(EffectTag.PRESENTATION), Reversibility.REVERSIBLE, false, false);
+    }
+
+    private PropertyCapability fieldBinding() {
+        return property("/field", Route.HANDOFF_STUDIO, RiskLevel.L3,
+                effects(EffectTag.DATA_BINDING), Reversibility.REVERSIBLE, true, true);
     }
 
     private PropertyCapability reorderWithinParent() {

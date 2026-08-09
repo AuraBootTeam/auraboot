@@ -45,6 +45,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.context.WebApplicationContext;
@@ -634,7 +636,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.session.riskLevel").value("L3"))
                 .andExpect(jsonPath("$.data.session.route").value("HANDOFF_STUDIO"))
                 .andExpect(jsonPath("$.data.session.publishPolicy").value("STUDIO_APPROVAL"))
-                .andExpect(jsonPath("$.data.session.snapshot.blocks[0].dataSource.model")
+                .andExpect(jsonPath("$.data.session.snapshot.blocks[0].blocks[0].dataSource.model")
                         .value("payments"));
 
         applyTestMetaContext();
@@ -745,6 +747,78 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 .containsExactly("ADD", "MOVE", "REMOVE");
         assertThat(pageSchemaMapper.selectByPid(page.getPid()).getBlocks())
                 .contains("field-a", "field-b").doesNotContain("middle");
+    }
+
+    @Test
+    void studioBatchPersistsTheWholeDocumentPlanWithOneAtomicBoundary() throws Exception {
+        grantDesignerAdmin();
+        PageSchema page = insertStructurePage();
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        String fieldChecksum = capabilityRegistry.find("field").orElseThrow().checksum();
+        String sectionChecksum = capabilityRegistry.find("form-section").orElseThrow().checksum();
+
+        mockMvc.perform(post("/api/authoring/sessions/{sessionPid}/studio-batches",
+                        opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedRevision":1,
+                                  "creates":[{"blockId":"middle","blockType":"form-section",
+                                    "parentBlockId":"form-root","beforeBlockId":null,
+                                    "manifestChecksum":"%s"}],
+                                  "relocations":[{"blockId":"field-a",
+                                    "targetParentBlockId":"middle","beforeBlockId":null,
+                                    "manifestChecksum":"%s"}],
+                                  "removes":[{"blockId":"field-b","manifestChecksum":"%s"}],
+                                  "moves":[],
+                                  "patches":[]
+                                }
+                                """.formatted(sectionChecksum, fieldChecksum, fieldChecksum)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.revision").value(4))
+                .andExpect(jsonPath("$.data.changeItemPids.length()").value(3))
+                .andExpect(jsonPath("$.data.session.snapshot.blocks[0].blocks[2].id")
+                        .value("middle"))
+                .andExpect(jsonPath("$.data.session.snapshot.blocks[0].blocks[2].blocks[0].id")
+                        .value("field-a"));
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void studioBatchRollsBackEarlierStructureWhenALaterPatchIsDenied() throws Exception {
+        grantDesignerAdmin();
+        PageSchema page = insertStructurePage();
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        String sectionChecksum = capabilityRegistry.find("form-section").orElseThrow().checksum();
+
+        mockMvc.perform(post("/api/authoring/sessions/{sessionPid}/studio-batches",
+                        opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedRevision":1,
+                                  "creates":[{"blockId":"middle","blockType":"form-section",
+                                    "parentBlockId":"form-root","beforeBlockId":null,
+                                    "manifestChecksum":"%s"}],
+                                  "relocations":[],
+                                  "removes":[],
+                                  "moves":[],
+                                  "patches":[{"blockId":"middle",
+                                    "propertyPath":"/props/undeclared","operation":"ADD",
+                                    "value":"must-not-persist","manifestChecksum":"%s"}]
+                                }
+                                """.formatted(sectionChecksum, sectionChecksum)))
+                .andExpect(status().isUnprocessableEntity());
+
+        applyTestMetaContext();
+        SessionView unchanged = workspaceService.get(opened.sessionPid());
+        assertThat(unchanged.revision()).isEqualTo(1);
+        assertThat(unchanged.snapshot().toString()).doesNotContain("middle");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_change_item
+                WHERE change_set_id = (
+                    SELECT id FROM ab_authoring_change_set WHERE pid = ?)
+                """, Integer.class, opened.changeSetPid())).isZero();
     }
 
     @Test
@@ -906,7 +980,8 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         applyTestMetaContext();
         SessionView reloaded = workspaceService.get(opened.sessionPid());
         assertThat(reloaded.revision()).isEqualTo(1);
-        assertThat(reloaded.snapshot().at("/blocks/0/id").asText()).isEqualTo("table-1");
+        assertThat(reloaded.snapshot().at("/blocks/0/blocks/0/id").asText())
+                .isEqualTo("table-1");
     }
 
     @Test
@@ -933,7 +1008,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         assertThat(opened.revision()).isEqualTo(1);
         assertThat(opened.interactionContext().has("secret")).isFalse();
         assertThat(result.session().revision()).isEqualTo(2);
-        assertThat(result.session().snapshot().at("/blocks/0/props/density").asText())
+        assertThat(result.session().snapshot().at("/blocks/0/blocks/0/props/density").asText())
                 .isEqualTo("compact");
         assertThat(result.changeItemPid()).hasSize(26);
         assertThat(count("ab_authoring_change_set", opened.changeSetPid())).isEqualTo(1);
@@ -977,7 +1052,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
 
         SessionView reloaded = workspaceService.get(opened.sessionPid());
         assertThat(reloaded.revision()).isEqualTo(2);
-        assertThat(reloaded.snapshot().at("/blocks/0/props/density").asText())
+        assertThat(reloaded.snapshot().at("/blocks/0/blocks/0/props/density").asText())
                 .isEqualTo("compact");
     }
 
@@ -1050,7 +1125,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         "PAGE_SCHEMA", page.getPid());
         assertThat(active).isNotNull();
         assertThat(active.releasePid()).isEqualTo(release.releasePid());
-        assertThat(active.snapshot().at("/blocks/0/props/density").asText())
+        assertThat(active.snapshot().at("/blocks/0/blocks/0/props/density").asText())
                 .isEqualTo("compact");
         assertThat(pageSchemaMapper.selectByPid(page.getPid()).getBlocks())
                 .contains("normal").doesNotContain("compact");
@@ -1154,7 +1229,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         "PAGE_SCHEMA", page.getPid());
         assertThat(active.releasePid()).isEqualTo(prior.releasePid());
         assertThat(active.channelVersion()).isEqualTo(1);
-        assertThat(active.snapshot().at("/blocks/0/props/density").asText())
+        assertThat(active.snapshot().at("/blocks/0/blocks/0/props/density").asText())
                 .isEqualTo("compact");
         assertThat(countReleases(second.changeSetPid())).isZero();
         assertThat(countReleaseItems(second.changeSetPid())).isZero();
@@ -1196,7 +1271,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         "PAGE_SCHEMA", page.getPid());
         assertThat(active.releasePid()).isEqualTo(prior.releasePid());
         assertThat(active.channelVersion()).isEqualTo(1);
-        assertThat(active.snapshot().at("/blocks/0/props/density").asText())
+        assertThat(active.snapshot().at("/blocks/0/blocks/0/props/density").asText())
                 .isEqualTo("compact");
         assertThat(countReleases(second.changeSetPid())).isZero();
         assertThat(countReleaseItems(second.changeSetPid())).isZero();
@@ -1223,7 +1298,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(get("/api/pages/key/{pageKey}", page.getPageKey()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.blocks[0].props.density").value("compact"))
+                .andExpect(jsonPath("$.data.blocks[0].blocks[0].props.density").value("compact"))
                 .andExpect(jsonPath("$.data.runtime.source").value("AUTHORING_RELEASE"))
                 .andExpect(jsonPath("$.data.runtime.releasePid").value(release.releasePid()))
                 .andExpect(jsonPath("$.data.runtime.channelVersion").value(1))
@@ -1233,13 +1308,14 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(get("/api/pages/runtime/{pid}", page.getPid()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.runtime.releasePid").value(release.releasePid()))
-                .andExpect(jsonPath("$.data.blocks[0].props.density").value("compact"));
+                .andExpect(jsonPath("$.data.blocks[0].blocks[0].props.density").value("compact"));
         mockMvc.perform(post("/api/pages/batch")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"pageKeys\":[\"" + page.getPageKey() + "\"]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].runtime.releasePid").value(release.releasePid()))
-                .andExpect(jsonPath("$.data[0].blocks[0].props.density").value("compact"));
+                .andExpect(jsonPath("$.data[0].blocks[0].blocks[0].props.density")
+                        .value("compact"));
 
         applyTestMetaContext();
         var mobileVersion = pageSchemaService.getVersionsSince(Instant.now().minusSeconds(60))
@@ -1882,16 +1958,20 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         assertThat(split.sourceSession().revision()).isEqualTo(4);
         assertThat(split.sourceSession().riskLevel()).isEqualTo("L0");
         assertThat(split.sourceSession().publishPolicy()).isEqualTo("DIRECT_ALLOWED");
-        assertThat(split.sourceSession().snapshot().at("/blocks/0/props/density").asText())
+        assertThat(split.sourceSession().snapshot()
+                .at("/blocks/0/blocks/0/props/density").asText())
                 .isEqualTo("compact");
-        assertThat(split.sourceSession().snapshot().at("/blocks/0/dataSource").isMissingNode())
+        assertThat(split.sourceSession().snapshot()
+                .at("/blocks/0/blocks/0/dataSource").isMissingNode())
                 .isTrue();
         assertThat(split.targetSession().revision()).isEqualTo(2);
         assertThat(split.targetSession().riskLevel()).isEqualTo("L3");
         assertThat(split.targetSession().publishPolicy()).isEqualTo("STUDIO_APPROVAL");
-        assertThat(split.targetSession().snapshot().at("/blocks/0/props/density").asText())
+        assertThat(split.targetSession().snapshot()
+                .at("/blocks/0/blocks/0/props/density").asText())
                 .isEqualTo("normal");
-        assertThat(split.targetSession().snapshot().at("/blocks/0/dataSource/model").asText())
+        assertThat(split.targetSession().snapshot()
+                .at("/blocks/0/blocks/0/dataSource/model").asText())
                 .isEqualTo("payments");
         assertThat(split.sourceItems()).extracting(item -> item.changeItemPid())
                 .containsExactly(lowRisk.changeItemPid());
@@ -1967,7 +2047,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
 
         SessionView unchanged = workspaceService.get(opened.sessionPid());
         assertThat(unchanged.revision()).isEqualTo(3);
-        assertThat(unchanged.snapshot().at("/blocks/0/props/density").asText())
+        assertThat(unchanged.snapshot().at("/blocks/0/blocks/0/props/density").asText())
                 .isEqualTo("comfortable");
         assertThat(governanceService.listChangeItems(opened.sessionPid())).hasSize(2);
     }
@@ -2000,7 +2080,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 first.changeSetPid(), new RevisionRequest(2));
 
         SessionView second = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
-        assertThat(second.snapshot().at("/blocks/0/props/density").asText())
+        assertThat(second.snapshot().at("/blocks/0/blocks/0/props/density").asText())
                 .isEqualTo("compact");
         patchDensity(second, "comfortable");
         prepareAndSubmit(second.sessionPid(), new RevisionRequest(2));
@@ -2018,7 +2098,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         testTenant.getId(), MetaContext.getCurrentEnvironmentId(),
                         "PAGE_SCHEMA", page.getPid());
         assertThat(active.releasePid()).isEqualTo(releaseOne.releasePid());
-        assertThat(active.snapshot().at("/blocks/0/props/density").asText())
+        assertThat(active.snapshot().at("/blocks/0/blocks/0/props/density").asText())
                 .isEqualTo("compact");
     }
 

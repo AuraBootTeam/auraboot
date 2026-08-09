@@ -22,6 +22,8 @@ import type {
   ApplyAuthoringAiPatchProposalResult,
   CreateNewPageWorkspaceInput,
   NewPageWorkspaceOptions,
+  AuthoringStudioBatchPlan,
+  AuthoringStudioBatchResult,
 } from './types';
 
 export interface InteractionContext {
@@ -335,6 +337,31 @@ export async function relocateAuthoringStudioBlock(
     },
   );
   return requireData(result, '无法跨父级移动受治理区块');
+}
+
+export async function applyAuthoringStudioBatch(
+  sessionPid: string,
+  revision: number,
+  plan: AuthoringStudioBatchPlan,
+): Promise<AuthoringStudioBatchResult> {
+  const result = await fetchResult<AuthoringStudioBatchResult>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/studio-batches`,
+    {
+      method: 'post',
+      params: {
+        expectedRevision: revision,
+        creates: plan.creates,
+        relocations: plan.relocations,
+        removes: plan.removes,
+        moves: plan.moves,
+        patches: plan.patches.map((patch) => ({
+          ...patch,
+          ...(patch.operation === 'REMOVE' ? { value: undefined } : {}),
+        })),
+      },
+    },
+  );
+  return requireData(result, '无法原子保存应用设计中心变更');
 }
 
 export async function createAuthoringAiPatchProposal(
