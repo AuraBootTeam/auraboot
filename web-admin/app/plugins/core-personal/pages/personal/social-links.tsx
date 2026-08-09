@@ -10,11 +10,16 @@
  *      DELETE /api/user/social-links/{provider}
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToast } from '~/contexts/ToastContext';
+import {
+  consumeOAuthState,
+  LINK_OAUTH_PROVIDER_KEY,
+  linkOAuthStateKey,
+} from '~/auth/oauth-state';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,8 +44,22 @@ interface DeactivationStatus {
   completedAt: string | null;
 }
 
+interface LoginChannelOption {
+  code: string;
+  kind: string;
+  displayName: string;
+  providerType: string | null;
+}
+
+interface ProviderDefinition {
+  code: string;
+  label: string;
+  color: string;
+  icon: React.ReactNode;
+}
+
 // All supported social providers
-const PROVIDERS = [
+const PROVIDERS: ProviderDefinition[] = [
   {
     code: 'wechat_web',
     label: 'WeChat',
@@ -94,10 +113,14 @@ const PROVIDERS = [
 
 export default function SocialLinksPage() {
   const { showSuccessToast, showErrorToast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [links, setLinks] = useState<SocialLink[]>([]);
+  const [configuredProviders, setConfiguredProviders] = useState<ProviderDefinition[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [unlinking, setUnlinking] = useState<string | null>(null);
+  const callbackStartedRef = useRef(false);
 
   // Fetch linked accounts
   const fetchLinks = useCallback(async () => {
@@ -119,11 +142,85 @@ export default function SocialLinksPage() {
     fetchLinks();
   }, [fetchLinks]);
 
+  useEffect(() => {
+    void (async () => {
+      try {
+        const result = await fetchResult<LoginChannelOption[]>('/api/auth/login/channel-options', {
+          method: 'get',
+        });
+        if (!ResultHelper.isSuccess(result) || !Array.isArray(result.data)) return;
+        const options = result.data
+          .filter((option) => option.kind === 'oauth')
+          .map((option) => {
+            const known = PROVIDERS.find((provider) => provider.code === option.code);
+            return (
+              known || {
+                code: option.code,
+                label: option.displayName || option.code,
+                color: 'bg-indigo-500',
+                icon: <span className="text-xs font-bold uppercase">{option.code.slice(0, 2)}</span>,
+              }
+            );
+          });
+        setConfiguredProviders(options);
+      } catch {
+        // Older servers do not expose descriptors; retain the legacy provider list.
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const returnedState = searchParams.get('state');
+    const providerError = searchParams.get('error_description') || searchParams.get('error');
+    if (!code && !returnedState && !providerError) return;
+    if (callbackStartedRef.current) return;
+    callbackStartedRef.current = true;
+
+    const provider = window.sessionStorage.getItem(LINK_OAUTH_PROVIDER_KEY);
+    window.sessionStorage.removeItem(LINK_OAUTH_PROVIDER_KEY);
+    if (!provider) {
+      showErrorToast('OAuth link session expired');
+      navigate('/personal/social-links', { replace: true });
+      return;
+    }
+    if (providerError) {
+      window.sessionStorage.removeItem(linkOAuthStateKey(provider));
+      showErrorToast(providerError);
+      navigate('/personal/social-links', { replace: true });
+      return;
+    }
+    if (!code || !consumeOAuthState(window.sessionStorage, linkOAuthStateKey(provider), returnedState)) {
+      showErrorToast('OAuth state validation failed');
+      navigate('/personal/social-links', { replace: true });
+      return;
+    }
+
+    void (async () => {
+      try {
+        const result = await fetchResult<void>(`/api/user/social-links/${provider}/callback`, {
+          method: 'post',
+          params: { code, state: returnedState },
+        });
+        if (!ResultHelper.isSuccess(result)) {
+          showErrorToast(result.message || 'Failed to link account');
+        } else {
+          showSuccessToast('Account linked successfully');
+          await fetchLinks();
+        }
+      } catch {
+        showErrorToast('Network error');
+      } finally {
+        navigate('/personal/social-links', { replace: true });
+      }
+    })();
+  }, [fetchLinks, navigate, searchParams, showErrorToast, showSuccessToast]);
+
   // Bind a new social account
   const handleBind = async (providerCode: string) => {
     try {
       const redirectUri = `${window.location.origin}/personal/social-links`;
-      const result = await fetchResult<{ authorizeUrl: string }>(
+      const result = await fetchResult<{ authorizeUrl: string; state: string }>(
         `/api/user/social-links/${providerCode}/link`,
         {
           method: 'post',
@@ -131,7 +228,9 @@ export default function SocialLinksPage() {
         },
       );
 
-      if (ResultHelper.isSuccess(result) && result.data?.authorizeUrl) {
+      if (ResultHelper.isSuccess(result) && result.data?.authorizeUrl && result.data.state) {
+        window.sessionStorage.setItem(LINK_OAUTH_PROVIDER_KEY, providerCode);
+        window.sessionStorage.setItem(linkOAuthStateKey(providerCode), result.data.state);
         window.location.href = result.data.authorizeUrl;
       } else {
         showErrorToast(result.message || 'Failed to initiate linking');
@@ -166,6 +265,22 @@ export default function SocialLinksPage() {
   const getLink = (providerCode: string): SocialLink | undefined =>
     links.find((l) => l.provider === providerCode);
 
+  const providerMap = new Map<string, ProviderDefinition>();
+  for (const provider of configuredProviders ?? PROVIDERS) {
+    providerMap.set(provider.code, provider);
+  }
+  for (const link of links) {
+    if (!providerMap.has(link.provider)) {
+      providerMap.set(link.provider, {
+        code: link.provider,
+        label: link.provider,
+        color: 'bg-indigo-500',
+        icon: <span className="text-xs font-bold uppercase">{link.provider.slice(0, 2)}</span>,
+      });
+    }
+  }
+  const visibleProviders = Array.from(providerMap.values());
+
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
@@ -199,7 +314,7 @@ export default function SocialLinksPage() {
             <p className="text-gray-500">Loading...</p>
           </div>
         ) : (
-          PROVIDERS.map((prov) => {
+          visibleProviders.map((prov) => {
             const link = getLink(prov.code);
             const isUnlinking = unlinking === prov.code;
 

@@ -2,6 +2,7 @@ package com.auraboot.framework.auth.strategy;
 
 import com.auraboot.framework.auth.dto.AuthenticationResponse;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
+import com.auraboot.framework.auth.dto.FederatedLoginContext;
 import com.auraboot.framework.auth.dto.LoginContextRef;
 import com.auraboot.framework.auth.dto.SessionTokenContext;
 import com.auraboot.framework.auth.constant.ExecutionScope;
@@ -62,6 +63,15 @@ public class LoginCompletionHelper {
      * @return fully populated authentication response
      */
     public AuthenticationResponse completeLogin(User user, String ipAddress, String userAgent) {
+        return completeLogin(user, null, ipAddress, userAgent);
+    }
+
+    /** Complete login using the server-resolved application, channel, and tenant context. */
+    public AuthenticationResponse completeLogin(
+            User user,
+            FederatedLoginContext federatedContext,
+            String ipAddress,
+            String userAgent) {
         // 1. Build a lightweight UserDetails for JWT generation
         CustomUserDetails userDetails = new CustomUserDetails(
                 user.getEmail(),
@@ -80,7 +90,9 @@ public class LoginCompletionHelper {
         Long memberId = null;
         String tenantStatus = "none";
         try {
-            tenantId = tenantMemberService.getTenantIdByUserId(user.getId());
+            tenantId = federatedContext != null && federatedContext.getTenantId() != null
+                    ? federatedContext.getTenantId()
+                    : tenantMemberService.getTenantIdByUserId(user.getId());
             if (tenantId != null) {
                 TenantMember tenantMember = tenantMemberService.findByTenantIdAndUserId(tenantId, user.getId());
                 if (tenantMember != null) {
@@ -120,7 +132,13 @@ public class LoginCompletionHelper {
         LoginContextRef loginContext = loginApplicationChannelMapper == null
                 ? null
                 : loginApplicationChannelMapper.resolveLoginContext(
-                        "business-web", "default-business-web", tenantId);
+                        federatedContext == null || federatedContext.getApplicationCode() == null
+                                ? "business-web"
+                                : federatedContext.getApplicationCode(),
+                        federatedContext == null || federatedContext.getLoginChannelCode() == null
+                                ? "default-business-web"
+                                : federatedContext.getLoginChannelCode(),
+                        tenantId);
         if (loginContext == null) {
             jwt = jwtUtil.generateTokenWithTenantId(
                     userDetails, user.getPid(), tenantId, memberId, securityVersion);

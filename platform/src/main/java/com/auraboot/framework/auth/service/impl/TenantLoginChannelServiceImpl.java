@@ -1,10 +1,12 @@
 package com.auraboot.framework.auth.service.impl;
 
 import com.auraboot.framework.auth.dto.ChannelUpdateRequest;
+import com.auraboot.framework.auth.dto.LoginChannelOption;
 import com.auraboot.framework.auth.entity.TenantLoginChannel;
 import com.auraboot.framework.auth.mapper.TenantLoginChannelMapper;
 import com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper;
 import com.auraboot.framework.auth.service.TenantLoginChannelService;
+import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,18 +38,39 @@ public class TenantLoginChannelServiceImpl implements TenantLoginChannelService 
     @Autowired(required = false)
     private LoginApplicationChannelMapper applicationChannelMapper;
 
+    @Autowired(required = false)
+    private SystemModeService systemModeService;
+
     @Override
     public List<String> getEnabledChannels(Long tenantId, String applicationCode, String channelCode) {
+        Long effectiveTenantId = resolvePreAuthTenantId(tenantId);
         if (applicationChannelMapper != null) {
             List<String> methods = applicationChannelMapper.findEnabledAuthMethods(
                     applicationCode == null || applicationCode.isBlank() ? "business-web" : applicationCode,
                     channelCode == null || channelCode.isBlank() ? "default-business-web" : channelCode,
-                    tenantId);
+                    effectiveTenantId);
             if (methods != null && !methods.isEmpty()) {
                 return methods;
             }
         }
-        return getEnabledChannels(tenantId);
+        return getEnabledChannels(effectiveTenantId);
+    }
+
+    @Override
+    public List<LoginChannelOption> getEnabledChannelOptions(
+            Long tenantId, String applicationCode, String channelCode) {
+        Long effectiveTenantId = resolvePreAuthTenantId(tenantId);
+        if (applicationChannelMapper != null) {
+            List<LoginChannelOption> options = applicationChannelMapper.findEnabledAuthOptions(
+                    applicationCode == null || applicationCode.isBlank() ? "business-web" : applicationCode,
+                    channelCode == null || channelCode.isBlank() ? "default-business-web" : channelCode,
+                    effectiveTenantId);
+            if (options != null && !options.isEmpty()) {
+                return options;
+            }
+        }
+        return TenantLoginChannelService.super.getEnabledChannelOptions(
+                effectiveTenantId, applicationCode, channelCode);
     }
 
     @Override
@@ -150,5 +173,12 @@ public class TenantLoginChannelServiceImpl implements TenantLoginChannelService 
         }
 
         log.info("Initialized default login channels for tenant {}", tenantId);
+    }
+
+    private Long resolvePreAuthTenantId(Long requestedTenantId) {
+        if (systemModeService != null && systemModeService.isSingleTenant()) {
+            return systemModeService.getDefaultTenantId();
+        }
+        return requestedTenantId;
     }
 }

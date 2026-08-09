@@ -1,7 +1,7 @@
 {
   "run": {
     "id": "single-business-tenant-party-actor-20260809",
-    "target": "SINGLE Business Tenant + Party Actor foundation",
+    "target": "SINGLE Business Tenant + Party Actor + federated identity foundation",
     "sot": "../auraboot-enterprise/docs/standards/decisions/DDR-2026-08-09-single-business-tenant-party-actor.md",
     "runtime": "auraboot-party-actor-long",
     "commit": "2104153bd",
@@ -76,19 +76,19 @@
           "id": "iam.default-surface",
           "action": "Resolve and repair the default LoginApplication/Channel/AuthMethod",
           "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.saas.bootstrap.BootstrapRepairServiceTenantBootstrapTest.xml", "platform/build/test-results/test/TEST-com.auraboot.framework.auth.service.impl.TenantLoginChannelServiceImplTest.xml"],
-          "assertion": "Schema-snapshot first install receives one default password surface and registry wins with safe legacy fallback",
+          "assertion": "Schema-snapshot first install receives separate Web/native default password surfaces and registry wins with safe legacy fallback",
           "verdict": "pass",
           "verdict_by": "spec-assert",
           "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
         },
         {
           "id": "iam.external-idp",
-          "action": "Manage external IdP instances and orchestrate all OAuth/LDAP federation flows",
-          "evidence": ["platform/src/main/resources/db/migration/core/V20260809120000__party_actor_and_login_application.sql", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
-          "assertion": "Stable tables exist, but unified management UI/runtime orchestration remains deliberately deferred and legacy social paths remain compatible",
-          "verdict": "partial",
+          "action": "Manage external IdP instances and orchestrate OAuth/LDAP federation through the canonical registry",
+          "evidence": ["platform/src/main/resources/db/migration/core/V20260809130000__federated_identity_channel_binding.sql", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Management API, channel binding, canonical external links and runtime orchestration are active while legacy social paths remain compatible; a full visual IdP administration console is a non-goal",
+          "verdict": "pass",
           "verdict_by": "spec-assert",
-          "surface": "journey", "dependencies": "deployed", "authority": "recorded", "driver": "http"
+          "surface": "api", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "http"
         }
       ]
     },
@@ -140,6 +140,61 @@
           "verdict": "partial",
           "verdict_by": "spec-assert",
           "surface": "journey", "dependencies": "deployed", "authority": "recorded", "driver": "http"
+        }
+      ]
+    },
+    {
+      "id": "federated-identity",
+      "title": "Federated identity registry, OAuth/OIDC/WeChat/LDAP and native clients",
+      "rows": [
+        {
+          "id": "sso.registry-channel",
+          "action": "Resolve separate Web/mobile login applications, channels and IdP instances in SINGLE mode",
+          "evidence": ["platform/src/main/resources/db/migration/core/V20260809130000__federated_identity_channel_binding.sql", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Fresh PostgreSQL bootstrap repairs both surfaces; same provider code can be independently enabled per application and SINGLE tenant is server-owned",
+          "verdict": "pass", "verdict_by": "spec-assert",
+          "surface": "api", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "http"
+        },
+        {
+          "id": "sso.transaction",
+          "action": "Create and consume one-time state/nonce/PKCE transactions bound to Web cookies or native secrets",
+          "evidence": ["docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Redis stores only the binding digest; wrong or missing binding and platform mismatch fail closed, consume the state, and cannot be replayed",
+          "verdict": "pass", "verdict_by": "spec-assert",
+          "surface": "api", "dependencies": "real-stack", "authority": "blocking-release", "driver": "http"
+        },
+        {
+          "id": "sso.provider-contracts",
+          "action": "Run OIDC, WeChat Website, Apple Web and LDAP protocol/security contracts",
+          "evidence": ["docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "OIDC URL/claim hardening, WeChat openid contract, Apple query-code callback and real TCP/JNDI LDAP immutable identity are executable and green",
+          "verdict": "pass", "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "controlled-http", "authority": "blocking-commit", "driver": "unit"
+        },
+        {
+          "id": "sso.web-journey",
+          "action": "Render a configured IdP, start OAuth, reject forged state, preserve password login and show authenticated binding UI",
+          "evidence": ["web-admin/tests/e2e/personal/social-links.spec.ts", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Real browser reached Google authorize, rejected wrong callback state, logged in by password to /home and rendered the configured binding card; the descriptor/link/bind-start Playwright suite passes 5/5",
+          "verdict": "pass", "verdict_by": "spec-assert",
+          "vision_check": "Inspected semantic DOM and rendered pixels for the login and social-binding pages on the PostgreSQL/Redis runtime",
+          "surface": "journey", "dependencies": "real-stack", "authority": "blocking-release", "driver": "browser"
+        },
+        {
+          "id": "sso.external-canary",
+          "action": "Complete an external Google/OIDC and WeChat login with real provider credentials",
+          "evidence": ["docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Official Google authorize is reachable with an intentionally invalid client, but no real Google/WeChat credential exchange was performed",
+          "verdict": "partial", "verdict_by": "spec-assert",
+          "surface": "journey", "dependencies": "external", "authority": "recorded", "driver": "browser"
+        },
+        {
+          "id": "sso.native-physical",
+          "action": "Complete mobile-channel deep-link/state/native-binding login on iOS and Android physical devices",
+          "evidence": ["docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Source-level tests and builds pass, but Android has no attached device; iPhone DDI/tunnel are ready while Xcode lacks the Team account and three development provisioning profiles, so no physical install/login occurred",
+          "verdict": "partial", "verdict_by": "spec-assert",
+          "surface": "deployed-native", "dependencies": "physical-device", "authority": "blocking-release", "driver": "native"
         }
       ]
     },

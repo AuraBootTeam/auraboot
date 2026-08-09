@@ -1,5 +1,6 @@
 package com.auraboot.framework.auth.controller;
 
+import com.auraboot.framework.auth.dto.LoginChannelOption;
 import com.auraboot.framework.auth.service.TenantLoginChannelService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -36,5 +37,18 @@ public class LoginChannelController {
             @RequestParam(defaultValue = "business-web") String application,
             @RequestParam(defaultValue = "default-business-web") String channel) {
         return ApiResponse.success(channelService.getEnabledChannels(tenantId, application, channel));
+    }
+
+    /**
+     * Backward-compatible companion to {@code /channels} for clients that need to render arbitrary
+     * tenant-defined IdP instances without guessing their protocol from the instance code.
+     */
+    @GetMapping("/channel-options")
+    public ApiResponse<List<LoginChannelOption>> getAvailableChannelOptions(
+            @RequestParam(required = false) Long tenantId,
+            @RequestParam(defaultValue = "business-web") String application,
+            @RequestParam(defaultValue = "default-business-web") String channel) {
+        return ApiResponse.success(
+                channelService.getEnabledChannelOptions(tenantId, application, channel));
     }
 }

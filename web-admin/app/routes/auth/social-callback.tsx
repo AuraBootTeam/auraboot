@@ -8,10 +8,11 @@
  * Route: /login/social/:provider/callback
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { consumeOAuthState, loginOAuthStateKey } from '~/auth/oauth-state';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,20 +56,43 @@ export default function SocialCallback() {
   const [password, setPassword] = useState('');
   const [merging, setMerging] = useState(false);
   const [mergeError, setMergeError] = useState('');
+  const exchangeStartedRef = useRef(false);
 
   // Exchange the authorization code for a JWT
   const exchangeCode = useCallback(async () => {
     const code = searchParams.get('code');
     const stateParam = searchParams.get('state');
+    const providerError = searchParams.get('error_description') || searchParams.get('error');
 
-    if (!code) {
-      setError('Missing authorization code from provider');
+    if (!provider) {
+      setError('Missing OAuth provider');
+      setState('error');
+      return;
+    }
+
+    if (providerError) {
+      window.sessionStorage.removeItem(loginOAuthStateKey(provider));
+      setError(providerError);
+      setState('error');
+      return;
+    }
+
+    if (!code || !stateParam) {
+      window.sessionStorage.removeItem(loginOAuthStateKey(provider));
+      setError('Missing authorization response from provider');
+      setState('error');
+      return;
+    }
+
+    if (
+      !consumeOAuthState(window.sessionStorage, loginOAuthStateKey(provider), stateParam)
+    ) {
+      setError('OAuth state validation failed');
       setState('error');
       return;
     }
 
     try {
-      const redirectUri = `${window.location.origin}/login/social/${provider}/callback`;
       const result = await fetchResult<AuthResponse>(
         `/api/auth/login/social/${provider}/callback`,
         {
@@ -76,7 +100,6 @@ export default function SocialCallback() {
           params: {
             code,
             state: stateParam,
-            redirectUri,
           },
         },
       );
@@ -138,6 +161,8 @@ export default function SocialCallback() {
   }, [provider, searchParams]);
 
   useEffect(() => {
+    if (exchangeStartedRef.current) return;
+    exchangeStartedRef.current = true;
     exchangeCode();
   }, [exchangeCode]);
 

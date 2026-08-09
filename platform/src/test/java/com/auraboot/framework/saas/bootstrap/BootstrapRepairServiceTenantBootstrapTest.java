@@ -133,7 +133,9 @@ class BootstrapRepairServiceTenantBootstrapTest {
 
         assertThat(service.ensureDefaultLoginSurface()).isTrue();
 
-        verify(jdbcTemplate, times(3)).update(
+        // Web and native login surfaces are repaired independently:
+        // application + channel + password method for each surface.
+        verify(jdbcTemplate, times(6)).update(
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.<Object[]>any());
     }

@@ -9588,8 +9588,16 @@ CREATE TABLE public.ab_login_channel_auth_method (
     settings jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    identity_provider_instance_id bigint,
     CONSTRAINT ck_login_auth_method_status CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'disabled'::character varying])::text[])))
 );
+
+
+--
+-- Name: COLUMN ab_login_channel_auth_method.identity_provider_instance_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_login_channel_auth_method.identity_provider_instance_id IS 'Concrete IdP instance for OAuth/OIDC/LDAP/SAML; NULL for local password/OTP methods';
 
 
 --
@@ -21988,14 +21996,6 @@ ALTER TABLE ONLY public.ab_kb_index_release
 
 
 --
--- Name: ab_login_channel_auth_method uq_login_auth_method; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.ab_login_channel_auth_method
-    ADD CONSTRAINT uq_login_auth_method UNIQUE (login_channel_id, auth_method);
-
-
---
 -- Name: ab_login_channel uq_login_channel_application_id_id; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -25712,6 +25712,13 @@ CREATE INDEX idx_lineage_tenant ON public.ab_semantic_lineage_edge USING btree (
 
 
 --
+-- Name: idx_login_auth_method_identity_provider; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_login_auth_method_identity_provider ON public.ab_login_channel_auth_method USING btree (identity_provider_instance_id) WHERE (identity_provider_instance_id IS NOT NULL);
+
+
+--
 -- Name: idx_memory_access_log_pid_time; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -27833,6 +27840,13 @@ CREATE UNIQUE INDEX uq_external_identity_subject_active ON public.ab_external_id
 
 
 --
+-- Name: uq_external_identity_user_instance_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_external_identity_user_instance_active ON public.ab_external_identity_link USING btree (user_id, identity_provider_instance_id) WHERE (unlinked_at IS NULL);
+
+
+--
 -- Name: uq_identity_provider_global_code; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -27844,6 +27858,20 @@ CREATE UNIQUE INDEX uq_identity_provider_global_code ON public.ab_identity_provi
 --
 
 CREATE UNIQUE INDEX uq_identity_provider_tenant_code ON public.ab_identity_provider_instance USING btree (application_id, tenant_id, code) WHERE (tenant_id IS NOT NULL);
+
+
+--
+-- Name: uq_login_auth_method_federated; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_login_auth_method_federated ON public.ab_login_channel_auth_method USING btree (login_channel_id, identity_provider_instance_id) WHERE (identity_provider_instance_id IS NOT NULL);
+
+
+--
+-- Name: uq_login_auth_method_local; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_login_auth_method_local ON public.ab_login_channel_auth_method USING btree (login_channel_id, auth_method) WHERE (identity_provider_instance_id IS NULL);
 
 
 --
@@ -28433,6 +28461,14 @@ ALTER TABLE ONLY public.ab_invitation
 
 ALTER TABLE ONLY public.ab_login_channel_auth_method
     ADD CONSTRAINT fk_login_auth_method_channel FOREIGN KEY (application_id, login_channel_id) REFERENCES public.ab_login_channel(application_id, id);
+
+
+--
+-- Name: ab_login_channel_auth_method fk_login_auth_method_identity_provider; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_login_channel_auth_method
+    ADD CONSTRAINT fk_login_auth_method_identity_provider FOREIGN KEY (application_id, identity_provider_instance_id) REFERENCES public.ab_identity_provider_instance(application_id, id);
 
 
 --

@@ -8,6 +8,7 @@ public class WhiteList {
             "/api/auth/login/sms",
             "/api/auth/login/email-code",
             "/api/auth/login/channels",
+            "/api/auth/login/channel-options",
             "/api/auth/access-policy",
             "/api/auth/login/social/**",
             "/api/auth/register",

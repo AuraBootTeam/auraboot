@@ -1,9 +1,11 @@
 package com.auraboot.framework.auth.service.impl;
 
 import com.auraboot.framework.auth.dto.ChannelUpdateRequest;
+import com.auraboot.framework.auth.dto.LoginChannelOption;
 import com.auraboot.framework.auth.entity.TenantLoginChannel;
 import com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper;
 import com.auraboot.framework.auth.mapper.TenantLoginChannelMapper;
+import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,12 +36,16 @@ class TenantLoginChannelServiceImplTest {
     @Mock
     private LoginApplicationChannelMapper applicationChannelMapper;
 
+    @Mock
+    private SystemModeService systemModeService;
+
     private TenantLoginChannelServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new TenantLoginChannelServiceImpl(channelMapper);
         ReflectionTestUtils.setField(service, "applicationChannelMapper", applicationChannelMapper);
+        ReflectionTestUtils.setField(service, "systemModeService", systemModeService);
     }
 
     private TenantLoginChannel ch(String code, int order) {
@@ -92,6 +98,55 @@ class TenantLoginChannelServiceImplTest {
                 List.of("email_password", "oidc"),
                 service.getEnabledChannels(1L, "business-web", "supplier-portal"));
         verify(channelMapper, never()).selectList(any());
+    }
+
+    @Test
+    @DisplayName("single mode resolves login methods with the server-owned default tenant")
+    void singleModeUsesServerOwnedDefaultTenant() {
+        when(systemModeService.isSingleTenant()).thenReturn(true);
+        when(systemModeService.getDefaultTenantId()).thenReturn(2L);
+        when(applicationChannelMapper.findEnabledAuthMethods(
+                "business-web", "default-business-web", 2L))
+                .thenReturn(List.of("email_password", "wechat"));
+
+        assertEquals(
+                List.of("email_password", "wechat"),
+                service.getEnabledChannels(999L, "business-web", "default-business-web"));
+        verify(applicationChannelMapper).findEnabledAuthMethods(
+                "business-web", "default-business-web", 2L);
+    }
+
+    @Test
+    @DisplayName("channel options expose routing metadata without guessing an IdP code")
+    void getEnabledChannelOptionsFromApplicationRegistry() {
+        LoginChannelOption password = new LoginChannelOption(
+                "email_password", "password", "email_password", null);
+        LoginChannelOption corporateOidc = new LoginChannelOption(
+                "acme-workforce", "oauth", "Acme Workforce", "oidc");
+        when(applicationChannelMapper.findEnabledAuthOptions(
+                "business-web", "default-business-web", 1L))
+                .thenReturn(List.of(password, corporateOidc));
+
+        assertEquals(
+                List.of(password, corporateOidc),
+                service.getEnabledChannelOptions(1L, "business-web", "default-business-web"));
+        verify(channelMapper, never()).selectList(any());
+    }
+
+    @Test
+    @DisplayName("legacy channel options classify LDAP and arbitrary social providers")
+    void getEnabledChannelOptionsLegacyFallback() {
+        when(applicationChannelMapper.findEnabledAuthOptions(
+                "business-web", "default-business-web", 1L)).thenReturn(List.of());
+        when(applicationChannelMapper.findEnabledAuthMethods(
+                "business-web", "default-business-web", 1L)).thenReturn(List.of());
+        when(channelMapper.selectList(any())).thenReturn(List.of(ch("ldap", 0), ch("custom-oauth", 1)));
+
+        List<LoginChannelOption> options = service.getEnabledChannelOptions(
+                1L, "business-web", "default-business-web");
+
+        assertEquals("ldap", options.get(0).getKind());
+        assertEquals("oauth", options.get(1).getKind());
     }
 
     @Test

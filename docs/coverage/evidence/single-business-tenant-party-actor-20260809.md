@@ -7,6 +7,8 @@
 - Isolated runtime: `auraboot-party-actor-long`
 - Real stack: PostgreSQL 16.14, Redis 7, Spring Boot backend, Remix/Vite Web Admin
 - Final rebuilt runtime ports: PostgreSQL 5481, backend 6492, Vite 5222, BFF 3549
+- Federated-identity incremental runtime: PostgreSQL 17.6 database
+  `aura_sso_idp_20260809`, Redis DB 15, backend 16443, Vite 15173, BFF 13500.
 - Secrets and bearer tokens are intentionally omitted.
 
 ## Automated results
@@ -80,8 +82,95 @@ Controlled mutation: temporarily make application/channel capability intersectio
 - Restore: reinstated active Party capability intersection and tenant/global channel ownership checks.
 - Restored green: 4/4 resolver tests passed, the real PostgreSQL IT passed, and the final 148-test combined batch passed.
 
+## Federated identity incremental evidence
+
+### Automated contracts
+
+- OSS registry/channel/management/bootstrap targeted batch: 31/31 passed, plus the bootstrap
+  billing-account test passed 1/1 on an isolated PostgreSQL database created from the current
+  schema snapshot. It includes Web/mobile
+  instance separation, mobile-only status changes, inline-secret rejection, exact redirect
+  allow-listing, and remote HTTP redirect rejection.
+- Enterprise federated-identity targeted batch: 22/22 passed across transaction, flow,
+  canonical/legacy identity routing, OIDC, Apple, WeChat and LDAP. A wrong native/browser binding
+  consumes the Redis state before rejection, and a retry with the correct binding still fails.
+- OIDC hardening rejects metadata, loopback, non-HTTP and plain-HTTP discovery URLs before
+  outbound I/O; discovery, authorization, token, JWKS and userinfo endpoints must use HTTPS.
+- A controlled identity-routing mutation restored canonical miss → legacy `providerType + subject`
+  fallback. `SocialOAuthAuthStrategyTest` then ran 2 tests with 1 failure at the explicit
+  never-call-legacy assertion. The restored code uses only `IdP instance + subject`; the same
+  strategy test returned 2/2 and the complete federated batch returned 22/22. Legacy lookup/write
+  is restricted to legacy provider configuration.
+- Apple Web uses `response_type=code&response_mode=query` with no scope, matching AuraBoot's
+  GET callback route; its dedicated contract test passes.
+- WeChat Website contract covers the official QR authorization shape, server state,
+  `openid` subject, optional `unionid`, and the fact that WeChat supplies no verified email.
+- LDAP 5/5 passed: an in-process UnboundID server is reached over the real TCP/JNDI protocol;
+  correct bind/search returns immutable `entryUUID`, while wrong password and escaped-filter
+  injection fail. Canonical instance non-secret config is merged with a
+  `cloud-config:` secret reference and routed through the shared admission/link strategy.
+- Android `:data:testDebugUnitTest :features:testDebugUnitTest :app:assembleDebug` completed
+  147 tasks. iOS `xcodebuild build-for-testing` completed after the mobile application/channel
+  split. These are unit/build evidence, not physical-device evidence.
+
+### Fresh PostgreSQL, Redis and API
+
+- OSS Flyway/schema snapshot exact check passed at 57 migrations and 28,788 lines; Enterprise
+  snapshot exact check passed at 63 migrations and 32,484 lines.
+- Enterprise Flyway applied and validated 63 migrations through `V20260809130000` on a fresh
+  PostgreSQL 17.6 database. The first fresh bootstrap exposed an obsolete conflict target left
+  by the partial unique-index migration; `ON CONFLICT DO NOTHING` repaired both the fresh path
+  and idempotent retry. Bootstrap creates/repairs both
+  `business-web/default-business-web` and `business-mobile/default-business-mobile`.
+- Real admin APIs created two OIDC instances with the same business code but different
+  application/client/redirect settings. Disabling only the mobile instance removed only the
+  mobile descriptor; Web stayed active. An inline `clientSecret` request returned HTTP 400.
+- Web OAuth start resolved the Web instance and Google discovery, and Redis stored a 10-minute
+  one-time transaction containing server-selected tenant/application/channel/instance,
+  redirect, nonce and PKCE verifier. Redis stores only the client-binding SHA-256 digest, never
+  the binding token itself.
+- Native start resolved the mobile instance and custom-scheme redirect. Missing binding, wrong
+  binding and Web/native platform mismatch all failed closed. Wrong binding destroyed the state,
+  and retry could not replay it.
+- The latest-source backend started healthy on PostgreSQL plus Redis DB 15. After password login,
+  a controlled canonical-link API fixture returned the current-tenant link once and returned no
+  link for a deliberately cross-tenant row. Provider instance code, display name and email were
+  projected without tokens; cleanup left 0 fixture rows.
+- A startup attempt without an explicit Redis host/port did not create `StringRedisTemplate` and
+  failed the required OAuth strategy dependency. With the real Redis connection declared, the
+  same source started successfully; no in-memory state/merge-token fallback was added.
+
+### Real browser journey
+
+- The real login page displayed Password plus `Google OIDC Canary` from
+  `business-web/default-business-web`; it did not borrow the mobile channel.
+- Clicking the dynamic button reached `accounts.google.com` and received the expected
+  `invalid_client` for the intentionally invalid acceptance client. This proves the UI → registry
+  → discovery → authorize path, not a successful Google login.
+- A forged local callback rendered `OAuth state validation failed` before backend exchange.
+- Password login still reached `/home`. The authenticated Social Account Binding page displayed
+  the same active instance as `Not linked` with a Bind action; semantic DOM and rendered pixels
+  were both inspected.
+- The versioned Playwright social-link suite executed 5/5 green on the same authenticated runtime:
+  live descriptor/link union, arbitrary `company-oidc` rendering, profile navigation, and a
+  controlled LINK start that asserts POST, follows the server authorize URL, and stores the exact
+  provider-scoped state.
+
+### Physical-device denominator
+
+- `adb devices -l` reports no Android physical device.
+- The paired iPhone 13 Pro Max runs iOS 26.5.2 with Developer Mode enabled. A final retry reached
+  `available (paired)`, `ddiServicesAvailable=true` and `tunnelState=connected`; the physical Debug
+  build then failed at provisioning because Xcode has no logged-in account for the certificate Team
+  and no development profiles for `com.auraboot.ios`, `.share` or `.widgets`. The app was not installed.
+- Therefore native deep-link/state/binding/login remains partial. No simulator or source build is
+  counted as a physical-device pass.
+
 ## Deliberate partials / residual scope
 
 - Complete data model does not mean complete UI/workflow. Generic Party invitation acceptance, Capability approval workbench, relation/network management, and all legacy business domains becoming Party-aware are deferred.
-- IdentityProviderInstance and ExternalIdentityLink are present, while unified external IdP management and full OAuth/LDAP federation orchestration remain partial; legacy social-link/provider paths stay compatible.
-- The browser journey was semantically inspected but not promoted to a new Playwright release gate in this branch.
+- Canonical IdP management API and OAuth/LDAP orchestration are implemented while legacy
+  social-link/provider paths stay compatible. Real external Google/WeChat credentials and the
+  physical-device native journeys remain explicitly partial.
+- The external provider exchange remains deliberately partial, but the local Web journey now has
+  both semantic/pixel review and an executable 5-case Playwright gate.

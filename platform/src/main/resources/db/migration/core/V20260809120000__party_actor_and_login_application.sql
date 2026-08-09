@@ -583,6 +583,32 @@ JOIN ab_login_application a ON a.id = c.application_id
 WHERE a.code = 'business-web' AND c.code = 'default-business-web' AND c.tenant_id IS NULL
 ON CONFLICT (login_channel_id, auth_method) DO NOTHING;
 
+-- Native clients use a separate application/channel so an administrator can enable only IdPs
+-- whose redirect contract is valid for installed apps. In particular, a Web-only WeChat/Apple
+-- client must not leak onto iOS/Android merely because it is enabled on business-web.
+INSERT INTO ab_login_application (pid, code, display_name, application_type, status)
+VALUES ('01K2AX1APP0000000000000001', 'business-mobile', 'Business Mobile', 'native', 'active')
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO ab_login_channel (
+    pid, application_id, tenant_id, code, display_name, channel_type, status, sort_order
+)
+SELECT '01K2AX1CHN0000000000000001', id, NULL, 'default-business-mobile',
+       'Default Business Mobile', 'business', 'active', 0
+FROM ab_login_application
+WHERE code = 'business-mobile'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO ab_login_channel_auth_method (
+    pid, application_id, login_channel_id, auth_method, status, sort_order
+)
+SELECT '01K2AX1MET0000000000000001', c.application_id, c.id,
+       'email_password', 'active', 0
+FROM ab_login_channel c
+JOIN ab_login_application a ON a.id = c.application_id
+WHERE a.code = 'business-mobile' AND c.code = 'default-business-mobile' AND c.tenant_id IS NULL
+ON CONFLICT (login_channel_id, auth_method) DO NOTHING;
+
 COMMENT ON TABLE ab_party IS 'Business participant/organization within one tenant; Party is an Actor, not an isolation boundary';
 COMMENT ON TABLE ab_party_capability IS 'Business qualification only; capability does not grant RBAC permission';
 COMMENT ON TABLE ab_party_relation IS 'Business relationship only; a relation does not grant resource access';

@@ -556,8 +556,37 @@ public class BootstrapRepairService {
                  WHERE a.code = 'business-web'
                    AND c.code = 'default-business-web'
                    AND c.tenant_id IS NULL
-                ON CONFLICT (login_channel_id, auth_method) DO NOTHING
+                ON CONFLICT DO NOTHING
                 """, "01K2AX1MET0000000000000000");
+        jdbcTemplate.update("""
+                INSERT INTO ab_login_application (
+                    pid, code, display_name, application_type, status
+                ) VALUES (?, 'business-mobile', 'Business Mobile', 'native', 'active')
+                ON CONFLICT (code) DO NOTHING
+                """, "01K2AX1APP0000000000000001");
+        jdbcTemplate.update("""
+                INSERT INTO ab_login_channel (
+                    pid, application_id, tenant_id, code, display_name,
+                    channel_type, status, sort_order
+                )
+                SELECT ?, id, NULL, 'default-business-mobile', 'Default Business Mobile',
+                       'business', 'active', 0
+                  FROM ab_login_application
+                 WHERE code = 'business-mobile'
+                ON CONFLICT DO NOTHING
+                """, "01K2AX1CHN0000000000000001");
+        jdbcTemplate.update("""
+                INSERT INTO ab_login_channel_auth_method (
+                    pid, application_id, login_channel_id, auth_method, status, sort_order
+                )
+                SELECT ?, c.application_id, c.id, 'email_password', 'active', 0
+                  FROM ab_login_channel c
+                  JOIN ab_login_application a ON a.id = c.application_id
+                 WHERE a.code = 'business-mobile'
+                   AND c.code = 'default-business-mobile'
+                   AND c.tenant_id IS NULL
+                ON CONFLICT DO NOTHING
+                """, "01K2AX1MET0000000000000001");
         return existing == null || existing == 0;
     }
 
