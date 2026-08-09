@@ -503,6 +503,9 @@ dashboard:
   goto_management: Go to Dashboard Management
   refresh: Refresh
   refreshed: Data refreshed
+  retry: Retry
+  error:
+    access_forbidden: You do not have permission to access dashboards
 
 # AI Center — Colleagues & Settings
 ai:

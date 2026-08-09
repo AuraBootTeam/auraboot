@@ -31,6 +31,24 @@
           }
         },
         {
+          "code": "submit_qdp_review",
+          "primary": false,
+          "icon": "Send",
+          "permissionCode": "crm.qdp.review",
+          "visibleWhen": "record.crm_qdp_status === 'draft' || record.crm_qdp_status === 'validation_failed'",
+          "label": { "zh-CN": "提交评审", "en-US": "Submit for Review" },
+          "action": {
+            "type": "command",
+            "command": "crm:submit_qdp_review",
+            "operationType": "update",
+            "targetRecordPid": "${record.pid}",
+            "payload": {
+              "crm_qdp_revision_id": "${record.pid}",
+              "crm_qdp_customer_request_id": "${record.crm_qdp_customer_request_id}"
+            }
+          }
+        },
+        {
           "code": "release_qdp",
           "primary": true,
           "icon": "PackageCheck",

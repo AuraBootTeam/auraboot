@@ -349,6 +349,8 @@ dashboard:
   refresh: 새로고침
   refreshed: 데이터가 새로고침되었습니다
   retry: 다시 시도
+  error:
+    access_forbidden: 대시보드에 접근할 권한이 없습니다
 search:
   placeholder: 검색...
   title: 전체 검색

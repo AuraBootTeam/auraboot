@@ -6,6 +6,12 @@
       "configFile": "web-admin/playwright.config.ts",
       "arrayName": "quoteOpsCurrentSpecNames",
       "project": "quoteops"
+    },
+    {
+      "dir": "plugins/crm/e2e",
+      "configFile": "plugins/crm/e2e/qdp-release-center.playwright.config.ts",
+      "arrayName": "qdpReleaseCenterSpecNames",
+      "project": "qdp-chromium"
     }
   ],
   "allow": {

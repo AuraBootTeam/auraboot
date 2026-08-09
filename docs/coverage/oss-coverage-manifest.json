@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "e052c741c",
+    "commit": "3c4aecb43",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -2284,6 +2284,19 @@
           "verdict": "untested"
         },
         {
+          "id": "crm:compile_qdp_revision",
+          "action": "crm:compile_qdp_revision",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-qdp-release-config.test.mjs",
+            "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
           "id": "crm:complete_campaign",
           "action": "crm:complete_campaign",
           "surface": "ui",
@@ -2342,6 +2355,7 @@
           "evidence": [
             "tests/crm-account-common-form-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
             "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard.spec.ts",
@@ -2351,6 +2365,7 @@
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
             "web-admin/tests/e2e/crm/crm-opportunity-currency.spec.ts",
             "web-admin/tests/e2e/crm/crm-opportunity-kanban.spec.ts",
+            "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts",
             "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
@@ -2509,6 +2524,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
             "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
             "web-admin/tests/e2e/email/email-crm-timeline.spec.ts",
@@ -2595,6 +2611,7 @@
             "tests/crm-lead-assignment-ref-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
             "web-admin/tests/e2e/crm/crm-batch-ops.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard.spec.ts",
             "web-admin/tests/e2e/crm/crm-inline-edit.spec.ts",
@@ -3637,6 +3654,31 @@
           "verdict": "untested"
         },
         {
+          "id": "crm:prepare_qdp_draft",
+          "action": "crm:prepare_qdp_draft",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-qdp-release-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
+          "id": "crm:publish_qdp_revision",
+          "action": "crm:publish_qdp_revision",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-qdp-release-config.test.mjs",
+            "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
           "id": "crm:qualify_lead",
           "action": "crm:qualify_lead",
           "surface": "ui",
@@ -3915,6 +3957,19 @@
           "evidence": [],
           "assertion": "no test references this command",
           "verdict": "untested"
+        },
+        {
+          "id": "crm:submit_qdp_review",
+          "action": "crm:submit_qdp_review",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-qdp-release-config.test.mjs",
+            "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:update_account",
@@ -4215,6 +4270,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts",
             "web-admin/tests/e2e/list-ux/list-ux-enhancements.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-bom-customer-crud-isolation.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-bom-forms-search-datascope.spec.ts",
@@ -4534,6 +4590,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
             "web-admin/tests/e2e/email/email-crm-timeline.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
@@ -4943,6 +5000,32 @@
           "assertion": "a browser spec reaches this page",
           "verdict": "pass",
           "note": "kind=list model=crm_opportunity_common"
+        },
+        {
+          "id": "page:crm_qdp_revision_common_detail",
+          "action": "crm_qdp_revision_common_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=crm_qdp_revision_common"
+        },
+        {
+          "id": "page:crm_qdp_revision_common_list",
+          "action": "crm_qdp_revision_common_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=crm_qdp_revision_common"
         },
         {
           "id": "page:crm_quote_summary_common_detail",
@@ -8916,6 +8999,7 @@
             "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
             "web-admin/tests/e2e/crm/crm-calendar-sync.spec.ts",
             "web-admin/tests/e2e/crm/crm-campaign-sla.spec.ts",
+            "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
             "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard.spec.ts",
@@ -8925,6 +9009,7 @@
             "web-admin/tests/e2e/crm/crm-inbound-smoke.spec.ts",
             "web-admin/tests/e2e/crm/crm-merge-queue.spec.ts",
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
+            "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts",
             "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
             "web-admin/tests/e2e/crm/crm-web-form.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
@@ -10052,9 +10137,9 @@
     }
   ],
   "stats": {
-    "commands": 452,
+    "commands": 456,
     "untested": 318,
-    "pages": 258,
+    "pages": 260,
     "pagesUntested": 167,
     "platformPages": 99,
     "platformPagesUntested": 41

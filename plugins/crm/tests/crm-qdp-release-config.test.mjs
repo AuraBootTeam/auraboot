@@ -41,7 +41,7 @@ const roleByCode = new Map(roles.map((role) => [role.code, role]));
 const menuByCode = new Map(menus.map((menu) => [menu.code, menu]));
 const dictByCode = new Map(dicts.map((dict) => [dict.code, dict]));
 
-const LEGACY_QDP_FIELDS = [
+const QDP_CONTENT_FIELDS = [
   'crm_qdp_code',
   'crm_qdp_customer_request_id',
   'crm_qdp_revision_no',
@@ -114,7 +114,7 @@ function block(pageKey, blockId) {
   return found;
 }
 
-test('QDP Release Center is a discoverable CRM minor release with one existing writer', () => {
+test('QDP Release Center is a discoverable CRM minor release with one internal handler', () => {
   assert.equal(plugin.version, '1.2.0');
   assert.equal(plugin.backend?.jarPath, 'backend/build/libs/crm-plugin-1.2.0.jar');
   assert.match(backendBuild, /^version = '1\.2\.0'$/m);
@@ -128,7 +128,6 @@ test('QDP Release Center is a discoverable CRM minor release with one existing w
     ['command', 'crm:compile_qdp_revision'],
     ['command', 'crm:submit_qdp_review'],
     ['command', 'crm:publish_qdp_revision'],
-    ['command', 'crm:release_qdp'],
   ]) {
     assert.ok(plugin.provides.some((entry) => entry.type === type && entry.code === code),
       `${type} ${code} should be advertised`);
@@ -139,23 +138,24 @@ test('QDP Release Center is a discoverable CRM minor release with one existing w
     'crm:compile_qdp_revision',
     'crm:submit_qdp_review',
     'crm:publish_qdp_revision',
-    'crm:release_qdp',
   ]) {
     assert.equal(command(code).handler, 'crm:release_qdp', `${code} must reuse the shipped QDP writer`);
   }
+  assert.equal(commandByCode.has('crm:release_qdp'), false,
+    'development-stage CRM must not publish the retired one-step compatibility command');
 });
 
-test('published ce55 QDP fields remain present and retain the legacy release writer bridge', () => {
-  for (const fieldCode of LEGACY_QDP_FIELDS) {
+test('QDP content fields use only the current lifecycle writers', () => {
+  for (const fieldCode of QDP_CONTENT_FIELDS) {
     const field = fieldByCode.get(fieldCode);
-    assert.ok(field, `published field ${fieldCode} must not be deleted`);
+    assert.ok(field, `QDP field ${fieldCode} must exist`);
     assert.ok(bindingByKey.has(`crm_qdp_revision_common:${fieldCode}`),
-      `published binding ${fieldCode} must not be deleted`);
-    assert.ok(field.allowedWriterCommands?.includes('crm:release_qdp'),
-      `${fieldCode} must retain the ce55 release writer compatibility`);
+      `QDP binding ${fieldCode} must exist`);
+    assert.equal(field.allowedWriterCommands?.includes('crm:release_qdp'), false,
+      `${fieldCode} must not retain the retired one-step writer`);
   }
 
-  for (const fieldCode of LEGACY_QDP_FIELDS.filter((code) => ![
+  for (const fieldCode of QDP_CONTENT_FIELDS.filter((code) => ![
     'crm_qdp_status',
     'crm_qdp_release_note',
     'crm_qdp_released_at',
@@ -190,13 +190,13 @@ test('supporting evidence objects are immutable while QDP only exposes exact lif
     assert.equal(field.immutable, true, `${fieldCode} must freeze at Draft preparation`);
     assert.deepEqual(field.allowedWriterCommands, ['crm:prepare_qdp_draft']);
     assert.equal(field.constraints?.required, undefined,
-      `${fieldCode} stays schema-optional only for rolling ce55 release compatibility`);
+      `${fieldCode} stays schema-optional until the QDP lifecycle contract is promoted`);
     assert.equal(bindingByKey.get(`crm_qdp_revision_common:${fieldCode}`)?.required, false);
   }
 
   assert.deepEqual(fieldByCode.get('crm_qdp_status').allowedWriterCommands,
     ['crm:prepare_qdp_draft', 'crm:compile_qdp_revision', 'crm:submit_qdp_review',
-      'crm:publish_qdp_revision', 'crm:release_qdp']);
+      'crm:publish_qdp_revision']);
   assert.deepEqual(fieldByCode.get('crm_qdp_gate_verdict').allowedWriterCommands,
     ['crm:prepare_qdp_draft', 'crm:compile_qdp_revision', 'crm:submit_qdp_review',
       'crm:publish_qdp_revision']);
@@ -243,19 +243,6 @@ test('prepare, review and publish commands have exact targets, permissions and o
     ['passedChecks', 'warningCount', 'failedChecks', 'outcomeLabel']);
   assert.match(compile.description, /Compiling/);
 
-  const legacy = command('crm:release_qdp');
-  assert.equal(legacy.modelCode, 'crm_customer_request_common');
-  assert.deepEqual(legacy.inputFields, [
-    'crm_qdp_customer_request_id',
-    'crm_qdp_primary_file_id',
-    'crm_qdp_file_manifest',
-    'crm_qdp_release_note',
-    'crm_qdp_pcba_rfq_id',
-  ]);
-  assert.deepEqual(legacy.permissions, ['crm.qdp.release']);
-  assert.equal(legacy.handler, 'crm:release_qdp');
-  assert.equal(legacy.concurrencyKey, 'crm:qdp:${payload.crm_qdp_customer_request_id}');
-  assert.equal(legacy.lockTimeoutMs, 8000);
 });
 
 test('role split keeps release on the explicit cross-owner composite duty role', () => {
@@ -326,6 +313,10 @@ test('Customer Request and Release Center pages expose complete lifecycle feedba
   assert.match(lifecycleButtons.get('compile_qdp_revision')?.visibleWhen, /draft/);
   assert.equal(lifecycleButtons.get('compile_qdp_revision')?.action?.command,
     'crm:compile_qdp_revision');
+  assert.equal(lifecycleButtons.get('submit_qdp_review')?.permissionCode, 'crm.qdp.review');
+  assert.match(lifecycleButtons.get('submit_qdp_review')?.visibleWhen, /draft/);
+  assert.equal(lifecycleButtons.get('submit_qdp_review')?.action?.command,
+    'crm:submit_qdp_review');
   assert.equal(lifecycleButtons.get('release_qdp')?.permissionCode, 'crm.qdp.release');
   assert.match(lifecycleButtons.get('release_qdp')?.visibleWhen, /ready_for_review/);
   assert.equal(lifecycleButtons.get('release_qdp')?.action?.command, 'crm:publish_qdp_revision');

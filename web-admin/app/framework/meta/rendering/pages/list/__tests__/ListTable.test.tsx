@@ -228,6 +228,39 @@ describe('ListTable selection column layout', () => {
       }
     }
   });
+
+  it('keeps empty-state content inside the scroll viewport for a wide table', async () => {
+    const clientWidthDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'clientWidth',
+    );
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => 900,
+    });
+
+    try {
+      renderListTable({
+        columns: Array.from({ length: 10 }, (_, index) => ({
+          field: `field_${index}`,
+          label: `Field ${index}`,
+          width: 240,
+        })),
+        data: [],
+      });
+
+      const content = await screen.findByTestId('empty-state-content');
+      expect(content).toHaveClass('sticky', 'left-0');
+      await waitFor(() => expect(content).toHaveStyle({ width: '900px' }));
+      expect(content).toHaveTextContent('table.noData');
+    } finally {
+      if (clientWidthDescriptor) {
+        Object.defineProperty(HTMLElement.prototype, 'clientWidth', clientWidthDescriptor);
+      } else {
+        delete (HTMLElement.prototype as any).clientWidth;
+      }
+    }
+  });
 });
 
 describe('ListTable expandable tree rows (T10)', () => {
