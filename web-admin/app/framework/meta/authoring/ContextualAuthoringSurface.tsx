@@ -98,6 +98,7 @@ export function ContextualAuthoringSurface({
     () => new Map(capabilities?.manifests.map((manifest) => [manifest.blockType, manifest]) ?? []),
     [capabilities],
   );
+  const authoringReadOnly = !canConfigure || session?.state !== 'ACTIVE';
 
   useEffect(() => {
     if (returnResumeAttemptedRef.current) return;
@@ -317,7 +318,7 @@ export function ContextualAuthoringSurface({
   };
 
   const createHandoff = async () => {
-    if (!session || !explain || handoffPending) return;
+    if (!canConfigure || !session || !explain || handoffPending) return;
     setHandoffPending(true);
     setError(null);
     try {
@@ -339,7 +340,7 @@ export function ContextualAuthoringSurface({
 
   const stageEdit = useCallback(
     (node: AuthoringNode, property: PropertyCapability, value: unknown, remove = false) => {
-      if (!session || session.state !== 'ACTIVE') return;
+      if (!canConfigure || !session || session.state !== 'ACTIVE') return;
       const manifestChecksum = manifestByType.get(node.blockType)?.checksum;
       if (!manifestChecksum) {
         setError(`未找到 ${node.blockType} 的能力清单，无法保存该变更`);
@@ -377,11 +378,18 @@ export function ContextualAuthoringSurface({
       setError(null);
       setStale(false);
     },
-    [manifestByType, schema, session],
+    [canConfigure, manifestByType, schema, session],
   );
 
   const saveChanges = useCallback(async () => {
-    if (!session || saving || pendingEdits.size === 0 || session.state !== 'ACTIVE') return;
+    if (
+      !canConfigure ||
+      !session ||
+      saving ||
+      pendingEdits.size === 0 ||
+      session.state !== 'ACTIVE'
+    )
+      return;
     setSaving(true);
     setError(null);
     let currentSession = session;
@@ -417,10 +425,10 @@ export function ContextualAuthoringSurface({
     } finally {
       setSaving(false);
     }
-  }, [pendingEdits, saving, schema, session]);
+  }, [canConfigure, pendingEdits, saving, schema, session]);
 
   const refreshDraft = useCallback(async () => {
-    if (!session) return;
+    if (!canConfigure || !session) return;
     setError(null);
     try {
       const latest = await loadAuthoringSession(session.sessionPid);
@@ -430,10 +438,17 @@ export function ContextualAuthoringSurface({
     } catch (refreshFailure) {
       setError(refreshFailure instanceof Error ? refreshFailure.message : '无法刷新配置草稿');
     }
-  }, [pendingEdits, schema, session]);
+  }, [canConfigure, pendingEdits, schema, session]);
 
   const submitForReview = useCallback(async () => {
-    if (!session || pendingEdits.size > 0 || submitting || session.state !== 'ACTIVE') return;
+    if (
+      !canConfigure ||
+      !session ||
+      pendingEdits.size > 0 ||
+      submitting ||
+      session.state !== 'ACTIVE'
+    )
+      return;
     setSubmitting(true);
     setError(null);
     try {
@@ -446,7 +461,7 @@ export function ContextualAuthoringSurface({
     } finally {
       setSubmitting(false);
     }
-  }, [pendingEdits.size, schema, session, submitting]);
+  }, [canConfigure, pendingEdits.size, schema, session, submitting]);
 
   if (!session) {
     return (
@@ -484,6 +499,7 @@ export function ContextualAuthoringSurface({
       className="border-border bg-subtle relative flex min-h-[calc(100vh-4rem)] flex-col overflow-hidden border"
       data-testid="contextual-authoring-surface"
       data-mode={effectiveMode}
+      data-read-only={authoringReadOnly ? 'true' : 'false'}
     >
       <AuthoringToolbar
         mode={mode}
@@ -509,6 +525,18 @@ export function ContextualAuthoringSurface({
         >
           <LockKeyhole className="h-4 w-4" />
           已拦截真实业务写入；交互预览只保留本地状态。
+        </div>
+      ) : null}
+      {!canConfigure ? (
+        <div
+          role="alert"
+          className="border-status-amber bg-status-amber-bg text-status-amber mx-3 mt-3 flex items-start gap-2 rounded-md border px-3 py-2 text-sm"
+          data-testid="authoring-permission-revoked"
+        >
+          <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            配置权限已收回，当前会话已即时转为只读。浏览器中的未保存差异仍会保留，但不会保存、提交或移交；可退出配置模式，或在权限恢复后继续。
+          </span>
         </div>
       ) : null}
       {error ? (
@@ -578,6 +606,7 @@ export function ContextualAuthoringSurface({
           node={selectedNode}
           manifest={selectedManifest}
           session={session}
+          readOnly={authoringReadOnly}
           open={inspectorOpen}
           onClose={() => setInspectorOpen(false)}
           onHandoff={(property) =>
@@ -598,6 +627,7 @@ export function ContextualAuthoringSurface({
         saving={saving}
         submitting={submitting}
         stale={stale}
+        readOnly={authoringReadOnly}
         onDiff={() => setDiffOpen(true)}
         onSave={saveChanges}
         onRefresh={refreshDraft}
@@ -800,6 +830,7 @@ function InspectorPanel({
   node,
   manifest,
   session,
+  readOnly,
   open,
   onClose,
   onHandoff,
@@ -808,6 +839,7 @@ function InspectorPanel({
   node: AuthoringNode;
   manifest?: CapabilityManifest;
   session: AuthoringSession;
+  readOnly: boolean;
   open: boolean;
   onClose: () => void;
   onHandoff: (property?: PropertyCapability) => void;
@@ -858,7 +890,7 @@ function InspectorPanel({
                   key={property.propertyPath}
                   node={node}
                   property={property}
-                  disabled={session.state !== 'ACTIVE'}
+                  disabled={readOnly}
                   onEdit={onEdit}
                   onHandoff={() => onHandoff(property)}
                 />
@@ -872,8 +904,9 @@ function InspectorPanel({
         </div>
         <button
           type="button"
+          disabled={readOnly}
           onClick={() => onHandoff()}
-          className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
+          className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           <Settings2 className="h-4 w-4" />
           高级设置
@@ -1030,6 +1063,7 @@ function ChangeDock({
   saving,
   submitting,
   stale,
+  readOnly,
   onDiff,
   onSave,
   onRefresh,
@@ -1040,13 +1074,13 @@ function ChangeDock({
   saving: boolean;
   submitting: boolean;
   stale: boolean;
+  readOnly: boolean;
   onDiff: () => void;
   onSave: () => void;
   onRefresh: () => void;
   onSubmit: () => void;
 }) {
   const validationErrors = session.validationState === 'INVALID' ? 1 : 0;
-  const readonly = session.state !== 'ACTIVE';
   return (
     <footer className="border-border bg-panel sticky bottom-0 z-20 flex min-h-14 flex-wrap items-center gap-3 border-t px-3 py-2 text-sm">
       <div className="mr-auto flex flex-wrap items-center gap-3">
@@ -1055,9 +1089,13 @@ function ChangeDock({
         <span className={validationErrors ? 'text-red-700' : 'text-slate-600'}>
           {validationErrors} 个校验错误
         </span>
-        {readonly ? (
+        {readOnly ? (
           <span className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-            {session.state === 'READ_ONLY' ? '已提交，当前只读' : session.state}
+            {session.state === 'READ_ONLY'
+              ? '已提交，当前只读'
+              : session.state !== 'ACTIVE'
+                ? session.state
+                : '权限已收回，当前只读'}
           </span>
         ) : null}
       </div>
@@ -1065,6 +1103,7 @@ function ChangeDock({
         <button
           type="button"
           onClick={onRefresh}
+          disabled={readOnly}
           className="border-status-amber text-status-amber inline-flex min-h-9 items-center gap-1.5 rounded-md border px-3 text-sm"
         >
           刷新基线并保留本地变更
@@ -1079,14 +1118,14 @@ function ChangeDock({
       <DockButton
         icon={saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
         label={saving ? '保存中…' : '保存'}
-        disabled={readonly || saving || edits.length === 0}
+        disabled={readOnly || saving || edits.length === 0}
         onClick={onSave}
       />
       <DockButton icon={<Eye className="h-4 w-4" />} label="实时预览" disabled />
       <DockButton
         label={submitting ? '提交中…' : '提交评审'}
         disabled={
-          readonly ||
+          readOnly ||
           submitting ||
           edits.length > 0 ||
           validationErrors > 0 ||

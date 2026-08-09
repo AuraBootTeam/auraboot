@@ -14,8 +14,20 @@ import {
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 import type { AuthoringSession } from '../types';
 
+const permissionMock = vi.hoisted(() => ({
+  canRead: true,
+  canManage: true,
+  usePermission: vi.fn((permission: string) =>
+    permission === 'meta.designer.read'
+      ? permissionMock.canRead
+      : permission === 'meta.designer.update'
+        ? permissionMock.canManage
+        : false,
+  ),
+}));
+
 vi.mock('~/contexts/AuthContext', () => ({
-  usePermission: vi.fn(() => true),
+  usePermission: permissionMock.usePermission,
 }));
 
 vi.mock('../authoringService', () => ({
@@ -48,6 +60,8 @@ const schema: UnifiedSchema = {
 describe('ContextualAuthoringSurface', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    permissionMock.canRead = true;
+    permissionMock.canManage = true;
     window.history.replaceState(
       null,
       '',
@@ -267,10 +281,52 @@ describe('ContextualAuthoringSurface', () => {
     expect(await screen.findByText('0 项未保存')).toBeInTheDocument();
     expect(screen.getByText('1 项草稿变更')).toBeInTheDocument();
   });
+
+  it('turns an active session read-only when permission is revoked and preserves local edits', async () => {
+    const view = renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+    await screen.findByTestId('contextual-authoring-surface');
+    fireEvent.click(screen.getByTestId('runtime-write'));
+    fireEvent.change(screen.getByLabelText(/标题/), { target: { value: '待恢复的订单标题' } });
+
+    expect(screen.getByText('1 项未保存')).toBeInTheDocument();
+    permissionMock.canManage = false;
+    view.rerender(surfaceElement(vi.fn(), vi.fn()));
+
+    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+      'data-read-only',
+      'true',
+    );
+    expect(screen.getByTestId('authoring-permission-revoked')).toHaveTextContent(
+      '未保存差异仍会保留',
+    );
+    expect(screen.getByLabelText(/标题/)).toBeDisabled();
+    expect(screen.getByText('1 项未保存')).toBeInTheDocument();
+    expect(screen.getByText('保存')).toBeDisabled();
+    expect(screen.getByText('提交评审')).toBeDisabled();
+    expect(screen.getByText('高级设置')).toBeDisabled();
+    fireEvent.click(screen.getByText('保存'));
+    expect(applyAuthoringPatch).not.toHaveBeenCalled();
+
+    permissionMock.canManage = true;
+    view.rerender(surfaceElement(vi.fn(), vi.fn()));
+    expect(screen.queryByTestId('authoring-permission-revoked')).not.toBeInTheDocument();
+    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+      'data-read-only',
+      'false',
+    );
+    expect(screen.getByLabelText(/标题/)).toBeEnabled();
+    expect(screen.getByText('1 项未保存')).toBeInTheDocument();
+    expect(screen.getByText('保存')).toBeEnabled();
+  });
 });
 
 function renderSurface(unsafeAction: () => void, safeTab: () => void) {
-  return render(
+  return render(surfaceElement(unsafeAction, safeTab));
+}
+
+function surfaceElement(unsafeAction: () => void, safeTab: () => void) {
+  return (
     <MemoryRouter initialEntries={['/orders?tab=open']}>
       <ContextualAuthoringSurface schema={schema} recordPid="record-1">
         <div data-aura-block-id="table-1">
@@ -282,7 +338,7 @@ function renderSurface(unsafeAction: () => void, safeTab: () => void) {
           </button>
         </div>
       </ContextualAuthoringSurface>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 }
 

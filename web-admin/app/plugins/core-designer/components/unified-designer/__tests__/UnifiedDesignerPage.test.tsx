@@ -274,6 +274,48 @@ describe('UnifiedDesignerPage', () => {
     expect(savePageSchemaV3).not.toHaveBeenCalled();
   });
 
+  it('preserves an unsaved Studio edit but blocks writes when admin permission is revoked', async () => {
+    setSearch('?contextId=ctx_secure_once');
+    const handoff = createHandoff('list_customer', '/dataSource');
+    const session = createAuthoringSession(createDocument('document_one', 'Isolated Draft'));
+    vi.mocked(consumeAuthoringHandoff).mockResolvedValue(handoff);
+    vi.mocked(loadAuthoringSession).mockResolvedValue(session);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+
+    const view = render(<UnifiedDesignerPage />);
+
+    await screen.findByTestId('studio-handoff-editable-reason');
+    await waitFor(() =>
+      expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('list_customer'),
+    );
+    fireEvent.change(screen.getByTestId('inspector-field-dataSource.model-manual'), {
+      target: { value: 'payment' },
+    });
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
+
+    permissionMock.canAdministerDesigner.mockReturnValue(false);
+    view.rerender(<UnifiedDesignerPage />);
+
+    expect(screen.getByTestId('studio-handoff-read-only-reason')).toHaveTextContent(
+      '当前仅可查看隔离草稿',
+    );
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
+    expect(screen.getByTestId('designer-save')).toBeDisabled();
+    expect(screen.queryByTestId('inspector-field-dataSource.model-manual')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('designer-save'));
+    expect(applyAuthoringStudioPatch).not.toHaveBeenCalled();
+    expect(moveAuthoringStudioBlock).not.toHaveBeenCalled();
+    expect(savePageSchemaV3).not.toHaveBeenCalled();
+
+    permissionMock.canAdministerDesigner.mockReturnValue(true);
+    view.rerender(<UnifiedDesignerPage />);
+    expect(screen.getByTestId('studio-handoff-editable-reason')).toBeInTheDocument();
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
+    expect(screen.getByTestId('designer-save')).toBeEnabled();
+    expect(screen.getByTestId('inspector-field-dataSource.model-manual')).toBeEnabled();
+    expect(screen.getByTestId('inspector-field-dataSource.model-manual')).toHaveValue('payment');
+  });
+
   it('saves a declared same-parent block reorder through the typed Studio move endpoint', async () => {
     setSearch('?contextId=ctx_secure_once');
     const handoff = createHandoff('field_customer_name', '/$structure/order');
