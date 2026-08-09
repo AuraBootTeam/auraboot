@@ -195,6 +195,18 @@ describe('root loader authentication guard', () => {
     ).toEqual([{ title: 'AuraBoot' }]);
   });
 
+  it('declares the fixed Community manifest and browser icons', async () => {
+    const { links } = await import('~/root');
+
+    expect(links()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rel: 'manifest', href: '/manifest.json' }),
+        expect.objectContaining({ rel: 'icon', href: '/favicon.ico' }),
+        expect.objectContaining({ rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }),
+      ]),
+    );
+  });
+
   it('keeps storefront runtime public even when an admin token exists', async () => {
     mocks.getTokenFromRequest.mockResolvedValue('admin-token');
 

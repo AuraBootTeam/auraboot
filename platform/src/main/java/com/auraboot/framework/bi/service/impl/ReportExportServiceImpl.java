@@ -6,6 +6,7 @@ import com.auraboot.framework.bi.dto.ReportExportRequest;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bi.service.ReportExportService;
 import com.auraboot.framework.bi.service.ReportStorageService;
+import com.auraboot.framework.branding.CommunityBranding;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
@@ -27,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.PDPageContentStream.AppendMode;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.poi.ss.usermodel.Cell;
@@ -56,6 +58,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -143,15 +146,18 @@ public class ReportExportServiceImpl implements ReportExportService {
                 sheet.autoSizeColumn(0);
             }
 
+            applyWorkbookBranding(workbook);
             workbook.write(output);
-            ReportExportFile file = new ReportExportFile(output.toByteArray(), safeFilename(title) + ".xlsx", XLSX_CONTENT_TYPE);
+            ReportExportFile file = new ReportExportFile(
+                    output.toByteArray(), safeFilename(title) + ".xlsx", XLSX_CONTENT_TYPE);
             recordExportAudit(request.getReportPid(), "EXPORT_EXCEL", "excel", file.getFilename());
             return file;
         } catch (ValidationException e) {
             throw e;
         } catch (Exception e) {
             log.error("Failed to export report as Excel: reportPid={}", request.getReportPid(), e);
-            throw new ValidationException(ResponseCode.CommonValidationFailed, "Excel export failed: " + e.getMessage());
+            throw new ValidationException(
+                    ResponseCode.CommonValidationFailed, "Excel export failed: " + e.getMessage());
         }
     }
 
@@ -165,7 +171,7 @@ public class ReportExportServiceImpl implements ReportExportService {
         String title = stringValue(reportDsl.get("title"), "report");
         Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(reportDsl);
 
-        byte[] pdfBytes = renderPdf(reportDsl, dataSets, title);
+        byte[] pdfBytes = applyPdfBranding(renderPdf(reportDsl, dataSets, title), title);
         ReportExportFile file = new ReportExportFile(pdfBytes, safeFilename(title) + ".pdf", PDF_CONTENT_TYPE);
         recordExportAudit(request.getReportPid(), "EXPORT_PDF", "pdf", file.getFilename());
         return file;
@@ -207,6 +213,45 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
     }
 
+    private void applyWorkbookBranding(Workbook workbook) {
+        if (workbook instanceof XSSFWorkbook xssfWorkbook) {
+            var coreProperties = xssfWorkbook.getProperties().getCoreProperties();
+            coreProperties.setCreator(CommunityBranding.PLATFORM_NAME);
+            coreProperties.setDescription(CommunityBranding.GENERATED_BY_TEXT);
+        }
+        for (int index = 0; index < workbook.getNumberOfSheets(); index++) {
+            workbook.getSheetAt(index).getFooter().setCenter(CommunityBranding.GENERATED_BY_TEXT);
+        }
+    }
+
+    private byte[] applyPdfBranding(byte[] pdfBytes, String title) {
+        try (PDDocument document = PDDocument.load(pdfBytes);
+                ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            float fontSize = 8f;
+            float textWidth = PDType1Font.HELVETICA.getStringWidth(CommunityBranding.GENERATED_BY_TEXT)
+                    / 1000f * fontSize;
+            for (PDPage page : document.getPages()) {
+                float x = Math.max(8f, (page.getMediaBox().getWidth() - textWidth) / 2f);
+                try (PDPageContentStream content = new PDPageContentStream(
+                        document, page, AppendMode.APPEND, true, true)) {
+                    content.beginText();
+                    content.setFont(PDType1Font.HELVETICA, fontSize);
+                    content.setNonStrokingColor(Color.GRAY);
+                    content.newLineAtOffset(x, 10f);
+                    content.showText(CommunityBranding.GENERATED_BY_TEXT);
+                    content.endText();
+                }
+            }
+            document.save(output);
+            return output.toByteArray();
+        } catch (Exception e) {
+            log.error("Failed to apply Community branding to PDF: title={}", title, e);
+            throw new ValidationException(
+                    ResponseCode.CommonValidationFailed,
+                    "PDF branding failed: " + e.getMessage());
+        }
+    }
+
     @Override
     public ReportExportFile exportJson(ReportExportRequest request) {
         if (request == null || !StringUtils.hasText(request.getReportPid())) {
@@ -223,7 +268,8 @@ public class ReportExportServiceImpl implements ReportExportService {
             payload.put("reportDsl", reportDsl);
             payload.put("dataSets", resolveDataSets(reportDsl));
             byte[] bytes = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(payload);
-            ReportExportFile file = new ReportExportFile(bytes, safeFilename(title) + ".report.json", JSON_CONTENT_TYPE);
+            ReportExportFile file = new ReportExportFile(
+                    bytes, safeFilename(title) + ".report.json", JSON_CONTENT_TYPE);
             recordExportAudit(request.getReportPid(), "EXPORT_JSON", "json", file.getFilename());
             return file;
         } catch (ValidationException e) {

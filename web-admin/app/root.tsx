@@ -9,6 +9,7 @@ import {
   useLoaderData,
   isRouteErrorResponse,
   type LoaderFunctionArgs,
+  type LinksFunction,
 } from 'react-router';
 import React, { useEffect } from 'react';
 import { isSystemTenant } from '~/constants/SpaceConstants';
@@ -235,6 +236,13 @@ export const meta = ({ data }: { data?: RootLoaderData }) => [
       ? data.icpCompliance.siteDisplayName
       : (data?.branding.productName ?? COMMUNITY_BRANDING.productName),
   },
+];
+
+export const links: LinksFunction = () => [
+  { rel: 'icon', href: '/favicon.ico' },
+  { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32x32.png' },
+  { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+  { rel: 'manifest', href: '/manifest.json' },
 ];
 
 export function useRootLoaderData(): RootLoaderData | undefined {
