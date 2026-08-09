@@ -118,6 +118,17 @@ class DynamicDataAccessorImplTest {
     }
 
     @Test
+    void compareAndSet_delegatesAtomicTransition() {
+        when(dynamicDataService.compareAndSet("m", "1", "status", "accepted", "superseded"))
+                .thenReturn(true);
+
+        assertThat(accessor.compareAndSet("m", "1", "status", "accepted", "superseded"))
+                .isTrue();
+        verify(dynamicDataService)
+                .compareAndSet("m", "1", "status", "accepted", "superseded");
+    }
+
+    @Test
     void batchCreate_returns_successItems_when_present() {
         DynamicBatchResponse resp = new DynamicBatchResponse();
         resp.setSuccessItems(List.of(Map.of("id", "a"), Map.of("id", "b")));
@@ -144,6 +155,13 @@ class DynamicDataAccessorImplTest {
     void delete_delegates() {
         accessor.delete("m", "1");
         verify(dynamicDataService).delete("m", "1");
+    }
+
+    @Test
+    void batchDelete_delegatesOneDistinctNonBlankIdList() {
+        accessor.batchDelete("m", java.util.Arrays.asList("1", "2", "1", null, ""));
+
+        verify(dynamicDataService).batchDelete("m", List.of("1", "2"));
     }
 
     @Test
