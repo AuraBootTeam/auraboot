@@ -7,6 +7,7 @@ export function AuthoringGovernanceNotice({
   currentUserId,
   canManage,
   canReview,
+  canPublish,
   pendingAction,
   error,
   onAction,
@@ -15,6 +16,7 @@ export function AuthoringGovernanceNotice({
   currentUserId?: string | number | null;
   canManage: boolean;
   canReview: boolean;
+  canPublish: boolean;
   pendingAction: AuthoringGovernanceAction | null;
   error?: string | null;
   onAction: (action: AuthoringGovernanceAction, reason: string) => Promise<void> | void;
@@ -22,12 +24,13 @@ export function AuthoringGovernanceNotice({
   const [reason, setReason] = useState('');
   const isOwner = currentUserId != null && String(currentUserId) === String(session.ownerUserId);
   const status = session.changeSetStatus;
-  if (!['IN_REVIEW', 'APPROVED', 'REJECTED'].includes(status)) return null;
+  if (!['IN_REVIEW', 'APPROVED', 'REJECTED', 'PUBLISHED'].includes(status)) return null;
 
   const pending = pendingAction !== null;
   const canWithdraw = status === 'IN_REVIEW' && isOwner && canManage;
   const canDecide = status === 'IN_REVIEW' && !isOwner && canReview;
   const canReopen = status === 'APPROVED' && isOwner && canManage;
+  const canActivate = status === 'APPROVED' && session.publishState === 'READY' && canPublish;
   const requiresReason = canWithdraw || canReopen || canDecide;
   const reasonMissing = reason.trim().length === 0;
   const tone = governanceTone(status);
@@ -78,13 +81,13 @@ export function AuthoringGovernanceNotice({
               />
             ) : null}
             {canReopen ? (
-                <GovernanceButton
-                  action="reopen"
-                  label={
-                    session.approvalState === 'APPROVED'
-                      ? '使批准失效并继续编辑'
-                      : '继续编辑并生成新 revision'
-                  }
+              <GovernanceButton
+                action="reopen"
+                label={
+                  session.approvalState === 'APPROVED'
+                    ? '使批准失效并继续编辑'
+                    : '继续编辑并生成新 revision'
+                }
                 pendingAction={pendingAction}
                 disabled={pending || reasonMissing}
                 onClick={run}
@@ -113,9 +116,35 @@ export function AuthoringGovernanceNotice({
         </div>
       ) : null}
 
+      {canActivate ? (
+        <div className="mt-3 rounded-md border border-emerald-200 bg-white/70 px-3 py-3">
+          <div className="text-xs leading-5">
+            发布将原子切换当前环境的活动 Release。失败时旧版本保持可见，当前 ChangeSet 仍为
+            READY，可在确认后重试。
+          </div>
+          <div className="mt-2 flex justify-end">
+            <GovernanceButton
+              action="publish"
+              label="发布当前 revision"
+              pendingAction={pendingAction}
+              disabled={pending}
+              onClick={run}
+              primary
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {status === 'APPROVED' && !canActivate && !canReopen ? (
+        <div className="mt-2 text-xs">
+          当前 revision 已批准，等待具备发布管理权限的人员切换活动版本。
+        </div>
+      ) : null}
+
       {status === 'IN_REVIEW' && !canWithdraw && !canDecide ? (
         <div className="mt-2 text-xs">
-          当前工作区只提供冻结 revision 查看。Owner 请在原地配置撤回；Reviewer 请从评审任务进入专用工作区。
+          当前工作区只提供冻结 revision 查看。Owner 请在原地配置撤回；Reviewer
+          请从评审任务进入专用工作区。
         </div>
       ) : null}
       {error ? (
@@ -165,7 +194,9 @@ function GovernanceButton({
 }
 
 function GovernanceIcon({ status, className }: { status: string; className: string }) {
-  if (status === 'APPROVED') return <CheckCircle2 className={className} />;
+  if (status === 'APPROVED' || status === 'PUBLISHED') {
+    return <CheckCircle2 className={className} />;
+  }
   if (status === 'REJECTED') return <XCircle className={className} />;
   return <GitPullRequest className={className} />;
 }
@@ -174,6 +205,7 @@ function governanceTitle(session: AuthoringSession): string {
   if (session.changeSetStatus === 'IN_REVIEW')
     return `评审中 · revision r${session.revision} 已冻结`;
   if (session.changeSetStatus === 'APPROVED') return `revision r${session.revision} 已批准`;
+  if (session.changeSetStatus === 'PUBLISHED') return `revision r${session.revision} 已发布`;
   return `评审已驳回 · 已进入可编辑 revision r${session.revision}`;
 }
 
@@ -186,11 +218,14 @@ function governanceDescription(session: AuthoringSession): string {
       ? '发布资格只绑定当前 revision。继续编辑会先把本次批准标记为 STALE，再生成新的未校验 revision。'
       : '当前 revision 已具备直发资格。继续编辑会生成新的未校验 revision。';
   }
+  if (session.changeSetStatus === 'PUBLISHED') {
+    return '该 revision 已成为当前环境的活动 Release。后续修改必须从活动版本创建新的隔离 ChangeSet。';
+  }
   return '驳回决策保留在上一 revision；当前 revision 已取消发布资格，可修改后重新提交。';
 }
 
 function governanceTone(status: string): { container: string } {
-  if (status === 'APPROVED') {
+  if (status === 'APPROVED' || status === 'PUBLISHED') {
     return { container: 'border-emerald-300 bg-emerald-50 text-emerald-950' };
   }
   if (status === 'REJECTED') {

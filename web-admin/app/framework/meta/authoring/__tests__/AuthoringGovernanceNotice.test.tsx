@@ -54,12 +54,59 @@ describe('AuthoringGovernanceNotice', () => {
     fireEvent.click(screen.getByTestId('authoring-governance-reopen'));
     expect(onAction).toHaveBeenCalledWith('reopen', '批准后发现遗漏说明');
   });
+
+  it('offers atomic publish only to a publish administrator and keeps rollback out of this surface', () => {
+    const onAction = vi.fn<(action: AuthoringGovernanceAction, reason: string) => void>();
+    const approved = reviewSession({
+      changeSetStatus: 'APPROVED',
+      approvalState: 'APPROVED',
+      publishState: 'READY',
+    });
+    const { rerender } = renderNotice(approved, {
+      currentUserId: '2',
+      canPublish: false,
+      onAction,
+    });
+
+    expect(screen.queryByTestId('authoring-governance-publish')).not.toBeInTheDocument();
+    expect(screen.getByText(/等待具备发布管理权限/)).toBeInTheDocument();
+
+    rerender(
+      <AuthoringGovernanceNotice
+        session={approved}
+        currentUserId="2"
+        canManage={false}
+        canReview={false}
+        canPublish
+        pendingAction={null}
+        onAction={onAction}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('authoring-governance-publish'));
+    expect(onAction).toHaveBeenCalledWith('publish', '');
+    expect(screen.queryByText(/一键回滚/)).not.toBeInTheDocument();
+  });
+
+  it('shows the terminal published state without another mutation action', () => {
+    renderNotice(
+      reviewSession({
+        changeSetStatus: 'PUBLISHED',
+        publishState: 'PUBLISHED',
+      }),
+      { currentUserId: '1', onAction: vi.fn() },
+    );
+
+    expect(screen.getByText('revision r7 已发布')).toBeInTheDocument();
+    expect(screen.getByText(/活动 Release/)).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
 });
 
 function renderNotice(
   session: AuthoringSession,
   overrides: {
     currentUserId: string;
+    canPublish?: boolean;
     onAction: (action: AuthoringGovernanceAction, reason: string) => void;
   },
 ) {
@@ -69,6 +116,7 @@ function renderNotice(
       currentUserId={overrides.currentUserId}
       canManage
       canReview
+      canPublish={overrides.canPublish ?? true}
       pendingAction={null}
       onAction={overrides.onAction}
     />,

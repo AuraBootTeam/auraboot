@@ -10,6 +10,7 @@ import type {
   PatchResult,
   AuthoringGovernanceAction,
   AuthoringChangeItem,
+  AuthoringRelease,
   AuthoringSplitResult,
 } from './types';
 
@@ -213,6 +214,17 @@ export async function transitionAuthoringGovernance(
   if (!ResultHelper.isSuccess(result)) {
     throw new Error(result.message || result.desc || '无法完成 ChangeSet 治理操作');
   }
+}
+
+export async function publishAuthoringChangeSet(
+  changeSetPid: string,
+  revision: number,
+): Promise<AuthoringRelease> {
+  const result = await fetchResult<AuthoringRelease>(
+    `/api/authoring/change-sets/${encodeURIComponent(changeSetPid)}/publish`,
+    { method: 'post', params: { expectedRevision: revision } },
+  );
+  return requireData(result, '发布失败；活动版本未改变，可检查状态后重试');
 }
 
 export async function loadAuthoringChangeItems(sessionPid: string): Promise<AuthoringChangeItem[]> {

@@ -16,6 +16,7 @@ import {
   moveAuthoringStudioBlock,
   openAuthoringReviewWorkspace,
   observeAuthoringChangeSet,
+  publishAuthoringChangeSet,
   splitAuthoringChangeSet,
   takeoverAuthoringWriterLease,
   transitionAuthoringGovernance,
@@ -63,6 +64,7 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   loadAuthoringSession: vi.fn(),
   moveAuthoringStudioBlock: vi.fn(),
   observeAuthoringChangeSet: vi.fn(),
+  publishAuthoringChangeSet: vi.fn(),
   splitAuthoringChangeSet: vi.fn(),
   openAuthoringReviewWorkspace: vi.fn(),
   takeoverAuthoringWriterLease: vi.fn(),
@@ -90,6 +92,7 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(applyAuthoringStudioPatch).mockReset();
     vi.mocked(moveAuthoringStudioBlock).mockReset();
     vi.mocked(observeAuthoringChangeSet).mockReset();
+    vi.mocked(publishAuthoringChangeSet).mockReset();
     vi.mocked(splitAuthoringChangeSet).mockReset();
     vi.mocked(openAuthoringReviewWorkspace).mockReset();
     vi.mocked(takeoverAuthoringWriterLease).mockReset();
@@ -341,8 +344,73 @@ describe('UnifiedDesignerPage', () => {
       'revision r7 已批准',
     );
     expect(screen.queryByTestId('authoring-governance-approve')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('authoring-governance-publish')).not.toBeInTheDocument();
     expect(String(window.location.search)).toContain('reviewSession=session_1');
     expect(observeAuthoringChangeSet).not.toHaveBeenCalled();
+  });
+
+  it('publishes an approved revision only from Studio and reloads the terminal state', async () => {
+    setSearch('?authoringSession=session_1');
+    const approved = createAuthoringSession(createDocument('document_one', 'Approved Draft'), 7);
+    Object.assign(approved, {
+      changeSetStatus: 'APPROVED',
+      state: 'READ_ONLY',
+      validationState: 'VALID',
+      impactState: 'KNOWN',
+      approvalState: 'APPROVED',
+      publishState: 'READY',
+    });
+    const published = { ...approved, changeSetStatus: 'PUBLISHED', state: 'CLOSED', publishState: 'PUBLISHED' };
+    vi.mocked(loadAuthoringSession)
+      .mockResolvedValueOnce(approved)
+      .mockResolvedValueOnce(published);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(publishAuthoringChangeSet).mockResolvedValue({
+      releasePid: 'release_1',
+      changeSetPid: 'changeset_1',
+      changeSetRevision: 7,
+      previousReleasePid: null,
+      status: 'ACTIVE',
+      manifestChecksum: 'manifest_1',
+      channelVersion: 1,
+      activatedAt: '2026-08-09T12:00:00Z',
+    });
+
+    render(<UnifiedDesignerPage />);
+
+    fireEvent.click(await screen.findByTestId('authoring-governance-publish'));
+    await waitFor(() =>
+      expect(publishAuthoringChangeSet).toHaveBeenCalledWith('changeset_1', 7),
+    );
+    expect(await screen.findByText('revision r7 已发布')).toBeInTheDocument();
+    expect(screen.queryByTestId('authoring-governance-publish')).not.toBeInTheDocument();
+    expect(loadAuthoringSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps an approved revision retryable when atomic publish fails', async () => {
+    setSearch('?authoringSession=session_1');
+    const approved = createAuthoringSession(createDocument('document_one', 'Approved Draft'), 7);
+    Object.assign(approved, {
+      changeSetStatus: 'APPROVED',
+      state: 'READ_ONLY',
+      validationState: 'VALID',
+      impactState: 'KNOWN',
+      approvalState: 'APPROVED',
+      publishState: 'READY',
+    });
+    vi.mocked(loadAuthoringSession).mockResolvedValue(approved);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(publishAuthoringChangeSet).mockRejectedValue(
+      new Error('发布失败；活动版本未改变，可检查状态后重试'),
+    );
+
+    render(<UnifiedDesignerPage />);
+
+    fireEvent.click(await screen.findByTestId('authoring-governance-publish'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('活动版本未改变');
+    expect(screen.getByTestId('authoring-governance-publish')).toBeEnabled();
+    expect(screen.getByText('revision r7 已批准')).toBeInTheDocument();
+    expect(loadAuthoringSession).toHaveBeenCalledTimes(1);
   });
 
   it('restores the dedicated review workspace after a full-page reload', async () => {

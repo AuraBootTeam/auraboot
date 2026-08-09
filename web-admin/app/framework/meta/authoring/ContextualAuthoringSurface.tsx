@@ -772,6 +772,7 @@ export function ContextualAuthoringSurface({
             currentUserId={user?.id}
             canManage={canConfigure}
             canReview={false}
+            canPublish={false}
             pendingAction={governancePending}
             error={governanceError}
             onAction={handleGovernanceAction}

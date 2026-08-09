@@ -25,6 +25,7 @@ import {
   moveAuthoringStudioBlock,
   openAuthoringReviewWorkspace,
   observeAuthoringChangeSet,
+  publishAuthoringChangeSet,
   takeoverAuthoringWriterLease,
   transitionAuthoringGovernance,
 } from '~/framework/meta/authoring/authoringService';
@@ -68,6 +69,7 @@ export default function UnifiedDesignerPage() {
   const canAdministerDesigner = usePermission('meta.designer.admin');
   const canManageDesigner = usePermission('meta.designer.update');
   const canReviewAuthoring = usePermission('meta.publish.update');
+  const canPublishAuthoring = usePermission('meta.publish.admin');
   const { user } = useUser();
   const [searchParams] = useSearchParams();
   const requestedPageId = searchParams.get('pageId') || searchParams.get('pid');
@@ -547,7 +549,14 @@ export default function UnifiedDesignerPage() {
     setGovernancePending(action);
     setGovernanceError(null);
     try {
-      await transitionAuthoringGovernance(action, authoringSession, reason);
+      if (action === 'publish') {
+        await publishAuthoringChangeSet(
+          authoringSession.changeSetPid,
+          authoringSession.revision,
+        );
+      } else {
+        await transitionAuthoringGovernance(action, authoringSession, reason);
+      }
       const latest = reviewWorkspaceMode
         ? (await loadAuthoringReviewWorkspace(authoringSession.sessionPid)).session
         : await loadAuthoringSession(authoringSession.sessionPid);
@@ -781,6 +790,7 @@ export default function UnifiedDesignerPage() {
             currentUserId={user?.id}
             canManage={!reviewWorkspaceMode && canManageDesigner}
             canReview={reviewWorkspaceMode && canReviewAuthoring}
+            canPublish={!reviewWorkspaceMode && canPublishAuthoring}
             pendingAction={governancePending}
             error={governanceError}
             onAction={handleGovernanceAction}

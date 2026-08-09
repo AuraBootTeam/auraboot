@@ -134,6 +134,17 @@ export interface AuthoringSplitResult {
   }>;
 }
 
+export interface AuthoringRelease {
+  releasePid: string;
+  changeSetPid: string;
+  changeSetRevision: number;
+  previousReleasePid?: string | null;
+  status: 'ACTIVE';
+  manifestChecksum: string;
+  channelVersion: number;
+  activatedAt: string;
+}
+
 export interface AuthoringNode {
   id: string;
   sourceId: string;
@@ -197,7 +208,7 @@ export interface PendingAuthoringEdit {
   value: unknown;
 }
 
-export type AuthoringGovernanceAction = 'withdraw' | 'reopen' | 'approve' | 'reject';
+export type AuthoringGovernanceAction = 'withdraw' | 'reopen' | 'approve' | 'reject' | 'publish';
 
 export interface ContextualAuthoringSurfaceProps {
   schema: UnifiedSchema;
