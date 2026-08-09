@@ -183,6 +183,15 @@
     "action": "read"
   },
   {
+    "code": "model.crm_forecast_submission.read",
+    "name:zh-CN": "查看销售预测模型",
+    "name:en": "Read Forecast Submission Model",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_forecast_submission",
+    "action": "read"
+  },
+  {
     "code": "model.crm_customer_request_common.read",
     "name:zh-CN": "查看客户需求模型",
     "name:en": "Read Customer Request Model",
@@ -492,6 +501,13 @@
     "name:zh-CN": "查看报价摘要",
     "name:en": "View Quote Summaries",
     "resourceType": "data",
+    "module": "crm"
+  },
+  {
+    "code": "crm.order_commitment.manage",
+    "name:zh-CN": "登记订单承诺",
+    "name:en": "Record Order Commitment",
+    "resourceType": "operation",
     "module": "crm"
   },
   {

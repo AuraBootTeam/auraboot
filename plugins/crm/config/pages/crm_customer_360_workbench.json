@@ -107,6 +107,7 @@
       "actions": [
         {
           "code": "open_customer_record",
+          "permissionCode": "crm.account.read",
           "label": { "zh-CN": "打开客户档案", "en": "Open Customer Record" },
           "variant": "secondary",
           "permissionCode": "crm.account.read",
@@ -118,6 +119,7 @@
         },
         {
           "code": "create_customer",
+          "permissionCode": "crm.account.manage",
           "label": { "zh-CN": "新建客户", "en": "Create Customer" },
           "variant": "primary",
           "permissionCode": "crm.account.manage",

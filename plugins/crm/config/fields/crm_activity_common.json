@@ -35,7 +35,13 @@
     "code": "crm_act_owner",
     "displayName:zh-CN": "负责人",
     "displayName:en": "Owner",
-    "dataType": "string",
+    "dataType": "reference",
+    "referenceModelCode": "sys_user",
+    "refTarget": {
+      "targetModel": "sys_user",
+      "valueField": "pid",
+      "displayField": "displayName"
+    },
     "constraints": { "maxLength": 100 }
   },
   {

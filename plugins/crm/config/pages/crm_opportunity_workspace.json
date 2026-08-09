@@ -103,6 +103,7 @@
       "actions": [
         {
           "code": "open_opportunity_record",
+          "permissionCode": "crm.opportunity.read",
           "label": { "zh-CN": "打开商机档案", "en": "Open Opportunity Record" },
           "variant": "secondary",
           "permissionCode": "crm.opportunity.read",
@@ -111,6 +112,7 @@
         },
         {
           "code": "create_opportunity",
+          "permissionCode": "crm.opportunity.manage",
           "label": { "zh-CN": "新建商机", "en": "Create Opportunity" },
           "variant": "primary",
           "permissionCode": "crm.opportunity.manage",
@@ -198,6 +200,7 @@
       "actions": [
         {
           "code": "qualify_opportunity",
+          "permissionCode": "crm.opportunity.manage",
           "label": { "zh-CN": "进入资格确认", "en": "Move to Qualification" },
           "variant": "primary",
           "permissionCode": "crm.opportunity.manage",
@@ -206,6 +209,7 @@
         },
         {
           "code": "advance_to_proposal",
+          "permissionCode": "crm.opportunity.manage",
           "label": { "zh-CN": "进入方案报价", "en": "Move to Proposal" },
           "variant": "primary",
           "permissionCode": "crm.opportunity.manage",
@@ -214,6 +218,7 @@
         },
         {
           "code": "advance_to_negotiation",
+          "permissionCode": "crm.opportunity.manage",
           "label": { "zh-CN": "进入商务谈判", "en": "Move to Negotiation" },
           "variant": "primary",
           "permissionCode": "crm.opportunity.manage",
@@ -222,6 +227,7 @@
         },
         {
           "code": "win_opportunity",
+          "permissionCode": "crm.opportunity.manage",
           "label": { "zh-CN": "标记赢单", "en": "Mark Won" },
           "variant": "primary",
           "permissionCode": "crm.opportunity.manage",
@@ -231,6 +237,7 @@
         },
         {
           "code": "lose_opportunity",
+          "permissionCode": "crm.opportunity.manage",
           "label": { "zh-CN": "标记丢单", "en": "Mark Lost" },
           "variant": "danger",
           "permissionCode": "crm.opportunity.manage",

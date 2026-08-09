@@ -117,7 +117,13 @@
     "code": "crm_qs_owner",
     "displayName:zh-CN": "负责人",
     "displayName:en": "Owner",
-    "dataType": "string",
+    "dataType": "reference",
+    "referenceModelCode": "sys_user",
+    "refTarget": {
+      "targetModel": "sys_user",
+      "valueField": "pid",
+      "displayField": "displayName"
+    },
     "constraints": { "maxLength": 100 },
     "feature": { "searchable": true }
   },
@@ -133,5 +139,40 @@
     "displayName:zh-CN": "摘要",
     "displayName:en": "Summary",
     "dataType": "text"
+  },
+  {
+    "code": "crm_qs_committed_qdp_revision_id",
+    "displayName:zh-CN": "承诺采用 QDP 版本",
+    "displayName:en": "Committed QDP Revision",
+    "dataType": "reference",
+    "referenceModelCode": "crm_qdp_revision_common",
+    "allowedWriterCommands": ["crm:record_order_commitment"],
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_qs_customer_confirmation_id",
+    "displayName:zh-CN": "订单客户确认证据",
+    "displayName:en": "Order Customer Confirmation",
+    "dataType": "reference",
+    "referenceModelCode": "crm_customer_confirmation_common",
+    "allowedWriterCommands": ["crm:record_order_commitment"],
+    "feature": { "searchable": true }
+  },
+  {
+    "code": "crm_qs_order_committed_at",
+    "displayName:zh-CN": "订单承诺时间",
+    "displayName:en": "Order Committed At",
+    "dataType": "datetime",
+    "allowedWriterCommands": ["crm:record_order_commitment"],
+    "feature": { "sortable": true }
+  },
+  {
+    "code": "crm_qs_order_committed_by",
+    "displayName:zh-CN": "订单承诺登记人",
+    "displayName:en": "Order Committed By",
+    "dataType": "string",
+    "allowedWriterCommands": ["crm:record_order_commitment"],
+    "constraints": { "maxLength": 100 },
+    "feature": { "searchable": true }
   }
 ]

@@ -102,6 +102,7 @@
       "actions": [
         {
           "code": "open_task_record",
+          "permissionCode": "crm.activity.read",
           "label": { "zh-CN": "打开任务", "en": "Open Task" },
           "variant": "secondary",
           "permissionCode": "crm.activity.read",
@@ -110,6 +111,7 @@
         },
         {
           "code": "open_complaint_record",
+          "permissionCode": "crm.complaint.read",
           "label": { "zh-CN": "打开投诉", "en": "Open Complaint" },
           "variant": "secondary",
           "permissionCode": "crm.complaint.read",
@@ -118,6 +120,7 @@
         },
         {
           "code": "create_task",
+          "permissionCode": "crm.activity.manage",
           "label": { "zh-CN": "新建任务", "en": "Create Task" },
           "variant": "primary",
           "permissionCode": "crm.activity.manage",
@@ -204,6 +207,7 @@
       "actions": [
         {
           "code": "start_task",
+          "permissionCode": "crm.activity.manage",
           "label": { "zh-CN": "开始任务", "en": "Start Task" },
           "variant": "primary",
           "permissionCode": "crm.activity.manage",
@@ -212,6 +216,7 @@
         },
         {
           "code": "complete_task",
+          "permissionCode": "crm.activity.manage",
           "label": { "zh-CN": "完成任务", "en": "Complete Task" },
           "variant": "primary",
           "permissionCode": "crm.activity.manage",
@@ -221,6 +226,7 @@
         },
         {
           "code": "investigate_complaint",
+          "permissionCode": "crm.complaint.manage",
           "label": { "zh-CN": "开始调查", "en": "Start Investigation" },
           "variant": "primary",
           "permissionCode": "crm.complaint.manage",
@@ -229,6 +235,7 @@
         },
         {
           "code": "resolve_complaint",
+          "permissionCode": "crm.complaint.manage",
           "label": { "zh-CN": "标记已解决", "en": "Mark Resolved" },
           "variant": "primary",
           "permissionCode": "crm.complaint.manage",
@@ -238,6 +245,7 @@
         },
         {
           "code": "close_complaint",
+          "permissionCode": "crm.complaint.manage",
           "label": { "zh-CN": "关闭投诉", "en": "Close Complaint" },
           "variant": "secondary",
           "permissionCode": "crm.complaint.manage",
