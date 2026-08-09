@@ -7,10 +7,12 @@ import {
   applyAuthoringPatch,
   createAuthoringHandoff,
   loadAuthoringCapabilities,
+  loadAuthoringSession,
   openAuthoringSession,
   submitAuthoringSession,
 } from '../authoringService';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
+import type { AuthoringSession } from '../types';
 
 vi.mock('~/contexts/AuthContext', () => ({
   usePermission: vi.fn(() => true),
@@ -46,24 +48,15 @@ const schema: UnifiedSchema = {
 describe('ContextualAuthoringSurface', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState(
+      null,
+      '',
+      '/orders?tab=open&filter.status=OPEN&sort=createdAt%3Adesc',
+    );
     vi.stubGlobal('scrollTo', vi.fn());
-    vi.mocked(openAuthoringSession).mockResolvedValue({
-      sessionPid: 'session-1',
-      changeSetPid: 'changeset-1',
-      pagePid: 'page-1',
-      state: 'ACTIVE',
-      revision: 1,
-      riskLevel: 'L0',
-      route: 'INLINE',
-      publishPolicy: 'DIRECT_ALLOWED',
-      validationState: 'UNVALIDATED',
-      approvalState: 'NOT_REQUIRED',
-      publishState: 'DRAFT',
-      manifestChecksum: 'registry-1',
-      snapshot: { ...schema, pid: 'page-1' },
-      interactionContext: {},
-      expiresAt: '2026-08-09T12:00:00Z',
-    });
+    Element.prototype.scrollIntoView = vi.fn();
+    const openedSession = createAuthoringSession();
+    vi.mocked(openAuthoringSession).mockResolvedValue(openedSession);
     vi.mocked(loadAuthoringCapabilities).mockResolvedValue({
       checksum: 'registry-1',
       manifests: [
@@ -138,6 +131,7 @@ describe('ContextualAuthoringSurface', () => {
       savedValue: '生产订单',
     });
     vi.mocked(submitAuthoringSession).mockResolvedValue(undefined);
+    vi.mocked(loadAuthoringSession).mockResolvedValue(openedSession);
   });
 
   it('enters from the runtime page, separates modes and exposes independent counters', async () => {
@@ -153,6 +147,22 @@ describe('ContextualAuthoringSurface', () => {
     expect(screen.getByText('0 项未保存')).toBeInTheDocument();
     expect(screen.getByText('0 项草稿变更')).toBeInTheDocument();
     expect(screen.getByText('0 个校验错误')).toBeInTheDocument();
+    expect(openAuthoringSession).toHaveBeenCalledWith(
+      'page-1',
+      expect.objectContaining({
+        route: '/orders?tab=open&filter.status=OPEN&sort=createdAt%3Adesc',
+        recordPid: 'record-1',
+        tabId: 'open',
+        filters: { 'filter.status': ['OPEN'] },
+        sort: { sort: ['createdAt:desc'] },
+        selection: 'page-1',
+        outlinePath: ['page-1'],
+        viewport: expect.objectContaining({
+          width: window.innerWidth,
+          height: window.innerHeight,
+        }),
+      }),
+    );
 
     fireEvent.click(screen.getByTestId('runtime-write'));
     expect(unsafeAction).not.toHaveBeenCalled();
@@ -169,6 +179,42 @@ describe('ContextualAuthoringSurface', () => {
 
     fireEvent.click(screen.getByTestId('runtime-tab'));
     expect(safeTab).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores the same session, focus and scroll after returning from Studio', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/orders?tab=open&authoringReturn=session-return&authoringFocus=table-1',
+    );
+    vi.mocked(loadAuthoringSession).mockResolvedValue(
+      createAuthoringSession({
+        sessionPid: 'session-return',
+        revision: 7,
+        snapshot: {
+          ...schema,
+          pid: 'page-1',
+          blocks: [{ ...schema.blocks[0], title: 'Studio 草稿表格' }],
+        },
+        interactionContext: {
+          route: '/orders?tab=open',
+          scroll: { x: 16, y: 640 },
+          selection: 'table-1',
+          viewport: { width: 1440, height: 900, scale: 2 },
+        },
+      }),
+    );
+
+    renderSurface(vi.fn(), vi.fn());
+
+    expect(await screen.findByTestId('contextual-authoring-surface')).toHaveTextContent(
+      'Studio 草稿表格',
+    );
+    expect(loadAuthoringSession).toHaveBeenCalledWith('session-return');
+    expect(openAuthoringSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId('authoring-inspector')).toHaveTextContent('Studio 草稿表格');
+    await waitFor(() => expect(window.scrollTo).toHaveBeenCalledWith(16, 640));
+    expect(window.location.search).toBe('?tab=open');
   });
 
   it('explains a studio boundary before creating an opaque handoff', async () => {
@@ -238,4 +284,25 @@ function renderSurface(unsafeAction: () => void, safeTab: () => void) {
       </ContextualAuthoringSurface>
     </MemoryRouter>,
   );
+}
+
+function createAuthoringSession(overrides: Partial<AuthoringSession> = {}): AuthoringSession {
+  return {
+    sessionPid: 'session-1',
+    changeSetPid: 'changeset-1',
+    pagePid: 'page-1',
+    state: 'ACTIVE',
+    revision: 1,
+    riskLevel: 'L0',
+    route: 'INLINE',
+    publishPolicy: 'DIRECT_ALLOWED',
+    validationState: 'UNVALIDATED',
+    approvalState: 'NOT_REQUIRED',
+    publishState: 'DRAFT',
+    manifestChecksum: 'registry-1',
+    snapshot: { ...schema, pid: 'page-1' },
+    interactionContext: {},
+    expiresAt: '2026-08-09T12:00:00Z',
+    ...overrides,
+  };
 }

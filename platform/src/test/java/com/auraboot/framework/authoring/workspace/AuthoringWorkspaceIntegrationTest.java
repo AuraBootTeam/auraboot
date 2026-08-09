@@ -171,6 +171,12 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                                   "interactionContext":{
                                     "route":"/orders",
                                     "recordPid":"record-1",
+                                    "filters":{"status":["OPEN"]},
+                                    "sort":["createdAt:desc"],
+                                    "scroll":{"x":12,"y":480},
+                                    "viewport":{"width":1440,"height":900,"scale":2},
+                                    "selection":"table-1",
+                                    "outlinePath":["page-1","table-1"],
                                     "secret":"must-not-return"
                                   }
                                 }
@@ -180,6 +186,11 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.changeSetPid").isNotEmpty())
                 .andExpect(jsonPath("$.data.revision").value(1))
                 .andExpect(jsonPath("$.data.interactionContext.route").value("/orders"))
+                .andExpect(jsonPath("$.data.interactionContext.filters.status[0]").value("OPEN"))
+                .andExpect(jsonPath("$.data.interactionContext.sort[0]").value("createdAt:desc"))
+                .andExpect(jsonPath("$.data.interactionContext.scroll.y").value(480))
+                .andExpect(jsonPath("$.data.interactionContext.viewport.width").value(1440))
+                .andExpect(jsonPath("$.data.interactionContext.selection").value("table-1"))
                 .andExpect(jsonPath("$.data.interactionContext.secret").doesNotExist());
     }
 

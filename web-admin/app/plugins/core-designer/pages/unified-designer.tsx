@@ -43,6 +43,8 @@ export default function UnifiedDesignerPage() {
   const requestedPageId = searchParams.get('pageId') || searchParams.get('pid');
   const pageKey = searchParams.get('pageKey');
   const contextId = searchParams.get('contextId');
+  const resumeSessionPid = searchParams.get('authoringSession');
+  const hasAuthoringContext = Boolean(contextId || resumeSessionPid);
   const [handoff, setHandoff] = useState<HandoffContext | null>(null);
   const [authoringSession, setAuthoringSession] = useState<AuthoringSession | null>(null);
   const [authoringCapabilities, setAuthoringCapabilities] = useState<CapabilityRegistry | null>(null);
@@ -55,13 +57,13 @@ export default function UnifiedDesignerPage() {
   const modelCodeKey = document ? collectModelCodesFromDocument(document).join('|') : '';
   const documentId = document?.id ?? null;
   const resolvingHandoff = Boolean(
-    contextId &&
+    hasAuthoringContext &&
       !handoffError &&
       (!handoff || !authoringSession || !authoringCapabilities || !document),
   );
 
   useEffect(() => {
-    if (!contextId) {
+    if (!hasAuthoringContext) {
       setHandoff(null);
       setAuthoringSession(null);
       setAuthoringCapabilities(null);
@@ -74,16 +76,30 @@ export default function UnifiedDesignerPage() {
     setAuthoringSession(null);
     setAuthoringCapabilities(null);
     setHandoffError(null);
-    void consumeAuthoringHandoff(contextId)
-      .then(async (consumed) => {
-        const [session, capabilities] = await Promise.all([
-          loadAuthoringSession(consumed.sessionPid),
+    const resolveContext = contextId
+      ? consumeAuthoringHandoff(contextId).then(async (consumed) => {
+          const [session, capabilities] = await Promise.all([
+            loadAuthoringSession(consumed.sessionPid),
+            loadAuthoringCapabilities(),
+          ]);
+          assertHandoffMatchesSession(consumed, session);
+          replaceConsumedHandoffUrl(consumed.sessionPid);
+          return { handoff: consumed, session, capabilities };
+        })
+      : Promise.all([
+          loadAuthoringSession(resumeSessionPid!),
           loadAuthoringCapabilities(),
-        ]);
-        assertHandoffMatchesSession(consumed, session);
+        ]).then(([session, capabilities]) => ({
+          handoff: resumeHandoffFromSession(session),
+          session,
+          capabilities,
+        }));
+
+    void resolveContext
+      .then(({ handoff: resolvedHandoff, session, capabilities }) => {
         if (!cancelled) {
           const isolatedDocument = authoringSnapshotToPageSchemaV3(session.snapshot);
-          setHandoff(consumed);
+          setHandoff(resolvedHandoff);
           setAuthoringSession(session);
           setAuthoringCapabilities(capabilities);
           setDocument(isolatedDocument);
@@ -107,13 +123,13 @@ export default function UnifiedDesignerPage() {
     return () => {
       cancelled = true;
     };
-  }, [contextId]);
+  }, [contextId, hasAuthoringContext, resumeSessionPid]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadDocument() {
-      if (contextId) return;
+      if (hasAuthoringContext) return;
       setError(null);
       if (!requestedPageId && !pageKey) {
         const localDocument = readLocalDocument();
@@ -143,7 +159,7 @@ export default function UnifiedDesignerPage() {
     return () => {
       cancelled = true;
     };
-  }, [contextId, pageKey, requestedPageId]);
+  }, [hasAuthoringContext, pageKey, requestedPageId]);
 
   useEffect(() => {
     if (!modelCodeKey) {
@@ -312,7 +328,13 @@ export default function UnifiedDesignerPage() {
       key={workbenchKey}
       initialDocument={document}
       modelFieldsByModel={modelFieldsByModel}
-      returnHref={handoff?.returnTo || (source.type === 'page' ? '/p/page_schema' : undefined)}
+      returnHref={
+        handoff
+          ? authoringReturnHref(handoff.returnTo, handoff.sessionPid, handoff.blockId)
+          : source.type === 'page'
+            ? '/p/page_schema'
+            : undefined
+      }
       onSave={handoff ? handleContextualStudioSave : handleSave}
       pageId={!handoff && source.type === 'page' ? source.pid : undefined}
       initialPublished={source.type === 'page' ? published : false}
@@ -360,6 +382,57 @@ function assertHandoffMatchesSession(
   ) {
     throw new Error('配置移交上下文与隔离会话不一致');
   }
+}
+
+function resumeHandoffFromSession(session: AuthoringSession): HandoffContext {
+  const selection = safeContextString(session.interactionContext.selection);
+  const outlinePath = Array.isArray(session.interactionContext.outlinePath)
+    ? session.interactionContext.outlinePath.filter(
+        (item): item is string => typeof item === 'string' && item.length > 0,
+      )
+    : [];
+  return {
+    pagePid: session.pagePid,
+    changeSetPid: session.changeSetPid,
+    sessionPid: session.sessionPid,
+    revision: session.revision,
+    intent: 'PAGE_STRUCTURE',
+    targetRoute: '/unified-designer',
+    returnTo: safeReturnTo(session.interactionContext.route),
+    blockId: selection || outlinePath.at(-1) || null,
+    propertyPath: null,
+    interactionContext: session.interactionContext,
+    expiresAt: session.expiresAt,
+  };
+}
+
+function replaceConsumedHandoffUrl(sessionPid: string): void {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  url.searchParams.delete('contextId');
+  url.searchParams.set('authoringSession', sessionPid);
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function safeReturnTo(value: unknown): string {
+  const route = safeContextString(value);
+  return route.startsWith('/') && !route.startsWith('//') ? route : '/';
+}
+
+function safeContextString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function authoringReturnHref(
+  returnTo: string,
+  sessionPid: string,
+  focusBlockId?: string | null,
+): string {
+  const safeRoute = safeReturnTo(returnTo);
+  const url = new URL(safeRoute, window.location.origin);
+  url.searchParams.set('authoringReturn', sessionPid);
+  if (focusBlockId) url.searchParams.set('authoringFocus', focusBlockId);
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 function readLocalDocument(): PageSchemaV3 | null {

@@ -16,6 +16,7 @@ export interface InteractionContext {
   filters?: unknown;
   sort?: unknown;
   scroll?: { x: number; y: number };
+  viewport?: { width: number; height: number; scale: number };
   selection?: string;
   outlinePath?: string[];
 }

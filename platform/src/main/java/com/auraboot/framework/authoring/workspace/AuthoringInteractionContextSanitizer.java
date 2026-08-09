@@ -17,7 +17,7 @@ public class AuthoringInteractionContextSanitizer {
     private static final int MAX_CONTEXT_BYTES = 16 * 1024;
     private static final Set<String> ALLOWED_KEYS = Set.of(
             "route", "recordPid", "tabId", "filters", "sort", "scroll", "selection",
-            "outlinePath");
+            "outlinePath", "viewport");
 
     private final ObjectMapper objectMapper;
 

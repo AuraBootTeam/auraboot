@@ -139,6 +139,7 @@ describe('UnifiedDesignerPage', () => {
 
   it('consumes an opaque handoff, loads the isolated snapshot and stays read-only without admin permission', async () => {
     setSearch('?contextId=ctx_secure_once');
+    const replaceState = vi.spyOn(window.history, 'replaceState');
     permissionMock.canAdministerDesigner.mockReturnValue(false);
     const handoff = createHandoff('field_customer_name', '/props/label');
     const session = createAuthoringSession(createDocument('document_one', 'Isolated Draft'));
@@ -160,7 +161,7 @@ describe('UnifiedDesignerPage', () => {
     );
     expect(screen.getByTestId('designer-return-link')).toHaveAttribute(
       'href',
-      '/orders?tab=open',
+      '/orders?tab=open&authoringReturn=session_1&authoringFocus=field_customer_name',
     );
     await waitFor(() =>
       expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_customer_name'),
@@ -173,6 +174,34 @@ describe('UnifiedDesignerPage', () => {
     expect(screen.getByTestId('designer-save')).toBeDisabled();
     expect(savePageSchemaV3).not.toHaveBeenCalled();
     expect(applyAuthoringStudioPatch).not.toHaveBeenCalled();
+    expect(String(replaceState.mock.calls.at(-1)?.[2])).toContain(
+      'authoringSession=session_1',
+    );
+    expect(String(replaceState.mock.calls.at(-1)?.[2])).not.toContain('contextId');
+    replaceState.mockRestore();
+  });
+
+  it('restores the isolated Studio session after a full-page reload without replaying the handoff', async () => {
+    setSearch('?authoringSession=session_1');
+    const session = createAuthoringSession(createDocument('document_one', 'Reloaded Draft'), 6);
+    session.interactionContext.selection = 'field_customer_name';
+    vi.mocked(loadAuthoringSession).mockResolvedValue(session);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+
+    render(<UnifiedDesignerPage />);
+
+    expect(await screen.findByTestId('studio-handoff-context')).toHaveTextContent('Reloaded Draft');
+    expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r6');
+    expect(consumeAuthoringHandoff).not.toHaveBeenCalled();
+    expect(loadAuthoringSession).toHaveBeenCalledWith('session_1');
+    expect(loadPageSchemaV3).not.toHaveBeenCalled();
+    expect(screen.getByTestId('designer-return-link')).toHaveAttribute(
+      'href',
+      '/orders?tab=open&authoringReturn=session_1&authoringFocus=field_customer_name',
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_customer_name'),
+    );
   });
 
   it('saves a manifest-backed Studio edit into the same ChangeSet without touching PageSchema', async () => {

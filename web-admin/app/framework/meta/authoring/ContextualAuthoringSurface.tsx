@@ -84,6 +84,7 @@ export function ContextualAuthoringSurface({
   const [writeBlocked, setWriteBlocked] = useState(false);
   const runtimeRootRef = useRef<HTMLDivElement | null>(null);
   const entryScrollRef = useRef({ x: 0, y: 0 });
+  const returnResumeAttemptedRef = useRef(false);
 
   const rootNode = useMemo(() => buildAuthoringTree(workingSchema), [workingSchema]);
   const nodeIndex = useMemo(() => indexTree(rootNode), [rootNode]);
@@ -98,13 +99,73 @@ export function ContextualAuthoringSurface({
     [capabilities],
   );
 
+  useEffect(() => {
+    if (returnResumeAttemptedRef.current) return;
+    const resume = readAuthoringReturnRequest();
+    if (!resume) return;
+    returnResumeAttemptedRef.current = true;
+    if (!canConfigure) {
+      setError('当前账号无权恢复配置会话');
+      return;
+    }
+
+    let cancelled = false;
+    setOpening(true);
+    setError(null);
+    void Promise.all([loadAuthoringSession(resume.sessionPid), loadAuthoringCapabilities()])
+      .then(([restored, registry]) => {
+        if (restored.pagePid !== schema.id) {
+          throw new Error('返回的配置会话与当前页面不一致');
+        }
+        if (cancelled) return;
+        const restoredSchema = schemaFromSnapshot(schema, restored.snapshot);
+        const restoredTree = buildAuthoringTree(restoredSchema);
+        const restoredIndex = indexTree(restoredTree);
+        const contextSelection = contextSelectionId(restored.interactionContext);
+        const selected = [resume.focusBlockId, contextSelection, schema.id].find(
+          (candidate) => candidate && restoredIndex.byId.has(candidate),
+        );
+        const scroll = contextScroll(restored.interactionContext);
+        entryScrollRef.current = scroll;
+        setSession(restored);
+        setWorkingSchema(restoredSchema);
+        setPendingEdits(new Map());
+        setStale(false);
+        setCapabilities(registry);
+        setSelectedId(selected ?? schema.id);
+        setOutlineOpen(true);
+        setInspectorOpen(true);
+        clearAuthoringReturnParams();
+        requestAnimationFrame(() => {
+          window.scrollTo(scroll.x, scroll.y);
+          if (selected && selected !== schema.id) {
+            runtimeRootRef.current
+              ?.querySelector<HTMLElement>(`[data-aura-block-id="${cssEscape(selected)}"]`)
+              ?.scrollIntoView({ block: 'center' });
+          }
+        });
+      })
+      .catch((resumeError) => {
+        if (!cancelled) {
+          setError(resumeError instanceof Error ? resumeError.message : '无法恢复返回的配置会话');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setOpening(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canConfigure, schema]);
+
   const enter = useCallback(async () => {
     if (!canConfigure || opening) return;
     setOpening(true);
     setError(null);
     entryScrollRef.current = { x: window.scrollX, y: window.scrollY };
     try {
-      const interactionContext = captureInteractionContext(recordPid);
+      const interactionContext = captureInteractionContext(recordPid, schema.id);
       const [opened, registry] = await Promise.all([
         openAuthoringSession(schema.id, interactionContext),
         loadAuthoringCapabilities(),
@@ -1250,15 +1311,90 @@ function RiskBadge({ risk }: { risk: string }) {
   return <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${tone}`}>{risk}</span>;
 }
 
-function captureInteractionContext(recordPid?: string) {
+function captureInteractionContext(recordPid?: string, selection?: string) {
   const url = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   const search = new URLSearchParams(window.location.search);
+  const filters = collectQueryState(
+    search,
+    (key) =>
+      key === 'q' ||
+      key === 'search' ||
+      key === 'filter' ||
+      key === 'filters' ||
+      key.startsWith('filter.') ||
+      key.startsWith('filter['),
+  );
+  const sort = collectQueryState(
+    search,
+    (key) => key === 'sort' || key === 'order' || key === 'orderBy',
+  );
   return {
     route: url,
     ...(recordPid ? { recordPid } : {}),
     ...(search.get('tab') ? { tabId: search.get('tab')! } : {}),
+    ...(Object.keys(filters).length > 0 ? { filters } : {}),
+    ...(Object.keys(sort).length > 0 ? { sort } : {}),
     scroll: { x: window.scrollX, y: window.scrollY },
+    viewport: {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      scale: window.devicePixelRatio,
+    },
+    ...(selection ? { selection, outlinePath: [selection] } : {}),
   };
+}
+
+function collectQueryState(
+  search: URLSearchParams,
+  include: (key: string) => boolean,
+): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  search.forEach((value, key) => {
+    if (!include(key)) return;
+    (result[key] ??= []).push(value);
+  });
+  return result;
+}
+
+function readAuthoringReturnRequest(): { sessionPid: string; focusBlockId: string | null } | null {
+  if (typeof window === 'undefined') return null;
+  const search = new URLSearchParams(window.location.search);
+  const sessionPid = search.get('authoringReturn');
+  if (!sessionPid) return null;
+  return {
+    sessionPid,
+    focusBlockId: search.get('authoringFocus'),
+  };
+}
+
+function clearAuthoringReturnParams(): void {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('authoringReturn');
+  url.searchParams.delete('authoringFocus');
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function contextSelectionId(context: Record<string, unknown>): string | null {
+  if (typeof context.selection === 'string' && context.selection) return context.selection;
+  if (!Array.isArray(context.outlinePath)) return null;
+  const last = context.outlinePath
+    .filter((value): value is string => typeof value === 'string')
+    .at(-1);
+  return last || null;
+}
+
+function contextScroll(context: Record<string, unknown>): { x: number; y: number } {
+  const scroll = context.scroll;
+  if (!scroll || typeof scroll !== 'object' || Array.isArray(scroll)) return { x: 0, y: 0 };
+  const value = scroll as Record<string, unknown>;
+  return {
+    x: finiteNumber(value.x),
+    y: finiteNumber(value.y),
+  };
+}
+
+function finiteNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
 function buildAuthoringTree(schema: ContextualAuthoringSurfaceProps['schema']): AuthoringNode {
