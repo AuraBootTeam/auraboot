@@ -18,7 +18,7 @@ import java.util.TreeSet;
 @Component
 public class AuthoringImpactAnalyzer {
 
-    public static final String ANALYZER_VERSION = "core-page-dependencies-v2";
+    public static final String ANALYZER_VERSION = "core-page-dependencies-v5";
     private static final Duration QUERY_TIMEOUT = Duration.ofSeconds(2);
     private static final Comparator<DependencyRef> DEPENDENCY_ORDER =
             Comparator.comparing(DependencyRef::resourceType)
@@ -34,13 +34,13 @@ public class AuthoringImpactAnalyzer {
         this.snapshotFactory = snapshotFactory;
     }
 
-    public ImpactResult analyze(long tenantId, JsonNode snapshot) {
+    public ImpactResult analyze(long tenantId, long envId, JsonNode snapshot) {
         Set<DependencyRef> references = new TreeSet<>(DEPENDENCY_ORDER);
         collectReferences(snapshot, references);
         ArrayNode dependencies = JsonNodeFactory.instance.arrayNode();
         try {
             for (DependencyRef reference : references) {
-                ResourceFingerprint resource = resolve(tenantId, reference);
+                ResourceFingerprint resource = resolve(tenantId, envId, reference);
                 if (resource == null) {
                     return ImpactResult.failed("DEPENDENCY_MISSING");
                 }
@@ -61,7 +61,7 @@ public class AuthoringImpactAnalyzer {
         return ImpactResult.known(dependencies, snapshotFactory.checksum(dependencies));
     }
 
-    private ResourceFingerprint resolve(long tenantId, DependencyRef reference) {
+    private ResourceFingerprint resolve(long tenantId, long envId, DependencyRef reference) {
         return switch (reference.resourceType()) {
             case "COMMAND" -> dependencyRepository.findCurrentCommand(
                     tenantId, reference.resourceCode(), QUERY_TIMEOUT);
@@ -69,6 +69,10 @@ public class AuthoringImpactAnalyzer {
                     tenantId, reference.resourceCode(), QUERY_TIMEOUT);
             case "MODEL" -> dependencyRepository.findCurrentModel(
                     tenantId, reference.resourceCode(), QUERY_TIMEOUT);
+            case "NAMED_QUERY" -> dependencyRepository.findCurrentNamedQuery(
+                    tenantId, reference.resourceCode(), QUERY_TIMEOUT);
+            case "PAGE" -> dependencyRepository.findCurrentPage(
+                    tenantId, envId, reference.resourceCode(), QUERY_TIMEOUT);
             default -> throw new IllegalStateException(
                     "Unsupported authoring dependency type: " + reference.resourceType());
         };
@@ -84,6 +88,11 @@ public class AuthoringImpactAnalyzer {
             addReference("DICTIONARY", node.get("dictCode"), references);
             addReference("COMMAND", node.get("command"), references);
             addReference("COMMAND", node.get("commandCode"), references);
+            addReference("NAMED_QUERY", node.get("queryCode"), references);
+            addPageTarget(node.get("navigateTo"), references);
+            if ("navigate".equals(node.path("type").asText())) {
+                addPageTarget(node.get("to"), references);
+            }
             JsonNode dataSource = node.get("dataSource");
             if (dataSource != null && dataSource.isObject()) {
                 addReference("MODEL", dataSource.get("model"), references);
@@ -105,6 +114,22 @@ public class AuthoringImpactAnalyzer {
             Set<DependencyRef> references) {
         if (value != null && value.isTextual() && !value.asText().isBlank()) {
             references.add(new DependencyRef(resourceType, value.asText()));
+        }
+    }
+
+    private void addPageTarget(JsonNode value, Set<DependencyRef> references) {
+        if (value == null || !value.isTextual()) {
+            return;
+        }
+        String target = value.asText().trim();
+        if (target.isBlank()
+                || target.startsWith("/")
+                || target.startsWith("{")
+                || target.contains(":")) {
+            return;
+        }
+        if (target.matches("[A-Za-z][A-Za-z0-9_-]*")) {
+            references.add(new DependencyRef("PAGE", target));
         }
     }
 

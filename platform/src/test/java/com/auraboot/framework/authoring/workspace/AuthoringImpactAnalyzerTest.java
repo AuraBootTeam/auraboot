@@ -13,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class AuthoringImpactAnalyzerTest {
@@ -31,7 +32,7 @@ class AuthoringImpactAnalyzerTest {
                 .thenReturn(resource(
                         "MODEL", "payments", "model-payments", 2, 4, "fields-payments"));
 
-        ImpactResult result = analyzer.analyze(7, objectMapper.readTree("""
+        ImpactResult result = analyzer.analyze(7, 11, objectMapper.readTree("""
                 {"pid":"page-1","modelCode":"orders","blocks":[
                   {"id":"table-1","blockType":"table",
                    "dataSource":{"model":"payments"}},
@@ -64,13 +65,30 @@ class AuthoringImpactAnalyzerTest {
         when(repository.findCurrentModel(eq(7L), eq("order_lines"), any(Duration.class)))
                 .thenReturn(resource(
                         "MODEL", "order_lines", "model-lines", 1, 1, "fields-lines"));
+        when(repository.findCurrentNamedQuery(eq(7L), eq("order_metrics"), any(Duration.class)))
+                .thenReturn(resource(
+                        "NAMED_QUERY", "order_metrics", "query-metrics", 2, 2,
+                        "query-fields"));
+        when(repository.findCurrentPage(
+                eq(7L), eq(11L), eq("orders_detail"), any(Duration.class)))
+                .thenReturn(resource(
+                        "PAGE", "orders_detail", "page-orders-detail", 5, 7,
+                        "page-components"));
+        when(repository.findCurrentPage(
+                eq(7L), eq(11L), eq("orders_form"), any(Duration.class)))
+                .thenReturn(resource(
+                        "PAGE", "orders_form", "page-orders-form", 2, 4,
+                        "page-form-components"));
 
-        ImpactResult result = analyzer.analyze(7, objectMapper.readTree("""
+        ImpactResult result = analyzer.analyze(7, 11, objectMapper.readTree("""
                 {"modelCode":"orders","blocks":[
                   {"dictCode":"order_status",
-                   "action":{"command":"orders:create"}},
+                   "action":{"type":"navigate","to":"orders_detail",
+                     "command":"orders:create"}},
                   {"subTable":{"childModel":"order_lines","commands":{
-                    "delete":"lines:delete"}}}
+                    "delete":"lines:delete"}}},
+                  {"dataSource":{"type":"namedQuery","queryCode":"order_metrics"}},
+                  {"code":"edit","navigateTo":"orders_form"}
                 ]}
                 """));
 
@@ -83,10 +101,30 @@ class AuthoringImpactAnalyzerTest {
                         "COMMAND:orders:create",
                         "DICTIONARY:order_status",
                         "MODEL:order_lines",
-                        "MODEL:orders");
+                        "MODEL:orders",
+                        "NAMED_QUERY:order_metrics",
+                        "PAGE:orders_detail",
+                        "PAGE:orders_form");
         assertThat(result.dependencies().toString())
                 .doesNotContain("label")
                 .doesNotContain("execution_config");
+    }
+
+    @Test
+    void ignoresRoutesDynamicTargetsAndCrossDesignerNavigation() throws Exception {
+        ImpactResult result = analyzer.analyze(7, 11, objectMapper.readTree("""
+                {"blocks":[
+                  {"action":{"type":"navigate","to":"/p/orders/{pid}"}},
+                  {"action":{"type":"navigate","to":"{target}"}},
+                  {"action":{"type":"navigate","to":"dashboard:sales"}},
+                  {"navigateTo":" /meta/models/new "},
+                  {"to":"looks_like_a_page_but_has_no_navigate_type"}
+                ]}
+                """));
+
+        assertThat(result.known()).isTrue();
+        assertThat(result.dependencies()).isEmpty();
+        verifyNoInteractions(repository);
     }
 
     @Test
@@ -94,7 +132,7 @@ class AuthoringImpactAnalyzerTest {
         when(repository.findCurrentModel(eq(7L), eq("missing"), any(Duration.class)))
                 .thenReturn(null);
 
-        ImpactResult result = analyzer.analyze(7, objectMapper.readTree("""
+        ImpactResult result = analyzer.analyze(7, 11, objectMapper.readTree("""
                 {"pid":"page-1","modelCode":"missing","blocks":[]}
                 """));
 
@@ -109,7 +147,7 @@ class AuthoringImpactAnalyzerTest {
         when(repository.findCurrentModel(eq(7L), eq("orders"), any(Duration.class)))
                 .thenThrow(new QueryTimeoutException("database details must not escape"));
 
-        ImpactResult result = analyzer.analyze(7, objectMapper.readTree("""
+        ImpactResult result = analyzer.analyze(7, 11, objectMapper.readTree("""
                 {"pid":"page-1","modelCode":"orders","blocks":[]}
                 """));
 

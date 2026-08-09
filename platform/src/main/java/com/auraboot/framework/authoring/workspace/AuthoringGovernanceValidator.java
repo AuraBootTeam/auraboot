@@ -139,7 +139,7 @@ public class AuthoringGovernanceValidator {
             return;
         }
         AuthoringImpactAnalyzer.ImpactResult current = impactAnalyzer.analyze(
-                row.tenantId(), row.snapshot());
+                row.tenantId(), row.envId(), row.snapshot());
         if (!current.known()) {
             throw stale(row, "authoring.impact." + current.failureCode().toLowerCase());
         }

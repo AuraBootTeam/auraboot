@@ -1201,6 +1201,140 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void namedQueryFieldDriftInvalidatesAnExactRevisionImpactResult() {
+        PageSchema page = insertPage("normal");
+        ensureNamedQuery("authoring_order_metrics");
+        page.setBlocks("""
+                [{"id":"table-1","blockType":"table",
+                  "props":{"density":"normal"},
+                  "dataSource":{"type":"namedQuery",
+                    "queryCode":"authoring_order_metrics"}}]
+                """);
+        pageSchemaMapper.updateById(page);
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult patched = patchDensity(opened, "compact");
+        SessionView prepared = governanceService.prepare(
+                opened.sessionPid(), new RevisionRequest(patched.session().revision()));
+
+        assertThat(prepared.impact().dependencies()).extracting(dependency ->
+                dependency.resourceType() + ":" + dependency.resourceCode())
+                .containsExactly("MODEL:test_model", "NAMED_QUERY:authoring_order_metrics");
+        jdbcTemplate.update("""
+                UPDATE ab_named_query_field
+                SET sortable = NOT sortable, updated_at = CURRENT_TIMESTAMP
+                WHERE tenant_id = ? AND query_code = 'authoring_order_metrics'
+                  AND field_code = 'total'
+                """, testTenant.getId());
+
+        assertThatThrownBy(() -> governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(prepared.revision())))
+                .isInstanceOf(AuthoringStaleStateException.class)
+                .hasMessageContaining("authoring.validation.dependency-stale");
+        assertThat(workspaceService.get(opened.sessionPid()).impactState()).isEqualTo("STALE");
+    }
+
+    @Test
+    void archivedNamedQueryFailsClosedAndKeepsTheDraftEditable() {
+        PageSchema page = insertPage("normal");
+        ensureNamedQuery("authoring_archived_metrics");
+        jdbcTemplate.update("""
+                UPDATE ab_named_query
+                SET status = 'archived', updated_at = CURRENT_TIMESTAMP
+                WHERE tenant_id = ? AND code = 'authoring_archived_metrics'
+                """, testTenant.getId());
+        page.setBlocks("""
+                [{"id":"table-1","blockType":"table",
+                  "props":{"density":"normal"},
+                  "dataSource":{"type":"namedQuery",
+                    "queryCode":"authoring_archived_metrics"}}]
+                """);
+        pageSchemaMapper.updateById(page);
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult patched = patchDensity(opened, "compact");
+
+        SessionView prepared = governanceService.prepare(
+                opened.sessionPid(), new RevisionRequest(patched.session().revision()));
+
+        assertThat(prepared.state()).isEqualTo("ACTIVE");
+        assertThat(prepared.changeSetStatus()).isEqualTo("DRAFT");
+        assertThat(prepared.validationState()).isEqualTo("VALID");
+        assertThat(prepared.impactState()).isEqualTo("FAILED");
+        assertThat(prepared.impact().failureCode()).isEqualTo("DEPENDENCY_MISSING");
+        assertThatThrownBy(() -> governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(prepared.revision())))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("authoring.submit.not-ready");
+    }
+
+    @Test
+    void navigatedPageDriftInvalidatesAnExactEnvironmentRevisionImpactResult() {
+        PageSchema target = insertPage("normal");
+        PageSchema page = insertPage("normal");
+        page.setBlocks("""
+                [{"id":"table-1","blockType":"table",
+                  "props":{"density":"normal"},
+                  "buttons":[{"code":"open","action":{
+                    "type":"navigate","to":"%s"}}]}]
+                """.formatted(target.getPageKey()));
+        pageSchemaMapper.updateById(page);
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult patched = patchDensity(opened, "compact");
+        SessionView prepared = governanceService.prepare(
+                opened.sessionPid(), new RevisionRequest(patched.session().revision()));
+
+        assertThat(prepared.impact().dependencies()).extracting(dependency ->
+                dependency.resourceType() + ":" + dependency.resourceCode())
+                .containsExactly("MODEL:test_model", "PAGE:" + target.getPageKey());
+        jdbcTemplate.update("""
+                UPDATE ab_page_schema
+                SET row_version = row_version + 1, updated_at = CURRENT_TIMESTAMP
+                WHERE tenant_id = ? AND env_id = ? AND pid = ?
+                  AND is_current = TRUE AND deleted_flag = FALSE
+                """, testTenant.getId(), MetaContext.getCurrentEnvironmentId(), target.getPid());
+
+        assertThatThrownBy(() -> governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(prepared.revision())))
+                .isInstanceOf(AuthoringStaleStateException.class)
+                .hasMessageContaining("authoring.validation.dependency-stale");
+        assertThat(workspaceService.get(opened.sessionPid()).impactState()).isEqualTo("STALE");
+    }
+
+    @Test
+    void navigatedPageActiveReleaseSwitchInvalidatesTheDependentRevision() {
+        PageSchema target = insertPage("normal");
+        SessionView targetFirst = workspaceService.open(
+                new OpenSessionRequest(target.getPid(), null));
+        patchDensity(targetFirst, "compact");
+        prepareAndSubmit(targetFirst.sessionPid(), new RevisionRequest(2));
+        governanceService.publish(targetFirst.changeSetPid(), new RevisionRequest(2));
+
+        PageSchema page = insertPage("normal");
+        page.setBlocks("""
+                [{"id":"table-1","blockType":"table",
+                  "props":{"density":"normal"},
+                  "buttons":[{"code":"open","action":{
+                    "type":"navigate","to":"%s"}}]}]
+                """.formatted(target.getPageKey()));
+        pageSchemaMapper.updateById(page);
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult patched = patchDensity(opened, "compact");
+        SessionView prepared = governanceService.prepare(
+                opened.sessionPid(), new RevisionRequest(patched.session().revision()));
+
+        SessionView targetSecond = workspaceService.open(
+                new OpenSessionRequest(target.getPid(), null));
+        patchDensity(targetSecond, "comfortable");
+        prepareAndSubmit(targetSecond.sessionPid(), new RevisionRequest(2));
+        governanceService.publish(targetSecond.changeSetPid(), new RevisionRequest(2));
+
+        assertThatThrownBy(() -> governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(prepared.revision())))
+                .isInstanceOf(AuthoringStaleStateException.class)
+                .hasMessageContaining("authoring.validation.dependency-stale");
+        assertThat(workspaceService.get(opened.sessionPid()).impactState()).isEqualTo("STALE");
+    }
+
+    @Test
     void realDependencyQueryTimeoutFailsClosedWithoutPoisoningTheOuterTransaction()
             throws Exception {
         try (Connection blocker = dataSource.getConnection();
@@ -1209,7 +1343,8 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
             statement.execute("LOCK TABLE ab_meta_model IN ACCESS EXCLUSIVE MODE");
 
             AuthoringImpactAnalyzer.ImpactResult result = impactAnalyzer.analyze(
-                    testTenant.getId(), objectMapper.readTree("""
+                    testTenant.getId(), MetaContext.getCurrentEnvironmentId(),
+                    objectMapper.readTree("""
                             {"pid":"timeout-page","modelCode":"blocked_model","blocks":[]}
                             """));
 
@@ -1669,6 +1804,39 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         '{}'::jsonb, '[]'::jsonb, '{"type":"state_transition"}'::jsonb,
                         '{}'::jsonb, 1, TRUE, 1, 'published', FALSE)
                 """, UniqueIdGenerator.generate(), testTenant.getId(), commandCode, modelCode);
+    }
+
+    private void ensureNamedQuery(String queryCode) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_named_query
+                WHERE tenant_id = ? AND code = ?
+                """, Integer.class, testTenant.getId(), queryCode);
+        if (count != null && count > 0) {
+            return;
+        }
+        String queryPid = UniqueIdGenerator.generate();
+        jdbcTemplate.update("""
+                INSERT INTO ab_named_query (
+                    pid, tenant_id, code, title, from_sql, base_where,
+                    status, current_version, policy)
+                VALUES (?, ?, ?, 'Authoring order metrics',
+                        'SELECT 1 AS total', '[]'::jsonb,
+                        'published', 1, '{}'::jsonb)
+                """, queryPid, testTenant.getId(), queryCode);
+        jdbcTemplate.update("""
+                INSERT INTO ab_named_query_field (
+                    tenant_id, query_code, field_code, column_expr,
+                    data_type, operators, sortable, searchable, sort_order, source)
+                VALUES (?, ?, 'total', 'total', 'integer',
+                        '["EQ"]'::jsonb, TRUE, TRUE, 10, 'test')
+                """, testTenant.getId(), queryCode);
+        jdbcTemplate.update("""
+                INSERT INTO ab_named_query_version (
+                    pid, tenant_id, query_code, version_no, from_sql,
+                    fields_snapshot, status)
+                VALUES (?, ?, ?, 1, 'SELECT 1 AS total',
+                        '[{"fieldCode":"total"}]'::jsonb, 'published')
+                """, UniqueIdGenerator.generate(), testTenant.getId(), queryCode);
     }
 
     private PageSchema insertReorderPage() {

@@ -117,7 +117,8 @@ public class AuthoringGovernanceService {
         if (!validation.valid()) {
             return sessionView(identity, sessionPid);
         }
-        ImpactResult impact = impactAnalyzer.analyze(row.tenantId(), row.snapshot());
+        ImpactResult impact = impactAnalyzer.analyze(
+                row.tenantId(), row.envId(), row.snapshot());
         String impactRunPid = UniqueIdGenerator.generate();
         governanceRepository.recordImpact(
                 row, impact, impactRunPid, snapshotFactory.checksum(row.snapshot()),

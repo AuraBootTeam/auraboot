@@ -80,6 +80,70 @@ public class AuthoringDependencyFingerprintRepository {
               AND c.is_current = TRUE AND c.deleted_flag = FALSE
             """;
 
+    private static final String NAMED_QUERY_SQL = """
+            SELECT q.pid, q.current_version AS version,
+                   q.current_version AS row_version, q.updated_at,
+                   md5(concat_ws('|', q.status, q.current_version,
+                       q.from_sql, q.base_where::text, q.default_order::text,
+                       q.parameter_schema::text, q.result_schema::text,
+                       q.policy::text, q.connector_pid, q.connector_endpoint_code,
+                       COALESCE(fields.field_fingerprint, '[]'),
+                       COALESCE(version_snapshot.version_fingerprint, '[]')))
+                       AS component_fingerprint
+            FROM ab_named_query q
+            LEFT JOIN LATERAL (
+                SELECT (jsonb_agg(jsonb_build_array(
+                            f.field_code, f.updated_at, f.column_expr, f.data_type,
+                            f.operators, f.dict_code, f.sortable, f.searchable,
+                            f.ui_component, f.linked_field, f.required,
+                            f.sort_order, f.ui_config)
+                            ORDER BY f.sort_order, f.field_code))::text AS field_fingerprint
+                FROM ab_named_query_field f
+                WHERE f.tenant_id = q.tenant_id AND f.query_code = q.code
+            ) fields ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT (jsonb_build_array(
+                            v.pid, v.version_no, v.status, v.published_at,
+                            md5(concat_ws('|', v.from_sql, v.base_where::text,
+                                v.default_order::text, v.fields_snapshot::text,
+                                v.policy::text))))::text AS version_fingerprint
+                FROM ab_named_query_version v
+                WHERE v.tenant_id = q.tenant_id AND v.query_code = q.code
+                  AND v.version_no = q.current_version
+                ORDER BY v.id DESC
+                LIMIT 1
+            ) version_snapshot ON TRUE
+            WHERE q.tenant_id = ? AND q.code = ?
+              AND q.status IN ('draft', 'testing', 'published')
+            """;
+
+    private static final String PAGE_SQL = """
+            WITH effective_page AS (
+                SELECT p.*
+                FROM ab_page_schema p
+                WHERE p.tenant_id = ? AND p.page_key = ?
+                  AND p.is_current = TRUE AND p.deleted_flag = FALSE
+                  AND p.status = 'published'
+                  AND (p.env_id = ? OR p.env_id IS NULL)
+                ORDER BY CASE WHEN p.env_id = ? THEN 0 ELSE 1 END
+                LIMIT 1
+            )
+            SELECT p.pid, p.version, p.row_version, p.updated_at,
+                   md5(concat_ws('|', p.status, p.schema_version,
+                       p.model_code, p.kind, p.profile, p.layout::text,
+                       p.blocks::text, p.meta_info::text, p.plugin_pid,
+                       channel.pid, channel.row_version,
+                       active_release.pid, active_release.manifest_checksum))
+                       AS component_fingerprint
+            FROM effective_page p
+            LEFT JOIN ab_authoring_release_channel channel
+              ON channel.tenant_id = p.tenant_id AND channel.env_id = ?
+             AND channel.resource_type = 'PAGE_SCHEMA'
+             AND channel.resource_pid = p.pid
+            LEFT JOIN ab_authoring_release active_release
+              ON active_release.id = channel.active_release_id
+            """;
+
     private final JdbcTemplate jdbcTemplate;
 
     public AuthoringDependencyFingerprintRepository(JdbcTemplate jdbcTemplate) {
@@ -101,18 +165,47 @@ public class AuthoringDependencyFingerprintRepository {
         return findCurrentResource("COMMAND", tenantId, commandCode, timeout, COMMAND_SQL);
     }
 
+    public ResourceFingerprint findCurrentNamedQuery(
+            long tenantId, String queryCode, Duration timeout) {
+        return findCurrentResource(
+                "NAMED_QUERY", tenantId, queryCode, timeout, NAMED_QUERY_SQL);
+    }
+
+    public ResourceFingerprint findCurrentPage(
+            long tenantId, long envId, String pageKey, Duration timeout) {
+        return findCurrentResource(
+                "PAGE", tenantId, pageKey, timeout, PAGE_SQL,
+                statement -> {
+                    statement.setLong(3, envId);
+                    statement.setLong(4, envId);
+                    statement.setLong(5, envId);
+                });
+    }
+
     private ResourceFingerprint findCurrentResource(
             String resourceType,
             long tenantId,
             String resourceCode,
             Duration timeout,
             String sql) {
+        return findCurrentResource(
+                resourceType, tenantId, resourceCode, timeout, sql, statement -> { });
+    }
+
+    private ResourceFingerprint findCurrentResource(
+            String resourceType,
+            long tenantId,
+            String resourceCode,
+            Duration timeout,
+            String sql,
+            StatementBinder extraBinder) {
         return jdbcTemplate.execute((ConnectionCallback<ResourceFingerprint>) connection -> {
             Savepoint savepoint = connection.getAutoCommit()
                     ? null : connection.setSavepoint("authoring_impact_probe");
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 statement.setLong(1, tenantId);
                 statement.setString(2, resourceCode);
+                extraBinder.bind(statement);
                 statement.setQueryTimeout(
                         Math.max(1, (int) Math.ceil(timeout.toMillis() / 1000.0)));
                 try (ResultSet resultSet = statement.executeQuery()) {
@@ -165,6 +258,11 @@ public class AuthoringDependencyFingerprintRepository {
         if (savepoint != null) {
             connection.releaseSavepoint(savepoint);
         }
+    }
+
+    @FunctionalInterface
+    private interface StatementBinder {
+        void bind(PreparedStatement statement) throws SQLException;
     }
 
     public record ResourceFingerprint(
