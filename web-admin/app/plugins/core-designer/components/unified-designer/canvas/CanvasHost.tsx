@@ -53,6 +53,8 @@ interface CanvasHostProps {
   activeDropIntent: ActiveDropIntent;
   rootAccepts: boolean;
   structuralReadOnly?: boolean;
+  canReorderBlock?: (blockId: string) => boolean;
+  canResizeSpan?: (blockId: string) => boolean;
   onSelect: CanvasSelectHandler;
   onMoveBefore: (movingBlockId: string, targetBlockId: string) => void;
   onPatchBlock: (blockId: string, updater: (block: DslBlockV3) => DslBlockV3) => void;
@@ -81,6 +83,8 @@ export function CanvasHost({
   activeDropIntent,
   rootAccepts,
   structuralReadOnly = false,
+  canReorderBlock,
+  canResizeSpan,
   onSelect,
   onMoveBefore,
   onPatchBlock,
@@ -160,6 +164,8 @@ export function CanvasHost({
               activeDropIntent={activeDropIntent}
               locale={locale}
               structuralReadOnly={structuralReadOnly}
+              canReorderBlock={canReorderBlock}
+              canResizeSpan={canResizeSpan}
               onSelect={onSelect}
               onMoveBefore={onMoveBefore}
               onMoveWidget={patchWidgetLayout}
@@ -380,6 +386,8 @@ interface BlockFrameProps {
   locale: string;
   dashboardSiblings?: DslBlockV3[];
   structuralReadOnly?: boolean;
+  canReorderBlock?: (blockId: string) => boolean;
+  canResizeSpan?: (blockId: string) => boolean;
   onSelect: CanvasSelectHandler;
   onMoveBefore: (movingBlockId: string, targetBlockId: string) => void;
   onMoveWidget: (blockId: string, layoutPatch: Record<string, number>) => void;
@@ -401,6 +409,8 @@ function BlockFrame(props: BlockFrameProps) {
     locale,
     dashboardSiblings,
     structuralReadOnly = false,
+    canReorderBlock,
+    canResizeSpan,
     onSelect,
     onMoveBefore,
     onMoveWidget,
@@ -411,11 +421,19 @@ function BlockFrame(props: BlockFrameProps) {
   } = props;
   const selected = selectedBlockId === block.id;
   const multiSelected = multiSelectedIds?.has(block.id) ?? false;
+  const reorderAllowed = canReorderBlock
+    ? canReorderBlock(block.id)
+    : !structuralReadOnly;
+  const spanResizeAllowed = canResizeSpan
+    ? canResizeSpan(block.id)
+    : !structuralReadOnly;
   const isDashboardWidget = block.blockType === 'widget' && Boolean(dashboardSiblings);
   const siblingIndex = siblingBlocks?.findIndex((sibling) => sibling.id === block.id) ?? -1;
   const previousSibling = siblingIndex > 0 ? siblingBlocks?.[siblingIndex - 1] : undefined;
   const nextSibling =
     siblingIndex >= 0 && siblingBlocks ? siblingBlocks[siblingIndex + 1] : undefined;
+  const movableNextSibling =
+    nextSibling && (!canReorderBlock || canReorderBlock(nextSibling.id)) ? nextSibling : undefined;
   const span = typeof block.layout?.span === 'number' ? block.layout.span : 12;
   const widgetX = getGridNumber(block.layout?.x, 0);
   const widgetY = getGridNumber(block.layout?.y, 0);
@@ -453,7 +471,7 @@ function BlockFrame(props: BlockFrameProps) {
   } = useDraggable({
     id: canvasDraggableId(block.id),
     data: { kind: 'canvas-block', blockId: block.id },
-    disabled: isDashboardWidget || structuralReadOnly,
+    disabled: isDashboardWidget || !reorderAllowed,
   });
   const setRefs = (node: HTMLElement | null) => {
     setDropRef(node);
@@ -515,7 +533,7 @@ function BlockFrame(props: BlockFrameProps) {
       <div className="border-b border-slate-100 px-3 py-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-start gap-1.5">
-            {!isDashboardWidget && !structuralReadOnly ? (
+            {!isDashboardWidget && reorderAllowed ? (
               <button
                 type="button"
                 aria-label={`Drag ${getBlockLabel(block, locale)}`}
@@ -548,17 +566,17 @@ function BlockFrame(props: BlockFrameProps) {
               <div className="truncate font-mono text-[11px] text-slate-400">{block.blockType}</div>
             </div>
           </div>
-          {mode === 'layout' && !isDashboardWidget && !structuralReadOnly ? (
+          {mode === 'layout' && !isDashboardWidget && reorderAllowed ? (
             <BlockOrderControls
               blockId={block.id}
               previousBlockId={previousSibling?.id}
-              nextBlockId={nextSibling?.id}
+              nextBlockId={movableNextSibling?.id}
               onSelect={onSelect}
               onMoveBefore={onMoveBefore}
             />
           ) : null}
         </div>
-        {mode === 'layout' && !isDashboardWidget && !structuralReadOnly ? (
+        {mode === 'layout' && !isDashboardWidget && spanResizeAllowed ? (
           <div className="mt-2">
             <SpanQuickControls blockId={block.id} currentSpan={span} onResizeSpan={onResizeSpan} />
           </div>
@@ -592,6 +610,8 @@ function BlockFrame(props: BlockFrameProps) {
         activeDropIntent={activeDropIntent}
         locale={locale}
         structuralReadOnly={structuralReadOnly}
+        canReorderBlock={canReorderBlock}
+        canResizeSpan={canResizeSpan}
         onSelect={onSelect}
         onMoveBefore={onMoveBefore}
         onMoveWidget={onMoveWidget}

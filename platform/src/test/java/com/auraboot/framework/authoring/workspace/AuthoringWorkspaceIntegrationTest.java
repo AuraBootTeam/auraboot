@@ -331,6 +331,22 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void studioMoveRequiresAdminPermission() throws Exception {
+        grantDesignerManage();
+        PageSchema page = insertReorderPage();
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+
+        mockMvc.perform(patch("/api/authoring/sessions/{sessionPid}/studio-moves",
+                        opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(studioMoveBody(opened, "column-b", "column-a")))
+                .andExpect(status().isForbidden());
+
+        applyTestMetaContext();
+        assertThat(workspaceService.get(opened.sessionPid()).revision()).isEqualTo(1);
+    }
+
+    @Test
     void studioPatchPersistsIntoTheSameChangeSetWithoutChangingLegacyPage() throws Exception {
         grantDesignerAdmin();
         PageSchema page = insertPage("normal");
@@ -352,6 +368,44 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         applyTestMetaContext();
         PageSchema unchanged = pageSchemaMapper.selectByPid(page.getPid());
         assertThat(unchanged.getBlocks()).doesNotContain("payments");
+    }
+
+    @Test
+    void studioMovePersistsStableSiblingOrderIntoTheSameChangeSet() throws Exception {
+        grantDesignerAdmin();
+        PageSchema page = insertReorderPage();
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+
+        mockMvc.perform(patch("/api/authoring/sessions/{sessionPid}/studio-moves",
+                        opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(studioMoveBody(opened, "column-b", "column-a")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.changeSetPid").value(opened.changeSetPid()))
+                .andExpect(jsonPath("$.data.session.revision").value(2))
+                .andExpect(jsonPath("$.data.session.riskLevel").value("L1"))
+                .andExpect(jsonPath("$.data.session.route").value("GUIDED_INLINE"))
+                .andExpect(jsonPath("$.data.session.publishPolicy").value("DEFAULT_REVIEW"))
+                .andExpect(jsonPath("$.data.session.snapshot.blocks[0].blocks[0].id")
+                        .value("column-b"))
+                .andExpect(jsonPath("$.data.session.snapshot.blocks[0].blocks[1].id")
+                        .value("column-a"))
+                .andExpect(jsonPath("$.data.previousValue.beforeBlockId").value("column-c"))
+                .andExpect(jsonPath("$.data.savedValue.beforeBlockId").value("column-a"));
+
+        applyTestMetaContext();
+        String operation = jdbcTemplate.queryForObject("""
+                SELECT operation FROM ab_authoring_change_item
+                WHERE tenant_id = ? AND env_id = ? AND change_set_id = (
+                    SELECT id FROM ab_authoring_change_set
+                    WHERE tenant_id = ? AND env_id = ? AND pid = ?)
+                """, String.class,
+                testTenant.getId(), MetaContext.getCurrentEnvironmentId(),
+                testTenant.getId(), MetaContext.getCurrentEnvironmentId(), opened.changeSetPid());
+        assertThat(operation).isEqualTo("MOVE");
+
+        PageSchema unchanged = pageSchemaMapper.selectByPid(page.getPid());
+        assertThat(unchanged.getBlocks()).containsSubsequence("column-a", "column-b", "column-c");
     }
 
     @Test
@@ -747,6 +801,20 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         return page;
     }
 
+    private PageSchema insertReorderPage() {
+        PageSchema page = insertPage("normal");
+        page.setSchemaVersion(3);
+        page.setBlocks("""
+                [{"id":"list-1","blockType":"list","blocks":[
+                  {"id":"column-a","blockType":"column"},
+                  {"id":"column-b","blockType":"column"},
+                  {"id":"column-c","blockType":"column"}
+                ]}]
+                """);
+        pageSchemaMapper.updateById(page);
+        return page;
+    }
+
     private int count(String table, String pid) {
         if (!table.equals("ab_authoring_change_set")
                 && !table.equals("ab_authoring_config_session")) {
@@ -812,6 +880,21 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 """.formatted(
                 opened.revision(),
                 capabilityRegistry.find("table").orElseThrow().checksum());
+    }
+
+    private String studioMoveBody(SessionView opened, String blockId, String beforeBlockId) {
+        return """
+                {
+                  "expectedRevision":%d,
+                  "blockId":"%s",
+                  "beforeBlockId":"%s",
+                  "manifestChecksum":"%s"
+                }
+                """.formatted(
+                opened.revision(),
+                blockId,
+                beforeBlockId,
+                capabilityRegistry.find("column").orElseThrow().checksum());
     }
 
     private PatchResult patchDensity(SessionView opened, String density) {

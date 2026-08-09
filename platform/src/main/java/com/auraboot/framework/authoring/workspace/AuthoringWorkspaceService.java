@@ -7,6 +7,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringPatchEngine.PreparedP
 import com.auraboot.framework.authoring.workspace.AuthoringActiveReleaseResolver.ActiveRelease;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ApplyPatchRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CapabilityRegistryView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.MoveBlockRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.REORDER_WITHIN_PARENT_PATH;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -148,6 +150,73 @@ public class AuthoringWorkspaceService {
         return apply(sessionPid, request, true);
     }
 
+    @Transactional
+    public PatchResult moveStudioBlock(String sessionPid, MoveBlockRequest request) {
+        Identity identity = identity();
+        WorkspaceRow workspace = requireWorkspace(identity, sessionPid, true);
+
+        PreparedPatch prepared;
+        try {
+            validateWritable(workspace, identity, request.expectedRevision());
+            prepared = patchEngine.prepareStudioMove(
+                    workspace.snapshot(),
+                    request.blockId(),
+                    request.beforeBlockId(),
+                    request.manifestChecksum(),
+                    snapshotFactory.resourceScope(workspace.snapshot()));
+        } catch (ResponseStatusException exception) {
+            auditService.recordDenied(audit(
+                    identity,
+                    workspace.changeSetPid(),
+                    workspace.sessionPid(),
+                    "STRUCTURE_MOVE_DENIED",
+                    "DENY",
+                    reason(exception),
+                    workspace.pagePid(),
+                    request.blockId(),
+                    REORDER_WITHIN_PARENT_PATH,
+                    moveMetadata(request, null)));
+            throw exception;
+        }
+
+        String changeItemPid = UniqueIdGenerator.generate();
+        AggregatePolicy aggregate = aggregatePolicyService.aggregate(workspace, prepared.decision());
+        repository.persistPatch(
+                workspace,
+                prepared.snapshot(),
+                capabilityRegistry.checksum(),
+                changeItemPid,
+                request.blockId(),
+                REORDER_WITHIN_PARENT_PATH,
+                "MOVE",
+                prepared.previousValue(),
+                prepared.savedValue(),
+                prepared.capability(),
+                prepared.decision(),
+                identity.userId(),
+                aggregate,
+                Instant.now().plus(WRITER_LEASE));
+        repository.audit(audit(
+                identity,
+                workspace.changeSetPid(),
+                workspace.sessionPid(),
+                "STRUCTURE_MOVE_SAVED",
+                "ALLOW",
+                prepared.decision().reason().name(),
+                workspace.pagePid(),
+                request.blockId(),
+                REORDER_WITHIN_PARENT_PATH,
+                moveMetadata(request, changeItemPid)));
+
+        SessionView reloaded = viewMapper.toView(requireWorkspace(identity, sessionPid, false));
+        return new PatchResult(
+                reloaded,
+                changeItemPid,
+                prepared.decision(),
+                prepared.previousValue(),
+                prepared.savedValue());
+    }
+
     private PatchResult apply(
             String sessionPid,
             ApplyPatchRequest request,
@@ -261,6 +330,24 @@ public class AuthoringWorkspaceService {
             throw new ResponseStatusException(FORBIDDEN, "authoring.context.incomplete");
         }
         return new Identity(context.getTenantId(), envId, context.getUserId());
+    }
+
+    private JsonNode moveMetadata(MoveBlockRequest request, String changeItemPid) {
+        var metadata = objectMapper.createObjectNode();
+        metadata.put("operation", "MOVE");
+        metadata.put("expectedRevision", request.expectedRevision());
+        metadata.put("authoringSurface", "STUDIO");
+        metadata.put("structureOperation", "REORDER_WITHIN_PARENT");
+        if (request.beforeBlockId() == null) {
+            metadata.putNull("beforeBlockId");
+        } else {
+            metadata.put("beforeBlockId", request.beforeBlockId());
+        }
+        if (changeItemPid != null) {
+            metadata.put("changeItemPid", changeItemPid);
+            metadata.put("resultRevision", request.expectedRevision() + 1);
+        }
+        return metadata;
     }
 
     private String reason(ResponseStatusException exception) {

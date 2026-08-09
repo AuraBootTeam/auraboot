@@ -37,6 +37,13 @@ public final class AuthoringWorkspaceContracts {
             @NotBlank String manifestChecksum) {
     }
 
+    public record MoveBlockRequest(
+            @Positive long expectedRevision,
+            @NotBlank @Size(max = 120) String blockId,
+            @Size(min = 1, max = 120) String beforeBlockId,
+            @NotBlank String manifestChecksum) {
+    }
+
     public record SessionView(
             String sessionPid,
             String changeSetPid,

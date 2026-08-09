@@ -11,6 +11,7 @@ import {
   consumeAuthoringHandoff,
   loadAuthoringCapabilities,
   loadAuthoringSession,
+  moveAuthoringStudioBlock,
 } from '~/framework/meta/authoring/authoringService';
 import type {
   AuthoringSession,
@@ -45,6 +46,7 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   consumeAuthoringHandoff: vi.fn(),
   loadAuthoringCapabilities: vi.fn(),
   loadAuthoringSession: vi.fn(),
+  moveAuthoringStudioBlock: vi.fn(),
 }));
 
 describe('UnifiedDesignerPage', () => {
@@ -59,6 +61,7 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(loadAuthoringSession).mockReset();
     vi.mocked(loadAuthoringCapabilities).mockReset();
     vi.mocked(applyAuthoringStudioPatch).mockReset();
+    vi.mocked(moveAuthoringStudioBlock).mockReset();
     permissionMock.canAdministerDesigner.mockReturnValue(true);
   });
 
@@ -219,7 +222,7 @@ describe('UnifiedDesignerPage', () => {
     fireEvent.click(screen.getByTestId('resource-tab-blocks'));
     const structuralActions = screen.getAllByTestId(/^palette-add-/);
     expect(structuralActions.length).toBeGreaterThan(0);
-    structuralActions.forEach((action) => expect(action).toBeDisabled());
+    structuralActions.forEach((action: HTMLElement) => expect(action).toBeDisabled());
 
     fireEvent.change(screen.getByTestId('inspector-field-dataSource.model-manual'), {
       target: { value: 'payment' },
@@ -240,6 +243,56 @@ describe('UnifiedDesignerPage', () => {
     expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4');
     expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('已保存');
     expect(savePageSchemaV3).not.toHaveBeenCalled();
+  });
+
+  it('saves a declared same-parent block reorder through the typed Studio move endpoint', async () => {
+    setSearch('?contextId=ctx_secure_once');
+    const handoff = createHandoff('field_customer_name', '/$structure/order');
+    const baseline = createDocument('document_one', 'Isolated Draft');
+    const session = createAuthoringSession(baseline);
+    const saved = createDocument('document_one', 'Isolated Draft');
+    const section = findBlock(saved.blocks, 'section_basic');
+    if (!section?.blocks) throw new Error('section_basic fixture missing');
+    const [name, phone, ...rest] = section.blocks;
+    section.blocks = [phone, name, ...rest];
+
+    vi.mocked(consumeAuthoringHandoff).mockResolvedValue(handoff);
+    vi.mocked(loadAuthoringSession).mockResolvedValue(session);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(moveAuthoringStudioBlock).mockResolvedValue({
+      session: createAuthoringSession(saved, 4, 'L1', 'GUIDED_INLINE'),
+      changeItemPid: 'item_move_1',
+      decision: {
+        route: 'GUIDED_INLINE',
+        risk: 'L1',
+        publishPolicy: 'DEFAULT_REVIEW',
+        reason: 'CAPABILITY_ALLOWED',
+        manifestChecksum: 'field-checksum',
+        rolePreviewRequired: false,
+      },
+      previousValue: { beforeBlockId: rest[0]?.id ?? null },
+      savedValue: { beforeBlockId: name.id },
+    });
+
+    render(<UnifiedDesignerPage />);
+
+    await screen.findByTestId('studio-handoff-context');
+    fireEvent.click(screen.getByTestId('designer-mode-layout'));
+    fireEvent.click(screen.getByTestId('block-move-down-field_customer_name'));
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    await waitFor(() =>
+      expect(moveAuthoringStudioBlock).toHaveBeenCalledWith(
+        'session_1',
+        3,
+        'field_customer_phone',
+        'field_customer_name',
+        'field-checksum',
+      ),
+    );
+    expect(applyAuthoringStudioPatch).not.toHaveBeenCalled();
+    expect(savePageSchemaV3).not.toHaveBeenCalled();
+    expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4');
   });
 });
 
@@ -313,6 +366,12 @@ function createCapabilities(): CapabilityRegistry {
         checksum: 'field-checksum',
         properties: {
           '/props/label': propertyCapability('/props/label', 'INLINE'),
+          '/layout/span': propertyCapability('/layout/span', 'INLINE'),
+          '/$structure/order': propertyCapability(
+            '/$structure/order',
+            'GUIDED_INLINE',
+            ['MOVE'],
+          ),
         },
       },
       {
@@ -323,16 +382,25 @@ function createCapabilities(): CapabilityRegistry {
         checksum: 'list-checksum',
         properties: {
           '/dataSource': propertyCapability('/dataSource', 'HANDOFF_STUDIO'),
+          '/$structure/order': propertyCapability(
+            '/$structure/order',
+            'GUIDED_INLINE',
+            ['MOVE'],
+          ),
         },
       },
     ],
   };
 }
 
-function propertyCapability(propertyPath: string, route: string) {
+function propertyCapability(
+  propertyPath: string,
+  route: string,
+  allowedOperations = ['ADD', 'REPLACE', 'REMOVE'],
+) {
   return {
     propertyPath,
-    allowedOperations: ['ADD', 'REPLACE', 'REMOVE'],
+    allowedOperations,
     route,
     risk: route === 'HANDOFF_STUDIO' ? 'L3' : 'L1',
     effectTags: route === 'HANDOFF_STUDIO' ? ['DATA_BINDING'] : ['PRESENTATION'],
@@ -340,4 +408,16 @@ function propertyCapability(propertyPath: string, route: string) {
     protectedSemantic: false,
     rolePreviewRequired: route === 'HANDOFF_STUDIO',
   };
+}
+
+function findBlock(
+  blocks: PageSchemaV3['blocks'],
+  blockId: string,
+): PageSchemaV3['blocks'][number] | null {
+  for (const block of blocks) {
+    if (block.id === blockId) return block;
+    const nested = findBlock(block.blocks ?? [], blockId);
+    if (nested) return nested;
+  }
+  return null;
 }

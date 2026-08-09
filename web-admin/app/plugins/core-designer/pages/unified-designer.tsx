@@ -21,6 +21,7 @@ import {
   consumeAuthoringHandoff,
   loadAuthoringCapabilities,
   loadAuthoringSession,
+  moveAuthoringStudioBlock,
 } from '~/framework/meta/authoring/authoringService';
 import type {
   AuthoringSession,
@@ -31,6 +32,7 @@ import {
   authoringSnapshotToPageSchemaV3,
   planStudioAuthoringPatches,
   studioEditablePropertyPaths,
+  studioReorderableBlockTypes,
 } from '../components/unified-designer/persistence/contextualAuthoringAdapter';
 
 const LOCAL_STORAGE_KEY = 'auraboot.unified-designer.sample';
@@ -209,6 +211,17 @@ export default function UnifiedDesignerPage() {
     }
 
     let workingSession = authoringSession;
+    for (const move of plan.moves) {
+      const result = await moveAuthoringStudioBlock(
+        workingSession.sessionPid,
+        workingSession.revision,
+        move.blockId,
+        move.beforeBlockId,
+        move.manifestChecksum,
+      );
+      workingSession = result.session;
+      setAuthoringSession(workingSession);
+    }
     for (const patch of plan.patches) {
       const result = await applyAuthoringStudioPatch(
         workingSession.sessionPid,
@@ -286,6 +299,10 @@ export default function UnifiedDesignerPage() {
         ? studioEditablePropertyPaths(authoringCapabilities)
         : {}
       : undefined;
+  const contextualReorderableBlockTypes =
+    handoff && canAdministerDesigner && authoringCapabilities
+      ? studioReorderableBlockTypes(authoringCapabilities)
+      : undefined;
   const contextualReadOnly = Boolean(
     handoff && (!canAdministerDesigner || authoringSession?.state !== 'ACTIVE'),
   );
@@ -305,6 +322,7 @@ export default function UnifiedDesignerPage() {
       initialSelectedBlockId={handoff?.blockId || undefined}
       contextualReadOnly={contextualReadOnly}
       contextualEditablePropertyPaths={contextualEditablePropertyPaths}
+      contextualReorderableBlockTypes={contextualReorderableBlockTypes}
     />
   );
 
@@ -322,7 +340,7 @@ export default function UnifiedDesignerPage() {
         ) : (
           <span className="ml-2" data-testid="studio-handoff-editable-reason">
             ChangeSet {handoff.changeSetPid} · 修订 r{authoringSession?.revision ?? handoff.revision} ·
-            高级属性将写回同一隔离草稿；结构操作需通过后续 typed patch，不会直接修改线上页面。
+            高级属性和已声明的同级顺序调整将写回同一隔离草稿；跨父级、增删区块等治理操作仍不开放。
           </span>
         )}
       </div>

@@ -32,6 +32,7 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
     private static final String PLUGIN_CODE = "core.designer";
     private static final String PLUGIN_VERSION = "0.1.0";
     private static final String MANIFEST_VERSION = "1";
+    public static final String REORDER_WITHIN_PARENT_PATH = "/$structure/order";
     private static final Set<PatchOperation> VALUE_OPERATIONS =
             Set.copyOf(EnumSet.of(PatchOperation.ADD, PatchOperation.REPLACE, PatchOperation.REMOVE));
 
@@ -42,7 +43,7 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
         Map<String, Map<String, PropertyCapability>> definitions = new LinkedHashMap<>();
 
         definitions.put("field", properties(
-                commonTitle(), commonSpan(),
+                commonTitle(), commonSpan(), reorderWithinParent(),
                 property("/props/label", Route.INLINE, RiskLevel.L1,
                         effects(EffectTag.PRESENTATION), Reversibility.REVERSIBLE, false, false),
                 property("/props/visible", Route.GUIDED_INLINE, RiskLevel.L2,
@@ -55,7 +56,7 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
         definitions.put("table", listProperties());
 
         definitions.put("action", properties(
-                commonTitle(), commonSpan(),
+                commonTitle(), commonSpan(), reorderWithinParent(),
                 property("/props/label", Route.GUIDED_INLINE, RiskLevel.L2,
                         effects(EffectTag.PRESENTATION),
                         Reversibility.REVERSIBLE, true, true),
@@ -73,7 +74,7 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
                         effects(EffectTag.BUSINESS_ACTION), Reversibility.REVERSIBLE, false, true)));
 
         definitions.put("chart", properties(
-                commonTitle(), commonSpan(),
+                commonTitle(), commonSpan(), reorderWithinParent(),
                 property("/props/height", Route.INLINE, RiskLevel.L0,
                         effects(EffectTag.PRESENTATION), Reversibility.REVERSIBLE, false, false),
                 property("/dataSource", Route.HANDOFF_STUDIO, RiskLevel.L3,
@@ -82,9 +83,21 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
         definitions.put("description", contentProperties());
         definitions.put("rich-text", contentProperties());
         definitions.put("tabs", properties(
-                commonTitle(), commonSpan(),
+                commonTitle(), commonSpan(), reorderWithinParent(),
                 property("/props/defaultTab", Route.INLINE, RiskLevel.L1,
                         effects(EffectTag.PRESENTATION), Reversibility.REVERSIBLE, false, false)));
+
+        definitions.put("filter-field", definitions.get("field"));
+        definitions.put("form", layoutProperties());
+        definitions.put("detail", layoutProperties());
+        definitions.put("dashboard", layoutProperties());
+        definitions.put("form-section", layoutProperties());
+        definitions.put("detail-section", layoutProperties());
+        definitions.put("tab", layoutProperties());
+        definitions.put("filter-bar", layoutProperties());
+        definitions.put("action-bar", layoutProperties());
+        definitions.put("widget", layoutProperties());
+        definitions.put("stat-card", layoutProperties());
 
         Map<String, CapabilityManifest> built = new LinkedHashMap<>();
         definitions.forEach((blockType, propertyMap) -> {
@@ -113,7 +126,7 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
 
     private Map<String, PropertyCapability> listProperties() {
         return properties(
-                commonTitle(), commonSpan(),
+                commonTitle(), commonSpan(), reorderWithinParent(),
                 property("/props/density", Route.INLINE, RiskLevel.L0,
                         effects(EffectTag.PRESENTATION), Reversibility.REVERSIBLE, false, false),
                 property("/props/pageSize", Route.INLINE, RiskLevel.L1,
@@ -128,9 +141,13 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
 
     private Map<String, PropertyCapability> contentProperties() {
         return properties(
-                commonTitle(), commonSpan(),
+                commonTitle(), commonSpan(), reorderWithinParent(),
                 property("/props/content", Route.INLINE, RiskLevel.L1,
                         effects(EffectTag.PRESENTATION), Reversibility.REVERSIBLE, false, false));
+    }
+
+    private Map<String, PropertyCapability> layoutProperties() {
+        return properties(commonTitle(), commonSpan(), reorderWithinParent());
     }
 
     private PropertyCapability commonTitle() {
@@ -141,6 +158,18 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
     private PropertyCapability commonSpan() {
         return property("/layout/span", Route.INLINE, RiskLevel.L0,
                 effects(EffectTag.PRESENTATION), Reversibility.REVERSIBLE, false, false);
+    }
+
+    private PropertyCapability reorderWithinParent() {
+        return new PropertyCapability(
+                REORDER_WITHIN_PARENT_PATH,
+                Set.of(PatchOperation.MOVE),
+                Route.GUIDED_INLINE,
+                RiskLevel.L1,
+                effects(EffectTag.PRESENTATION),
+                Reversibility.REVERSIBLE,
+                false,
+                false);
     }
 
     private PropertyCapability property(

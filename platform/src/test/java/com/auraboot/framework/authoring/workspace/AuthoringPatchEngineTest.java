@@ -35,7 +35,8 @@ class AuthoringPatchEngineTest {
                 new AuthoringContentSanitizer(),
                 new AuthoringProtectedSemanticValidator(commandDefinitionMapper),
                 new AuthoringSnapshotTargetResolver(),
-                new AuthoringJsonObjectPatchApplier());
+                new AuthoringJsonObjectPatchApplier(),
+                new AuthoringStableBlockTreeEditor());
     }
 
     @Test
@@ -94,6 +95,62 @@ class AuthoringPatchEngineTest {
         assertThat(patch.snapshot().at("/blocks/0/dataSource/model").asText())
                 .isEqualTo("payments");
         assertThat(source.at("/blocks/0/dataSource/model").asText()).isEqualTo("orders");
+    }
+
+    @Test
+    void studioMoveReordersStableSiblingsWithoutMutatingTheSource() throws Exception {
+        ObjectNode source = (ObjectNode) objectMapper.readTree("""
+                {"blocks":[{"id":"form-1","blockType":"form","blocks":[
+                  {"id":"field-a","blockType":"field"},
+                  {"id":"field-b","blockType":"field"},
+                  {"id":"field-c","blockType":"field"}
+                ]}]}
+                """);
+
+        AuthoringPatchEngine.PreparedPatch patch = engine.prepareStudioMove(
+                source,
+                "field-b",
+                "field-a",
+                checksum("field"),
+                ResourceScope.CURRENT_PAGE);
+
+        assertThat(patch.decision().route()).isEqualTo(Route.GUIDED_INLINE);
+        assertThat(patch.previousValue().path("beforeBlockId").asText()).isEqualTo("field-c");
+        assertThat(patch.savedValue().path("beforeBlockId").asText()).isEqualTo("field-a");
+        assertThat(patch.snapshot().at("/blocks/0/blocks/0/id").asText()).isEqualTo("field-b");
+        assertThat(source.at("/blocks/0/blocks/0/id").asText()).isEqualTo("field-a");
+    }
+
+    @Test
+    void studioMoveRejectsCrossParentTargetsAndNoOps() throws Exception {
+        ObjectNode source = (ObjectNode) objectMapper.readTree("""
+                {"blocks":[
+                  {"id":"left","blockType":"form-section","blocks":[
+                    {"id":"field-a","blockType":"field"},
+                    {"id":"field-b","blockType":"field"}
+                  ]},
+                  {"id":"right","blockType":"form-section","blocks":[
+                    {"id":"field-c","blockType":"field"}
+                  ]}
+                ]}
+                """);
+
+        assertThatThrownBy(() -> engine.prepareStudioMove(
+                source,
+                "field-a",
+                "field-c",
+                checksum("field"),
+                ResourceScope.CURRENT_PAGE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("target-not-sibling");
+        assertThatThrownBy(() -> engine.prepareStudioMove(
+                source,
+                "field-a",
+                "field-b",
+                checksum("field"),
+                ResourceScope.CURRENT_PAGE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("no-op");
     }
 
     @Test

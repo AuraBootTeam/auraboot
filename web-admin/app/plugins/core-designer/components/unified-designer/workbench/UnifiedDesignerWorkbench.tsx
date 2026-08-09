@@ -112,6 +112,7 @@ export interface UnifiedDesignerWorkbenchProps {
   initialSelectedBlockId?: string;
   contextualReadOnly?: boolean;
   contextualEditablePropertyPaths?: Record<string, string[]>;
+  contextualReorderableBlockTypes?: string[];
 }
 
 export function UnifiedDesignerWorkbench({
@@ -128,6 +129,7 @@ export function UnifiedDesignerWorkbench({
   initialSelectedBlockId,
   contextualReadOnly = false,
   contextualEditablePropertyPaths,
+  contextualReorderableBlockTypes,
 }: UnifiedDesignerWorkbenchProps) {
   const { locale } = useI18n();
   const initialSnapshot = serializeDocument(initialDocument);
@@ -159,6 +161,10 @@ export function UnifiedDesignerWorkbench({
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const contextualRestricted = contextualEditablePropertyPaths !== undefined;
+  const contextualReorderableTypes = useMemo(
+    () => new Set(contextualReorderableBlockTypes ?? []),
+    [contextualReorderableBlockTypes],
+  );
 
   React.useEffect(() => {
     if (initialSelectedBlockId) setSelectedBlockId(initialSelectedBlockId);
@@ -289,7 +295,8 @@ export function UnifiedDesignerWorkbench({
   };
 
   const handleMoveBefore = (movingBlockId: string, targetBlockId: string) => {
-    if (contextualReadOnly || contextualRestricted) return;
+    if (contextualReadOnly) return;
+    if (contextualRestricted && !canContextualReorder(movingBlockId, targetBlockId)) return;
     updateDocument((current) => ({
       ...current,
       blocks: moveBlockBefore(current.blocks, movingBlockId, targetBlockId),
@@ -414,6 +421,7 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canMoveBlockBeforeTarget = (movingBlockId: string, targetBlockId: string) => {
+    if (contextualRestricted && !canContextualReorder(movingBlockId, targetBlockId)) return false;
     return canMoveExistingBlockBeforeTarget({
       blocks: document.blocks,
       kind: document.kind,
@@ -424,6 +432,7 @@ export function UnifiedDesignerWorkbench({
   };
 
   const canMoveBlockToParent = (movingBlockId: string, parentBlockId: string) => {
+    if (contextualRestricted) return false;
     return canMoveExistingBlockToParent({
       blocks: document.blocks,
       kind: document.kind,
@@ -431,6 +440,22 @@ export function UnifiedDesignerWorkbench({
       movingBlockId,
       parentBlockId,
     });
+  };
+
+  const canContextualReorder = (movingBlockId: string, targetBlockId: string): boolean => {
+    const movingResult = findBlockById(document.blocks, movingBlockId);
+    const targetResult = findBlockById(document.blocks, targetBlockId);
+    if (!movingResult || !targetResult) return false;
+    if (!contextualReorderableTypes.has(movingResult.block.blockType)) return false;
+    const movingParent = movingResult.path.at(-2)?.id ?? null;
+    const targetParent = targetResult.path.at(-2)?.id ?? null;
+    return movingParent === targetParent;
+  };
+
+  const canContextualResizeSpan = (blockId: string): boolean => {
+    const block = findBlockById(document.blocks, blockId)?.block;
+    if (!block) return false;
+    return contextualEditablePropertyPaths?.[block.blockType]?.includes('/layout/span') ?? false;
   };
 
   const canAddBlockToRoot = (blockType: string) => {
@@ -659,7 +684,8 @@ export function UnifiedDesignerWorkbench({
     blockId: string,
     updater: (block: PageSchemaV3['blocks'][number]) => PageSchemaV3['blocks'][number],
   ) => {
-    if (contextualReadOnly || contextualRestricted) return;
+    if (contextualReadOnly) return;
+    if (contextualRestricted && !canContextualResizeSpan(blockId)) return;
     updateDocument((current) => ({
       ...current,
       blocks: updateBlockById(current.blocks, blockId, updater),
@@ -1069,6 +1095,15 @@ export function UnifiedDesignerWorkbench({
               activeDropIntent={activeDropIntent}
               rootAccepts={Boolean(rootAccepts)}
               structuralReadOnly={contextualRestricted}
+              canReorderBlock={
+                contextualRestricted
+                  ? (blockId) => {
+                      const block = findBlockById(document.blocks, blockId)?.block;
+                      return Boolean(block && contextualReorderableTypes.has(block.blockType));
+                    }
+                  : undefined
+              }
+              canResizeSpan={contextualRestricted ? canContextualResizeSpan : undefined}
               onSelect={handleCanvasSelect}
               onMoveBefore={handleMoveBefore}
               onPatchBlock={patchBlock}

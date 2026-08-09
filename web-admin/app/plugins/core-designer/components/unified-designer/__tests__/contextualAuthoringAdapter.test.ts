@@ -18,6 +18,7 @@ const capabilities: CapabilityRegistry = {
       properties: {
         '/title': property('/title', 'INLINE'),
         '/dataSource': property('/dataSource', 'HANDOFF_STUDIO'),
+        '/$structure/order': property('/$structure/order', 'GUIDED_INLINE', ['MOVE']),
       },
     },
   ],
@@ -52,12 +53,47 @@ describe('contextualAuthoringAdapter', () => {
     const plan = planStudioAuthoringPatches(baseline, candidate, capabilities);
 
     expect(plan.unsupported).toEqual([]);
+    expect(plan.moves).toEqual([]);
     expect(plan.patches).toEqual([
       {
         blockId: 'table-1',
         propertyPath: '/dataSource',
         operation: 'REPLACE',
         value: { model: 'payments' },
+        manifestChecksum: 'table-1',
+      },
+    ]);
+  });
+
+  it('plans stable same-parent reorder operations without treating them as property patches', () => {
+    const baseline: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'list',
+      id: 'orders_list',
+      blocks: [
+        { id: 'table-a', blockType: 'table' },
+        { id: 'table-b', blockType: 'table' },
+        { id: 'table-c', blockType: 'table' },
+      ],
+    };
+    const candidate: PageSchemaV3 = {
+      ...baseline,
+      blocks: [baseline.blocks[1], baseline.blocks[2], baseline.blocks[0]],
+    };
+
+    const plan = planStudioAuthoringPatches(baseline, candidate, capabilities);
+
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.patches).toEqual([]);
+    expect(plan.moves).toEqual([
+      {
+        blockId: 'table-b',
+        beforeBlockId: 'table-a',
+        manifestChecksum: 'table-1',
+      },
+      {
+        blockId: 'table-c',
+        beforeBlockId: 'table-a',
         manifestChecksum: 'table-1',
       },
     ]);
@@ -84,12 +120,43 @@ describe('contextualAuthoringAdapter', () => {
     expect(plan.unsupported.join(' ')).toContain('新增或删除区块');
     expect(plan.unsupported.join(' ')).toContain('能力清单未声明');
   });
+
+  it('fails closed instead of translating a cross-parent move', () => {
+    const tableA = { id: 'table-a', blockType: 'table' } as const;
+    const tableB = { id: 'table-b', blockType: 'table' } as const;
+    const baseline: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'composite',
+      id: 'operations',
+      blocks: [
+        { id: 'left', blockType: 'form', blocks: [tableA] },
+        { id: 'right', blockType: 'form', blocks: [tableB] },
+      ],
+    };
+    const candidate: PageSchemaV3 = {
+      ...baseline,
+      blocks: [
+        { ...baseline.blocks[0], blocks: [] },
+        { ...baseline.blocks[1], blocks: [tableB, tableA] },
+      ],
+    };
+
+    const plan = planStudioAuthoringPatches(baseline, candidate, capabilities);
+
+    expect(plan.moves).toEqual([]);
+    expect(plan.patches).toEqual([]);
+    expect(plan.unsupported.join(' ')).toContain('跨父级移动');
+  });
 });
 
-function property(propertyPath: string, route: string) {
+function property(
+  propertyPath: string,
+  route: string,
+  allowedOperations = ['ADD', 'REPLACE', 'REMOVE'],
+) {
   return {
     propertyPath,
-    allowedOperations: ['ADD', 'REPLACE', 'REMOVE'],
+    allowedOperations,
     route,
     risk: route === 'HANDOFF_STUDIO' ? 'L3' : 'L1',
     effectTags: route === 'HANDOFF_STUDIO' ? ['DATA_BINDING'] : ['PRESENTATION'],

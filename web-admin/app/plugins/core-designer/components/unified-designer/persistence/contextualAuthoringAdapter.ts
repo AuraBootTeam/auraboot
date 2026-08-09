@@ -18,10 +18,19 @@ export interface StudioAuthoringPatch {
   manifestChecksum: string;
 }
 
+export interface StudioAuthoringMove {
+  blockId: string;
+  beforeBlockId: string | null;
+  manifestChecksum: string;
+}
+
 export interface StudioAuthoringPatchPlan {
   patches: StudioAuthoringPatch[];
+  moves: StudioAuthoringMove[];
   unsupported: string[];
 }
+
+export const STUDIO_REORDER_WITHIN_PARENT_PATH = '/$structure/order';
 
 interface IndexedBlock {
   block: DslBlockV3;
@@ -93,16 +102,30 @@ export function planStudioAuthoringPatches(
     capabilities.manifests.map((manifest) => [manifest.blockType, manifest]),
   );
   const patches: StudioAuthoringPatch[] = [];
+  const moves: StudioAuthoringMove[] = [];
+  const processedOrderParents = new Set<string>();
 
   baselineIndex.forEach((baseEntry, blockId) => {
     const nextEntry = candidateIndex.get(blockId);
     if (!nextEntry) return;
-    if (
-      baseEntry.block.blockType !== nextEntry.block.blockType ||
-      baseEntry.parentId !== nextEntry.parentId ||
-      !deepEqual(baseEntry.siblingIds, nextEntry.siblingIds)
-    ) {
-      unsupported.push(`区块 ${blockId} 的类型、父级或顺序变更尚未声明为 typed patch`);
+    if (baseEntry.block.blockType !== nextEntry.block.blockType) {
+      unsupported.push(`区块 ${blockId} 的类型变更尚未声明为 typed patch`);
+    }
+    if (baseEntry.parentId !== nextEntry.parentId) {
+      unsupported.push(`区块 ${blockId} 的跨父级移动必须使用专业结构变更流程`);
+    } else if (!deepEqual(baseEntry.siblingIds, nextEntry.siblingIds)) {
+      const parentKey = baseEntry.parentId ?? '$page-root';
+      if (!processedOrderParents.has(parentKey)) {
+        processedOrderParents.add(parentKey);
+        const orderPlan = planSiblingMoves(
+          baseEntry.siblingIds,
+          nextEntry.siblingIds,
+          baselineIndex,
+          manifests,
+        );
+        moves.push(...orderPlan.moves);
+        unsupported.push(...orderPlan.unsupported);
+      }
     }
 
     const manifest = manifests.get(baseEntry.block.blockType);
@@ -115,6 +138,7 @@ export function planStudioAuthoringPatches(
 
     const reconstructed = cloneJson(withoutChildren(baseEntry.block));
     Object.values(manifest.properties)
+      .filter((property) => !isStructuralCapabilityPath(property.propertyPath))
       .sort((left, right) => left.propertyPath.localeCompare(right.propertyPath))
       .forEach((property) => {
         const previous = readPointer(
@@ -143,7 +167,7 @@ export function planStudioAuthoringPatches(
     }
   });
 
-  return { patches, unsupported: [...new Set(unsupported)] };
+  return { patches, moves, unsupported: [...new Set(unsupported)] };
 }
 
 export function studioEditablePropertyPaths(
@@ -152,9 +176,55 @@ export function studioEditablePropertyPaths(
   return Object.fromEntries(
     capabilities.manifests.map((manifest) => [
       manifest.blockType,
-      Object.values(manifest.properties).map((property) => property.propertyPath),
+      Object.values(manifest.properties)
+        .map((property) => property.propertyPath)
+        .filter((propertyPath) => !isStructuralCapabilityPath(propertyPath)),
     ]),
   );
+}
+
+export function studioReorderableBlockTypes(capabilities: CapabilityRegistry): string[] {
+  return capabilities.manifests
+    .filter((manifest) => {
+      const capability = manifest.properties[STUDIO_REORDER_WITHIN_PARENT_PATH];
+      return capability?.allowedOperations.includes('MOVE');
+    })
+    .map((manifest) => manifest.blockType);
+}
+
+function planSiblingMoves(
+  baselineIds: string[],
+  candidateIds: string[],
+  baselineIndex: Map<string, IndexedBlock>,
+  manifests: Map<string, CapabilityRegistry['manifests'][number]>,
+): { moves: StudioAuthoringMove[]; unsupported: string[] } {
+  if (!deepEqual([...baselineIds].sort(), [...candidateIds].sort())) {
+    return { moves: [], unsupported: ['区块顺序变更包含新增、删除或跨父级移动'] };
+  }
+
+  const current = [...baselineIds];
+  const moves: StudioAuthoringMove[] = [];
+  const unsupported: string[] = [];
+  candidateIds.forEach((desiredId, targetIndex) => {
+    if (current[targetIndex] === desiredId) return;
+    const moving = baselineIndex.get(desiredId);
+    const manifest = moving ? manifests.get(moving.block.blockType) : undefined;
+    const capability = manifest?.properties[STUDIO_REORDER_WITHIN_PARENT_PATH];
+    if (!manifest || !capability?.allowedOperations.includes('MOVE')) {
+      unsupported.push(`区块 ${desiredId} 未声明同级顺序调整能力`);
+      return;
+    }
+    const beforeBlockId = current[targetIndex] ?? null;
+    moves.push({ blockId: desiredId, beforeBlockId, manifestChecksum: manifest.checksum });
+    current.splice(current.indexOf(desiredId), 1);
+    current.splice(targetIndex, 0, desiredId);
+  });
+
+  return unsupported.length > 0 ? { moves: [], unsupported } : { moves, unsupported: [] };
+}
+
+function isStructuralCapabilityPath(propertyPath: string): boolean {
+  return propertyPath.startsWith('/$structure/');
 }
 
 function indexBlocks(blocks: DslBlockV3[]): Map<string, IndexedBlock> {

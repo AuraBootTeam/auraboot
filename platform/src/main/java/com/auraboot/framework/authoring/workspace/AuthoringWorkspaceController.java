@@ -6,6 +6,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Ch
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateHandoffRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffContextView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffCreatedView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.MoveBlockRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseView;
@@ -89,6 +90,14 @@ public class AuthoringWorkspaceController {
             @PathVariable String sessionPid,
             @Valid @RequestBody ApplyPatchRequest request) {
         return ApiResponse.success(workspaceService.applyStudio(sessionPid, request));
+    }
+
+    @PatchMapping("/sessions/{sessionPid}/studio-moves")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<PatchResult> moveStudioBlock(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody MoveBlockRequest request) {
+        return ApiResponse.success(workspaceService.moveStudioBlock(sessionPid, request));
     }
 
     @PostMapping("/sessions/{sessionPid}/submit")

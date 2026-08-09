@@ -19,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Locale;
 
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.REORDER_WITHIN_PARENT_PATH;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY;
 
@@ -32,6 +33,7 @@ public class AuthoringPatchEngine {
     private final AuthoringProtectedSemanticValidator semanticValidator;
     private final AuthoringSnapshotTargetResolver targetResolver;
     private final AuthoringJsonObjectPatchApplier patchApplier;
+    private final AuthoringStableBlockTreeEditor blockTreeEditor;
 
     public AuthoringPatchEngine(
             AuthoringCapabilityRegistry registry,
@@ -39,13 +41,15 @@ public class AuthoringPatchEngine {
             AuthoringContentSanitizer contentSanitizer,
             AuthoringProtectedSemanticValidator semanticValidator,
             AuthoringSnapshotTargetResolver targetResolver,
-            AuthoringJsonObjectPatchApplier patchApplier) {
+            AuthoringJsonObjectPatchApplier patchApplier,
+            AuthoringStableBlockTreeEditor blockTreeEditor) {
         this.registry = registry;
         this.boundaryPolicyService = boundaryPolicyService;
         this.contentSanitizer = contentSanitizer;
         this.semanticValidator = semanticValidator;
         this.targetResolver = targetResolver;
         this.patchApplier = patchApplier;
+        this.blockTreeEditor = blockTreeEditor;
     }
 
     public PreparedPatch prepareInline(
@@ -70,6 +74,39 @@ public class AuthoringPatchEngine {
             ResourceScope resourceScope) {
         return prepare(sourceSnapshot, blockId, propertyPath, operation, proposedValue,
                 manifestChecksum, resourceScope, true);
+    }
+
+    public PreparedPatch prepareStudioMove(
+            JsonNode sourceSnapshot,
+            String blockId,
+            String beforeBlockId,
+            String manifestChecksum,
+            ResourceScope resourceScope) {
+        DraftTarget target = targetResolver.resolve(sourceSnapshot, blockId);
+        CapabilityManifest manifest = registry.find(target.blockType()).orElse(null);
+        PropertyCapability capability = manifest == null
+                ? null
+                : manifest.properties().get(REORDER_WITHIN_PARENT_PATH);
+        BoundaryDecision decision = boundaryPolicyService.evaluate(new BoundaryEvaluationInput(
+                target.blockType(),
+                REORDER_WITHIN_PARENT_PATH,
+                PatchOperation.MOVE,
+                resourceScope,
+                securityImpact(capability),
+                capability != null,
+                capability != null && !capability.protectedSemantic(),
+                manifestChecksum));
+        requireAllowedDecision(decision, true);
+
+        AuthoringStableBlockTreeEditor.MoveResult move = blockTreeEditor.moveBefore(
+                target.snapshot(), blockId, beforeBlockId);
+        return new PreparedPatch(
+                move.snapshot(),
+                target.blockType(),
+                capability,
+                decision,
+                move.previousValue(),
+                move.savedValue());
     }
 
     private PreparedPatch prepare(
