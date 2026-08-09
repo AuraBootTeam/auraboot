@@ -1,4 +1,4 @@
-import { appendFile, copyFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { appendFile, copyFile, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -139,6 +139,21 @@ describe('deployment branding server resolver', () => {
         ),
       }),
     ).rejects.toThrow(/does not grant required feature: white_label/);
+  });
+
+  it('rejects a License supplied through a symbolic link', async () => {
+    const configPath = await writeBranding();
+    const directory = await mkdtemp(join(tmpdir(), 'auraboot-license-symlink-'));
+    tempDirectories.push(directory);
+    const linkedLicense = join(directory, 'license.json');
+    await symlink(join(licenseFixtureRoot, 'license.json'), linkedLicense);
+
+    await expect(
+      resolveDeploymentBranding({
+        ...signedEnvironment(configPath),
+        AURABOOT_COMMERCIAL_LICENSE_PATH: linkedLicense,
+      }),
+    ).rejects.toThrow(/Unable to read Commercial License/);
   });
 
   it('rejects unsupported commercial License enforcement modes', async () => {

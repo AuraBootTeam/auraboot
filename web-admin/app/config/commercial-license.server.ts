@@ -1,5 +1,6 @@
 import { createHash, createPublicKey, verify } from 'node:crypto';
-import { lstat, readFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { open } from 'node:fs/promises';
 
 export const OFFLINE_SIGNATURE_ENFORCEMENT = 'offline-signature';
 
@@ -116,16 +117,22 @@ function requiredEnvironment(
 }
 
 async function regularFile(path: string, label: string): Promise<Buffer> {
-  let metadata;
+  let handle;
   try {
-    metadata = await lstat(path);
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   } catch (error) {
     throw new Error(`Unable to read ${label}: ${path}`, { cause: error });
   }
-  if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size === 0) {
-    throw new Error(`${label} must be a non-empty regular file: ${path}`);
+
+  try {
+    const metadata = await handle.stat();
+    if (!metadata.isFile() || metadata.size === 0) {
+      throw new Error(`${label} must be a non-empty regular file: ${path}`);
+    }
+    return await handle.readFile();
+  } finally {
+    await handle.close();
   }
-  return readFile(path);
 }
 
 function parseJson(bytes: Buffer, label: string, path: string): Record<string, unknown> {
