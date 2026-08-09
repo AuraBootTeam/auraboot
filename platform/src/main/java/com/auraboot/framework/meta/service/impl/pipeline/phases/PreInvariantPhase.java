@@ -52,8 +52,22 @@ public class PreInvariantPhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
+        // Resolve the plugin's persistence ownership before loading any target state. A handler
+        // that owns persistence is also skipped by StateCheckPhase, so probing the model's first
+        // *_status field here is both semantically unrelated and an avoidable database read.
+        String pluginHandlerCode = resolvePluginHandlerCode(ctx.getCommand().getCode(), ctx.getExecConfig());
+        Optional<CommandHandlerExtension> pluginHandler = findPluginHandler(pluginHandlerCode);
+        ctx.setHasPluginHandler(pluginHandler.isPresent());
+        ctx.setPluginRequiresDslPersistence(pluginHandler
+                .map(handler -> handler.requiresDslPersistence(
+                        pluginHandlerCode, ctx.getExecConfig(), ctx.getRequest()))
+                .orElse(false));
+
         // Pre-invariant
-        String stateField = stateCheckExecutor.getStateFieldForModel(ctx.getCommand().getModelCode());
+        boolean requiresPipelineState = !ctx.isHasPluginHandler() || ctx.isPluginRequiresDslPersistence();
+        String stateField = requiresPipelineState
+                ? stateCheckExecutor.getStateFieldForModel(ctx.getCommand().getModelCode())
+                : null;
         String currentState = (ctx.getRequest() != null
                 && StringUtils.hasText(ctx.getRequest().getTargetRecordId()) && stateField != null)
                 ? stateCheckExecutor.readCurrentState(ctx.getTenantId(), ctx.getCommand().getModelCode(),
@@ -66,15 +80,6 @@ public class PreInvariantPhase implements CommandPhase {
 
         // Cross-field rules
         executeCrossFieldRules(ctx.getCommand(), ctx.getPayload(), ctx.getExecConfig());
-
-        // Resolve plugin handler flags
-        String pluginHandlerCode = resolvePluginHandlerCode(ctx.getCommand().getCode(), ctx.getExecConfig());
-        Optional<CommandHandlerExtension> pluginHandler = findPluginHandler(pluginHandlerCode);
-        ctx.setHasPluginHandler(pluginHandler.isPresent());
-        ctx.setPluginRequiresDslPersistence(pluginHandler
-                .map(handler -> handler.requiresDslPersistence(
-                        pluginHandlerCode, ctx.getExecConfig(), ctx.getRequest()))
-                .orElse(false));
     }
 
     // ==================== Inlined delegate methods ====================
