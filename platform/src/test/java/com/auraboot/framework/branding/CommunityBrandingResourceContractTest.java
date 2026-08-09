@@ -36,6 +36,13 @@ class CommunityBrandingResourceContractTest {
         assertThat(occurrences).isEqualTo(DEFAULT_PRINT_TEMPLATES.size());
     }
 
+    @Test
+    void commercialLoginCopyUsesTheResolvedProductName() throws IOException {
+        assertThat(readResource("seed/i18n-base.json"))
+                .contains("\"key\": \"auth.commercialBranding.welcomeSub\"")
+                .contains("{productName}");
+    }
+
     private String readResource(String path) throws IOException {
         try (InputStream input = getClass().getClassLoader().getResourceAsStream(path)) {
             assertThat(input).as(path).isNotNull();

@@ -6,7 +6,8 @@ import com.auraboot.framework.bi.dto.ReportExportRequest;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bi.service.ReportExportService;
 import com.auraboot.framework.bi.service.ReportStorageService;
-import com.auraboot.framework.branding.CommunityBranding;
+import com.auraboot.framework.branding.BrandingIdentity;
+import com.auraboot.framework.branding.BrandingProvider;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.dto.AuditTrailEvent;
@@ -123,6 +124,7 @@ public class ReportExportServiceImpl implements ReportExportService {
     private final ReportStorageService reportStorageService;
     private final AuditTrailService auditTrailService;
     private final ReportRenderClient reportRenderClient;
+    private final BrandingProvider brandingProvider;
 
     @Override
     public ReportExportFile exportExcel(ReportExportRequest request) {
@@ -214,21 +216,23 @@ public class ReportExportServiceImpl implements ReportExportService {
     }
 
     private void applyWorkbookBranding(Workbook workbook) {
+        BrandingIdentity branding = brandingProvider.current();
         if (workbook instanceof XSSFWorkbook xssfWorkbook) {
             var coreProperties = xssfWorkbook.getProperties().getCoreProperties();
-            coreProperties.setCreator(CommunityBranding.PLATFORM_NAME);
-            coreProperties.setDescription(CommunityBranding.GENERATED_BY_TEXT);
+            coreProperties.setCreator(branding.platformName());
+            coreProperties.setDescription(branding.generatedByText());
         }
         for (int index = 0; index < workbook.getNumberOfSheets(); index++) {
-            workbook.getSheetAt(index).getFooter().setCenter(CommunityBranding.GENERATED_BY_TEXT);
+            workbook.getSheetAt(index).getFooter().setCenter(branding.generatedByText());
         }
     }
 
     private byte[] applyPdfBranding(byte[] pdfBytes, String title) {
+        BrandingIdentity branding = brandingProvider.current();
         try (PDDocument document = PDDocument.load(pdfBytes);
                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             float fontSize = 8f;
-            float textWidth = PDType1Font.HELVETICA.getStringWidth(CommunityBranding.GENERATED_BY_TEXT)
+            float textWidth = PDType1Font.HELVETICA.getStringWidth(branding.generatedByText())
                     / 1000f * fontSize;
             for (PDPage page : document.getPages()) {
                 float x = Math.max(8f, (page.getMediaBox().getWidth() - textWidth) / 2f);
@@ -238,7 +242,7 @@ public class ReportExportServiceImpl implements ReportExportService {
                     content.setFont(PDType1Font.HELVETICA, fontSize);
                     content.setNonStrokingColor(Color.GRAY);
                     content.newLineAtOffset(x, 10f);
-                    content.showText(CommunityBranding.GENERATED_BY_TEXT);
+                    content.showText(branding.generatedByText());
                     content.endText();
                 }
             }

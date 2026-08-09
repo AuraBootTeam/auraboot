@@ -1380,6 +1380,13 @@
     "en-US": "Sign in to continue to AuraBoot"
   },
   {
+    "key": "auth.commercialBranding.welcomeSub",
+    "zh-CN": "登录以继续使用 {productName} 工作台",
+    "en-US": "Sign in to continue to the {productName} workspace",
+    "ja-JP": "{productName} ワークスペースに進むにはサインインしてください",
+    "ko-KR": "{productName} 작업 공간을 계속하려면 로그인하세요"
+  },
+  {
     "key": "auth.compliance.identifier",
     "zh-CN": "账号或邮箱",
     "en-US": "Account or email"

@@ -6,7 +6,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { useHydrated } from '~/hooks/useHydrated';
 import { useAuth } from '~/contexts/AuthContext';
 import { useRootLoaderData } from '~/root';
-import { COMMUNITY_BRANDING } from '~/config/branding';
+import { COMMUNITY_BRANDING, resolveBrandDisplayName } from '~/config/branding';
 
 const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';
 
@@ -14,7 +14,7 @@ export default function AuthHeader() {
   const rootData = useRootLoaderData();
   const compliance = rootData!.icpCompliance;
   const branding = rootData?.branding ?? COMMUNITY_BRANDING;
-  const displayName = compliance.enabled ? compliance.siteDisplayName : branding.productName;
+  const displayName = resolveBrandDisplayName(branding, compliance);
   const { theme, setTheme, isDark } = useTheme();
   const { t, locale, setLocale } = useI18n();
   const isHydrated = useHydrated();

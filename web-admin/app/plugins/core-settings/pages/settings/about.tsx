@@ -6,11 +6,16 @@ import {
   Mail,
   Scale,
 } from 'lucide-react';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData, type RootLoaderData } from '~/root';
 import { useI18n } from '~/contexts/I18nContext';
 import { COMMUNITY_BRANDING } from '~/config/branding';
 
-export const meta = () => [{ title: `About ${COMMUNITY_BRANDING.productName}` }];
+export function meta({ matches }: { matches: Array<{ id: string; data?: unknown }> }) {
+  const rootData = matches.find((match) => match.id === 'root')?.data as
+    | RootLoaderData
+    | undefined;
+  return [{ title: `About ${rootData?.branding.productName ?? COMMUNITY_BRANDING.productName}` }];
+}
 
 function formatEdition(edition: string): string {
   const normalized = edition.trim().toLowerCase();
@@ -48,30 +53,43 @@ export default function AboutPage() {
     version: t('about.version', undefined, isZh ? '构建版本' : 'Build version'),
     revision: t('about.revision', undefined, isZh ? '构建修订' : 'Build revision'),
     license: t('about.license', undefined, isZh ? '许可证' : 'License'),
-    resources: t('about.resources', undefined, isZh ? '官方资源' : 'Official resources'),
+    resources: t('about.resources', undefined, isZh ? '产品与法律资源' : 'Product and legal resources'),
     website: t('about.website', undefined, isZh ? '官方网站' : 'Website'),
     docs: t('about.docs', undefined, isZh ? '产品文档' : 'Documentation'),
+    support: t('about.support', undefined, isZh ? '客户支持' : 'Customer support'),
     source: t('about.source', undefined, isZh ? '源代码' : 'Source code'),
     contact: t('about.contact', undefined, isZh ? '商业授权与支持' : 'Commercial licensing and support'),
     legal: t('about.legal', undefined, isZh ? '法律与品牌' : 'Legal and branding'),
     legalNote: t(
       'about.legalNote',
       undefined,
-      isZh
-        ? 'Community 部署必须保留 AuraBoot 品牌与相关 notices。白标、移除品牌或官方支持需要单独的 Commercial License。'
-        : 'Community deployments must retain AuraBoot branding and required notices. White-labeling, brand removal, and official support require a separate Commercial License.',
+      branding.mode === 'commercial'
+        ? isZh
+          ? '本部署依据商业订单使用客户品牌。AuraBoot 源码版权、License 和第三方 notices 仍然适用。'
+          : 'This deployment uses customer branding under a commercial order. AuraBoot source copyright, License, and third-party notices remain applicable.'
+        : isZh
+          ? 'Community 部署必须保留 AuraBoot 品牌与相关 notices。白标、移除品牌或官方支持需要单独的 Commercial License。'
+          : 'Community deployments must retain AuraBoot branding and required notices. White-labeling, brand removal, and official support require a separate Commercial License.',
     ),
   };
 
   const resources = [
     { label: labels.website, href: branding.websiteUrl, icon: Globe2 },
     { label: labels.docs, href: branding.docsUrl, icon: BookOpen },
+    {
+      label: branding.mode === 'commercial' ? labels.support : labels.contact,
+      href: branding.mode === 'commercial' ? branding.supportUrl : branding.commercialContactUrl,
+      icon: Mail,
+    },
     { label: labels.source, href: branding.sourceUrl, icon: Github },
-    { label: labels.contact, href: branding.commercialContactUrl, icon: Mail },
   ];
 
   return (
-    <div data-testid="about-page" className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8 lg:py-12">
+    <div
+      data-testid="about-page"
+      data-branding-mode={branding.mode}
+      className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8 lg:py-12"
+    >
       <header className="flex flex-col gap-5 border-b border-gray-200 pb-8 sm:flex-row sm:items-center dark:border-gray-700">
         <img
           src={branding.logoUrl}
@@ -163,9 +181,14 @@ export default function AboutPage() {
         <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600 dark:text-gray-400">
           {labels.legalNote}
         </p>
-        <p className="mt-4 text-xs text-gray-500 dark:text-gray-500">
+        <p data-testid="about-owner-copyright" className="mt-4 text-xs text-gray-500 dark:text-gray-500">
           © {currentYear} {branding.copyrightHolder}
         </p>
+        {branding.mode === 'commercial' && (
+          <p data-testid="about-auraboot-notice" className="mt-1 text-xs text-gray-500 dark:text-gray-500">
+            © {currentYear} {branding.aurabootCopyrightHolder} · {branding.licenseName}
+          </p>
+        )}
       </section>
     </div>
   );

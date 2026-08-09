@@ -17,7 +17,7 @@ import { ResultHelper, type User } from '~/utils/type';
 import { getUserInfo } from '~/shared/services/userService';
 import { useI18n } from '~/contexts/I18nContext';
 import { useRootLoaderData } from '~/root';
-import { COMMUNITY_BRANDING } from '~/config/branding';
+import { COMMUNITY_BRANDING, resolveBrandDisplayName } from '~/config/branding';
 import IcpComplianceFooter from './IcpComplianceFooter';
 import { getLoginFailureActionData } from './login-errors';
 
@@ -330,8 +330,8 @@ export default function LoginPage() {
   const rootData = useRootLoaderData();
   const compliance = rootData!.icpCompliance;
   const branding = rootData?.branding ?? COMMUNITY_BRANDING;
-  const displayName = compliance.enabled ? compliance.siteDisplayName : branding.productName;
-  const { t } = useI18n();
+  const displayName = resolveBrandDisplayName(branding, compliance);
+  const { t, locale } = useI18n();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
   const actionData = useActionData<typeof action>();
@@ -511,9 +511,17 @@ export default function LoginPage() {
           {t('auth.welcome') || '欢迎回来'}
         </h1>
         <p className="mt-2 text-[15px] text-[#8A8694] dark:text-gray-400">
-          {compliance.enabled
-            ? t('auth.compliance.welcomeSub', undefined, `登录以继续使用 ${branding.productName}`)
-            : t('auth.welcomeSub', undefined, `登录以继续使用 ${branding.productName} 工作台`)}
+          {branding.mode === 'commercial'
+            ? t(
+                'auth.commercialBranding.welcomeSub',
+                { productName: branding.productName },
+                locale.startsWith('zh')
+                  ? `登录以继续使用 ${branding.productName} 工作台`
+                  : `Sign in to continue to the ${branding.productName} workspace`,
+              )
+            : compliance.enabled
+              ? t('auth.compliance.welcomeSub', undefined, `登录以继续使用 ${branding.productName}`)
+              : t('auth.welcomeSub', undefined, `登录以继续使用 ${branding.productName} 工作台`)}
         </p>
       </div>
 

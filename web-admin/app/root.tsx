@@ -9,7 +9,6 @@ import {
   useLoaderData,
   isRouteErrorResponse,
   type LoaderFunctionArgs,
-  type LinksFunction,
 } from 'react-router';
 import React, { useEffect } from 'react';
 import { isSystemTenant } from '~/constants/SpaceConstants';
@@ -32,8 +31,8 @@ import { useFederationStore } from '~/plugins/FederationManager';
 import { resolveIcpComplianceConfig, type IcpComplianceConfig } from '~/config/icpCompliance';
 import {
   COMMUNITY_BRANDING,
+  resolveBrandDisplayName,
   resolveBuildIdentity,
-  resolveCommunityBranding,
   type BrandingConfig,
   type BuildIdentity,
 } from '~/config/branding';
@@ -112,7 +111,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   const { pathname } = new URL(request.url);
   const runtimeProfile = getRuntimeProfileFromPathname(pathname);
   const icpCompliance = resolveIcpComplianceConfig(process.env);
-  const branding = resolveCommunityBranding();
+  const { resolveDeploymentBranding } = await import('~/config/branding.server');
+  const branding = await resolveDeploymentBranding(process.env);
   const buildIdentity = resolveBuildIdentity(process.env);
 
   // Bootstrap status: never redirect; inject into loader data so the banner can render
@@ -232,24 +232,31 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
 
 export const meta = ({ data }: { data?: RootLoaderData }) => [
   {
-    title: data?.icpCompliance.enabled
-      ? data.icpCompliance.siteDisplayName
-      : (data?.branding.productName ?? COMMUNITY_BRANDING.productName),
+    title: data
+      ? resolveBrandDisplayName(data.branding, data.icpCompliance)
+      : COMMUNITY_BRANDING.productName,
   },
-];
-
-export const links: LinksFunction = () => [
-  { rel: 'icon', href: '/favicon.ico' },
-  { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32x32.png' },
-  { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
-  { rel: 'manifest', href: '/manifest.json' },
 ];
 
 export function useRootLoaderData(): RootLoaderData | undefined {
   return useRouteLoaderData<typeof loader>('root') as RootLoaderData | undefined;
 }
 
+export function resolveBrandingDocumentLinks(branding: BrandingConfig) {
+  return [
+    { rel: 'icon', href: branding.faviconUrl },
+    { rel: 'icon', type: 'image/png', sizes: '32x32', href: branding.favicon32Url },
+    {
+      rel: 'apple-touch-icon',
+      sizes: '180x180',
+      href: branding.appleTouchIconUrl,
+    },
+    { rel: 'manifest', href: branding.manifestUrl },
+  ];
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
+  const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
   return (
     <html lang="zh-CN" className="h-full" suppressHydrationWarning>
       <head>
@@ -258,6 +265,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="color-scheme" content="light dark" />
         <Meta />
         <Links />
+        {resolveBrandingDocumentLinks(branding).map((link) => (
+          <link key={`${link.rel}:${link.href}`} {...link} />
+        ))}
       </head>
       <body className="h-full bg-gray-50 transition-colors duration-200 dark:bg-gray-900">
         {children}

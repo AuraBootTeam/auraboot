@@ -195,10 +195,25 @@ describe('root loader authentication guard', () => {
     ).toEqual([{ title: 'AuraBoot' }]);
   });
 
-  it('declares the fixed Community manifest and browser icons', async () => {
-    const { links } = await import('~/root');
+  it('keeps commercial branding in the title when ICP records are enabled', async () => {
+    const { COMMUNITY_BRANDING } = await import('~/config/branding');
+    const { meta } = await import('~/root');
 
-    expect(links()).toEqual(
+    expect(
+      meta({
+        data: {
+          branding: { ...COMMUNITY_BRANDING, mode: 'commercial', productName: 'Northstar' },
+          icpCompliance: { enabled: true, siteDisplayName: 'AuraBoot Filed Site' },
+        } as any,
+      }),
+    ).toEqual([{ title: 'Northstar' }]);
+  });
+
+  it('declares browser identity links from the resolved branding contract', async () => {
+    const { COMMUNITY_BRANDING } = await import('~/config/branding');
+    const { resolveBrandingDocumentLinks } = await import('~/root');
+
+    expect(resolveBrandingDocumentLinks(COMMUNITY_BRANDING)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ rel: 'manifest', href: '/manifest.json' }),
         expect.objectContaining({ rel: 'icon', href: '/favicon.ico' }),
