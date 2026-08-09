@@ -299,6 +299,60 @@ export const DESIGNER_I18N = {
     multiSelectDelete: { 'zh-CN': '删除所选', 'en-US': 'Delete selected' } as L,
     multiSelectClear: { 'zh-CN': '清除选择', 'en-US': 'Clear selection' } as L,
 
+    rolePreview: {
+      device: { 'zh-CN': '预览设备', 'en-US': 'Preview device' } as L,
+      perspective: { 'zh-CN': '权限视角', 'en-US': 'Permission perspective' } as L,
+      currentActor: {
+        'zh-CN': '当前操作者 · 实时预览',
+        'en-US': 'Current actor · live preview',
+      } as L,
+      calculating: {
+        'zh-CN': '正在计算权限结构…',
+        'en-US': 'Calculating permission structure...',
+      } as L,
+      title: {
+        'zh-CN': '{role} · 权限结构预览',
+        'en-US': '{role} · permission structure preview',
+      } as L,
+      intersection: {
+        'zh-CN': '当前操作者权限 ∩ 目标角色权限',
+        'en-US': 'Current actor permissions ∩ target role permissions',
+      } as L,
+      exit: { 'zh-CN': '退出角色预览', 'en-US': 'Exit role preview' } as L,
+      noTargetData: {
+        'zh-CN': '不读取目标角色真实数据',
+        'en-US': 'No target-role business data is read',
+      } as L,
+      exportOff: { 'zh-CN': '导出关闭', 'en-US': 'Export disabled' } as L,
+      actionsOff: { 'zh-CN': '业务动作关闭', 'en-US': 'Business actions disabled' } as L,
+      inspect: { 'zh-CN': '查看结构裁决', 'en-US': 'Inspect structure decisions' } as L,
+      visibleWritable: { 'zh-CN': '可见 · 可写', 'en-US': 'Visible · writable' } as L,
+      visibleReadOnly: { 'zh-CN': '可见 · 只读', 'en-US': 'Visible · read-only' } as L,
+      hidden: { 'zh-CN': '不可见', 'en-US': 'Hidden' } as L,
+      failed: {
+        'zh-CN': '权限结构计算失败，已停止目标角色预览：{error}',
+        'en-US': 'Permission structure calculation failed; target-role preview stopped: {error}',
+      } as L,
+      targetsFailed: {
+        'zh-CN': '可预览角色加载失败：{error}',
+        'en-US': 'Preview roles could not be loaded: {error}',
+      } as L,
+      safeLoading: {
+        'zh-CN': '正在生成不含业务数据的权限结构…',
+        'en-US': 'Generating a permission structure without business data...',
+      } as L,
+      safeFailure: {
+        'zh-CN': '无法安全生成目标角色结构；请退出角色预览后重试。',
+        'en-US': 'The target-role structure could not be generated safely. Exit role preview and retry.',
+      } as L,
+      node: {
+        menu: { 'zh-CN': '菜单', 'en-US': 'Menu' } as L,
+        block: { 'zh-CN': '区块', 'en-US': 'Block' } as L,
+        field: { 'zh-CN': '字段', 'en-US': 'Field' } as L,
+        action: { 'zh-CN': '动作', 'en-US': 'Action' } as L,
+      },
+    },
+
     // Palette category headers
     category: {
       page: { 'zh-CN': '页面', 'en-US': 'Page' } as L,

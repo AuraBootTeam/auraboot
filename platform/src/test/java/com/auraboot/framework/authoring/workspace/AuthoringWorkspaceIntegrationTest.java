@@ -165,6 +165,11 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/authoring/review-workspaces/missing"))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/authoring/sessions/missing/role-preview-targets"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/authoring/sessions/missing/role-structure-preview")
+                        .param("rolePid", "role"))
+                .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/authoring/sessions/missing/writer-lease/takeover")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"expectedRevision\":1,\"reason\":\"test\"}"))

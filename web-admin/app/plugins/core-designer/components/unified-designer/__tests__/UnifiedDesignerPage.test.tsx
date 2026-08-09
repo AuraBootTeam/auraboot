@@ -12,6 +12,8 @@ import {
   loadAuthoringCapabilities,
   loadAuthoringChangeItems,
   loadAuthoringReleaseHistory,
+  loadAuthoringRolePreviewTargets,
+  loadAuthoringRoleStructurePreview,
   loadAuthoringReviewWorkspace,
   loadAuthoringSession,
   moveAuthoringStudioBlock,
@@ -63,6 +65,8 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   loadAuthoringCapabilities: vi.fn(),
   loadAuthoringChangeItems: vi.fn(),
   loadAuthoringReleaseHistory: vi.fn(),
+  loadAuthoringRolePreviewTargets: vi.fn(),
+  loadAuthoringRoleStructurePreview: vi.fn(),
   loadAuthoringReviewWorkspace: vi.fn(),
   loadAuthoringSession: vi.fn(),
   moveAuthoringStudioBlock: vi.fn(),
@@ -111,6 +115,9 @@ describe('UnifiedDesignerPage', () => {
       size: 10,
       total: 0,
     });
+    vi.mocked(loadAuthoringRolePreviewTargets).mockReset();
+    vi.mocked(loadAuthoringRolePreviewTargets).mockResolvedValue([]);
+    vi.mocked(loadAuthoringRoleStructurePreview).mockReset();
     vi.mocked(loadAuthoringReviewWorkspace).mockReset();
     vi.mocked(applyAuthoringStudioPatch).mockReset();
     vi.mocked(moveAuthoringStudioBlock).mockReset();

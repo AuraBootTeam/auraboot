@@ -25,6 +25,8 @@ interface RecursiveBlockRendererProps {
   schema: PageSchemaV3;
   runtimeServices?: RuntimeExecutionServices;
   permissionEvaluator?: (permissionCode: string) => boolean;
+  /** Disable every native control; used by governed structure-only previews. */
+  interactionDisabled?: boolean;
   /**
    * Model field metadata for the page's primary model. When provided, form `field`
    * blocks render the real platform control (true WYSIWYG) via {@link RuntimePlatformField}
@@ -38,6 +40,7 @@ export function RecursiveBlockRenderer({
   schema,
   runtimeServices,
   permissionEvaluator,
+  interactionDisabled = false,
   modelFields,
 }: RecursiveBlockRendererProps) {
   const { hasPermission } = usePermissions();
@@ -65,21 +68,27 @@ export function RecursiveBlockRenderer({
       <RuntimeModelFieldsContext.Provider value={modelFieldList}>
         <DesignerPageModelCodeContext.Provider value={schema.modelCode}>
         <RuntimePermissionContext.Provider value={evaluatePermission}>
-          <div
-            className="grid grid-cols-12 gap-4"
-            data-testid={`runtime-page-${schema.id}`}
-            data-schema-version={schema.schemaVersion}
+          <fieldset
+            disabled={interactionDisabled}
+            className="contents"
+            data-interaction-disabled={interactionDisabled ? 'true' : undefined}
           >
-            {schema.blocks.map((block) => (
-              <RuntimeBlock
-                key={block.id}
-                block={block}
-                runtimeServices={runtimeServices}
-                pageContext={pageContext}
-                blockPath={[block.id]}
-              />
-            ))}
-          </div>
+            <div
+              className="grid grid-cols-12 gap-4"
+              data-testid={`runtime-page-${schema.id}`}
+              data-schema-version={schema.schemaVersion}
+            >
+              {schema.blocks.map((block) => (
+                <RuntimeBlock
+                  key={block.id}
+                  block={block}
+                  runtimeServices={runtimeServices}
+                  pageContext={pageContext}
+                  blockPath={[block.id]}
+                />
+              ))}
+            </div>
+          </fieldset>
         </RuntimePermissionContext.Provider>
         </DesignerPageModelCodeContext.Provider>
       </RuntimeModelFieldsContext.Provider>

@@ -63,6 +63,21 @@ import { CanvasHost } from '../canvas/CanvasHost';
 import { InspectorHost } from './InspectorHost';
 import { RecursiveBlockRenderer } from '../runtime/RecursiveBlockRenderer';
 import { defaultRuntimeExecutionServices } from '../runtime/runtimeExecution';
+import {
+  createRoleStructurePermissionEvaluator,
+  roleStructurePreviewRuntimeServices,
+  sanitizeRoleStructurePreviewDocument,
+  summarizeRoleStructureDecisions,
+} from '../preview/roleStructurePreview';
+import {
+  loadAuthoringRolePreviewTargets,
+  loadAuthoringRoleStructurePreview,
+} from '~/framework/meta/authoring/authoringService';
+import type {
+  AuthoringRolePreviewTarget,
+  AuthoringRoleStructureDecision,
+  AuthoringRoleStructurePreview,
+} from '~/framework/meta/authoring/types';
 import { AiDesignDialog } from '../ai/AiDesignDialog';
 import { buildDesignCopilotPrompt, applyDesignBlocks, type ParsedDesign } from '../ai/designCopilot';
 
@@ -113,6 +128,8 @@ export interface UnifiedDesignerWorkbenchProps {
   contextualReadOnly?: boolean;
   contextualEditablePropertyPaths?: Record<string, string[]>;
   contextualReorderableBlockTypes?: string[];
+  /** Active governed authoring session; enables target-role structure preview in Preview mode. */
+  roleStructurePreviewSessionPid?: string;
 }
 
 export function UnifiedDesignerWorkbench({
@@ -130,6 +147,7 @@ export function UnifiedDesignerWorkbench({
   contextualReadOnly = false,
   contextualEditablePropertyPaths,
   contextualReorderableBlockTypes,
+  roleStructurePreviewSessionPid,
 }: UnifiedDesignerWorkbenchProps) {
   const { locale } = useI18n();
   const initialSnapshot = serializeDocument(initialDocument);
@@ -144,6 +162,12 @@ export function UnifiedDesignerWorkbench({
   const [publishError, setPublishError] = useState<string | null>(null);
   const [mode, setMode] = useState<WorkbenchMode>('edit');
   const [previewDeviceId, setPreviewDeviceId] = useState<string>(DEFAULT_DEVICE_PREVIEW_ID);
+  const [rolePreviewTargets, setRolePreviewTargets] = useState<AuthoringRolePreviewTarget[]>([]);
+  const [selectedRolePreviewPid, setSelectedRolePreviewPid] = useState('');
+  const [roleStructurePreview, setRoleStructurePreview] =
+    useState<AuthoringRoleStructurePreview | null>(null);
+  const [rolePreviewLoading, setRolePreviewLoading] = useState(false);
+  const [rolePreviewError, setRolePreviewError] = useState<string | null>(null);
   // Primary + additive multi-selection model, extracted to a shared kernel so
   // the report designer (block-tree family) reuses the same modifier-click /
   // marquee rules. `selectedBlockId` is dual-purpose: the inspector target AND
@@ -169,6 +193,62 @@ export function UnifiedDesignerWorkbench({
   React.useEffect(() => {
     if (initialSelectedBlockId) setSelectedBlockId(initialSelectedBlockId);
   }, [initialSelectedBlockId, setSelectedBlockId]);
+
+  React.useEffect(() => {
+    setRolePreviewTargets([]);
+    setSelectedRolePreviewPid('');
+    setRoleStructurePreview(null);
+    setRolePreviewError(null);
+    if (!roleStructurePreviewSessionPid || mode !== 'preview') return;
+    let cancelled = false;
+    void loadAuthoringRolePreviewTargets(roleStructurePreviewSessionPid)
+      .then((targets) => {
+        if (!cancelled) setRolePreviewTargets(targets);
+      })
+      .catch((targetError: unknown) => {
+        if (!cancelled) {
+          setRolePreviewError(
+            targetError instanceof Error ? targetError.message : '无法加载可预览角色',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, roleStructurePreviewSessionPid]);
+
+  React.useEffect(() => {
+    setRoleStructurePreview(null);
+    setRolePreviewError(null);
+    if (!roleStructurePreviewSessionPid || !selectedRolePreviewPid) {
+      setRolePreviewLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setRolePreviewLoading(true);
+    void loadAuthoringRoleStructurePreview(
+      roleStructurePreviewSessionPid,
+      selectedRolePreviewPid,
+    )
+      .then((preview) => {
+        if (!cancelled) setRoleStructurePreview(preview);
+      })
+      .catch((previewError: unknown) => {
+        if (!cancelled) {
+          setRolePreviewError(
+            previewError instanceof Error
+              ? previewError.message
+              : '无法生成角色权限结构预览',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setRolePreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [roleStructurePreviewSessionPid, selectedRolePreviewPid]);
 
   // Toolbar save indicator follows the live document snapshot; wired into the
   // document kernel's onChange so every edit / undo / redo refreshes it.
@@ -916,6 +996,25 @@ export function UnifiedDesignerWorkbench({
     setSelectedBlockId(null);
   };
 
+  const rolePreviewDocument = useMemo(
+    () =>
+      roleStructurePreview
+        ? sanitizeRoleStructurePreviewDocument(document)
+        : document,
+    [document, roleStructurePreview],
+  );
+  const rolePreviewPermissionEvaluator = useMemo(
+    () =>
+      roleStructurePreview
+        ? createRoleStructurePermissionEvaluator(roleStructurePreview)
+        : undefined,
+    [roleStructurePreview],
+  );
+  const rolePreviewSummary = useMemo(
+    () => summarizeRoleStructureDecisions(roleStructurePreview?.decisions ?? []),
+    [roleStructurePreview],
+  );
+
   return (
     <div
       className="flex h-[calc(100vh-64px)] min-h-[656px] flex-col overflow-hidden bg-slate-100 text-slate-900"
@@ -974,21 +1073,151 @@ export function UnifiedDesignerWorkbench({
           className="min-h-0 flex-1 overflow-auto bg-slate-100 p-4 lg:p-6"
           data-testid="unified-runtime-preview"
         >
-          <div className="mx-auto mb-3 flex max-w-7xl items-center gap-2">
-            <span className="text-xs font-medium text-slate-500">预览设备</span>
-            <select
-              data-testid="preview-device-select"
-              value={previewDeviceId}
-              onChange={(event) => setPreviewDeviceId(event.target.value)}
-              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-blue-500"
-            >
-              {DEVICE_PREVIEW_PRESETS.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.label}
-                </option>
-              ))}
-            </select>
+          <div className="mx-auto mb-3 flex max-w-7xl flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
+              {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.device, locale)}
+              <select
+                data-testid="preview-device-select"
+                value={previewDeviceId}
+                onChange={(event) => setPreviewDeviceId(event.target.value)}
+                className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-blue-500"
+              >
+                {DEVICE_PREVIEW_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {roleStructurePreviewSessionPid ? (
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.perspective, locale)}
+                <select
+                  data-testid="role-preview-target-select"
+                  value={selectedRolePreviewPid}
+                  onChange={(event) => setSelectedRolePreviewPid(event.target.value)}
+                  className="min-w-48 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-blue-500"
+                >
+                  <option value="">
+                    {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.currentActor, locale)}
+                  </option>
+                  {rolePreviewTargets.map((target) => (
+                    <option key={target.rolePid} value={target.rolePid}>
+                      {target.roleName} · {target.roleCode}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {rolePreviewLoading ? (
+              <span className="text-xs text-blue-700" data-testid="role-preview-loading">
+                {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.calculating, locale)}
+              </span>
+            ) : null}
           </div>
+          {rolePreviewError && !selectedRolePreviewPid ? (
+            <div
+              className="mx-auto mb-3 max-w-7xl rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800"
+              data-testid="role-preview-targets-error"
+            >
+              {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.targetsFailed, locale, {
+                error: rolePreviewError,
+              })}
+            </div>
+          ) : null}
+          {roleStructurePreview ? (
+            <div
+              className="mx-auto mb-3 max-w-7xl rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950"
+              data-testid="role-structure-preview-banner"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="font-semibold">
+                    {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.title, locale, {
+                      role: roleStructurePreview.targetRole.roleName,
+                    })}
+                  </span>
+                  <span className="ml-2 text-xs text-blue-700">
+                    {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.intersection, locale)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  data-testid="role-preview-exit"
+                  onClick={() => setSelectedRolePreviewPid('')}
+                  className="rounded-md border border-blue-300 bg-white px-2.5 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100"
+                >
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.exit, locale)}
+                </button>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-blue-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.noTargetData, locale)}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-blue-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.exportOff, locale)}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-blue-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.actionsOff, locale)}
+                </span>
+                {rolePreviewSummary.map((summary) => (
+                  <span
+                    key={summary.nodeType}
+                    className="rounded-full bg-white px-2 py-1 ring-1 ring-blue-200"
+                    data-testid={`role-preview-summary-${summary.nodeType.toLowerCase()}`}
+                  >
+                    {rolePreviewNodeLabel(summary.nodeType, locale)} {summary.allowed}/{summary.total}
+                  </span>
+                ))}
+              </div>
+              <details className="mt-2 text-xs">
+                <summary className="cursor-pointer font-medium text-blue-800">
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.inspect, locale)}
+                </summary>
+                <div className="mt-2 max-h-40 overflow-auto rounded-md bg-white ring-1 ring-blue-100">
+                  {roleStructurePreview.decisions.map((decision) => (
+                    <div
+                      key={`${decision.nodeType}:${decision.nodeId}`}
+                      className="grid grid-cols-[64px_minmax(120px,1fr)_auto] gap-2 border-b border-blue-50 px-3 py-2 last:border-b-0"
+                      data-testid={`role-preview-decision-${decision.nodeId}`}
+                    >
+                      <span className="text-slate-500">
+                        {rolePreviewNodeLabel(decision.nodeType, locale)}
+                      </span>
+                      <span className="truncate" title={decision.permissionCode || undefined}>
+                        {decision.label || decision.nodeId}
+                      </span>
+                      <span
+                        className={decision.visible ? 'text-emerald-700' : 'font-medium text-amber-700'}
+                      >
+                        {decision.visible
+                          ? resolveDesignerText(
+                              decision.writable
+                                ? DESIGNER_I18N.unified.rolePreview.visibleWritable
+                                : DESIGNER_I18N.unified.rolePreview.visibleReadOnly,
+                              locale,
+                            )
+                          : resolveDesignerText(
+                              DESIGNER_I18N.unified.rolePreview.hidden,
+                              locale,
+                            )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </div>
+          ) : null}
+          {rolePreviewError && selectedRolePreviewPid ? (
+            <div
+              className="mx-auto mb-3 max-w-7xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              data-testid="role-preview-error"
+            >
+              {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.failed, locale, {
+                error: rolePreviewError,
+              })}
+            </div>
+          ) : null}
           <div
             className={
               getDevicePreviewPreset(previewDeviceId).width == null
@@ -999,13 +1228,34 @@ export function UnifiedDesignerWorkbench({
             data-device={previewDeviceId}
             style={getDeviceFrameStyle(getDevicePreviewPreset(previewDeviceId))}
           >
-            <RecursiveBlockRenderer
-              schema={document}
-              runtimeServices={defaultRuntimeExecutionServices}
-              modelFields={
-                document.modelCode ? modelFieldsByModel[document.modelCode] ?? [] : []
-              }
-            />
+            {selectedRolePreviewPid && (rolePreviewLoading || rolePreviewError) ? (
+              <div
+                className="grid min-h-64 place-items-center bg-white p-6 text-sm text-slate-500"
+                data-testid="role-preview-fail-closed"
+              >
+                {rolePreviewLoading
+                  ? resolveDesignerText(DESIGNER_I18N.unified.rolePreview.safeLoading, locale)
+                  : resolveDesignerText(DESIGNER_I18N.unified.rolePreview.safeFailure, locale)}
+              </div>
+            ) : (
+              <RecursiveBlockRenderer
+                schema={rolePreviewDocument}
+                runtimeServices={
+                  roleStructurePreview
+                    ? roleStructurePreviewRuntimeServices
+                    : defaultRuntimeExecutionServices
+                }
+                permissionEvaluator={rolePreviewPermissionEvaluator}
+                interactionDisabled={Boolean(roleStructurePreview)}
+                modelFields={
+                  roleStructurePreview
+                    ? []
+                    : document.modelCode
+                      ? modelFieldsByModel[document.modelCode] ?? []
+                      : []
+                }
+              />
+            )}
           </div>
         </div>
       ) : (
@@ -1322,4 +1572,20 @@ function isDotPathAllowed(dotPath: string, capabilityPointers: string[]): boolea
     (capabilityPointer) =>
       pointer === capabilityPointer || pointer.startsWith(`${capabilityPointer}/`),
   );
+}
+
+function rolePreviewNodeLabel(
+  nodeType: AuthoringRoleStructureDecision['nodeType'],
+  locale: string,
+): string {
+  switch (nodeType) {
+    case 'MENU':
+      return resolveDesignerText(DESIGNER_I18N.unified.rolePreview.node.menu, locale);
+    case 'FIELD':
+      return resolveDesignerText(DESIGNER_I18N.unified.rolePreview.node.field, locale);
+    case 'ACTION':
+      return resolveDesignerText(DESIGNER_I18N.unified.rolePreview.node.action, locale);
+    default:
+      return resolveDesignerText(DESIGNER_I18N.unified.rolePreview.node.block, locale);
+  }
 }

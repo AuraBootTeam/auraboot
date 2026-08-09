@@ -757,6 +757,9 @@ export default function UnifiedDesignerPage() {
       contextualReadOnly={contextualReadOnly}
       contextualEditablePropertyPaths={contextualEditablePropertyPaths}
       contextualReorderableBlockTypes={contextualReorderableBlockTypes}
+      roleStructurePreviewSessionPid={
+        handoff && canManageDesigner ? authoringSession?.sessionPid : undefined
+      }
     />
   );
 

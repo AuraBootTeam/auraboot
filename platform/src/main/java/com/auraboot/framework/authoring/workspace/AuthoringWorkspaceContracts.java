@@ -125,6 +125,40 @@ public final class AuthoringWorkspaceContracts {
             Instant expiresAt) {
     }
 
+    /** Minimal role identity exposed to the governed structure-preview selector. */
+    public record RolePreviewTargetView(
+            String rolePid,
+            String roleCode,
+            String roleName) {
+    }
+
+    /** One structural visibility/write decision; it never contains record data. */
+    public record RoleStructureDecisionView(
+            String nodeType,
+            String nodeId,
+            String label,
+            String permissionCode,
+            boolean allowed,
+            boolean visible,
+            boolean writable,
+            String reason) {
+    }
+
+    /**
+     * Governed role structure preview. The booleans are deliberate contract assertions consumed by
+     * the Studio UI and acceptance tests; this response never impersonates the target role.
+     */
+    public record RoleStructurePreviewView(
+            String mode,
+            String pagePid,
+            RolePreviewTargetView targetRole,
+            boolean actorIntersectionApplied,
+            boolean businessDataIncluded,
+            boolean exportAllowed,
+            boolean businessActionsAllowed,
+            List<RoleStructureDecisionView> decisions) {
+    }
+
     public enum StudioIntent {
         PAGE_STRUCTURE,
         NEW_PAGE,

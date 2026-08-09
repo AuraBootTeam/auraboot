@@ -15,6 +15,8 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Re
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewWorkspaceView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RolePreviewTargetView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RoleStructurePreviewView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RevisionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RollbackRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ResumeEditingRequest;
@@ -49,14 +51,17 @@ public class AuthoringWorkspaceController {
     private final AuthoringWorkspaceService workspaceService;
     private final AuthoringGovernanceService governanceService;
     private final AuthoringHandoffService handoffService;
+    private final AuthoringRoleStructurePreviewService roleStructurePreviewService;
 
     public AuthoringWorkspaceController(
             AuthoringWorkspaceService workspaceService,
             AuthoringGovernanceService governanceService,
-            AuthoringHandoffService handoffService) {
+            AuthoringHandoffService handoffService,
+            AuthoringRoleStructurePreviewService roleStructurePreviewService) {
         this.workspaceService = workspaceService;
         this.governanceService = governanceService;
         this.handoffService = handoffService;
+        this.roleStructurePreviewService = roleStructurePreviewService;
     }
 
     @GetMapping("/capabilities")
@@ -75,6 +80,21 @@ public class AuthoringWorkspaceController {
     @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
     public ApiResponse<SessionView> get(@PathVariable String sessionPid) {
         return ApiResponse.success(workspaceService.get(sessionPid));
+    }
+
+    @GetMapping("/sessions/{sessionPid}/role-preview-targets")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
+    public ApiResponse<List<RolePreviewTargetView>> rolePreviewTargets(
+            @PathVariable String sessionPid) {
+        return ApiResponse.success(roleStructurePreviewService.targets(sessionPid));
+    }
+
+    @GetMapping("/sessions/{sessionPid}/role-structure-preview")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
+    public ApiResponse<RoleStructurePreviewView> roleStructurePreview(
+            @PathVariable String sessionPid,
+            @RequestParam @jakarta.validation.constraints.NotBlank String rolePid) {
+        return ApiResponse.success(roleStructurePreviewService.preview(sessionPid, rolePid));
     }
 
     @PostMapping("/change-sets/{changeSetPid}/sessions")

@@ -13,6 +13,8 @@ import type {
   AuthoringRelease,
   AuthoringReleaseHistory,
   AuthoringSplitResult,
+  AuthoringRolePreviewTarget,
+  AuthoringRoleStructurePreview,
 } from './types';
 
 export interface InteractionContext {
@@ -48,6 +50,26 @@ export async function loadAuthoringSession(sessionPid: string): Promise<Authorin
     `/api/authoring/sessions/${encodeURIComponent(sessionPid)}`,
   );
   return requireData(result, '无法刷新配置草稿');
+}
+
+export async function loadAuthoringRolePreviewTargets(
+  sessionPid: string,
+): Promise<AuthoringRolePreviewTarget[]> {
+  const result = await fetchResult<AuthoringRolePreviewTarget[]>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/role-preview-targets`,
+  );
+  return requireData(result, '无法加载可预览角色');
+}
+
+export async function loadAuthoringRoleStructurePreview(
+  sessionPid: string,
+  rolePid: string,
+): Promise<AuthoringRoleStructurePreview> {
+  const result = await fetchResult<AuthoringRoleStructurePreview>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/role-structure-preview`,
+    { params: { rolePid } },
+  );
+  return requireData(result, '无法生成角色权限结构预览');
 }
 
 export async function observeAuthoringChangeSet(

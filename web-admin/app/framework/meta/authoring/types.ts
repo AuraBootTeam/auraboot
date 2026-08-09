@@ -107,6 +107,36 @@ export interface AuthoringReviewWorkspace {
   capabilities: CapabilityRegistry;
 }
 
+export interface AuthoringRolePreviewTarget {
+  rolePid: string;
+  roleCode: string;
+  roleName: string;
+}
+
+export type AuthoringRoleStructureNodeType = 'MENU' | 'BLOCK' | 'FIELD' | 'ACTION';
+
+export interface AuthoringRoleStructureDecision {
+  nodeType: AuthoringRoleStructureNodeType;
+  nodeId: string;
+  label: string;
+  permissionCode?: string | null;
+  allowed: boolean;
+  visible: boolean;
+  writable: boolean;
+  reason: 'UNRESTRICTED' | 'ALLOW' | 'TARGET_ROLE_DENY' | 'ACTOR_SCOPE_LIMIT';
+}
+
+export interface AuthoringRoleStructurePreview {
+  mode: 'STRUCTURE';
+  pagePid: string;
+  targetRole: AuthoringRolePreviewTarget;
+  actorIntersectionApplied: true;
+  businessDataIncluded: false;
+  exportAllowed: false;
+  businessActionsAllowed: false;
+  decisions: AuthoringRoleStructureDecision[];
+}
+
 export interface AuthoringChangeItem {
   changeItemPid: string;
   sourceChangeItemPid?: string | null;
