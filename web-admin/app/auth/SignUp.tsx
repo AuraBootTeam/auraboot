@@ -13,6 +13,8 @@ import { createUserSession, getTokenFromRequest } from '~/shared/services/sessio
 import { validateEmail } from '~/utils/utils';
 import { post } from '~/shared/services/http-client';
 import { ResultHelper, type User } from '~/utils/type';
+import { useRootLoaderData } from '~/root';
+import { COMMUNITY_BRANDING } from '~/config/branding';
 
 const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';
 
@@ -106,6 +108,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Join() {
+  const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
   const [searchParams] = useSearchParams();
   const actionData = useActionData<typeof action>();
   const emailRef = useRef<HTMLInputElement>(null);
@@ -153,7 +156,9 @@ export default function Join() {
             <div className="relative z-10">
               <div className="mb-6 text-center">
                 <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">创建账号</h1>
-                <p className="text-sm text-gray-600 dark:text-gray-400">注册以开始使用 AuraBoot</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  注册以开始使用 {branding.productName}
+                </p>
               </div>
               <SignUpForm
                 emailRef={emailRef}
@@ -175,7 +180,7 @@ export default function Join() {
               <div className="absolute right-20 bottom-20 h-40 w-40 rounded-full bg-white/10 blur-2xl"></div>
             </div>
             <div className="relative z-10 max-w-md text-center text-white">
-              <h2 className="mb-4 text-5xl font-bold tracking-tight">AuraBoot</h2>
+              <h2 className="mb-4 text-5xl font-bold tracking-tight">{branding.productName}</h2>
               <p className="mb-8 text-lg text-white/80">快速构建企业级应用的低代码平台</p>
               <div className="space-y-4 text-left">
                 <div className="flex items-center space-x-3">
@@ -258,7 +263,9 @@ export default function Join() {
                   </div>
                 </div>
                 <h1 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">创建账号</h1>
-                <p className="text-gray-600 dark:text-gray-400">注册以开始使用 AuraBoot</p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  注册以开始使用 {branding.productName}
+                </p>
               </div>
               <SignUpForm
                 emailRef={emailRef}

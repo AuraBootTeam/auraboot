@@ -1,10 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import Header from '../Header';
 
 vi.mock('~/root', () => ({
-  useRootLoaderData: () => ({ user: { username: 'cat', tenantName: 'AcmeCo' } }),
+  useRootLoaderData: () => ({
+    user: { username: 'cat', tenantName: 'AcmeCo' },
+    branding: {
+      productName: 'AuraBoot',
+      logoUrl: '/android-chrome-192x192.png',
+    },
+  }),
 }));
 vi.mock('~/contexts/ThemeContext', () => ({
   useTheme: () => ({ theme: 'light', setTheme: vi.fn(), isDark: false }),
@@ -98,5 +104,19 @@ describe('Header — polish', () => {
       'aria-label',
       'Close navigation menu',
     );
+  });
+
+  it('exposes the About page from the account menu', () => {
+    render(
+      <MemoryRouter>
+        <Header />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'User avatar' }));
+
+    const aboutLink = screen.getByTestId('about-link');
+    expect(aboutLink).toHaveAttribute('href', '/about');
+    expect(aboutLink).toHaveTextContent('About AuraBoot');
   });
 });

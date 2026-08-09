@@ -29,6 +29,13 @@ import {
 } from '@auraboot/runtime-kernel';
 import { useFederationStore } from '~/plugins/FederationManager';
 import { resolveIcpComplianceConfig, type IcpComplianceConfig } from '~/config/icpCompliance';
+import {
+  COMMUNITY_BRANDING,
+  resolveBuildIdentity,
+  resolveCommunityBranding,
+  type BrandingConfig,
+  type BuildIdentity,
+} from '~/config/branding';
 
 export interface RootLoaderData {
   runtimeProfile: RuntimeProfile;
@@ -43,6 +50,8 @@ export interface RootLoaderData {
   spaces: any[];
   bootstrapStatus: BootstrapStatus | null;
   icpCompliance: IcpComplianceConfig;
+  branding: BrandingConfig;
+  buildIdentity: BuildIdentity;
 }
 
 import '~/app.css';
@@ -102,6 +111,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   const { pathname } = new URL(request.url);
   const runtimeProfile = getRuntimeProfileFromPathname(pathname);
   const icpCompliance = resolveIcpComplianceConfig(process.env);
+  const branding = resolveCommunityBranding();
+  const buildIdentity = resolveBuildIdentity(process.env);
 
   // Bootstrap status: never redirect; inject into loader data so the banner can render
   const bootstrapStatus = await fetchBootstrapStatus();
@@ -139,6 +150,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
       spaces: [],
       bootstrapStatus,
       icpCompliance,
+      branding,
+      buildIdentity,
     };
     ssrLoaderCache.set(cacheKey, result);
     return result;
@@ -211,11 +224,18 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     spaces,
     bootstrapStatus,
     icpCompliance,
+    branding,
+    buildIdentity,
   };
 }
 
-export const meta = ({ data }: { data?: RootLoaderData }) =>
-  data?.icpCompliance.enabled ? [{ title: data.icpCompliance.siteDisplayName }] : [];
+export const meta = ({ data }: { data?: RootLoaderData }) => [
+  {
+    title: data?.icpCompliance.enabled
+      ? data.icpCompliance.siteDisplayName
+      : (data?.branding.productName ?? COMMUNITY_BRANDING.productName),
+  },
+];
 
 export function useRootLoaderData(): RootLoaderData | undefined {
   return useRouteLoaderData<typeof loader>('root') as RootLoaderData | undefined;
@@ -285,8 +305,8 @@ export default function App() {
   // Capture uncaught front-end errors → /api/client-errors so they surface in the
   // in-app troubleshooting center (/ops/errors) instead of vanishing.
   useEffect(() => {
-    void import('~/shared/observability/clientErrorReporter').then(({ installClientErrorReporter }) =>
-      installClientErrorReporter(),
+    void import('~/shared/observability/clientErrorReporter').then(
+      ({ installClientErrorReporter }) => installClientErrorReporter(),
     );
   }, []);
 

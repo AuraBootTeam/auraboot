@@ -147,6 +147,14 @@ describe('root loader authentication guard', () => {
         enabled: false,
         siteDisplayName: 'AuraBoot',
       },
+      branding: {
+        productName: 'AuraBoot',
+        poweredByText: 'Powered by AuraBoot',
+      },
+      buildIdentity: {
+        version: 'development',
+        revision: 'local',
+      },
     });
     expect(mocks.getUserInfo).not.toHaveBeenCalled();
     expect(mocks.getUserMenus).not.toHaveBeenCalled();
@@ -171,6 +179,20 @@ describe('root loader authentication guard', () => {
         siteDisplayName: 'AuraBoot Runtime title',
       },
     });
+  });
+
+  it('always emits a stable product title when ICP mode is disabled', async () => {
+    const { COMMUNITY_BRANDING } = await import('~/config/branding');
+    const { meta } = await import('~/root');
+
+    expect(
+      meta({
+        data: {
+          branding: COMMUNITY_BRANDING,
+          icpCompliance: { enabled: false },
+        } as any,
+      }),
+    ).toEqual([{ title: 'AuraBoot' }]);
   });
 
   it('keeps storefront runtime public even when an admin token exists', async () => {
