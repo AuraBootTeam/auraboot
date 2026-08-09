@@ -60,6 +60,7 @@ import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityReg
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
+import static org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY;
 
 /** Transactional contextual-authoring workspace; it never invokes a business command. */
 @Service
@@ -68,6 +69,7 @@ public class AuthoringWorkspaceService {
     private static final Duration SESSION_TTL = Duration.ofHours(8);
     private static final Duration WRITER_LEASE = Duration.ofMinutes(5);
     private static final String REVIEW_WORKSPACE_MODE = "REVIEW";
+    private static final Set<String> NEW_PAGE_KINDS = Set.of("list", "form", "detail");
     private static final String RESOURCE_BLOCK_ID = "$resource";
     private static final String CREATE_PAGE_PATH = "/$resource/page";
     private static final String CREATE_MENU_PATH = "/$resource/menu";
@@ -209,6 +211,7 @@ public class AuthoringWorkspaceService {
         Identity identity = identity();
         WorkspaceRow source = requireWorkspace(identity, sourceSessionPid, true);
         validateWritable(source, identity, request.expectedSourceRevision());
+        requireSupportedNewPageKind(request.kind());
         newPageMaterializer.requireAvailable(
                 identity.tenantId(), identity.envId(), request.pageKey(), request.menuCode(),
                 request.menuPath(), request.parentMenuCode(), request.permissionCode());
@@ -266,6 +269,13 @@ public class AuthoringWorkspaceService {
                 "STUDIO_NEW_RESOURCE_RESERVED", pagePid, RESOURCE_BLOCK_ID,
                 CREATE_PAGE_PATH, auditMetadata));
         return viewMapper.toView(reloaded, identity.userId());
+    }
+
+    private void requireSupportedNewPageKind(String kind) {
+        if (!NEW_PAGE_KINDS.contains(kind)) {
+            throw new ResponseStatusException(
+                    UNPROCESSABLE_ENTITY, "authoring.new-page.kind-unsupported");
+        }
     }
 
     private ObjectNode newPageDefinition(

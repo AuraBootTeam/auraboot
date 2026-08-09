@@ -111,6 +111,20 @@ class AuthoringNewPageWorkspaceIntegrationTest extends BaseIntegrationTest {
                 """, Integer.class, created.changeSetPid())).isZero();
     }
 
+    @Test
+    void dashboardPageSchemaCreationFailsClosedBeforeAnyResourceIsReserved() {
+        Fixture fixture = fixture();
+        CreateNewPageWorkspaceRequest invalid = requestWithKind(fixture.request(), "dashboard");
+
+        assertThatThrownBy(() -> workspaceService.createNewPageWorkspace(
+                fixture.source().sessionPid(), invalid))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("authoring.new-page.kind-unsupported");
+
+        assertThat(countPage(fixture.pageKey())).isZero();
+        assertThat(countMenu(fixture.menuCode())).isZero();
+    }
+
     private Fixture fixture() {
         PageSchema sourcePage = insertSourcePage();
         SessionView source = workspaceService.open(new OpenSessionRequest(sourcePage.getPid(), null));
@@ -124,7 +138,7 @@ class AuthoringNewPageWorkspaceIntegrationTest extends BaseIntegrationTest {
         String menuPath = "/authoring/new/" + suffix;
         CreateNewPageWorkspaceRequest request = new CreateNewPageWorkspaceRequest(
                 1, pageKey, "Authoring new " + suffix, "受治理新页面", "integration",
-                "composite", parentCode, menuCode, "受治理新页面", menuPath,
+                "list", parentCode, menuCode, "受治理新页面", menuPath,
                 "LayoutDashboard", permissionCode);
         return new Fixture(source, request, pageKey, menuCode, menuPath, parentId);
     }
@@ -137,7 +151,7 @@ class AuthoringNewPageWorkspaceIntegrationTest extends BaseIntegrationTest {
         page.setEnvId(MetaContext.getCurrentEnvironmentId());
         page.setPageKey("authoring_source_" + pid.toLowerCase());
         page.setName("Authoring source " + pid);
-        page.setKind("composite");
+        page.setKind("list");
         page.setSchemaVersion(4);
         page.setProfile("admin");
         page.setTitle("{\"zh-CN\":\"Source\"}");
@@ -151,6 +165,15 @@ class AuthoringNewPageWorkspaceIntegrationTest extends BaseIntegrationTest {
         page.setDeletedFlag(false);
         pageSchemaMapper.insert(page);
         return page;
+    }
+
+    private CreateNewPageWorkspaceRequest requestWithKind(
+            CreateNewPageWorkspaceRequest source,
+            String kind) {
+        return new CreateNewPageWorkspaceRequest(
+                source.expectedSourceRevision(), source.pageKey(), source.name(), source.title(),
+                source.description(), kind, source.parentMenuCode(), source.menuCode(),
+                source.menuName(), source.menuPath(), source.menuIcon(), source.permissionCode());
     }
 
     private long insertParentMenu(String code) {

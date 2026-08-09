@@ -4,7 +4,6 @@
  */
 
 import type { LinkageRule } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
-import type { RuntimePageKind } from '~/framework/meta/schemas/pageKinds';
 
 // 多语言文本类型
 // 注意: 此类型应与 i18n-renderer.ts 中的定义保持一致
@@ -605,7 +604,7 @@ export interface PageDataSourceConfig {
 
 // 统一 Schema 接口
 export interface UnifiedSchema {
-  kind: RuntimePageKind;
+  kind: 'page' | 'list' | 'form' | 'detail' | 'page_layout';
   version: string;
   /** DSL schema format version (single integer, default 1). */
   schemaVersion?: number;

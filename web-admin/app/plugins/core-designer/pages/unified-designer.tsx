@@ -1200,7 +1200,7 @@ function NewPageWorkspaceWizard({
 }) {
   const [title, setTitle] = useState('');
   const [pageKey, setPageKey] = useState('');
-  const [kind, setKind] = useState<CreateNewPageWorkspaceInput['kind']>('composite');
+  const [kind, setKind] = useState<CreateNewPageWorkspaceInput['kind']>('list');
   const [parentMenuCode, setParentMenuCode] = useState('');
   const [permissionCode, setPermissionCode] = useState('');
   const [description, setDescription] = useState('');
@@ -1313,12 +1313,20 @@ function NewPageWorkspaceWizard({
                   onChange={(event) => setKind(event.target.value as CreateNewPageWorkspaceInput['kind'])}
                   className="min-h-11 rounded-md border border-slate-300 bg-white px-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 >
-                  <option value="composite">综合页面</option>
                   <option value="list">列表</option>
                   <option value="form">表单</option>
                   <option value="detail">详情</option>
-                  <option value="dashboard">看板</option>
                 </select>
+                <span className="text-xs font-normal leading-5 text-slate-500">
+                  仪表板是一等资源，不属于 PageSchema 页面类型；请使用
+                  <a
+                    href="/dashboard-designer"
+                    className="ml-1 font-semibold text-blue-700 underline-offset-2 hover:underline"
+                  >
+                    仪表板设计器
+                  </a>
+                  。
+                </span>
               </label>
             </div>
 

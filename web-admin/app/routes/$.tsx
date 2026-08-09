@@ -13,17 +13,17 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate, useLoaderData, type LoaderFunctionArgs } from 'react-router';
+import {
+  useLocation,
+  useNavigate,
+  useLoaderData,
+  type LoaderFunctionArgs,
+} from 'react-router';
 import { getTokenFromRequest } from '~/shared/services/session';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { DynamicPageRenderer } from '~/framework/meta/rendering/pages/DynamicPageRenderer';
 import { resolveLocalMenuRedirect } from '~/routes/_shared/dynamic-route-utils';
-import {
-  isRuntimePageKind,
-  RUNTIME_PAGE_KINDS,
-  type RuntimePageKind,
-} from '~/framework/meta/schemas/pageKinds';
 
 interface MenuInfo {
   pid: string;
@@ -71,7 +71,7 @@ export default function CatchAllRoute() {
   const [renderPage, setRenderPage] = useState<{
     tableName: string;
     pageKey?: string;
-    pageType: RuntimePageKind;
+    pageType: 'list' | 'form' | 'detail' | 'kanban';
   } | null>(null);
 
   useEffect(() => {
@@ -170,18 +170,16 @@ export default function CatchAllRoute() {
         // Step 3: Resolve rendering strategy based on page configuration
         const { modelCode, kind } = pageInfo;
         // Pass kind directly — must match ab_page_schema.kind values
+        const VALID_KINDS = ['list', 'form', 'detail', 'kanban'] as const;
+        type PageKind = (typeof VALID_KINDS)[number];
         const resolvedKind = (kind || 'list') as string;
-        if (!isRuntimePageKind(resolvedKind)) {
+        if (!VALID_KINDS.includes(resolvedKind as PageKind)) {
           console.error(
             `[CatchAllRoute] Invalid page kind "${resolvedKind}" for path "${location.pathname}". ` +
-              `Expected one of: ${RUNTIME_PAGE_KINDS.join(', ')}. Check ab_page_schema.kind value.`,
+            `Expected one of: ${VALID_KINDS.join(', ')}. Check ab_page_schema.kind value.`
           );
-          setError(
-            `Page "${pageInfo.pageKey || pageInfo.pid}" uses unsupported kind "${resolvedKind}"`,
-          );
-          return;
         }
-        const pageType = resolvedKind;
+        const pageType = resolvedKind as PageKind;
 
         if (pageInfo.pageKey) {
           // Page has a pageKey — render via DynamicPageRenderer

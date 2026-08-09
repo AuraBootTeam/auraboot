@@ -3,10 +3,9 @@ import { localizedTextSchema } from './localized-text.schema';
 import { blockSchema } from './block.schema';
 import { dataSourceConfigSchema, pageDataSourceSchema } from './data-source.schema';
 import { handlerConfigSchema } from './handler.schema';
-import { RUNTIME_PAGE_KINDS } from '~/framework/meta/schemas/pageKinds';
 
-/** Keep structural validation aligned with the published runtime contract. */
-export const KIND_VALUES = RUNTIME_PAGE_KINDS;
+/** Kind values — detail and page_layout added; dashboard removed (use composite pages instead) */
+export const KIND_VALUES = ['page', 'list', 'form', 'detail', 'page_layout'] as const;
 
 export const kindEnum = z.enum(KIND_VALUES);
 

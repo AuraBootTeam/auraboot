@@ -52,7 +52,7 @@ public final class AuthoringWorkspaceContracts {
             @NotBlank @Size(max = 200) String title,
             @Size(max = 1000) String description,
             @NotBlank @jakarta.validation.constraints.Pattern(
-                    regexp = "^(list|form|detail|dashboard|composite)$")
+                    regexp = "^(list|form|detail)$")
             String kind,
             @NotBlank @Size(max = 100) String parentMenuCode,
             @NotBlank @Size(max = 100)

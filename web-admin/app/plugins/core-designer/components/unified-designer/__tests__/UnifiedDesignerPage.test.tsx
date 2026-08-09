@@ -336,7 +336,11 @@ describe('UnifiedDesignerPage', () => {
     fireEvent.change(screen.getByLabelText(/^页面标识/), {
       target: { value: 'production_exception' },
     });
-    fireEvent.change(screen.getByLabelText('页面类型'), { target: { value: 'dashboard' } });
+    expect(screen.getByRole('combobox', { name: /页面类型/ })).not.toHaveTextContent('看板');
+    expect(screen.getByRole('link', { name: '仪表板设计器' })).toHaveAttribute(
+      'href',
+      '/dashboard-designer',
+    );
     fireEvent.change(screen.getByLabelText('父菜单'), { target: { value: 'manufacturing' } });
     fireEvent.change(screen.getByLabelText('访问权限'), {
       target: { value: 'page.production_exception.read' },
@@ -349,7 +353,7 @@ describe('UnifiedDesignerPage', () => {
         name: 'production_exception',
         title: '生产异常看板',
         description: undefined,
-        kind: 'dashboard',
+        kind: 'list',
         parentMenuCode: 'manufacturing',
         menuCode: 'production_exception',
         menuName: '生产异常看板',

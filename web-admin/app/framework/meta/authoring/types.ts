@@ -129,7 +129,7 @@ export interface CreateNewPageWorkspaceInput {
   name: string;
   title: string;
   description?: string;
-  kind: 'list' | 'form' | 'detail' | 'dashboard' | 'composite';
+  kind: 'list' | 'form' | 'detail';
   parentMenuCode: string;
   menuCode: string;
   menuName: string;
