@@ -14,6 +14,7 @@ public class MetaContext {
     private static final ThreadLocal<MetaContext> HOLDER = new ThreadLocal<>();
     private static final ThreadLocal<Long> MEMBER_ID = new ThreadLocal<>();
     private static final ThreadLocal<Long> ENV_ID = new ThreadLocal<>();
+    private static final ThreadLocal<SessionContext> SESSION_CONTEXT = new ThreadLocal<>();
     /** OTel trace id snapshotted at the request seam so async workers / LLM call sites
      *  can correlate without an active span (A-G6 / §2.6). */
     private static final ThreadLocal<String> OTEL_TRACE_ID = new ThreadLocal<>();
@@ -107,6 +108,7 @@ public class MetaContext {
         HOLDER.remove();
         MEMBER_ID.remove();
         ENV_ID.remove();
+        SESSION_CONTEXT.remove();
         OTEL_TRACE_ID.remove();
         ENV_FILTER_BYPASSED.remove();
         LOCK_GUARD_BYPASSED.remove();
@@ -124,8 +126,18 @@ public class MetaContext {
      * a worker thread would let background work silently inherit a foreground request's authority.
      * An async command must reconstruct its persisted permit plan explicitly.
      */
+    public record SessionContext(
+            Long applicationId,
+            Long loginChannelId,
+            String executionScope,
+            Long actorPartyId,
+            Long partyMembershipId,
+            String sessionStage,
+            long contextVersion) {}
+
     public record Snapshot(Long tenantId, Long userId, String userPid, String username,
-                           Set<Long> roleIds, Long memberId, Long envId, String otelTraceId) {}
+                           Set<Long> roleIds, Long memberId, Long envId, String otelTraceId,
+                           SessionContext sessionContext) {}
 
     /**
      * Capture the current thread's identity + correlation context for later
@@ -138,7 +150,7 @@ public class MetaContext {
             return null;
         }
         return new Snapshot(ctx.tenantId, ctx.userId, ctx.userPid, ctx.username, ctx.roleIds,
-                MEMBER_ID.get(), ENV_ID.get(), OTEL_TRACE_ID.get());
+                MEMBER_ID.get(), ENV_ID.get(), OTEL_TRACE_ID.get(), SESSION_CONTEXT.get());
     }
 
     /**
@@ -153,6 +165,44 @@ public class MetaContext {
         MEMBER_ID.set(s.memberId());
         ENV_ID.set(s.envId());
         OTEL_TRACE_ID.set(s.otelTraceId());
+        SESSION_CONTEXT.set(s.sessionContext());
+    }
+
+    public static void setSessionContext(
+            Long applicationId,
+            Long loginChannelId,
+            String executionScope,
+            Long actorPartyId,
+            Long partyMembershipId,
+            String sessionStage,
+            long contextVersion) {
+        SESSION_CONTEXT.set(new SessionContext(
+                applicationId,
+                loginChannelId,
+                executionScope,
+                actorPartyId,
+                partyMembershipId,
+                sessionStage,
+                Math.max(1, contextVersion)));
+    }
+
+    public static SessionContext getSessionContext() {
+        return SESSION_CONTEXT.get();
+    }
+
+    public static String getCurrentExecutionScope() {
+        SessionContext context = SESSION_CONTEXT.get();
+        return context == null ? null : context.executionScope();
+    }
+
+    public static Long getCurrentActorPartyId() {
+        SessionContext context = SESSION_CONTEXT.get();
+        return context == null ? null : context.actorPartyId();
+    }
+
+    public static Long getCurrentPartyMembershipId() {
+        SessionContext context = SESSION_CONTEXT.get();
+        return context == null ? null : context.partyMembershipId();
     }
 
     /** Snapshotted OTel trace id for the current thread (A-G6 correlation); may be null. */

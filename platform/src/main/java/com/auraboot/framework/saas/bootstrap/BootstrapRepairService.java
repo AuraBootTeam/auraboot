@@ -127,6 +127,20 @@ public class BootstrapRepairService {
                     "system", "string", "Platform display name", false);
             systemConfigService.initialize(SystemConfigKeys.SYSTEM_ALLOW_SELF_REGISTRATION, "false",
                     "system", "boolean", "Allow self-registration", false);
+            systemConfigService.initialize(SystemConfigKeys.SYSTEM_USER_REGISTRATION_POLICY, "closed",
+                    "system", "string", "User registration policy (open/invite_only/closed)", false);
+            systemConfigService.initialize(SystemConfigKeys.SYSTEM_TENANT_PROVISIONING_POLICY,
+                    SystemMode.SINGLE.getCode().equalsIgnoreCase(mode) ? "disabled" : "self_service",
+                    "system", "string",
+                    "Tenant provisioning policy (disabled/platform_managed/self_service)", false);
+            systemConfigService.initialize(SystemConfigKeys.SYSTEM_PARTY_CREATION_POLICY, "approval_required",
+                    "system", "string",
+                    "Party creation policy (disabled/approval_required/auto_approve)", false);
+            systemConfigService.initialize(SystemConfigKeys.SYSTEM_PARTY_INVITATION_ENABLED, "true",
+                    "system", "boolean", "Allow Party invitations", false);
+            systemConfigService.initialize(SystemConfigKeys.SYSTEM_ACTOR_SWITCH_ENABLED, "true",
+                    "system", "boolean", "Allow Party Actor switching", false);
+            boolean loginSurfaceWasMissing = ensureDefaultLoginSurface();
 
             // db_uuid is immutable: only generate if missing.
             String existingDbUuid = systemConfigService.get(SystemConfigKeys.SYSTEM_DB_UUID).orElse(null);
@@ -141,7 +155,7 @@ public class BootstrapRepairService {
             systemConfigService.initialize(SystemConfigKeys.SYSTEM_INSTANCE_URL, instanceUrl,
                     "system", "string", "Instance base URL for fingerprint binding", false);
 
-            return wasMissing
+            return wasMissing || loginSurfaceWasMissing
                     ? RepairStepResult.created(STEP_SYSTEM_CONFIG, "system_config rows initialized (mode=" + mode + ")")
                     : RepairStepResult.present(STEP_SYSTEM_CONFIG, "system_config rows already present");
         } catch (Exception e) {
@@ -505,6 +519,46 @@ public class BootstrapRepairService {
     public RepairStepResult repairJwtSecret(RepairOptions opts) {
         return RepairStepResult.present(STEP_JWT_SECRET,
                 "JWT secret sourced from security.jwt.secret (no system_config row required)");
+    }
+
+    /**
+     * Schema snapshots intentionally contain no data, so the first-install bootstrap must
+     * repair the minimal public login registry that a normal Flyway migration also seeds.
+     */
+    boolean ensureDefaultLoginSurface() {
+        Integer existing = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_login_application WHERE code = 'business-web'",
+                Integer.class);
+        jdbcTemplate.update("""
+                INSERT INTO ab_login_application (
+                    pid, code, display_name, application_type, status
+                ) VALUES (?, 'business-web', 'Business Web', 'web', 'active')
+                ON CONFLICT (code) DO NOTHING
+                """, "01K2AX1APP0000000000000000");
+        jdbcTemplate.update("""
+                INSERT INTO ab_login_channel (
+                    pid, application_id, tenant_id, code, display_name,
+                    channel_type, status, sort_order
+                )
+                SELECT ?, id, NULL, 'default-business-web', 'Default Business Web',
+                       'business', 'active', 0
+                  FROM ab_login_application
+                 WHERE code = 'business-web'
+                ON CONFLICT DO NOTHING
+                """, "01K2AX1CHN0000000000000000");
+        jdbcTemplate.update("""
+                INSERT INTO ab_login_channel_auth_method (
+                    pid, application_id, login_channel_id, auth_method, status, sort_order
+                )
+                SELECT ?, c.application_id, c.id, 'email_password', 'active', 0
+                  FROM ab_login_channel c
+                  JOIN ab_login_application a ON a.id = c.application_id
+                 WHERE a.code = 'business-web'
+                   AND c.code = 'default-business-web'
+                   AND c.tenant_id IS NULL
+                ON CONFLICT (login_channel_id, auth_method) DO NOTHING
+                """, "01K2AX1MET0000000000000000");
+        return existing == null || existing == 0;
     }
 
     // ────────────────────────────────────────────────────────────────────

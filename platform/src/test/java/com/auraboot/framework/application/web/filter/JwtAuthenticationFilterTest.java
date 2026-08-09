@@ -5,6 +5,7 @@ import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.rbac.service.UserRoleService;
+import com.auraboot.framework.party.service.PartyAuthorizationService;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.dao.entity.User;
@@ -51,6 +52,7 @@ class JwtAuthenticationFilterTest {
     @Mock SystemModeService systemModeService;
     @Mock TenantMemberService tenantMemberService;
     @Mock UserRoleService userRoleService;
+    @Mock PartyAuthorizationService partyAuthorizationService;
     @Mock FilterChain chain;
 
     private JwtAuthenticationFilter filter;
@@ -63,6 +65,7 @@ class JwtAuthenticationFilterTest {
         ReflectionTestUtils.setField(filter, "systemModeService", systemModeService);
         ReflectionTestUtils.setField(filter, "tenantMemberService", tenantMemberService);
         ReflectionTestUtils.setField(filter, "userRoleService", userRoleService);
+        ReflectionTestUtils.setField(filter, "partyAuthorizationService", partyAuthorizationService);
         ReflectionTestUtils.setField(filter, "activeProfile", "");
         SecurityContextHolder.clearContext();
     }
@@ -167,6 +170,70 @@ class JwtAuthenticationFilterTest {
         verify(sessionManagementService).updateLastActive("valid.token");
         // After chain completes the filter clears MetaContext in finally.
         assertFalse(MetaContext.exists());
+    }
+
+    @Test
+    void partyTokenRevalidatesMembershipAndAddsOnlyPartyScopedRoles() throws Exception {
+        MockHttpServletRequest req = req();
+        req.addHeader("Authorization", "Bearer party.token");
+        CustomUserDetails ud = new CustomUserDetails("alice", "p", 7L, "alice_pid",
+                Collections.emptyList(), true, true, true, true);
+        when(jwtUtil.extractIdentifier("party.token")).thenReturn("alice_pid");
+        when(userDetailsService.loadUserByUsername("alice_pid")).thenReturn(ud);
+        when(jwtUtil.validateToken("party.token", ud)).thenReturn(true);
+        User user = new User();
+        user.setSecurityVersion(0);
+        when(userService.findByPid("alice_pid")).thenReturn(user);
+        when(sessionManagementService.isSessionValid("party.token")).thenReturn(true);
+        when(jwtUtil.extractTenantId("party.token")).thenReturn(100L);
+        when(jwtUtil.extractMemberId("party.token")).thenReturn(55L);
+        when(jwtUtil.extractExecutionScope("party.token")).thenReturn("party");
+        when(jwtUtil.extractSessionStage("party.token")).thenReturn("ready");
+        when(jwtUtil.extractActorPartyId("party.token")).thenReturn(66L);
+        when(jwtUtil.extractPartyMembershipId("party.token")).thenReturn(77L);
+        when(userRoleService.getRoleIdsByMemberIdAndTenantId(55L, 100L)).thenReturn(List.of(1L));
+        when(partyAuthorizationService.resolveActivePartyRoleIds(100L, 55L, 66L, 77L))
+                .thenAnswer(invocation -> {
+                    assertEquals(100L, MetaContext.getCurrentTenantId());
+                    assertEquals(55L, MetaContext.getCurrentMemberId());
+                    return java.util.Set.of(2L);
+                });
+        @SuppressWarnings("unchecked")
+        java.util.Set<Long>[] seenRoles = new java.util.Set[1];
+        Long[] seenParty = new Long[1];
+        doAnswer(invocation -> {
+            seenRoles[0] = MetaContext.getCurrentRoleIds();
+            seenParty[0] = MetaContext.getCurrentActorPartyId();
+            return null;
+        }).when(chain).doFilter(eq(req), any());
+
+        filter.doFilter(req, new MockHttpServletResponse(), chain);
+
+        assertEquals(java.util.Set.of(1L, 2L), seenRoles[0]);
+        assertEquals(66L, seenParty[0]);
+        verify(partyAuthorizationService).resolveActivePartyRoleIds(100L, 55L, 66L, 77L);
+    }
+
+    @Test
+    void onboardingStageCannotReachOrdinaryBusinessApi() throws Exception {
+        MockHttpServletRequest req = req();
+        req.addHeader("Authorization", "Bearer onboarding.token");
+        CustomUserDetails ud = new CustomUserDetails("alice", "p", 7L, "alice_pid",
+                Collections.emptyList(), true, true, true, true);
+        when(jwtUtil.extractIdentifier("onboarding.token")).thenReturn("alice_pid");
+        when(userDetailsService.loadUserByUsername("alice_pid")).thenReturn(ud);
+        when(jwtUtil.validateToken("onboarding.token", ud)).thenReturn(true);
+        User user = new User();
+        user.setSecurityVersion(0);
+        when(userService.findByPid("alice_pid")).thenReturn(user);
+        when(sessionManagementService.isSessionValid("onboarding.token")).thenReturn(true);
+        when(jwtUtil.extractSessionStage("onboarding.token")).thenReturn("onboarding");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(req, response, chain);
+
+        assertEquals(401, response.getStatus());
+        verify(chain, never()).doFilter(any(), any());
     }
 
     @Test

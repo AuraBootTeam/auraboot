@@ -2,6 +2,7 @@ package com.auraboot.framework.auth.service.impl;
 
 import com.auraboot.framework.auth.dto.ChannelUpdateRequest;
 import com.auraboot.framework.auth.entity.TenantLoginChannel;
+import com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper;
 import com.auraboot.framework.auth.mapper.TenantLoginChannelMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -29,11 +31,15 @@ class TenantLoginChannelServiceImplTest {
     @Mock
     private TenantLoginChannelMapper channelMapper;
 
+    @Mock
+    private LoginApplicationChannelMapper applicationChannelMapper;
+
     private TenantLoginChannelServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new TenantLoginChannelServiceImpl(channelMapper);
+        ReflectionTestUtils.setField(service, "applicationChannelMapper", applicationChannelMapper);
     }
 
     private TenantLoginChannel ch(String code, int order) {
@@ -73,6 +79,19 @@ class TenantLoginChannelServiceImplTest {
     void getEnabledChannelsTenantEmpty() {
         when(channelMapper.selectList(any())).thenReturn(List.of());
         assertEquals(List.of("email_password"), service.getEnabledChannels(1L));
+    }
+
+    @Test
+    @DisplayName("application/channel registry wins over legacy tenant channel rows")
+    void getEnabledChannelsFromApplicationRegistry() {
+        when(applicationChannelMapper.findEnabledAuthMethods(
+                "business-web", "supplier-portal", 1L))
+                .thenReturn(List.of("email_password", "oidc"));
+
+        assertEquals(
+                List.of("email_password", "oidc"),
+                service.getEnabledChannels(1L, "business-web", "supplier-portal"));
+        verify(channelMapper, never()).selectList(any());
     }
 
     @Test

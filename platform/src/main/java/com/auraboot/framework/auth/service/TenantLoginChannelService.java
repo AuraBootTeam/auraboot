@@ -24,6 +24,11 @@ public interface TenantLoginChannelService {
      */
     List<String> getEnabledChannels(Long tenantId);
 
+    /** Resolve auth methods from the application/channel registry, with legacy tenant toggles as fallback. */
+    default List<String> getEnabledChannels(Long tenantId, String applicationCode, String channelCode) {
+        return getEnabledChannels(tenantId);
+    }
+
     /**
      * List all channel configurations for a tenant (enabled and disabled).
      *

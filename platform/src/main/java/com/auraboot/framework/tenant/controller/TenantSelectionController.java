@@ -3,12 +3,16 @@ package com.auraboot.framework.tenant.controller;
 import com.auraboot.framework.application.annotation.CurrentUserId;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.auth.util.JwtUtil;
+import com.auraboot.framework.auth.constant.ExecutionScope;
+import com.auraboot.framework.auth.constant.SessionStage;
+import com.auraboot.framework.auth.dto.SessionTokenContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.i18n.util.I18nLocaleResolver;
 import jakarta.servlet.http.HttpServletRequest;
+import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.service.RoleService;
@@ -62,6 +66,7 @@ public class TenantSelectionController {
     private final SessionManagementService sessionManagementService;
     private final I18nService i18nService;
     private final I18nLocaleResolver i18nLocaleResolver;
+    private final SystemModeService systemModeService;
 
     /**
      * List all spaces (tenants) the current user belongs to.
@@ -102,6 +107,15 @@ public class TenantSelectionController {
                         .toList();
             }
 
+            if (systemModeService.isSingleTenant()) {
+                Long defaultTenantId = systemModeService.getDefaultTenantId();
+                boolean defaultBusinessSpace = !isSystem && tenantId.equals(defaultTenantId);
+                boolean platformOperatorSpace = isSystem && roleCodes.contains("platform_admin");
+                if (!defaultBusinessSpace && !platformOperatorSpace) {
+                    continue;
+                }
+            }
+
             spaces.add(UserSpaceDTO.builder()
                     .tenantId(tenantId)
                     .tenantName(tenant.getName())
@@ -126,8 +140,20 @@ public class TenantSelectionController {
         TenantSelectionResponse response;
 
         switch (request.getAction()) {
-            case "create" -> response = tenantApplicationService.createTenantForUser(request, user);
-            case "join" -> response = tenantApplicationService.joinTenantByInviteCode(request, user);
+            case "create" -> {
+                if (!systemModeService.isTenantSelfProvisioningAllowed()) {
+                    throw new RootUnCheckedException(ResponseCode.FORBIDDEN,
+                            "Tenant self-provisioning is disabled for this deployment");
+                }
+                response = tenantApplicationService.createTenantForUser(request, user);
+            }
+            case "join" -> {
+                if (systemModeService.isSingleTenant()) {
+                    throw new RootUnCheckedException(ResponseCode.FORBIDDEN,
+                            "Tenant joining is disabled in single business tenant mode");
+                }
+                response = tenantApplicationService.joinTenantByInviteCode(request, user);
+            }
             case "select" -> response = selectSpace(request, user);
             default -> throw new RootUnCheckedException(UnreachableCodePathException);
         }
@@ -182,12 +208,38 @@ public class TenantSelectionController {
             throw new RootUnCheckedException(ResponseCode.NOT_FOUND, "Tenant not found");
         }
 
+        if (systemModeService.isSingleTenant()) {
+            Long defaultTenantId = systemModeService.getDefaultTenantId();
+            boolean defaultBusinessSpace = tenantId.equals(defaultTenantId)
+                    && !"System".equalsIgnoreCase(tenant.getName());
+            boolean platformOperatorSpace = "System".equalsIgnoreCase(tenant.getName())
+                    && hasRole(member.getId(), tenantId, "platform_admin");
+            if (!defaultBusinessSpace && !platformOperatorSpace) {
+                throw new RootUnCheckedException(ResponseCode.FORBIDDEN,
+                        "Tenant switching is disabled in single business tenant mode");
+            }
+        }
+
         // Generate new JWT with selected tenantId and memberId
         UserDetails userDetails = new org.springframework.security.core.userdetails.User(
                 user.getEmail(), "",
                 Collections.singletonList(new SimpleGrantedAuthority("role_user")));
         int securityVersion = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
-        String jwt = jwtUtil.generateTokenWithTenantId(userDetails, user.getPid(), tenantId, member.getId(), securityVersion);
+        boolean platformSpace = "System".equalsIgnoreCase(tenant.getName());
+        String jwt = jwtUtil.generateTokenWithContext(
+                userDetails,
+                user.getPid(),
+                new SessionTokenContext(
+                        tenantId,
+                        member.getId(),
+                        null,
+                        null,
+                        platformSpace ? ExecutionScope.PLATFORM : ExecutionScope.TENANT,
+                        null,
+                        null,
+                        platformSpace ? SessionStage.PLATFORM : SessionStage.READY,
+                        1,
+                        securityVersion));
 
         // Register new JWT in session store so JwtAuthenticationFilter.isSessionValid() passes
         sessionManagementService.createSession(user.getId(), jwt, null, "space-switch");
@@ -202,5 +254,20 @@ public class TenantSelectionController {
         log.info("User {} selected space: tenant={} ({})", user.getId(), tenantId, tenant.getName());
 
         return response;
+    }
+
+    private boolean hasRole(Long memberId, Long tenantId, String roleCode) {
+        List<Long> roleIds = userRoleService.list(new LambdaQueryWrapper<UserRole>()
+                        .eq(UserRole::getMemberId, memberId)
+                        .eq(UserRole::getTenantId, tenantId)
+                        .eq(UserRole::getDeletedFlag, false))
+                .stream()
+                .map(UserRole::getRoleId)
+                .toList();
+        if (roleIds.isEmpty()) {
+            return false;
+        }
+        return roleService.listByIds(roleIds).stream()
+                .anyMatch(role -> roleCode.equals(role.getCode()));
     }
 }

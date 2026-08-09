@@ -1,0 +1,163 @@
+{
+  "run": {
+    "id": "single-business-tenant-party-actor-20260809",
+    "target": "SINGLE Business Tenant + Party Actor foundation",
+    "sot": "../auraboot-enterprise/docs/standards/decisions/DDR-2026-08-09-single-business-tenant-party-actor.md",
+    "runtime": "auraboot-party-actor-long",
+    "commit": "cd1ea6c7+working-tree",
+    "fix_rounds": 3
+  },
+  "groups": [
+    {
+      "id": "policy",
+      "title": "SINGLE product policies and admission",
+      "rows": [
+        {
+          "id": "policy.server-source",
+          "action": "Resolve registration, Tenant provisioning and Party creation policies on the server",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.saas.config.service.impl.SystemModeServiceImplTest.xml", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "SINGLE forces Tenant provisioning disabled and retains legacy registration compatibility without allowing it to weaken explicit policy",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "pure-logic", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        },
+        {
+          "id": "policy.single-admission",
+          "action": "Admit an allowed identity into the server-owned Default Business Tenant",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.auth.service.impl.UserAdmissionServiceImplTest.xml"],
+          "assertion": "SINGLE creates/reuses the business TenantMember, rejects CLOSED registration and never selects System Tenant",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        },
+        {
+          "id": "policy.tenant-entry",
+          "action": "Block create/join/select product entry in SINGLE while preserving MULTI self-service",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.tenant.controller.TenantSelectionControllerPolicyTest.xml", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Direct API calls are rejected in SINGLE; MULTI policy remains delegated; SINGLE browser exposes no Tenant self-service entry",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "api", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        }
+      ]
+    },
+    {
+      "id": "schema-iam",
+      "title": "Complete Party and IAM data model",
+      "rows": [
+        {
+          "id": "schema.party-iam",
+          "action": "Migrate Party 12 tables, IAM 5 tables, role scope and session context fields",
+          "evidence": ["platform/src/main/resources/db/migration/core/V20260809120000__party_actor_and_login_application.sql", "platform/build/test-results/test/TEST-com.auraboot.framework.integration.PartyActorPersistenceIntegrationTest.xml"],
+          "assertion": "Fresh PostgreSQL reaches migration v20260809120000 and model round-trips without schema drift",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "contract", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "it"
+        },
+        {
+          "id": "schema.tenant-boundaries",
+          "action": "Keep Party persistence tenant-filtered with composite tenant foreign keys",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.integration.PartyActorPersistenceIntegrationTest.xml", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Party mapper observes current tenant and schema prevents cross-tenant membership/session references",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "real-stack", "authority": "blocking-commit", "driver": "it"
+        },
+        {
+          "id": "iam.default-surface",
+          "action": "Resolve and repair the default LoginApplication/Channel/AuthMethod",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.saas.bootstrap.BootstrapRepairServiceTenantBootstrapTest.xml", "platform/build/test-results/test/TEST-com.auraboot.framework.auth.service.impl.TenantLoginChannelServiceImplTest.xml"],
+          "assertion": "Schema-snapshot first install receives one default password surface and registry wins with safe legacy fallback",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        },
+        {
+          "id": "iam.external-idp",
+          "action": "Manage external IdP instances and orchestrate all OAuth/LDAP federation flows",
+          "evidence": ["platform/src/main/resources/db/migration/core/V20260809120000__party_actor_and_login_application.sql", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Stable tables exist, but unified management UI/runtime orchestration remains deliberately deferred and legacy social paths remain compatible",
+          "verdict": "partial",
+          "verdict_by": "spec-assert",
+          "surface": "journey", "dependencies": "deployed", "authority": "recorded", "driver": "http"
+        }
+      ]
+    },
+    {
+      "id": "actor",
+      "title": "Party lifecycle, authorization and Actor session",
+      "rows": [
+        {
+          "id": "actor.create-approve",
+          "action": "Create a Party under approval policy and activate it",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.party.service.impl.PartyActorServiceImplTest.xml", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Approval-required creates pending Party/Membership; approval makes the Actor eligible",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        },
+        {
+          "id": "actor.switch",
+          "action": "Switch to an active Party Actor",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.party.service.impl.PartyActorServiceImplTest.xml", "platform/build/test-results/test/TEST-com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest.xml", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Replacement session is minted before old revoke; new token is ready/party with cv increment, old token is rejected",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "api", "dependencies": "real-stack", "authority": "blocking-release", "driver": "http"
+        },
+        {
+          "id": "actor.authorization",
+          "action": "Evaluate active membership, PARTY role, capability and resource ownership",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.party.service.impl.PartyAuthorizationServiceImplTest.xml", "platform/build/test-results/test/TEST-com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest.xml"],
+          "assertion": "Only the selected active Actor contributes PARTY roles; capability remains distinct; cross-Party resource access is denied",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        },
+        {
+          "id": "actor.extended-workflows",
+          "action": "Run generic invitation, capability approval, relation and business-network workflows",
+          "evidence": ["platform/src/main/resources/db/migration/core/V20260809120000__party_actor_and_login_application.sql", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Full model exists; general-purpose workflow/UI is intentionally deferred until a concrete domain needs it",
+          "verdict": "partial",
+          "verdict_by": "spec-assert",
+          "surface": "journey", "dependencies": "deployed", "authority": "recorded", "driver": "http"
+        }
+      ]
+    },
+    {
+      "id": "web-performance-trust",
+      "title": "Web journey, SQL performance and falsifiability",
+      "rows": [
+        {
+          "id": "web.actor-switch",
+          "action": "Log in to the unique business workspace and switch Business identity from the Header",
+          "evidence": ["web-admin/test-results/results.json", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "No registration/Tenant self-service entry; Actor switch persists and current Actor is visibly selected; console has no errors",
+          "verdict": "pass",
+          "verdict_by": "agent-vision",
+          "vision_check": "Manually inspected login, /home, user menu, switch result and browser console in isolated runtime",
+          "surface": "journey", "dependencies": "real-stack", "authority": "blocking-release", "driver": "browser"
+        },
+        {
+          "id": "performance.tenant-index",
+          "action": "Query Party by fixed tenant and lifecycle at realistic fixture cardinality",
+          "evidence": ["docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "PostgreSQL uses idx_party_tenant_status; 20k-row transactional fixture is fully rolled back",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "real-stack", "authority": "recorded", "driver": "it"
+        },
+        {
+          "id": "trust.party-context-mutation",
+          "action": "Remove tenant/member context before Party revalidation, observe red, restore and rerun",
+          "evidence": ["docs/coverage/evidence/single-business-tenant-party-actor-20260809.md", "platform/build/test-results/test/TEST-com.auraboot.framework.application.web.filter.JwtAuthenticationFilterTest.xml"],
+          "assertion": "Controlled mutation fails the crown-jewel test and restored code passes targeted plus final combined suite",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "contract", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        }
+      ]
+    }
+  ]
+}

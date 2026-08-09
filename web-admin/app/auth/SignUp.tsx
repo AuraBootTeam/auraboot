@@ -13,11 +13,11 @@ import { createUserSession, getTokenFromRequest } from '~/shared/services/sessio
 import { validateEmail } from '~/utils/utils';
 import { post } from '~/shared/services/http-client';
 import { ResultHelper, type User } from '~/utils/type';
-
-const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';
+import { fetchAccessPolicy, isPublicRegistrationOpen } from '~/services/accessPolicy';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  if (!PUBLIC_REGISTRATION_ENABLED) {
+  const accessPolicy = await fetchAccessPolicy();
+  if (!isPublicRegistrationOpen(accessPolicy)) {
     return redirect('/login');
   }
   const token = await getTokenFromRequest(request);
@@ -28,7 +28,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  if (!PUBLIC_REGISTRATION_ENABLED) {
+  const accessPolicy = await fetchAccessPolicy();
+  if (!isPublicRegistrationOpen(accessPolicy)) {
     return {
       errors: { email: 'Self-registration is disabled', password: null, displayName: null },
       status: 403,

@@ -10,10 +10,6 @@ import com.auraboot.framework.auth.service.UserInfoService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.saas.config.service.SystemModeService;
-import com.auraboot.framework.tenant.service.TenantMemberService;
-import com.auraboot.framework.user.dao.entity.User;
-import com.auraboot.framework.user.service.UserService;
-import com.auraboot.framework.auth.util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
@@ -33,11 +28,8 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserInfoService userInfoService;
-    private final UserService userService;
     private final PasswordManagementService passwordManagementService;
     private final LoginRateLimiter loginRateLimiter;
-    private final JwtUtil jwtUtil;
-    private final UserDetailsService userDetailsService;
 
     @Autowired
     private ApiRateLimiter apiRateLimiter;
@@ -45,11 +37,32 @@ public class AuthController {
     @Autowired(required = false)
     private SystemModeService systemModeService;
 
-    @Autowired(required = false)
-    private TenantMemberService tenantMemberService;
-
     @Value("${security.password.self-service-enabled:false}")
     private boolean passwordSelfServiceEnabled;
+
+    @GetMapping("/access-policy")
+    @ResponseBody
+    @Operation(summary = "Get public access policy", description = "Returns non-sensitive registration and workspace-entry policies used by public login surfaces.")
+    public ApiResponse<AccessPolicyResponse> getAccessPolicy() {
+        if (systemModeService == null) {
+            return ApiResponse.success(AccessPolicyResponse.builder()
+                    .deploymentMode("single")
+                    .userRegistrationPolicy("closed")
+                    .tenantProvisioningPolicy("disabled")
+                    .partyCreationPolicy("approval_required")
+                    .partyInvitationEnabled(false)
+                    .actorSwitchEnabled(false)
+                    .build());
+        }
+        return ApiResponse.success(AccessPolicyResponse.builder()
+                .deploymentMode(systemModeService.getMode().getCode())
+                .userRegistrationPolicy(systemModeService.getUserRegistrationPolicy().getCode())
+                .tenantProvisioningPolicy(systemModeService.getTenantProvisioningPolicy().getCode())
+                .partyCreationPolicy(systemModeService.getPartyCreationPolicy().getCode())
+                .partyInvitationEnabled(systemModeService.isPartyInvitationEnabled())
+                .actorSwitchEnabled(systemModeService.isActorSwitchEnabled())
+                .build());
+    }
 
     @PostMapping("/login")
     @ResponseBody
@@ -77,28 +90,6 @@ public class AuthController {
             }
 
             AuthenticationResponse response = authService.register(request);
-
-            // SINGLE mode: auto-join user to default tenant
-            if (systemModeService != null && systemModeService.isSingleTenant() && response.getUserId() != null) {
-                Long defaultTenantId = systemModeService.getDefaultTenantId();
-                if (defaultTenantId != null && defaultTenantId > 0 && tenantMemberService != null) {
-                    try {
-                        tenantMemberService.addMember(response.getUserId(), defaultTenantId, "active");
-                        // Re-generate JWT with tenantId included
-                        User user = userService.findByUserId(response.getUserId());
-                        if (user != null) {
-                            String newJwt = jwtUtil.generateTokenWithTenantId(
-                                userDetailsService.loadUserByUsername(user.getPid()),
-                                user.getPid(), defaultTenantId);
-                            response = new AuthenticationResponse(newJwt, user.getId(), user.getPid(),
-                                user.getNickName(), defaultTenantId, "member");
-                        }
-                    } catch (Exception e) {
-                        log.warn("Failed to auto-join user to default tenant: {}", e.getMessage());
-                    }
-                }
-            }
-
             return ApiResponse.success(response);
 
     }

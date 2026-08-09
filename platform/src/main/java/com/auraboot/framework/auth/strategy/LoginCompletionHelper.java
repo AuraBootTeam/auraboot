@@ -2,6 +2,11 @@ package com.auraboot.framework.auth.strategy;
 
 import com.auraboot.framework.auth.dto.AuthenticationResponse;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
+import com.auraboot.framework.auth.dto.LoginContextRef;
+import com.auraboot.framework.auth.dto.SessionTokenContext;
+import com.auraboot.framework.auth.constant.ExecutionScope;
+import com.auraboot.framework.auth.constant.SessionStage;
+import com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper;
 import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.auth.util.JwtUtil;
@@ -16,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Collections;
 
@@ -43,6 +49,9 @@ public class LoginCompletionHelper {
     private final TenantService tenantService;
     private final SessionManagementService sessionManagementService;
     private final PasswordManagementService passwordManagementService;
+
+    @Autowired(required = false)
+    private LoginApplicationChannelMapper loginApplicationChannelMapper;
 
     /**
      * Complete the login flow after identity verification.
@@ -107,7 +116,30 @@ public class LoginCompletionHelper {
 
         // 3. Generate JWT with security version and memberId
         int securityVersion = user.getSecurityVersion() != null ? user.getSecurityVersion() : 0;
-        String jwt = jwtUtil.generateTokenWithTenantId(userDetails, user.getPid(), tenantId, memberId, securityVersion);
+        String jwt;
+        LoginContextRef loginContext = loginApplicationChannelMapper == null
+                ? null
+                : loginApplicationChannelMapper.resolveLoginContext(
+                        "business-web", "default-business-web", tenantId);
+        if (loginContext == null) {
+            jwt = jwtUtil.generateTokenWithTenantId(
+                    userDetails, user.getPid(), tenantId, memberId, securityVersion);
+        } else {
+            jwt = jwtUtil.generateTokenWithContext(
+                    userDetails,
+                    user.getPid(),
+                    new SessionTokenContext(
+                            tenantId,
+                            memberId,
+                            loginContext.getApplicationId(),
+                            loginContext.getLoginChannelId(),
+                            tenantId == null ? null : ExecutionScope.TENANT,
+                            null,
+                            null,
+                            tenantId == null ? SessionStage.ONBOARDING : SessionStage.READY,
+                            1,
+                            securityVersion));
+        }
 
         // 4. Create session record — non-fatal; login should succeed even if session persistence fails
         // CATCH: non-transactional auxiliary operation — session creation failure must not block login

@@ -3,11 +3,13 @@ package com.auraboot.framework.auth.service.impl;
 import com.auraboot.framework.auth.dto.ChannelUpdateRequest;
 import com.auraboot.framework.auth.entity.TenantLoginChannel;
 import com.auraboot.framework.auth.mapper.TenantLoginChannelMapper;
+import com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper;
 import com.auraboot.framework.auth.service.TenantLoginChannelService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
@@ -30,6 +32,23 @@ public class TenantLoginChannelServiceImpl implements TenantLoginChannelService 
     );
 
     private final TenantLoginChannelMapper channelMapper;
+
+    @Autowired(required = false)
+    private LoginApplicationChannelMapper applicationChannelMapper;
+
+    @Override
+    public List<String> getEnabledChannels(Long tenantId, String applicationCode, String channelCode) {
+        if (applicationChannelMapper != null) {
+            List<String> methods = applicationChannelMapper.findEnabledAuthMethods(
+                    applicationCode == null || applicationCode.isBlank() ? "business-web" : applicationCode,
+                    channelCode == null || channelCode.isBlank() ? "default-business-web" : channelCode,
+                    tenantId);
+            if (methods != null && !methods.isEmpty()) {
+                return methods;
+            }
+        }
+        return getEnabledChannels(tenantId);
+    }
 
     @Override
     public List<String> getEnabledChannels(Long tenantId) {

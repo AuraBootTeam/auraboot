@@ -32,7 +32,9 @@ public class LoginChannelController {
      */
     @GetMapping("/channels")
     public ApiResponse<List<String>> getAvailableChannels(
-            @RequestParam(required = false) Long tenantId) {
-        return ApiResponse.success(channelService.getEnabledChannels(tenantId));
+            @RequestParam(required = false) Long tenantId,
+            @RequestParam(defaultValue = "business-web") String application,
+            @RequestParam(defaultValue = "default-business-web") String channel) {
+        return ApiResponse.success(channelService.getEnabledChannels(tenantId, application, channel));
     }
 }

@@ -15,6 +15,11 @@ public final class SystemConfigKeys {
     // System scope (mutable)
     public static final String SYSTEM_PLATFORM_NAME = "system.platform_name";
     public static final String SYSTEM_ALLOW_SELF_REGISTRATION = "system.allow_self_registration";
+    public static final String SYSTEM_USER_REGISTRATION_POLICY = "system.user_registration_policy";
+    public static final String SYSTEM_TENANT_PROVISIONING_POLICY = "system.tenant_provisioning_policy";
+    public static final String SYSTEM_PARTY_CREATION_POLICY = "system.party_creation_policy";
+    public static final String SYSTEM_PARTY_INVITATION_ENABLED = "system.party_invitation_enabled";
+    public static final String SYSTEM_ACTOR_SWITCH_ENABLED = "system.actor_switch_enabled";
 
     // AI scope (mutable)
     public static final String AI_NBA_ENABLED = "ai.nba.enabled";

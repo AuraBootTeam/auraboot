@@ -11,6 +11,7 @@ import {
   ComputerDesktopIcon,
   GlobeAltIcon,
   SparklesIcon,
+  IdentificationIcon,
 } from '@heroicons/react/24/outline';
 import { useRootLoaderData } from '~/root';
 import { useTheme } from '~/contexts/ThemeContext';
@@ -32,6 +33,16 @@ interface HeaderProps {
   simplified?: boolean;
 }
 
+interface PartyActorOption {
+  partyId: string;
+  partyMembershipId: string;
+  displayName: string;
+  partyType: string;
+  lifecycleStatus: string;
+  membershipStatus: string;
+  current: boolean;
+}
+
 export default function Header({
   sidebarOpen,
   setSidebarOpen,
@@ -43,6 +54,7 @@ export default function Header({
   const { state: aiState, togglePanel: toggleAI } = useAuraBot();
   const rootData = useRootLoaderData();
   const user = rootData?.user ?? null;
+  const showBusinessWorkspaceSwitcher = rootData?.accessPolicy?.deploymentMode !== 'single';
   const { theme, setTheme, isDark } = useTheme();
   const { t, locale, setLocale } = useI18n();
   const st = useSmartText();
@@ -51,7 +63,10 @@ export default function Header({
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
-  const [spaces, setSpaces] = useState<Array<{ tenantId: string; tenantName: string; tenantDisplayName: string; spaceType: string }>>([]);
+  const [spaces, setSpaces] = useState<
+    Array<{ tenantId: string; tenantName: string; tenantDisplayName: string; spaceType: string }>
+  >([]);
+  const [actors, setActors] = useState<PartyActorOption[]>([]);
   // Hydration marker (same pattern as Login.tsx): the SSR header renders the
   // avatar long before React attaches its click handlers, so E2E must be able
   // to wait for interactivity instead of clicking a dead button.
@@ -92,9 +107,21 @@ export default function Header({
     if (!user || simplified) return;
     fetch('/api/tenant-selection/my-spaces')
       .then((res) => (res.ok ? res.json() : null))
-      .then((result) => { if (result?.data) setSpaces(result.data); })
+      .then((result) => {
+        if (result?.data) setSpaces(result.data);
+      })
       .catch(() => {});
   }, [user, simplified]);
+
+  useEffect(() => {
+    if (!user || simplified || !rootData?.accessPolicy?.actorSwitchEnabled) return;
+    fetch('/api/actors')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((result) => {
+        if (Array.isArray(result?.data)) setActors(result.data);
+      })
+      .catch(() => {});
+  }, [user, simplified, rootData?.accessPolicy?.actorSwitchEnabled]);
 
   // Connect to SSE for real-time data sync via useSSE hook
   // (provides exponential backoff, tab visibility pause, and proper cleanup)
@@ -196,7 +223,7 @@ export default function Header({
             {envChipLabel && (
               <span
                 data-testid="header-env-chip"
-                className="ml-2 px-1.5 py-0.5 text-[11px] font-medium text-gray-500 bg-[#f6f9fc] rounded dark:bg-gray-700 dark:text-gray-300"
+                className="ml-2 rounded bg-[#f6f9fc] px-1.5 py-0.5 text-[11px] font-medium text-gray-500 dark:bg-gray-700 dark:text-gray-300"
               >
                 {envChipLabel}
               </span>
@@ -222,7 +249,7 @@ export default function Header({
             <button
               onClick={toggleAI}
               data-testid="ai-panel-toggle"
-              className={`flex w-8 h-8 items-center justify-center rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-md ${
+              className={`flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-md ${
                 aiState.panelState === 'expanded'
                   ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
                   : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
@@ -244,7 +271,7 @@ export default function Header({
             <div className="relative" ref={langDropdownRef} data-testid="lang-toggle">
               <button
                 onClick={() => setShowLangDropdown(!showLangDropdown)}
-                className="flex w-8 h-8 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                className="flex h-8 w-8 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
               >
                 <GlobeAltIcon className="h-5 w-5" />
               </button>
@@ -280,7 +307,7 @@ export default function Header({
           <div className="relative" ref={themeDropdownRef} data-testid="theme-toggle">
             <button
               onClick={() => setShowThemeDropdown(!showThemeDropdown)}
-              className="flex w-8 h-8 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              className="flex h-8 w-8 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
             >
               {isHydrated && isDark ? (
                 <MoonIcon className="h-6 w-6" />
@@ -319,12 +346,7 @@ export default function Header({
           </div>
 
           {/* Divider */}
-          {user && (
-            <span
-              className="mx-1.5 w-px h-5 bg-[#e3e8ee] dark:bg-gray-700"
-              aria-hidden
-            />
-          )}
+          {user && <span className="mx-1.5 h-5 w-px bg-[#e3e8ee] dark:bg-gray-700" aria-hidden />}
 
           {/* User menu */}
           {user ? (
@@ -334,7 +356,7 @@ export default function Header({
                 className="flex items-center rounded-full ring-2 ring-transparent transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:shadow-md hover:ring-gray-200 dark:hover:bg-gray-700 dark:hover:ring-gray-600"
               >
                 <img
-                  className="w-[30px] h-[30px] rounded-full object-cover shadow-sm border border-[#e3e8ee] dark:border-gray-700"
+                  className="h-[30px] w-[30px] rounded-full border border-[#e3e8ee] object-cover shadow-sm dark:border-gray-700"
                   src="/avatar.jpeg"
                   alt="User avatar"
                 />
@@ -355,65 +377,136 @@ export default function Header({
                     </p>
                   </div>
 
-                  {/* Tenant list */}
-                  {spaces.filter(s => s.spaceType === 'business').length > 0 && (
+                  {actors.length > 0 && (
                     <div className="border-b border-gray-200 py-1 dark:border-gray-700">
-                      <p className="px-4 py-1 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                        {workspaceLabel}
+                      <p className="px-4 py-1 text-xs font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                        Business identity
                       </p>
-                      {spaces.filter(s => s.spaceType === 'business').map((space) => {
-                        const isCurrent = String(user.tenantId) === String(space.tenantId);
+                      {actors.map((actor) => {
+                        const selectable =
+                          actor.lifecycleStatus === 'active' && actor.membershipStatus === 'active';
                         return (
                           <button
-                            key={space.tenantId}
-                            data-testid={`tenant-switch-${space.tenantId}`}
+                            key={actor.partyMembershipId}
+                            type="button"
+                            disabled={!selectable || actor.current}
+                            data-testid={`actor-switch-${actor.partyId}`}
                             onClick={() => {
-                              if (isCurrent) return;
+                              if (!selectable || actor.current) return;
                               setShowUserDropdown(false);
                               const form = document.createElement('form');
                               form.method = 'POST';
-                              form.action = '/_action/switch-space';
-                              const tid = document.createElement('input');
-                              tid.type = 'hidden'; tid.name = 'tenantId'; tid.value = space.tenantId;
-                              form.appendChild(tid);
+                              form.action = '/_action/switch-actor';
+                              const party = document.createElement('input');
+                              party.type = 'hidden';
+                              party.name = 'partyId';
+                              party.value = actor.partyId;
+                              form.appendChild(party);
                               const redir = document.createElement('input');
-                              redir.type = 'hidden'; redir.name = 'redirectTo'; redir.value = '/';
+                              redir.type = 'hidden';
+                              redir.name = 'redirectTo';
+                              redir.value = '/';
                               form.appendChild(redir);
                               document.body.appendChild(form);
                               form.submit();
                             }}
                             className={`flex w-full items-center gap-3 px-4 py-2 text-sm transition-colors ${
-                              isCurrent
-                                ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                                : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                              actor.current
+                                ? 'bg-violet-50 font-medium text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'
+                                : selectable
+                                  ? 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                                  : 'cursor-not-allowed text-gray-400'
                             }`}
                           >
-                            <BuildingOffice2Icon className={`h-4 w-4 flex-shrink-0 ${isCurrent ? 'text-blue-500' : 'text-gray-400'}`} />
-                            <span className="truncate">{space.tenantDisplayName || space.tenantName}</span>
-                            {isCurrent && <span className="ms-auto text-xs text-blue-500">&#10003;</span>}
+                            <IdentificationIcon className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{actor.displayName}</span>
+                            {actor.current ? (
+                              <span className="ms-auto text-xs">&#10003;</span>
+                            ) : !selectable ? (
+                              <span className="ms-auto text-xs">{actor.lifecycleStatus}</span>
+                            ) : null}
                           </button>
                         );
                       })}
                     </div>
                   )}
 
+                  {/* Tenant list */}
+                  {showBusinessWorkspaceSwitcher &&
+                    spaces.filter((s) => s.spaceType === 'business').length > 0 && (
+                    <div className="border-b border-gray-200 py-1 dark:border-gray-700">
+                      <p className="px-4 py-1 text-xs font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                        {workspaceLabel}
+                      </p>
+                      {spaces
+                        .filter((s) => s.spaceType === 'business')
+                        .map((space) => {
+                          const isCurrent = String(user.tenantId) === String(space.tenantId);
+                          return (
+                            <button
+                              key={space.tenantId}
+                              data-testid={`tenant-switch-${space.tenantId}`}
+                              onClick={() => {
+                                if (isCurrent) return;
+                                setShowUserDropdown(false);
+                                const form = document.createElement('form');
+                                form.method = 'POST';
+                                form.action = '/_action/switch-space';
+                                const tid = document.createElement('input');
+                                tid.type = 'hidden';
+                                tid.name = 'tenantId';
+                                tid.value = space.tenantId;
+                                form.appendChild(tid);
+                                const redir = document.createElement('input');
+                                redir.type = 'hidden';
+                                redir.name = 'redirectTo';
+                                redir.value = '/';
+                                form.appendChild(redir);
+                                document.body.appendChild(form);
+                                form.submit();
+                              }}
+                              className={`flex w-full items-center gap-3 px-4 py-2 text-sm transition-colors ${
+                                isCurrent
+                                  ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
+                                  : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                              }`}
+                            >
+                              <BuildingOffice2Icon
+                                className={`h-4 w-4 flex-shrink-0 ${isCurrent ? 'text-blue-500' : 'text-gray-400'}`}
+                              />
+                              <span className="truncate">
+                                {space.tenantDisplayName || space.tenantName}
+                              </span>
+                              {isCurrent && (
+                                <span className="ms-auto text-xs text-blue-500">&#10003;</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  )}
+
                   {/* Platform Console — only for platform_admin users */}
-                  {spaces.some(s => s.spaceType === 'platform') && (
+                  {spaces.some((s) => s.spaceType === 'platform') && (
                     <div className="border-b border-gray-200 py-1 dark:border-gray-700">
                       <button
                         data-testid="platform-console-link"
                         onClick={() => {
                           setShowUserDropdown(false);
-                          const platformSpace = spaces.find(s => s.spaceType === 'platform');
+                          const platformSpace = spaces.find((s) => s.spaceType === 'platform');
                           if (!platformSpace) return;
                           const form = document.createElement('form');
                           form.method = 'POST';
                           form.action = '/_action/switch-space';
                           const tid = document.createElement('input');
-                          tid.type = 'hidden'; tid.name = 'tenantId'; tid.value = platformSpace.tenantId;
+                          tid.type = 'hidden';
+                          tid.name = 'tenantId';
+                          tid.value = platformSpace.tenantId;
                           form.appendChild(tid);
                           const redir = document.createElement('input');
-                          redir.type = 'hidden'; redir.name = 'redirectTo'; redir.value = '/platform/plugins';
+                          redir.type = 'hidden';
+                          redir.name = 'redirectTo';
+                          redir.value = '/platform/plugins';
                           form.appendChild(redir);
                           document.body.appendChild(form);
                           form.submit();

@@ -101,8 +101,13 @@ public class MybatisPlusConfig {
                     || "ab_tenant".equals(tableName)
                     || "ab_tenant_member".equals(tableName)           // Cross-tenant: "which tenants does user belong to"
                     || "ab_invitation".equals(tableName)              // Pre-join: invitation verified before tenant context
-                    || "ab_user_session".equals(tableName)            // No tenant_id
+                    || "ab_user_session".equals(tableName)            // Global session/token lookup; effective tenant context is stored explicitly
                     || "ab_user_social_link".equals(tableName)        // No tenant_id, global per user
+                    || "ab_login_application".equals(tableName)       // Pre-auth global application registry
+                    || "ab_login_channel".equals(tableName)           // Pre-auth routing; tenant selector is explicit
+                    || "ab_login_channel_auth_method".equals(tableName) // No tenant_id; parent channel is explicit
+                    || "ab_identity_provider_instance".equals(tableName) // Pre-auth routing; tenant selector is explicit
+                    || "ab_external_identity_link".equals(tableName)  // Identity lookup occurs before tenant context
                     || "ab_user_deactivation".equals(tableName)       // No tenant_id
                     || "ab_verification_code".equals(tableName)       // No tenant_id, pre-auth OTP
                     || "ab_system_config".equals(tableName)           // G1: no tenant_id

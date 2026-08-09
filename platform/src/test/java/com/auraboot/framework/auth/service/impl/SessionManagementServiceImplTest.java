@@ -2,6 +2,7 @@ package com.auraboot.framework.auth.service.impl;
 
 import com.auraboot.framework.auth.entity.UserSession;
 import com.auraboot.framework.auth.mapper.UserSessionMapper;
+import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Field;
 import java.time.Duration;
@@ -36,6 +38,8 @@ class SessionManagementServiceImplTest {
 
     @Mock
     private UserSessionMapper userSessionMapper;
+    @Mock
+    private JwtUtil jwtUtil;
 
     private SessionManagementServiceImpl service;
 
@@ -55,6 +59,33 @@ class SessionManagementServiceImplTest {
         assertEquals(512, s.getUserAgent().length());
         assertFalse(Boolean.TRUE.equals(s.getRevoked()));
         verify(userSessionMapper).insert(any(UserSession.class));
+    }
+
+    @Test
+    @DisplayName("createSession persists the effective tenant and Party Actor context")
+    void createSessionPersistsExecutionContext() {
+        ReflectionTestUtils.setField(service, "jwtUtil", jwtUtil);
+        when(jwtUtil.extractApplicationId("actor-token")).thenReturn(10L);
+        when(jwtUtil.extractLoginChannelId("actor-token")).thenReturn(11L);
+        when(jwtUtil.extractTenantId("actor-token")).thenReturn(12L);
+        when(jwtUtil.extractMemberId("actor-token")).thenReturn(13L);
+        when(jwtUtil.extractExecutionScope("actor-token")).thenReturn("party");
+        when(jwtUtil.extractActorPartyId("actor-token")).thenReturn(14L);
+        when(jwtUtil.extractPartyMembershipId("actor-token")).thenReturn(15L);
+        when(jwtUtil.extractSessionStage("actor-token")).thenReturn("ready");
+        when(jwtUtil.extractContextVersion("actor-token")).thenReturn(4L);
+
+        UserSession session = service.createSession(1L, "actor-token", null, null);
+
+        assertEquals(10L, session.getApplicationId());
+        assertEquals(11L, session.getLoginChannelId());
+        assertEquals(12L, session.getTenantId());
+        assertEquals(13L, session.getTenantMemberId());
+        assertEquals("party", session.getExecutionScope());
+        assertEquals(14L, session.getActorPartyId());
+        assertEquals(15L, session.getPartyMembershipId());
+        assertEquals("ready", session.getSessionStage());
+        assertEquals(4L, session.getContextVersion());
     }
 
     @Test

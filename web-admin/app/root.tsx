@@ -43,6 +43,7 @@ export interface RootLoaderData {
   spaces: any[];
   bootstrapStatus: BootstrapStatus | null;
   icpCompliance: IcpComplianceConfig;
+  accessPolicy: AccessPolicy;
 }
 
 import '~/app.css';
@@ -66,6 +67,7 @@ import { DslRegistryProvider } from '~/contexts/DslRegistryContext';
 import { AuraBotProvider } from '~/plugins/core-aurabot/components-shell';
 import { QueryProvider } from '~/providers/QueryProvider';
 import { fetchBootstrapStatus, type BootstrapStatus } from '~/services/bootstrapStatus';
+import { fetchAccessPolicy, type AccessPolicy } from '~/services/accessPolicy';
 import { BootstrapBanner } from '~/components/BootstrapBanner';
 import { BootstrapNotReady } from '~/components/BootstrapNotReady';
 import { AuthSessionRevalidator } from '~/components/AuthSessionRevalidator';
@@ -105,6 +107,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
 
   // Bootstrap status: never redirect; inject into loader data so the banner can render
   const bootstrapStatus = await fetchBootstrapStatus();
+  const accessPolicy = await fetchAccessPolicy();
   const token = await getTokenFromRequest(request);
 
   // Public runtime shells must never load admin user, permissions, or menus.
@@ -139,6 +142,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
       spaces: [],
       bootstrapStatus,
       icpCompliance,
+      accessPolicy,
     };
     ssrLoaderCache.set(cacheKey, result);
     return result;
@@ -211,6 +215,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     spaces,
     bootstrapStatus,
     icpCompliance,
+    accessPolicy,
   };
 }
 
@@ -285,8 +290,8 @@ export default function App() {
   // Capture uncaught front-end errors → /api/client-errors so they surface in the
   // in-app troubleshooting center (/ops/errors) instead of vanishing.
   useEffect(() => {
-    void import('~/shared/observability/clientErrorReporter').then(({ installClientErrorReporter }) =>
-      installClientErrorReporter(),
+    void import('~/shared/observability/clientErrorReporter').then(
+      ({ installClientErrorReporter }) => installClientErrorReporter(),
     );
   }, []);
 

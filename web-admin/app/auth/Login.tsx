@@ -19,12 +19,11 @@ import { useI18n } from '~/contexts/I18nContext';
 import { useRootLoaderData } from '~/root';
 import IcpComplianceFooter from './IcpComplianceFooter';
 import { getLoginFailureActionData } from './login-errors';
+import { fetchAccessPolicy, isPublicRegistrationOpen } from '~/services/accessPolicy';
 
 const REMEMBER_KEY = 'auth.remember';
 const REMEMBER_EMAIL_KEY = 'auth.rememberedEmail';
 const REMEMBER_PWD_KEY = 'auth.rememberedPwd';
-const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';
-
 const CHANNEL_I18N_KEYS: Record<string, string> = {
   EMAIL_PASSWORD: 'auth.channel.emailPassword',
   email_password: 'auth.channel.emailPassword',
@@ -43,6 +42,7 @@ const SOCIAL_I18N_KEYS: Record<string, string> = {
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const accessPolicy = await fetchAccessPolicy();
   const token = await getTokenFromRequest(request);
   if (token) {
     const { user } = await getUserInfo(request);
@@ -51,7 +51,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
     const session = await sessionStorage.getSession(request.headers.get('Cookie'));
     return data(
-      { channels: ['email_password'] },
+      { channels: ['email_password'], accessPolicy },
       {
         headers: {
           'Set-Cookie': await sessionStorage.destroySession(session),
@@ -71,7 +71,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // fallback to email/password only
   }
 
-  return { channels };
+  return { channels, accessPolicy };
 };
 
 function isMobileDevice(userAgent: string): boolean {
@@ -171,7 +171,10 @@ async function handleEmailPasswordLogin(
   const identifier = typeof identifierValue === 'string' ? identifierValue.trim() : '';
 
   if (!identifier) {
-    return data({ errors: { email: 'auth.error.identifierRequired', password: null } }, { status: 400 });
+    return data(
+      { errors: { email: 'auth.error.identifierRequired', password: null } },
+      { status: 400 },
+    );
   }
 
   if (typeof password !== 'string' || password.length === 0) {
@@ -213,10 +216,16 @@ async function handleSmsLogin(
   const code = formData.get('code') as string;
 
   if (!mobile || mobile.trim().length < 10) {
-    return data({ channelCode: 'sms', errors: { mobile: 'auth.error.invalidMobile', code: null } }, { status: 400 });
+    return data(
+      { channelCode: 'sms', errors: { mobile: 'auth.error.invalidMobile', code: null } },
+      { status: 400 },
+    );
   }
   if (!code || code.trim().length < 4) {
-    return data({ channelCode: 'sms', errors: { mobile: null, code: 'auth.error.codeRequired' } }, { status: 400 });
+    return data(
+      { channelCode: 'sms', errors: { mobile: null, code: 'auth.error.codeRequired' } },
+      { status: 400 },
+    );
   }
 
   const result = await post<User>(
@@ -228,7 +237,10 @@ async function handleSmsLogin(
 
   if (!ResultHelper.isSuccess(result)) {
     return data(
-      { channelCode: 'sms', errors: { mobile: null, code: extractCodeLoginError(result, 'auth.error.codeInvalid') } },
+      {
+        channelCode: 'sms',
+        errors: { mobile: null, code: extractCodeLoginError(result, 'auth.error.codeInvalid') },
+      },
       { status: 400 },
     );
   }
@@ -246,10 +258,16 @@ async function handleEmailCodeLogin(
   const code = formData.get('code') as string;
 
   if (!validateEmail(email)) {
-    return data({ channelCode: 'email_code', errors: { email: 'Email is invalid', code: null } }, { status: 400 });
+    return data(
+      { channelCode: 'email_code', errors: { email: 'Email is invalid', code: null } },
+      { status: 400 },
+    );
   }
   if (!code || code.trim().length < 4) {
-    return data({ channelCode: 'email_code', errors: { email: null, code: 'auth.error.codeRequired' } }, { status: 400 });
+    return data(
+      { channelCode: 'email_code', errors: { email: null, code: 'auth.error.codeRequired' } },
+      { status: 400 },
+    );
   }
 
   const result = await post<User>(
@@ -261,7 +279,10 @@ async function handleEmailCodeLogin(
 
   if (!ResultHelper.isSuccess(result)) {
     return data(
-      { channelCode: 'email_code', errors: { email: null, code: extractCodeLoginError(result, 'auth.error.codeInvalid') } },
+      {
+        channelCode: 'email_code',
+        errors: { email: null, code: extractCodeLoginError(result, 'auth.error.codeInvalid') },
+      },
       { status: 400 },
     );
   }
@@ -312,13 +333,15 @@ export default function LoginPage() {
   const actionData = useActionData<typeof action>();
   const visibleActionData = actionData ?? getLoginFailureActionData(searchParams);
   const loaderData = useLoaderData<typeof loader>();
+  const registrationOpen = isPublicRegistrationOpen(loaderData.accessPolicy);
   const rawChannels = Array.isArray((loaderData as any)?.channels)
     ? ((loaderData as any).channels as unknown[])
     : ['email_password'];
   const channels: string[] = Array.from(
     new Set(rawChannels.map((channel) => String(channel || '').toLowerCase()).filter(Boolean)),
   );
-  const actionChannel = typeof (visibleActionData as any)?.channelCode === 'string'
+  const actionChannel =
+    typeof (visibleActionData as any)?.channelCode === 'string'
       ? String((visibleActionData as any).channelCode).toLowerCase()
       : null;
 
@@ -333,7 +356,8 @@ export default function LoginPage() {
   // Determine which tab channels and social channels are available
   const tabChannels = channels.filter((c: string) => !SOCIAL_CHANNELS.includes(c as any));
   const socialChannels = channels.filter((c: string) => SOCIAL_CHANNELS.includes(c as any));
-  const preferredTab = actionChannel && tabChannels.includes(actionChannel)
+  const preferredTab =
+    actionChannel && tabChannels.includes(actionChannel)
       ? actionChannel
       : tabChannels[0] || 'email_password';
   const [activeTab, setActiveTab] = useState<string>(preferredTab);
@@ -399,9 +423,33 @@ export default function LoginPage() {
       icon: (
         <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
           <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-          <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-          <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-          <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+          <rect
+            x="14"
+            y="3"
+            width="7"
+            height="7"
+            rx="1.5"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          />
+          <rect
+            x="3"
+            y="14"
+            width="7"
+            height="7"
+            rx="1.5"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          />
+          <rect
+            x="14"
+            y="14"
+            width="7"
+            height="7"
+            rx="1.5"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          />
         </svg>
       ),
     },
@@ -412,7 +460,11 @@ export default function LoginPage() {
       icon: (
         <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
           <ellipse cx="12" cy="6" rx="8" ry="3" stroke="currentColor" strokeWidth="1.8" />
-          <path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" stroke="currentColor" strokeWidth="1.8" />
+          <path
+            d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          />
         </svg>
       ),
     },
@@ -435,7 +487,12 @@ export default function LoginPage() {
       desc: t('auth.feature.aiAgent.desc', undefined, 'Agent 在租户内调用全部业务命令'),
       icon: (
         <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-          <path d="M12 3l2 4 4 1-3 3 1 4-4-2-4 2 1-4-3-3 4-1 2-4z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+          <path
+            d="M12 3l2 4 4 1-3 3 1 4-4-2-4 2 1-4-3-3 4-1 2-4z"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinejoin="round"
+          />
         </svg>
       ),
     },
@@ -539,8 +596,17 @@ export default function LoginPage() {
               onClick={() => startSocialLogin('oidc')}
               className="mt-5 flex h-[50px] w-full items-center justify-center gap-2.5 rounded-[13px] border-[1.5px] border-[#E4E2EC] bg-white text-[14.5px] font-semibold text-[#54505E] transition hover:border-[#CFCCDA] hover:bg-[#FAFAFD] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             >
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-                <path d="M12 2L4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z" strokeLinejoin="round" />
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+              >
+                <path
+                  d="M12 2L4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z"
+                  strokeLinejoin="round"
+                />
                 <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               {t('auth.ssoLogin', undefined, '使用企业 SSO 登录')}
@@ -557,7 +623,7 @@ export default function LoginPage() {
         </div>
       )}
 
-      {PUBLIC_REGISTRATION_ENABLED && (
+      {registrationOpen && (
         <div className="mt-7 text-center text-[14px] text-[#8A8694] dark:text-gray-400">
           {t('auth.noAccount') || 'No account yet?'}{' '}
           <Link
@@ -614,7 +680,7 @@ export default function LoginPage() {
               </span>
 
               {/* Headline with brand-colored highlight word */}
-              <h1 className="mt-8 max-w-[580px] text-balance text-[34px] font-extrabold leading-[1.16] tracking-tight text-[#15131C] lg:text-[44px] xl:text-[50px] dark:text-white">
+              <h1 className="mt-8 max-w-[580px] text-[34px] leading-[1.16] font-extrabold tracking-tight text-balance text-[#15131C] lg:text-[44px] xl:text-[50px] dark:text-white">
                 {t('auth.headline.pre', undefined, '配置即应用,')}
                 <span className="mx-1.5 text-[#4B3FE4] dark:text-[#8d7fff]">
                   {t('auth.headline.em', undefined, 'AI 即战力')}
@@ -723,7 +789,8 @@ function ErrorBanner({ message, t }: { message: string; t: (key: string) => stri
       </svg>
       <p className="font-medium">
         {message === 'auth.error.invalidCredentials'
-          ? t('auth.error.invalidCredentials') || 'Invalid username/email or password, please try again'
+          ? t('auth.error.invalidCredentials') ||
+            'Invalid username/email or password, please try again'
           : t(message) || message}
       </p>
     </div>
@@ -839,17 +906,44 @@ function EmailPasswordForm({
             type="button"
             data-testid="login-toggle-password"
             onClick={() => setShowPwd((v) => !v)}
-            aria-label={t(showPwd ? 'auth.hidePassword' : 'auth.showPassword', undefined, showPwd ? '隐藏密码' : '显示密码')}
+            aria-label={t(
+              showPwd ? 'auth.hidePassword' : 'auth.showPassword',
+              undefined,
+              showPwd ? '隐藏密码' : '显示密码',
+            )}
             className="absolute top-1/2 right-2.5 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-[#9A96A4] transition-colors hover:bg-[#F1F0F8] hover:text-[#4B3FE4] dark:hover:bg-gray-600"
           >
             {showPwd ? (
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-                <path d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M9.4 5.2A9.5 9.5 0 0112 5c5 0 9 4.5 9 7a12 12 0 01-2.2 3M6.3 6.3A12.4 12.4 0 003 12c0 2.5 4 7 9 7a9.6 9.6 0 004.2-1" strokeLinecap="round" strokeLinejoin="round" />
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+              >
+                <path
+                  d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M9.4 5.2A9.5 9.5 0 0112 5c5 0 9 4.5 9 7a12 12 0 01-2.2 3M6.3 6.3A12.4 12.4 0 003 12c0 2.5 4 7 9 7a9.6 9.6 0 004.2-1"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             ) : (
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-                <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z" strokeLinejoin="round" />
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+              >
+                <path
+                  d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z"
+                  strokeLinejoin="round"
+                />
                 <circle cx="12" cy="12" r="2.8" />
               </svg>
             )}

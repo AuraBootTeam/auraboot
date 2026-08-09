@@ -17,6 +17,15 @@ public class UserSession {
     private String pid;
     private Long userId;
     private String tokenHash;
+    private Long applicationId;
+    private Long loginChannelId;
+    private Long tenantId;
+    private Long tenantMemberId;
+    private String executionScope;
+    private Long actorPartyId;
+    private Long partyMembershipId;
+    private String sessionStage;
+    private Long contextVersion;
     private String deviceInfo;
     private String ipAddress;
     private String userAgent;
