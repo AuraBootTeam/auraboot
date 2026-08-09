@@ -35,11 +35,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataAccessException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -85,6 +89,9 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Autowired
     private DataSource dataSource;
@@ -913,6 +920,151 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 "UPDATE ab_authoring_release SET manifest = '{}'::jsonb WHERE pid = ?",
                 release.releasePid()))
                 .hasMessageContaining("authoring release content is immutable");
+    }
+
+    @Test
+    void firstChannelFailureRollsBackPreparedReleaseAndItemAtomically() {
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        patchDensity(opened, "compact");
+        prepareAndSubmit(opened.sessionPid(), new RevisionRequest(2));
+        jdbcTemplate.execute("""
+                CREATE OR REPLACE FUNCTION pg_temp.fail_authoring_channel_insert()
+                RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                    RAISE EXCEPTION 'injected authoring channel insert failure';
+                END;
+                $$
+                """);
+        jdbcTemplate.execute("""
+                CREATE TRIGGER trg_test_fail_authoring_channel_insert
+                BEFORE INSERT ON ab_authoring_release_channel
+                FOR EACH ROW EXECUTE FUNCTION pg_temp.fail_authoring_channel_insert()
+                """);
+
+        assertThatThrownBy(() -> publishInNestedTransaction(opened.changeSetPid(), 2))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("injected authoring channel insert failure");
+
+        assertThat(countReleases(opened.changeSetPid())).isZero();
+        assertThat(countReleaseItems(opened.changeSetPid())).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_release_channel
+                WHERE tenant_id = ? AND env_id = ?
+                  AND resource_type = 'PAGE_SCHEMA' AND resource_pid = ?
+                """, Integer.class, testTenant.getId(),
+                MetaContext.getCurrentEnvironmentId(), page.getPid())).isZero();
+        SessionView unchanged = workspaceService.get(opened.sessionPid());
+        assertThat(unchanged.changeSetStatus()).isEqualTo("APPROVED");
+        assertThat(unchanged.publishState()).isEqualTo("READY");
+        assertThat(unchanged.state()).isEqualTo("READ_ONLY");
+        assertThat(countPublishAudits(opened.changeSetPid())).isZero();
+    }
+
+    @Test
+    void latePublishFailureRestoresPreviousChannelAndReleaseStatesAtomically() {
+        PageSchema page = insertPage("normal");
+        SessionView first = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        patchDensity(first, "compact");
+        prepareAndSubmit(first.sessionPid(), new RevisionRequest(2));
+        ReleaseView prior = governanceService.publish(
+                first.changeSetPid(), new RevisionRequest(2));
+
+        SessionView second = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        patchDensity(second, "comfortable");
+        prepareAndSubmit(second.sessionPid(), new RevisionRequest(2));
+        jdbcTemplate.execute("""
+                CREATE OR REPLACE FUNCTION pg_temp.fail_authoring_change_set_publish()
+                RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                    IF OLD.status = 'APPROVED' AND NEW.status = 'PUBLISHED' THEN
+                        RAISE EXCEPTION 'injected authoring change set publish failure';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$
+                """);
+        jdbcTemplate.execute("""
+                CREATE TRIGGER trg_test_fail_authoring_change_set_publish
+                BEFORE UPDATE OF status ON ab_authoring_change_set
+                FOR EACH ROW EXECUTE FUNCTION pg_temp.fail_authoring_change_set_publish()
+                """);
+
+        assertThatThrownBy(() -> publishInNestedTransaction(second.changeSetPid(), 2))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("injected authoring change set publish failure");
+
+        AuthoringActiveReleaseResolver.ActiveRelease active =
+                activeReleaseResolver.findByResource(
+                        testTenant.getId(), MetaContext.getCurrentEnvironmentId(),
+                        "PAGE_SCHEMA", page.getPid());
+        assertThat(active.releasePid()).isEqualTo(prior.releasePid());
+        assertThat(active.channelVersion()).isEqualTo(1);
+        assertThat(active.snapshot().at("/blocks/0/props/density").asText())
+                .isEqualTo("compact");
+        assertThat(countReleases(second.changeSetPid())).isZero();
+        assertThat(countReleaseItems(second.changeSetPid())).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT status FROM ab_authoring_release WHERE pid = ?
+                """, String.class, prior.releasePid())).isEqualTo("ACTIVE");
+        SessionView unchanged = workspaceService.get(second.sessionPid());
+        assertThat(unchanged.changeSetStatus()).isEqualTo("APPROVED");
+        assertThat(unchanged.publishState()).isEqualTo("READY");
+        assertThat(unchanged.state()).isEqualTo("READ_ONLY");
+        assertThat(countPublishAudits(second.changeSetPid())).isZero();
+    }
+
+    @Test
+    void publishAuditFailureRollsBackTheCompletedPointerSwitchAtomically() {
+        PageSchema page = insertPage("normal");
+        SessionView first = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        patchDensity(first, "compact");
+        prepareAndSubmit(first.sessionPid(), new RevisionRequest(2));
+        ReleaseView prior = governanceService.publish(
+                first.changeSetPid(), new RevisionRequest(2));
+
+        SessionView second = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        patchDensity(second, "comfortable");
+        prepareAndSubmit(second.sessionPid(), new RevisionRequest(2));
+        jdbcTemplate.execute("""
+                CREATE OR REPLACE FUNCTION pg_temp.fail_authoring_publish_audit()
+                RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                    IF NEW.event_type = 'RELEASE_PUBLISHED' THEN
+                        RAISE EXCEPTION 'injected authoring publish audit failure';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$
+                """);
+        jdbcTemplate.execute("""
+                CREATE TRIGGER trg_test_fail_authoring_publish_audit
+                BEFORE INSERT ON ab_authoring_audit_event
+                FOR EACH ROW EXECUTE FUNCTION pg_temp.fail_authoring_publish_audit()
+                """);
+
+        assertThatThrownBy(() -> publishInNestedTransaction(second.changeSetPid(), 2))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("injected authoring publish audit failure");
+
+        AuthoringActiveReleaseResolver.ActiveRelease active =
+                activeReleaseResolver.findByResource(
+                        testTenant.getId(), MetaContext.getCurrentEnvironmentId(),
+                        "PAGE_SCHEMA", page.getPid());
+        assertThat(active.releasePid()).isEqualTo(prior.releasePid());
+        assertThat(active.channelVersion()).isEqualTo(1);
+        assertThat(active.snapshot().at("/blocks/0/props/density").asText())
+                .isEqualTo("compact");
+        assertThat(countReleases(second.changeSetPid())).isZero();
+        assertThat(countReleaseItems(second.changeSetPid())).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT status FROM ab_authoring_release WHERE pid = ?
+                """, String.class, prior.releasePid())).isEqualTo("ACTIVE");
+        SessionView unchanged = workspaceService.get(second.sessionPid());
+        assertThat(unchanged.changeSetStatus()).isEqualTo("APPROVED");
+        assertThat(unchanged.publishState()).isEqualTo("READY");
+        assertThat(unchanged.state()).isEqualTo("READ_ONLY");
+        assertThat(countPublishAudits(second.changeSetPid())).isZero();
     }
 
     @Test
@@ -1851,6 +2003,42 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 """);
         pageSchemaMapper.updateById(page);
         return page;
+    }
+
+    private void publishInNestedTransaction(String changeSetPid, long expectedRevision) {
+        TransactionTemplate nested = new TransactionTemplate(transactionManager);
+        nested.setPropagationBehavior(TransactionDefinition.PROPAGATION_NESTED);
+        nested.executeWithoutResult(ignored -> governanceService.publish(
+                changeSetPid, new RevisionRequest(expectedRevision)));
+    }
+
+    private int countReleases(String changeSetPid) {
+        Integer value = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_release release
+                JOIN ab_authoring_change_set change_set
+                  ON change_set.id = release.change_set_id
+                WHERE change_set.pid = ?
+                """, Integer.class, changeSetPid);
+        return value == null ? 0 : value;
+    }
+
+    private int countReleaseItems(String changeSetPid) {
+        Integer value = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_release_item item
+                JOIN ab_authoring_release release ON release.id = item.release_id
+                JOIN ab_authoring_change_set change_set
+                  ON change_set.id = release.change_set_id
+                WHERE change_set.pid = ?
+                """, Integer.class, changeSetPid);
+        return value == null ? 0 : value;
+    }
+
+    private int countPublishAudits(String changeSetPid) {
+        Integer value = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_audit_event
+                WHERE change_set_pid = ? AND event_type = 'RELEASE_PUBLISHED'
+                """, Integer.class, changeSetPid);
+        return value == null ? 0 : value;
     }
 
     private int count(String table, String pid) {
