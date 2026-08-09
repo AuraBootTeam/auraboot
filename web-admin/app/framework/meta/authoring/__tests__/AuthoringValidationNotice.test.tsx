@@ -65,6 +65,7 @@ function invalidSession(): AuthoringSession {
     route: 'GUIDED_INLINE',
     publishPolicy: 'REQUIRED_REVIEW',
     validationState: 'INVALID',
+    impactState: 'UNKNOWN',
     validation: {
       validationRunPid: 'validation-1',
       revision: 2,

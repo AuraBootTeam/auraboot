@@ -1,10 +1,13 @@
 package com.auraboot.framework.authoring.workspace;
 
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ImpactDependencyView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ImpactSummaryView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ValidationIssueView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ValidationSummaryView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.WriterLeaseView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.ValidationRunSummary;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.ImpactRunSummary;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.WorkspaceRow;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Component;
@@ -44,6 +47,8 @@ public class AuthoringWorkspaceViewMapper {
                 row.publishPolicy(),
                 row.validationState(),
                 validation(row.validation()),
+                row.impactState(),
+                impact(row.impact()),
                 row.approvalState(),
                 row.publishState(),
                 row.manifestChecksum(),
@@ -72,6 +77,27 @@ public class AuthoringWorkspaceViewMapper {
                                 issue.path("messageKey").asText()))
                         .toList(),
                 summary.validatedAt());
+    }
+
+    private ImpactSummaryView impact(ImpactRunSummary summary) {
+        if (summary == null) {
+            return null;
+        }
+        return new ImpactSummaryView(
+                summary.impactRunPid(),
+                summary.revision(),
+                summary.status(),
+                summary.dependencyChecksum(),
+                StreamSupport.stream(summary.dependencies().spliterator(), false)
+                        .map(dependency -> new ImpactDependencyView(
+                                dependency.path("resourceType").asText(),
+                                dependency.path("resourceCode").asText(),
+                                dependency.path("resourcePid").asText(),
+                                dependency.path("version").asInt(),
+                                dependency.path("rowVersion").asInt()))
+                        .toList(),
+                summary.failureCode(),
+                summary.analyzedAt());
     }
 
     private String nullableText(JsonNode value) {

@@ -29,11 +29,13 @@ import {
   loadAuthoringSession,
   loadAuthoringCapabilities,
   openAuthoringSession,
+  prepareAuthoringSession,
   submitAuthoringSession,
   takeoverAuthoringWriterLease,
   transitionAuthoringGovernance,
 } from './authoringService';
 import { AuthoringGovernanceNotice } from './AuthoringGovernanceNotice';
+import { AuthoringImpactNotice } from './AuthoringImpactNotice';
 import { AuthoringRiskSummary } from './AuthoringRiskSummary';
 import { AuthoringValidationNotice } from './AuthoringValidationNotice';
 import { AuthoringWriterLeaseNotice } from './AuthoringWriterLeaseNotice';
@@ -589,12 +591,24 @@ export function ContextualAuthoringSurface({
     setSubmitting(true);
     setError(null);
     try {
-      await submitAuthoringSession(session.sessionPid, session.revision);
-      const latest = await loadAuthoringSession(session.sessionPid);
+      const prepared = session.validationState === 'VALID' && session.impactState === 'KNOWN';
+      let latest: AuthoringSession;
+      if (prepared) {
+        await submitAuthoringSession(session.sessionPid, session.revision);
+        latest = await loadAuthoringSession(session.sessionPid);
+      } else {
+        latest = await prepareAuthoringSession(session.sessionPid, session.revision);
+      }
       setSession(latest);
       setWorkingSchema(schemaFromSnapshot(schema, latest.snapshot));
     } catch (submitFailure) {
       setError(submitFailure instanceof Error ? submitFailure.message : '无法提交评审');
+      try {
+        const latest = await loadAuthoringSession(session.sessionPid);
+        setSession(latest);
+      } catch {
+        // Preserve the actionable transition error when a follow-up refresh also fails.
+      }
     } finally {
       setSubmitting(false);
     }
@@ -744,6 +758,11 @@ export function ContextualAuthoringSurface({
       {session.validationState === 'INVALID' ? (
         <div className="mx-3 mt-3">
           <AuthoringValidationNotice session={session} maxVisibleIssues={8} />
+        </div>
+      ) : null}
+      {session.impactState !== 'KNOWN' && session.revision > 1 ? (
+        <div className="mx-3 mt-3">
+          <AuthoringImpactNotice session={session} />
         </div>
       ) : null}
       {['IN_REVIEW', 'APPROVED', 'REJECTED'].includes(session.changeSetStatus) ? (
@@ -1342,6 +1361,12 @@ function ChangeDock({
 }) {
   const validationErrors =
     session.validationState === 'INVALID' ? (session.validation?.errorCount ?? 1) : 0;
+  const prepared = session.validationState === 'VALID' && session.impactState === 'KNOWN';
+  const submitLabel = prepared
+    ? '提交评审'
+    : session.impactState === 'FAILED'
+      ? '重试影响分析'
+      : '校验与影响分析';
   return (
     <footer className="border-border bg-panel sticky bottom-0 z-20 flex min-h-14 flex-wrap items-center gap-3 border-t px-3 py-2 text-sm">
       <div className="mr-auto flex flex-wrap items-center gap-3">
@@ -1380,12 +1405,13 @@ function ChangeDock({
       />
       <DockButton icon={<Eye className="h-4 w-4" />} label="实时预览" disabled />
       <DockButton
-        label={submitting ? '提交中…' : '提交评审'}
+        label={submitting ? (prepared ? '提交中…' : '分析中…') : submitLabel}
         disabled={
           readOnly ||
           submitting ||
           edits.length > 0 ||
           validationErrors > 0 ||
+          session.impactState === 'STALE' ||
           session.revision <= 1
         }
         onClick={onSubmit}

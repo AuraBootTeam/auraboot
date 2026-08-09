@@ -9,6 +9,7 @@ import {
   loadAuthoringCapabilities,
   loadAuthoringSession,
   openAuthoringSession,
+  prepareAuthoringSession,
   submitAuthoringSession,
   takeoverAuthoringWriterLease,
   transitionAuthoringGovernance,
@@ -42,6 +43,7 @@ vi.mock('../authoringService', () => ({
   loadAuthoringCapabilities: vi.fn(),
   loadAuthoringSession: vi.fn(),
   applyAuthoringPatch: vi.fn(),
+  prepareAuthoringSession: vi.fn(),
   submitAuthoringSession: vi.fn(),
   createAuthoringHandoff: vi.fn(),
   takeoverAuthoringWriterLease: vi.fn(),
@@ -138,6 +140,7 @@ describe('ContextualAuthoringSurface', () => {
         route: 'INLINE',
         publishPolicy: 'DIRECT_ALLOWED',
         validationState: 'VALID',
+        impactState: 'KNOWN',
         approvalState: 'NOT_REQUIRED',
         publishState: 'DRAFT',
         manifestChecksum: 'registry-1',
@@ -162,6 +165,29 @@ describe('ContextualAuthoringSurface', () => {
       savedValue: '生产订单',
     });
     vi.mocked(submitAuthoringSession).mockResolvedValue(undefined);
+    vi.mocked(prepareAuthoringSession).mockResolvedValue(
+      createAuthoringSession({
+        revision: 2,
+        validationState: 'VALID',
+        impactState: 'KNOWN',
+        validation: {
+          validationRunPid: 'validation-1',
+          revision: 2,
+          status: 'VALID',
+          errorCount: 0,
+          issues: [],
+          validatedAt: '2026-08-09T12:00:00Z',
+        },
+        impact: {
+          impactRunPid: 'impact-1',
+          revision: 2,
+          status: 'KNOWN',
+          dependencyChecksum: 'dependency-1',
+          dependencies: [],
+          analyzedAt: '2026-08-09T12:00:00Z',
+        },
+      }),
+    );
     vi.mocked(transitionAuthoringGovernance).mockResolvedValue(undefined);
     vi.mocked(loadAuthoringSession).mockResolvedValue(openedSession);
     vi.mocked(takeoverAuthoringWriterLease).mockResolvedValue(
@@ -400,6 +426,7 @@ describe('ContextualAuthoringSurface', () => {
         changeSetStatus: 'IN_REVIEW',
         state: 'READ_ONLY',
         validationState: 'VALID',
+        impactState: 'KNOWN',
         approvalState: 'PENDING',
         publishState: 'DRAFT',
       }),
@@ -410,6 +437,7 @@ describe('ContextualAuthoringSurface', () => {
         changeSetStatus: 'DRAFT',
         state: 'ACTIVE',
         validationState: 'UNVALIDATED',
+        impactState: 'UNKNOWN',
         approvalState: 'STALE',
         publishState: 'DRAFT',
       }),
@@ -462,7 +490,7 @@ describe('ContextualAuthoringSurface', () => {
     expect(screen.getByLabelText(/标题/)).toBeDisabled();
     expect(screen.getByText('1 项未保存')).toBeInTheDocument();
     expect(screen.getByText('保存')).toBeDisabled();
-    expect(screen.getByText('提交评审')).toBeDisabled();
+    expect(screen.getByText('校验与影响分析')).toBeDisabled();
     expect(screen.getByText('高级设置')).toBeDisabled();
     fireEvent.click(screen.getByText('保存'));
     expect(applyAuthoringPatch).not.toHaveBeenCalled();
@@ -477,6 +505,86 @@ describe('ContextualAuthoringSurface', () => {
     expect(screen.getByLabelText(/标题/)).toBeEnabled();
     expect(screen.getByText('1 项未保存')).toBeInTheDocument();
     expect(screen.getByText('保存')).toBeEnabled();
+  });
+
+  it('prepares validation and impact before a separate submit-for-review action', async () => {
+    vi.mocked(openAuthoringSession).mockResolvedValue(
+      createAuthoringSession({
+        revision: 2,
+        validationState: 'UNVALIDATED',
+        impactState: 'UNKNOWN',
+      }),
+    );
+    vi.mocked(loadAuthoringSession).mockResolvedValue(
+      createAuthoringSession({
+        revision: 2,
+        validationState: 'VALID',
+        impactState: 'KNOWN',
+      }),
+    );
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+
+    const prepare = await screen.findByText('校验与影响分析');
+    fireEvent.click(prepare);
+
+    await waitFor(() =>
+      expect(prepareAuthoringSession).toHaveBeenCalledWith('session-1', 2),
+    );
+    expect(submitAuthoringSession).not.toHaveBeenCalled();
+    const submit = await screen.findByText('提交评审');
+    fireEvent.click(submit);
+
+    await waitFor(() =>
+      expect(submitAuthoringSession).toHaveBeenCalledWith('session-1', 2),
+    );
+    expect(prepareAuthoringSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps stale dependency results fail-closed until a new revision exists', async () => {
+    vi.mocked(openAuthoringSession).mockResolvedValue(
+      createAuthoringSession({
+        revision: 2,
+        validationState: 'STALE',
+        impactState: 'STALE',
+      }),
+    );
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+
+    expect(await screen.findByTestId('authoring-impact-notice')).toHaveTextContent(
+      '依赖已变化',
+    );
+    expect(screen.getByText('校验与影响分析')).toBeDisabled();
+    expect(prepareAuthoringSession).not.toHaveBeenCalled();
+    expect(submitAuthoringSession).not.toHaveBeenCalled();
+  });
+
+  it('retries a timed-out impact analysis without submitting the revision', async () => {
+    vi.mocked(openAuthoringSession).mockResolvedValue(
+      createAuthoringSession({
+        revision: 2,
+        validationState: 'VALID',
+        impactState: 'FAILED',
+        impact: {
+          impactRunPid: 'impact-timeout',
+          revision: 2,
+          status: 'FAILED',
+          dependencies: [],
+          failureCode: 'ANALYSIS_TIMEOUT',
+          analyzedAt: '2026-08-09T12:00:00Z',
+        },
+      }),
+    );
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+
+    fireEvent.click(await screen.findByText('重试影响分析'));
+
+    await waitFor(() =>
+      expect(prepareAuthoringSession).toHaveBeenCalledWith('session-1', 2),
+    );
+    expect(submitAuthoringSession).not.toHaveBeenCalled();
   });
 
   it('shows a held writer lease as read-only and allows an audited admin takeover', async () => {
@@ -554,6 +662,7 @@ function createAuthoringSession(overrides: Partial<AuthoringSession> = {}): Auth
     route: 'INLINE',
     publishPolicy: 'DIRECT_ALLOWED',
     validationState: 'UNVALIDATED',
+    impactState: 'UNKNOWN',
     approvalState: 'NOT_REQUIRED',
     publishState: 'DRAFT',
     manifestChecksum: 'registry-1',

@@ -86,7 +86,8 @@ public class AuthoringWorkspaceRepository {
                             cs.owner_user_id AS change_set_owner_user_id,
                             cs.status AS change_set_status,
                             cs.revision AS change_set_revision, cs.risk_level, cs.route,
-                            cs.publish_policy, cs.validation_state, cs.approval_state,
+                            cs.publish_policy, cs.validation_state, cs.impact_state,
+                            cs.approval_state,
                             cs.publish_state, cs.manifest_checksum,
                             validation_run.validation_run_pid,
                             validation_run.validation_revision,
@@ -94,6 +95,13 @@ public class AuthoringWorkspaceRepository {
                             validation_run.validation_error_count,
                             validation_run.validation_issues,
                             validation_run.validated_at,
+                            impact_run.impact_run_pid,
+                            impact_run.impact_revision,
+                            impact_run.impact_status,
+                            impact_run.impact_dependency_checksum,
+                            impact_run.impact_dependencies,
+                            impact_run.impact_failure_code,
+                            impact_run.analyzed_at,
                             rd.id AS resource_draft_id, rd.pid AS resource_draft_pid,
                             rd.revision AS resource_revision, rd.snapshot::text,
                             wl.id AS lease_id, wl.session_id AS lease_session_id,
@@ -119,6 +127,22 @@ public class AuthoringWorkspaceRepository {
                             ORDER BY vr.created_at DESC, vr.id DESC
                             LIMIT 1
                         ) validation_run ON TRUE
+                        LEFT JOIN LATERAL (
+                            SELECT ir.pid AS impact_run_pid,
+                                   ir.change_set_revision AS impact_revision,
+                                   ir.status AS impact_status,
+                                   ir.dependency_checksum AS impact_dependency_checksum,
+                                   ir.dependencies::text AS impact_dependencies,
+                                   ir.failure_code AS impact_failure_code,
+                                   ir.created_at AS analyzed_at
+                            FROM ab_authoring_impact_run ir
+                            WHERE ir.tenant_id = cs.tenant_id
+                              AND ir.env_id = cs.env_id
+                              AND ir.change_set_id = cs.id
+                              AND ir.change_set_revision = cs.revision
+                            ORDER BY ir.created_at DESC, ir.id DESC
+                            LIMIT 1
+                        ) impact_run ON TRUE
                         WHERE s.tenant_id = ? AND s.env_id = ? AND s.pid = ?
                           AND cs.tenant_id = ? AND cs.env_id = ? AND cs.deleted_flag = FALSE
                           AND rd.tenant_id = ? AND rd.env_id = ?
@@ -227,6 +251,7 @@ public class AuthoringWorkspaceRepository {
                     revision = revision + 1,
                     manifest_checksum = ?,
                     validation_state = 'UNVALIDATED',
+                    impact_state = 'UNKNOWN',
                     stale_reason = NULL,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
@@ -243,6 +268,7 @@ public class AuthoringWorkspaceRepository {
                     route = ?,
                     publish_policy = ?,
                     validation_state = 'UNVALIDATED',
+                    impact_state = 'UNKNOWN',
                     approval_state = ?,
                     publish_state = 'DRAFT',
                     stale_reason = NULL,
@@ -391,6 +417,8 @@ public class AuthoringWorkspaceRepository {
                 resultSet.getString("publish_policy"),
                 resultSet.getString("validation_state"),
                 mapValidationSummary(resultSet),
+                resultSet.getString("impact_state"),
+                mapImpactSummary(resultSet),
                 resultSet.getString("approval_state"),
                 resultSet.getString("publish_state"),
                 resultSet.getString("manifest_checksum"),
@@ -417,6 +445,21 @@ public class AuthoringWorkspaceRepository {
                 resultSet.getInt("validation_error_count"),
                 parse(resultSet.getString("validation_issues")),
                 resultSet.getTimestamp("validated_at").toInstant());
+    }
+
+    private ImpactRunSummary mapImpactSummary(ResultSet resultSet) throws SQLException {
+        String status = resultSet.getString("impact_status");
+        if (status == null) {
+            return null;
+        }
+        return new ImpactRunSummary(
+                resultSet.getString("impact_run_pid"),
+                resultSet.getLong("impact_revision"),
+                status,
+                resultSet.getString("impact_dependency_checksum"),
+                parse(resultSet.getString("impact_dependencies")),
+                resultSet.getString("impact_failure_code"),
+                resultSet.getTimestamp("analyzed_at").toInstant());
     }
 
     private void requireOne(int rows, String reason) {
@@ -530,6 +573,8 @@ public class AuthoringWorkspaceRepository {
             String publishPolicy,
             String validationState,
             ValidationRunSummary validation,
+            String impactState,
+            ImpactRunSummary impact,
             String approvalState,
             String publishState,
             String manifestChecksum,
@@ -551,6 +596,16 @@ public class AuthoringWorkspaceRepository {
             int errorCount,
             JsonNode issues,
             Instant validatedAt) {
+    }
+
+    public record ImpactRunSummary(
+            String impactRunPid,
+            long revision,
+            String status,
+            String dependencyChecksum,
+            JsonNode dependencies,
+            String failureCode,
+            Instant analyzedAt) {
     }
 
     public record AggregatePolicy(

@@ -32,6 +32,7 @@ import { AuthoringWriterLeaseNotice } from '~/framework/meta/authoring/Authoring
 import { AuthoringGovernanceNotice } from '~/framework/meta/authoring/AuthoringGovernanceNotice';
 import { AuthoringRiskSummary } from '~/framework/meta/authoring/AuthoringRiskSummary';
 import { AuthoringValidationNotice } from '~/framework/meta/authoring/AuthoringValidationNotice';
+import { AuthoringImpactNotice } from '~/framework/meta/authoring/AuthoringImpactNotice';
 import { AuthoringChangeSetSplitPanel } from '~/framework/meta/authoring/AuthoringChangeSetSplitPanel';
 import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
 import { AuthoringConflictResolutionPanel } from '../components/unified-designer/AuthoringConflictResolutionPanel';
@@ -767,6 +768,11 @@ export default function UnifiedDesignerPage() {
         {authoringSession?.validationState === 'INVALID' ? (
           <div className="mt-2">
             <AuthoringValidationNotice session={authoringSession} />
+          </div>
+        ) : null}
+        {authoringSession?.impactState !== 'KNOWN' && (authoringSession?.revision ?? 0) > 1 ? (
+          <div className="mt-2">
+            <AuthoringImpactNotice session={authoringSession!} />
           </div>
         ) : null}
         <div className="mt-2">

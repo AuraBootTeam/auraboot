@@ -3555,7 +3555,9 @@ CREATE TABLE public.ab_authoring_change_set (
     source_change_set_id bigint,
     source_change_set_revision bigint,
     lineage jsonb DEFAULT '[]'::jsonb NOT NULL,
+    impact_state character varying(16) DEFAULT 'UNKNOWN'::character varying NOT NULL,
     CONSTRAINT chk_authoring_change_set_approval CHECK (((approval_state)::text = ANY ((ARRAY['NOT_REQUIRED'::character varying, 'PENDING'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'STALE'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_change_set_impact CHECK (((impact_state)::text = ANY ((ARRAY['UNKNOWN'::character varying, 'KNOWN'::character varying, 'STALE'::character varying, 'FAILED'::character varying])::text[]))),
     CONSTRAINT chk_authoring_change_set_publish CHECK (((publish_state)::text = ANY ((ARRAY['DRAFT'::character varying, 'READY'::character varying, 'PUBLISHING'::character varying, 'PUBLISHED'::character varying, 'FAILED'::character varying, 'ROLLED_BACK'::character varying])::text[]))),
     CONSTRAINT chk_authoring_change_set_publish_policy CHECK (((publish_policy)::text = ANY ((ARRAY['DIRECT_ALLOWED'::character varying, 'DEFAULT_REVIEW'::character varying, 'REQUIRED_REVIEW'::character varying, 'STUDIO_APPROVAL'::character varying, 'DENIED'::character varying])::text[]))),
     CONSTRAINT chk_authoring_change_set_revision CHECK ((revision > 0)),
@@ -3747,6 +3749,67 @@ ALTER SEQUENCE public.ab_authoring_handoff_context_id_seq OWNED BY public.ab_aut
 
 
 --
+-- Name: ab_authoring_impact_run; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_impact_run (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    change_set_id bigint NOT NULL,
+    change_set_revision bigint NOT NULL,
+    resource_draft_id bigint NOT NULL,
+    status character varying(16) NOT NULL,
+    analyzer_version character varying(40) NOT NULL,
+    manifest_checksum character varying(64) NOT NULL,
+    snapshot_checksum character varying(64) NOT NULL,
+    dependency_checksum character varying(64),
+    dependencies jsonb DEFAULT '[]'::jsonb NOT NULL,
+    failure_code character varying(80),
+    actor_user_id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_authoring_impact_dependencies CHECK ((jsonb_typeof(dependencies) = 'array'::text)),
+    CONSTRAINT chk_authoring_impact_result CHECK (((((status)::text = 'KNOWN'::text) AND (dependency_checksum IS NOT NULL) AND (failure_code IS NULL)) OR (((status)::text = 'FAILED'::text) AND (dependency_checksum IS NULL) AND (failure_code IS NOT NULL)))),
+    CONSTRAINT chk_authoring_impact_revision CHECK ((change_set_revision > 0)),
+    CONSTRAINT chk_authoring_impact_status CHECK (((status)::text = ANY ((ARRAY['KNOWN'::character varying, 'FAILED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_authoring_impact_run; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_impact_run IS 'Append-only dependency impact result bound to one immutable ChangeSet revision';
+
+
+--
+-- Name: COLUMN ab_authoring_impact_run.dependencies; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_authoring_impact_run.dependencies IS 'Metadata-only resource fingerprints; no business record values are persisted';
+
+
+--
+-- Name: ab_authoring_impact_run_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_impact_run_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_impact_run_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_impact_run_id_seq OWNED BY public.ab_authoring_impact_run.id;
+
+
+--
 -- Name: ab_authoring_release; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3901,6 +3964,8 @@ CREATE TABLE public.ab_authoring_resource_draft (
     stale_reason character varying(80),
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    impact_state character varying(16) DEFAULT 'UNKNOWN'::character varying NOT NULL,
+    CONSTRAINT chk_authoring_resource_draft_impact CHECK (((impact_state)::text = ANY ((ARRAY['UNKNOWN'::character varying, 'KNOWN'::character varying, 'STALE'::character varying, 'FAILED'::character varying])::text[]))),
     CONSTRAINT chk_authoring_resource_draft_revision CHECK ((revision > 0)),
     CONSTRAINT chk_authoring_resource_draft_validation CHECK (((validation_state)::text = ANY ((ARRAY['UNVALIDATED'::character varying, 'VALID'::character varying, 'INVALID'::character varying, 'STALE'::character varying])::text[])))
 );
@@ -16881,6 +16946,13 @@ ALTER TABLE ONLY public.ab_authoring_handoff_context ALTER COLUMN id SET DEFAULT
 
 
 --
+-- Name: ab_authoring_impact_run id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_impact_run ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_impact_run_id_seq'::regclass);
+
+
+--
 -- Name: ab_authoring_release id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -18309,6 +18381,22 @@ ALTER TABLE ONLY public.ab_authoring_handoff_context
 
 ALTER TABLE ONLY public.ab_authoring_handoff_context
     ADD CONSTRAINT ab_authoring_handoff_context_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_impact_run ab_authoring_impact_run_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_impact_run
+    ADD CONSTRAINT ab_authoring_impact_run_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_impact_run ab_authoring_impact_run_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_impact_run
+    ADD CONSTRAINT ab_authoring_impact_run_pkey PRIMARY KEY (id);
 
 
 --
@@ -24115,6 +24203,13 @@ CREATE INDEX idx_authoring_handoff_actor ON public.ab_authoring_handoff_context 
 
 
 --
+-- Name: idx_authoring_impact_revision; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_impact_revision ON public.ab_authoring_impact_run USING btree (tenant_id, env_id, change_set_id, change_set_revision, created_at DESC, id DESC);
+
+
+--
 -- Name: idx_authoring_release_active; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -28189,6 +28284,13 @@ CREATE TRIGGER trg_authoring_change_set_split_append_only BEFORE DELETE OR UPDAT
 
 
 --
+-- Name: ab_authoring_impact_run trg_authoring_impact_run_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_impact_run_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_impact_run FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
 -- Name: ab_authoring_release trg_authoring_release_immutable_delete; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -28605,6 +28707,30 @@ ALTER TABLE ONLY public.ab_authoring_handoff_context
 
 ALTER TABLE ONLY public.ab_authoring_handoff_context
     ADD CONSTRAINT fk_authoring_handoff_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_impact_run fk_authoring_impact_change_set; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_impact_run
+    ADD CONSTRAINT fk_authoring_impact_change_set FOREIGN KEY (change_set_id) REFERENCES public.ab_authoring_change_set(id);
+
+
+--
+-- Name: ab_authoring_impact_run fk_authoring_impact_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_impact_run
+    ADD CONSTRAINT fk_authoring_impact_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_impact_run fk_authoring_impact_resource_draft; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_impact_run
+    ADD CONSTRAINT fk_authoring_impact_resource_draft FOREIGN KEY (resource_draft_id) REFERENCES public.ab_authoring_resource_draft(id);
 
 
 --

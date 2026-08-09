@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.authoring.workspace.AuthoringChangeSetSplitter.ChangeItem;
 import com.auraboot.framework.authoring.workspace.AuthoringChangeSetSplitter.SplitPlan;
 import com.auraboot.framework.authoring.workspace.AuthoringDraftValidator.ValidationResult;
+import com.auraboot.framework.authoring.workspace.AuthoringImpactAnalyzer.ImpactResult;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.ChannelRow;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.GovernanceRow;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.ReleaseRow;
@@ -17,6 +18,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Re
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RevisionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RollbackRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ResumeEditingRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.AuditEntry;
@@ -56,6 +58,7 @@ public class AuthoringGovernanceService {
     private final AuthoringChangeSetSplitter changeSetSplitter;
     private final AuthoringAggregatePolicyService aggregatePolicyService;
     private final AuthoringDraftValidator draftValidator;
+    private final AuthoringImpactAnalyzer impactAnalyzer;
     private final AuthoringWorkspaceViewMapper viewMapper;
     private final ObjectMapper objectMapper;
 
@@ -68,6 +71,7 @@ public class AuthoringGovernanceService {
             AuthoringChangeSetSplitter changeSetSplitter,
             AuthoringAggregatePolicyService aggregatePolicyService,
             AuthoringDraftValidator draftValidator,
+            AuthoringImpactAnalyzer impactAnalyzer,
             AuthoringWorkspaceViewMapper viewMapper,
             ObjectMapper objectMapper) {
         this.governanceRepository = governanceRepository;
@@ -78,12 +82,13 @@ public class AuthoringGovernanceService {
         this.changeSetSplitter = changeSetSplitter;
         this.aggregatePolicyService = aggregatePolicyService;
         this.draftValidator = draftValidator;
+        this.impactAnalyzer = impactAnalyzer;
         this.viewMapper = viewMapper;
         this.objectMapper = objectMapper;
     }
 
-    @Transactional
-    public ChangeSetView submit(String sessionPid, RevisionRequest request) {
+    @Transactional(noRollbackFor = AuthoringStaleStateException.class)
+    public SessionView prepare(String sessionPid, RevisionRequest request) {
         Identity identity = identity();
         WorkspaceRow workspace = requireOwnedSession(identity, sessionPid);
         GovernanceRow row = requireChangeSet(identity, workspace.changeSetPid(), true);
@@ -110,8 +115,35 @@ public class AuthoringGovernanceService {
                 validation.valid() ? "REVISION_VALID" : "REVISION_INVALID",
                 validationMetadata);
         if (!validation.valid()) {
-            return view(requireChangeSet(identity, row.changeSetPid(), false));
+            return sessionView(identity, sessionPid);
         }
+        ImpactResult impact = impactAnalyzer.analyze(row.tenantId(), row.snapshot());
+        String impactRunPid = UniqueIdGenerator.generate();
+        governanceRepository.recordImpact(
+                row, impact, impactRunPid, snapshotFactory.checksum(row.snapshot()),
+                identity.userId());
+        ObjectNode impactMetadata = objectMapper.createObjectNode();
+        impactMetadata.put("impactRunPid", impactRunPid);
+        impactMetadata.put("analyzedRevision", row.revision());
+        impactMetadata.put("dependencyCount", impact.dependencies().size());
+        audit(identity, row, sessionPid,
+                impact.known() ? "CHANGE_SET_IMPACT_KNOWN" : "CHANGE_SET_IMPACT_FAILED",
+                impact.known() ? "ALLOW" : "DENY",
+                impact.known() ? "DEPENDENCIES_RESOLVED" : impact.failureCode(),
+                impactMetadata);
+        return sessionView(identity, sessionPid);
+    }
+
+    @Transactional(noRollbackFor = AuthoringStaleStateException.class)
+    public ChangeSetView submit(String sessionPid, RevisionRequest request) {
+        Identity identity = identity();
+        WorkspaceRow workspace = requireOwnedSession(identity, sessionPid);
+        GovernanceRow row = requireChangeSet(identity, workspace.changeSetPid(), true);
+        requireWritableSession(workspace, row, identity, request.expectedRevision());
+        governanceValidator.requireRevision(row, request.expectedRevision());
+        governanceValidator.requireStatus(row, "DRAFT", "REJECTED");
+        governanceValidator.requireFresh(row);
+        governanceValidator.requirePrepared(row);
         boolean approvalRequired = governanceValidator.approvalRequired(row);
         governanceRepository.submit(row, approvalRequired, identity.userId());
         audit(identity, row, sessionPid, "CHANGE_SET_SUBMITTED", "ALLOW",
@@ -119,7 +151,7 @@ public class AuthoringGovernanceService {
         return view(requireChangeSet(identity, row.changeSetPid(), false));
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = AuthoringStaleStateException.class)
     public ChangeSetView approve(String changeSetPid, ReviewRequest request) {
         Identity identity = identity();
         GovernanceRow row = requireChangeSet(identity, changeSetPid, true);
@@ -263,7 +295,7 @@ public class AuthoringGovernanceService {
                 lineage);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = AuthoringStaleStateException.class)
     public ReleaseView publish(String changeSetPid, RevisionRequest request) {
         Identity identity = identity();
         GovernanceRow row = requireChangeSet(identity, changeSetPid, true);
@@ -362,8 +394,12 @@ public class AuthoringGovernanceService {
         return new ChangeSetView(
                 row.changeSetPid(), row.resourcePid(), row.ownerUserId(), row.status(),
                 row.revision(), row.riskLevel(), row.route(), row.publishPolicy(),
-                row.validationState(), row.approvalState(), row.publishState(),
+                row.validationState(), row.impactState(), row.approvalState(), row.publishState(),
                 row.manifestChecksum());
+    }
+
+    private SessionView sessionView(Identity identity, String sessionPid) {
+        return viewMapper.toView(requireOwnedSession(identity, sessionPid), identity.userId());
     }
 
     private ReleaseView releaseView(ReleaseRow row) {

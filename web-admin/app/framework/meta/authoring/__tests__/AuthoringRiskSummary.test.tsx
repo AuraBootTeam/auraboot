@@ -42,6 +42,7 @@ function session(riskLevel: string, publishPolicy: string): AuthoringSession {
     route: riskLevel === 'L3' ? 'HANDOFF_STUDIO' : 'GUIDED_INLINE',
     publishPolicy,
     validationState: 'UNVALIDATED',
+    impactState: 'UNKNOWN',
     approvalState: 'PENDING',
     publishState: 'DRAFT',
     manifestChecksum: 'registry-1',

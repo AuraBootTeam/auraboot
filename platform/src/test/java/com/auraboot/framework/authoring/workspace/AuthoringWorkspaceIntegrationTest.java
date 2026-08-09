@@ -154,6 +154,10 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                                  "title":"split","reason":"test"}
                                 """))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/sessions/missing/prepare")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":1}"))
+                .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/authoring/sessions/missing/review/withdraw")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"expectedRevision\":1,\"reason\":\"test\"}"))
@@ -603,7 +607,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                     1, "table-1", "/props/pageSize", PatchOperation.ADD,
                     objectMapper.getNodeFactory().numberNode(20),
                     capabilityRegistry.find("table").orElseThrow().checksum()));
-            governanceService.submit(opened.sessionPid(), new RevisionRequest(2));
+            prepareAndSubmit(opened.sessionPid(), new RevisionRequest(2));
         } finally {
             applyTestMetaContext();
         }
@@ -641,7 +645,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                     1, "table-1", "/props/pageSize", PatchOperation.ADD,
                     objectMapper.getNodeFactory().numberNode(20),
                     capabilityRegistry.find("table").orElseThrow().checksum()));
-            governanceService.submit(opened.sessionPid(), new RevisionRequest(2));
+            prepareAndSubmit(opened.sessionPid(), new RevisionRequest(2));
         } finally {
             applyTestMetaContext();
         }
@@ -719,7 +723,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         PageSchema page = insertPage("normal");
         SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
         patchDensity(opened, "compact");
-        governanceService.submit(opened.sessionPid(), new RevisionRequest(2));
+        prepareAndSubmit(opened.sessionPid(), new RevisionRequest(2));
 
         grantPublisherAdmin();
         assertThat(userPermissionService.hasPermission(
@@ -872,7 +876,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
         patchDensity(opened, "compact");
 
-        ChangeSetView submitted = governanceService.submit(
+        ChangeSetView submitted = prepareAndSubmit(
                 opened.sessionPid(), new RevisionRequest(2));
         assertThat(submitted.status()).isEqualTo("APPROVED");
         assertThat(submitted.validationState()).isEqualTo("VALID");
@@ -908,7 +912,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         PageSchema page = insertPage("normal");
         SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
         patchDensity(opened, "compact");
-        governanceService.submit(opened.sessionPid(), new RevisionRequest(2));
+        prepareAndSubmit(opened.sessionPid(), new RevisionRequest(2));
         ReleaseView release = governanceService.publish(
                 opened.changeSetPid(), new RevisionRequest(2));
 
@@ -966,7 +970,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 1, "table-1", "/props/pageSize", PatchOperation.ADD,
                 objectMapper.getNodeFactory().numberNode(20), checksum));
 
-        ChangeSetView submitted = governanceService.submit(
+        ChangeSetView submitted = prepareAndSubmit(
                 opened.sessionPid(), new RevisionRequest(2));
         assertThat(submitted.status()).isEqualTo("IN_REVIEW");
         assertThat(submitted.approvalState()).isEqualTo("PENDING");
@@ -1020,7 +1024,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         assertThat(laterLowRisk.session().riskLevel()).isEqualTo("L2");
         assertThat(laterLowRisk.session().publishPolicy()).isEqualTo("REQUIRED_REVIEW");
 
-        ChangeSetView submitted = governanceService.submit(
+        ChangeSetView submitted = prepareAndSubmit(
                 opened.sessionPid(), new RevisionRequest(laterLowRisk.session().revision()));
         assertThat(submitted.status()).isEqualTo("IN_REVIEW");
         assertThat(submitted.approvalState()).isEqualTo("PENDING");
@@ -1037,6 +1041,88 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void unknownImpactCannotSubmitUntilTheExactRevisionIsPrepared() {
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult patched = patchDensity(opened, "compact");
+
+        assertThatThrownBy(() -> governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(patched.session().revision())))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("authoring.submit.not-ready");
+
+        SessionView prepared = governanceService.prepare(
+                opened.sessionPid(), new RevisionRequest(patched.session().revision()));
+        assertThat(prepared.changeSetStatus()).isEqualTo("DRAFT");
+        assertThat(prepared.validationState()).isEqualTo("VALID");
+        assertThat(prepared.impactState()).isEqualTo("KNOWN");
+        assertThat(prepared.impact()).isNotNull();
+        assertThat(prepared.impact().revision()).isEqualTo(2);
+        assertThat(prepared.impact().dependencies()).extracting(dependency ->
+                dependency.resourceCode()).containsExactly("test_model");
+
+        ChangeSetView submitted = governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(prepared.revision()));
+        assertThat(submitted.status()).isEqualTo("APPROVED");
+        assertThat(submitted.impactState()).isEqualTo("KNOWN");
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                UPDATE ab_authoring_impact_run SET dependencies = '[]'::jsonb
+                WHERE change_set_id = (
+                    SELECT id FROM ab_authoring_change_set WHERE pid = ?)
+                """, opened.changeSetPid()))
+                .hasMessageContaining("authoring history is append-only");
+    }
+
+    @Test
+    void missingDependencyFailsClosedAndKeepsTheDraftEditable() {
+        PageSchema page = insertPage("normal");
+        page.setModelCode("missing_model");
+        pageSchemaMapper.updateById(page);
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult patched = patchDensity(opened, "compact");
+
+        SessionView prepared = governanceService.prepare(
+                opened.sessionPid(), new RevisionRequest(patched.session().revision()));
+
+        assertThat(prepared.state()).isEqualTo("ACTIVE");
+        assertThat(prepared.changeSetStatus()).isEqualTo("DRAFT");
+        assertThat(prepared.validationState()).isEqualTo("VALID");
+        assertThat(prepared.impactState()).isEqualTo("FAILED");
+        assertThat(prepared.impact().failureCode()).isEqualTo("DEPENDENCY_MISSING");
+        assertThat(prepared.impact().dependencies()).isEmpty();
+        assertThatThrownBy(() -> governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(prepared.revision())))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("authoring.submit.not-ready");
+    }
+
+    @Test
+    void dependencyDriftStalesValidationImpactAndPublishEligibility() {
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult patched = patchDensity(opened, "compact");
+        SessionView prepared = governanceService.prepare(
+                opened.sessionPid(), new RevisionRequest(patched.session().revision()));
+        assertThat(prepared.impactState()).isEqualTo("KNOWN");
+
+        jdbcTemplate.update("""
+                UPDATE ab_meta_model
+                SET row_version = row_version + 1, updated_at = CURRENT_TIMESTAMP
+                WHERE tenant_id = ? AND code = 'test_model'
+                  AND is_current = TRUE AND deleted_flag = FALSE
+                """, testTenant.getId());
+
+        assertThatThrownBy(() -> governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(prepared.revision())))
+                .isInstanceOf(AuthoringStaleStateException.class)
+                .hasMessageContaining("authoring.validation.dependency-stale");
+        SessionView stale = workspaceService.get(opened.sessionPid());
+        assertThat(stale.validationState()).isEqualTo("STALE");
+        assertThat(stale.impactState()).isEqualTo("STALE");
+        assertThat(stale.publishState()).isEqualTo("DRAFT");
+    }
+
+    @Test
     void invalidRevisionStaysEditableAndAValidNewRevisionGetsItsOwnValidationFact() {
         PageSchema page = insertPage("normal");
         SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
@@ -1048,10 +1134,10 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         objectMapper.getNodeFactory().textNode("status = OPEN secret-value"),
                         capabilityRegistry.find("table").orElseThrow().checksum()));
 
-        ChangeSetView invalid = governanceService.submit(
+        SessionView invalid = governanceService.prepare(
                 opened.sessionPid(), new RevisionRequest(invalidPatch.session().revision()));
 
-        assertThat(invalid.status()).isEqualTo("DRAFT");
+        assertThat(invalid.changeSetStatus()).isEqualTo("DRAFT");
         assertThat(invalid.validationState()).isEqualTo("INVALID");
         assertThat(invalid.publishState()).isEqualTo("DRAFT");
         SessionView invalidSession = workspaceService.get(opened.sessionPid());
@@ -1082,7 +1168,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         assertThat(fixed.session().validationState()).isEqualTo("UNVALIDATED");
         assertThat(fixed.session().validation()).isNull();
 
-        ChangeSetView submitted = governanceService.submit(
+        ChangeSetView submitted = prepareAndSubmit(
                 opened.sessionPid(), new RevisionRequest(fixed.session().revision()));
         assertThat(submitted.status()).isEqualTo("IN_REVIEW");
         assertThat(submitted.validationState()).isEqualTo("VALID");
@@ -1113,7 +1199,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 1, "table-1", "/props/pageSize", PatchOperation.ADD,
                 objectMapper.getNodeFactory().numberNode(20),
                 capabilityRegistry.find("table").orElseThrow().checksum()));
-        governanceService.submit(opened.sessionPid(), new RevisionRequest(2));
+        prepareAndSubmit(opened.sessionPid(), new RevisionRequest(2));
 
         ChangeSetView withdrawn = governanceService.withdrawReview(
                 opened.sessionPid(), new ResumeEditingRequest(2, "补充筛选条件"));
@@ -1148,7 +1234,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 1, "table-1", "/props/pageSize", PatchOperation.ADD,
                 objectMapper.getNodeFactory().numberNode(20),
                 capabilityRegistry.find("table").orElseThrow().checksum()));
-        governanceService.submit(opened.sessionPid(), new RevisionRequest(2));
+        prepareAndSubmit(opened.sessionPid(), new RevisionRequest(2));
 
         long environmentId = MetaContext.getCurrentEnvironmentId();
         try {
@@ -1192,7 +1278,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 1, "table-1", "/props/pageSize", PatchOperation.ADD,
                 objectMapper.getNodeFactory().numberNode(20),
                 capabilityRegistry.find("table").orElseThrow().checksum()));
-        governanceService.submit(opened.sessionPid(), new RevisionRequest(2));
+        prepareAndSubmit(opened.sessionPid(), new RevisionRequest(2));
 
         long environmentId = MetaContext.getCurrentEnvironmentId();
         try {
@@ -1275,10 +1361,10 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(opened.changeSetPid());
         assertThat(split.lineage().get(0).path("revision").asLong()).isEqualTo(3);
 
-        assertThat(governanceService.submit(
+        assertThat(prepareAndSubmit(
                 split.sourceSession().sessionPid(), new RevisionRequest(4)).status())
                 .isEqualTo("APPROVED");
-        assertThat(governanceService.submit(
+        assertThat(prepareAndSubmit(
                 split.targetSession().sessionPid(), new RevisionRequest(2)).status())
                 .isEqualTo("IN_REVIEW");
 
@@ -1352,10 +1438,10 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         patchDensity(first, "compact");
         patchDensity(concurrent, "comfortable");
 
-        governanceService.submit(first.sessionPid(), new RevisionRequest(2));
+        prepareAndSubmit(first.sessionPid(), new RevisionRequest(2));
         governanceService.publish(first.changeSetPid(), new RevisionRequest(2));
 
-        assertThatThrownBy(() -> governanceService.submit(
+        assertThatThrownBy(() -> prepareAndSubmit(
                 concurrent.sessionPid(), new RevisionRequest(2)))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("base-release-stale");
@@ -1367,7 +1453,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         PageSchema page = insertPage("normal");
         SessionView first = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
         patchDensity(first, "compact");
-        governanceService.submit(first.sessionPid(), new RevisionRequest(2));
+        prepareAndSubmit(first.sessionPid(), new RevisionRequest(2));
         ReleaseView releaseOne = governanceService.publish(
                 first.changeSetPid(), new RevisionRequest(2));
 
@@ -1375,7 +1461,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         assertThat(second.snapshot().at("/blocks/0/props/density").asText())
                 .isEqualTo("compact");
         patchDensity(second, "comfortable");
-        governanceService.submit(second.sessionPid(), new RevisionRequest(2));
+        prepareAndSubmit(second.sessionPid(), new RevisionRequest(2));
         ReleaseView releaseTwo = governanceService.publish(
                 second.changeSetPid(), new RevisionRequest(2));
         assertThat(releaseTwo.previousReleasePid()).isEqualTo(releaseOne.releasePid());
@@ -1395,6 +1481,8 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     }
 
     private PageSchema insertPage(String density) {
+        ensureModel("test_model");
+        ensureModel("payments");
         String pid = UniqueIdGenerator.generate();
         PageSchema page = new PageSchema();
         page.setPid(pid);
@@ -1418,6 +1506,24 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         page.setDeletedFlag(false);
         pageSchemaMapper.insert(page);
         return page;
+    }
+
+    private void ensureModel(String modelCode) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_meta_model
+                WHERE tenant_id = ? AND code = ? AND is_current = TRUE
+                  AND deleted_flag = FALSE
+                """, Integer.class, testTenant.getId(), modelCode);
+        if (count != null && count > 0) {
+            return;
+        }
+        jdbcTemplate.update("""
+                INSERT INTO ab_meta_model (
+                    pid, tenant_id, code, table_name, version, is_current,
+                    row_version, status, deleted_flag)
+                VALUES (?, ?, ?, ?, 1, TRUE, 1, 'published', FALSE)
+                """, UniqueIdGenerator.generate(), testTenant.getId(), modelCode,
+                "mt_" + modelCode);
     }
 
     private PageSchema insertReorderPage() {
@@ -1521,6 +1627,11 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 opened.revision(), "table-1", "/props/density", PatchOperation.REPLACE,
                 objectMapper.getNodeFactory().textNode(density),
                 capabilityRegistry.find("table").orElseThrow().checksum()));
+    }
+
+    private ChangeSetView prepareAndSubmit(String sessionPid, RevisionRequest request) {
+        governanceService.prepare(sessionPid, request);
+        return governanceService.submit(sessionPid, request);
     }
 
     private String approvalStatus(String changeSetPid, long revision) {

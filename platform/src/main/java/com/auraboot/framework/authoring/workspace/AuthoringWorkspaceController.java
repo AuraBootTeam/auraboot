@@ -161,6 +161,14 @@ public class AuthoringWorkspaceController {
         return ApiResponse.success(governanceService.submit(sessionPid, request));
     }
 
+    @PostMapping("/sessions/{sessionPid}/prepare")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
+    public ApiResponse<SessionView> prepare(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody RevisionRequest request) {
+        return ApiResponse.success(governanceService.prepare(sessionPid, request));
+    }
+
     @PostMapping("/sessions/{sessionPid}/review/withdraw")
     @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
     public ApiResponse<ChangeSetView> withdrawReview(

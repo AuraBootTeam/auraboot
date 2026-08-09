@@ -184,6 +184,17 @@ export async function submitAuthoringSession(sessionPid: string, revision: numbe
   }
 }
 
+export async function prepareAuthoringSession(
+  sessionPid: string,
+  revision: number,
+): Promise<AuthoringSession> {
+  const result = await fetchResult<AuthoringSession>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/prepare`,
+    { method: 'post', params: { expectedRevision: revision } },
+  );
+  return requireData(result, '无法完成校验与影响分析');
+}
+
 export async function transitionAuthoringGovernance(
   action: AuthoringGovernanceAction,
   session: Pick<AuthoringSession, 'sessionPid' | 'changeSetPid' | 'revision'>,

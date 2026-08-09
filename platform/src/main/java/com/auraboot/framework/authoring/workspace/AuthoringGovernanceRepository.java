@@ -3,6 +3,7 @@ package com.auraboot.framework.authoring.workspace;
 import com.auraboot.framework.authoring.workspace.AuthoringChangeSetSplitter.ChangeItem;
 import com.auraboot.framework.authoring.workspace.AuthoringChangeSetSplitter.SplitPlan;
 import com.auraboot.framework.authoring.workspace.AuthoringDraftValidator.ValidationResult;
+import com.auraboot.framework.authoring.workspace.AuthoringImpactAnalyzer.ImpactResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.AggregatePolicy;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -40,7 +41,8 @@ public class AuthoringGovernanceRepository {
                         SELECT cs.id AS change_set_id, cs.pid AS change_set_pid,
                                cs.tenant_id, cs.env_id, cs.owner_user_id, cs.title, cs.status,
                                cs.revision, cs.risk_level, cs.route, cs.publish_policy,
-                               cs.validation_state, cs.approval_state, cs.publish_state,
+                               cs.validation_state, cs.impact_state,
+                               cs.approval_state, cs.publish_state,
                                cs.manifest_checksum, cs.base_release_pid,
                                cs.source_change_set_id, cs.source_change_set_revision,
                                cs.lineage::text,
@@ -48,6 +50,8 @@ public class AuthoringGovernanceRepository {
                                rd.resource_pid, rd.base_version, rd.base_checksum,
                                rd.manifest_checksum AS draft_manifest_checksum,
                                rd.snapshot::text,
+                               impact_run.dependency_checksum AS impact_dependency_checksum,
+                               impact_run.dependencies::text AS impact_dependencies,
                                wl.session_id AS lease_session_id,
                                wl.holder_user_id AS lease_holder_user_id,
                                wl.lease_revision
@@ -61,6 +65,16 @@ public class AuthoringGovernanceRepository {
                           ON wl.change_set_id = cs.id
                          AND wl.tenant_id = cs.tenant_id
                          AND wl.env_id = cs.env_id
+                        LEFT JOIN LATERAL (
+                            SELECT ir.dependency_checksum, ir.dependencies
+                            FROM ab_authoring_impact_run ir
+                            WHERE ir.tenant_id = cs.tenant_id
+                              AND ir.env_id = cs.env_id
+                              AND ir.change_set_id = cs.id
+                              AND ir.change_set_revision = cs.revision
+                            ORDER BY ir.created_at DESC, ir.id DESC
+                            LIMIT 1
+                        ) impact_run ON TRUE
                         WHERE cs.tenant_id = ? AND cs.env_id = ? AND cs.pid = ?
                           AND cs.deleted_flag = FALSE
                         """ + lockClause,
@@ -151,18 +165,83 @@ public class AuthoringGovernanceRepository {
         requireOne(resourceUpdated, "authoring.validation.resource-revision-conflict");
     }
 
+    public void recordImpact(
+            GovernanceRow row,
+            ImpactResult result,
+            String impactRunPid,
+            String snapshotChecksum,
+            long actorUserId) {
+        jdbcTemplate.update("""
+                INSERT INTO ab_authoring_impact_run (
+                    pid, tenant_id, env_id, change_set_id, change_set_revision,
+                    resource_draft_id, status, analyzer_version, manifest_checksum,
+                    snapshot_checksum, dependency_checksum, dependencies,
+                    failure_code, actor_user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?)
+                """,
+                impactRunPid, row.tenantId(), row.envId(), row.changeSetId(), row.revision(),
+                row.resourceDraftId(), result.status(), AuthoringImpactAnalyzer.ANALYZER_VERSION,
+                row.draftManifestChecksum(), snapshotChecksum, result.dependencyChecksum(),
+                json(result.dependencies()), result.failureCode(), actorUserId);
+        int changeSetUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_change_set
+                SET impact_state = ?,
+                    publish_state = CASE WHEN ? = 'FAILED' THEN 'DRAFT' ELSE publish_state END,
+                    stale_reason = NULL, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
+                  AND status IN ('DRAFT', 'REJECTED')
+                """,
+                result.status(), result.status(), row.changeSetId(), row.tenantId(), row.envId(),
+                row.revision());
+        requireOne(changeSetUpdated, "authoring.impact.revision-conflict");
+        int resourceUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_resource_draft
+                SET impact_state = ?, stale_reason = NULL, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
+                """,
+                result.status(), row.resourceDraftId(), row.tenantId(), row.envId(), row.revision());
+        requireOne(resourceUpdated, "authoring.impact.resource-revision-conflict");
+    }
+
+    public void markStale(GovernanceRow row, String reason) {
+        int changeSetUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_change_set
+                SET validation_state = CASE
+                        WHEN validation_state = 'VALID' THEN 'STALE' ELSE validation_state END,
+                    impact_state = CASE
+                        WHEN impact_state = 'KNOWN' THEN 'STALE' ELSE impact_state END,
+                    approval_state = CASE
+                        WHEN approval_state IN ('PENDING', 'APPROVED') THEN 'STALE'
+                        ELSE approval_state END,
+                    publish_state = 'DRAFT', stale_reason = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
+                """, reason, row.changeSetId(), row.tenantId(), row.envId(), row.revision());
+        requireOne(changeSetUpdated, "authoring.stale.revision-conflict");
+        int resourceUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_resource_draft
+                SET validation_state = CASE
+                        WHEN validation_state = 'VALID' THEN 'STALE' ELSE validation_state END,
+                    impact_state = CASE
+                        WHEN impact_state = 'KNOWN' THEN 'STALE' ELSE impact_state END,
+                    stale_reason = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
+                """, reason, row.resourceDraftId(), row.tenantId(), row.envId(), row.revision());
+        requireOne(resourceUpdated, "authoring.stale.resource-revision-conflict");
+    }
+
     public void submit(GovernanceRow row, boolean approvalRequired, long actorUserId) {
         String status = approvalRequired ? "IN_REVIEW" : "APPROVED";
         String approvalState = approvalRequired ? "PENDING" : "NOT_REQUIRED";
         String publishState = approvalRequired ? "DRAFT" : "READY";
         int updated = jdbcTemplate.update("""
                 UPDATE ab_authoring_change_set
-                SET status = ?, validation_state = 'VALID', approval_state = ?,
+                SET status = ?, approval_state = ?,
                     publish_state = ?, submitted_at = CURRENT_TIMESTAMP,
                     approved_at = CASE WHEN ? THEN NULL ELSE CURRENT_TIMESTAMP END,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
                   AND status IN ('DRAFT', 'REJECTED')
+                  AND validation_state = 'VALID' AND impact_state = 'KNOWN'
                 """, status, approvalState, publishState, approvalRequired,
                 row.changeSetId(), row.tenantId(), row.envId(), row.revision());
         requireOne(updated, "authoring.submit.conflict");
@@ -200,6 +279,7 @@ public class AuthoringGovernanceRepository {
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
                   AND status = 'IN_REVIEW' AND validation_state = 'VALID'
+                  AND impact_state = 'KNOWN'
                 """, row.changeSetId(), row.tenantId(), row.envId(), row.revision());
         requireOne(changeSetUpdated, "authoring.approval.conflict");
     }
@@ -282,6 +362,7 @@ public class AuthoringGovernanceRepository {
         int resourceUpdated = jdbcTemplate.update("""
                 UPDATE ab_authoring_resource_draft
                 SET revision = revision + 1, validation_state = 'UNVALIDATED',
+                    impact_state = 'UNKNOWN',
                     stale_reason = NULL, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
                 """, row.resourceDraftId(), row.tenantId(), row.envId(), row.revision());
@@ -290,7 +371,8 @@ public class AuthoringGovernanceRepository {
         int changeSetUpdated = jdbcTemplate.update("""
                 UPDATE ab_authoring_change_set
                 SET revision = revision + 1, status = ?,
-                    validation_state = 'UNVALIDATED', approval_state = ?,
+                    validation_state = 'UNVALIDATED', impact_state = 'UNKNOWN',
+                    approval_state = ?,
                     publish_state = 'DRAFT', stale_reason = NULL,
                     submitted_at = NULL, approved_at = NULL, published_at = NULL,
                     updated_at = CURRENT_TIMESTAMP
@@ -337,6 +419,7 @@ public class AuthoringGovernanceRepository {
         int sourceDraftUpdated = jdbcTemplate.update("""
                 UPDATE ab_authoring_resource_draft
                 SET snapshot = ?::jsonb, revision = ?, validation_state = 'UNVALIDATED',
+                    impact_state = 'UNKNOWN',
                     stale_reason = NULL, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
                 """, json(plan.sourceSnapshot()), sourceResultRevision,
@@ -347,6 +430,7 @@ public class AuthoringGovernanceRepository {
                 UPDATE ab_authoring_change_set
                 SET revision = ?, status = 'DRAFT', risk_level = ?, route = ?,
                     publish_policy = ?, validation_state = 'UNVALIDATED',
+                    impact_state = 'UNKNOWN',
                     approval_state = ?, publish_state = 'DRAFT', stale_reason = NULL,
                     submitted_at = NULL, approved_at = NULL, published_at = NULL,
                     updated_at = CURRENT_TIMESTAMP
@@ -710,6 +794,7 @@ public class AuthoringGovernanceRepository {
                 resultSet.getLong("revision"), resultSet.getString("risk_level"),
                 resultSet.getString("route"), resultSet.getString("publish_policy"),
                 resultSet.getString("validation_state"),
+                resultSet.getString("impact_state"),
                 resultSet.getString("approval_state"), resultSet.getString("publish_state"),
                 resultSet.getString("manifest_checksum"),
                 resultSet.getString("base_release_pid"),
@@ -722,6 +807,8 @@ public class AuthoringGovernanceRepository {
                 resultSet.getString("base_checksum"),
                 resultSet.getString("draft_manifest_checksum"),
                 parse(resultSet.getString("snapshot")),
+                resultSet.getString("impact_dependency_checksum"),
+                nullableParse(resultSet.getString("impact_dependencies")),
                 resultSet.getLong("lease_session_id"),
                 resultSet.getLong("lease_holder_user_id"),
                 resultSet.getLong("lease_revision"));
@@ -786,6 +873,7 @@ public class AuthoringGovernanceRepository {
             String route,
             String publishPolicy,
             String validationState,
+            String impactState,
             String approvalState,
             String publishState,
             String manifestChecksum,
@@ -800,6 +888,8 @@ public class AuthoringGovernanceRepository {
             String baseChecksum,
             String draftManifestChecksum,
             JsonNode snapshot,
+            String impactDependencyChecksum,
+            JsonNode impactDependencies,
             long leaseSessionId,
             long leaseHolderUserId,
             long leaseRevision) {

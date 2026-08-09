@@ -93,6 +93,7 @@ function session(overrides: Partial<AuthoringSession> = {}): AuthoringSession {
     route: 'HANDOFF_STUDIO',
     publishPolicy: 'STUDIO_APPROVAL',
     validationState: 'UNVALIDATED',
+    impactState: 'UNKNOWN',
     approvalState: 'PENDING',
     publishState: 'DRAFT',
     manifestChecksum: 'registry-1',

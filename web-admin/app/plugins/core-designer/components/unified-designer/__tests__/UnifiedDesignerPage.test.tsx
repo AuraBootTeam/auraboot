@@ -297,6 +297,7 @@ describe('UnifiedDesignerPage', () => {
       workspaceMode: 'REVIEW',
       state: 'READ_ONLY',
       validationState: 'VALID',
+      impactState: 'KNOWN',
       approvalState: 'PENDING',
       publishState: 'DRAFT',
       writerLease: {
@@ -358,6 +359,7 @@ describe('UnifiedDesignerPage', () => {
       workspaceMode: 'REVIEW',
       state: 'READ_ONLY',
       validationState: 'VALID',
+      impactState: 'KNOWN',
       approvalState: 'PENDING',
       writerLease: {
         status: 'HELD_BY_OTHER',
@@ -773,6 +775,7 @@ function createAuthoringSession(
     route,
     publishPolicy: route === 'HANDOFF_STUDIO' ? 'STUDIO_APPROVAL' : 'DIRECT_ALLOWED',
     validationState: 'UNVALIDATED',
+    impactState: 'UNKNOWN',
     approvalState: route === 'HANDOFF_STUDIO' ? 'REQUIRED' : 'NOT_REQUIRED',
     publishState: 'DRAFT',
     manifestChecksum: 'registry-checksum',

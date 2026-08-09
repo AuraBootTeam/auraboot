@@ -89,6 +89,7 @@ function reviewSession(overrides: Partial<AuthoringSession> = {}): AuthoringSess
     route: 'GUIDED_INLINE',
     publishPolicy: 'REQUIRED_REVIEW',
     validationState: 'VALID',
+    impactState: 'KNOWN',
     approvalState: 'PENDING',
     publishState: 'DRAFT',
     manifestChecksum: 'registry-1',

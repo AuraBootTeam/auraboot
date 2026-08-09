@@ -18,6 +18,8 @@ export interface AuthoringSession {
   publishPolicy: string;
   validationState: string;
   validation?: AuthoringValidationSummary | null;
+  impactState: 'UNKNOWN' | 'KNOWN' | 'STALE' | 'FAILED';
+  impact?: AuthoringImpactSummary | null;
   approvalState: string;
   publishState: string;
   manifestChecksum: string;
@@ -43,6 +45,24 @@ export interface AuthoringValidationSummary {
   errorCount: number;
   issues: AuthoringValidationIssue[];
   validatedAt: string;
+}
+
+export interface AuthoringImpactDependency {
+  resourceType: string;
+  resourceCode: string;
+  resourcePid: string;
+  version: number;
+  rowVersion: number;
+}
+
+export interface AuthoringImpactSummary {
+  impactRunPid: string;
+  revision: number;
+  status: 'KNOWN' | 'FAILED';
+  dependencyChecksum?: string | null;
+  dependencies: AuthoringImpactDependency[];
+  failureCode?: string | null;
+  analyzedAt: string;
 }
 
 export type AuthoringWriterLeaseStatus =

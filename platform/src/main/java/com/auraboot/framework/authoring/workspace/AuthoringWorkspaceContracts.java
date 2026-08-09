@@ -82,6 +82,24 @@ public final class AuthoringWorkspaceContracts {
             Instant validatedAt) {
     }
 
+    public record ImpactDependencyView(
+            String resourceType,
+            String resourceCode,
+            String resourcePid,
+            int version,
+            int rowVersion) {
+    }
+
+    public record ImpactSummaryView(
+            String impactRunPid,
+            long revision,
+            String status,
+            String dependencyChecksum,
+            List<ImpactDependencyView> dependencies,
+            String failureCode,
+            Instant analyzedAt) {
+    }
+
     public record SessionView(
             String sessionPid,
             String changeSetPid,
@@ -96,6 +114,8 @@ public final class AuthoringWorkspaceContracts {
             String publishPolicy,
             String validationState,
             ValidationSummaryView validation,
+            String impactState,
+            ImpactSummaryView impact,
             String approvalState,
             String publishState,
             String manifestChecksum,
@@ -208,6 +228,7 @@ public final class AuthoringWorkspaceContracts {
             String route,
             String publishPolicy,
             String validationState,
+            String impactState,
             String approvalState,
             String publishState,
             String manifestChecksum) {
