@@ -13,8 +13,104 @@
     "visible": true
   },
   {
-    "code": "crm_dashboard",
+    "code": "crm_customer_360_workspace",
     "parentCode": "crm_root",
+    "name:zh-CN": "客户 360",
+    "name:en": "Customer 360",
+    "path": "/p/c/crm_customer_360_workbench",
+    "pageKey": "crm_customer_360_workbench",
+    "component": null,
+    "icon": "IconBuilding",
+    "type": 1,
+    "permissionCode": "crm.account.read",
+    "orderNo": 1,
+    "visible": true
+  },
+  {
+    "code": "crm_lead_desk_workspace",
+    "parentCode": "crm_root",
+    "name:zh-CN": "线索工作台",
+    "name:en": "Lead Desk",
+    "path": "/p/c/crm_lead_desk_workbench",
+    "pageKey": "crm_lead_desk_workbench",
+    "component": null,
+    "icon": "IconRadar",
+    "type": 1,
+    "permissionCode": "crm.lead.read",
+    "orderNo": 2,
+    "visible": true
+  },
+  {
+    "code": "crm_opportunity_workspace",
+    "parentCode": "crm_root",
+    "name:zh-CN": "商机工作台",
+    "name:en": "Opportunity Workspace",
+    "path": "/p/c/crm_opportunity_workspace",
+    "pageKey": "crm_opportunity_workspace",
+    "component": null,
+    "icon": "IconTrendingUp",
+    "type": 1,
+    "permissionCode": "crm.opportunity.read",
+    "orderNo": 3,
+    "visible": true
+  },
+  {
+    "code": "crm_forecast_cockpit_workspace",
+    "parentCode": "crm_root",
+    "name:zh-CN": "预测驾驶舱",
+    "name:en": "Forecast Cockpit",
+    "path": "/p/c/crm_forecast_cockpit",
+    "pageKey": "crm_forecast_cockpit",
+    "component": null,
+    "icon": "IconChartBar",
+    "type": 1,
+    "permissionCode": "crm.forecast.read",
+    "orderNo": 4,
+    "visible": true
+  },
+  {
+    "code": "crm_activity_service_workspace",
+    "parentCode": "crm_root",
+    "name:zh-CN": "活动与服务工作台",
+    "name:en": "Activity & Service Desk",
+    "path": "/p/c/crm_activity_service_desk",
+    "pageKey": "crm_activity_service_desk",
+    "component": null,
+    "icon": "IconListCheck",
+    "type": 1,
+    "permissionCode": "crm.activity.read",
+    "orderNo": 5,
+    "visible": true
+  },
+  {
+    "code": "crm_records",
+    "parentCode": "crm_root",
+    "name:zh-CN": "业务档案",
+    "name:en": "Business Records",
+    "path": null,
+    "component": null,
+    "icon": "IconFolders",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 10,
+    "visible": true
+  },
+  {
+    "code": "crm_operations",
+    "parentCode": "crm_root",
+    "name:zh-CN": "运营与配置",
+    "name:en": "Operations",
+    "path": null,
+    "component": null,
+    "icon": "IconSettings",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 20,
+    "visible": true
+  },
+  {
+    "code": "crm_dashboard",
+    "parentCode": "crm_operations",
     "name:zh-CN": "驾驶舱",
     "name:en": "Dashboard",
     "path": "/dashboards/view/crm_dashboard",
@@ -24,11 +120,11 @@
     "type": 1,
     "permissionCode": "crm.account.read",
     "orderNo": 1,
-    "visible": true
+    "visible": false
   },
   {
     "code": "crm_sales_forecast",
-    "parentCode": "crm_root",
+    "parentCode": "crm_operations",
     "name:zh-CN": "销售预测",
     "name:en": "Sales Forecast",
     "path": "/dashboards/view/crm_sales_forecast",
@@ -38,11 +134,11 @@
     "type": 1,
     "permissionCode": "crm.opportunity.read",
     "orderNo": 2,
-    "visible": true
+    "visible": false
   },
   {
     "code": "crm_sales_workbench",
-    "parentCode": "crm_root",
+    "parentCode": "crm_operations",
     "name:zh-CN": "销售工作台",
     "name:en": "Sales Workbench",
     "path": "/p/crm_sales_workbench",
@@ -51,12 +147,12 @@
     "type": 1,
     "permissionCode": "crm.customer_request.read",
     "orderNo": 2,
-    "visible": true,
+    "visible": false,
     "pageKey": "crm_sales_workbench_list"
   },
   {
     "code": "crm_manager_workbench",
-    "parentCode": "crm_root",
+    "parentCode": "crm_operations",
     "name:zh-CN": "经理工作台",
     "name:en": "Manager Workbench",
     "path": "/p/crm_manager_workbench",
@@ -65,12 +161,12 @@
     "type": 1,
     "permissionCode": "crm.customer_request.read",
     "orderNo": 3,
-    "visible": true,
+    "visible": false,
     "pageKey": "crm_manager_workbench_list"
   },
   {
     "code": "crm_accounts",
-    "parentCode": null,
+    "parentCode": "crm_records",
     "name:zh-CN": "客户",
     "name:en": "Accounts",
     "path": "/p/crm_account_common",
@@ -84,7 +180,7 @@
   },
   {
     "code": "crm_contacts",
-    "parentCode": "crm_root",
+    "parentCode": "crm_records",
     "name:zh-CN": "联系人",
     "name:en": "Contacts",
     "path": "/p/crm_contact_common",
@@ -98,7 +194,7 @@
   },
   {
     "code": "crm_leads",
-    "parentCode": "crm_root",
+    "parentCode": "crm_records",
     "name:zh-CN": "线索",
     "name:en": "Leads",
     "path": "/p/crm_lead_common",
@@ -112,7 +208,7 @@
   },
   {
     "code": "crm_opportunities",
-    "parentCode": "crm_root",
+    "parentCode": "crm_records",
     "name:zh-CN": "商机",
     "name:en": "Opportunities",
     "path": "/p/crm_opportunity_common",
@@ -126,7 +222,7 @@
   },
   {
     "code": "crm_customer_requests",
-    "parentCode": "crm_root",
+    "parentCode": "crm_records",
     "name:zh-CN": "客户需求",
     "name:en": "Customer Requests",
     "path": "/p/crm_customer_request_common",
@@ -140,7 +236,7 @@
   },
   {
     "code": "crm_quote_summaries",
-    "parentCode": "crm_root",
+    "parentCode": "crm_records",
     "name:zh-CN": "报价摘要",
     "name:en": "Quote Summaries",
     "path": "/p/crm_quote_summary_common",
@@ -154,7 +250,7 @@
   },
   {
     "code": "crm_tasks",
-    "parentCode": "crm_root",
+    "parentCode": "crm_records",
     "name:zh-CN": "我的任务",
     "name:en": "My Tasks",
     "path": "/p/crm_my_tasks",
@@ -168,7 +264,7 @@
   },
   {
     "code": "crm_activities",
-    "parentCode": "crm_root",
+    "parentCode": "crm_records",
     "name:zh-CN": "活动",
     "name:en": "Activities",
     "path": "/p/crm_activity_common",
@@ -182,7 +278,7 @@
   },
   {
     "code": "crm_complaints",
-    "parentCode": "crm_root",
+    "parentCode": "crm_records",
     "name:zh-CN": "投诉",
     "name:en": "Complaints",
     "path": "/p/crm_complaint",
@@ -196,7 +292,7 @@
   },
   {
     "code": "crm_campaigns",
-    "parentCode": "crm_root",
+    "parentCode": "crm_operations",
     "name:zh-CN": "营销活动",
     "name:en": "Campaigns",
     "path": "/p/crm_campaign",
@@ -210,7 +306,7 @@
   },
   {
     "code": "crm_service_desk",
-    "parentCode": "crm_root",
+    "parentCode": "crm_operations",
     "name:zh-CN": "服务台",
     "name:en": "Service Desk",
     "path": null,
@@ -251,7 +347,7 @@
   },
   {
     "code": "crm_email_mgmt",
-    "parentCode": "crm_root",
+    "parentCode": "crm_operations",
     "name:zh-CN": "邮件管理",
     "name:en": "Email Management",
     "path": null,
@@ -300,7 +396,7 @@
     "icon": "IconSettings",
     "type": 0,
     "permissionCode": null,
-    "orderNo": 20,
+    "orderNo": 30,
     "visible": true
   },
   {
@@ -333,7 +429,7 @@
   },
   {
     "code": "crm_forecast_submit",
-    "parentCode": "crm_root",
+    "parentCode": "crm_records",
     "name:zh-CN": "预测提交",
     "name:en": "Forecast Submissions",
     "path": "/p/crm_forecast_submission",
@@ -347,7 +443,7 @@
   },
   {
     "code": "crm_consent",
-    "parentCode": "crm_root",
+    "parentCode": "crm_operations",
     "name:zh-CN": "同意记录",
     "name:en": "Consent",
     "path": "/p/crm_consent",
@@ -361,7 +457,7 @@
   },
   {
     "code": "crm_subscription",
-    "parentCode": "crm_root",
+    "parentCode": "crm_operations",
     "name:zh-CN": "订阅",
     "name:en": "Subscriptions",
     "path": "/p/crm_subscription",
@@ -375,7 +471,7 @@
   },
   {
     "code": "crm_segment",
-    "parentCode": "crm_root",
+    "parentCode": "crm_operations",
     "name:zh-CN": "细分人群",
     "name:en": "Segments",
     "path": "/p/crm_segment",
@@ -389,7 +485,7 @@
   },
   {
     "code": "crm_attribution",
-    "parentCode": "crm_root",
+    "parentCode": "crm_operations",
     "name:zh-CN": "营销归因",
     "name:en": "Attribution",
     "path": "/p/crm_attribution",
@@ -403,7 +499,7 @@
   },
   {
     "code": "crm_omni_session",
-    "parentCode": "crm_root",
+    "parentCode": "crm_operations",
     "name:zh-CN": "全渠道会话",
     "name:en": "Omni Sessions",
     "path": "/p/crm_omni_session",
@@ -417,7 +513,7 @@
   },
   {
     "code": "crm_journey",
-    "parentCode": "crm_root",
+    "parentCode": "crm_operations",
     "name:zh-CN": "客户旅程",
     "name:en": "Journeys",
     "path": "/p/crm_journey",
@@ -431,7 +527,7 @@
   },
   {
     "code": "crm_journey_enrollment",
-    "parentCode": "crm_root",
+    "parentCode": "crm_operations",
     "name:zh-CN": "旅程参与",
     "name:en": "Enrollments",
     "path": "/p/crm_journey_enrollment",
@@ -445,7 +541,7 @@
   },
   {
     "code": "crm_sales_snapshot",
-    "parentCode": "crm_root",
+    "parentCode": "crm_operations",
     "name:zh-CN": "销售分析快照",
     "name:en": "Sales Snapshot",
     "path": "/p/crm_sales_snapshot",
@@ -459,7 +555,7 @@
   },
   {
     "code": "crm_approval_case_menu",
-    "parentCode": "crm_root",
+    "parentCode": "crm_records",
     "name:zh-CN": "审批事项",
     "name:en": "Approval Cases",
     "path": "/p/crm_approval_case_common",
@@ -473,7 +569,7 @@
   },
   {
     "code": "crm_review_common_menu",
-    "parentCode": "crm_root",
+    "parentCode": "crm_records",
     "name:zh-CN": "评审",
     "name:en": "Review",
     "path": "/p/crm_review_common",
@@ -487,7 +583,7 @@
   },
   {
     "code": "crm_risk_common_menu",
-    "parentCode": "crm_root",
+    "parentCode": "crm_records",
     "name:zh-CN": "风险项",
     "name:en": "Risk",
     "path": "/p/crm_risk_common",
@@ -501,7 +597,7 @@
   },
   {
     "code": "crm_clarification_common_menu",
-    "parentCode": "crm_root",
+    "parentCode": "crm_records",
     "name:zh-CN": "澄清项",
     "name:en": "Clarification",
     "path": "/p/crm_clarification_common",
@@ -523,7 +619,7 @@
     "icon": "IconPackage",
     "type": 1,
     "permissionCode": "crm.qdp.read",
-    "orderNo": 24,
+    "orderNo": 6,
     "visible": true,
     "pageKey": "crm_qdp_release_workbench"
   }

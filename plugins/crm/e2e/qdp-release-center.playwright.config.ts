@@ -6,12 +6,18 @@ for (const key of ['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY']) de
 process.env.NO_PROXY = 'localhost,127.0.0.1';
 process.env.no_proxy = process.env.NO_PROXY;
 
-const qdpReleaseCenterSpecNames = ['qdp-release-center.golden'];
+const qdpReleaseCenterSpecNames = [
+  'qdp-release-center.golden',
+  'core-workbenches.golden',
+];
 
 export default defineConfig({
   testDir: '.',
   testMatch: qdpReleaseCenterSpecNames.map((name) => `${name}.spec.ts`),
-  outputDir: process.env.QDP_BROWSER_ARTIFACT_DIR || '/tmp/qdp-release-center-browser-artifacts',
+  outputDir:
+    process.env.CRM_BROWSER_ARTIFACT_DIR
+    || process.env.QDP_BROWSER_ARTIFACT_DIR
+    || '/tmp/crm-browser-artifacts',
   fullyParallel: false,
   workers: 1,
   retries: 0,

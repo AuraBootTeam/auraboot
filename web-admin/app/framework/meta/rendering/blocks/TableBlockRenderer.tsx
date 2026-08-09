@@ -516,10 +516,10 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     // valueType 渲染
     switch (column.valueType) {
       case 'date':
-        return new Date(value).toLocaleDateString();
+        return new Date(value).toLocaleDateString(locale);
 
       case 'datetime':
-        return new Date(value).toLocaleString();
+        return new Date(value).toLocaleString(locale);
 
       case 'currency':
         return new Intl.NumberFormat(locale, {
