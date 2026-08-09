@@ -60,9 +60,11 @@ vi.mock('../persistence/modelFieldsRepository', async () => {
 });
 
 vi.mock('~/framework/meta/authoring/authoringService', () => ({
+  endAuthoringIdentitySimulation: vi.fn(),
   applyAuthoringStudioPatch: vi.fn(),
   consumeAuthoringHandoff: vi.fn(),
   loadAuthoringCapabilities: vi.fn(),
+  loadAuthoringIdentitySimulation: vi.fn(),
   loadAuthoringChangeItems: vi.fn(),
   loadAuthoringReleaseHistory: vi.fn(),
   loadAuthoringRolePreviewTargets: vi.fn(),
@@ -75,6 +77,7 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   publishAuthoringChangeSet: vi.fn(),
   rollbackAuthoringRelease: vi.fn(),
   splitAuthoringChangeSet: vi.fn(),
+  startAuthoringIdentitySimulation: vi.fn(),
   openAuthoringReviewWorkspace: vi.fn(),
   takeoverAuthoringWriterLease: vi.fn(),
   transitionAuthoringGovernance: vi.fn(),

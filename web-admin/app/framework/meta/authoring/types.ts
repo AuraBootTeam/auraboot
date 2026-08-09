@@ -157,6 +157,26 @@ export interface AuthoringSyntheticPreview {
   widgets: Record<string, AuthoringSyntheticPreviewWidget>;
 }
 
+export type AuthoringIdentitySimulationStatus = 'ACTIVE' | 'ENDED' | 'EXPIRED';
+
+export interface AuthoringIdentitySimulation {
+  simulationPid: string;
+  mode: 'AUDITED_IDENTITY';
+  sourceSessionPid: string;
+  pagePid: string;
+  targetRole: AuthoringRolePreviewTarget;
+  actorIntersectionApplied: true;
+  businessDataIncluded: false;
+  readOnly: true;
+  exportAllowed: false;
+  businessActionsAllowed: false;
+  status: AuthoringIdentitySimulationStatus;
+  startedAt: string;
+  expiresAt: string;
+  endedAt?: string | null;
+  decisions: AuthoringRoleStructureDecision[];
+}
+
 export interface AuthoringChangeItem {
   changeItemPid: string;
   sourceChangeItemPid?: string | null;

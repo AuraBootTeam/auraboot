@@ -10,11 +10,13 @@ import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.Filter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,6 +26,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -40,6 +43,8 @@ class AuthoringRoleStructurePreviewIntegrationTest extends BaseIntegrationTest {
     private UserPermissionService userPermissionService;
     @Autowired
     private WebApplicationContext webApplicationContext;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private MockMvc mockMvc;
 
@@ -169,6 +174,117 @@ class AuthoringRoleStructurePreviewIntegrationTest extends BaseIntegrationTest {
         assertThat(tableCount("ab_behavior_outcome_outbox")).isEqualTo(behaviorOutboxBefore);
         assertThat(tableCount("ab_im_message")).isEqualTo(messageBefore);
         assertThat(tableCount("ab_webhook_delivery_log")).isEqualTo(webhookBefore);
+    }
+
+    @Test
+    void identitySimulationIsActorBoundReadonlyLimitedAndFullyLifecycleAudited() throws Exception {
+        grantActorPermissions();
+        grantCommittedPermissionToTestRole(
+                MetaPermission.META_AUDIT_TRAIL_ADMIN,
+                "audit", "identity_simulation", "admin", "Identity Simulation Admin");
+        Long targetRoleId = positiveRandomId();
+        String targetRolePid = UniqueIdGenerator.generate();
+        insertTargetRole(targetRoleId, targetRolePid);
+        bindRolePermission(targetRoleId, permissionId("customer.public.read"));
+        userPermissionService.evictRoleUsers(getTestTenant().getId(), targetRoleId);
+        userPermissionService.evictUserPermissions(
+                getTestTenant().getId(), getTestUser().getId());
+        PageSchema page = insertPermissionPage();
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+
+        String started = mockMvc.perform(post(
+                        "/api/authoring/sessions/{sessionPid}/identity-simulations",
+                        opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"rolePid":"%s","durationMinutes":5,
+                                 "reason":"incident-742 permission review"}
+                                """.formatted(targetRolePid)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.mode").value("AUDITED_IDENTITY"))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.actorIntersectionApplied").value(true))
+                .andExpect(jsonPath("$.data.businessDataIncluded").value(false))
+                .andExpect(jsonPath("$.data.readOnly").value(true))
+                .andExpect(jsonPath("$.data.exportAllowed").value(false))
+                .andExpect(jsonPath("$.data.businessActionsAllowed").value(false))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String simulationPid = objectMapper.readTree(started).path("data").path("simulationPid")
+                .asText();
+
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_identity_simulation
+                WHERE tenant_id = ? AND actor_user_id = ?
+                  AND pid = ? AND status = 'ACTIVE' AND reason = ?
+                """, Integer.class,
+                getTestTenant().getId(), getTestUser().getId(), simulationPid,
+                "incident-742 permission review"))
+                .isEqualTo(1);
+        assertThat(auditEventCount(simulationPid, "IDENTITY_SIMULATION_STARTED")).isEqualTo(1);
+        assertThat(auditMetadata(simulationPid))
+                .contains("readOnly")
+                .contains(targetRolePid)
+                .doesNotContain("incident-742 permission review");
+
+        mockMvc.perform(get("/api/authoring/identity-simulations/{pid}", simulationPid))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.decisions.length()").value(4));
+        assertThat(auditEventCount(simulationPid, "IDENTITY_SIMULATION_ACCESSED")).isEqualTo(1);
+
+        mockMvc.perform(post("/api/authoring/identity-simulations/{pid}/end", simulationPid))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ENDED"))
+                .andExpect(jsonPath("$.data.decisions.length()").value(0));
+        assertThat(auditEventCount(simulationPid, "IDENTITY_SIMULATION_ENDED")).isEqualTo(1);
+    }
+
+    @Test
+    void identitySimulationExpiresAndCannotBeReadUnderAnotherActor() throws Exception {
+        grantActorPermissions();
+        grantCommittedPermissionToTestRole(
+                MetaPermission.META_AUDIT_TRAIL_ADMIN,
+                "audit", "identity_simulation", "admin", "Identity Simulation Admin");
+        Long targetRoleId = positiveRandomId();
+        String targetRolePid = UniqueIdGenerator.generate();
+        insertTargetRole(targetRoleId, targetRolePid);
+        PageSchema page = insertPermissionPage();
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        String started = mockMvc.perform(post(
+                        "/api/authoring/sessions/{sessionPid}/identity-simulations",
+                        opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"rolePid":"%s","durationMinutes":1,"reason":"ttl proof"}
+                                """.formatted(targetRolePid)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String simulationPid = objectMapper.readTree(started).path("data").path("simulationPid")
+                .asText();
+
+        jdbcTemplate.update("""
+                UPDATE ab_authoring_identity_simulation
+                SET started_at = CURRENT_TIMESTAMP - INTERVAL '2 minutes',
+                    expires_at = CURRENT_TIMESTAMP - INTERVAL '1 minute'
+                WHERE pid = ?
+                """, simulationPid);
+        mockMvc.perform(get("/api/authoring/identity-simulations/{pid}", simulationPid))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("EXPIRED"))
+                .andExpect(jsonPath("$.data.decisions.length()").value(0));
+        assertThat(auditEventCount(simulationPid, "IDENTITY_SIMULATION_EXPIRED")).isEqualTo(1);
+
+        jdbcTemplate.update("""
+                UPDATE ab_authoring_identity_simulation
+                SET actor_user_id = actor_user_id + 100000
+                WHERE pid = ?
+                """, simulationPid);
+        mockMvc.perform(get("/api/authoring/identity-simulations/{pid}", simulationPid))
+                .andExpect(status().isNotFound());
     }
 
     private void grantActorPermissions() {
@@ -324,6 +440,26 @@ class AuthoringRoleStructurePreviewIntegrationTest extends BaseIntegrationTest {
         };
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class);
         return count == null ? 0 : count;
+    }
+
+    private int auditEventCount(String simulationPid, String eventType) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_audit_event
+                WHERE tenant_id = ? AND event_type = ?
+                  AND metadata ->> 'simulationPid' = ?
+                """, Integer.class,
+                getTestTenant().getId(), eventType, simulationPid);
+        return count == null ? 0 : count;
+    }
+
+    private String auditMetadata(String simulationPid) {
+        return jdbcTemplate.queryForObject("""
+                SELECT metadata::text FROM ab_authoring_audit_event
+                WHERE tenant_id = ?
+                  AND metadata ->> 'simulationPid' = ?
+                ORDER BY created_at ASC LIMIT 1
+                """, String.class,
+                getTestTenant().getId(), simulationPid);
     }
 
     private static long positiveRandomId() {

@@ -74,11 +74,15 @@ import {
   createSyntheticPreviewRuntimeServices,
 } from '../preview/syntheticPreview';
 import {
+  endAuthoringIdentitySimulation,
+  loadAuthoringIdentitySimulation,
   loadAuthoringRolePreviewTargets,
   loadAuthoringRoleStructurePreview,
   loadAuthoringSyntheticPreview,
+  startAuthoringIdentitySimulation,
 } from '~/framework/meta/authoring/authoringService';
 import type {
+  AuthoringIdentitySimulation,
   AuthoringRolePreviewTarget,
   AuthoringRoleStructureDecision,
   AuthoringRoleStructurePreview,
@@ -138,6 +142,8 @@ export interface UnifiedDesignerWorkbenchProps {
   contextualReorderableBlockTypes?: string[];
   /** Active governed authoring session; enables target-role structure preview in Preview mode. */
   roleStructurePreviewSessionPid?: string;
+  /** Security-admin capability for starting a short-lived, audited, read-only role simulation. */
+  identitySimulationAllowed?: boolean;
 }
 
 export function UnifiedDesignerWorkbench({
@@ -156,6 +162,7 @@ export function UnifiedDesignerWorkbench({
   contextualEditablePropertyPaths,
   contextualReorderableBlockTypes,
   roleStructurePreviewSessionPid,
+  identitySimulationAllowed = false,
 }: UnifiedDesignerWorkbenchProps) {
   const { locale } = useI18n();
   const initialSnapshot = serializeDocument(initialDocument);
@@ -179,8 +186,22 @@ export function UnifiedDesignerWorkbench({
   const [syntheticPreview, setSyntheticPreview] = useState<AuthoringSyntheticPreview | null>(null);
   const [syntheticPreviewLoading, setSyntheticPreviewLoading] = useState(false);
   const [syntheticPreviewError, setSyntheticPreviewError] = useState<string | null>(null);
+  const [identitySimulation, setIdentitySimulation] = useState<AuthoringIdentitySimulation | null>(
+    null,
+  );
+  const [identitySimulationFormOpen, setIdentitySimulationFormOpen] = useState(false);
+  const [identitySimulationDuration, setIdentitySimulationDuration] = useState<5 | 10 | 15>(5);
+  const [identitySimulationReason, setIdentitySimulationReason] = useState('');
+  const [identitySimulationPending, setIdentitySimulationPending] = useState(false);
+  const [identitySimulationEnding, setIdentitySimulationEnding] = useState(false);
+  const [identitySimulationError, setIdentitySimulationError] = useState<string | null>(null);
+  const [identitySimulationRemainingSeconds, setIdentitySimulationRemainingSeconds] = useState(0);
+  const identityTerminalRefreshPendingRef = useRef(false);
   const syntheticPreviewSelected = selectedRolePreviewPid === SYNTHETIC_PREVIEW_OPTION;
   const selectedTargetRolePid = syntheticPreviewSelected ? '' : selectedRolePreviewPid;
+  const identitySimulationActive = identitySimulation?.status === 'ACTIVE';
+  const identitySimulationPid = identitySimulation?.simulationPid;
+  const identitySimulationExpiresAt = identitySimulation?.expiresAt;
   // Primary + additive multi-selection model, extracted to a shared kernel so
   // the report designer (block-tree family) reuses the same modifier-click /
   // marquee rules. `selectedBlockId` is dual-purpose: the inspector target AND
@@ -292,6 +313,91 @@ export function UnifiedDesignerWorkbench({
       cancelled = true;
     };
   }, [roleStructurePreviewSessionPid, syntheticPreviewSelected]);
+
+  React.useEffect(() => {
+    setIdentitySimulation(null);
+    setIdentitySimulationFormOpen(false);
+    setIdentitySimulationReason('');
+    setIdentitySimulationError(null);
+  }, [roleStructurePreviewSessionPid]);
+
+  React.useEffect(() => {
+    if (!identitySimulationActive || !identitySimulationPid || !identitySimulationExpiresAt) {
+      setIdentitySimulationRemainingSeconds(0);
+      identityTerminalRefreshPendingRef.current = false;
+      return;
+    }
+    let cancelled = false;
+    const refreshRemaining = () => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((Date.parse(identitySimulationExpiresAt) - Date.now()) / 1000),
+      );
+      setIdentitySimulationRemainingSeconds(remaining);
+      if (remaining === 0 && !identityTerminalRefreshPendingRef.current) {
+        identityTerminalRefreshPendingRef.current = true;
+        void loadAuthoringIdentitySimulation(identitySimulationPid)
+          .then((refreshed) => {
+            if (!cancelled) setIdentitySimulation(refreshed);
+          })
+          .catch((refreshError: unknown) => {
+            if (!cancelled) {
+              setIdentitySimulationError(
+                refreshError instanceof Error ? refreshError.message : '无法确认身份模拟是否已到期',
+              );
+            }
+          })
+          .finally(() => {
+            identityTerminalRefreshPendingRef.current = false;
+          });
+      }
+    };
+    refreshRemaining();
+    const timer = window.setInterval(refreshRemaining, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [identitySimulationActive, identitySimulationExpiresAt, identitySimulationPid]);
+
+  const handleStartIdentitySimulation = async () => {
+    const reason = identitySimulationReason.trim();
+    if (!roleStructurePreviewSessionPid || !selectedTargetRolePid || !reason) return;
+    setIdentitySimulationPending(true);
+    setIdentitySimulationError(null);
+    try {
+      const started = await startAuthoringIdentitySimulation(
+        roleStructurePreviewSessionPid,
+        selectedTargetRolePid,
+        identitySimulationDuration,
+        reason,
+      );
+      setIdentitySimulation(started);
+      setIdentitySimulationFormOpen(false);
+      setIdentitySimulationReason('');
+    } catch (startError: unknown) {
+      setIdentitySimulationError(
+        startError instanceof Error ? startError.message : '无法启动审计身份模拟',
+      );
+    } finally {
+      setIdentitySimulationPending(false);
+    }
+  };
+
+  const handleEndIdentitySimulation = async () => {
+    if (!identitySimulationActive || !identitySimulation) return;
+    setIdentitySimulationEnding(true);
+    setIdentitySimulationError(null);
+    try {
+      setIdentitySimulation(await endAuthoringIdentitySimulation(identitySimulation.simulationPid));
+    } catch (endError: unknown) {
+      setIdentitySimulationError(
+        endError instanceof Error ? endError.message : '无法结束审计身份模拟',
+      );
+    } finally {
+      setIdentitySimulationEnding(false);
+    }
+  };
 
   // Toolbar save indicator follows the live document snapshot; wired into the
   // document kernel's onChange so every edit / undo / redo refreshes it.
@@ -1039,24 +1145,34 @@ export function UnifiedDesignerWorkbench({
     setSelectedBlockId(null);
   };
 
-  const previewDocument = useMemo(
-    () => {
-      if (roleStructurePreview) return sanitizeRoleStructurePreviewDocument(document);
-      if (syntheticPreview) return applySyntheticPreviewToDocument(document, syntheticPreview);
-      return document;
-    },
-    [document, roleStructurePreview, syntheticPreview],
-  );
+  const effectiveRoleStructurePreview = useMemo<AuthoringRoleStructurePreview | null>(() => {
+    if (!identitySimulationActive || !identitySimulation) return roleStructurePreview;
+    return {
+      mode: 'STRUCTURE',
+      pagePid: identitySimulation.pagePid,
+      targetRole: identitySimulation.targetRole,
+      actorIntersectionApplied: true,
+      businessDataIncluded: false,
+      exportAllowed: false,
+      businessActionsAllowed: false,
+      decisions: identitySimulation.decisions,
+    };
+  }, [identitySimulation, identitySimulationActive, roleStructurePreview]);
+  const previewDocument = useMemo(() => {
+    if (effectiveRoleStructurePreview) return sanitizeRoleStructurePreviewDocument(document);
+    if (syntheticPreview) return applySyntheticPreviewToDocument(document, syntheticPreview);
+    return document;
+  }, [document, effectiveRoleStructurePreview, syntheticPreview]);
   const rolePreviewPermissionEvaluator = useMemo(
     () =>
-      roleStructurePreview
-        ? createRoleStructurePermissionEvaluator(roleStructurePreview)
+      effectiveRoleStructurePreview
+        ? createRoleStructurePermissionEvaluator(effectiveRoleStructurePreview)
         : undefined,
-    [roleStructurePreview],
+    [effectiveRoleStructurePreview],
   );
   const rolePreviewSummary = useMemo(
-    () => summarizeRoleStructureDecisions(roleStructurePreview?.decisions ?? []),
-    [roleStructurePreview],
+    () => summarizeRoleStructureDecisions(effectiveRoleStructurePreview?.decisions ?? []),
+    [effectiveRoleStructurePreview],
   );
   const syntheticPreviewRuntimeServices = useMemo(
     () => (syntheticPreview ? createSyntheticPreviewRuntimeServices(syntheticPreview) : undefined),
@@ -1144,6 +1260,7 @@ export function UnifiedDesignerWorkbench({
                   data-testid="role-preview-target-select"
                   value={selectedRolePreviewPid}
                   onChange={(event) => setSelectedRolePreviewPid(event.target.value)}
+                  disabled={identitySimulationActive || identitySimulationPending}
                   className="min-w-48 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-blue-500"
                 >
                   <option value="">
@@ -1160,12 +1277,14 @@ export function UnifiedDesignerWorkbench({
                 </select>
               </label>
             ) : null}
-            {rolePreviewLoading || syntheticPreviewLoading ? (
+            {rolePreviewLoading || syntheticPreviewLoading || identitySimulationPending ? (
               <span className="text-xs text-blue-700" data-testid="role-preview-loading">
                 {resolveDesignerText(
-                  syntheticPreviewSelected
-                    ? DESIGNER_I18N.unified.syntheticPreview.calculating
-                    : DESIGNER_I18N.unified.rolePreview.calculating,
+                  identitySimulationPending
+                    ? DESIGNER_I18N.unified.identitySimulation.starting
+                    : syntheticPreviewSelected
+                      ? DESIGNER_I18N.unified.syntheticPreview.calculating
+                      : DESIGNER_I18N.unified.rolePreview.calculating,
                   locale,
                 )}
               </span>
@@ -1181,7 +1300,7 @@ export function UnifiedDesignerWorkbench({
               })}
             </div>
           ) : null}
-          {roleStructurePreview ? (
+          {roleStructurePreview && !identitySimulation ? (
             <div
               className="mx-auto mb-3 max-w-7xl rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950"
               data-testid="role-structure-preview-banner"
@@ -1197,15 +1316,99 @@ export function UnifiedDesignerWorkbench({
                     {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.intersection, locale)}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  data-testid="role-preview-exit"
-                  onClick={() => setSelectedRolePreviewPid('')}
-                  className="rounded-md border border-blue-300 bg-white px-2.5 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100"
-                >
-                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.exit, locale)}
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {identitySimulationAllowed ? (
+                    <button
+                      type="button"
+                      data-testid="identity-simulation-open"
+                      onClick={() => {
+                        setIdentitySimulationFormOpen((current) => !current);
+                        setIdentitySimulationError(null);
+                      }}
+                      className="rounded-md bg-rose-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-800"
+                    >
+                      {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.open, locale)}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    data-testid="role-preview-exit"
+                    onClick={() => setSelectedRolePreviewPid('')}
+                    className="rounded-md border border-blue-300 bg-white px-2.5 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100"
+                  >
+                    {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.exit, locale)}
+                  </button>
+                </div>
               </div>
+              {identitySimulationFormOpen ? (
+                <div
+                  className="mt-3 rounded-lg border border-rose-200 bg-white p-3 text-slate-800"
+                  data-testid="identity-simulation-form"
+                >
+                  <div className="font-semibold text-rose-900">
+                    {resolveDesignerText(
+                      DESIGNER_I18N.unified.identitySimulation.confirmTitle,
+                      locale,
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-600">
+                    {resolveDesignerText(
+                      DESIGNER_I18N.unified.identitySimulation.confirmDescription,
+                      locale,
+                    )}
+                  </p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[160px_minmax(240px,1fr)_auto] sm:items-end">
+                    <label className="grid gap-1 text-xs font-medium text-slate-600">
+                      {resolveDesignerText(
+                        DESIGNER_I18N.unified.identitySimulation.duration,
+                        locale,
+                      )}
+                      <select
+                        data-testid="identity-simulation-duration"
+                        value={identitySimulationDuration}
+                        onChange={(event) =>
+                          setIdentitySimulationDuration(Number(event.target.value) as 5 | 10 | 15)
+                        }
+                        className="rounded-md border border-slate-300 bg-white px-2 py-2 text-sm"
+                      >
+                        {[5, 10, 15].map((duration) => (
+                          <option key={duration} value={duration}>
+                            {resolveDesignerText(
+                              DESIGNER_I18N.unified.identitySimulation.minutes,
+                              locale,
+                              { count: duration },
+                            )}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-1 text-xs font-medium text-slate-600">
+                      {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.reason, locale)}
+                      <textarea
+                        data-testid="identity-simulation-reason"
+                        value={identitySimulationReason}
+                        maxLength={1000}
+                        rows={2}
+                        onChange={(event) => setIdentitySimulationReason(event.target.value)}
+                        placeholder={resolveDesignerText(
+                          DESIGNER_I18N.unified.identitySimulation.reasonPlaceholder,
+                          locale,
+                        )}
+                        className="resize-none rounded-md border border-slate-300 px-2 py-2 text-sm"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      data-testid="identity-simulation-start"
+                      disabled={identitySimulationPending || !identitySimulationReason.trim()}
+                      onClick={() => void handleStartIdentitySimulation()}
+                      className="rounded-md bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.start, locale)}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
                 <span className="rounded-full bg-white px-2 py-1 ring-1 ring-blue-200">
                   {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.noTargetData, locale)}
@@ -1262,6 +1465,98 @@ export function UnifiedDesignerWorkbench({
                   ))}
                 </div>
               </details>
+            </div>
+          ) : null}
+          {identitySimulation ? (
+            <div
+              className="mx-auto mb-3 max-w-7xl rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950 shadow-sm"
+              data-testid="identity-simulation-banner"
+              data-status={identitySimulation.status}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <span className="font-semibold">
+                    {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.title, locale, {
+                      role: identitySimulation.targetRole.roleName,
+                    })}
+                  </span>
+                  <span className="ml-2 text-xs font-medium text-rose-700">
+                    {resolveDesignerText(
+                      identitySimulation.status === 'ACTIVE'
+                        ? DESIGNER_I18N.unified.identitySimulation.active
+                        : identitySimulation.status === 'EXPIRED'
+                          ? DESIGNER_I18N.unified.identitySimulation.expired
+                          : DESIGNER_I18N.unified.identitySimulation.ended,
+                      locale,
+                    )}
+                  </span>
+                </div>
+                {identitySimulationActive ? (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="font-mono text-xs font-semibold text-rose-800"
+                      data-testid="identity-simulation-countdown"
+                    >
+                      {String(Math.floor(identitySimulationRemainingSeconds / 60)).padStart(2, '0')}
+                      :{String(identitySimulationRemainingSeconds % 60).padStart(2, '0')}
+                    </span>
+                    <button
+                      type="button"
+                      data-testid="identity-simulation-end"
+                      disabled={identitySimulationEnding}
+                      onClick={() => void handleEndIdentitySimulation()}
+                      className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100 disabled:opacity-50"
+                    >
+                      {resolveDesignerText(
+                        identitySimulationEnding
+                          ? DESIGNER_I18N.unified.identitySimulation.ending
+                          : DESIGNER_I18N.unified.identitySimulation.end,
+                        locale,
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="identity-simulation-dismiss"
+                    onClick={() => setIdentitySimulation(null)}
+                    className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100"
+                  >
+                    {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.dismiss, locale)}
+                  </button>
+                )}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-rose-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.intersection, locale)}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-rose-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.readOnly, locale)}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-rose-200">
+                  {resolveDesignerText(
+                    DESIGNER_I18N.unified.identitySimulation.noBusinessRecords,
+                    locale,
+                  )}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-rose-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.exportOff, locale)}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-rose-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.actionsOff, locale)}
+                </span>
+                {identitySimulationActive
+                  ? rolePreviewSummary.map((summary) => (
+                      <span
+                        key={summary.nodeType}
+                        className="rounded-full bg-white px-2 py-1 ring-1 ring-rose-200"
+                      >
+                        {rolePreviewNodeLabel(summary.nodeType, locale)} {summary.allowed}/
+                        {summary.total}
+                      </span>
+                    ))
+                  : null}
+              </div>
             </div>
           ) : null}
           {syntheticPreview ? (
@@ -1328,6 +1623,16 @@ export function UnifiedDesignerWorkbench({
               })}
             </div>
           ) : null}
+          {identitySimulationError ? (
+            <div
+              className="mx-auto mb-3 max-w-7xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              data-testid="identity-simulation-error"
+            >
+              {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.failed, locale, {
+                error: identitySimulationError,
+              })}
+            </div>
+          ) : null}
           <div
             className={
               getDevicePreviewPreset(previewDeviceId).width == null
@@ -1339,49 +1644,61 @@ export function UnifiedDesignerWorkbench({
             style={getDeviceFrameStyle(getDevicePreviewPreset(previewDeviceId))}
           >
             {(selectedTargetRolePid && (rolePreviewLoading || rolePreviewError)) ||
-            (syntheticPreviewSelected && (syntheticPreviewLoading || syntheticPreviewError)) ? (
+            (syntheticPreviewSelected && (syntheticPreviewLoading || syntheticPreviewError)) ||
+            (identitySimulationActive &&
+              identitySimulationRemainingSeconds === 0 &&
+              identitySimulationError) ? (
               <div
                 className="grid min-h-64 place-items-center bg-white p-6 text-sm text-slate-500"
                 data-testid={
-                  syntheticPreviewSelected
-                    ? 'synthetic-preview-fail-closed'
-                    : 'role-preview-fail-closed'
+                  identitySimulationActive && identitySimulationRemainingSeconds === 0
+                    ? 'identity-simulation-fail-closed'
+                    : syntheticPreviewSelected
+                      ? 'synthetic-preview-fail-closed'
+                      : 'role-preview-fail-closed'
                 }
               >
-                {syntheticPreviewSelected
+                {identitySimulationActive && identitySimulationRemainingSeconds === 0
                   ? resolveDesignerText(
-                      syntheticPreviewLoading
-                        ? DESIGNER_I18N.unified.syntheticPreview.safeLoading
-                        : DESIGNER_I18N.unified.syntheticPreview.safeFailure,
+                      DESIGNER_I18N.unified.identitySimulation.safeFailure,
                       locale,
                     )
-                  : resolveDesignerText(
-                      rolePreviewLoading
-                        ? DESIGNER_I18N.unified.rolePreview.safeLoading
-                        : DESIGNER_I18N.unified.rolePreview.safeFailure,
-                      locale,
-                    )}
+                  : syntheticPreviewSelected
+                    ? resolveDesignerText(
+                        syntheticPreviewLoading
+                          ? DESIGNER_I18N.unified.syntheticPreview.safeLoading
+                          : DESIGNER_I18N.unified.syntheticPreview.safeFailure,
+                        locale,
+                      )
+                    : resolveDesignerText(
+                        rolePreviewLoading
+                          ? DESIGNER_I18N.unified.rolePreview.safeLoading
+                          : DESIGNER_I18N.unified.rolePreview.safeFailure,
+                        locale,
+                      )}
               </div>
             ) : (
               <RecursiveBlockRenderer
                 key={
                   syntheticPreview
                     ? `synthetic:${syntheticPreview.fixtureRevision}`
-                    : roleStructurePreview
-                      ? `role:${roleStructurePreview.targetRole.rolePid}`
+                    : effectiveRoleStructurePreview
+                      ? identitySimulationActive
+                        ? `identity:${identitySimulation.simulationPid}`
+                        : `role:${effectiveRoleStructurePreview.targetRole.rolePid}`
                       : 'actor'
                 }
                 schema={previewDocument}
                 runtimeServices={
-                  roleStructurePreview
+                  effectiveRoleStructurePreview
                     ? roleStructurePreviewRuntimeServices
                     : syntheticPreviewRuntimeServices ?? defaultRuntimeExecutionServices
                 }
                 permissionEvaluator={rolePreviewPermissionEvaluator}
-                interactionDisabled={Boolean(roleStructurePreview || syntheticPreview)}
+                interactionDisabled={Boolean(effectiveRoleStructurePreview || syntheticPreview)}
                 previewInitialFormValues={syntheticPreview?.formValues}
                 modelFields={
-                  roleStructurePreview || syntheticPreview
+                  effectiveRoleStructurePreview || syntheticPreview
                     ? []
                     : document.modelCode
                       ? modelFieldsByModel[document.modelCode] ?? []

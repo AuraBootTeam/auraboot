@@ -404,6 +404,58 @@ export const DESIGNER_I18N = {
           'Synthetic data could not be generated safely. Live data will not be used as a fallback.',
       } as L,
     },
+    identitySimulation: {
+      open: {
+        'zh-CN': '启动审计身份模拟',
+        'en-US': 'Start audited identity simulation',
+      } as L,
+      confirmTitle: {
+        'zh-CN': '这是受审计的高敏感操作',
+        'en-US': 'This is an audited, sensitive operation',
+      } as L,
+      confirmDescription: {
+        'zh-CN':
+          '仅模拟当前操作者与目标角色的权限交集；限时、只读、禁导出、禁业务动作，当前阶段不读取真实业务记录。',
+        'en-US':
+          'Only the current actor and target-role permission intersection is simulated. It is time-bound, read-only, non-exportable, and does not read business records in this phase.',
+      } as L,
+      duration: { 'zh-CN': '有效时长', 'en-US': 'Duration' } as L,
+      minutes: { 'zh-CN': '{count} 分钟', 'en-US': '{count} minutes' } as L,
+      reason: { 'zh-CN': '模拟原因（必填）', 'en-US': 'Reason (required)' } as L,
+      reasonPlaceholder: {
+        'zh-CN': '例如：复核工单 INC-742 的权限表现',
+        'en-US': 'For example: review permission behavior for incident INC-742',
+      } as L,
+      start: { 'zh-CN': '确认并启动', 'en-US': 'Confirm and start' } as L,
+      starting: {
+        'zh-CN': '正在启动审计身份模拟…',
+        'en-US': 'Starting audited simulation...',
+      } as L,
+      title: {
+        'zh-CN': '{role} · 审计身份模拟',
+        'en-US': '{role} · audited identity simulation',
+      } as L,
+      active: { 'zh-CN': '进行中', 'en-US': 'Active' } as L,
+      ended: { 'zh-CN': '已主动结束', 'en-US': 'Ended' } as L,
+      expired: { 'zh-CN': '已到期', 'en-US': 'Expired' } as L,
+      readOnly: { 'zh-CN': '全程只读', 'en-US': 'Read-only throughout' } as L,
+      noBusinessRecords: {
+        'zh-CN': '当前阶段不读取真实业务记录',
+        'en-US': 'This phase does not read real business records',
+      } as L,
+      end: { 'zh-CN': '立即结束', 'en-US': 'End now' } as L,
+      ending: { 'zh-CN': '正在结束…', 'en-US': 'Ending...' } as L,
+      dismiss: { 'zh-CN': '返回结构预览', 'en-US': 'Return to structure preview' } as L,
+      failed: {
+        'zh-CN': '身份模拟操作失败，未放宽任何权限：{error}',
+        'en-US': 'Identity simulation failed without relaxing permissions: {error}',
+      } as L,
+      safeFailure: {
+        'zh-CN': '无法确认模拟仍在有效期内，已停止渲染模拟结果；不会回退到实时数据。',
+        'en-US':
+          'The simulation validity could not be confirmed, so simulated output is blocked. Live data will not be used as a fallback.',
+      } as L,
+    },
 
     // Palette category headers
     category: {

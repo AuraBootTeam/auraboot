@@ -16,6 +16,7 @@ import type {
   AuthoringRolePreviewTarget,
   AuthoringRoleStructurePreview,
   AuthoringSyntheticPreview,
+  AuthoringIdentitySimulation,
 } from './types';
 
 export interface InteractionContext {
@@ -80,6 +81,41 @@ export async function loadAuthoringSyntheticPreview(
     `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/synthetic-preview`,
   );
   return requireData(result, '无法生成隔离合成数据');
+}
+
+export async function startAuthoringIdentitySimulation(
+  sessionPid: string,
+  rolePid: string,
+  durationMinutes: 5 | 10 | 15,
+  reason: string,
+): Promise<AuthoringIdentitySimulation> {
+  const result = await fetchResult<AuthoringIdentitySimulation>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/identity-simulations`,
+    {
+      method: 'post',
+      params: { rolePid, durationMinutes, reason },
+    },
+  );
+  return requireData(result, '无法启动审计身份模拟');
+}
+
+export async function loadAuthoringIdentitySimulation(
+  simulationPid: string,
+): Promise<AuthoringIdentitySimulation> {
+  const result = await fetchResult<AuthoringIdentitySimulation>(
+    `/api/authoring/identity-simulations/${encodeURIComponent(simulationPid)}`,
+  );
+  return requireData(result, '无法刷新审计身份模拟');
+}
+
+export async function endAuthoringIdentitySimulation(
+  simulationPid: string,
+): Promise<AuthoringIdentitySimulation> {
+  const result = await fetchResult<AuthoringIdentitySimulation>(
+    `/api/authoring/identity-simulations/${encodeURIComponent(simulationPid)}/end`,
+    { method: 'post' },
+  );
+  return requireData(result, '无法结束审计身份模拟');
 }
 
 export async function observeAuthoringChangeSet(

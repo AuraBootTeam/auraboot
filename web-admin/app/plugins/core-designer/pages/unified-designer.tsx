@@ -72,6 +72,7 @@ export default function UnifiedDesignerPage() {
   const canReviewAuthoring = usePermission('meta.publish.update');
   const canReadAuthoringReleases = usePermission('meta.publish.read');
   const canPublishAuthoring = usePermission('meta.publish.admin');
+  const canAuditIdentitySimulation = usePermission('audit.trail.admin');
   const { user } = useUser();
   const [searchParams] = useSearchParams();
   const requestedPageId = searchParams.get('pageId') || searchParams.get('pid');
@@ -760,6 +761,9 @@ export default function UnifiedDesignerPage() {
       roleStructurePreviewSessionPid={
         handoff && canManageDesigner ? authoringSession?.sessionPid : undefined
       }
+      identitySimulationAllowed={Boolean(
+        handoff && canManageDesigner && canAuditIdentitySimulation && authoringSession?.sessionPid,
+      )}
     />
   );
 

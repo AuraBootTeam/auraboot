@@ -7,6 +7,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Ch
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateHandoffRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffContextView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffCreatedView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.IdentitySimulationView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.MoveBlockRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ObserveChangeSetRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
@@ -23,6 +24,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Re
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.StartIdentitySimulationRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SyntheticPreviewView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.TakeoverWriterLeaseRequest;
 import com.auraboot.framework.common.dto.ApiResponse;
@@ -54,18 +56,21 @@ public class AuthoringWorkspaceController {
     private final AuthoringHandoffService handoffService;
     private final AuthoringRoleStructurePreviewService roleStructurePreviewService;
     private final AuthoringSyntheticPreviewService syntheticPreviewService;
+    private final AuthoringIdentitySimulationService identitySimulationService;
 
     public AuthoringWorkspaceController(
             AuthoringWorkspaceService workspaceService,
             AuthoringGovernanceService governanceService,
             AuthoringHandoffService handoffService,
             AuthoringRoleStructurePreviewService roleStructurePreviewService,
-            AuthoringSyntheticPreviewService syntheticPreviewService) {
+            AuthoringSyntheticPreviewService syntheticPreviewService,
+            AuthoringIdentitySimulationService identitySimulationService) {
         this.workspaceService = workspaceService;
         this.governanceService = governanceService;
         this.handoffService = handoffService;
         this.roleStructurePreviewService = roleStructurePreviewService;
         this.syntheticPreviewService = syntheticPreviewService;
+        this.identitySimulationService = identitySimulationService;
     }
 
     @GetMapping("/capabilities")
@@ -105,6 +110,28 @@ public class AuthoringWorkspaceController {
     @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
     public ApiResponse<SyntheticPreviewView> syntheticPreview(@PathVariable String sessionPid) {
         return ApiResponse.success(syntheticPreviewService.preview(sessionPid));
+    }
+
+    @PostMapping("/sessions/{sessionPid}/identity-simulations")
+    @RequirePermission(MetaPermission.META_AUDIT_TRAIL_ADMIN)
+    public ApiResponse<IdentitySimulationView> startIdentitySimulation(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody StartIdentitySimulationRequest request) {
+        return ApiResponse.success(identitySimulationService.start(sessionPid, request));
+    }
+
+    @GetMapping("/identity-simulations/{simulationPid}")
+    @RequirePermission(MetaPermission.META_AUDIT_TRAIL_ADMIN)
+    public ApiResponse<IdentitySimulationView> getIdentitySimulation(
+            @PathVariable String simulationPid) {
+        return ApiResponse.success(identitySimulationService.get(simulationPid));
+    }
+
+    @PostMapping("/identity-simulations/{simulationPid}/end")
+    @RequirePermission(MetaPermission.META_AUDIT_TRAIL_ADMIN)
+    public ApiResponse<IdentitySimulationView> endIdentitySimulation(
+            @PathVariable String simulationPid) {
+        return ApiResponse.success(identitySimulationService.end(simulationPid));
     }
 
     @PostMapping("/change-sets/{changeSetPid}/sessions")

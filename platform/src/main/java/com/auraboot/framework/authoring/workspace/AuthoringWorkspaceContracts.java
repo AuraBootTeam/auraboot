@@ -4,6 +4,8 @@ import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.Boundary
 import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.CapabilityManifest;
 import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.PatchOperation;
 import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -183,6 +185,32 @@ public final class AuthoringWorkspaceContracts {
             Map<String, Object> formValues,
             List<Map<String, Object>> records,
             Map<String, SyntheticPreviewWidgetView> widgets) {
+    }
+
+    /** Security-admin request for a bounded, actor-bound, read-only simulation session. */
+    public record StartIdentitySimulationRequest(
+            @NotBlank String rolePid,
+            @Min(1) @Max(15) int durationMinutes,
+            @NotBlank @Size(max = 1000) String reason) {
+    }
+
+    /** Audited identity simulation lifecycle and its current actor∩role structure. */
+    public record IdentitySimulationView(
+            String simulationPid,
+            String mode,
+            String sourceSessionPid,
+            String pagePid,
+            RolePreviewTargetView targetRole,
+            boolean actorIntersectionApplied,
+            boolean businessDataIncluded,
+            boolean readOnly,
+            boolean exportAllowed,
+            boolean businessActionsAllowed,
+            String status,
+            Instant startedAt,
+            Instant expiresAt,
+            Instant endedAt,
+            List<RoleStructureDecisionView> decisions) {
     }
 
     public enum StudioIntent {
