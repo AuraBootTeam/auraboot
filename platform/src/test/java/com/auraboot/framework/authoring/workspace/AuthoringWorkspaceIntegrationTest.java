@@ -43,6 +43,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.context.WebApplicationContext;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 
@@ -66,6 +69,9 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     private AuthoringGovernanceService governanceService;
 
     @Autowired
+    private AuthoringImpactAnalyzer impactAnalyzer;
+
+    @Autowired
     private AuthoringActiveReleaseResolver activeReleaseResolver;
 
     @Autowired
@@ -79,6 +85,9 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private DataSource dataSource;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -1123,6 +1132,96 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void dictionaryItemDriftInvalidatesAnExactRevisionImpactResult() {
+        PageSchema page = insertPage("normal");
+        ensureDictionary("authoring_test_status");
+        page.setBlocks("""
+                [{"id":"table-1","blockType":"table",
+                  "props":{"density":"normal"},
+                  "columns":[{"field":"status","dictCode":"authoring_test_status"}]}]
+                """);
+        pageSchemaMapper.updateById(page);
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult patched = patchDensity(opened, "compact");
+        SessionView prepared = governanceService.prepare(
+                opened.sessionPid(), new RevisionRequest(patched.session().revision()));
+
+        assertThat(prepared.impact().dependencies()).extracting(dependency ->
+                dependency.resourceType() + ":" + dependency.resourceCode())
+                .containsExactly("DICTIONARY:authoring_test_status", "MODEL:test_model");
+        jdbcTemplate.update("""
+                UPDATE ab_dict_item
+                SET label = 'Closed updated', updated_at = CURRENT_TIMESTAMP
+                WHERE tenant_id = ? AND dict_id = (
+                    SELECT id FROM ab_dict
+                    WHERE tenant_id = ? AND code = 'authoring_test_status'
+                      AND is_current = TRUE AND deleted_flag = FALSE)
+                  AND value = 'closed'
+                """, testTenant.getId(), testTenant.getId());
+
+        assertThatThrownBy(() -> governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(prepared.revision())))
+                .isInstanceOf(AuthoringStaleStateException.class)
+                .hasMessageContaining("authoring.validation.dependency-stale");
+        SessionView stale = workspaceService.get(opened.sessionPid());
+        assertThat(stale.validationState()).isEqualTo("STALE");
+        assertThat(stale.impactState()).isEqualTo("STALE");
+    }
+
+    @Test
+    void commandDefinitionDriftInvalidatesAnExactRevisionImpactResult() {
+        PageSchema page = insertPage("normal");
+        ensureCommand("authoring:test_approve", "test_model");
+        page.setBlocks("""
+                [{"id":"table-1","blockType":"table",
+                  "props":{"density":"normal"},
+                  "buttons":[{"code":"approve","command":"authoring:test_approve"}]}]
+                """);
+        pageSchemaMapper.updateById(page);
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult patched = patchDensity(opened, "compact");
+        SessionView prepared = governanceService.prepare(
+                opened.sessionPid(), new RevisionRequest(patched.session().revision()));
+
+        assertThat(prepared.impact().dependencies()).extracting(dependency ->
+                dependency.resourceType() + ":" + dependency.resourceCode())
+                .containsExactly("COMMAND:authoring:test_approve", "MODEL:test_model");
+        jdbcTemplate.update("""
+                UPDATE ab_command_definition
+                SET row_version = row_version + 1, updated_at = CURRENT_TIMESTAMP
+                WHERE tenant_id = ? AND code = 'authoring:test_approve'
+                  AND is_current = TRUE AND deleted_flag = FALSE
+                """, testTenant.getId());
+
+        assertThatThrownBy(() -> governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(prepared.revision())))
+                .isInstanceOf(AuthoringStaleStateException.class)
+                .hasMessageContaining("authoring.validation.dependency-stale");
+        assertThat(workspaceService.get(opened.sessionPid()).impactState()).isEqualTo("STALE");
+    }
+
+    @Test
+    void realDependencyQueryTimeoutFailsClosedWithoutPoisoningTheOuterTransaction()
+            throws Exception {
+        try (Connection blocker = dataSource.getConnection();
+                Statement statement = blocker.createStatement()) {
+            blocker.setAutoCommit(false);
+            statement.execute("LOCK TABLE ab_meta_model IN ACCESS EXCLUSIVE MODE");
+
+            AuthoringImpactAnalyzer.ImpactResult result = impactAnalyzer.analyze(
+                    testTenant.getId(), objectMapper.readTree("""
+                            {"pid":"timeout-page","modelCode":"blocked_model","blocks":[]}
+                            """));
+
+            assertThat(result.status()).isEqualTo("FAILED");
+            assertThat(result.failureCode()).isEqualTo("ANALYSIS_TIMEOUT");
+            assertThat(result.dependencies()).isEmpty();
+            assertThat(jdbcTemplate.queryForObject("SELECT 1", Integer.class)).isEqualTo(1);
+            blocker.rollback();
+        }
+    }
+
+    @Test
     void invalidRevisionStaysEditableAndAValidNewRevisionGetsItsOwnValidationFact() {
         PageSchema page = insertPage("normal");
         SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
@@ -1524,6 +1623,52 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 VALUES (?, ?, ?, ?, 1, TRUE, 1, 'published', FALSE)
                 """, UniqueIdGenerator.generate(), testTenant.getId(), modelCode,
                 "mt_" + modelCode);
+    }
+
+    private void ensureDictionary(String dictCode) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_dict
+                WHERE tenant_id = ? AND code = ? AND is_current = TRUE
+                  AND deleted_flag = FALSE
+                """, Integer.class, testTenant.getId(), dictCode);
+        if (count != null && count > 0) {
+            return;
+        }
+        String dictPid = UniqueIdGenerator.generate();
+        jdbcTemplate.update("""
+                INSERT INTO ab_dict (
+                    pid, tenant_id, code, name, dict_type, status,
+                    version, is_current, extension, deleted_flag)
+                VALUES (?, ?, ?, 'Authoring status', 'dynamic', 'published',
+                        1, TRUE, '{}'::jsonb, FALSE)
+                """, dictPid, testTenant.getId(), dictCode);
+        jdbcTemplate.update("""
+                INSERT INTO ab_dict_item (
+                    pid, tenant_id, dict_id, value, label, sort_no, status, source)
+                VALUES (?, ?, (
+                    SELECT id FROM ab_dict WHERE pid = ?),
+                    'closed', 'Closed', 10, 'enabled', 'test')
+                """, UniqueIdGenerator.generate(), testTenant.getId(), dictPid);
+    }
+
+    private void ensureCommand(String commandCode, String modelCode) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_command_definition
+                WHERE tenant_id = ? AND code = ? AND is_current = TRUE
+                  AND deleted_flag = FALSE
+                """, Integer.class, testTenant.getId(), commandCode);
+        if (count != null && count > 0) {
+            return;
+        }
+        jdbcTemplate.update("""
+                INSERT INTO ab_command_definition (
+                    pid, tenant_id, code, display_name, model_code,
+                    input_schema, target_models, execution_config, extension,
+                    version, is_current, row_version, status, deleted_flag)
+                VALUES (?, ?, ?, 'Authoring approve', ?,
+                        '{}'::jsonb, '[]'::jsonb, '{"type":"state_transition"}'::jsonb,
+                        '{}'::jsonb, 1, TRUE, 1, 'published', FALSE)
+                """, UniqueIdGenerator.generate(), testTenant.getId(), commandCode, modelCode);
     }
 
     private PageSchema insertReorderPage() {

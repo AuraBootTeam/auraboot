@@ -1,6 +1,6 @@
 package com.auraboot.framework.authoring.workspace;
 
-import com.auraboot.framework.authoring.workspace.AuthoringDependencyFingerprintRepository.ModelFingerprint;
+import com.auraboot.framework.authoring.workspace.AuthoringDependencyFingerprintRepository.ResourceFingerprint;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -10,6 +10,7 @@ import org.springframework.dao.QueryTimeoutException;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -17,8 +18,11 @@ import java.util.TreeSet;
 @Component
 public class AuthoringImpactAnalyzer {
 
-    public static final String ANALYZER_VERSION = "core-page-dependencies-v1";
+    public static final String ANALYZER_VERSION = "core-page-dependencies-v2";
     private static final Duration QUERY_TIMEOUT = Duration.ofSeconds(2);
+    private static final Comparator<DependencyRef> DEPENDENCY_ORDER =
+            Comparator.comparing(DependencyRef::resourceType)
+                    .thenComparing(DependencyRef::resourceCode);
 
     private final AuthoringDependencyFingerprintRepository dependencyRepository;
     private final AuthoringPageSnapshotFactory snapshotFactory;
@@ -31,24 +35,23 @@ public class AuthoringImpactAnalyzer {
     }
 
     public ImpactResult analyze(long tenantId, JsonNode snapshot) {
-        Set<String> modelCodes = new TreeSet<>();
-        collectModelCodes(snapshot, modelCodes);
+        Set<DependencyRef> references = new TreeSet<>(DEPENDENCY_ORDER);
+        collectReferences(snapshot, references);
         ArrayNode dependencies = JsonNodeFactory.instance.arrayNode();
         try {
-            for (String modelCode : modelCodes) {
-                ModelFingerprint model = dependencyRepository.findCurrentModel(
-                        tenantId, modelCode, QUERY_TIMEOUT);
-                if (model == null) {
+            for (DependencyRef reference : references) {
+                ResourceFingerprint resource = resolve(tenantId, reference);
+                if (resource == null) {
                     return ImpactResult.failed("DEPENDENCY_MISSING");
                 }
                 ObjectNode dependency = dependencies.addObject();
-                dependency.put("resourceType", "MODEL");
-                dependency.put("resourceCode", modelCode);
-                dependency.put("resourcePid", model.pid());
-                dependency.put("version", model.version());
-                dependency.put("rowVersion", model.rowVersion());
-                dependency.put("updatedAt", model.updatedAt().toString());
-                dependency.put("fieldFingerprint", model.fieldFingerprint());
+                dependency.put("resourceType", resource.resourceType());
+                dependency.put("resourceCode", resource.resourceCode());
+                dependency.put("resourcePid", resource.pid());
+                dependency.put("version", resource.version());
+                dependency.put("rowVersion", resource.rowVersion());
+                dependency.put("updatedAt", resource.updatedAt().toString());
+                dependency.put("componentFingerprint", resource.componentFingerprint());
             }
         } catch (QueryTimeoutException exception) {
             return ImpactResult.failed("ANALYSIS_TIMEOUT");
@@ -58,26 +61,54 @@ public class AuthoringImpactAnalyzer {
         return ImpactResult.known(dependencies, snapshotFactory.checksum(dependencies));
     }
 
-    private void collectModelCodes(JsonNode node, Set<String> modelCodes) {
+    private ResourceFingerprint resolve(long tenantId, DependencyRef reference) {
+        return switch (reference.resourceType()) {
+            case "COMMAND" -> dependencyRepository.findCurrentCommand(
+                    tenantId, reference.resourceCode(), QUERY_TIMEOUT);
+            case "DICTIONARY" -> dependencyRepository.findCurrentDictionary(
+                    tenantId, reference.resourceCode(), QUERY_TIMEOUT);
+            case "MODEL" -> dependencyRepository.findCurrentModel(
+                    tenantId, reference.resourceCode(), QUERY_TIMEOUT);
+            default -> throw new IllegalStateException(
+                    "Unsupported authoring dependency type: " + reference.resourceType());
+        };
+    }
+
+    private void collectReferences(JsonNode node, Set<DependencyRef> references) {
         if (node == null || node.isNull()) {
             return;
         }
         if (node.isObject()) {
-            addText(node.get("modelCode"), modelCodes);
+            addReference("MODEL", node.get("modelCode"), references);
+            addReference("MODEL", node.get("childModel"), references);
+            addReference("DICTIONARY", node.get("dictCode"), references);
+            addReference("COMMAND", node.get("command"), references);
+            addReference("COMMAND", node.get("commandCode"), references);
             JsonNode dataSource = node.get("dataSource");
             if (dataSource != null && dataSource.isObject()) {
-                addText(dataSource.get("model"), modelCodes);
+                addReference("MODEL", dataSource.get("model"), references);
             }
-            node.elements().forEachRemaining(child -> collectModelCodes(child, modelCodes));
+            JsonNode commands = node.get("commands");
+            if (commands != null && commands.isObject()) {
+                commands.elements().forEachRemaining(
+                        command -> addReference("COMMAND", command, references));
+            }
+            node.elements().forEachRemaining(child -> collectReferences(child, references));
         } else if (node.isArray()) {
-            node.elements().forEachRemaining(child -> collectModelCodes(child, modelCodes));
+            node.elements().forEachRemaining(child -> collectReferences(child, references));
         }
     }
 
-    private void addText(JsonNode value, Set<String> modelCodes) {
+    private void addReference(
+            String resourceType,
+            JsonNode value,
+            Set<DependencyRef> references) {
         if (value != null && value.isTextual() && !value.asText().isBlank()) {
-            modelCodes.add(value.asText());
+            references.add(new DependencyRef(resourceType, value.asText()));
         }
+    }
+
+    private record DependencyRef(String resourceType, String resourceCode) {
     }
 
     public record ImpactResult(
