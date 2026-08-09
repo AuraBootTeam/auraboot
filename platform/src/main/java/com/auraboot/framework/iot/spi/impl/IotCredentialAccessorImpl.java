@@ -261,13 +261,23 @@ public class IotCredentialAccessorImpl implements BackgroundIotCredentialAccesso
         Long priorUser = had ? MetaContext.getCurrentUserId() : null;
         String priorUserPid = had ? MetaContext.getCurrentUserPid() : null;
         String priorUsername = had ? MetaContext.getCurrentUsername() : null;
+        Long priorMember = MetaContext.getCurrentMemberId();
+        Long priorEnv = MetaContext.getCurrentEnvironmentId();
         java.util.Set<Long> priorRoles = had ? MetaContext.getCurrentRoleIds() : java.util.Set.of();
         MetaContext.setContext(tenantId, SYSTEM_USER_ID, null, "system");
+        MetaContext.setMemberId(null);
+        MetaContext.setEnvironmentId(priorEnv);
         try {
-            return work.get();
+            // Credential issue/revoke and ACL reconciliation are authenticated background
+            // operations whose tenant was already validated by this accessor. Carry that
+            // system decision explicitly so DynamicDataService does not try to resolve a
+            // foreground member permission for the synthetic system user.
+            return MetaContext.runWithCommandPermitScope("ALL", work);
         } finally {
             if (had) {
                 MetaContext.setContext(priorTenant, priorUser, priorUserPid, priorUsername, priorRoles);
+                MetaContext.setMemberId(priorMember);
+                MetaContext.setEnvironmentId(priorEnv);
             } else {
                 MetaContext.clear();
             }

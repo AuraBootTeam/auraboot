@@ -1,5 +1,6 @@
 package com.auraboot.framework.iot.spi.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.iot.broker.EmqxAclSyncService;
 import com.auraboot.framework.iot.security.IotCredentialEncryptionService;
 import com.auraboot.framework.iot.security.IotJwtService;
@@ -11,6 +12,7 @@ import com.auraboot.framework.plugin.extension.iot.BackgroundDeviceAccessor;
 import com.auraboot.framework.plugin.extension.iot.BackgroundDeviceAccessor.DeviceView;
 import com.auraboot.framework.plugin.extension.iot.BackgroundIotCredentialAccessor.CredentialType;
 import com.auraboot.framework.plugin.extension.iot.BackgroundIotCredentialAccessor.IotCredentials;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -42,6 +44,11 @@ class IotCredentialAccessorImplTest {
     private IotJwtService jwt;
     private EmqxAclSyncService emqx;
     private IotCredentialAccessorImpl accessor;
+
+    @AfterEach
+    void clearMetaContext() {
+        MetaContext.clear();
+    }
 
     @BeforeEach
     void setUp() {
@@ -97,6 +104,30 @@ class IotCredentialAccessorImplTest {
         assertThat(patch.getValue()).containsEntry("iot_d_credentials_type", "ACCESS_TOKEN");
         assertThat((String) patch.getValue().get("iot_d_credentials_enc")).startsWith("ENC:");
         verify(emqx, times(1)).syncDeviceUser(eq(42L), eq("dev-1"), anyString(), eq(List.of("/sys/pk-air/dev-1/#")));
+    }
+
+    @Test
+    void issueCredentials_updatesUnderExplicitBackgroundPermit_andRestoresCallerContext() {
+        MetaContext.setContext(7L, 99L, "user-pid", "operator", java.util.Set.of(11L));
+        MetaContext.setMemberId(123L);
+        when(deviceAccessor.lookupByCode(42L, "dev-1"))
+                .thenReturn(Optional.of(device(42L, "dev-1", "iot-1")));
+        when(dds.update(eq(IotDeviceAccessorImpl.MODEL_CODE), eq("pid-iot-1"), any()))
+                .thenAnswer(invocation -> {
+                    assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);
+                    assertThat(MetaContext.getCurrentUserId()).isEqualTo(0L);
+                    assertThat(MetaContext.getCurrentMemberId()).isNull();
+                    assertThat(MetaContext.getCommandPermitScope()).isEqualTo("ALL");
+                    return Map.of();
+                });
+
+        accessor.issueCredentials(42L, "dev-1", CredentialType.ACCESS_TOKEN);
+
+        assertThat(MetaContext.getCurrentTenantId()).isEqualTo(7L);
+        assertThat(MetaContext.getCurrentUserId()).isEqualTo(99L);
+        assertThat(MetaContext.getCurrentMemberId()).isEqualTo(123L);
+        assertThat(MetaContext.getCurrentRoleIds()).containsExactly(11L);
+        assertThat(MetaContext.getCommandPermitScope()).isNull();
     }
 
     @Test
