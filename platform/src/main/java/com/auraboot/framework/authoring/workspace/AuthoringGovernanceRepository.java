@@ -1,5 +1,9 @@
 package com.auraboot.framework.authoring.workspace;
 
+import com.auraboot.framework.authoring.workspace.AuthoringChangeSetSplitter.ChangeItem;
+import com.auraboot.framework.authoring.workspace.AuthoringChangeSetSplitter.SplitPlan;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.AggregatePolicy;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,6 +16,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.springframework.http.HttpStatus.CONFLICT;
 
@@ -31,10 +37,12 @@ public class AuthoringGovernanceRepository {
         String lockClause = lock ? " FOR UPDATE OF cs, rd, wl" : "";
         return jdbcTemplate.query("""
                         SELECT cs.id AS change_set_id, cs.pid AS change_set_pid,
-                               cs.tenant_id, cs.env_id, cs.owner_user_id, cs.status,
+                               cs.tenant_id, cs.env_id, cs.owner_user_id, cs.title, cs.status,
                                cs.revision, cs.risk_level, cs.route, cs.publish_policy,
                                cs.validation_state, cs.approval_state, cs.publish_state,
                                cs.manifest_checksum, cs.base_release_pid,
+                               cs.source_change_set_id, cs.source_change_set_revision,
+                               cs.lineage::text,
                                rd.id AS resource_draft_id, rd.pid AS resource_draft_pid,
                                rd.resource_pid, rd.base_version, rd.base_checksum,
                                rd.manifest_checksum AS draft_manifest_checksum,
@@ -61,10 +69,61 @@ public class AuthoringGovernanceRepository {
 
     public int countItems(GovernanceRow row) {
         Integer count = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM ab_authoring_change_item
-                WHERE tenant_id = ? AND env_id = ? AND change_set_id = ?
+                SELECT COUNT(*) FROM ab_authoring_change_item ci
+                WHERE ci.tenant_id = ? AND ci.env_id = ? AND ci.change_set_id = ?
+                  AND NOT EXISTS (
+                      SELECT 1 FROM ab_authoring_change_item_split split_item
+                      WHERE split_item.tenant_id = ci.tenant_id
+                        AND split_item.env_id = ci.env_id
+                        AND split_item.source_change_item_id = ci.id)
                 """, Integer.class, row.tenantId(), row.envId(), row.changeSetId());
         return count == null ? 0 : count;
+    }
+
+    public List<ChangeItem> findActiveItems(GovernanceRow row) {
+        return jdbcTemplate.query("""
+                        SELECT ci.id, ci.pid, ci.block_id, ci.property_path, ci.operation,
+                               ci.old_value::text, ci.new_value::text, ci.effect_tags::text,
+                               ci.risk_level, ci.route, ci.publish_policy, ci.reversibility,
+                               ci.manifest_checksum, ci.base_revision, ci.result_revision,
+                               ci.actor_user_id, ci.created_at, ci.source_change_item_id,
+                               source_item.pid AS source_change_item_pid,
+                               ci.dependency_snapshot::text
+                        FROM ab_authoring_change_item ci
+                        LEFT JOIN ab_authoring_change_item source_item
+                          ON source_item.id = ci.source_change_item_id
+                         AND source_item.tenant_id = ci.tenant_id
+                         AND source_item.env_id = ci.env_id
+                        WHERE ci.tenant_id = ? AND ci.env_id = ? AND ci.change_set_id = ?
+                          AND NOT EXISTS (
+                              SELECT 1 FROM ab_authoring_change_item_split split_item
+                              WHERE split_item.tenant_id = ci.tenant_id
+                                AND split_item.env_id = ci.env_id
+                                AND split_item.source_change_item_id = ci.id)
+                        ORDER BY ci.result_revision, ci.id
+                        """,
+                (resultSet, rowNumber) -> new ChangeItem(
+                        resultSet.getLong("id"),
+                        resultSet.getString("pid"),
+                        resultSet.getString("block_id"),
+                        resultSet.getString("property_path"),
+                        resultSet.getString("operation"),
+                        nullableParse(resultSet.getString("old_value")),
+                        nullableParse(resultSet.getString("new_value")),
+                        parse(resultSet.getString("effect_tags")),
+                        resultSet.getString("risk_level"),
+                        resultSet.getString("route"),
+                        resultSet.getString("publish_policy"),
+                        resultSet.getString("reversibility"),
+                        resultSet.getString("manifest_checksum"),
+                        resultSet.getLong("base_revision"),
+                        resultSet.getLong("result_revision"),
+                        resultSet.getLong("actor_user_id"),
+                        resultSet.getTimestamp("created_at").toInstant(),
+                        resultSet.getObject("source_change_item_id", Long.class),
+                        resultSet.getString("source_change_item_pid"),
+                        parse(resultSet.getString("dependency_snapshot"))),
+                row.tenantId(), row.envId(), row.changeSetId());
     }
 
     public void submit(GovernanceRow row, boolean approvalRequired, long actorUserId) {
@@ -245,6 +304,176 @@ public class AuthoringGovernanceRepository {
         requireOne(leaseUpdated, "authoring.review.lease-conflict");
     }
 
+    public SplitPersistenceResult split(SplitPersistenceCommand command) {
+        GovernanceRow row = command.source();
+        SplitPlan plan = command.plan();
+        long sourceResultRevision = row.revision() + 1;
+
+        int sourceDraftUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_resource_draft
+                SET snapshot = ?::jsonb, revision = ?, validation_state = 'UNVALIDATED',
+                    stale_reason = NULL, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
+                """, json(plan.sourceSnapshot()), sourceResultRevision,
+                row.resourceDraftId(), row.tenantId(), row.envId(), row.revision());
+        requireOne(sourceDraftUpdated, "authoring.split.source-revision-conflict");
+
+        int sourceUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_change_set
+                SET revision = ?, status = 'DRAFT', risk_level = ?, route = ?,
+                    publish_policy = ?, validation_state = 'UNVALIDATED',
+                    approval_state = ?, publish_state = 'DRAFT', stale_reason = NULL,
+                    submitted_at = NULL, approved_at = NULL, published_at = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
+                  AND status IN ('DRAFT', 'REJECTED')
+                """, sourceResultRevision,
+                command.sourceAggregate().riskLevel(), command.sourceAggregate().route(),
+                command.sourceAggregate().publishPolicy(), command.sourceAggregate().approvalState(),
+                row.changeSetId(), row.tenantId(), row.envId(), row.revision());
+        requireOne(sourceUpdated, "authoring.split.source-revision-conflict");
+
+        int sourceSessionsUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_config_session
+                SET revision = ?,
+                    state = CASE
+                        WHEN expires_at <= CURRENT_TIMESTAMP THEN 'EXPIRED'
+                        WHEN id = ? THEN 'ACTIVE'
+                        ELSE 'READ_ONLY'
+                    END,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE change_set_id = ? AND tenant_id = ? AND env_id = ?
+                  AND state IN ('ACTIVE', 'READ_ONLY')
+                """, sourceResultRevision, command.sourceSessionId(),
+                row.changeSetId(), row.tenantId(), row.envId());
+        if (sourceSessionsUpdated == 0) {
+            throw new ResponseStatusException(CONFLICT, "authoring.split.source-session-conflict");
+        }
+        int sourceLeaseUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_writer_lease
+                SET leased_until = ?, lease_revision = lease_revision + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE change_set_id = ? AND tenant_id = ? AND env_id = ?
+                  AND session_id = ? AND holder_user_id = ? AND lease_revision = ?
+                  AND leased_until > CURRENT_TIMESTAMP
+                """, Timestamp.from(command.leaseUntil()), row.changeSetId(),
+                row.tenantId(), row.envId(), command.sourceSessionId(), command.actorUserId(),
+                row.leaseRevision());
+        requireOne(sourceLeaseUpdated, "authoring.writer-lease.lost");
+
+        long targetRevision = plan.targetItems().size() + 1L;
+        Long targetChangeSetId = jdbcTemplate.queryForObject("""
+                INSERT INTO ab_authoring_change_set (
+                    pid, tenant_id, env_id, owner_user_id, title, status, revision,
+                    base_release_pid, manifest_checksum, risk_level, route, publish_policy,
+                    validation_state, approval_state, publish_state,
+                    source_change_set_id, source_change_set_revision, lineage)
+                VALUES (?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?,
+                        'UNVALIDATED', ?, 'DRAFT', ?, ?, ?::jsonb)
+                RETURNING id
+                """, Long.class,
+                command.targetChangeSetPid(), row.tenantId(), row.envId(), command.actorUserId(),
+                command.title(), targetRevision, row.baseReleasePid(), row.manifestChecksum(),
+                command.targetAggregate().riskLevel(), command.targetAggregate().route(),
+                command.targetAggregate().publishPolicy(), command.targetAggregate().approvalState(),
+                row.changeSetId(), row.revision(), json(command.lineage()));
+        if (targetChangeSetId == null) {
+            throw new ResponseStatusException(CONFLICT, "authoring.split.target-create-failed");
+        }
+
+        Long targetDraftId = jdbcTemplate.queryForObject("""
+                INSERT INTO ab_authoring_resource_draft (
+                    pid, tenant_id, env_id, change_set_id, resource_type, resource_pid,
+                    base_version, base_checksum, manifest_checksum, snapshot, revision,
+                    validation_state)
+                VALUES (?, ?, ?, ?, 'PAGE_SCHEMA', ?, ?, ?, ?, ?::jsonb, ?, 'UNVALIDATED')
+                RETURNING id
+                """, Long.class,
+                command.targetResourceDraftPid(), row.tenantId(), row.envId(), targetChangeSetId,
+                row.resourcePid(), row.baseVersion(), row.baseChecksum(),
+                row.draftManifestChecksum(), json(plan.targetSnapshot()), targetRevision);
+        if (targetDraftId == null) {
+            throw new ResponseStatusException(CONFLICT, "authoring.split.target-create-failed");
+        }
+
+        Long targetSessionId = jdbcTemplate.queryForObject("""
+                INSERT INTO ab_authoring_config_session (
+                    pid, tenant_id, env_id, actor_user_id, change_set_id, page_pid, state,
+                    workspace_mode, interaction_context, revision, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', 'AUTHORING', ?::jsonb, ?, ?)
+                RETURNING id
+                """, Long.class,
+                command.targetSessionPid(), row.tenantId(), row.envId(), command.actorUserId(),
+                targetChangeSetId, row.resourcePid(), json(command.interactionContext()),
+                targetRevision, Timestamp.from(command.sessionExpiresAt()));
+        if (targetSessionId == null) {
+            throw new ResponseStatusException(CONFLICT, "authoring.split.target-create-failed");
+        }
+        jdbcTemplate.update("""
+                INSERT INTO ab_authoring_writer_lease (
+                    pid, tenant_id, env_id, change_set_id, session_id, holder_user_id,
+                    lease_revision, leased_until)
+                VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+                """, command.targetLeasePid(), row.tenantId(), row.envId(), targetChangeSetId,
+                targetSessionId, command.actorUserId(), Timestamp.from(command.leaseUntil()));
+
+        List<TargetItem> targetItems = new ArrayList<>();
+        long itemRevision = 1;
+        for (ChangeItem item : plan.targetItems()) {
+            String targetItemPid = UniqueIdGenerator.generate();
+            JsonNode dependencies = plan.targetDependencySnapshots().get(item.pid());
+            Long targetItemId = jdbcTemplate.queryForObject("""
+                    INSERT INTO ab_authoring_change_item (
+                        pid, tenant_id, env_id, change_set_id, resource_draft_id, block_id,
+                        property_path, operation, old_value, new_value, effect_tags,
+                        risk_level, route, publish_policy, reversibility, manifest_checksum,
+                        base_revision, result_revision, actor_user_id,
+                        source_change_item_id, dependency_snapshot, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb,
+                            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)
+                    RETURNING id
+                    """, Long.class,
+                    targetItemPid, row.tenantId(), row.envId(), targetChangeSetId, targetDraftId,
+                    item.blockId(), item.propertyPath(), item.operation(),
+                    nullableJson(item.oldValue()), nullableJson(item.newValue()),
+                    json(item.effectTags()), item.riskLevel(), item.route(), item.publishPolicy(),
+                    item.reversibility(), item.manifestChecksum(), itemRevision, itemRevision + 1,
+                    item.actorUserId(), item.id(), json(dependencies),
+                    Timestamp.from(item.createdAt()));
+            if (targetItemId == null) {
+                throw new ResponseStatusException(CONFLICT, "authoring.split.target-item-failed");
+            }
+            targetItems.add(new TargetItem(item, targetItemId, targetItemPid, dependencies));
+            itemRevision++;
+        }
+
+        Long splitId = jdbcTemplate.queryForObject("""
+                INSERT INTO ab_authoring_change_set_split (
+                    pid, tenant_id, env_id, source_change_set_id, source_change_set_revision,
+                    target_change_set_id, actor_user_id, reason, dependency_snapshot)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+                RETURNING id
+                """, Long.class,
+                command.splitPid(), row.tenantId(), row.envId(), row.changeSetId(), row.revision(),
+                targetChangeSetId, command.actorUserId(), command.reason(),
+                json(command.dependencySnapshot()));
+        if (splitId == null) {
+            throw new ResponseStatusException(CONFLICT, "authoring.split.record-failed");
+        }
+        for (TargetItem targetItem : targetItems) {
+            jdbcTemplate.update("""
+                    INSERT INTO ab_authoring_change_item_split (
+                        pid, tenant_id, env_id, split_id, source_change_item_id,
+                        target_change_item_id, dependency_snapshot)
+                    VALUES (?, ?, ?, ?, ?, ?, ?::jsonb)
+                    """, UniqueIdGenerator.generate(), row.tenantId(), row.envId(), splitId,
+                    targetItem.source().id(), targetItem.id(), json(targetItem.dependencies()));
+        }
+        return new SplitPersistenceResult(
+                command.targetChangeSetPid(), command.targetSessionPid(), sourceResultRevision,
+                targetRevision);
+    }
+
     public ChannelRow lockChannel(GovernanceRow row) {
         return jdbcTemplate.query("""
                         SELECT c.id AS channel_id, c.pid AS channel_pid, c.row_version,
@@ -351,9 +580,14 @@ public class AuthoringGovernanceRepository {
 
     public int countNonReversibleItems(RollbackRow rollback) {
         Integer count = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM ab_authoring_change_item
-                WHERE tenant_id = ? AND env_id = ? AND change_set_id = ?
-                  AND reversibility <> 'REVERSIBLE'
+                SELECT COUNT(*) FROM ab_authoring_change_item ci
+                WHERE ci.tenant_id = ? AND ci.env_id = ? AND ci.change_set_id = ?
+                  AND ci.reversibility <> 'REVERSIBLE'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM ab_authoring_change_item_split split_item
+                      WHERE split_item.tenant_id = ci.tenant_id
+                        AND split_item.env_id = ci.env_id
+                        AND split_item.source_change_item_id = ci.id)
                 """, Integer.class, rollback.tenantId(), rollback.envId(),
                 rollback.activeChangeSetId());
         return count == null ? 0 : count;
@@ -446,13 +680,17 @@ public class AuthoringGovernanceRepository {
         return new GovernanceRow(
                 resultSet.getLong("change_set_id"), resultSet.getString("change_set_pid"),
                 resultSet.getLong("tenant_id"), resultSet.getLong("env_id"),
-                resultSet.getLong("owner_user_id"), resultSet.getString("status"),
+                resultSet.getLong("owner_user_id"), resultSet.getString("title"),
+                resultSet.getString("status"),
                 resultSet.getLong("revision"), resultSet.getString("risk_level"),
                 resultSet.getString("route"), resultSet.getString("publish_policy"),
                 resultSet.getString("validation_state"),
                 resultSet.getString("approval_state"), resultSet.getString("publish_state"),
                 resultSet.getString("manifest_checksum"),
                 resultSet.getString("base_release_pid"),
+                resultSet.getObject("source_change_set_id", Long.class),
+                resultSet.getObject("source_change_set_revision", Long.class),
+                parse(resultSet.getString("lineage")),
                 resultSet.getLong("resource_draft_id"),
                 resultSet.getString("resource_draft_pid"),
                 resultSet.getString("resource_pid"), resultSet.getLong("base_version"),
@@ -494,6 +732,14 @@ public class AuthoringGovernanceRepository {
         }
     }
 
+    private String nullableJson(JsonNode value) {
+        return value == null ? null : json(value);
+    }
+
+    private JsonNode nullableParse(String value) {
+        return value == null ? null : parse(value);
+    }
+
     private JsonNode parse(String value) {
         try {
             return objectMapper.readTree(value);
@@ -508,6 +754,7 @@ public class AuthoringGovernanceRepository {
             long tenantId,
             long envId,
             long ownerUserId,
+            String title,
             String status,
             long revision,
             String riskLevel,
@@ -518,6 +765,9 @@ public class AuthoringGovernanceRepository {
             String publishState,
             String manifestChecksum,
             String baseReleasePid,
+            Long sourceChangeSetId,
+            Long sourceChangeSetRevision,
+            JsonNode lineage,
             long resourceDraftId,
             String resourceDraftPid,
             String resourcePid,
@@ -528,6 +778,41 @@ public class AuthoringGovernanceRepository {
             long leaseSessionId,
             long leaseHolderUserId,
             long leaseRevision) {
+    }
+
+    public record SplitPersistenceCommand(
+            GovernanceRow source,
+            SplitPlan plan,
+            AggregatePolicy sourceAggregate,
+            AggregatePolicy targetAggregate,
+            long sourceSessionId,
+            long actorUserId,
+            String targetChangeSetPid,
+            String targetResourceDraftPid,
+            String targetSessionPid,
+            String targetLeasePid,
+            String splitPid,
+            String title,
+            String reason,
+            JsonNode interactionContext,
+            JsonNode lineage,
+            JsonNode dependencySnapshot,
+            Instant sessionExpiresAt,
+            Instant leaseUntil) {
+    }
+
+    public record SplitPersistenceResult(
+            String targetChangeSetPid,
+            String targetSessionPid,
+            long sourceRevision,
+            long targetRevision) {
+    }
+
+    private record TargetItem(
+            ChangeItem source,
+            long id,
+            String pid,
+            JsonNode dependencies) {
     }
 
     public record ChannelRow(

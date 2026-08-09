@@ -144,6 +144,36 @@ public final class AuthoringWorkspaceContracts {
             @NotBlank @Size(max = 1000) String reason) {
     }
 
+    public record SplitChangeSetRequest(
+            @Positive long expectedRevision,
+            @NotNull @Size(min = 1, max = 200) List<@NotBlank String> itemPids,
+            @NotBlank @Size(max = 200) String title,
+            @NotBlank @Size(max = 1000) String reason) {
+    }
+
+    public record ChangeItemView(
+            String changeItemPid,
+            String sourceChangeItemPid,
+            String blockId,
+            String propertyPath,
+            String operation,
+            String riskLevel,
+            String route,
+            String publishPolicy,
+            String reversibility,
+            long actorUserId,
+            JsonNode dependencySnapshot,
+            Instant createdAt) {
+    }
+
+    public record SplitChangeSetView(
+            SessionView sourceSession,
+            SessionView targetSession,
+            List<ChangeItemView> sourceItems,
+            List<ChangeItemView> targetItems,
+            JsonNode lineage) {
+    }
+
     public record RollbackRequest(
             @Positive long expectedChannelVersion,
             @NotBlank @Size(max = 1000) String reason) {

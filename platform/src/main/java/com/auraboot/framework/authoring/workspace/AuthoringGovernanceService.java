@@ -1,17 +1,25 @@
 package com.auraboot.framework.authoring.workspace;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.authoring.workspace.AuthoringChangeSetSplitter.ChangeItem;
+import com.auraboot.framework.authoring.workspace.AuthoringChangeSetSplitter.SplitPlan;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.ChannelRow;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.GovernanceRow;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.ReleaseRow;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.RollbackRow;
+import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.SplitPersistenceCommand;
+import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.SplitPersistenceResult;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ChangeItemView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ChangeSetView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RevisionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RollbackRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ResumeEditingRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.AuditEntry;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.AggregatePolicy;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.WorkspaceRow;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -24,6 +32,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 import static org.springframework.http.HttpStatus.CONFLICT;
@@ -35,6 +44,7 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 public class AuthoringGovernanceService {
 
     private static final Duration WRITER_LEASE = Duration.ofMinutes(5);
+    private static final Duration SESSION_TTL = Duration.ofHours(8);
     private static final String REVIEW_WORKSPACE_MODE = "REVIEW";
 
     private final AuthoringGovernanceRepository governanceRepository;
@@ -42,6 +52,9 @@ public class AuthoringGovernanceService {
     private final AuthoringGovernanceValidator governanceValidator;
     private final AuthoringPageSnapshotFactory snapshotFactory;
     private final AuthoringRuntimeSnapshotSanitizer runtimeSanitizer;
+    private final AuthoringChangeSetSplitter changeSetSplitter;
+    private final AuthoringAggregatePolicyService aggregatePolicyService;
+    private final AuthoringWorkspaceViewMapper viewMapper;
     private final ObjectMapper objectMapper;
 
     public AuthoringGovernanceService(
@@ -50,12 +63,18 @@ public class AuthoringGovernanceService {
             AuthoringGovernanceValidator governanceValidator,
             AuthoringPageSnapshotFactory snapshotFactory,
             AuthoringRuntimeSnapshotSanitizer runtimeSanitizer,
+            AuthoringChangeSetSplitter changeSetSplitter,
+            AuthoringAggregatePolicyService aggregatePolicyService,
+            AuthoringWorkspaceViewMapper viewMapper,
             ObjectMapper objectMapper) {
         this.governanceRepository = governanceRepository;
         this.workspaceRepository = workspaceRepository;
         this.governanceValidator = governanceValidator;
         this.snapshotFactory = snapshotFactory;
         this.runtimeSanitizer = runtimeSanitizer;
+        this.changeSetSplitter = changeSetSplitter;
+        this.aggregatePolicyService = aggregatePolicyService;
+        this.viewMapper = viewMapper;
         this.objectMapper = objectMapper;
     }
 
@@ -138,6 +157,88 @@ public class AuthoringGovernanceService {
         audit(identity, row, null, "CHANGE_SET_REJECTED", "ALLOW", "REVISION_REJECTED",
                 revisionTransition(row, reason));
         return view(requireChangeSet(identity, changeSetPid, false));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChangeItemView> listChangeItems(String sessionPid) {
+        Identity identity = identity();
+        WorkspaceRow workspace = requireOwnedSession(identity, sessionPid);
+        requireNonReviewWorkspace(workspace);
+        GovernanceRow row = requireChangeSet(identity, workspace.changeSetPid(), false);
+        requireOwner(row, identity);
+        return governanceRepository.findActiveItems(row).stream().map(this::itemView).toList();
+    }
+
+    @Transactional
+    public SplitChangeSetView split(
+            String sessionPid,
+            SplitChangeSetRequest request) {
+        Identity identity = identity();
+        WorkspaceRow workspace = requireOwnedSession(identity, sessionPid);
+        GovernanceRow row = requireChangeSet(identity, workspace.changeSetPid(), true);
+        requireOwner(row, identity);
+        governanceValidator.requireStatus(row, "DRAFT", "REJECTED");
+        requireWritableSession(workspace, row, identity, request.expectedRevision());
+
+        List<ChangeItem> items = governanceRepository.findActiveItems(row);
+        SplitPlan plan = changeSetSplitter.split(row.snapshot(), items, request.itemPids());
+        AggregatePolicy sourceAggregate = aggregatePolicyService.aggregateItems(plan.sourceItems());
+        AggregatePolicy targetAggregate = aggregatePolicyService.aggregateItems(plan.targetItems());
+        String reason = requireSplitText(request.reason(), "authoring.split.reason-required");
+        String title = requireSplitText(request.title(), "authoring.split.title-required");
+        String targetChangeSetPid = UniqueIdGenerator.generate();
+        String targetSessionPid = UniqueIdGenerator.generate();
+        ArrayNode lineage = splitLineage(row);
+        ObjectNode dependencies = splitDependencySnapshot(plan);
+        Instant now = Instant.now();
+
+        SplitPersistenceResult persisted = governanceRepository.split(new SplitPersistenceCommand(
+                row,
+                plan,
+                sourceAggregate,
+                targetAggregate,
+                workspace.sessionId(),
+                identity.userId(),
+                targetChangeSetPid,
+                UniqueIdGenerator.generate(),
+                targetSessionPid,
+                UniqueIdGenerator.generate(),
+                UniqueIdGenerator.generate(),
+                title,
+                reason,
+                workspace.interactionContext(),
+                lineage,
+                dependencies,
+                now.plus(SESSION_TTL),
+                now.plus(WRITER_LEASE)));
+
+        GovernanceRow sourceReloaded = requireChangeSet(identity, row.changeSetPid(), false);
+        GovernanceRow targetReloaded = requireChangeSet(identity, targetChangeSetPid, false);
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("reason", reason);
+        metadata.put("sourceRevision", row.revision());
+        metadata.put("sourceResultRevision", persisted.sourceRevision());
+        metadata.put("targetChangeSetPid", targetChangeSetPid);
+        metadata.put("targetRevision", persisted.targetRevision());
+        metadata.set("selectedItemPids", dependencies.get("targetItemPids"));
+        audit(identity, sourceReloaded, sessionPid, "CHANGE_SET_SPLIT_SOURCE", "ALLOW",
+                "DEPENDENCY_INDEPENDENT_PARTITION", metadata);
+
+        ObjectNode targetMetadata = metadata.deepCopy();
+        targetMetadata.put("sourceChangeSetPid", row.changeSetPid());
+        audit(identity, targetReloaded, targetSessionPid, "CHANGE_SET_SPLIT_TARGET", "ALLOW",
+                "LINEAGE_PRESERVED", targetMetadata);
+
+        WorkspaceRow sourceSession = requireOwnedSession(identity, sessionPid);
+        WorkspaceRow targetSession = requireOwnedSession(identity, targetSessionPid);
+        return new SplitChangeSetView(
+                viewMapper.toView(sourceSession, identity.userId()),
+                viewMapper.toView(targetSession, identity.userId()),
+                governanceRepository.findActiveItems(sourceReloaded).stream()
+                        .map(this::itemView).toList(),
+                governanceRepository.findActiveItems(targetReloaded).stream()
+                        .map(this::itemView).toList(),
+                lineage);
     }
 
     @Transactional
@@ -248,6 +349,46 @@ public class AuthoringGovernanceService {
                 row.releasePid(), row.changeSetPid(), row.changeSetRevision(),
                 row.previousReleasePid(), row.status(), row.manifestChecksum(),
                 row.channelVersion(), row.activatedAt());
+    }
+
+    private ChangeItemView itemView(ChangeItem item) {
+        return new ChangeItemView(
+                item.pid(), item.sourceChangeItemPid(), item.blockId(), item.propertyPath(),
+                item.operation(), item.riskLevel(), item.route(), item.publishPolicy(),
+                item.reversibility(), item.actorUserId(), item.dependencySnapshot(),
+                item.createdAt());
+    }
+
+    private ArrayNode splitLineage(GovernanceRow row) {
+        ArrayNode lineage = row.lineage() != null && row.lineage().isArray()
+                ? (ArrayNode) row.lineage().deepCopy()
+                : objectMapper.createArrayNode();
+        ObjectNode ancestor = lineage.addObject();
+        ancestor.put("changeSetPid", row.changeSetPid());
+        ancestor.put("revision", row.revision());
+        ancestor.put("relation", "SPLIT_FROM");
+        return lineage;
+    }
+
+    private ObjectNode splitDependencySnapshot(SplitPlan plan) {
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        ArrayNode source = snapshot.putArray("sourceItemPids");
+        plan.sourceItems().forEach(item -> source.add(item.pid()));
+        ArrayNode target = snapshot.putArray("targetItemPids");
+        plan.targetItems().forEach(item -> target.add(item.pid()));
+        ObjectNode sourceDependencies = snapshot.putObject("sourceDependencies");
+        plan.sourceDependencySnapshots().forEach(sourceDependencies::set);
+        ObjectNode targetDependencies = snapshot.putObject("targetDependencies");
+        plan.targetDependencySnapshots().forEach(targetDependencies::set);
+        snapshot.put("crossPartitionDependencies", false);
+        return snapshot;
+    }
+
+    private String requireSplitText(String value, String reason) {
+        if (value == null || value.isBlank()) {
+            throw conflict(reason);
+        }
+        return value.trim();
     }
 
     private String safeReason(String reason) {

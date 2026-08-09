@@ -17,6 +17,8 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Re
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RollbackRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ResumeEditingRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.StudioIntent;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
@@ -42,6 +44,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -142,6 +145,15 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"expectedRevision\":1,\"reason\":\"test\"}"))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/authoring/sessions/missing/change-items"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/sessions/missing/split")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expectedRevision":1,"itemPids":["item"],
+                                 "title":"split","reason":"test"}
+                                """))
+                .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/authoring/sessions/missing/review/withdraw")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"expectedRevision\":1,\"reason\":\"test\"}"))
@@ -178,6 +190,62 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"pagePid\":\"hidden\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void changeSetSplitRequiresDesignerAdminRatherThanInlineManagePermission() throws Exception {
+        grantDesignerManage();
+
+        mockMvc.perform(get("/api/authoring/sessions/missing/change-items"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/sessions/missing/split")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expectedRevision":1,"itemPids":["item"],
+                                 "title":"split","reason":"separate risk"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void designerAdminListsAndSplitsChangeItemsThroughTheHttpBoundary() throws Exception {
+        grantDesignerAdmin();
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult lowRisk = patchDensity(opened, "compact");
+        PatchResult highRisk = workspaceService.applyStudio(
+                opened.sessionPid(),
+                new ApplyPatchRequest(
+                        lowRisk.session().revision(), "table-1", "/dataSource",
+                        PatchOperation.ADD, objectMapper.createObjectNode().put("model", "payments"),
+                        capabilityRegistry.find("table").orElseThrow().checksum()));
+
+        mockMvc.perform(get(
+                        "/api/authoring/sessions/{sessionPid}/change-items",
+                        opened.sessionPid()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[1].changeItemPid").value(highRisk.changeItemPid()))
+                .andExpect(jsonPath("$.data[1].riskLevel").value("L3"));
+
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put("expectedRevision", highRisk.session().revision());
+        request.putArray("itemPids").add(highRisk.changeItemPid());
+        request.put("title", "支付数据源变更");
+        request.put("reason", "将 L3 变更独立评审");
+        mockMvc.perform(post(
+                        "/api/authoring/sessions/{sessionPid}/split",
+                        opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sourceSession.revision").value(4))
+                .andExpect(jsonPath("$.data.sourceItems.length()").value(1))
+                .andExpect(jsonPath("$.data.targetSession.revision").value(2))
+                .andExpect(jsonPath("$.data.targetItems[0].sourceChangeItemPid")
+                        .value(highRisk.changeItemPid()))
+                .andExpect(jsonPath("$.data.lineage[0].changeSetPid")
+                        .value(opened.changeSetPid()));
     }
 
     @Test
@@ -1046,6 +1114,121 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         assertThat(resumed.state()).isEqualTo("ACTIVE");
         assertThat(resumed.revision()).isEqualTo(3);
         assertThat(patchDensity(resumed, "compact").session().revision()).isEqualTo(4);
+    }
+
+    @Test
+    void splitCreatesIndependentSourceAndChildWithLineageDiffAuthorAndAudit() throws Exception {
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult lowRisk = patchDensity(opened, "compact");
+        ObjectNode dataSource = objectMapper.createObjectNode().put("model", "payments");
+        PatchResult highRisk = workspaceService.applyStudio(
+                opened.sessionPid(),
+                new ApplyPatchRequest(
+                        lowRisk.session().revision(), "table-1", "/dataSource",
+                        PatchOperation.ADD, dataSource,
+                        capabilityRegistry.find("table").orElseThrow().checksum()));
+
+        SplitChangeSetView split = governanceService.split(
+                opened.sessionPid(),
+                new SplitChangeSetRequest(
+                        highRisk.session().revision(),
+                        List.of(highRisk.changeItemPid()),
+                        "支付数据源变更",
+                        "将 L3 数据源变更与 L0 密度调整分开评审"));
+
+        assertThat(split.sourceSession().changeSetPid()).isEqualTo(opened.changeSetPid());
+        assertThat(split.sourceSession().revision()).isEqualTo(4);
+        assertThat(split.sourceSession().riskLevel()).isEqualTo("L0");
+        assertThat(split.sourceSession().publishPolicy()).isEqualTo("DIRECT_ALLOWED");
+        assertThat(split.sourceSession().snapshot().at("/blocks/0/props/density").asText())
+                .isEqualTo("compact");
+        assertThat(split.sourceSession().snapshot().at("/blocks/0/dataSource").isMissingNode())
+                .isTrue();
+        assertThat(split.targetSession().revision()).isEqualTo(2);
+        assertThat(split.targetSession().riskLevel()).isEqualTo("L3");
+        assertThat(split.targetSession().publishPolicy()).isEqualTo("STUDIO_APPROVAL");
+        assertThat(split.targetSession().snapshot().at("/blocks/0/props/density").asText())
+                .isEqualTo("normal");
+        assertThat(split.targetSession().snapshot().at("/blocks/0/dataSource/model").asText())
+                .isEqualTo("payments");
+        assertThat(split.sourceItems()).extracting(item -> item.changeItemPid())
+                .containsExactly(lowRisk.changeItemPid());
+        assertThat(split.targetItems()).hasSize(1);
+        assertThat(split.targetItems().get(0).sourceChangeItemPid())
+                .isEqualTo(highRisk.changeItemPid());
+        assertThat(split.targetItems().get(0).actorUserId()).isEqualTo(testUser.getId());
+        assertThat(split.lineage().get(0).path("changeSetPid").asText())
+                .isEqualTo(opened.changeSetPid());
+        assertThat(split.lineage().get(0).path("revision").asLong()).isEqualTo(3);
+
+        assertThat(governanceService.submit(
+                split.sourceSession().sessionPid(), new RevisionRequest(4)).status())
+                .isEqualTo("APPROVED");
+        assertThat(governanceService.submit(
+                split.targetSession().sessionPid(), new RevisionRequest(2)).status())
+                .isEqualTo("IN_REVIEW");
+
+        Integer mappingCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_change_item_split item_split
+                JOIN ab_authoring_change_item source_item
+                  ON source_item.id = item_split.source_change_item_id
+                JOIN ab_authoring_change_item target_item
+                  ON target_item.id = item_split.target_change_item_id
+                WHERE source_item.pid = ? AND target_item.source_change_item_id = source_item.id
+                """, Integer.class, highRisk.changeItemPid());
+        assertThat(mappingCount).isEqualTo(1);
+        String dependencyJson = jdbcTemplate.queryForObject("""
+                SELECT dependency_snapshot::text
+                FROM ab_authoring_change_set_split
+                WHERE target_change_set_id = (
+                    SELECT id FROM ab_authoring_change_set WHERE pid = ?)
+                """, String.class, split.targetSession().changeSetPid());
+        ObjectNode dependencySnapshot = (ObjectNode) objectMapper.readTree(dependencyJson);
+        assertThat(dependencySnapshot.path("crossPartitionDependencies").asBoolean()).isFalse();
+        assertThat(dependencySnapshot.path("sourceItemPids").get(0).asText())
+                .isEqualTo(lowRisk.changeItemPid());
+        assertThat(dependencySnapshot.path("targetItemPids").get(0).asText())
+                .isEqualTo(highRisk.changeItemPid());
+        Integer auditCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_audit_event
+                WHERE tenant_id = ? AND env_id = ?
+                  AND event_type IN ('CHANGE_SET_SPLIT_SOURCE', 'CHANGE_SET_SPLIT_TARGET')
+                  AND metadata ->> 'reason' = ?
+                """, Integer.class,
+                testTenant.getId(), MetaContext.getCurrentEnvironmentId(),
+                "将 L3 数据源变更与 L0 密度调整分开评审");
+        assertThat(auditCount).isEqualTo(2);
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "UPDATE ab_authoring_change_set_split SET reason = 'rewrite' "
+                        + "WHERE target_change_set_id = "
+                        + "(SELECT id FROM ab_authoring_change_set WHERE pid = ?)",
+                split.targetSession().changeSetPid()))
+                .hasMessageContaining("authoring history is append-only");
+    }
+
+    @Test
+    void splitRejectsCrossPartitionPropertyDependenciesWithoutChangingTheSource() {
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult first = patchDensity(opened, "compact");
+        PatchResult second = patchDensity(first.session(), "comfortable");
+
+        assertThatThrownBy(() -> governanceService.split(
+                opened.sessionPid(),
+                new SplitChangeSetRequest(
+                        second.session().revision(),
+                        List.of(second.changeItemPid()),
+                        "后续密度调整",
+                        "尝试切断同一路径依赖")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("authoring.split.dependency-crosses-partition");
+
+        SessionView unchanged = workspaceService.get(opened.sessionPid());
+        assertThat(unchanged.revision()).isEqualTo(3);
+        assertThat(unchanged.snapshot().at("/blocks/0/props/density").asText())
+                .isEqualTo("comfortable");
+        assertThat(governanceService.listChangeItems(opened.sessionPid())).hasSize(2);
     }
 
     @Test

@@ -10,16 +10,20 @@ import {
   applyAuthoringStudioPatch,
   consumeAuthoringHandoff,
   loadAuthoringCapabilities,
+  loadAuthoringChangeItems,
   loadAuthoringReviewWorkspace,
   loadAuthoringSession,
   moveAuthoringStudioBlock,
   openAuthoringReviewWorkspace,
   observeAuthoringChangeSet,
+  splitAuthoringChangeSet,
   takeoverAuthoringWriterLease,
   transitionAuthoringGovernance,
 } from '~/framework/meta/authoring/authoringService';
 import type {
+  AuthoringChangeItem,
   AuthoringSession,
+  AuthoringSplitResult,
   CapabilityRegistry,
   HandoffContext,
 } from '~/framework/meta/authoring/types';
@@ -54,10 +58,12 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   applyAuthoringStudioPatch: vi.fn(),
   consumeAuthoringHandoff: vi.fn(),
   loadAuthoringCapabilities: vi.fn(),
+  loadAuthoringChangeItems: vi.fn(),
   loadAuthoringReviewWorkspace: vi.fn(),
   loadAuthoringSession: vi.fn(),
   moveAuthoringStudioBlock: vi.fn(),
   observeAuthoringChangeSet: vi.fn(),
+  splitAuthoringChangeSet: vi.fn(),
   openAuthoringReviewWorkspace: vi.fn(),
   takeoverAuthoringWriterLease: vi.fn(),
   transitionAuthoringGovernance: vi.fn(),
@@ -78,10 +84,13 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(consumeAuthoringHandoff).mockReset();
     vi.mocked(loadAuthoringSession).mockReset();
     vi.mocked(loadAuthoringCapabilities).mockReset();
+    vi.mocked(loadAuthoringChangeItems).mockReset();
+    vi.mocked(loadAuthoringChangeItems).mockResolvedValue([]);
     vi.mocked(loadAuthoringReviewWorkspace).mockReset();
     vi.mocked(applyAuthoringStudioPatch).mockReset();
     vi.mocked(moveAuthoringStudioBlock).mockReset();
     vi.mocked(observeAuthoringChangeSet).mockReset();
+    vi.mocked(splitAuthoringChangeSet).mockReset();
     vi.mocked(openAuthoringReviewWorkspace).mockReset();
     vi.mocked(takeoverAuthoringWriterLease).mockReset();
     vi.mocked(transitionAuthoringGovernance).mockReset();
@@ -670,6 +679,46 @@ describe('UnifiedDesignerPage', () => {
     expect(savePageSchemaV3).not.toHaveBeenCalled();
     expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4');
   });
+
+  it('keeps the source workspace continuous after a governed ChangeSet split', async () => {
+    setSearch('?authoringSession=session_1');
+    const original = createAuthoringSession(createDocument('document_one', 'Mixed Changes'));
+    const source = createAuthoringSession(createDocument('document_one', 'Source After Split'), 4);
+    const target = {
+      ...createAuthoringSession(createDocument('document_one', 'Target Split'), 2, 'L3', 'HANDOFF_STUDIO'),
+      sessionPid: 'session_target',
+      changeSetPid: 'changeset_target',
+    };
+    const items = createSplitItems();
+    const split: AuthoringSplitResult = {
+      sourceSession: source,
+      targetSession: target,
+      sourceItems: [items[0]],
+      targetItems: [{ ...items[1], sourceChangeItemPid: 'item_l3' }],
+      lineage: [{ changeSetPid: 'changeset_1', revision: 3, relation: 'SPLIT_FROM' }],
+    };
+    vi.mocked(loadAuthoringSession).mockResolvedValue(original);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(loadAuthoringChangeItems).mockResolvedValue(items);
+    vi.mocked(splitAuthoringChangeSet).mockResolvedValue(split);
+
+    render(<UnifiedDesignerPage />);
+
+    expect(await screen.findByText('Mixed Changes')).toBeInTheDocument();
+    expect(await screen.findByTestId('authoring-split-panel')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('authoring-split-item-item_l3'));
+    fireEvent.change(screen.getByTestId('authoring-split-reason'), {
+      target: { value: '高风险数据源独立评审' },
+    });
+    fireEvent.click(screen.getByTestId('authoring-split-submit'));
+
+    expect(await screen.findByText('Source After Split')).toBeInTheDocument();
+    expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4');
+    expect(screen.getByTestId('authoring-split-target-link')).toHaveAttribute(
+      'href',
+      expect.stringContaining('authoringSession=session_target'),
+    );
+  });
 });
 
 function setSearch(search: string) {
@@ -770,6 +819,37 @@ function createCapabilities(): CapabilityRegistry {
       },
     ],
   };
+}
+
+function createSplitItems(): AuthoringChangeItem[] {
+  return [
+    {
+      changeItemPid: 'item_l0',
+      blockId: 'field_customer_name',
+      propertyPath: '/props/label',
+      operation: 'REPLACE',
+      riskLevel: 'L0',
+      route: 'INLINE',
+      publishPolicy: 'DIRECT_ALLOWED',
+      reversibility: 'REVERSIBLE',
+      actorUserId: 1,
+      dependencySnapshot: [],
+      createdAt: '2026-08-09T00:00:01Z',
+    },
+    {
+      changeItemPid: 'item_l3',
+      blockId: 'list_customers',
+      propertyPath: '/dataSource',
+      operation: 'ADD',
+      riskLevel: 'L3',
+      route: 'HANDOFF_STUDIO',
+      publishPolicy: 'STUDIO_APPROVAL',
+      reversibility: 'REVERSIBLE',
+      actorUserId: 1,
+      dependencySnapshot: [],
+      createdAt: '2026-08-09T00:00:02Z',
+    },
+  ];
 }
 
 function propertyCapability(

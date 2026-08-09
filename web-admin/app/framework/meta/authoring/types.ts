@@ -68,6 +68,33 @@ export interface AuthoringReviewWorkspace {
   capabilities: CapabilityRegistry;
 }
 
+export interface AuthoringChangeItem {
+  changeItemPid: string;
+  sourceChangeItemPid?: string | null;
+  blockId: string;
+  propertyPath: string;
+  operation: string;
+  riskLevel: string;
+  route: string;
+  publishPolicy: string;
+  reversibility: string;
+  actorUserId: number;
+  dependencySnapshot: string[];
+  createdAt: string;
+}
+
+export interface AuthoringSplitResult {
+  sourceSession: AuthoringSession;
+  targetSession: AuthoringSession;
+  sourceItems: AuthoringChangeItem[];
+  targetItems: AuthoringChangeItem[];
+  lineage: Array<{
+    changeSetPid: string;
+    revision: number;
+    relation: 'SPLIT_FROM';
+  }>;
+}
+
 export interface AuthoringNode {
   id: string;
   sourceId: string;

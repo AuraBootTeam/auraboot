@@ -4,9 +4,12 @@ import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.Boundary
 import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.PublishPolicy;
 import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.RiskLevel;
 import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.Route;
+import com.auraboot.framework.authoring.workspace.AuthoringChangeSetSplitter.ChangeItem;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.AggregatePolicy;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.WorkspaceRow;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 /** Monotonically raises aggregate review requirements as draft changes accumulate. */
 @Component
@@ -22,6 +25,21 @@ public class AuthoringAggregatePolicyService {
                 route.name(),
                 publishPolicy.name(),
                 approvalState(row, publishPolicy));
+    }
+
+    public AggregatePolicy aggregateItems(List<ChangeItem> items) {
+        RiskLevel risk = RiskLevel.L0;
+        Route route = Route.INLINE;
+        PublishPolicy publishPolicy = PublishPolicy.DIRECT_ALLOWED;
+        for (ChangeItem item : items) {
+            risk = maxRisk(risk, RiskLevel.valueOf(item.riskLevel()));
+            route = maxRoute(route, Route.valueOf(item.route()));
+            publishPolicy = maxPublishPolicy(
+                    publishPolicy, PublishPolicy.valueOf(item.publishPolicy()));
+        }
+        return new AggregatePolicy(
+                risk.name(), route.name(), publishPolicy.name(),
+                publishPolicy == PublishPolicy.DIRECT_ALLOWED ? "NOT_REQUIRED" : "PENDING");
     }
 
     private String approvalState(WorkspaceRow row, PublishPolicy publishPolicy) {

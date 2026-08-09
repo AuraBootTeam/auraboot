@@ -2,6 +2,7 @@ package com.auraboot.framework.authoring.workspace;
 
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ApplyPatchRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CapabilityRegistryView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ChangeItemView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ChangeSetView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateHandoffRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffContextView;
@@ -17,6 +18,8 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Re
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RollbackRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ResumeEditingRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.TakeoverWriterLeaseRequest;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -29,6 +32,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /** Permission-rechecked HTTP boundary for contextual-authoring sessions. */
 @RestController
@@ -132,6 +137,20 @@ public class AuthoringWorkspaceController {
             @PathVariable String sessionPid,
             @Valid @RequestBody MoveBlockRequest request) {
         return ApiResponse.success(workspaceService.moveStudioBlock(sessionPid, request));
+    }
+
+    @GetMapping("/sessions/{sessionPid}/change-items")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<List<ChangeItemView>> listChangeItems(@PathVariable String sessionPid) {
+        return ApiResponse.success(governanceService.listChangeItems(sessionPid));
+    }
+
+    @PostMapping("/sessions/{sessionPid}/split")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<SplitChangeSetView> splitChangeSet(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody SplitChangeSetRequest request) {
+        return ApiResponse.success(governanceService.split(sessionPid, request));
     }
 
     @PostMapping("/sessions/{sessionPid}/submit")

@@ -3436,6 +3436,8 @@ CREATE TABLE public.ab_authoring_change_item (
     result_revision bigint NOT NULL,
     actor_user_id bigint NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    source_change_item_id bigint,
+    dependency_snapshot jsonb DEFAULT '[]'::jsonb NOT NULL,
     CONSTRAINT chk_authoring_change_item_operation CHECK (((operation)::text = ANY ((ARRAY['ADD'::character varying, 'REPLACE'::character varying, 'REMOVE'::character varying, 'MOVE'::character varying, 'COPY'::character varying])::text[]))),
     CONSTRAINT chk_authoring_change_item_publish_policy CHECK (((publish_policy)::text = ANY ((ARRAY['DIRECT_ALLOWED'::character varying, 'DEFAULT_REVIEW'::character varying, 'REQUIRED_REVIEW'::character varying, 'STUDIO_APPROVAL'::character varying, 'DENIED'::character varying])::text[]))),
     CONSTRAINT chk_authoring_change_item_reversibility CHECK (((reversibility)::text = ANY ((ARRAY['REVERSIBLE'::character varying, 'COMPENSATABLE'::character varying, 'FORWARD_ONLY'::character varying])::text[]))),
@@ -3450,6 +3452,13 @@ CREATE TABLE public.ab_authoring_change_item (
 --
 
 COMMENT ON TABLE public.ab_authoring_change_item IS 'Typed, policy-resolved semantic patch history; no executable business command payload';
+
+
+--
+-- Name: COLUMN ab_authoring_change_item.dependency_snapshot; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_authoring_change_item.dependency_snapshot IS 'Source item pids required before this typed diff can be replayed';
 
 
 --
@@ -3469,6 +3478,50 @@ CREATE SEQUENCE public.ab_authoring_change_item_id_seq
 --
 
 ALTER SEQUENCE public.ab_authoring_change_item_id_seq OWNED BY public.ab_authoring_change_item.id;
+
+
+--
+-- Name: ab_authoring_change_item_split; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_change_item_split (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    split_id bigint NOT NULL,
+    source_change_item_id bigint NOT NULL,
+    target_change_item_id bigint NOT NULL,
+    dependency_snapshot jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_authoring_change_item_split_distinct CHECK ((source_change_item_id <> target_change_item_id))
+);
+
+
+--
+-- Name: TABLE ab_authoring_change_item_split; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_change_item_split IS 'Append-only mapping from immutable source diff rows to replayed child diff rows';
+
+
+--
+-- Name: ab_authoring_change_item_split_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_change_item_split_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_change_item_split_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_change_item_split_id_seq OWNED BY public.ab_authoring_change_item_split.id;
 
 
 --
@@ -3499,12 +3552,16 @@ CREATE TABLE public.ab_authoring_change_set (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted_flag boolean DEFAULT false NOT NULL,
+    source_change_set_id bigint,
+    source_change_set_revision bigint,
+    lineage jsonb DEFAULT '[]'::jsonb NOT NULL,
     CONSTRAINT chk_authoring_change_set_approval CHECK (((approval_state)::text = ANY ((ARRAY['NOT_REQUIRED'::character varying, 'PENDING'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'STALE'::character varying])::text[]))),
     CONSTRAINT chk_authoring_change_set_publish CHECK (((publish_state)::text = ANY ((ARRAY['DRAFT'::character varying, 'READY'::character varying, 'PUBLISHING'::character varying, 'PUBLISHED'::character varying, 'FAILED'::character varying, 'ROLLED_BACK'::character varying])::text[]))),
     CONSTRAINT chk_authoring_change_set_publish_policy CHECK (((publish_policy)::text = ANY ((ARRAY['DIRECT_ALLOWED'::character varying, 'DEFAULT_REVIEW'::character varying, 'REQUIRED_REVIEW'::character varying, 'STUDIO_APPROVAL'::character varying, 'DENIED'::character varying])::text[]))),
     CONSTRAINT chk_authoring_change_set_revision CHECK ((revision > 0)),
     CONSTRAINT chk_authoring_change_set_risk CHECK (((risk_level)::text = ANY ((ARRAY['L0'::character varying, 'L1'::character varying, 'L2'::character varying, 'L3'::character varying])::text[]))),
     CONSTRAINT chk_authoring_change_set_route CHECK (((route)::text = ANY ((ARRAY['PERSONALIZE'::character varying, 'INLINE'::character varying, 'GUIDED_INLINE'::character varying, 'HANDOFF_STUDIO'::character varying, 'DENY'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_change_set_source_revision CHECK ((((source_change_set_id IS NULL) AND (source_change_set_revision IS NULL)) OR ((source_change_set_id IS NOT NULL) AND (source_change_set_revision > 0)))),
     CONSTRAINT chk_authoring_change_set_status CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'IN_REVIEW'::character varying, 'APPROVED'::character varying, 'PUBLISHED'::character varying, 'REJECTED'::character varying, 'WITHDRAWN'::character varying])::text[]))),
     CONSTRAINT chk_authoring_change_set_validation CHECK (((validation_state)::text = ANY ((ARRAY['UNVALIDATED'::character varying, 'VALID'::character varying, 'INVALID'::character varying, 'STALE'::character varying])::text[])))
 );
@@ -3515,6 +3572,13 @@ CREATE TABLE public.ab_authoring_change_set (
 --
 
 COMMENT ON TABLE public.ab_authoring_change_set IS 'Contextual Authoring aggregate with orthogonal validation, approval and publish states';
+
+
+--
+-- Name: COLUMN ab_authoring_change_set.lineage; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_authoring_change_set.lineage IS 'Ordered immutable ancestry copied into a split child ChangeSet';
 
 
 --
@@ -3534,6 +3598,54 @@ CREATE SEQUENCE public.ab_authoring_change_set_id_seq
 --
 
 ALTER SEQUENCE public.ab_authoring_change_set_id_seq OWNED BY public.ab_authoring_change_set.id;
+
+
+--
+-- Name: ab_authoring_change_set_split; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_change_set_split (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    source_change_set_id bigint NOT NULL,
+    source_change_set_revision bigint NOT NULL,
+    target_change_set_id bigint NOT NULL,
+    actor_user_id bigint NOT NULL,
+    reason character varying(1000) NOT NULL,
+    dependency_snapshot jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_authoring_change_set_split_distinct CHECK ((source_change_set_id <> target_change_set_id)),
+    CONSTRAINT chk_authoring_change_set_split_reason CHECK ((length(TRIM(BOTH FROM reason)) > 0)),
+    CONSTRAINT chk_authoring_change_set_split_revision CHECK ((source_change_set_revision > 0))
+);
+
+
+--
+-- Name: TABLE ab_authoring_change_set_split; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_change_set_split IS 'Append-only governed split operation; source history is never rewritten';
+
+
+--
+-- Name: ab_authoring_change_set_split_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_change_set_split_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_change_set_split_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_change_set_split_id_seq OWNED BY public.ab_authoring_change_set_split.id;
 
 
 --
@@ -16674,10 +16786,24 @@ ALTER TABLE ONLY public.ab_authoring_change_item ALTER COLUMN id SET DEFAULT nex
 
 
 --
+-- Name: ab_authoring_change_item_split id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_change_item_split_id_seq'::regclass);
+
+
+--
 -- Name: ab_authoring_change_set id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.ab_authoring_change_set ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_change_set_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_change_set_split id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set_split ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_change_set_split_id_seq'::regclass);
 
 
 --
@@ -18007,6 +18133,38 @@ ALTER TABLE ONLY public.ab_authoring_change_item
 
 
 --
+-- Name: ab_authoring_change_item_split ab_authoring_change_item_split_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT ab_authoring_change_item_split_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_change_item_split ab_authoring_change_item_split_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT ab_authoring_change_item_split_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_change_item_split ab_authoring_change_item_split_source_change_item_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT ab_authoring_change_item_split_source_change_item_id_key UNIQUE (source_change_item_id);
+
+
+--
+-- Name: ab_authoring_change_item_split ab_authoring_change_item_split_target_change_item_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT ab_authoring_change_item_split_target_change_item_id_key UNIQUE (target_change_item_id);
+
+
+--
 -- Name: ab_authoring_change_set ab_authoring_change_set_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -18020,6 +18178,30 @@ ALTER TABLE ONLY public.ab_authoring_change_set
 
 ALTER TABLE ONLY public.ab_authoring_change_set
     ADD CONSTRAINT ab_authoring_change_set_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_change_set_split ab_authoring_change_set_split_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set_split
+    ADD CONSTRAINT ab_authoring_change_set_split_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_change_set_split ab_authoring_change_set_split_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set_split
+    ADD CONSTRAINT ab_authoring_change_set_split_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_change_set_split ab_authoring_change_set_split_target_change_set_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set_split
+    ADD CONSTRAINT ab_authoring_change_set_split_target_change_set_id_key UNIQUE (target_change_set_id);
 
 
 --
@@ -23787,10 +23969,38 @@ CREATE INDEX idx_authoring_change_item_set ON public.ab_authoring_change_item US
 
 
 --
+-- Name: idx_authoring_change_item_source; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_change_item_source ON public.ab_authoring_change_item USING btree (source_change_item_id);
+
+
+--
+-- Name: idx_authoring_change_item_split_operation; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_change_item_split_operation ON public.ab_authoring_change_item_split USING btree (split_id, id);
+
+
+--
 -- Name: idx_authoring_change_set_owner; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_authoring_change_set_owner ON public.ab_authoring_change_set USING btree (tenant_id, env_id, owner_user_id, updated_at DESC) WHERE (deleted_flag = false);
+
+
+--
+-- Name: idx_authoring_change_set_source; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_change_set_source ON public.ab_authoring_change_set USING btree (source_change_set_id, source_change_set_revision);
+
+
+--
+-- Name: idx_authoring_change_set_split_source; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_change_set_split_source ON public.ab_authoring_change_set_split USING btree (tenant_id, env_id, source_change_set_id, created_at DESC);
 
 
 --
@@ -27875,6 +28085,20 @@ CREATE TRIGGER trg_authoring_change_item_append_only BEFORE DELETE OR UPDATE ON 
 
 
 --
+-- Name: ab_authoring_change_item_split trg_authoring_change_item_split_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_change_item_split_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_change_item_split FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_authoring_change_set_split trg_authoring_change_set_split_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_change_set_split_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_change_set_split FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
 -- Name: ab_authoring_release trg_authoring_release_immutable_delete; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -28175,11 +28399,83 @@ ALTER TABLE ONLY public.ab_authoring_change_item
 
 
 --
+-- Name: ab_authoring_change_item fk_authoring_change_item_source; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item
+    ADD CONSTRAINT fk_authoring_change_item_source FOREIGN KEY (source_change_item_id) REFERENCES public.ab_authoring_change_item(id);
+
+
+--
+-- Name: ab_authoring_change_item_split fk_authoring_change_item_split_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT fk_authoring_change_item_split_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_change_item_split fk_authoring_change_item_split_operation; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT fk_authoring_change_item_split_operation FOREIGN KEY (split_id) REFERENCES public.ab_authoring_change_set_split(id);
+
+
+--
+-- Name: ab_authoring_change_item_split fk_authoring_change_item_split_source; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT fk_authoring_change_item_split_source FOREIGN KEY (source_change_item_id) REFERENCES public.ab_authoring_change_item(id);
+
+
+--
+-- Name: ab_authoring_change_item_split fk_authoring_change_item_split_target; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT fk_authoring_change_item_split_target FOREIGN KEY (target_change_item_id) REFERENCES public.ab_authoring_change_item(id);
+
+
+--
 -- Name: ab_authoring_change_set fk_authoring_change_set_env; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.ab_authoring_change_set
     ADD CONSTRAINT fk_authoring_change_set_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_change_set fk_authoring_change_set_source; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set
+    ADD CONSTRAINT fk_authoring_change_set_source FOREIGN KEY (source_change_set_id) REFERENCES public.ab_authoring_change_set(id);
+
+
+--
+-- Name: ab_authoring_change_set_split fk_authoring_change_set_split_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set_split
+    ADD CONSTRAINT fk_authoring_change_set_split_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_change_set_split fk_authoring_change_set_split_source; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set_split
+    ADD CONSTRAINT fk_authoring_change_set_split_source FOREIGN KEY (source_change_set_id) REFERENCES public.ab_authoring_change_set(id);
+
+
+--
+-- Name: ab_authoring_change_set_split fk_authoring_change_set_split_target; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set_split
+    ADD CONSTRAINT fk_authoring_change_set_split_target FOREIGN KEY (target_change_set_id) REFERENCES public.ab_authoring_change_set(id);
 
 
 --

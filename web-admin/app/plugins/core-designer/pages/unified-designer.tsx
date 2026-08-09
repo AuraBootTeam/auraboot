@@ -30,11 +30,13 @@ import {
 } from '~/framework/meta/authoring/authoringService';
 import { AuthoringWriterLeaseNotice } from '~/framework/meta/authoring/AuthoringWriterLeaseNotice';
 import { AuthoringGovernanceNotice } from '~/framework/meta/authoring/AuthoringGovernanceNotice';
+import { AuthoringChangeSetSplitPanel } from '~/framework/meta/authoring/AuthoringChangeSetSplitPanel';
 import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
 import { AuthoringConflictResolutionPanel } from '../components/unified-designer/AuthoringConflictResolutionPanel';
 import type {
   AuthoringSession,
   AuthoringGovernanceAction,
+  AuthoringSplitResult,
   CapabilityRegistry,
   HandoffContext,
 } from '~/framework/meta/authoring/types';
@@ -618,6 +620,27 @@ export default function UnifiedDesignerPage() {
     }
   };
 
+  const handleChangeSetSplit = (result: AuthoringSplitResult) => {
+    const sourceSession = result.sourceSession;
+    const canonicalDocument = authoringSnapshotToPageSchemaV3(sourceSession.snapshot);
+    documentBaselineRef.current = sourceSession;
+    setAuthoringSession(sourceSession);
+    setDocument(canonicalDocument);
+    setStudioConflict(null);
+    setConflictError(null);
+    setWorkbenchGeneration((current) => current + 1);
+    setHandoff((current) =>
+      current
+        ? {
+            ...current,
+            changeSetPid: sourceSession.changeSetPid,
+            sessionPid: sourceSession.sessionPid,
+            revision: sourceSession.revision,
+          }
+        : current,
+    );
+  };
+
   const handlePublish = async (pid: string): Promise<boolean> => {
     const result = await publishPageSchemaV3({ pid });
     if (!result.ok) {
@@ -746,6 +769,19 @@ export default function UnifiedDesignerPage() {
           pendingAction={governancePending}
           error={governanceError}
           onAction={handleGovernanceAction}
+        />
+        <AuthoringChangeSetSplitPanel
+          session={authoringSession!}
+          enabled={Boolean(
+            !reviewWorkspaceMode &&
+              canAdministerDesigner &&
+              user?.id != null &&
+              String(user.id) === String(authoringSession?.ownerUserId) &&
+              authoringSession?.state === 'ACTIVE' &&
+              hasOwnedWriterLease(authoringSession) &&
+              !studioConflict
+          )}
+          onSplit={handleChangeSetSplit}
         />
         {!reviewWorkspaceMode &&
         authoringSession?.writerLease &&

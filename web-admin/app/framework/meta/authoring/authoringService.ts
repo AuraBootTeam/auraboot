@@ -9,6 +9,8 @@ import type {
   PatchOperation,
   PatchResult,
   AuthoringGovernanceAction,
+  AuthoringChangeItem,
+  AuthoringSplitResult,
 } from './types';
 
 export interface InteractionContext {
@@ -200,6 +202,30 @@ export async function transitionAuthoringGovernance(
   if (!ResultHelper.isSuccess(result)) {
     throw new Error(result.message || result.desc || '无法完成 ChangeSet 治理操作');
   }
+}
+
+export async function loadAuthoringChangeItems(sessionPid: string): Promise<AuthoringChangeItem[]> {
+  const result = await fetchResult<AuthoringChangeItem[]>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/change-items`,
+  );
+  return requireData(result, '无法加载 ChangeSet 变更项');
+}
+
+export async function splitAuthoringChangeSet(
+  sessionPid: string,
+  revision: number,
+  itemPids: string[],
+  title: string,
+  reason: string,
+): Promise<AuthoringSplitResult> {
+  const result = await fetchResult<AuthoringSplitResult>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/split`,
+    {
+      method: 'post',
+      params: { expectedRevision: revision, itemPids, title, reason },
+    },
+  );
+  return requireData(result, '无法拆分 ChangeSet；请检查变更依赖后重试');
 }
 
 export async function createAuthoringHandoff(
