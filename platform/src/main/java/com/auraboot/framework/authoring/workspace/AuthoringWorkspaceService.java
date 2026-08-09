@@ -11,6 +11,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Mo
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ObserveChangeSetRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewWorkspaceView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.TakeoverWriterLeaseRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.AggregatePolicy;
@@ -45,6 +46,7 @@ public class AuthoringWorkspaceService {
 
     private static final Duration SESSION_TTL = Duration.ofHours(8);
     private static final Duration WRITER_LEASE = Duration.ofMinutes(5);
+    private static final String REVIEW_WORKSPACE_MODE = "REVIEW";
     private final AuthoringCapabilityRegistry capabilityRegistry;
     private final AuthoringPatchEngine patchEngine;
     private final AuthoringWorkspaceRepository repository;
@@ -145,6 +147,14 @@ public class AuthoringWorkspaceService {
 
     @Transactional
     public SessionView observe(String changeSetPid, ObserveChangeSetRequest request) {
+        return observe(changeSetPid, request, "OBSERVER", "OBSERVER_SESSION_OPENED");
+    }
+
+    private SessionView observe(
+            String changeSetPid,
+            ObserveChangeSetRequest request,
+            String workspaceMode,
+            String auditEventType) {
         Identity identity = identity();
         String sessionPid = UniqueIdGenerator.generate();
         JsonNode interactionContext = interactionContextSanitizer.sanitize(
@@ -155,6 +165,7 @@ public class AuthoringWorkspaceService {
                 identity.userId(),
                 changeSetPid,
                 sessionPid,
+                workspaceMode,
                 interactionContext,
                 Instant.now().plus(SESSION_TTL)));
         if (created == null) {
@@ -165,7 +176,7 @@ public class AuthoringWorkspaceService {
                 identity,
                 workspace.changeSetPid(),
                 workspace.sessionPid(),
-                "OBSERVER_SESSION_OPENED",
+                auditEventType,
                 "ALLOW",
                 null,
                 workspace.pagePid(),
@@ -173,8 +184,29 @@ public class AuthoringWorkspaceService {
                 null,
                 objectMapper.valueToTree(Map.of(
                         "leaseRevision", workspace.leaseRevision(),
+                        "workspaceMode", workspaceMode,
                         "writerLeaseStatus", "HELD_BY_OTHER"))));
         return viewMapper.toView(workspace, identity.userId());
+    }
+
+    @Transactional
+    public ReviewWorkspaceView openReviewWorkspace(
+            String changeSetPid,
+            ObserveChangeSetRequest request) {
+        SessionView session = observe(
+                changeSetPid, request, REVIEW_WORKSPACE_MODE, "REVIEW_WORKSPACE_OPENED");
+        return new ReviewWorkspaceView(session, capabilities());
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewWorkspaceView getReviewWorkspace(String sessionPid) {
+        Identity identity = identity();
+        WorkspaceRow workspace = requireWorkspace(identity, sessionPid, false);
+        if (!REVIEW_WORKSPACE_MODE.equals(workspace.workspaceMode())) {
+            throw new ResponseStatusException(FORBIDDEN, "authoring.review.workspace-required");
+        }
+        return new ReviewWorkspaceView(
+                viewMapper.toView(workspace, identity.userId()), capabilities());
     }
 
     @Transactional
@@ -183,6 +215,7 @@ public class AuthoringWorkspaceService {
             TakeoverWriterLeaseRequest request) {
         Identity identity = identity();
         WorkspaceRow workspace = requireWorkspace(identity, sessionPid, true);
+        requireNonReviewWorkspace(workspace);
         if (workspace.changeSetRevision() != request.expectedRevision()) {
             throw new ResponseStatusException(CONFLICT, "authoring.revision.conflict");
         }
@@ -393,6 +426,7 @@ public class AuthoringWorkspaceService {
     }
 
     private void validateWritable(WorkspaceRow row, Identity identity, long expectedRevision) {
+        requireNonReviewWorkspace(row);
         Instant now = Instant.now();
         if (!row.expiresAt().isAfter(now)) {
             throw new ResponseStatusException(CONFLICT, "authoring.session.expired");
@@ -411,6 +445,12 @@ public class AuthoringWorkspaceService {
                 || row.resourceRevision() != expectedRevision
                 || row.sessionRevision() != expectedRevision) {
             throw new ResponseStatusException(CONFLICT, "authoring.revision.conflict");
+        }
+    }
+
+    private void requireNonReviewWorkspace(WorkspaceRow row) {
+        if (REVIEW_WORKSPACE_MODE.equals(row.workspaceMode())) {
+            throw new ResponseStatusException(FORBIDDEN, "authoring.review.workspace-read-only");
         }
     }
 

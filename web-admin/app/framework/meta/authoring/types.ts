@@ -8,6 +8,9 @@ export interface AuthoringSession {
   sessionPid: string;
   changeSetPid: string;
   pagePid: string;
+  ownerUserId: number;
+  changeSetStatus: string;
+  workspaceMode: 'AUTHORING' | 'OBSERVER' | 'REVIEW';
   state: string;
   revision: number;
   riskLevel: string;
@@ -58,6 +61,11 @@ export interface CapabilityManifest {
 export interface CapabilityRegistry {
   checksum: string;
   manifests: CapabilityManifest[];
+}
+
+export interface AuthoringReviewWorkspace {
+  session: AuthoringSession;
+  capabilities: CapabilityRegistry;
 }
 
 export interface AuthoringNode {
@@ -122,6 +130,8 @@ export interface PendingAuthoringEdit {
   previousValue: unknown;
   value: unknown;
 }
+
+export type AuthoringGovernanceAction = 'withdraw' | 'reopen' | 'approve' | 'reject';
 
 export interface ContextualAuthoringSurfaceProps {
   schema: UnifiedSchema;

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { usePermission } from '~/contexts/AuthContext';
+import { usePermission, useUser } from '~/contexts/AuthContext';
 import { UnifiedDesignerWorkbench } from '../components/unified-designer/workbench/UnifiedDesignerWorkbench';
 import { sampleModelFieldsByModel } from '../components/unified-designer/fixtures/sampleModelFields';
 import { samplePageSchemaV3 } from '../components/unified-designer/fixtures/samplePageSchemaV3';
@@ -20,16 +20,21 @@ import {
   applyAuthoringStudioPatch,
   consumeAuthoringHandoff,
   loadAuthoringCapabilities,
+  loadAuthoringReviewWorkspace,
   loadAuthoringSession,
   moveAuthoringStudioBlock,
+  openAuthoringReviewWorkspace,
   observeAuthoringChangeSet,
   takeoverAuthoringWriterLease,
+  transitionAuthoringGovernance,
 } from '~/framework/meta/authoring/authoringService';
 import { AuthoringWriterLeaseNotice } from '~/framework/meta/authoring/AuthoringWriterLeaseNotice';
+import { AuthoringGovernanceNotice } from '~/framework/meta/authoring/AuthoringGovernanceNotice';
 import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
 import { AuthoringConflictResolutionPanel } from '../components/unified-designer/AuthoringConflictResolutionPanel';
 import type {
   AuthoringSession,
+  AuthoringGovernanceAction,
   CapabilityRegistry,
   HandoffContext,
 } from '~/framework/meta/authoring/types';
@@ -56,15 +61,25 @@ interface StudioConflictState {
 
 export default function UnifiedDesignerPage() {
   const canAdministerDesigner = usePermission('meta.designer.admin');
+  const canManageDesigner = usePermission('meta.designer.update');
+  const canReviewAuthoring = usePermission('meta.publish.update');
+  const { user } = useUser();
   const [searchParams] = useSearchParams();
   const requestedPageId = searchParams.get('pageId') || searchParams.get('pid');
   const pageKey = searchParams.get('pageKey');
   const contextId = searchParams.get('contextId');
   const resumeSessionPid = searchParams.get('authoringSession');
+  const resumeReviewSessionPid = searchParams.get('reviewSession');
   const observedChangeSetPid = searchParams.get('changeSetId');
+  const observedReviewChangeSetPid = searchParams.get('reviewChangeSetId');
   const conflictContextId = searchParams.get('conflictContext');
   const hasAuthoringContext = Boolean(
-    contextId || resumeSessionPid || observedChangeSetPid || conflictContextId,
+    contextId ||
+      resumeSessionPid ||
+      resumeReviewSessionPid ||
+      observedChangeSetPid ||
+      observedReviewChangeSetPid ||
+      conflictContextId,
   );
   const [handoff, setHandoff] = useState<HandoffContext | null>(null);
   const [authoringSession, setAuthoringSession] = useState<AuthoringSession | null>(null);
@@ -75,6 +90,11 @@ export default function UnifiedDesignerPage() {
   const [studioConflict, setStudioConflict] = useState<StudioConflictState | null>(null);
   const [conflictPending, setConflictPending] = useState(false);
   const [conflictError, setConflictError] = useState<string | null>(null);
+  const [governancePending, setGovernancePending] = useState<AuthoringGovernanceAction | null>(
+    null,
+  );
+  const [governanceError, setGovernanceError] = useState<string | null>(null);
+  const [reviewWorkspaceMode, setReviewWorkspaceMode] = useState(false);
   const [workbenchGeneration, setWorkbenchGeneration] = useState(0);
   const [document, setDocument] = useState<PageSchemaV3 | null>(null);
   const [source, setSource] = useState<PageSchemaV3Source>({ type: 'local' });
@@ -101,6 +121,7 @@ export default function UnifiedDesignerPage() {
       setLeaseTakeoverError(null);
       setStudioConflict(null);
       setConflictError(null);
+      setReviewWorkspaceMode(false);
       documentBaselineRef.current = null;
       return;
     }
@@ -113,6 +134,7 @@ export default function UnifiedDesignerPage() {
     setLeaseTakeoverError(null);
     setStudioConflict(null);
     setConflictError(null);
+    setReviewWorkspaceMode(false);
     documentBaselineRef.current = null;
     const resolveContext = contextId
       ? consumeAuthoringHandoff(contextId).then(async (consumed) => {
@@ -122,31 +144,54 @@ export default function UnifiedDesignerPage() {
           ]);
           assertHandoffMatchesSession(consumed, session);
           replaceAuthoringContextUrl('contextId', consumed.sessionPid);
-          return { handoff: consumed, session, capabilities };
+          return { handoff: consumed, session, capabilities, reviewWorkspace: false };
         })
-      : observedChangeSetPid
-        ? Promise.all([
-            observeAuthoringChangeSet(observedChangeSetPid),
-            loadAuthoringCapabilities(),
-          ]).then(([session, capabilities]) => {
-            replaceAuthoringContextUrl('changeSetId', session.sessionPid);
-            return {
-              handoff: resumeHandoffFromSession(session),
-              session,
-              capabilities,
-            };
-          })
-        : Promise.all([
-            loadAuthoringSession(resumeSessionPid!),
-            loadAuthoringCapabilities(),
-          ]).then(([session, capabilities]) => ({
-            handoff: resumeHandoffFromSession(session),
-            session,
-            capabilities,
-          }));
+      : observedReviewChangeSetPid
+        ? openAuthoringReviewWorkspace(observedReviewChangeSetPid).then(
+            ({ session, capabilities }) => {
+              replaceAuthoringReviewContextUrl('reviewChangeSetId', session.sessionPid);
+              return {
+                handoff: resumeHandoffFromSession(session),
+                session,
+                capabilities,
+                reviewWorkspace: true,
+              };
+            },
+          )
+        : observedChangeSetPid
+          ? Promise.all([
+              observeAuthoringChangeSet(observedChangeSetPid),
+              loadAuthoringCapabilities(),
+            ]).then(([session, capabilities]) => {
+              replaceAuthoringContextUrl('changeSetId', session.sessionPid);
+              return {
+                handoff: resumeHandoffFromSession(session),
+                session,
+                capabilities,
+                reviewWorkspace: false,
+              };
+            })
+          : resumeReviewSessionPid
+            ? loadAuthoringReviewWorkspace(resumeReviewSessionPid).then(
+                ({ session, capabilities }) => ({
+                  handoff: resumeHandoffFromSession(session),
+                  session,
+                  capabilities,
+                  reviewWorkspace: true,
+                }),
+              )
+            : Promise.all([
+                loadAuthoringSession(resumeSessionPid!),
+                loadAuthoringCapabilities(),
+              ]).then(([session, capabilities]) => ({
+                handoff: resumeHandoffFromSession(session),
+                session,
+                capabilities,
+                reviewWorkspace: false,
+              }));
 
     void resolveContext
-      .then(({ handoff: resolvedHandoff, session, capabilities }) => {
+      .then(({ handoff: resolvedHandoff, session, capabilities, reviewWorkspace }) => {
         if (!cancelled) {
           let isolatedDocument = authoringSnapshotToPageSchemaV3(session.snapshot);
           if (conflictContextId) {
@@ -179,6 +224,7 @@ export default function UnifiedDesignerPage() {
           setHandoff(resolvedHandoff);
           setAuthoringSession(session);
           setAuthoringCapabilities(capabilities);
+          setReviewWorkspaceMode(reviewWorkspace || session.workspaceMode === 'REVIEW');
           documentBaselineRef.current = session;
           setDocument(isolatedDocument);
           setSource({
@@ -206,6 +252,8 @@ export default function UnifiedDesignerPage() {
     contextId,
     hasAuthoringContext,
     observedChangeSetPid,
+    observedReviewChangeSetPid,
+    resumeReviewSessionPid,
     resumeSessionPid,
   ]);
 
@@ -213,7 +261,10 @@ export default function UnifiedDesignerPage() {
     if (!activeAuthoringSessionPid) return;
     let cancelled = false;
     const interval = window.setInterval(() => {
-      void loadAuthoringSession(activeAuthoringSessionPid)
+      const refresh = reviewWorkspaceMode
+        ? loadAuthoringReviewWorkspace(activeAuthoringSessionPid).then((value) => value.session)
+        : loadAuthoringSession(activeAuthoringSessionPid);
+      void refresh
         .then((latest) => {
           if (!cancelled && latest.revision >= (activeAuthoringRevision ?? -1)) {
             setAuthoringSession(latest);
@@ -227,7 +278,7 @@ export default function UnifiedDesignerPage() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [activeAuthoringRevision, activeAuthoringSessionPid]);
+  }, [activeAuthoringRevision, activeAuthoringSessionPid, reviewWorkspaceMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -483,8 +534,45 @@ export default function UnifiedDesignerPage() {
     }
   };
 
+  const handleGovernanceAction = async (
+    action: AuthoringGovernanceAction,
+    reason: string,
+  ) => {
+    if (!authoringSession || governancePending) return;
+    setGovernancePending(action);
+    setGovernanceError(null);
+    try {
+      await transitionAuthoringGovernance(action, authoringSession, reason);
+      const latest = reviewWorkspaceMode
+        ? (await loadAuthoringReviewWorkspace(authoringSession.sessionPid)).session
+        : await loadAuthoringSession(authoringSession.sessionPid);
+      const canonicalDocument = authoringSnapshotToPageSchemaV3(latest.snapshot);
+      documentBaselineRef.current = latest;
+      setAuthoringSession(latest);
+      setDocument(canonicalDocument);
+      setStudioConflict(null);
+      setConflictError(null);
+      setWorkbenchGeneration((current) => current + 1);
+    } catch (governanceFailure) {
+      setGovernanceError(
+        governanceFailure instanceof Error
+          ? governanceFailure.message
+          : '无法完成 ChangeSet 治理操作',
+      );
+    } finally {
+      setGovernancePending(null);
+    }
+  };
+
   const handleWriterLeaseTakeover = async (reason: string) => {
-    if (!handoff || !authoringSession || leaseTakeoverPending || !canAdministerDesigner) return;
+    if (
+      reviewWorkspaceMode ||
+      !handoff ||
+      !authoringSession ||
+      leaseTakeoverPending ||
+      !canAdministerDesigner
+    )
+      return;
     setLeaseTakeoverPending(true);
     setLeaseTakeoverError(null);
     try {
@@ -584,17 +672,18 @@ export default function UnifiedDesignerPage() {
     : getWorkbenchKey(document, source);
   const contextualEditablePropertyPaths =
     handoff
-      ? canAdministerDesigner && authoringCapabilities
+      ? !reviewWorkspaceMode && canAdministerDesigner && authoringCapabilities
         ? studioEditablePropertyPaths(authoringCapabilities)
         : {}
       : undefined;
   const contextualReorderableBlockTypes =
-    handoff && canAdministerDesigner && authoringCapabilities
+    handoff && !reviewWorkspaceMode && canAdministerDesigner && authoringCapabilities
       ? studioReorderableBlockTypes(authoringCapabilities)
       : undefined;
   const contextualReadOnly = Boolean(
     handoff &&
-      (!canAdministerDesigner ||
+      (reviewWorkspaceMode ||
+        !canAdministerDesigner ||
         authoringSession?.state !== 'ACTIVE' ||
         !hasOwnedWriterLease(authoringSession) ||
         Boolean(studioConflict)),
@@ -634,7 +723,12 @@ export default function UnifiedDesignerPage() {
         {contextualReadOnly ? (
           <span className="ml-2" data-testid="studio-handoff-read-only-reason">
             ChangeSet {handoff.changeSetPid} · 修订 r{authoringSession?.revision ?? handoff.revision} ·
-            {studioReadOnlyReason(authoringSession, canAdministerDesigner, Boolean(studioConflict))}，当前仅可查看隔离草稿。
+            {studioReadOnlyReason(
+              authoringSession,
+              canAdministerDesigner,
+              Boolean(studioConflict),
+              reviewWorkspaceMode,
+            )}，当前仅可查看隔离草稿。
           </span>
         ) : (
           <span className="ml-2" data-testid="studio-handoff-editable-reason">
@@ -644,12 +738,27 @@ export default function UnifiedDesignerPage() {
         )}
       </div>
       <div className="px-4 pt-3">
-        <AuthoringWriterLeaseNotice
-          lease={authoringSession?.writerLease}
-          canTakeover={canAdministerDesigner}
-          pending={leaseTakeoverPending}
-          onTakeover={handleWriterLeaseTakeover}
+        <AuthoringGovernanceNotice
+          session={authoringSession!}
+          currentUserId={user?.id}
+          canManage={!reviewWorkspaceMode && canManageDesigner}
+          canReview={reviewWorkspaceMode && canReviewAuthoring}
+          pendingAction={governancePending}
+          error={governanceError}
+          onAction={handleGovernanceAction}
         />
+        {!reviewWorkspaceMode &&
+        authoringSession?.writerLease &&
+        authoringSession.writerLease.status !== 'OWNED' ? (
+          <div className="mt-2">
+            <AuthoringWriterLeaseNotice
+              lease={authoringSession.writerLease}
+              canTakeover={canAdministerDesigner}
+              pending={leaseTakeoverPending}
+              onTakeover={handleWriterLeaseTakeover}
+            />
+          </div>
+        ) : null}
         {leaseTakeoverError ? (
           <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
             {leaseTakeoverError}
@@ -715,7 +824,20 @@ function replaceAuthoringContextUrl(
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
   url.searchParams.delete(parameter);
+  url.searchParams.delete('reviewSession');
   url.searchParams.set('authoringSession', sessionPid);
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function replaceAuthoringReviewContextUrl(
+  parameter: 'reviewChangeSetId',
+  sessionPid: string,
+): void {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  url.searchParams.delete(parameter);
+  url.searchParams.delete('authoringSession');
+  url.searchParams.set('reviewSession', sessionPid);
   window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
@@ -734,7 +856,9 @@ function studioReadOnlyReason(
   session: AuthoringSession | null,
   canAdministerDesigner: boolean,
   hasConflict: boolean,
+  reviewWorkspace: boolean,
 ): string {
+  if (reviewWorkspace) return '评审工作区按当前 revision 只读';
   if (!canAdministerDesigner) return '缺少高级设计权限';
   if (hasConflict) return '存在待裁决的 Base / Mine / Latest 三方冲突';
   if (session?.writerLease?.status === 'EXPIRED') return 'Writer lease 已过期';

@@ -12,8 +12,10 @@ import java.time.Instant;
 public class AuthoringWorkspaceViewMapper {
 
     public SessionView toView(WorkspaceRow row, long currentUserId) {
+        Instant now = Instant.now();
+        String sessionState = row.expiresAt().isAfter(now) ? row.sessionState() : "EXPIRED";
         String leaseStatus;
-        if (!row.leasedUntil().isAfter(Instant.now())) {
+        if (!row.leasedUntil().isAfter(now)) {
             leaseStatus = "EXPIRED";
         } else if (row.leaseSessionId() == row.sessionId()
                 && row.leaseHolderUserId() == currentUserId) {
@@ -27,7 +29,10 @@ public class AuthoringWorkspaceViewMapper {
                 row.sessionPid(),
                 row.changeSetPid(),
                 row.pagePid(),
-                row.sessionState(),
+                row.changeSetOwnerUserId(),
+                row.changeSetStatus(),
+                row.workspaceMode(),
+                sessionState,
                 row.changeSetRevision(),
                 row.riskLevel(),
                 row.route(),

@@ -11,6 +11,7 @@ import {
   openAuthoringSession,
   submitAuthoringSession,
   takeoverAuthoringWriterLease,
+  transitionAuthoringGovernance,
 } from '../authoringService';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 import type { AuthoringSession } from '../types';
@@ -33,6 +34,7 @@ const permissionMock = vi.hoisted(() => ({
 
 vi.mock('~/contexts/AuthContext', () => ({
   usePermission: permissionMock.usePermission,
+  useUser: () => ({ user: { id: '1' }, isAuthenticated: true }),
 }));
 
 vi.mock('../authoringService', () => ({
@@ -43,6 +45,7 @@ vi.mock('../authoringService', () => ({
   submitAuthoringSession: vi.fn(),
   createAuthoringHandoff: vi.fn(),
   takeoverAuthoringWriterLease: vi.fn(),
+  transitionAuthoringGovernance: vi.fn(),
 }));
 
 vi.mock('../authoringConflictTransfer', () => ({
@@ -126,6 +129,9 @@ describe('ContextualAuthoringSurface', () => {
         sessionPid: 'session-1',
         changeSetPid: 'changeset-1',
         pagePid: 'page-1',
+        ownerUserId: 1,
+        changeSetStatus: 'DRAFT',
+        workspaceMode: 'AUTHORING',
         state: 'ACTIVE',
         revision: 2,
         riskLevel: 'L1',
@@ -156,6 +162,7 @@ describe('ContextualAuthoringSurface', () => {
       savedValue: '生产订单',
     });
     vi.mocked(submitAuthoringSession).mockResolvedValue(undefined);
+    vi.mocked(transitionAuthoringGovernance).mockResolvedValue(undefined);
     vi.mocked(loadAuthoringSession).mockResolvedValue(openedSession);
     vi.mocked(takeoverAuthoringWriterLease).mockResolvedValue(
       createAuthoringSession({
@@ -355,7 +362,7 @@ describe('ContextualAuthoringSurface', () => {
     let poll: (() => void) | undefined;
     const interval = vi.spyOn(window, 'setInterval').mockImplementation((handler) => {
       if (typeof handler === 'function') poll = handler;
-      return 1;
+      return {} as ReturnType<typeof window.setInterval>;
     });
     renderSurface(vi.fn(), vi.fn());
     fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
@@ -384,6 +391,54 @@ describe('ContextualAuthoringSurface', () => {
     expect(screen.getByText('保存')).toBeDisabled();
     expect(applyAuthoringPatch).not.toHaveBeenCalled();
     interval.mockRestore();
+  });
+
+  it('withdraws a frozen review into a new editable revision without hidden mutation', async () => {
+    vi.mocked(openAuthoringSession).mockResolvedValue(
+      createAuthoringSession({
+        revision: 7,
+        changeSetStatus: 'IN_REVIEW',
+        state: 'READ_ONLY',
+        validationState: 'VALID',
+        approvalState: 'PENDING',
+        publishState: 'DRAFT',
+      }),
+    );
+    vi.mocked(loadAuthoringSession).mockResolvedValueOnce(
+      createAuthoringSession({
+        revision: 8,
+        changeSetStatus: 'DRAFT',
+        state: 'ACTIVE',
+        validationState: 'UNVALIDATED',
+        approvalState: 'STALE',
+        publishState: 'DRAFT',
+      }),
+    );
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+
+    expect(await screen.findByTestId('authoring-governance-notice')).toHaveTextContent(
+      'revision r7 已冻结',
+    );
+    expect(screen.getByText('保存')).toBeDisabled();
+    fireEvent.change(screen.getByTestId('authoring-governance-reason'), {
+      target: { value: '补充评审要求的异常场景' },
+    });
+    fireEvent.click(screen.getByTestId('authoring-governance-withdraw'));
+
+    await waitFor(() =>
+      expect(transitionAuthoringGovernance).toHaveBeenCalledWith(
+        'withdraw',
+        expect.objectContaining({ sessionPid: 'session-1', revision: 7 }),
+        '补充评审要求的异常场景',
+      ),
+    );
+    expect(screen.queryByTestId('authoring-governance-notice')).not.toBeInTheDocument();
+    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+      'data-read-only',
+      'false',
+    );
+    expect(screen.getByText('保存')).toBeDisabled();
   });
 
   it('turns an active session read-only when permission is revoked and preserves local edits', async () => {
@@ -490,6 +545,9 @@ function createAuthoringSession(overrides: Partial<AuthoringSession> = {}): Auth
     sessionPid: 'session-1',
     changeSetPid: 'changeset-1',
     pagePid: 'page-1',
+    ownerUserId: 1,
+    changeSetStatus: 'DRAFT',
+    workspaceMode: 'AUTHORING',
     state: 'ACTIVE',
     revision: 1,
     riskLevel: 'L0',

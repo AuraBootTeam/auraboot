@@ -17,7 +17,7 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react';
-import { usePermission } from '~/contexts/AuthContext';
+import { usePermission, useUser } from '~/contexts/AuthContext';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import {
   activateAuthoringPreviewGuard,
@@ -31,12 +31,15 @@ import {
   openAuthoringSession,
   submitAuthoringSession,
   takeoverAuthoringWriterLease,
+  transitionAuthoringGovernance,
 } from './authoringService';
+import { AuthoringGovernanceNotice } from './AuthoringGovernanceNotice';
 import { AuthoringWriterLeaseNotice } from './AuthoringWriterLeaseNotice';
 import { storeAuthoringConflictTransfer } from './authoringConflictTransfer';
 import type {
   AuthoringMode,
   AuthoringNode,
+  AuthoringGovernanceAction,
   AuthoringSession,
   CapabilityManifest,
   CapabilityRegistry,
@@ -73,6 +76,7 @@ export function ContextualAuthoringSurface({
   const canReadDesigner = usePermission('meta.designer.read');
   const canManageDesigner = usePermission('meta.designer.update');
   const canAdministerDesigner = usePermission('meta.designer.admin');
+  const { user } = useUser();
   const canConfigure = canReadDesigner && canManageDesigner;
   const [session, setSession] = useState<AuthoringSession | null>(null);
   const [workingSchema, setWorkingSchema] = useState<UnifiedSchema>(schema);
@@ -95,6 +99,10 @@ export function ContextualAuthoringSurface({
   const [handoffPending, setHandoffPending] = useState(false);
   const [writeBlocked, setWriteBlocked] = useState(false);
   const [leaseTakeoverPending, setLeaseTakeoverPending] = useState(false);
+  const [governancePending, setGovernancePending] = useState<AuthoringGovernanceAction | null>(
+    null,
+  );
+  const [governanceError, setGovernanceError] = useState<string | null>(null);
   const [contextualConflict, setContextualConflict] = useState<ContextualConflictState | null>(
     null,
   );
@@ -152,6 +160,7 @@ export function ContextualAuthoringSurface({
         setPendingEdits(new Map());
         setStale(false);
         setContextualConflict(null);
+        setGovernanceError(null);
         setCapabilities(registry);
         setSelectedId(selected ?? schema.id);
         setOutlineOpen(true);
@@ -196,6 +205,7 @@ export function ContextualAuthoringSurface({
       setPendingEdits(new Map());
       setStale(false);
       setContextualConflict(null);
+      setGovernanceError(null);
       setCapabilities(registry);
       setSelectedId(schema.id);
     } catch (enterError) {
@@ -211,6 +221,7 @@ export function ContextualAuthoringSurface({
     setPendingEdits(new Map());
     setStale(false);
     setContextualConflict(null);
+    setGovernanceError(null);
     setCapabilities(null);
     setExplain(null);
     setError(null);
@@ -587,6 +598,31 @@ export function ContextualAuthoringSurface({
     }
   }, [canConfigure, contextualConflict, pendingEdits.size, schema, session, submitting]);
 
+  const handleGovernanceAction = useCallback(
+    async (action: AuthoringGovernanceAction, reason: string) => {
+      if (!session || governancePending || !['withdraw', 'reopen'].includes(action)) return;
+      setGovernancePending(action);
+      setGovernanceError(null);
+      try {
+        await transitionAuthoringGovernance(action, session, reason);
+        const latest = await loadAuthoringSession(session.sessionPid);
+        setSession(latest);
+        setWorkingSchema(materializePendingSchema(schema, latest.snapshot, pendingEdits));
+        setContextualConflict(null);
+        setStale(false);
+      } catch (governanceFailure) {
+        setGovernanceError(
+          governanceFailure instanceof Error
+            ? governanceFailure.message
+            : '无法恢复 ChangeSet 编辑',
+        );
+      } finally {
+        setGovernancePending(null);
+      }
+    },
+    [governancePending, pendingEdits, schema, session],
+  );
+
   const takeoverWriterLease = useCallback(
     async (reason: string) => {
       if (!canAdministerDesigner || !session || leaseTakeoverPending) return;
@@ -698,6 +734,19 @@ export function ContextualAuthoringSurface({
           <span>
             配置权限已收回，当前会话已即时转为只读。浏览器中的未保存差异仍会保留，但不会保存、提交或移交；可退出配置模式，或在权限恢复后继续。
           </span>
+        </div>
+      ) : null}
+      {['IN_REVIEW', 'APPROVED', 'REJECTED'].includes(session.changeSetStatus) ? (
+        <div className="mx-3 mt-3">
+          <AuthoringGovernanceNotice
+            session={session}
+            currentUserId={user?.id}
+            canManage={canConfigure}
+            canReview={false}
+            pendingAction={governancePending}
+            error={governanceError}
+            onAction={handleGovernanceAction}
+          />
         </div>
       ) : null}
       {canConfigure ? (

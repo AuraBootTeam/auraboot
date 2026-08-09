@@ -3555,9 +3555,18 @@ CREATE TABLE public.ab_authoring_config_session (
     last_seen_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    workspace_mode character varying(20) DEFAULT 'AUTHORING'::character varying NOT NULL,
     CONSTRAINT chk_authoring_config_session_revision CHECK ((revision > 0)),
-    CONSTRAINT chk_authoring_config_session_state CHECK (((state)::text = ANY ((ARRAY['ACTIVE'::character varying, 'READ_ONLY'::character varying, 'CLOSED'::character varying, 'EXPIRED'::character varying])::text[])))
+    CONSTRAINT chk_authoring_config_session_state CHECK (((state)::text = ANY ((ARRAY['ACTIVE'::character varying, 'READ_ONLY'::character varying, 'CLOSED'::character varying, 'EXPIRED'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_config_session_workspace_mode CHECK (((workspace_mode)::text = ANY ((ARRAY['AUTHORING'::character varying, 'OBSERVER'::character varying, 'REVIEW'::character varying])::text[])))
 );
+
+
+--
+-- Name: COLUMN ab_authoring_config_session.workspace_mode; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_authoring_config_session.workspace_mode IS 'Server-enforced authoring surface boundary; REVIEW sessions remain read-only even for designer admins';
 
 
 --

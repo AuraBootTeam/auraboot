@@ -10,10 +10,13 @@ import {
   applyAuthoringStudioPatch,
   consumeAuthoringHandoff,
   loadAuthoringCapabilities,
+  loadAuthoringReviewWorkspace,
   loadAuthoringSession,
   moveAuthoringStudioBlock,
+  openAuthoringReviewWorkspace,
   observeAuthoringChangeSet,
   takeoverAuthoringWriterLease,
+  transitionAuthoringGovernance,
 } from '~/framework/meta/authoring/authoringService';
 import type {
   AuthoringSession,
@@ -22,10 +25,13 @@ import type {
 } from '~/framework/meta/authoring/types';
 import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
 
-const permissionMock = vi.hoisted(() => ({ canAdministerDesigner: vi.fn(() => true) }));
+const permissionMock = vi.hoisted(() => ({
+  canAdministerDesigner: vi.fn((_permission: string) => true),
+}));
 
 vi.mock('~/contexts/AuthContext', () => ({
   usePermission: permissionMock.canAdministerDesigner,
+  useUser: () => ({ user: { id: '1' }, isAuthenticated: true }),
 }));
 
 vi.mock('../persistence/pageSchemaV3Repository', () => ({
@@ -48,10 +54,13 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   applyAuthoringStudioPatch: vi.fn(),
   consumeAuthoringHandoff: vi.fn(),
   loadAuthoringCapabilities: vi.fn(),
+  loadAuthoringReviewWorkspace: vi.fn(),
   loadAuthoringSession: vi.fn(),
   moveAuthoringStudioBlock: vi.fn(),
   observeAuthoringChangeSet: vi.fn(),
+  openAuthoringReviewWorkspace: vi.fn(),
   takeoverAuthoringWriterLease: vi.fn(),
+  transitionAuthoringGovernance: vi.fn(),
 }));
 
 vi.mock('~/framework/meta/authoring/authoringConflictTransfer', () => ({
@@ -69,12 +78,18 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(consumeAuthoringHandoff).mockReset();
     vi.mocked(loadAuthoringSession).mockReset();
     vi.mocked(loadAuthoringCapabilities).mockReset();
+    vi.mocked(loadAuthoringReviewWorkspace).mockReset();
     vi.mocked(applyAuthoringStudioPatch).mockReset();
     vi.mocked(moveAuthoringStudioBlock).mockReset();
     vi.mocked(observeAuthoringChangeSet).mockReset();
+    vi.mocked(openAuthoringReviewWorkspace).mockReset();
     vi.mocked(takeoverAuthoringWriterLease).mockReset();
+    vi.mocked(transitionAuthoringGovernance).mockReset();
+    vi.mocked(transitionAuthoringGovernance).mockResolvedValue(undefined);
     vi.mocked(consumeAuthoringConflictTransfer).mockReset();
-    permissionMock.canAdministerDesigner.mockReturnValue(true);
+    permissionMock.canAdministerDesigner.mockImplementation(
+      (permission: string) => permission !== 'meta.publish.update',
+    );
   });
 
   it('loads a pageId document and saves edits through the V3 repository', async () => {
@@ -262,6 +277,103 @@ describe('UnifiedDesignerPage', () => {
     );
     expect(String(replaceState.mock.calls.at(-1)?.[2])).not.toContain('changeSetId');
     replaceState.mockRestore();
+  });
+
+  it('lets a non-owner reviewer approve the exact frozen revision in Studio', async () => {
+    setSearch('?reviewChangeSetId=changeset_1');
+    const observer = createAuthoringSession(createDocument('document_one', 'Review Draft'), 7);
+    Object.assign(observer, {
+      ownerUserId: 2,
+      changeSetStatus: 'IN_REVIEW',
+      workspaceMode: 'REVIEW',
+      state: 'READ_ONLY',
+      validationState: 'VALID',
+      approvalState: 'PENDING',
+      publishState: 'DRAFT',
+      writerLease: {
+        status: 'HELD_BY_OTHER',
+        revision: 4,
+        leasedUntil: '2026-08-09T12:05:00Z',
+      },
+    });
+    const approved = { ...observer, changeSetStatus: 'APPROVED', approvalState: 'APPROVED', publishState: 'READY' };
+    permissionMock.canAdministerDesigner.mockReturnValue(true);
+    vi.mocked(openAuthoringReviewWorkspace).mockResolvedValue({
+      session: observer,
+      capabilities: createCapabilities(),
+    });
+    vi.mocked(loadAuthoringReviewWorkspace).mockResolvedValueOnce({
+      session: approved,
+      capabilities: createCapabilities(),
+    });
+
+    render(<UnifiedDesignerPage />);
+
+    expect(await screen.findByTestId('authoring-governance-notice')).toHaveTextContent(
+      'revision r7 已冻结',
+    );
+    expect(screen.getByTestId('designer-save')).toBeDisabled();
+    expect(screen.getByTestId('studio-handoff-read-only-reason')).toHaveTextContent(
+      '评审工作区按当前 revision 只读',
+    );
+    expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('authoring-writer-lease-takeover')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('authoring-governance-approve'));
+
+    await waitFor(() =>
+      expect(transitionAuthoringGovernance).toHaveBeenCalledWith(
+        'approve',
+        expect.objectContaining({ changeSetPid: 'changeset_1', revision: 7 }),
+        '',
+      ),
+    );
+    expect(screen.getByTestId('authoring-governance-notice')).toHaveTextContent(
+      'revision r7 已批准',
+    );
+    expect(screen.queryByTestId('authoring-governance-approve')).not.toBeInTheDocument();
+    expect(String(window.location.search)).toContain('reviewSession=session_1');
+    expect(observeAuthoringChangeSet).not.toHaveBeenCalled();
+  });
+
+  it('restores the dedicated review workspace after a full-page reload', async () => {
+    setSearch('?reviewSession=review_session_1');
+    permissionMock.canAdministerDesigner.mockReturnValue(true);
+    const reviewSession = createAuthoringSession(
+      createDocument('document_one', 'Reloaded Review Draft'),
+      9,
+    );
+    Object.assign(reviewSession, {
+      sessionPid: 'review_session_1',
+      ownerUserId: 2,
+      changeSetStatus: 'IN_REVIEW',
+      workspaceMode: 'REVIEW',
+      state: 'READ_ONLY',
+      validationState: 'VALID',
+      approvalState: 'PENDING',
+      writerLease: {
+        status: 'HELD_BY_OTHER',
+        revision: 5,
+        leasedUntil: '2026-08-09T12:05:00Z',
+      },
+    });
+    vi.mocked(loadAuthoringReviewWorkspace).mockResolvedValue({
+      session: reviewSession,
+      capabilities: createCapabilities(),
+    });
+
+    render(<UnifiedDesignerPage />);
+
+    expect(await screen.findByTestId('studio-handoff-context')).toHaveTextContent(
+      'Reloaded Review Draft',
+    );
+    expect(loadAuthoringReviewWorkspace).toHaveBeenCalledWith('review_session_1');
+    expect(loadAuthoringSession).not.toHaveBeenCalled();
+    expect(loadAuthoringCapabilities).not.toHaveBeenCalled();
+    expect(screen.getByTestId('studio-handoff-read-only-reason')).toHaveTextContent(
+      '评审工作区按当前 revision 只读',
+    );
+    expect(screen.getByTestId('authoring-governance-approve')).toBeEnabled();
+    expect(screen.queryByTestId('authoring-writer-lease-takeover')).not.toBeInTheDocument();
   });
 
   it('consumes an opaque same-tab conflict transfer and opens the professional three-way panel', async () => {
@@ -603,6 +715,9 @@ function createAuthoringSession(
     sessionPid: 'session_1',
     changeSetPid: 'changeset_1',
     pagePid: 'page_1',
+    ownerUserId: 1,
+    changeSetStatus: 'DRAFT',
+    workspaceMode: 'AUTHORING',
     state: 'ACTIVE',
     revision,
     riskLevel,

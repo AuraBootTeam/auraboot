@@ -114,6 +114,9 @@ public class AuthoringHandoffService {
     }
 
     private void validateSource(WorkspaceRow workspace, long expectedRevision) {
+        if ("REVIEW".equals(workspace.workspaceMode())) {
+            throw new ResponseStatusException(FORBIDDEN, "authoring.review.workspace-read-only");
+        }
         if (!"ACTIVE".equals(workspace.sessionState())
                 || !workspace.expiresAt().isAfter(Instant.now())) {
             throw new ResponseStatusException(CONFLICT, "authoring.session.expired");

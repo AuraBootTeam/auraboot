@@ -12,8 +12,10 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Op
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewWorkspaceView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RevisionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RollbackRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ResumeEditingRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.TakeoverWriterLeaseRequest;
 import com.auraboot.framework.common.dto.ApiResponse;
@@ -72,6 +74,20 @@ public class AuthoringWorkspaceController {
         return ApiResponse.success(workspaceService.observe(changeSetPid, request));
     }
 
+    @PostMapping("/change-sets/{changeSetPid}/review-workspaces")
+    @RequirePermission(MetaPermission.PAGE_PUBLISH_MANAGE)
+    public ApiResponse<ReviewWorkspaceView> openReviewWorkspace(
+            @PathVariable String changeSetPid,
+            @Valid @RequestBody(required = false) ObserveChangeSetRequest request) {
+        return ApiResponse.success(workspaceService.openReviewWorkspace(changeSetPid, request));
+    }
+
+    @GetMapping("/review-workspaces/{sessionPid}")
+    @RequirePermission(MetaPermission.PAGE_PUBLISH_MANAGE)
+    public ApiResponse<ReviewWorkspaceView> getReviewWorkspace(@PathVariable String sessionPid) {
+        return ApiResponse.success(workspaceService.getReviewWorkspace(sessionPid));
+    }
+
     @PostMapping("/sessions/{sessionPid}/writer-lease/takeover")
     @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
     public ApiResponse<SessionView> takeoverWriterLease(
@@ -124,6 +140,22 @@ public class AuthoringWorkspaceController {
             @PathVariable String sessionPid,
             @Valid @RequestBody RevisionRequest request) {
         return ApiResponse.success(governanceService.submit(sessionPid, request));
+    }
+
+    @PostMapping("/sessions/{sessionPid}/review/withdraw")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
+    public ApiResponse<ChangeSetView> withdrawReview(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody ResumeEditingRequest request) {
+        return ApiResponse.success(governanceService.withdrawReview(sessionPid, request));
+    }
+
+    @PostMapping("/sessions/{sessionPid}/approved/reopen")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
+    public ApiResponse<ChangeSetView> reopenApproved(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody ResumeEditingRequest request) {
+        return ApiResponse.success(governanceService.reopenApproved(sessionPid, request));
     }
 
     @PostMapping("/change-sets/{changeSetPid}/approve")

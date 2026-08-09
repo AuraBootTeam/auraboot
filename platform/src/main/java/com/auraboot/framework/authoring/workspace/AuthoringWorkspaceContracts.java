@@ -23,6 +23,11 @@ public final class AuthoringWorkspaceContracts {
             List<CapabilityManifest> manifests) {
     }
 
+    public record ReviewWorkspaceView(
+            SessionView session,
+            CapabilityRegistryView capabilities) {
+    }
+
     public record OpenSessionRequest(
             @NotBlank String pagePid,
             JsonNode interactionContext) {
@@ -63,6 +68,9 @@ public final class AuthoringWorkspaceContracts {
             String sessionPid,
             String changeSetPid,
             String pagePid,
+            long ownerUserId,
+            String changeSetStatus,
+            String workspaceMode,
             String state,
             long revision,
             String riskLevel,
@@ -129,6 +137,11 @@ public final class AuthoringWorkspaceContracts {
     public record ReviewRequest(
             @Positive long expectedRevision,
             @Size(max = 1000) String reason) {
+    }
+
+    public record ResumeEditingRequest(
+            @Positive long expectedRevision,
+            @NotBlank @Size(max = 1000) String reason) {
     }
 
     public record RollbackRequest(

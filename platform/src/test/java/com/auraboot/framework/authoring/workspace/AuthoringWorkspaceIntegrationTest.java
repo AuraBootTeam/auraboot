@@ -15,6 +15,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Re
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RevisionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RollbackRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ResumeEditingRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.StudioIntent;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -131,7 +132,21 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/change-sets/missing/review-workspaces")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/authoring/review-workspaces/missing"))
+                .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/authoring/sessions/missing/writer-lease/takeover")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":1,\"reason\":\"test\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/sessions/missing/review/withdraw")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":1,\"reason\":\"test\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/sessions/missing/approved/reopen")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"expectedRevision\":1,\"reason\":\"test\"}"))
                 .andExpect(status().isForbidden());
@@ -542,6 +557,96 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void reviewerGetsABoundedReadOnlyWorkspaceWithoutDesignerAdminPermission() throws Exception {
+        PageSchema page = insertPage("normal");
+        SessionView normalAuthoringSession = workspaceService.open(
+                new OpenSessionRequest(page.getPid(), null));
+        long environmentId = MetaContext.getCurrentEnvironmentId();
+        SessionView opened;
+        long authorUserId = testUser.getId() + 100_000;
+        try {
+            MetaContext.setContext(
+                    testTenant.getId(), authorUserId, "author", "author");
+            MetaContext.setEnvironmentId(environmentId);
+            opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+            workspaceService.apply(opened.sessionPid(), new ApplyPatchRequest(
+                    1, "table-1", "/props/pageSize", PatchOperation.ADD,
+                    objectMapper.getNodeFactory().numberNode(20),
+                    capabilityRegistry.find("table").orElseThrow().checksum()));
+            governanceService.submit(opened.sessionPid(), new RevisionRequest(2));
+        } finally {
+            applyTestMetaContext();
+        }
+
+        grantPublisherManage();
+        String body = mockMvc.perform(post(
+                        "/api/authoring/change-sets/{changeSetPid}/review-workspaces",
+                        opened.changeSetPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.state").value("READ_ONLY"))
+                .andExpect(jsonPath("$.data.session.workspaceMode").value("REVIEW"))
+                .andExpect(jsonPath("$.data.session.ownerUserId").value(authorUserId))
+                .andExpect(jsonPath("$.data.session.changeSetStatus").value("IN_REVIEW"))
+                .andExpect(jsonPath("$.data.session.revision").value(2))
+                .andExpect(jsonPath("$.data.capabilities.checksum").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        String reviewSessionPid = objectMapper.readTree(body).at("/data/session/sessionPid").asText();
+
+        mockMvc.perform(get(
+                        "/api/authoring/review-workspaces/{sessionPid}", reviewSessionPid))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.sessionPid").value(reviewSessionPid));
+        mockMvc.perform(get(
+                        "/api/authoring/review-workspaces/{sessionPid}",
+                        normalAuthoringSession.sessionPid()))
+                .andExpect(status().isForbidden());
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_audit_event
+                WHERE tenant_id = ? AND env_id = ? AND change_set_pid = ?
+                  AND event_type = 'REVIEW_WORKSPACE_OPENED'
+                  AND metadata ->> 'workspaceMode' = 'REVIEW'
+                """, Integer.class,
+                testTenant.getId(), environmentId, opened.changeSetPid())).isEqualTo(1);
+
+        grantDesignerManage();
+        grantDesignerAdmin();
+        mockMvc.perform(post(
+                        "/api/authoring/sessions/{sessionPid}/writer-lease/takeover",
+                        reviewSessionPid)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":2,\"reason\":\"reviewer must stay read-only\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(patch(
+                        "/api/authoring/sessions/{sessionPid}/studio-patches", reviewSessionPid)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expectedRevision":2,"blockId":"table-1",
+                                 "propertyPath":"/props/density","operation":"REPLACE",
+                                 "value":"compact","manifestChecksum":"ignored"}
+                                """))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post(
+                        "/api/authoring/sessions/{sessionPid}/handoffs", reviewSessionPid)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":2,\"intent\":\"PAGE_STRUCTURE\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post(
+                        "/api/authoring/sessions/{sessionPid}/submit", reviewSessionPid)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":2}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post(
+                        "/api/authoring/change-sets/{changeSetPid}/approve",
+                        opened.changeSetPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":2,\"reason\":\"reviewed\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("APPROVED"));
+    }
+
+    @Test
     void controllerAllowsPublishOnlyWithPublishAdminPermission() throws Exception {
         PageSchema page = insertPage("normal");
         SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
@@ -823,6 +928,127 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void ownerWithdrawalCreatesANewEditableRevisionAndStalesThePendingReview() {
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        workspaceService.apply(opened.sessionPid(), new ApplyPatchRequest(
+                1, "table-1", "/props/pageSize", PatchOperation.ADD,
+                objectMapper.getNodeFactory().numberNode(20),
+                capabilityRegistry.find("table").orElseThrow().checksum()));
+        governanceService.submit(opened.sessionPid(), new RevisionRequest(2));
+
+        ChangeSetView withdrawn = governanceService.withdrawReview(
+                opened.sessionPid(), new ResumeEditingRequest(2, "补充筛选条件"));
+
+        assertThat(withdrawn.status()).isEqualTo("DRAFT");
+        assertThat(withdrawn.revision()).isEqualTo(3);
+        assertThat(withdrawn.validationState()).isEqualTo("UNVALIDATED");
+        assertThat(withdrawn.approvalState()).isEqualTo("STALE");
+        assertThat(approvalStatus(opened.changeSetPid(), 2)).isEqualTo("STALE");
+        assertRevisionTransitionAudit(
+                opened.changeSetPid(), "CHANGE_SET_REVIEW_WITHDRAWN",
+                "补充筛选条件", 2, 3);
+        SessionView resumed = workspaceService.get(opened.sessionPid());
+        assertThat(resumed.state()).isEqualTo("ACTIVE");
+        assertThat(resumed.revision()).isEqualTo(3);
+
+        assertThatThrownBy(() -> workspaceService.apply(
+                opened.sessionPid(), new ApplyPatchRequest(
+                        2, "table-1", "/props/density", PatchOperation.REPLACE,
+                        objectMapper.getNodeFactory().textNode("compact"),
+                        capabilityRegistry.find("table").orElseThrow().checksum())))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("authoring.revision.conflict");
+        assertThat(patchDensity(resumed, "compact").session().revision()).isEqualTo(4);
+    }
+
+    @Test
+    void reopeningAnApprovedRevisionInvalidatesItsApprovalBeforeFurtherEditing() {
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        workspaceService.apply(opened.sessionPid(), new ApplyPatchRequest(
+                1, "table-1", "/props/pageSize", PatchOperation.ADD,
+                objectMapper.getNodeFactory().numberNode(20),
+                capabilityRegistry.find("table").orElseThrow().checksum()));
+        governanceService.submit(opened.sessionPid(), new RevisionRequest(2));
+
+        long environmentId = MetaContext.getCurrentEnvironmentId();
+        try {
+            MetaContext.setContext(
+                    testTenant.getId(), testUser.getId() + 100_000,
+                    "reviewer", "reviewer");
+            MetaContext.setEnvironmentId(environmentId);
+            governanceService.approve(
+                    opened.changeSetPid(), new ReviewRequest(2, "reviewed"));
+        } finally {
+            applyTestMetaContext();
+        }
+
+        ChangeSetView reopened = governanceService.reopenApproved(
+                opened.sessionPid(), new ResumeEditingRequest(2, "批准后发现需补充说明"));
+
+        assertThat(reopened.status()).isEqualTo("DRAFT");
+        assertThat(reopened.revision()).isEqualTo(3);
+        assertThat(reopened.validationState()).isEqualTo("UNVALIDATED");
+        assertThat(reopened.approvalState()).isEqualTo("STALE");
+        assertThat(approvalStatus(opened.changeSetPid(), 2)).isEqualTo("STALE");
+        assertThat(approvalReason(opened.changeSetPid(), 2)).isEqualTo("reviewed");
+        assertRevisionTransitionAudit(
+                opened.changeSetPid(), "CHANGE_SET_APPROVAL_INVALIDATED",
+                "批准后发现需补充说明", 2, 3);
+        assertThatThrownBy(() -> governanceService.publish(
+                opened.changeSetPid(), new RevisionRequest(3)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("authoring.workflow.invalid-state");
+        SessionView resumed = workspaceService.get(opened.sessionPid());
+        assertThat(resumed.state()).isEqualTo("ACTIVE");
+        assertThat(resumed.revision()).isEqualTo(3);
+        assertThat(patchDensity(resumed, "compact").session().revision()).isEqualTo(4);
+    }
+
+    @Test
+    void rejectionRecordsTheOldDecisionAndReturnsTheOwnerToANewRevision() {
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        workspaceService.apply(opened.sessionPid(), new ApplyPatchRequest(
+                1, "table-1", "/props/pageSize", PatchOperation.ADD,
+                objectMapper.getNodeFactory().numberNode(20),
+                capabilityRegistry.find("table").orElseThrow().checksum()));
+        governanceService.submit(opened.sessionPid(), new RevisionRequest(2));
+
+        long environmentId = MetaContext.getCurrentEnvironmentId();
+        try {
+            MetaContext.setContext(
+                    testTenant.getId(), testUser.getId() + 100_000,
+                    "reviewer", "reviewer");
+            MetaContext.setEnvironmentId(environmentId);
+            assertThatThrownBy(() -> governanceService.reject(
+                    opened.changeSetPid(), new ReviewRequest(2, " ")))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .hasMessageContaining("authoring.review.reason-required");
+            ChangeSetView rejected = governanceService.reject(
+                    opened.changeSetPid(), new ReviewRequest(2, "默认筛选会隐藏异常订单"));
+            assertThat(rejected.status()).isEqualTo("REJECTED");
+            assertThat(rejected.revision()).isEqualTo(3);
+            assertThat(rejected.validationState()).isEqualTo("UNVALIDATED");
+            assertThat(rejected.approvalState()).isEqualTo("REJECTED");
+        } finally {
+            applyTestMetaContext();
+        }
+
+        assertThat(approvalStatus(opened.changeSetPid(), 2)).isEqualTo("REJECTED");
+        assertThat(approvalReason(opened.changeSetPid(), 2))
+                .isEqualTo("默认筛选会隐藏异常订单");
+        assertRevisionTransitionAudit(
+                opened.changeSetPid(), "CHANGE_SET_REJECTED",
+                "默认筛选会隐藏异常订单", 2, 3);
+        SessionView resumed = workspaceService.get(opened.sessionPid());
+        assertThat(resumed.state()).isEqualTo("ACTIVE");
+        assertThat(resumed.revision()).isEqualTo(3);
+        assertThat(patchDensity(resumed, "compact").session().revision()).isEqualTo(4);
+    }
+
+    @Test
     void activeReleaseMakesConcurrentLegacyBaseStale() {
         PageSchema page = insertPage("normal");
         SessionView first = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
@@ -999,6 +1225,43 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 opened.revision(), "table-1", "/props/density", PatchOperation.REPLACE,
                 objectMapper.getNodeFactory().textNode(density),
                 capabilityRegistry.find("table").orElseThrow().checksum()));
+    }
+
+    private String approvalStatus(String changeSetPid, long revision) {
+        return jdbcTemplate.queryForObject("""
+                SELECT status FROM ab_authoring_approval
+                WHERE change_set_id = (
+                    SELECT id FROM ab_authoring_change_set WHERE pid = ?)
+                  AND change_set_revision = ?
+                """, String.class, changeSetPid, revision);
+    }
+
+    private String approvalReason(String changeSetPid, long revision) {
+        return jdbcTemplate.queryForObject("""
+                SELECT reason FROM ab_authoring_approval
+                WHERE change_set_id = (
+                    SELECT id FROM ab_authoring_change_set WHERE pid = ?)
+                  AND change_set_revision = ?
+                """, String.class, changeSetPid, revision);
+    }
+
+    private void assertRevisionTransitionAudit(
+            String changeSetPid,
+            String eventType,
+            String reason,
+            long decisionRevision,
+            long resultRevision) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_audit_event
+                WHERE tenant_id = ? AND env_id = ? AND change_set_pid = ?
+                  AND event_type = ? AND result = 'ALLOW'
+                  AND metadata ->> 'reason' = ?
+                  AND (metadata ->> 'decisionRevision')::bigint = ?
+                  AND (metadata ->> 'resultRevision')::bigint = ?
+                """, Integer.class,
+                testTenant.getId(), MetaContext.getCurrentEnvironmentId(), changeSetPid,
+                eventType, reason, decisionRevision, resultRevision);
+        assertThat(count).isEqualTo(1);
     }
 
     private void grantDesignerRead() {

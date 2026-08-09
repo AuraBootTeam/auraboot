@@ -2,11 +2,13 @@ import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type {
   AuthoringSession,
+  AuthoringReviewWorkspace,
   CapabilityRegistry,
   HandoffContext,
   HandoffCreated,
   PatchOperation,
   PatchResult,
+  AuthoringGovernanceAction,
 } from './types';
 
 export interface InteractionContext {
@@ -56,6 +58,29 @@ export async function observeAuthoringChangeSet(
     },
   );
   return requireData(result, '无法打开 ChangeSet 只读会话');
+}
+
+export async function openAuthoringReviewWorkspace(
+  changeSetPid: string,
+  interactionContext?: Partial<InteractionContext>,
+): Promise<AuthoringReviewWorkspace> {
+  const result = await fetchResult<AuthoringReviewWorkspace>(
+    `/api/authoring/change-sets/${encodeURIComponent(changeSetPid)}/review-workspaces`,
+    {
+      method: 'post',
+      params: interactionContext ? { interactionContext } : {},
+    },
+  );
+  return requireData(result, '无法打开 ChangeSet 评审工作区');
+}
+
+export async function loadAuthoringReviewWorkspace(
+  sessionPid: string,
+): Promise<AuthoringReviewWorkspace> {
+  const result = await fetchResult<AuthoringReviewWorkspace>(
+    `/api/authoring/review-workspaces/${encodeURIComponent(sessionPid)}`,
+  );
+  return requireData(result, '无法刷新 ChangeSet 评审工作区');
 }
 
 export async function takeoverAuthoringWriterLease(
@@ -154,6 +179,26 @@ export async function submitAuthoringSession(sessionPid: string, revision: numbe
   );
   if (!ResultHelper.isSuccess(result)) {
     throw new Error(result.message || result.desc || '无法提交评审');
+  }
+}
+
+export async function transitionAuthoringGovernance(
+  action: AuthoringGovernanceAction,
+  session: Pick<AuthoringSession, 'sessionPid' | 'changeSetPid' | 'revision'>,
+  reason: string,
+): Promise<void> {
+  const target =
+    action === 'withdraw'
+      ? `/api/authoring/sessions/${encodeURIComponent(session.sessionPid)}/review/withdraw`
+      : action === 'reopen'
+        ? `/api/authoring/sessions/${encodeURIComponent(session.sessionPid)}/approved/reopen`
+        : `/api/authoring/change-sets/${encodeURIComponent(session.changeSetPid)}/${action}`;
+  const result = await fetchResult<unknown>(target, {
+    method: 'post',
+    params: { expectedRevision: session.revision, reason },
+  });
+  if (!ResultHelper.isSuccess(result)) {
+    throw new Error(result.message || result.desc || '无法完成 ChangeSet 治理操作');
   }
 }
 

@@ -10,6 +10,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Re
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RevisionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RollbackRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ResumeEditingRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.AuditEntry;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.WorkspaceRow;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -34,6 +35,7 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 public class AuthoringGovernanceService {
 
     private static final Duration WRITER_LEASE = Duration.ofMinutes(5);
+    private static final String REVIEW_WORKSPACE_MODE = "REVIEW";
 
     private final AuthoringGovernanceRepository governanceRepository;
     private final AuthoringWorkspaceRepository workspaceRepository;
@@ -62,6 +64,7 @@ public class AuthoringGovernanceService {
         Identity identity = identity();
         WorkspaceRow workspace = requireOwnedSession(identity, sessionPid);
         GovernanceRow row = requireChangeSet(identity, workspace.changeSetPid(), true);
+        requireWritableSession(workspace, row, identity, request.expectedRevision());
         governanceValidator.requireRevision(row, request.expectedRevision());
         governanceValidator.requireStatus(row, "DRAFT", "REJECTED");
         governanceValidator.requireFresh(row);
@@ -90,17 +93,50 @@ public class AuthoringGovernanceService {
     }
 
     @Transactional
+    public ChangeSetView withdrawReview(String sessionPid, ResumeEditingRequest request) {
+        Identity identity = identity();
+        WorkspaceRow workspace = requireOwnedSession(identity, sessionPid);
+        GovernanceRow row = requireChangeSet(identity, workspace.changeSetPid(), true);
+        governanceValidator.requireRevision(row, request.expectedRevision());
+        governanceValidator.requireStatus(row, "IN_REVIEW");
+        requireOwner(row, identity);
+        requireResumableSession(workspace, request.expectedRevision());
+        governanceRepository.withdrawReview(
+                row, workspace.sessionId(), identity.userId(), Instant.now().plus(WRITER_LEASE));
+        audit(identity, row, sessionPid, "CHANGE_SET_REVIEW_WITHDRAWN", "ALLOW",
+                "OWNER_RESUMED_EDITING", revisionTransition(row, request.reason()));
+        return view(requireChangeSet(identity, row.changeSetPid(), false));
+    }
+
+    @Transactional
+    public ChangeSetView reopenApproved(String sessionPid, ResumeEditingRequest request) {
+        Identity identity = identity();
+        WorkspaceRow workspace = requireOwnedSession(identity, sessionPid);
+        GovernanceRow row = requireChangeSet(identity, workspace.changeSetPid(), true);
+        governanceValidator.requireRevision(row, request.expectedRevision());
+        governanceValidator.requireStatus(row, "APPROVED");
+        requireOwner(row, identity);
+        requireResumableSession(workspace, request.expectedRevision());
+        governanceRepository.reopenApproved(
+                row, workspace.sessionId(), identity.userId(), Instant.now().plus(WRITER_LEASE));
+        audit(identity, row, sessionPid, "CHANGE_SET_APPROVAL_INVALIDATED", "ALLOW",
+                "OWNER_RESUMED_EDITING", revisionTransition(row, request.reason()));
+        return view(requireChangeSet(identity, row.changeSetPid(), false));
+    }
+
+    @Transactional
     public ChangeSetView reject(String changeSetPid, ReviewRequest request) {
         Identity identity = identity();
         GovernanceRow row = requireChangeSet(identity, changeSetPid, true);
         governanceValidator.requireRevision(row, request.expectedRevision());
         governanceValidator.requireStatus(row, "IN_REVIEW");
         governanceValidator.requireFourEyes(row, identity.userId());
+        String reason = requireReason(request.reason());
         governanceRepository.reject(
-                row, identity.userId(), safeReason(request.reason()),
+                row, identity.userId(), reason,
                 Instant.now().plus(WRITER_LEASE));
         audit(identity, row, null, "CHANGE_SET_REJECTED", "ALLOW", "REVISION_REJECTED",
-                objectMapper.valueToTree(Map.of("rejectedRevision", row.revision())));
+                revisionTransition(row, reason));
         return view(requireChangeSet(identity, changeSetPid, false));
     }
 
@@ -216,6 +252,72 @@ public class AuthoringGovernanceService {
 
     private String safeReason(String reason) {
         return reason == null || reason.isBlank() ? null : reason.trim();
+    }
+
+    private String requireReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw conflict("authoring.review.reason-required");
+        }
+        return reason.trim();
+    }
+
+    private void requireOwner(GovernanceRow row, Identity identity) {
+        if (row.ownerUserId() != identity.userId()) {
+            throw new ResponseStatusException(FORBIDDEN, "authoring.change-set.owner-required");
+        }
+    }
+
+    private void requireResumableSession(WorkspaceRow workspace, long expectedRevision) {
+        requireNonReviewWorkspace(workspace);
+        if (!workspace.expiresAt().isAfter(Instant.now())
+                || (!"ACTIVE".equals(workspace.sessionState())
+                && !"READ_ONLY".equals(workspace.sessionState()))) {
+            throw conflict("authoring.session.expired");
+        }
+        if (workspace.sessionRevision() != expectedRevision
+                || workspace.resourceRevision() != expectedRevision) {
+            throw conflict("authoring.revision.conflict");
+        }
+    }
+
+    private void requireWritableSession(
+            WorkspaceRow workspace,
+            GovernanceRow row,
+            Identity identity,
+            long expectedRevision) {
+        requireNonReviewWorkspace(workspace);
+        Instant now = Instant.now();
+        if (!workspace.expiresAt().isAfter(now)) {
+            throw conflict("authoring.session.expired");
+        }
+        if (!"ACTIVE".equals(workspace.sessionState())) {
+            throw conflict("authoring.session.read-only");
+        }
+        if (row.leaseSessionId() != workspace.sessionId()
+                || row.leaseHolderUserId() != identity.userId()) {
+            throw conflict("authoring.writer-lease.lost");
+        }
+        if (!workspace.leasedUntil().isAfter(now)) {
+            throw conflict("authoring.writer-lease.expired");
+        }
+        if (row.revision() != expectedRevision
+                || workspace.sessionRevision() != expectedRevision
+                || workspace.resourceRevision() != expectedRevision) {
+            throw conflict("authoring.revision.conflict");
+        }
+    }
+
+    private void requireNonReviewWorkspace(WorkspaceRow workspace) {
+        if (REVIEW_WORKSPACE_MODE.equals(workspace.workspaceMode())) {
+            throw new ResponseStatusException(FORBIDDEN, "authoring.review.workspace-read-only");
+        }
+    }
+
+    private JsonNode revisionTransition(GovernanceRow row, String reason) {
+        return objectMapper.valueToTree(Map.of(
+                "reason", reason.trim(),
+                "decisionRevision", row.revision(),
+                "resultRevision", row.revision() + 1));
     }
 
     private Identity identity() {

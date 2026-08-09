@@ -28,7 +28,7 @@ public class AuthoringGovernanceRepository {
     }
 
     public GovernanceRow findChangeSet(long tenantId, long envId, String changeSetPid, boolean lock) {
-        String lockClause = lock ? " FOR UPDATE OF cs, rd" : "";
+        String lockClause = lock ? " FOR UPDATE OF cs, rd, wl" : "";
         return jdbcTemplate.query("""
                         SELECT cs.id AS change_set_id, cs.pid AS change_set_pid,
                                cs.tenant_id, cs.env_id, cs.owner_user_id, cs.status,
@@ -38,13 +38,20 @@ public class AuthoringGovernanceRepository {
                                rd.id AS resource_draft_id, rd.pid AS resource_draft_pid,
                                rd.resource_pid, rd.base_version, rd.base_checksum,
                                rd.manifest_checksum AS draft_manifest_checksum,
-                               rd.snapshot::text
+                               rd.snapshot::text,
+                               wl.session_id AS lease_session_id,
+                               wl.holder_user_id AS lease_holder_user_id,
+                               wl.lease_revision
                         FROM ab_authoring_change_set cs
                         JOIN ab_authoring_resource_draft rd
                           ON rd.change_set_id = cs.id
                          AND rd.tenant_id = cs.tenant_id
                          AND rd.env_id = cs.env_id
                          AND rd.resource_type = 'PAGE_SCHEMA'
+                        JOIN ab_authoring_writer_lease wl
+                          ON wl.change_set_id = cs.id
+                         AND wl.tenant_id = cs.tenant_id
+                         AND wl.env_id = cs.env_id
                         WHERE cs.tenant_id = ? AND cs.env_id = ? AND cs.pid = ?
                           AND cs.deleted_flag = FALSE
                         """ + lockClause,
@@ -113,40 +120,129 @@ public class AuthoringGovernanceRepository {
         requireOne(changeSetUpdated, "authoring.approval.conflict");
     }
 
+    public void withdrawReview(
+            GovernanceRow row,
+            long sessionId,
+            long ownerUserId,
+            Instant leaseUntil) {
+        invalidateApproval(row, "PENDING", "authoring.approval.not-pending");
+        resumeEditing(row, "IN_REVIEW", "DRAFT", "STALE", sessionId, ownerUserId, leaseUntil);
+    }
+
+    public void reopenApproved(
+            GovernanceRow row,
+            long sessionId,
+            long ownerUserId,
+            Instant leaseUntil) {
+        String nextApprovalState = "NOT_REQUIRED";
+        if ("APPROVED".equals(row.approvalState())) {
+            invalidateApproval(row, "APPROVED", "authoring.approval.not-approved");
+            nextApprovalState = "STALE";
+        }
+        resumeEditing(
+                row, "APPROVED", "DRAFT", nextApprovalState,
+                sessionId, ownerUserId, leaseUntil);
+    }
+
     public void reject(
             GovernanceRow row,
             long reviewerUserId,
             String reason,
             Instant leaseUntil) {
-        int approvalUpdated = jdbcTemplate.update("""
+        decideApproval(row, "PENDING", "REJECTED", reviewerUserId, reason,
+                "authoring.approval.not-pending");
+        resumeEditing(
+                row, "IN_REVIEW", "REJECTED", "REJECTED",
+                row.leaseSessionId(), row.leaseHolderUserId(), leaseUntil);
+    }
+
+    private void decideApproval(
+            GovernanceRow row,
+            String expectedStatus,
+            String resultStatus,
+            long actorUserId,
+            String reason,
+            String conflictReason) {
+        int updated = jdbcTemplate.update("""
                 UPDATE ab_authoring_approval
-                SET status = 'REJECTED', reviewer_user_id = ?, reason = ?,
+                SET status = ?, reviewer_user_id = ?, reason = ?,
                     decided_at = CURRENT_TIMESTAMP
                 WHERE tenant_id = ? AND env_id = ? AND change_set_id = ?
-                  AND change_set_revision = ? AND status = 'PENDING'
-                """, reviewerUserId, reason, row.tenantId(), row.envId(),
-                row.changeSetId(), row.revision());
-        requireOne(approvalUpdated, "authoring.approval.not-pending");
+                  AND change_set_revision = ? AND status = ?
+                """, resultStatus, actorUserId, reason, row.tenantId(), row.envId(),
+                row.changeSetId(), row.revision(), expectedStatus);
+        requireOne(updated, conflictReason);
+    }
+
+    private void invalidateApproval(
+            GovernanceRow row,
+            String expectedStatus,
+            String conflictReason) {
+        int updated = jdbcTemplate.update("""
+                UPDATE ab_authoring_approval
+                SET status = 'STALE'
+                WHERE tenant_id = ? AND env_id = ? AND change_set_id = ?
+                  AND change_set_revision = ? AND status = ?
+                """, row.tenantId(), row.envId(), row.changeSetId(), row.revision(), expectedStatus);
+        requireOne(updated, conflictReason);
+    }
+
+    private void resumeEditing(
+            GovernanceRow row,
+            String expectedStatus,
+            String resultStatus,
+            String approvalState,
+            long writerSessionId,
+            long writerUserId,
+            Instant leaseUntil) {
+        int resourceUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_resource_draft
+                SET revision = revision + 1, validation_state = 'UNVALIDATED',
+                    stale_reason = NULL, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
+                """, row.resourceDraftId(), row.tenantId(), row.envId(), row.revision());
+        requireOne(resourceUpdated, "authoring.review.resource-revision-conflict");
+
         int changeSetUpdated = jdbcTemplate.update("""
                 UPDATE ab_authoring_change_set
-                SET status = 'REJECTED', approval_state = 'REJECTED',
-                    publish_state = 'DRAFT', updated_at = CURRENT_TIMESTAMP
+                SET revision = revision + 1, status = ?,
+                    validation_state = 'UNVALIDATED', approval_state = ?,
+                    publish_state = 'DRAFT', stale_reason = NULL,
+                    submitted_at = NULL, approved_at = NULL, published_at = NULL,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND tenant_id = ? AND env_id = ? AND revision = ?
-                  AND status = 'IN_REVIEW'
-                """, row.changeSetId(), row.tenantId(), row.envId(), row.revision());
-        requireOne(changeSetUpdated, "authoring.rejection.conflict");
-        jdbcTemplate.update("""
+                  AND status = ?
+                """, resultStatus, approvalState, row.changeSetId(), row.tenantId(), row.envId(),
+                row.revision(), expectedStatus);
+        requireOne(changeSetUpdated, "authoring.review.revision-conflict");
+
+        int sessionUpdated = jdbcTemplate.update("""
                 UPDATE ab_authoring_config_session
-                SET state = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
-                WHERE change_set_id = ? AND tenant_id = ? AND env_id = ?
-                  AND expires_at > CURRENT_TIMESTAMP AND state = 'READ_ONLY'
-                """, row.changeSetId(), row.tenantId(), row.envId());
-        jdbcTemplate.update("""
-                UPDATE ab_authoring_writer_lease
-                SET leased_until = ?, lease_revision = lease_revision + 1,
+                SET revision = ?,
+                    state = CASE
+                        WHEN expires_at <= CURRENT_TIMESTAMP THEN 'EXPIRED'
+                        WHEN id = ? THEN 'ACTIVE'
+                        ELSE 'READ_ONLY'
+                    END,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE change_set_id = ? AND tenant_id = ? AND env_id = ?
-                """, Timestamp.from(leaseUntil), row.changeSetId(), row.tenantId(), row.envId());
+                  AND state IN ('ACTIVE', 'READ_ONLY')
+                """, row.revision() + 1, writerSessionId,
+                row.changeSetId(), row.tenantId(), row.envId());
+        if (sessionUpdated == 0) {
+            throw new ResponseStatusException(CONFLICT, "authoring.review.session-conflict");
+        }
+
+        int leaseUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_writer_lease
+                SET session_id = ?, holder_user_id = ?, acquired_at = CURRENT_TIMESTAMP,
+                    leased_until = ?, lease_revision = lease_revision + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE change_set_id = ? AND tenant_id = ? AND env_id = ?
+                  AND lease_revision = ?
+                """, writerSessionId, writerUserId, Timestamp.from(leaseUntil),
+                row.changeSetId(), row.tenantId(), row.envId(), row.leaseRevision());
+        requireOne(leaseUpdated, "authoring.review.lease-conflict");
     }
 
     public ChannelRow lockChannel(GovernanceRow row) {
@@ -362,7 +458,10 @@ public class AuthoringGovernanceRepository {
                 resultSet.getString("resource_pid"), resultSet.getLong("base_version"),
                 resultSet.getString("base_checksum"),
                 resultSet.getString("draft_manifest_checksum"),
-                parse(resultSet.getString("snapshot")));
+                parse(resultSet.getString("snapshot")),
+                resultSet.getLong("lease_session_id"),
+                resultSet.getLong("lease_holder_user_id"),
+                resultSet.getLong("lease_revision"));
     }
 
     private RollbackRow mapRollback(ResultSet resultSet) throws SQLException {
@@ -425,7 +524,10 @@ public class AuthoringGovernanceRepository {
             long baseVersion,
             String baseChecksum,
             String draftManifestChecksum,
-            JsonNode snapshot) {
+            JsonNode snapshot,
+            long leaseSessionId,
+            long leaseHolderUserId,
+            long leaseRevision) {
     }
 
     public record ChannelRow(

@@ -55,8 +55,8 @@ public class AuthoringWorkspaceRepository {
         Long sessionId = jdbcTemplate.queryForObject("""
                 INSERT INTO ab_authoring_config_session (
                     pid, tenant_id, env_id, actor_user_id, change_set_id, page_pid, state,
-                    interaction_context, revision, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?::jsonb, 1, ?)
+                    workspace_mode, interaction_context, revision, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', 'AUTHORING', ?::jsonb, 1, ?)
                 RETURNING id
                 """, Long.class,
                 command.sessionPid(), command.tenantId(), command.envId(), command.actorUserId(),
@@ -79,9 +79,11 @@ public class AuthoringWorkspaceRepository {
                         SELECT
                             s.id AS session_id, s.pid AS session_pid, s.tenant_id, s.env_id,
                             s.actor_user_id,
-                            s.page_pid, s.state AS session_state, s.interaction_context::text,
+                            s.page_pid, s.state AS session_state, s.workspace_mode,
+                            s.interaction_context::text,
                             s.expires_at, s.revision AS session_revision,
                             cs.id AS change_set_id, cs.pid AS change_set_pid,
+                            cs.owner_user_id AS change_set_owner_user_id,
                             cs.status AS change_set_status,
                             cs.revision AS change_set_revision, cs.risk_level, cs.route,
                             cs.publish_policy, cs.validation_state, cs.approval_state,
@@ -136,11 +138,12 @@ public class AuthoringWorkspaceRepository {
         jdbcTemplate.update("""
                 INSERT INTO ab_authoring_config_session (
                     pid, tenant_id, env_id, actor_user_id, change_set_id, page_pid, state,
-                    interaction_context, revision, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?, 'READ_ONLY', ?::jsonb, ?, ?)
+                    workspace_mode, interaction_context, revision, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'READ_ONLY', ?, ?::jsonb, ?, ?)
                 """,
                 command.sessionPid(), command.tenantId(), command.envId(), command.actorUserId(),
-                target.changeSetId(), target.pagePid(), json(command.interactionContext()),
+                target.changeSetId(), target.pagePid(), command.workspaceMode(),
+                json(command.interactionContext()),
                 target.revision(), Timestamp.from(command.expiresAt()));
         return command.sessionPid();
     }
@@ -353,11 +356,13 @@ public class AuthoringWorkspaceRepository {
                 resultSet.getLong("actor_user_id"),
                 resultSet.getString("page_pid"),
                 resultSet.getString("session_state"),
+                resultSet.getString("workspace_mode"),
                 parse(resultSet.getString("interaction_context")),
                 resultSet.getTimestamp("expires_at").toInstant(),
                 resultSet.getLong("session_revision"),
                 resultSet.getLong("change_set_id"),
                 resultSet.getString("change_set_pid"),
+                resultSet.getLong("change_set_owner_user_id"),
                 resultSet.getString("change_set_status"),
                 resultSet.getLong("change_set_revision"),
                 resultSet.getString("risk_level"),
@@ -433,6 +438,7 @@ public class AuthoringWorkspaceRepository {
             long actorUserId,
             String changeSetPid,
             String sessionPid,
+            String workspaceMode,
             JsonNode interactionContext,
             Instant expiresAt) {
     }
@@ -474,11 +480,13 @@ public class AuthoringWorkspaceRepository {
             long actorUserId,
             String pagePid,
             String sessionState,
+            String workspaceMode,
             JsonNode interactionContext,
             Instant expiresAt,
             long sessionRevision,
             long changeSetId,
             String changeSetPid,
+            long changeSetOwnerUserId,
             String changeSetStatus,
             long changeSetRevision,
             String riskLevel,
