@@ -35,6 +35,14 @@ public class PromotionUnit {
     /** Version assigned in target env when applied. NULL until APPLIED. */
     private Integer targetVersion;
 
+    /** Target PageSchema.pid captured by the latest drift assessment. */
+    private String targetResourcePid;
+
+    private String driftStatus;
+    private String driftFingerprint;
+    private String driftDecision;
+    private String driftDecisionPid;
+
     private Integer sortOrder;
 
     private Date createdAt;

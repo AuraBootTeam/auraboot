@@ -14,6 +14,11 @@ import {
 } from '@heroicons/react/24/outline';
 import { fetchResult } from '~/shared/services/http-client/HttpClient';
 import { useToken as useAuthToken } from '~/contexts/AuthContext';
+import {
+  PromotionDriftDecisionPanel,
+  type PromotionDrift,
+  type PromotionDriftDecision,
+} from '../../components/PromotionDriftDecisionPanel';
 
 // ---------- Types ----------
 
@@ -54,6 +59,7 @@ interface DryRunResult {
   valid: boolean;
   conflicts: Conflict[];
   missingDependencies: any[];
+  drifts?: PromotionDrift[];
 }
 
 interface PromotionResponse {
@@ -116,16 +122,7 @@ export default function PromotionManagement() {
   const [applyTarget, setApplyTarget] = useState<PromotionResponse | null>(null);
   const [applyReason, setApplyReason] = useState('');
   const [applySubmitting, setApplySubmitting] = useState(false);
-
-  const envByPid: Record<string, EnvironmentLite> = useMemo(
-    () => Object.fromEntries(environments.map((e) => [e.pid, e])),
-    [environments],
-  );
-  const envById: Record<number, EnvironmentLite & { id: number }> = useMemo(() => {
-    const m: any = {};
-    // We don't have id on the lite; we'll fetch with full env list via /api/admin/environments
-    return m;
-  }, []);
+  const [resolvingDriftUnitPid, setResolvingDriftUnitPid] = useState<string | null>(null);
 
   // Fetch envs (full)
   const fetchEnvs = useCallback(async () => {
@@ -257,6 +254,38 @@ export default function PromotionManagement() {
   const openApplyDialog = (p: PromotionResponse) => {
     setApplyTarget(p);
     setApplyReason('');
+  };
+
+  const handleResolveDrift = async (
+    promotionPid: string,
+    unitPid: string,
+    input: {
+      expectedFingerprint: string;
+      decision: PromotionDriftDecision;
+      reason: string;
+    },
+  ) => {
+    setResolvingDriftUnitPid(unitPid);
+    setError(null);
+    try {
+      const result = await fetchResult<PromotionResponse>(
+        `/api/admin/promotions/${promotionPid}/drifts/${unitPid}/decision`,
+        {
+          method: 'post',
+          params: input,
+          token: token ?? undefined,
+        },
+      );
+      if (!result.success) {
+        setError('Drift decision failed');
+        return;
+      }
+      await fetchPromotions();
+    } catch (caught: any) {
+      setError(caught?.message ?? 'Drift decision failed');
+    } finally {
+      setResolvingDriftUnitPid(null);
+    }
   };
 
   const handleApply = async () => {
@@ -474,6 +503,21 @@ export default function PromotionManagement() {
                   </li>
                 ))}
               </ul>
+
+              {selected.dryRunResult && (selected.dryRunResult.drifts?.length ?? 0) > 0 && (
+                <div className="mt-4 space-y-3" data-testid="promotion-drift-list">
+                  {selected.dryRunResult.drifts?.map((drift) => (
+                    <PromotionDriftDecisionPanel
+                      key={`${drift.unitPid}:${drift.fingerprint}`}
+                      drift={drift}
+                      submitting={resolvingDriftUnitPid === drift.unitPid}
+                      onResolve={(input) =>
+                        handleResolveDrift(selected.pid, drift.unitPid, input)
+                      }
+                    />
+                  ))}
+                </div>
+              )}
 
               {selected.dryRunResult && selected.dryRunResult.conflicts.length > 0 && (
                 <div className="mt-3">

@@ -4,13 +4,20 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.promotion.dto.DryRunResult;
 import com.auraboot.framework.promotion.dto.PromotionApplyRequest;
+import com.auraboot.framework.promotion.dto.PromotionDriftDecisionRequest;
 import com.auraboot.framework.promotion.dto.PromotionRequest;
 import com.auraboot.framework.promotion.dto.PromotionResponse;
 import com.auraboot.framework.promotion.service.PromotionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -51,6 +58,16 @@ public class PromotionController {
     public ApiResponse<DryRunResult> validate(@PathVariable String pid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         return ApiResponse.success(promotionService.validate(pid, tenantId));
+    }
+
+    @PostMapping("/{pid}/drifts/{unitPid}/decision")
+    public ApiResponse<PromotionResponse> resolveDrift(
+            @PathVariable String pid,
+            @PathVariable String unitPid,
+            @Valid @RequestBody PromotionDriftDecisionRequest request) {
+        return ApiResponse.success(promotionService.resolveDrift(
+                pid, unitPid, request,
+                MetaContext.getCurrentTenantId(), MetaContext.getCurrentUserId()));
     }
 
     @PostMapping("/{pid}/apply")

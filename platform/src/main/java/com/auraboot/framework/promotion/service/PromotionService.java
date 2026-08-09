@@ -3,6 +3,7 @@ package com.auraboot.framework.promotion.service;
 import com.auraboot.framework.promotion.dto.DryRunResult;
 import com.auraboot.framework.promotion.dto.PromotionRequest;
 import com.auraboot.framework.promotion.dto.PromotionResponse;
+import com.auraboot.framework.promotion.dto.PromotionDriftDecisionRequest;
 
 import java.util.List;
 
@@ -26,6 +27,14 @@ public interface PromotionService {
      * @throws IllegalStateException if current status is not DRAFT or VALIDATED
      */
     DryRunResult validate(String pid, Long tenantId);
+
+    /** Record an exact-fingerprint fate for one target-local drift and re-run validation. */
+    PromotionResponse resolveDrift(
+            String pid,
+            String unitPid,
+            PromotionDriftDecisionRequest request,
+            Long tenantId,
+            Long actorUserId);
 
     /**
      * Apply a VALIDATED promotion to its target env. Each unit either INSERTs a new PageSchema

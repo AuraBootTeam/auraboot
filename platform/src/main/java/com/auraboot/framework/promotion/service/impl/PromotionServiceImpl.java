@@ -17,10 +17,13 @@ import com.auraboot.framework.promotion.diff.SemanticDiffEntry;
 import com.auraboot.framework.promotion.domain.PromotionStateMachine;
 import com.auraboot.framework.promotion.domain.PromotionStatus;
 import com.auraboot.framework.promotion.dto.DryRunResult;
+import com.auraboot.framework.promotion.dto.PromotionDriftDecisionRequest;
 import com.auraboot.framework.promotion.dto.PromotionRequest;
 import com.auraboot.framework.promotion.dto.PromotionResponse;
 import com.auraboot.framework.promotion.reference.service.ResourceReferenceService;
 import com.auraboot.framework.promotion.service.PromotionService;
+import com.auraboot.framework.promotion.service.PromotionDriftCoordinator;
+import com.auraboot.framework.promotion.service.PromotionDriftCoordinator.Assessment;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -32,13 +35,14 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -58,6 +62,7 @@ public class PromotionServiceImpl implements PromotionService {
     private final EnvironmentMapper environmentMapper;
     private final PageSchemaDiffService pageSchemaDiffService;
     private final ResourceReferenceService resourceReferenceService;
+    private final PromotionDriftCoordinator promotionDriftCoordinator;
     private final PlatformTransactionManager transactionManager;
     private final com.auraboot.framework.audit.service.AdminEventLogService adminEventLogService;
 
@@ -170,7 +175,11 @@ public class PromotionServiceImpl implements PromotionService {
             // Find target by logical identity (page_key) within target env
             PageSchema target = withEnvId(p.getTargetEnvId(),
                     () -> findByPageKey(source.getPageKey(), tenantId));
-            if (target != null && contentDiffers(source, target)) {
+            Optional<Assessment> drift = promotionDriftCoordinator.assess(
+                    p, unit, source, target,
+                    MetaContext.exists() ? MetaContext.getCurrentUserId() : null);
+            drift.map(promotionDriftCoordinator::toView).ifPresent(result.getDrifts()::add);
+            if (target != null && drift.isEmpty() && contentDiffers(source, target)) {
                 List<SemanticDiffEntry> diff = pageSchemaDiffService.diff(source, target);
                 DryRunResult.Conflict c = new DryRunResult.Conflict();
                 c.setResourceType("PAGE_SCHEMA");
@@ -184,7 +193,10 @@ public class PromotionServiceImpl implements PromotionService {
             }
         }
 
-        result.setValid(result.getConflicts().isEmpty() && result.getMissingDependencies().isEmpty());
+        boolean driftsReady = result.getDrifts().stream().allMatch(DryRunResult.Drift::isApplyReady);
+        result.setValid(result.getConflicts().isEmpty()
+                && result.getMissingDependencies().isEmpty()
+                && driftsReady);
 
         p.setDryRunResult(toJson(result));
         p.setDryRunAt(result.getValidatedAt());
@@ -204,6 +216,41 @@ public class PromotionServiceImpl implements PromotionService {
         return result;
     }
 
+    @Override
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public PromotionResponse resolveDrift(
+            String pid,
+            String unitPid,
+            PromotionDriftDecisionRequest request,
+            Long tenantId,
+            Long actorUserId) {
+        Promotion promotion = findByPidOrThrow(pid, tenantId);
+        PromotionStatus current = PromotionStatus.valueOf(promotion.getStatus());
+        if (current != PromotionStatus.DRAFT && current != PromotionStatus.VALIDATED) {
+            throw new IllegalStateException("Promotion drift cannot be resolved in status " + current);
+        }
+        PromotionUnit unit = findUnitByPid(promotion.getId(), unitPid, tenantId);
+        PageSchema source = withEnvId(promotion.getSourceEnvId(),
+                () -> pageSchemaMapper.selectByPid(unit.getResourcePid()));
+        if (source == null) {
+            throw new IllegalStateException("Promotion source resource is missing: " + unit.getResourcePid());
+        }
+        PageSchema target = withEnvId(promotion.getTargetEnvId(),
+                () -> findByPageKey(source.getPageKey(), tenantId));
+        try {
+            promotionDriftCoordinator.resolve(
+                    promotion, unit, source, target, request, actorUserId);
+        } catch (ResponseStatusException rejectedDecision) {
+            // The exact fingerprint may have become stale while the decision form was open.
+            // Preserve the STALE/DETECTED ledger rows and synchronize the promotion back to
+            // its current dry-run state before surfacing the conflict to the caller.
+            validate(pid, tenantId);
+            throw rejectedDecision;
+        }
+        validate(pid, tenantId);
+        return toResponse(findByPidOrThrow(pid, tenantId));
+    }
+
     // ---- apply ----
 
     @Override
@@ -219,7 +266,19 @@ public class PromotionServiceImpl implements PromotionService {
         }
         DryRunResult lastDryRun = parseDryRunResult(p.getDryRunResult());
         if (lastDryRun == null || !lastDryRun.isValid()) {
-            throw new IllegalStateException("Last dry-run had conflicts. Re-validate without errors first.");
+            throw new IllegalStateException(
+                    "Last dry-run had conflicts or unresolved drift and is not apply-ready. "
+                            + "Resolve them, then re-validate.");
+        }
+
+        // Recompute target-local release fingerprints before entering the failure-marking apply
+        // transaction. A stale human decision is an expected revalidation state, not an APPLIED
+        // transaction failure and must not make the promotion terminally FAILED.
+        try {
+            requireCurrentDriftDecisions(p, approverId);
+        } catch (ResponseStatusException staleDrift) {
+            invalidatePromotionForDrift(p, approverId);
+            throw staleDrift;
         }
 
         // 2. Four-eyes for locked target
@@ -293,7 +352,7 @@ public class PromotionServiceImpl implements PromotionService {
     private void applyAllUnits(Promotion p, Long approverId, String reason) {
         List<PromotionUnit> units = listUnits(p.getId(), p.getTenantId());
         for (PromotionUnit unit : units) {
-            applyOneUnit(p, unit);
+            applyOneUnit(p, unit, approverId, reason);
         }
 
         // Mark APPLIED in same tx
@@ -307,7 +366,34 @@ public class PromotionServiceImpl implements PromotionService {
         promotionMapper.updateById(fresh);
     }
 
-    private void applyOneUnit(Promotion p, PromotionUnit unit) {
+    private void requireCurrentDriftDecisions(Promotion promotion, Long actorUserId) {
+        for (PromotionUnit unit : listUnits(promotion.getId(), promotion.getTenantId())) {
+            PageSchema source = withEnvId(promotion.getSourceEnvId(),
+                    () -> pageSchemaMapper.selectByPid(unit.getResourcePid()));
+            if (source == null) {
+                continue;
+            }
+            PageSchema target = withEnvId(promotion.getTargetEnvId(),
+                    () -> findByPageKey(source.getPageKey(), promotion.getTenantId()));
+            promotionDriftCoordinator.requireApplyReady(
+                    promotion, unit, source, target, actorUserId);
+        }
+    }
+
+    private void invalidatePromotionForDrift(Promotion promotion, Long actorUserId) {
+        UpdateWrapper<Promotion> update = new UpdateWrapper<>();
+        update.eq("id", promotion.getId())
+                .eq("tenant_id", promotion.getTenantId())
+                .eq("deleted_flag", false)
+                .set("status", PromotionStatus.DRAFT.name())
+                .set("dry_run_at", null)
+                .set("dry_run_result", null)
+                .set("updated_at", new Date())
+                .set("updated_by", actorUserId);
+        promotionMapper.update(null, update);
+    }
+
+    private void applyOneUnit(Promotion p, PromotionUnit unit, Long approverId, String reason) {
         if (!"PAGE_SCHEMA".equals(unit.getResourceType())) {
             throw new UnsupportedOperationException("Unsupported resourceType in PoC: " + unit.getResourceType());
         }
@@ -319,10 +405,16 @@ public class PromotionServiceImpl implements PromotionService {
             throw new IllegalStateException(
                     "Source page missing in source env (deleted after draft?): " + unit.getResourcePid());
         }
+        if (unit.getSourceVersion() != null
+                && !unit.getSourceVersion().equals(source.getVersion())) {
+            throw new IllegalStateException("Promotion source changed after draft: " + unit.getResourcePid());
+        }
 
         // Find existing target page (by page_key, in target env)
         PageSchema existingTarget = withEnvId(p.getTargetEnvId(),
                 () -> findByPageKey(source.getPageKey(), p.getTenantId()));
+        Optional<Assessment> drift = promotionDriftCoordinator.requireApplyReady(
+                p, unit, source, existingTarget, approverId);
 
         int targetVersion = (existingTarget == null) ? 1 : existingTarget.getVersion() + 1;
 
@@ -353,6 +445,9 @@ public class PromotionServiceImpl implements PromotionService {
         clone.setMetaInfo(source.getMetaInfo());
         clone.setIsTemplate(source.getIsTemplate());
         clone.setTemplateCategory(source.getTemplateCategory());
+        clone.setPluginPid(source.getPluginPid());
+        clone.setOwnershipScope(source.getOwnershipScope());
+        clone.setOwnershipRef(source.getOwnershipRef());
         clone.setSortWeight(source.getSortWeight());
         clone.setStatus("draft");
         clone.setVersion(targetVersion);
@@ -370,6 +465,9 @@ public class PromotionServiceImpl implements PromotionService {
                     resourceReferenceService.refresh(clone);
                     return null;
                 }));
+
+        drift.ifPresent(assessment -> promotionDriftCoordinator.applyOverwrite(
+                p, unit, assessment, approverId, reason));
 
         // Stamp target_version on the unit
         unit.setTargetVersion(targetVersion);
@@ -421,6 +519,19 @@ public class PromotionServiceImpl implements PromotionService {
         return promotionUnitMapper.selectList(qw);
     }
 
+    private PromotionUnit findUnitByPid(Long promotionId, String unitPid, Long tenantId) {
+        QueryWrapper<PromotionUnit> query = new QueryWrapper<>();
+        query.eq("promotion_id", promotionId)
+                .eq("pid", unitPid)
+                .eq("tenant_id", tenantId)
+                .eq("deleted_flag", false);
+        PromotionUnit unit = promotionUnitMapper.selectOne(query);
+        if (unit == null) {
+            throw new IllegalArgumentException("Promotion unit not found: " + unitPid);
+        }
+        return unit;
+    }
+
     private Promotion findByPidOrThrow(String pid, Long tenantId) {
         QueryWrapper<Promotion> qw = new QueryWrapper<>();
         qw.eq("pid", pid).eq("tenant_id", tenantId).eq("deleted_flag", false);
@@ -467,6 +578,10 @@ public class PromotionServiceImpl implements PromotionService {
             v.setResourcePid(u.getResourcePid());
             v.setSourceVersion(u.getSourceVersion());
             v.setTargetVersion(u.getTargetVersion());
+            v.setTargetResourcePid(u.getTargetResourcePid());
+            v.setDriftStatus(u.getDriftStatus());
+            v.setDriftFingerprint(u.getDriftFingerprint());
+            v.setDriftDecision(u.getDriftDecision());
             v.setSortOrder(u.getSortOrder());
             return v;
         }).collect(Collectors.toList()));

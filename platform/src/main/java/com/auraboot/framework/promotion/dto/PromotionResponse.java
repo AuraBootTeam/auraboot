@@ -39,6 +39,10 @@ public class PromotionResponse {
         private String resourcePid;
         private Integer sourceVersion;
         private Integer targetVersion;
+        private String targetResourcePid;
+        private String driftStatus;
+        private String driftFingerprint;
+        private String driftDecision;
         private Integer sortOrder;
     }
 }
