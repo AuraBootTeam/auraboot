@@ -42,6 +42,7 @@ public class AuthoringNewPageMaterializer {
             String pageKey,
             String menuCode,
             String menuPath,
+            String modelCode,
             String parentMenuCode,
             String permissionCode) {
         if (exists("""
@@ -63,11 +64,25 @@ public class AuthoringNewPageMaterializer {
             throw conflict("authoring.new-page.page-key-reserved");
         }
         requireMenuAvailable(tenantId, menuCode, menuPath);
+        requireModel(tenantId, modelCode);
         requireParentMenu(tenantId, envId, parentMenuCode);
         requirePermission(tenantId, permissionCode);
     }
 
     public NewPageWorkspaceOptions options(long tenantId, long envId) {
+        java.util.List<NewPageOption> models = jdbcTemplate.query("""
+                        SELECT code,
+                               COALESCE(NULLIF(extension ->> 'displayName', ''),
+                                        NULLIF(extension #>> '{extension,displayName}', ''),
+                                        code) AS label
+                        FROM ab_meta_model
+                        WHERE tenant_id = ? AND status = 'published' AND is_current = TRUE
+                          AND deleted_flag = FALSE
+                        ORDER BY label, code LIMIT 1000
+                        """,
+                (resultSet, rowNumber) -> new NewPageOption(
+                        resultSet.getString("code"), resultSet.getString("label")),
+                tenantId);
         java.util.List<NewPageOption> parentMenus = jdbcTemplate.query("""
                         SELECT code, name FROM ab_menu
                         WHERE tenant_id = ? AND type = 0 AND status = 'active'
@@ -88,7 +103,7 @@ public class AuthoringNewPageMaterializer {
                 (resultSet, rowNumber) -> new NewPageOption(
                         resultSet.getString("code"), resultSet.getString("name")),
                 tenantId);
-        return new NewPageWorkspaceOptions(parentMenus, permissions);
+        return new NewPageWorkspaceOptions(models, parentMenus, permissions);
     }
 
     public boolean isNewResource(JsonNode snapshot) {
@@ -123,11 +138,12 @@ public class AuthoringNewPageMaterializer {
                     published_at, ownership_scope, ownership_ref,
                     created_at, updated_at, created_by, updated_by, deleted_flag)
                 VALUES (?, ?, ?, 'default', TRUE, 'published', '{}'::jsonb,
-                        ?, NULL, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb,
+                        ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb,
                         FALSE, 1, 1, 0, CURRENT_TIMESTAMP, 'TENANT', ?,
                         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, FALSE)
                 """,
                 row.resourcePid(), row.tenantId(), row.envId(), pageKey,
+                requiredText(runtimeSnapshot, "modelCode"),
                 requiredText(runtimeSnapshot, "name"), nullableText(runtimeSnapshot, "description"),
                 requiredText(runtimeSnapshot, "kind"), runtimeSnapshot.path("schemaVersion").asInt(4),
                 runtimeSnapshot.path("profile").asText("admin"), json(runtimeSnapshot.path("title")),
@@ -161,6 +177,7 @@ public class AuthoringNewPageMaterializer {
         JsonNode menu = snapshot.path(RESOURCE_METADATA).path("menu");
         requireMenuAvailable(
                 row.tenantId(), requiredText(menu, "code"), requiredText(menu, "path"));
+        requireModel(row.tenantId(), requiredText(snapshot, "modelCode"));
         requireParentMenu(row.tenantId(), row.envId(), requiredText(menu, "parentCode"));
         requirePermission(row.tenantId(), requiredText(menu, "permissionCode"));
     }
@@ -207,6 +224,16 @@ public class AuthoringNewPageMaterializer {
             throw invalid("authoring.new-page.parent-menu-invalid");
         }
         return parentId;
+    }
+
+    private void requireModel(long tenantId, String modelCode) {
+        if (!exists("""
+                SELECT COUNT(*) FROM ab_meta_model
+                WHERE tenant_id = ? AND code = ? AND status = 'published'
+                  AND is_current = TRUE AND deleted_flag = FALSE
+                """, tenantId, modelCode)) {
+            throw invalid("authoring.new-page.model-invalid");
+        }
     }
 
     private void requirePermission(long tenantId, String permissionCode) {

@@ -1201,6 +1201,7 @@ function NewPageWorkspaceWizard({
   const [title, setTitle] = useState('');
   const [pageKey, setPageKey] = useState('');
   const [kind, setKind] = useState<CreateNewPageWorkspaceInput['kind']>('list');
+  const [modelCode, setModelCode] = useState('');
   const [parentMenuCode, setParentMenuCode] = useState('');
   const [permissionCode, setPermissionCode] = useState('');
   const [description, setDescription] = useState('');
@@ -1215,6 +1216,7 @@ function NewPageWorkspaceWizard({
       options &&
       title.trim() &&
       /^[a-zA-Z][a-zA-Z0-9_-]{1,99}$/.test(pageKey) &&
+      modelCode &&
       parentMenuCode &&
       permissionCode &&
       derivedMenuCode &&
@@ -1230,6 +1232,7 @@ function NewPageWorkspaceWizard({
       title: title.trim(),
       description: description.trim() || undefined,
       kind,
+      modelCode,
       parentMenuCode,
       menuCode: derivedMenuCode,
       menuName: title.trim(),
@@ -1326,6 +1329,40 @@ function NewPageWorkspaceWizard({
                     仪表板设计器
                   </a>
                   。
+                </span>
+              </label>
+              <label className="grid gap-1.5 text-sm font-medium text-slate-700 sm:col-span-2">
+                业务模型
+                <select
+                  aria-label="业务模型"
+                  required
+                  value={modelCode}
+                  onChange={(event) => setModelCode(event.target.value)}
+                  disabled={!options || options.models.length === 0}
+                  className="min-h-11 rounded-md border border-slate-300 bg-white px-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                >
+                  <option value="">
+                    {!options
+                      ? '正在加载…'
+                      : options.models.length
+                        ? '请选择已发布模型'
+                        : '暂无已发布模型'}
+                  </option>
+                  {options?.models.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label} · {option.value}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs font-normal leading-5 text-slate-500">
+                  列表、表单和详情页必须绑定一个已发布模型。没有可选模型时，请先到
+                  <a
+                    href="/meta/models/new"
+                    className="ml-1 font-semibold text-blue-700 underline-offset-2 hover:underline"
+                  >
+                    模型设计器
+                  </a>
+                  创建并发布模型。
                 </span>
               </label>
             </div>

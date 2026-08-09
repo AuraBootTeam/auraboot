@@ -56,7 +56,7 @@ export async function loadAuthoringNewPageWorkspaceOptions(): Promise<NewPageWor
   const result = await fetchResult<NewPageWorkspaceOptions>(
     '/api/authoring/new-page-workspace-options',
   );
-  return requireData(result, '无法加载新页面的父菜单与权限选项');
+  return requireData(result, '无法加载新页面的业务模型、父菜单与权限选项');
 }
 
 export async function createAuthoringNewPageWorkspace(

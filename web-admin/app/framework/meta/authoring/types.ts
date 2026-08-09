@@ -120,6 +120,7 @@ export interface NewPageWorkspaceOption {
 }
 
 export interface NewPageWorkspaceOptions {
+  models: NewPageWorkspaceOption[];
   parentMenus: NewPageWorkspaceOption[];
   permissions: NewPageWorkspaceOption[];
 }
@@ -130,6 +131,7 @@ export interface CreateNewPageWorkspaceInput {
   title: string;
   description?: string;
   kind: 'list' | 'form' | 'detail';
+  modelCode: string;
   parentMenuCode: string;
   menuCode: string;
   menuName: string;

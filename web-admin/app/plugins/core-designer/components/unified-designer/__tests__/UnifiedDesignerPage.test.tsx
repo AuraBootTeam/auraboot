@@ -320,6 +320,7 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(loadAuthoringSession).mockResolvedValue(sourceSession);
     vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
     vi.mocked(loadAuthoringNewPageWorkspaceOptions).mockResolvedValue({
+      models: [{ value: 'manufacturing_exception', label: '生产异常' }],
       parentMenus: [{ value: 'manufacturing', label: '生产管理' }],
       permissions: [{ value: 'page.production_exception.read', label: '查看生产异常' }],
     });
@@ -341,9 +342,17 @@ describe('UnifiedDesignerPage', () => {
       'href',
       '/dashboard-designer',
     );
+    expect(screen.getByRole('link', { name: '模型设计器' })).toHaveAttribute(
+      'href',
+      '/meta/models/new',
+    );
     fireEvent.change(screen.getByLabelText('父菜单'), { target: { value: 'manufacturing' } });
     fireEvent.change(screen.getByLabelText('访问权限'), {
       target: { value: 'page.production_exception.read' },
+    });
+    expect(screen.getByRole('button', { name: '创建并进入页面设计' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('业务模型'), {
+      target: { value: 'manufacturing_exception' },
     });
     fireEvent.click(screen.getByRole('button', { name: '创建并进入页面设计' }));
 
@@ -354,6 +363,7 @@ describe('UnifiedDesignerPage', () => {
         title: '生产异常看板',
         description: undefined,
         kind: 'list',
+        modelCode: 'manufacturing_exception',
         parentMenuCode: 'manufacturing',
         menuCode: 'production_exception',
         menuName: '生产异常看板',
@@ -366,6 +376,35 @@ describe('UnifiedDesignerPage', () => {
       'ChangeSet changeset_new_page',
     );
     expect(screen.queryByTestId('new-page-workspace-wizard')).not.toBeInTheDocument();
+  });
+
+  it('fails closed when the tenant has no published business model', async () => {
+    setSearch('?contextId=ctx_new_page_without_model');
+    const handoff = createHandoff('field_customer_name', '/props/label');
+    handoff.intent = 'NEW_PAGE';
+
+    vi.mocked(consumeAuthoringHandoff).mockResolvedValue(handoff);
+    vi.mocked(loadAuthoringSession).mockResolvedValue(
+      createAuthoringSession(createDocument('source_page', 'Source page')),
+    );
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(loadAuthoringNewPageWorkspaceOptions).mockResolvedValue({
+      models: [],
+      parentMenus: [{ value: 'manufacturing', label: '生产管理' }],
+      permissions: [{ value: 'page.production_exception.read', label: '查看生产异常' }],
+    });
+
+    render(<UnifiedDesignerPage />);
+
+    const modelSelect = await screen.findByLabelText('业务模型');
+    expect(modelSelect).toBeDisabled();
+    expect(modelSelect).toHaveTextContent('暂无已发布模型');
+    expect(screen.getByRole('button', { name: '创建并进入页面设计' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: '模型设计器' })).toHaveAttribute(
+      'href',
+      '/meta/models/new',
+    );
+    expect(createAuthoringNewPageWorkspace).not.toHaveBeenCalled();
   });
 
   it('restores the isolated Studio session after a full-page reload without replaying the handoff', async () => {

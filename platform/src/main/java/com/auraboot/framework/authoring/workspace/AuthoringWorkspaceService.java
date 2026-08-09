@@ -214,7 +214,8 @@ public class AuthoringWorkspaceService {
         requireSupportedNewPageKind(request.kind());
         newPageMaterializer.requireAvailable(
                 identity.tenantId(), identity.envId(), request.pageKey(), request.menuCode(),
-                request.menuPath(), request.parentMenuCode(), request.permissionCode());
+                request.menuPath(), request.modelCode(), request.parentMenuCode(),
+                request.permissionCode());
 
         String pagePid = UniqueIdGenerator.generate();
         String sessionPid = UniqueIdGenerator.generate();
@@ -290,6 +291,7 @@ public class AuthoringWorkspaceService {
             page.put("description", request.description().trim());
         }
         page.put("kind", request.kind());
+        page.put("modelCode", request.modelCode());
         page.put("schemaVersion", 4);
         page.put("profile", "admin");
         page.put("isTemplate", false);

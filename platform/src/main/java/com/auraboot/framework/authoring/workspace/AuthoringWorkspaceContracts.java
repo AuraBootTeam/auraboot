@@ -39,8 +39,9 @@ public final class AuthoringWorkspaceContracts {
     }
 
     /**
-     * Creates a governed NEW_RESOURCE workspace. The request carries only resource identity and
-     * navigation metadata; page structure is authored afterwards in Studio.
+     * Creates a governed NEW_RESOURCE workspace. The request carries resource identity, its
+     * published business-model binding, and navigation metadata; page structure is authored
+     * afterwards in Studio.
      */
     public record CreateNewPageWorkspaceRequest(
             @Positive long expectedSourceRevision,
@@ -54,6 +55,10 @@ public final class AuthoringWorkspaceContracts {
             @NotBlank @jakarta.validation.constraints.Pattern(
                     regexp = "^(list|form|detail)$")
             String kind,
+            @NotBlank @Size(max = 100)
+            @jakarta.validation.constraints.Pattern(
+                    regexp = "^[a-zA-Z][a-zA-Z0-9_.-]*$")
+            String modelCode,
             @NotBlank @Size(max = 100) String parentMenuCode,
             @NotBlank @Size(max = 100)
             @jakarta.validation.constraints.Pattern(
@@ -71,6 +76,7 @@ public final class AuthoringWorkspaceContracts {
     }
 
     public record NewPageWorkspaceOptions(
+            List<NewPageOption> models,
             List<NewPageOption> parentMenus,
             List<NewPageOption> permissions) {
     }
