@@ -22,7 +22,10 @@ import {
   loadAuthoringCapabilities,
   loadAuthoringSession,
   moveAuthoringStudioBlock,
+  observeAuthoringChangeSet,
+  takeoverAuthoringWriterLease,
 } from '~/framework/meta/authoring/authoringService';
+import { AuthoringWriterLeaseNotice } from '~/framework/meta/authoring/AuthoringWriterLeaseNotice';
 import type {
   AuthoringSession,
   CapabilityRegistry,
@@ -44,11 +47,14 @@ export default function UnifiedDesignerPage() {
   const pageKey = searchParams.get('pageKey');
   const contextId = searchParams.get('contextId');
   const resumeSessionPid = searchParams.get('authoringSession');
-  const hasAuthoringContext = Boolean(contextId || resumeSessionPid);
+  const observedChangeSetPid = searchParams.get('changeSetId');
+  const hasAuthoringContext = Boolean(contextId || resumeSessionPid || observedChangeSetPid);
   const [handoff, setHandoff] = useState<HandoffContext | null>(null);
   const [authoringSession, setAuthoringSession] = useState<AuthoringSession | null>(null);
   const [authoringCapabilities, setAuthoringCapabilities] = useState<CapabilityRegistry | null>(null);
   const [handoffError, setHandoffError] = useState<string | null>(null);
+  const [leaseTakeoverPending, setLeaseTakeoverPending] = useState(false);
+  const [leaseTakeoverError, setLeaseTakeoverError] = useState<string | null>(null);
   const [document, setDocument] = useState<PageSchemaV3 | null>(null);
   const [source, setSource] = useState<PageSchemaV3Source>({ type: 'local' });
   const [published, setPublished] = useState(false);
@@ -61,6 +67,7 @@ export default function UnifiedDesignerPage() {
       !handoffError &&
       (!handoff || !authoringSession || !authoringCapabilities || !document),
   );
+  const activeAuthoringSessionPid = authoringSession?.sessionPid;
 
   useEffect(() => {
     if (!hasAuthoringContext) {
@@ -68,6 +75,7 @@ export default function UnifiedDesignerPage() {
       setAuthoringSession(null);
       setAuthoringCapabilities(null);
       setHandoffError(null);
+      setLeaseTakeoverError(null);
       return;
     }
     let cancelled = false;
@@ -76,6 +84,7 @@ export default function UnifiedDesignerPage() {
     setAuthoringSession(null);
     setAuthoringCapabilities(null);
     setHandoffError(null);
+    setLeaseTakeoverError(null);
     const resolveContext = contextId
       ? consumeAuthoringHandoff(contextId).then(async (consumed) => {
           const [session, capabilities] = await Promise.all([
@@ -83,17 +92,29 @@ export default function UnifiedDesignerPage() {
             loadAuthoringCapabilities(),
           ]);
           assertHandoffMatchesSession(consumed, session);
-          replaceConsumedHandoffUrl(consumed.sessionPid);
+          replaceAuthoringContextUrl('contextId', consumed.sessionPid);
           return { handoff: consumed, session, capabilities };
         })
-      : Promise.all([
-          loadAuthoringSession(resumeSessionPid!),
-          loadAuthoringCapabilities(),
-        ]).then(([session, capabilities]) => ({
-          handoff: resumeHandoffFromSession(session),
-          session,
-          capabilities,
-        }));
+      : observedChangeSetPid
+        ? Promise.all([
+            observeAuthoringChangeSet(observedChangeSetPid),
+            loadAuthoringCapabilities(),
+          ]).then(([session, capabilities]) => {
+            replaceAuthoringContextUrl('changeSetId', session.sessionPid);
+            return {
+              handoff: resumeHandoffFromSession(session),
+              session,
+              capabilities,
+            };
+          })
+        : Promise.all([
+            loadAuthoringSession(resumeSessionPid!),
+            loadAuthoringCapabilities(),
+          ]).then(([session, capabilities]) => ({
+            handoff: resumeHandoffFromSession(session),
+            session,
+            capabilities,
+          }));
 
     void resolveContext
       .then(({ handoff: resolvedHandoff, session, capabilities }) => {
@@ -123,7 +144,25 @@ export default function UnifiedDesignerPage() {
     return () => {
       cancelled = true;
     };
-  }, [contextId, hasAuthoringContext, resumeSessionPid]);
+  }, [contextId, hasAuthoringContext, observedChangeSetPid, resumeSessionPid]);
+
+  useEffect(() => {
+    if (!activeAuthoringSessionPid) return;
+    let cancelled = false;
+    const interval = window.setInterval(() => {
+      void loadAuthoringSession(activeAuthoringSessionPid)
+        .then((latest) => {
+          if (!cancelled) setAuthoringSession(latest);
+        })
+        .catch(() => {
+          // Keep the current isolated document and foreground error state on poll failure.
+        });
+    }, 15_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeAuthoringSessionPid]);
 
   useEffect(() => {
     let cancelled = false;
@@ -257,6 +296,34 @@ export default function UnifiedDesignerPage() {
     return canonicalDocument;
   };
 
+  const handleWriterLeaseTakeover = async (reason: string) => {
+    if (!handoff || !authoringSession || leaseTakeoverPending || !canAdministerDesigner) return;
+    setLeaseTakeoverPending(true);
+    setLeaseTakeoverError(null);
+    try {
+      const taken = await takeoverAuthoringWriterLease(
+        authoringSession.sessionPid,
+        authoringSession.revision,
+        reason,
+      );
+      const canonicalDocument = authoringSnapshotToPageSchemaV3(taken.snapshot);
+      setAuthoringSession(taken);
+      setDocument(canonicalDocument);
+      setHandoff((current) =>
+        current
+          ? { ...current, sessionPid: taken.sessionPid, revision: taken.revision }
+          : current,
+      );
+      replaceAuthoringSessionUrl(taken.sessionPid);
+    } catch (takeoverError) {
+      setLeaseTakeoverError(
+        takeoverError instanceof Error ? takeoverError.message : '无法接管 ChangeSet 编辑权',
+      );
+    } finally {
+      setLeaseTakeoverPending(false);
+    }
+  };
+
   const handlePublish = async (pid: string): Promise<boolean> => {
     const result = await publishPageSchemaV3({ pid });
     if (!result.ok) {
@@ -320,7 +387,10 @@ export default function UnifiedDesignerPage() {
       ? studioReorderableBlockTypes(authoringCapabilities)
       : undefined;
   const contextualReadOnly = Boolean(
-    handoff && (!canAdministerDesigner || authoringSession?.state !== 'ACTIVE'),
+    handoff &&
+      (!canAdministerDesigner ||
+        authoringSession?.state !== 'ACTIVE' ||
+        !hasOwnedWriterLease(authoringSession)),
   );
 
   const workbench = (
@@ -357,7 +427,7 @@ export default function UnifiedDesignerPage() {
         {contextualReadOnly ? (
           <span className="ml-2" data-testid="studio-handoff-read-only-reason">
             ChangeSet {handoff.changeSetPid} · 修订 r{authoringSession?.revision ?? handoff.revision} ·
-            缺少高级设计权限或会话不可编辑，当前仅可查看隔离草稿。
+            {studioReadOnlyReason(authoringSession, canAdministerDesigner)}，当前仅可查看隔离草稿。
           </span>
         ) : (
           <span className="ml-2" data-testid="studio-handoff-editable-reason">
@@ -365,6 +435,19 @@ export default function UnifiedDesignerPage() {
             高级属性和已声明的同级顺序调整将写回同一隔离草稿；跨父级、增删区块等治理操作仍不开放。
           </span>
         )}
+      </div>
+      <div className="px-4 pt-3">
+        <AuthoringWriterLeaseNotice
+          lease={authoringSession?.writerLease}
+          canTakeover={canAdministerDesigner}
+          pending={leaseTakeoverPending}
+          onTakeover={handleWriterLeaseTakeover}
+        />
+        {leaseTakeoverError ? (
+          <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+            {leaseTakeoverError}
+          </div>
+        ) : null}
       </div>
       <div className="min-h-0 flex-1">{workbench}</div>
     </div>
@@ -406,12 +489,35 @@ function resumeHandoffFromSession(session: AuthoringSession): HandoffContext {
   };
 }
 
-function replaceConsumedHandoffUrl(sessionPid: string): void {
+function replaceAuthoringContextUrl(parameter: 'contextId' | 'changeSetId', sessionPid: string): void {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
-  url.searchParams.delete('contextId');
+  url.searchParams.delete(parameter);
   url.searchParams.set('authoringSession', sessionPid);
   window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function replaceAuthoringSessionUrl(sessionPid: string): void {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  url.searchParams.set('authoringSession', sessionPid);
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function hasOwnedWriterLease(session: AuthoringSession | null): boolean {
+  return Boolean(session && (!session.writerLease || session.writerLease.status === 'OWNED'));
+}
+
+function studioReadOnlyReason(
+  session: AuthoringSession | null,
+  canAdministerDesigner: boolean,
+): string {
+  if (!canAdministerDesigner) return '缺少高级设计权限';
+  if (session?.writerLease?.status === 'EXPIRED') return 'Writer lease 已过期';
+  if (session?.writerLease && session.writerLease.status !== 'OWNED') {
+    return 'Writer lease 由其他会话持有';
+  }
+  return `会话状态为 ${session?.state ?? 'UNKNOWN'}`;
 }
 
 function safeReturnTo(value: unknown): string {

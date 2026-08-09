@@ -44,6 +44,35 @@ export async function loadAuthoringSession(sessionPid: string): Promise<Authorin
   return requireData(result, '无法刷新配置草稿');
 }
 
+export async function observeAuthoringChangeSet(
+  changeSetPid: string,
+  interactionContext?: Partial<InteractionContext>,
+): Promise<AuthoringSession> {
+  const result = await fetchResult<AuthoringSession>(
+    `/api/authoring/change-sets/${encodeURIComponent(changeSetPid)}/sessions`,
+    {
+      method: 'post',
+      params: interactionContext ? { interactionContext } : {},
+    },
+  );
+  return requireData(result, '无法打开 ChangeSet 只读会话');
+}
+
+export async function takeoverAuthoringWriterLease(
+  sessionPid: string,
+  revision: number,
+  reason: string,
+): Promise<AuthoringSession> {
+  const result = await fetchResult<AuthoringSession>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/writer-lease/takeover`,
+    {
+      method: 'post',
+      params: { expectedRevision: revision, reason },
+    },
+  );
+  return requireData(result, '无法接管 ChangeSet 编辑权');
+}
+
 export async function applyAuthoringPatch(
   sessionPid: string,
   revision: number,

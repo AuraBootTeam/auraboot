@@ -44,6 +44,21 @@ public final class AuthoringWorkspaceContracts {
             @NotBlank String manifestChecksum) {
     }
 
+    public record ObserveChangeSetRequest(
+            JsonNode interactionContext) {
+    }
+
+    public record TakeoverWriterLeaseRequest(
+            @Positive long expectedRevision,
+            @NotBlank @Size(max = 1000) String reason) {
+    }
+
+    public record WriterLeaseView(
+            String status,
+            long revision,
+            Instant leasedUntil) {
+    }
+
     public record SessionView(
             String sessionPid,
             String changeSetPid,
@@ -59,6 +74,7 @@ public final class AuthoringWorkspaceContracts {
             String manifestChecksum,
             JsonNode snapshot,
             JsonNode interactionContext,
+            WriterLeaseView writerLease,
             Instant expiresAt) {
     }
 

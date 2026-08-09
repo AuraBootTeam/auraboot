@@ -8,12 +8,15 @@ import com.auraboot.framework.authoring.workspace.AuthoringActiveReleaseResolver
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ApplyPatchRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CapabilityRegistryView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.MoveBlockRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ObserveChangeSetRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.TakeoverWriterLeaseRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.AggregatePolicy;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.AuditEntry;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.CreateWorkspace;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.CreateObserverSession;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.WorkspaceRow;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.entity.PageSchema;
@@ -131,13 +134,95 @@ public class AuthoringWorkspaceService {
         repository.audit(audit(identity, changeSetPid, sessionPid, "SESSION_OPENED", "ALLOW",
                 null, page.getPid(), null, null,
                 objectMapper.valueToTree(Map.of("baseVersion", snapshotFactory.baseVersion(page)))));
-        return viewMapper.toView(requireWorkspace(identity, sessionPid, false));
+        return viewMapper.toView(requireWorkspace(identity, sessionPid, false), identity.userId());
     }
 
     @Transactional(readOnly = true)
     public SessionView get(String sessionPid) {
         Identity identity = identity();
-        return viewMapper.toView(requireWorkspace(identity, sessionPid, false));
+        return viewMapper.toView(requireWorkspace(identity, sessionPid, false), identity.userId());
+    }
+
+    @Transactional
+    public SessionView observe(String changeSetPid, ObserveChangeSetRequest request) {
+        Identity identity = identity();
+        String sessionPid = UniqueIdGenerator.generate();
+        JsonNode interactionContext = interactionContextSanitizer.sanitize(
+                request == null ? null : request.interactionContext());
+        String created = repository.createObserverSession(new CreateObserverSession(
+                identity.tenantId(),
+                identity.envId(),
+                identity.userId(),
+                changeSetPid,
+                sessionPid,
+                interactionContext,
+                Instant.now().plus(SESSION_TTL)));
+        if (created == null) {
+            throw new ResponseStatusException(NOT_FOUND, "authoring.change-set.not-found");
+        }
+        WorkspaceRow workspace = requireWorkspace(identity, created, false);
+        repository.audit(audit(
+                identity,
+                workspace.changeSetPid(),
+                workspace.sessionPid(),
+                "OBSERVER_SESSION_OPENED",
+                "ALLOW",
+                null,
+                workspace.pagePid(),
+                null,
+                null,
+                objectMapper.valueToTree(Map.of(
+                        "leaseRevision", workspace.leaseRevision(),
+                        "writerLeaseStatus", "HELD_BY_OTHER"))));
+        return viewMapper.toView(workspace, identity.userId());
+    }
+
+    @Transactional
+    public SessionView takeoverWriterLease(
+            String sessionPid,
+            TakeoverWriterLeaseRequest request) {
+        Identity identity = identity();
+        WorkspaceRow workspace = requireWorkspace(identity, sessionPid, true);
+        if (workspace.changeSetRevision() != request.expectedRevision()) {
+            throw new ResponseStatusException(CONFLICT, "authoring.revision.conflict");
+        }
+        if (!"DRAFT".equals(workspace.changeSetStatus())
+                && !"REJECTED".equals(workspace.changeSetStatus())) {
+            throw new ResponseStatusException(CONFLICT, "authoring.writer-lease.change-set-frozen");
+        }
+        Instant now = Instant.now();
+        boolean alreadyOwned = workspace.leaseSessionId() == workspace.sessionId()
+                && workspace.leaseHolderUserId() == identity.userId()
+                && workspace.leasedUntil().isAfter(now)
+                && "ACTIVE".equals(workspace.sessionState());
+        if (alreadyOwned) {
+            return viewMapper.toView(workspace, identity.userId());
+        }
+
+        long previousHolderUserId = workspace.leaseHolderUserId();
+        long previousLeaseRevision = workspace.leaseRevision();
+        repository.takeoverWriterLease(
+                workspace,
+                identity.userId(),
+                now.plus(SESSION_TTL),
+                now.plus(WRITER_LEASE));
+        WorkspaceRow reloaded = requireWorkspace(identity, sessionPid, false);
+        repository.audit(audit(
+                identity,
+                reloaded.changeSetPid(),
+                reloaded.sessionPid(),
+                "WRITER_LEASE_TAKEN_OVER",
+                "ALLOW",
+                "EXPLICIT_ADMIN_TAKEOVER",
+                reloaded.pagePid(),
+                null,
+                null,
+                objectMapper.valueToTree(Map.of(
+                        "reason", request.reason().trim(),
+                        "previousHolderUserId", previousHolderUserId,
+                        "previousLeaseRevision", previousLeaseRevision,
+                        "resultLeaseRevision", reloaded.leaseRevision()))));
+        return viewMapper.toView(reloaded, identity.userId());
     }
 
     @Transactional
@@ -208,7 +293,8 @@ public class AuthoringWorkspaceService {
                 REORDER_WITHIN_PARENT_PATH,
                 moveMetadata(request, changeItemPid)));
 
-        SessionView reloaded = viewMapper.toView(requireWorkspace(identity, sessionPid, false));
+        SessionView reloaded = viewMapper.toView(
+                requireWorkspace(identity, sessionPid, false), identity.userId());
         return new PatchResult(
                 reloaded,
                 changeItemPid,
@@ -289,7 +375,8 @@ public class AuthoringWorkspaceService {
                         "route", prepared.decision().route().name(),
                         "authoringSurface", studioRoute ? "STUDIO" : "CONTEXTUAL"))));
 
-        SessionView reloaded = viewMapper.toView(requireWorkspace(identity, sessionPid, false));
+        SessionView reloaded = viewMapper.toView(
+                requireWorkspace(identity, sessionPid, false), identity.userId());
         return new PatchResult(reloaded, changeItemPid, prepared.decision(),
                 prepared.previousValue(), prepared.savedValue());
     }
@@ -307,14 +394,18 @@ public class AuthoringWorkspaceService {
 
     private void validateWritable(WorkspaceRow row, Identity identity, long expectedRevision) {
         Instant now = Instant.now();
-        if (!"ACTIVE".equals(row.sessionState()) || !row.expiresAt().isAfter(now)) {
+        if (!row.expiresAt().isAfter(now)) {
             throw new ResponseStatusException(CONFLICT, "authoring.session.expired");
+        }
+        if (row.leaseSessionId() != row.sessionId()
+                || row.leaseHolderUserId() != identity.userId()) {
+            throw new ResponseStatusException(CONFLICT, "authoring.writer-lease.lost");
+        }
+        if (!"ACTIVE".equals(row.sessionState())) {
+            throw new ResponseStatusException(CONFLICT, "authoring.session.read-only");
         }
         if (!row.leasedUntil().isAfter(now)) {
             throw new ResponseStatusException(CONFLICT, "authoring.writer-lease.expired");
-        }
-        if (row.actorUserId() != identity.userId()) {
-            throw new ResponseStatusException(FORBIDDEN, "authoring.writer-lease.actor-mismatch");
         }
         if (row.changeSetRevision() != expectedRevision
                 || row.resourceRevision() != expectedRevision

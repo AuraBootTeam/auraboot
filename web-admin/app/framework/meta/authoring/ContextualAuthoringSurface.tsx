@@ -30,7 +30,9 @@ import {
   loadAuthoringCapabilities,
   openAuthoringSession,
   submitAuthoringSession,
+  takeoverAuthoringWriterLease,
 } from './authoringService';
+import { AuthoringWriterLeaseNotice } from './AuthoringWriterLeaseNotice';
 import type {
   AuthoringMode,
   AuthoringNode,
@@ -61,6 +63,7 @@ export function ContextualAuthoringSurface({
   const navigate = useNavigate();
   const canReadDesigner = usePermission('meta.designer.read');
   const canManageDesigner = usePermission('meta.designer.update');
+  const canAdministerDesigner = usePermission('meta.designer.admin');
   const canConfigure = canReadDesigner && canManageDesigner;
   const [session, setSession] = useState<AuthoringSession | null>(null);
   const [workingSchema, setWorkingSchema] = useState<UnifiedSchema>(schema);
@@ -82,6 +85,7 @@ export function ContextualAuthoringSurface({
   const [explain, setExplain] = useState<ExplainState | null>(null);
   const [handoffPending, setHandoffPending] = useState(false);
   const [writeBlocked, setWriteBlocked] = useState(false);
+  const [leaseTakeoverPending, setLeaseTakeoverPending] = useState(false);
   const runtimeRootRef = useRef<HTMLDivElement | null>(null);
   const entryScrollRef = useRef({ x: 0, y: 0 });
   const returnResumeAttemptedRef = useRef(false);
@@ -98,7 +102,8 @@ export function ContextualAuthoringSurface({
     () => new Map(capabilities?.manifests.map((manifest) => [manifest.blockType, manifest]) ?? []),
     [capabilities],
   );
-  const authoringReadOnly = !canConfigure || session?.state !== 'ACTIVE';
+  const authoringReadOnly = !isAuthoringSessionWritable(session, canConfigure);
+  const activeSessionPid = session?.sessionPid;
 
   useEffect(() => {
     if (returnResumeAttemptedRef.current) return;
@@ -204,6 +209,26 @@ export function ContextualAuthoringSurface({
     if (!session) return;
     return activateAuthoringPreviewGuard(session.sessionPid);
   }, [session]);
+
+  useEffect(() => {
+    if (!activeSessionPid) return;
+    let cancelled = false;
+    const interval = window.setInterval(() => {
+      void loadAuthoringSession(activeSessionPid)
+        .then((latest) => {
+          if (cancelled) return;
+          setSession(latest);
+          setWorkingSchema(materializePendingSchema(schema, latest.snapshot, pendingEdits));
+        })
+        .catch(() => {
+          // Background lease/revision refresh must not replace the foreground error state.
+        });
+    }, 15_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeSessionPid, pendingEdits, schema]);
 
   useEffect(() => {
     if (!session) return;
@@ -318,7 +343,7 @@ export function ContextualAuthoringSurface({
   };
 
   const createHandoff = async () => {
-    if (!canConfigure || !session || !explain || handoffPending) return;
+    if (!isAuthoringSessionWritable(session, canConfigure) || !explain || handoffPending) return;
     setHandoffPending(true);
     setError(null);
     try {
@@ -340,7 +365,7 @@ export function ContextualAuthoringSurface({
 
   const stageEdit = useCallback(
     (node: AuthoringNode, property: PropertyCapability, value: unknown, remove = false) => {
-      if (!canConfigure || !session || session.state !== 'ACTIVE') return;
+      if (!isAuthoringSessionWritable(session, canConfigure)) return;
       const manifestChecksum = manifestByType.get(node.blockType)?.checksum;
       if (!manifestChecksum) {
         setError(`未找到 ${node.blockType} 的能力清单，无法保存该变更`);
@@ -383,8 +408,7 @@ export function ContextualAuthoringSurface({
 
   const saveChanges = useCallback(async () => {
     if (
-      !canConfigure ||
-      !session ||
+      !isAuthoringSessionWritable(session, canConfigure) ||
       saving ||
       pendingEdits.size === 0 ||
       session.state !== 'ACTIVE'
@@ -442,8 +466,7 @@ export function ContextualAuthoringSurface({
 
   const submitForReview = useCallback(async () => {
     if (
-      !canConfigure ||
-      !session ||
+      !isAuthoringSessionWritable(session, canConfigure) ||
       pendingEdits.size > 0 ||
       submitting ||
       session.state !== 'ACTIVE'
@@ -462,6 +485,31 @@ export function ContextualAuthoringSurface({
       setSubmitting(false);
     }
   }, [canConfigure, pendingEdits.size, schema, session, submitting]);
+
+  const takeoverWriterLease = useCallback(
+    async (reason: string) => {
+      if (!canAdministerDesigner || !session || leaseTakeoverPending) return;
+      setLeaseTakeoverPending(true);
+      setError(null);
+      try {
+        const taken = await takeoverAuthoringWriterLease(
+          session.sessionPid,
+          session.revision,
+          reason,
+        );
+        setSession(taken);
+        setWorkingSchema(materializePendingSchema(schema, taken.snapshot, pendingEdits));
+        setStale(false);
+      } catch (takeoverFailure) {
+        setError(
+          takeoverFailure instanceof Error ? takeoverFailure.message : '无法接管 ChangeSet 编辑权',
+        );
+      } finally {
+        setLeaseTakeoverPending(false);
+      }
+    },
+    [canAdministerDesigner, leaseTakeoverPending, pendingEdits, schema, session],
+  );
 
   if (!session) {
     return (
@@ -537,6 +585,16 @@ export function ContextualAuthoringSurface({
           <span>
             配置权限已收回，当前会话已即时转为只读。浏览器中的未保存差异仍会保留，但不会保存、提交或移交；可退出配置模式，或在权限恢复后继续。
           </span>
+        </div>
+      ) : null}
+      {canConfigure ? (
+        <div className="mx-3 mt-3">
+          <AuthoringWriterLeaseNotice
+            lease={session.writerLease}
+            canTakeover={canAdministerDesigner}
+            pending={leaseTakeoverPending}
+            onTakeover={takeoverWriterLease}
+          />
         </div>
       ) : null}
       {error ? (
@@ -628,6 +686,7 @@ export function ContextualAuthoringSurface({
         submitting={submitting}
         stale={stale}
         readOnly={authoringReadOnly}
+        readOnlyLabel={authoringReadOnlyLabel(session, canConfigure)}
         onDiff={() => setDiffOpen(true)}
         onSave={saveChanges}
         onRefresh={refreshDraft}
@@ -1064,6 +1123,7 @@ function ChangeDock({
   submitting,
   stale,
   readOnly,
+  readOnlyLabel,
   onDiff,
   onSave,
   onRefresh,
@@ -1075,6 +1135,7 @@ function ChangeDock({
   submitting: boolean;
   stale: boolean;
   readOnly: boolean;
+  readOnlyLabel: string;
   onDiff: () => void;
   onSave: () => void;
   onRefresh: () => void;
@@ -1091,11 +1152,7 @@ function ChangeDock({
         </span>
         {readOnly ? (
           <span className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-            {session.state === 'READ_ONLY'
-              ? '已提交，当前只读'
-              : session.state !== 'ACTIVE'
-                ? session.state
-                : '权限已收回，当前只读'}
+            {readOnlyLabel}
           </span>
         ) : null}
       </div>
@@ -1135,6 +1192,25 @@ function ChangeDock({
       />
     </footer>
   );
+}
+
+function isAuthoringSessionWritable(
+  session: AuthoringSession | null,
+  canConfigure: boolean,
+): session is AuthoringSession {
+  return Boolean(
+    canConfigure &&
+    session?.state === 'ACTIVE' &&
+    (!session.writerLease || session.writerLease.status === 'OWNED'),
+  );
+}
+
+function authoringReadOnlyLabel(session: AuthoringSession, canConfigure: boolean): string {
+  if (!canConfigure) return '权限已收回，当前只读';
+  if (session.writerLease?.status === 'EXPIRED') return '编辑租约已过期';
+  if (session.writerLease && session.writerLease.status !== 'OWNED') return '编辑权由其他会话持有';
+  if (session.state === 'READ_ONLY') return '已冻结，当前只读';
+  return session.state;
 }
 
 function DockButton({

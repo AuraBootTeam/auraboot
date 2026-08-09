@@ -7,6 +7,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Cr
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffContextView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffCreatedView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.MoveBlockRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ObserveChangeSetRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseView;
@@ -14,6 +15,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Re
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RevisionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RollbackRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.TakeoverWriterLeaseRequest;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
@@ -60,6 +62,22 @@ public class AuthoringWorkspaceController {
     @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
     public ApiResponse<SessionView> get(@PathVariable String sessionPid) {
         return ApiResponse.success(workspaceService.get(sessionPid));
+    }
+
+    @PostMapping("/change-sets/{changeSetPid}/sessions")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<SessionView> observe(
+            @PathVariable String changeSetPid,
+            @Valid @RequestBody(required = false) ObserveChangeSetRequest request) {
+        return ApiResponse.success(workspaceService.observe(changeSetPid, request));
+    }
+
+    @PostMapping("/sessions/{sessionPid}/writer-lease/takeover")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<SessionView> takeoverWriterLease(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody TakeoverWriterLeaseRequest request) {
+        return ApiResponse.success(workspaceService.takeoverWriterLease(sessionPid, request));
     }
 
     @PostMapping("/sessions/{sessionPid}/handoffs")

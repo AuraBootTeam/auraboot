@@ -19,7 +19,20 @@ export interface AuthoringSession {
   manifestChecksum: string;
   snapshot: Record<string, unknown>;
   interactionContext: Record<string, unknown>;
+  writerLease?: AuthoringWriterLease;
   expiresAt: string;
+}
+
+export type AuthoringWriterLeaseStatus =
+  | 'OWNED'
+  | 'HELD_BY_OTHER'
+  | 'HELD_BY_OTHER_SESSION'
+  | 'EXPIRED';
+
+export interface AuthoringWriterLease {
+  status: AuthoringWriterLeaseStatus;
+  revision: number;
+  leasedUntil: string;
 }
 
 export interface PropertyCapability {

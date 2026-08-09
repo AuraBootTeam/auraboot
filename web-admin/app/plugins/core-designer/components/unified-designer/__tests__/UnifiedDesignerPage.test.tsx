@@ -12,6 +12,8 @@ import {
   loadAuthoringCapabilities,
   loadAuthoringSession,
   moveAuthoringStudioBlock,
+  observeAuthoringChangeSet,
+  takeoverAuthoringWriterLease,
 } from '~/framework/meta/authoring/authoringService';
 import type {
   AuthoringSession,
@@ -47,6 +49,8 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   loadAuthoringCapabilities: vi.fn(),
   loadAuthoringSession: vi.fn(),
   moveAuthoringStudioBlock: vi.fn(),
+  observeAuthoringChangeSet: vi.fn(),
+  takeoverAuthoringWriterLease: vi.fn(),
 }));
 
 describe('UnifiedDesignerPage', () => {
@@ -62,6 +66,8 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(loadAuthoringCapabilities).mockReset();
     vi.mocked(applyAuthoringStudioPatch).mockReset();
     vi.mocked(moveAuthoringStudioBlock).mockReset();
+    vi.mocked(observeAuthoringChangeSet).mockReset();
+    vi.mocked(takeoverAuthoringWriterLease).mockReset();
     permissionMock.canAdministerDesigner.mockReturnValue(true);
   });
 
@@ -202,6 +208,54 @@ describe('UnifiedDesignerPage', () => {
     await waitFor(() =>
       expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_customer_name'),
     );
+  });
+
+  it('opens a ChangeSet as a read-only observer and takes over its writer lease with a reason', async () => {
+    setSearch('?changeSetId=changeset_1');
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+    const observer = createAuthoringSession(createDocument('document_one', 'Observed Draft'));
+    observer.state = 'READ_ONLY';
+    observer.writerLease = {
+      status: 'HELD_BY_OTHER',
+      revision: 4,
+      leasedUntil: '2026-08-09T12:05:00Z',
+    };
+    const taken = createAuthoringSession(createDocument('document_one', 'Observed Draft'));
+    taken.writerLease = {
+      status: 'OWNED',
+      revision: 5,
+      leasedUntil: '2026-08-09T12:10:00Z',
+    };
+    vi.mocked(observeAuthoringChangeSet).mockResolvedValue(observer);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(takeoverAuthoringWriterLease).mockResolvedValue(taken);
+
+    render(<UnifiedDesignerPage />);
+
+    expect(await screen.findByTestId('authoring-writer-lease-notice')).toHaveTextContent(
+      '另一位管理员正在编辑',
+    );
+    expect(observeAuthoringChangeSet).toHaveBeenCalledWith('changeset_1');
+    expect(screen.getByTestId('designer-save')).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('接管原因'), {
+      target: { value: '经值班负责人确认接管' },
+    });
+    fireEvent.click(screen.getByTestId('authoring-writer-lease-takeover'));
+
+    await waitFor(() =>
+      expect(takeoverAuthoringWriterLease).toHaveBeenCalledWith(
+        'session_1',
+        3,
+        '经值班负责人确认接管',
+      ),
+    );
+    expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument();
+    expect(screen.getByTestId('studio-handoff-editable-reason')).toBeInTheDocument();
+    expect(String(replaceState.mock.calls.at(-1)?.[2])).toContain(
+      'authoringSession=session_1',
+    );
+    expect(String(replaceState.mock.calls.at(-1)?.[2])).not.toContain('changeSetId');
+    replaceState.mockRestore();
   });
 
   it('saves a manifest-backed Studio edit into the same ChangeSet without touching PageSchema', async () => {

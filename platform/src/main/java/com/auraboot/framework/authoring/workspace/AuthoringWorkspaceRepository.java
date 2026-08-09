@@ -82,18 +82,20 @@ public class AuthoringWorkspaceRepository {
                             s.page_pid, s.state AS session_state, s.interaction_context::text,
                             s.expires_at, s.revision AS session_revision,
                             cs.id AS change_set_id, cs.pid AS change_set_pid,
+                            cs.status AS change_set_status,
                             cs.revision AS change_set_revision, cs.risk_level, cs.route,
                             cs.publish_policy, cs.validation_state, cs.approval_state,
                             cs.publish_state, cs.manifest_checksum,
                             rd.id AS resource_draft_id, rd.pid AS resource_draft_pid,
                             rd.revision AS resource_revision, rd.snapshot::text,
-                            wl.id AS lease_id, wl.leased_until
+                            wl.id AS lease_id, wl.session_id AS lease_session_id,
+                            wl.holder_user_id AS lease_holder_user_id,
+                            wl.lease_revision, wl.leased_until
                         FROM ab_authoring_config_session s
                         JOIN ab_authoring_change_set cs ON cs.id = s.change_set_id
                         JOIN ab_authoring_resource_draft rd ON rd.change_set_id = cs.id
                             AND rd.resource_type = 'PAGE_SCHEMA' AND rd.resource_pid = s.page_pid
                         JOIN ab_authoring_writer_lease wl ON wl.change_set_id = cs.id
-                            AND wl.session_id = s.id
                         WHERE s.tenant_id = ? AND s.env_id = ? AND s.pid = ?
                           AND cs.tenant_id = ? AND cs.env_id = ? AND cs.deleted_flag = FALSE
                           AND rd.tenant_id = ? AND rd.env_id = ?
@@ -104,6 +106,79 @@ public class AuthoringWorkspaceRepository {
                 tenantId, envId,
                 tenantId, envId,
                 tenantId, envId);
+    }
+
+    public String createObserverSession(CreateObserverSession command) {
+        List<ObservationTarget> targets = jdbcTemplate.query("""
+                        SELECT cs.id AS change_set_id, cs.revision,
+                               rd.resource_pid AS page_pid
+                        FROM ab_authoring_change_set cs
+                        JOIN ab_authoring_resource_draft rd ON rd.change_set_id = cs.id
+                          AND rd.resource_type = 'PAGE_SCHEMA'
+                        JOIN ab_authoring_writer_lease wl ON wl.change_set_id = cs.id
+                        WHERE cs.tenant_id = ? AND cs.env_id = ? AND cs.pid = ?
+                          AND cs.deleted_flag = FALSE
+                          AND rd.tenant_id = ? AND rd.env_id = ?
+                          AND wl.tenant_id = ? AND wl.env_id = ?
+                        FOR UPDATE OF cs, rd, wl
+                        """,
+                (resultSet, rowNum) -> new ObservationTarget(
+                        resultSet.getLong("change_set_id"),
+                        resultSet.getLong("revision"),
+                        resultSet.getString("page_pid")),
+                command.tenantId(), command.envId(), command.changeSetPid(),
+                command.tenantId(), command.envId(),
+                command.tenantId(), command.envId());
+        if (targets.size() != 1) {
+            return null;
+        }
+        ObservationTarget target = targets.get(0);
+        jdbcTemplate.update("""
+                INSERT INTO ab_authoring_config_session (
+                    pid, tenant_id, env_id, actor_user_id, change_set_id, page_pid, state,
+                    interaction_context, revision, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'READ_ONLY', ?::jsonb, ?, ?)
+                """,
+                command.sessionPid(), command.tenantId(), command.envId(), command.actorUserId(),
+                target.changeSetId(), target.pagePid(), json(command.interactionContext()),
+                target.revision(), Timestamp.from(command.expiresAt()));
+        return command.sessionPid();
+    }
+
+    public void takeoverWriterLease(
+            WorkspaceRow workspace,
+            long actorUserId,
+            Instant sessionExpiresAt,
+            Instant leaseUntil) {
+        jdbcTemplate.update("""
+                UPDATE ab_authoring_config_session
+                SET state = 'READ_ONLY', updated_at = CURRENT_TIMESTAMP
+                WHERE change_set_id = ? AND tenant_id = ? AND env_id = ?
+                  AND state = 'ACTIVE'
+                """,
+                workspace.changeSetId(), workspace.tenantId(), workspace.envId());
+        int sessionUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_config_session
+                SET state = 'ACTIVE', revision = ?, expires_at = ?,
+                    last_seen_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND tenant_id = ? AND env_id = ? AND actor_user_id = ?
+                """,
+                workspace.changeSetRevision(), Timestamp.from(sessionExpiresAt),
+                workspace.sessionId(), workspace.tenantId(), workspace.envId(), actorUserId);
+        requireOne(sessionUpdated, "authoring.session.actor-mismatch");
+
+        int leaseUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_writer_lease
+                SET session_id = ?, holder_user_id = ?,
+                    lease_revision = lease_revision + 1,
+                    acquired_at = CURRENT_TIMESTAMP, leased_until = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND tenant_id = ? AND env_id = ? AND lease_revision = ?
+                """,
+                workspace.sessionId(), actorUserId, Timestamp.from(leaseUntil),
+                workspace.leaseId(), workspace.tenantId(), workspace.envId(),
+                workspace.leaseRevision());
+        requireOne(leaseUpdated, "authoring.writer-lease.conflict");
     }
 
     public void persistPatch(
@@ -283,6 +358,7 @@ public class AuthoringWorkspaceRepository {
                 resultSet.getLong("session_revision"),
                 resultSet.getLong("change_set_id"),
                 resultSet.getString("change_set_pid"),
+                resultSet.getString("change_set_status"),
                 resultSet.getLong("change_set_revision"),
                 resultSet.getString("risk_level"),
                 resultSet.getString("route"),
@@ -296,6 +372,9 @@ public class AuthoringWorkspaceRepository {
                 resultSet.getLong("resource_revision"),
                 parse(resultSet.getString("snapshot")),
                 resultSet.getLong("lease_id"),
+                resultSet.getLong("lease_session_id"),
+                resultSet.getLong("lease_holder_user_id"),
+                resultSet.getLong("lease_revision"),
                 resultSet.getTimestamp("leased_until").toInstant());
     }
 
@@ -348,6 +427,19 @@ public class AuthoringWorkspaceRepository {
     public record CreatedWorkspace(long changeSetId, long resourceDraftId, long sessionId) {
     }
 
+    public record CreateObserverSession(
+            long tenantId,
+            long envId,
+            long actorUserId,
+            String changeSetPid,
+            String sessionPid,
+            JsonNode interactionContext,
+            Instant expiresAt) {
+    }
+
+    private record ObservationTarget(long changeSetId, long revision, String pagePid) {
+    }
+
     public record CreateHandoff(
             String pid,
             long tenantId,
@@ -387,6 +479,7 @@ public class AuthoringWorkspaceRepository {
             long sessionRevision,
             long changeSetId,
             String changeSetPid,
+            String changeSetStatus,
             long changeSetRevision,
             String riskLevel,
             String route,
@@ -400,6 +493,9 @@ public class AuthoringWorkspaceRepository {
             long resourceRevision,
             JsonNode snapshot,
             long leaseId,
+            long leaseSessionId,
+            long leaseHolderUserId,
+            long leaseRevision,
             Instant leasedUntil) {
     }
 

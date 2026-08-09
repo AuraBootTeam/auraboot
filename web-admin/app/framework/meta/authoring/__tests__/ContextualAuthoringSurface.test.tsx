@@ -10,6 +10,7 @@ import {
   loadAuthoringSession,
   openAuthoringSession,
   submitAuthoringSession,
+  takeoverAuthoringWriterLease,
 } from '../authoringService';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 import type { AuthoringSession } from '../types';
@@ -17,12 +18,15 @@ import type { AuthoringSession } from '../types';
 const permissionMock = vi.hoisted(() => ({
   canRead: true,
   canManage: true,
+  canAdmin: true,
   usePermission: vi.fn((permission: string) =>
     permission === 'meta.designer.read'
       ? permissionMock.canRead
       : permission === 'meta.designer.update'
         ? permissionMock.canManage
-        : false,
+        : permission === 'meta.designer.admin'
+          ? permissionMock.canAdmin
+          : false,
   ),
 }));
 
@@ -37,6 +41,7 @@ vi.mock('../authoringService', () => ({
   applyAuthoringPatch: vi.fn(),
   submitAuthoringSession: vi.fn(),
   createAuthoringHandoff: vi.fn(),
+  takeoverAuthoringWriterLease: vi.fn(),
 }));
 
 const schema: UnifiedSchema = {
@@ -62,6 +67,7 @@ describe('ContextualAuthoringSurface', () => {
     vi.clearAllMocks();
     permissionMock.canRead = true;
     permissionMock.canManage = true;
+    permissionMock.canAdmin = true;
     window.history.replaceState(
       null,
       '',
@@ -146,6 +152,15 @@ describe('ContextualAuthoringSurface', () => {
     });
     vi.mocked(submitAuthoringSession).mockResolvedValue(undefined);
     vi.mocked(loadAuthoringSession).mockResolvedValue(openedSession);
+    vi.mocked(takeoverAuthoringWriterLease).mockResolvedValue(
+      createAuthoringSession({
+        writerLease: {
+          status: 'OWNED',
+          revision: 2,
+          leasedUntil: '2026-08-09T12:05:00Z',
+        },
+      }),
+    );
   });
 
   it('enters from the runtime page, separates modes and exposes independent counters', async () => {
@@ -318,6 +333,45 @@ describe('ContextualAuthoringSurface', () => {
     expect(screen.getByLabelText(/标题/)).toBeEnabled();
     expect(screen.getByText('1 项未保存')).toBeInTheDocument();
     expect(screen.getByText('保存')).toBeEnabled();
+  });
+
+  it('shows a held writer lease as read-only and allows an audited admin takeover', async () => {
+    vi.mocked(openAuthoringSession).mockResolvedValue(
+      createAuthoringSession({
+        writerLease: {
+          status: 'HELD_BY_OTHER',
+          revision: 7,
+          leasedUntil: '2026-08-09T12:05:00Z',
+        },
+      }),
+    );
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+
+    expect(await screen.findByTestId('authoring-writer-lease-notice')).toHaveTextContent(
+      '另一位管理员正在编辑',
+    );
+    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+      'data-read-only',
+      'true',
+    );
+    fireEvent.change(screen.getByLabelText('接管原因'), {
+      target: { value: '原作者离线，继续紧急修复' },
+    });
+    fireEvent.click(screen.getByTestId('authoring-writer-lease-takeover'));
+
+    await waitFor(() =>
+      expect(takeoverAuthoringWriterLease).toHaveBeenCalledWith(
+        'session-1',
+        1,
+        '原作者离线，继续紧急修复',
+      ),
+    );
+    expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument();
+    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+      'data-read-only',
+      'false',
+    );
   });
 });
 

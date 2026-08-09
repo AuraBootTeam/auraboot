@@ -127,6 +127,14 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"expectedRevision\":1,\"intent\":\"PAGE_STRUCTURE\"}"))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/change-sets/missing/sessions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/sessions/missing/writer-lease/takeover")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":1,\"reason\":\"test\"}"))
+                .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/authoring/handoffs/ctx_abcdefghijklmnopqrstuvwxyz123456/consume"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/authoring/change-sets/missing/approve")
@@ -155,6 +163,84 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"pagePid\":\"hidden\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void secondAdminObservesReadOnlyAndTakesOverTheSingleWriterLeaseWithAudit() throws Exception {
+        grantDesignerAdmin();
+        PageSchema page = insertPage("normal");
+        long environmentId = MetaContext.getCurrentEnvironmentId();
+        SessionView original;
+        try {
+            MetaContext.setContext(
+                    testTenant.getId(), testUser.getId() + 100_000,
+                    "original-author", "original-author");
+            MetaContext.setEnvironmentId(environmentId);
+            original = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        } finally {
+            applyTestMetaContext();
+        }
+
+        String observerBody = mockMvc.perform(post(
+                        "/api/authoring/change-sets/{changeSetPid}/sessions",
+                        original.changeSetPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"interactionContext\":{\"route\":\"/studio/review\"}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.state").value("READ_ONLY"))
+                .andExpect(jsonPath("$.data.changeSetPid").value(original.changeSetPid()))
+                .andExpect(jsonPath("$.data.writerLease.status").value("HELD_BY_OTHER"))
+                .andExpect(jsonPath("$.data.interactionContext.route").value("/studio/review"))
+                .andReturn().getResponse().getContentAsString();
+        String observerSessionPid = objectMapper.readTree(observerBody).at("/data/sessionPid").asText();
+
+        mockMvc.perform(post(
+                        "/api/authoring/sessions/{sessionPid}/writer-lease/takeover",
+                        observerSessionPid)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":1,\"reason\":\"继续处理紧急变更\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sessionPid").value(observerSessionPid))
+                .andExpect(jsonPath("$.data.state").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.writerLease.status").value("OWNED"))
+                .andExpect(jsonPath("$.data.writerLease.revision").value(2));
+
+        applyTestMetaContext();
+        PatchResult saved = workspaceService.apply(observerSessionPid, new ApplyPatchRequest(
+                1, "table-1", "/props/density", PatchOperation.REPLACE,
+                objectMapper.getNodeFactory().textNode("compact"),
+                capabilityRegistry.find("table").orElseThrow().checksum()));
+        assertThat(saved.session().revision()).isEqualTo(2);
+
+        try {
+            MetaContext.setContext(
+                    testTenant.getId(), testUser.getId() + 100_000,
+                    "original-author", "original-author");
+            MetaContext.setEnvironmentId(environmentId);
+            SessionView lost = workspaceService.get(original.sessionPid());
+            assertThat(lost.state()).isEqualTo("READ_ONLY");
+            assertThat(lost.writerLease().status()).isEqualTo("HELD_BY_OTHER");
+            assertThatThrownBy(() -> workspaceService.apply(
+                    original.sessionPid(),
+                    new ApplyPatchRequest(
+                            1, "table-1", "/props/density", PatchOperation.REPLACE,
+                            objectMapper.getNodeFactory().textNode("comfortable"),
+                            capabilityRegistry.find("table").orElseThrow().checksum())))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .hasMessageContaining("authoring.writer-lease.lost");
+        } finally {
+            applyTestMetaContext();
+        }
+
+        Integer takeoverEvents = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_audit_event
+                WHERE tenant_id = ? AND env_id = ? AND change_set_pid = ?
+                  AND event_type = 'WRITER_LEASE_TAKEN_OVER'
+                  AND result = 'ALLOW'
+                  AND metadata ->> 'reason' = '继续处理紧急变更'
+                """, Integer.class,
+                testTenant.getId(), environmentId, original.changeSetPid());
+        assertThat(takeoverEvents).isEqualTo(1);
     }
 
     @Test
