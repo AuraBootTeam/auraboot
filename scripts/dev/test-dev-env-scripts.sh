@@ -337,7 +337,7 @@ INSPECT_OUTPUT="$(
     AURA_ENV_REGISTRY_ROOT="$REGISTRY_ROOT" scripts/dev/env.sh inspect --slug=scriptcheck-r2
 )"
 assert_contains "env inspect includes auth root" "$INSPECT_OUTPUT" "\"authRoot\":\"$REGISTRY_ROOT/envs/scriptcheck-r2/auth\""
-assert_contains "env inspect includes branch" "$INSPECT_OUTPUT" "\"coreBranch\":\"bugfix/daily-core\""
+assert_contains "env inspect includes branch" "$INSPECT_OUTPUT" "\"coreBranch\":\"$(git -C "$PROJECT_ROOT" branch --show-current)\""
 
 REUSE_START_OUTPUT="$(
     cd "$PROJECT_ROOT" &&
@@ -365,6 +365,13 @@ STATUS_OUTPUT_FROM_OTHER_CWD="$(
     AURA_ENV_REGISTRY_ROOT="$REGISTRY_ROOT" "$PROJECT_ROOT/scripts/dev/env.sh" status --slug=scriptcheck-r2
 )"
 assert_contains "env status anchors env file to script project root" "$STATUS_OUTPUT_FROM_OTHER_CWD" '"slug":"scriptcheck-r2"'
+
+SCHEMA_VERIFY_OUTPUT="$(
+    cd "$PROJECT_ROOT" &&
+    AURA_ENV_REGISTRY_ROOT="$REGISTRY_ROOT" scripts/dev/env.sh verify --mode=bugfix --product=enterprise --slug=scriptcheck-r2 --level=schema --dry-run
+)"
+assert_contains "env schema verify dry-run names schema readiness" "$SCHEMA_VERIFY_OUTPUT" "Schema readiness targets"
+assert_contains "env schema verify dry-run checks QR enterprise table" "$SCHEMA_VERIFY_OUTPUT" "required table: ab_qr_label_template"
 
 echo "Scenario 13: unified env reset dry-run is explicit and does not stop host processes"
 RESET_OUTPUT="$(

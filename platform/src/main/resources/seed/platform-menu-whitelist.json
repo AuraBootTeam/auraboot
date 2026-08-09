@@ -9,6 +9,7 @@
     "platform_infra",
     "platform_cloud_config",
     "platform_templates",
+    "platform_qr_template_operations",
     "platform_plugins",
     "platform_system",
     "platform_audit_logs",

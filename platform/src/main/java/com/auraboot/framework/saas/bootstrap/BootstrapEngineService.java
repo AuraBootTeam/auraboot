@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * Bootstrap Engine — orchestrates the minimal system initialization pipeline.
@@ -64,6 +65,7 @@ public class BootstrapEngineService {
     private final TenantBootstrapService tenantBootstrapService;
     private final BootstrapRepairService bootstrapRepairService;
     private final ObjectMapper objectMapper;
+    private final List<BootstrapPostProcessor> postProcessors;
 
     // ── Public API ──────────────────────────────────────────────────────
 
@@ -86,6 +88,7 @@ public class BootstrapEngineService {
 
         try {
             CoreBootstrapResult coreResult = executeCoreBootstrap(bootstrap, request);
+            runPostProcessors(coreResult);
             finalizeBootstrap(bootstrap, coreResult);
             return BootstrapResult.success(null, coreResult.defaultTenantId);
         } catch (Exception e) {
@@ -219,6 +222,18 @@ public class BootstrapEngineService {
     }
 
     // ── Step 10: Finalize ───────────────────────────────────────────────
+
+    private void runPostProcessors(CoreBootstrapResult coreResult) {
+        BootstrapContext context = new BootstrapContext(
+                coreResult.systemTenantId,
+                coreResult.defaultTenantId,
+                coreResult.adminUserId,
+                coreResult.adminUserPid);
+        for (BootstrapPostProcessor postProcessor : postProcessors) {
+            log.info("Running bootstrap post-processor: {}", postProcessor.getClass().getName());
+            postProcessor.process(context);
+        }
+    }
 
     private void finalizeBootstrap(BootstrapEntity bootstrap, CoreBootstrapResult coreResult) {
         updateProgress(bootstrap, 10, "finalize");

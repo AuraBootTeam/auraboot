@@ -1,11 +1,13 @@
 package com.auraboot.framework.auth.dto;
 
 import lombok.Data;
+import lombok.ToString;
 
 @Data
 public class AuthenticationRequest {
     private String identifier;
     private String email;
+    @ToString.Exclude
     private String password;
 
     public String resolveIdentifier() {
