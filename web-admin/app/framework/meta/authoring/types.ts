@@ -137,6 +137,26 @@ export interface AuthoringRoleStructurePreview {
   decisions: AuthoringRoleStructureDecision[];
 }
 
+export interface AuthoringSyntheticPreviewWidget {
+  source: 'GENERATED_IN_MEMORY';
+  value: string;
+  series: Array<{ label: string; value: number }>;
+}
+
+export interface AuthoringSyntheticPreview {
+  mode: 'SYNTHETIC';
+  pagePid: string;
+  source: 'GENERATED_IN_MEMORY';
+  isolatedFromTenantData: true;
+  persisted: false;
+  exportAllowed: false;
+  businessActionsAllowed: false;
+  fixtureRevision: number;
+  formValues: Record<string, unknown>;
+  records: Array<Record<string, unknown>>;
+  widgets: Record<string, AuthoringSyntheticPreviewWidget>;
+}
+
 export interface AuthoringChangeItem {
   changeItemPid: string;
   sourceChangeItemPid?: string | null;

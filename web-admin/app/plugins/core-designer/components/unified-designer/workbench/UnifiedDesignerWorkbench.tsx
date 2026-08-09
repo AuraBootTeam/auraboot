@@ -70,13 +70,19 @@ import {
   summarizeRoleStructureDecisions,
 } from '../preview/roleStructurePreview';
 import {
+  applySyntheticPreviewToDocument,
+  createSyntheticPreviewRuntimeServices,
+} from '../preview/syntheticPreview';
+import {
   loadAuthoringRolePreviewTargets,
   loadAuthoringRoleStructurePreview,
+  loadAuthoringSyntheticPreview,
 } from '~/framework/meta/authoring/authoringService';
 import type {
   AuthoringRolePreviewTarget,
   AuthoringRoleStructureDecision,
   AuthoringRoleStructurePreview,
+  AuthoringSyntheticPreview,
 } from '~/framework/meta/authoring/types';
 import { AiDesignDialog } from '../ai/AiDesignDialog';
 import { buildDesignCopilotPrompt, applyDesignBlocks, type ParsedDesign } from '../ai/designCopilot';
@@ -90,6 +96,8 @@ const designerCollisionDetection: CollisionDetection = (args) => {
     args.droppableRects,
   );
 };
+
+const SYNTHETIC_PREVIEW_OPTION = '__synthetic_fixture__';
 
 export interface UnifiedDesignerWorkbenchProps {
   initialDocument: PageSchemaV3;
@@ -168,6 +176,11 @@ export function UnifiedDesignerWorkbench({
     useState<AuthoringRoleStructurePreview | null>(null);
   const [rolePreviewLoading, setRolePreviewLoading] = useState(false);
   const [rolePreviewError, setRolePreviewError] = useState<string | null>(null);
+  const [syntheticPreview, setSyntheticPreview] = useState<AuthoringSyntheticPreview | null>(null);
+  const [syntheticPreviewLoading, setSyntheticPreviewLoading] = useState(false);
+  const [syntheticPreviewError, setSyntheticPreviewError] = useState<string | null>(null);
+  const syntheticPreviewSelected = selectedRolePreviewPid === SYNTHETIC_PREVIEW_OPTION;
+  const selectedTargetRolePid = syntheticPreviewSelected ? '' : selectedRolePreviewPid;
   // Primary + additive multi-selection model, extracted to a shared kernel so
   // the report designer (block-tree family) reuses the same modifier-click /
   // marquee rules. `selectedBlockId` is dual-purpose: the inspector target AND
@@ -199,6 +212,8 @@ export function UnifiedDesignerWorkbench({
     setSelectedRolePreviewPid('');
     setRoleStructurePreview(null);
     setRolePreviewError(null);
+    setSyntheticPreview(null);
+    setSyntheticPreviewError(null);
     if (!roleStructurePreviewSessionPid || mode !== 'preview') return;
     let cancelled = false;
     void loadAuthoringRolePreviewTargets(roleStructurePreviewSessionPid)
@@ -220,7 +235,7 @@ export function UnifiedDesignerWorkbench({
   React.useEffect(() => {
     setRoleStructurePreview(null);
     setRolePreviewError(null);
-    if (!roleStructurePreviewSessionPid || !selectedRolePreviewPid) {
+    if (!roleStructurePreviewSessionPid || !selectedTargetRolePid) {
       setRolePreviewLoading(false);
       return;
     }
@@ -228,7 +243,7 @@ export function UnifiedDesignerWorkbench({
     setRolePreviewLoading(true);
     void loadAuthoringRoleStructurePreview(
       roleStructurePreviewSessionPid,
-      selectedRolePreviewPid,
+      selectedTargetRolePid,
     )
       .then((preview) => {
         if (!cancelled) setRoleStructurePreview(preview);
@@ -248,7 +263,35 @@ export function UnifiedDesignerWorkbench({
     return () => {
       cancelled = true;
     };
-  }, [roleStructurePreviewSessionPid, selectedRolePreviewPid]);
+  }, [roleStructurePreviewSessionPid, selectedTargetRolePid]);
+
+  React.useEffect(() => {
+    setSyntheticPreview(null);
+    setSyntheticPreviewError(null);
+    if (!roleStructurePreviewSessionPid || !syntheticPreviewSelected) {
+      setSyntheticPreviewLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSyntheticPreviewLoading(true);
+    void loadAuthoringSyntheticPreview(roleStructurePreviewSessionPid)
+      .then((preview) => {
+        if (!cancelled) setSyntheticPreview(preview);
+      })
+      .catch((previewError: unknown) => {
+        if (!cancelled) {
+          setSyntheticPreviewError(
+            previewError instanceof Error ? previewError.message : '无法生成隔离合成数据',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSyntheticPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [roleStructurePreviewSessionPid, syntheticPreviewSelected]);
 
   // Toolbar save indicator follows the live document snapshot; wired into the
   // document kernel's onChange so every edit / undo / redo refreshes it.
@@ -996,12 +1039,13 @@ export function UnifiedDesignerWorkbench({
     setSelectedBlockId(null);
   };
 
-  const rolePreviewDocument = useMemo(
-    () =>
-      roleStructurePreview
-        ? sanitizeRoleStructurePreviewDocument(document)
-        : document,
-    [document, roleStructurePreview],
+  const previewDocument = useMemo(
+    () => {
+      if (roleStructurePreview) return sanitizeRoleStructurePreviewDocument(document);
+      if (syntheticPreview) return applySyntheticPreviewToDocument(document, syntheticPreview);
+      return document;
+    },
+    [document, roleStructurePreview, syntheticPreview],
   );
   const rolePreviewPermissionEvaluator = useMemo(
     () =>
@@ -1013,6 +1057,10 @@ export function UnifiedDesignerWorkbench({
   const rolePreviewSummary = useMemo(
     () => summarizeRoleStructureDecisions(roleStructurePreview?.decisions ?? []),
     [roleStructurePreview],
+  );
+  const syntheticPreviewRuntimeServices = useMemo(
+    () => (syntheticPreview ? createSyntheticPreviewRuntimeServices(syntheticPreview) : undefined),
+    [syntheticPreview],
   );
 
   return (
@@ -1101,6 +1149,9 @@ export function UnifiedDesignerWorkbench({
                   <option value="">
                     {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.currentActor, locale)}
                   </option>
+                  <option value={SYNTHETIC_PREVIEW_OPTION}>
+                    {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.option, locale)}
+                  </option>
                   {rolePreviewTargets.map((target) => (
                     <option key={target.rolePid} value={target.rolePid}>
                       {target.roleName} · {target.roleCode}
@@ -1109,9 +1160,14 @@ export function UnifiedDesignerWorkbench({
                 </select>
               </label>
             ) : null}
-            {rolePreviewLoading ? (
+            {rolePreviewLoading || syntheticPreviewLoading ? (
               <span className="text-xs text-blue-700" data-testid="role-preview-loading">
-                {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.calculating, locale)}
+                {resolveDesignerText(
+                  syntheticPreviewSelected
+                    ? DESIGNER_I18N.unified.syntheticPreview.calculating
+                    : DESIGNER_I18N.unified.rolePreview.calculating,
+                  locale,
+                )}
               </span>
             ) : null}
           </div>
@@ -1208,13 +1264,67 @@ export function UnifiedDesignerWorkbench({
               </details>
             </div>
           ) : null}
-          {rolePreviewError && selectedRolePreviewPid ? (
+          {syntheticPreview ? (
+            <div
+              className="mx-auto mb-3 max-w-7xl rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950"
+              data-testid="synthetic-preview-banner"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="font-semibold">
+                    {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.title, locale)}
+                  </span>
+                  <span className="ml-2 text-xs text-violet-700">
+                    {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.source, locale)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  data-testid="synthetic-preview-exit"
+                  onClick={() => setSelectedRolePreviewPid('')}
+                  className="rounded-md border border-violet-300 bg-white px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100"
+                >
+                  {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.exit, locale)}
+                </button>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-violet-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.isolated, locale)}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-violet-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.notPersisted, locale)}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-violet-200">
+                  {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.actionsOff, locale)}
+                </span>
+                <span
+                  className="rounded-full bg-white px-2 py-1 ring-1 ring-violet-200"
+                  data-testid="synthetic-preview-record-count"
+                >
+                  {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.recordCount, locale, {
+                    count: syntheticPreview.records.length,
+                  })}
+                </span>
+              </div>
+            </div>
+          ) : null}
+          {rolePreviewError && selectedTargetRolePid ? (
             <div
               className="mx-auto mb-3 max-w-7xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
               data-testid="role-preview-error"
             >
               {resolveDesignerText(DESIGNER_I18N.unified.rolePreview.failed, locale, {
                 error: rolePreviewError,
+              })}
+            </div>
+          ) : null}
+          {syntheticPreviewError && syntheticPreviewSelected ? (
+            <div
+              className="mx-auto mb-3 max-w-7xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              data-testid="synthetic-preview-error"
+            >
+              {resolveDesignerText(DESIGNER_I18N.unified.syntheticPreview.failed, locale, {
+                error: syntheticPreviewError,
               })}
             </div>
           ) : null}
@@ -1228,27 +1338,50 @@ export function UnifiedDesignerWorkbench({
             data-device={previewDeviceId}
             style={getDeviceFrameStyle(getDevicePreviewPreset(previewDeviceId))}
           >
-            {selectedRolePreviewPid && (rolePreviewLoading || rolePreviewError) ? (
+            {(selectedTargetRolePid && (rolePreviewLoading || rolePreviewError)) ||
+            (syntheticPreviewSelected && (syntheticPreviewLoading || syntheticPreviewError)) ? (
               <div
                 className="grid min-h-64 place-items-center bg-white p-6 text-sm text-slate-500"
-                data-testid="role-preview-fail-closed"
+                data-testid={
+                  syntheticPreviewSelected
+                    ? 'synthetic-preview-fail-closed'
+                    : 'role-preview-fail-closed'
+                }
               >
-                {rolePreviewLoading
-                  ? resolveDesignerText(DESIGNER_I18N.unified.rolePreview.safeLoading, locale)
-                  : resolveDesignerText(DESIGNER_I18N.unified.rolePreview.safeFailure, locale)}
+                {syntheticPreviewSelected
+                  ? resolveDesignerText(
+                      syntheticPreviewLoading
+                        ? DESIGNER_I18N.unified.syntheticPreview.safeLoading
+                        : DESIGNER_I18N.unified.syntheticPreview.safeFailure,
+                      locale,
+                    )
+                  : resolveDesignerText(
+                      rolePreviewLoading
+                        ? DESIGNER_I18N.unified.rolePreview.safeLoading
+                        : DESIGNER_I18N.unified.rolePreview.safeFailure,
+                      locale,
+                    )}
               </div>
             ) : (
               <RecursiveBlockRenderer
-                schema={rolePreviewDocument}
+                key={
+                  syntheticPreview
+                    ? `synthetic:${syntheticPreview.fixtureRevision}`
+                    : roleStructurePreview
+                      ? `role:${roleStructurePreview.targetRole.rolePid}`
+                      : 'actor'
+                }
+                schema={previewDocument}
                 runtimeServices={
                   roleStructurePreview
                     ? roleStructurePreviewRuntimeServices
-                    : defaultRuntimeExecutionServices
+                    : syntheticPreviewRuntimeServices ?? defaultRuntimeExecutionServices
                 }
                 permissionEvaluator={rolePreviewPermissionEvaluator}
-                interactionDisabled={Boolean(roleStructurePreview)}
+                interactionDisabled={Boolean(roleStructurePreview || syntheticPreview)}
+                previewInitialFormValues={syntheticPreview?.formValues}
                 modelFields={
-                  roleStructurePreview
+                  roleStructurePreview || syntheticPreview
                     ? []
                     : document.modelCode
                       ? modelFieldsByModel[document.modelCode] ?? []

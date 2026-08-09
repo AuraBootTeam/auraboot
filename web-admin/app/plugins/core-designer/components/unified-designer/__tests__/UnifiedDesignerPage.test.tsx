@@ -67,6 +67,7 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   loadAuthoringReleaseHistory: vi.fn(),
   loadAuthoringRolePreviewTargets: vi.fn(),
   loadAuthoringRoleStructurePreview: vi.fn(),
+  loadAuthoringSyntheticPreview: vi.fn(),
   loadAuthoringReviewWorkspace: vi.fn(),
   loadAuthoringSession: vi.fn(),
   moveAuthoringStudioBlock: vi.fn(),

@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 /** HTTP-safe contracts for the contextual-authoring workspace. */
 public final class AuthoringWorkspaceContracts {
@@ -157,6 +158,31 @@ public final class AuthoringWorkspaceContracts {
             boolean exportAllowed,
             boolean businessActionsAllowed,
             List<RoleStructureDecisionView> decisions) {
+    }
+
+    /** One deterministic widget projection generated without querying tenant business data. */
+    public record SyntheticPreviewWidgetView(
+            String source,
+            String value,
+            List<Map<String, Object>> series) {
+    }
+
+    /**
+     * In-memory synthetic fixture for Studio preview. Values are generated from schema metadata,
+     * are never loaded from tenant records, and are never persisted.
+     */
+    public record SyntheticPreviewView(
+            String mode,
+            String pagePid,
+            String source,
+            boolean isolatedFromTenantData,
+            boolean persisted,
+            boolean exportAllowed,
+            boolean businessActionsAllowed,
+            long fixtureRevision,
+            Map<String, Object> formValues,
+            List<Map<String, Object>> records,
+            Map<String, SyntheticPreviewWidgetView> widgets) {
     }
 
     public enum StudioIntent {

@@ -135,6 +135,42 @@ class AuthoringRoleStructurePreviewIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void generatesSyntheticRowsInMemoryWithoutTenantRecordOrSideEffects() throws Exception {
+        grantActorPermissions();
+        PageSchema page = insertPermissionPage();
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        int outboxBefore = tableCount("ab_outbox");
+        int behaviorOutboxBefore = tableCount("ab_behavior_outcome_outbox");
+        int messageBefore = tableCount("ab_im_message");
+        int webhookBefore = tableCount("ab_webhook_delivery_log");
+
+        String response = mockMvc.perform(get(
+                        "/api/authoring/sessions/{sessionPid}/synthetic-preview",
+                        opened.sessionPid()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.mode").value("SYNTHETIC"))
+                .andExpect(jsonPath("$.data.source").value("GENERATED_IN_MEMORY"))
+                .andExpect(jsonPath("$.data.isolatedFromTenantData").value(true))
+                .andExpect(jsonPath("$.data.persisted").value(false))
+                .andExpect(jsonPath("$.data.exportAllowed").value(false))
+                .andExpect(jsonPath("$.data.businessActionsAllowed").value(false))
+                .andExpect(jsonPath("$.data.records.length()").value(3))
+                .andExpect(jsonPath("$.data.records[0].pid").value("synthetic-001"))
+                .andExpect(jsonPath("$.data.records[0].name").value("Sample name 01"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(response)
+                .doesNotContain("TOP-SECRET-RECORD")
+                .doesNotContain("real-record-7");
+        assertThat(tableCount("ab_outbox")).isEqualTo(outboxBefore);
+        assertThat(tableCount("ab_behavior_outcome_outbox")).isEqualTo(behaviorOutboxBefore);
+        assertThat(tableCount("ab_im_message")).isEqualTo(messageBefore);
+        assertThat(tableCount("ab_webhook_delivery_log")).isEqualTo(webhookBefore);
+    }
+
     private void grantActorPermissions() {
         grantCommittedPermissionToTestRole(
                 MetaPermission.PAGE_DESIGNER_MANAGE,
@@ -274,6 +310,20 @@ class AuthoringRoleStructurePreviewIntegrationTest extends BaseIntegrationTest {
                 """, positiveRandomId(), foreignRolePid, foreignTenantId,
                 "foreign_" + foreignRolePid.toLowerCase());
         return foreignRolePid;
+    }
+
+    private int tableCount(String table) {
+        String sql = switch (table) {
+            case "ab_outbox" -> "SELECT COUNT(*) FROM ab_outbox";
+            case "ab_behavior_outcome_outbox" ->
+                    "SELECT COUNT(*) FROM ab_behavior_outcome_outbox";
+            case "ab_im_message" -> "SELECT COUNT(*) FROM ab_im_message";
+            case "ab_webhook_delivery_log" ->
+                    "SELECT COUNT(*) FROM ab_webhook_delivery_log";
+            default -> throw new IllegalArgumentException("Unsupported table: " + table);
+        };
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class);
+        return count == null ? 0 : count;
     }
 
     private static long positiveRandomId() {

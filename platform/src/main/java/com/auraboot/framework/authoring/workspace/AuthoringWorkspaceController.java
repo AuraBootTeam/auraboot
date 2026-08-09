@@ -23,6 +23,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Re
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SyntheticPreviewView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.TakeoverWriterLeaseRequest;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -52,16 +53,19 @@ public class AuthoringWorkspaceController {
     private final AuthoringGovernanceService governanceService;
     private final AuthoringHandoffService handoffService;
     private final AuthoringRoleStructurePreviewService roleStructurePreviewService;
+    private final AuthoringSyntheticPreviewService syntheticPreviewService;
 
     public AuthoringWorkspaceController(
             AuthoringWorkspaceService workspaceService,
             AuthoringGovernanceService governanceService,
             AuthoringHandoffService handoffService,
-            AuthoringRoleStructurePreviewService roleStructurePreviewService) {
+            AuthoringRoleStructurePreviewService roleStructurePreviewService,
+            AuthoringSyntheticPreviewService syntheticPreviewService) {
         this.workspaceService = workspaceService;
         this.governanceService = governanceService;
         this.handoffService = handoffService;
         this.roleStructurePreviewService = roleStructurePreviewService;
+        this.syntheticPreviewService = syntheticPreviewService;
     }
 
     @GetMapping("/capabilities")
@@ -95,6 +99,12 @@ public class AuthoringWorkspaceController {
             @PathVariable String sessionPid,
             @RequestParam @jakarta.validation.constraints.NotBlank String rolePid) {
         return ApiResponse.success(roleStructurePreviewService.preview(sessionPid, rolePid));
+    }
+
+    @GetMapping("/sessions/{sessionPid}/synthetic-preview")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
+    public ApiResponse<SyntheticPreviewView> syntheticPreview(@PathVariable String sessionPid) {
+        return ApiResponse.success(syntheticPreviewService.preview(sessionPid));
     }
 
     @PostMapping("/change-sets/{changeSetPid}/sessions")

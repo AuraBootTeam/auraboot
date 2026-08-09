@@ -27,6 +27,8 @@ interface RecursiveBlockRendererProps {
   permissionEvaluator?: (permissionCode: string) => boolean;
   /** Disable every native control; used by governed structure-only previews. */
   interactionDisabled?: boolean;
+  /** Ephemeral fixture values used only by the isolated synthetic-data preview. */
+  previewInitialFormValues?: Record<string, unknown>;
   /**
    * Model field metadata for the page's primary model. When provided, form `field`
    * blocks render the real platform control (true WYSIWYG) via {@link RuntimePlatformField}
@@ -41,6 +43,7 @@ export function RecursiveBlockRenderer({
   runtimeServices,
   permissionEvaluator,
   interactionDisabled = false,
+  previewInitialFormValues,
   modelFields,
 }: RecursiveBlockRendererProps) {
   const { hasPermission } = usePermissions();
@@ -65,33 +68,37 @@ export function RecursiveBlockRenderer({
 
   const tree = (
     <RuntimeLocaleContext.Provider value={locale}>
-      <RuntimeModelFieldsContext.Provider value={modelFieldList}>
-        <DesignerPageModelCodeContext.Provider value={schema.modelCode}>
-        <RuntimePermissionContext.Provider value={evaluatePermission}>
-          <fieldset
-            disabled={interactionDisabled}
-            className="contents"
-            data-interaction-disabled={interactionDisabled ? 'true' : undefined}
-          >
-            <div
-              className="grid grid-cols-12 gap-4"
-              data-testid={`runtime-page-${schema.id}`}
-              data-schema-version={schema.schemaVersion}
+      <RuntimeInitialFormValuesContext.Provider
+        value={previewInitialFormValues ?? EMPTY_PREVIEW_FORM_VALUES}
+      >
+        <RuntimeModelFieldsContext.Provider value={modelFieldList}>
+          <DesignerPageModelCodeContext.Provider value={schema.modelCode}>
+          <RuntimePermissionContext.Provider value={evaluatePermission}>
+            <fieldset
+              disabled={interactionDisabled}
+              className="contents"
+              data-interaction-disabled={interactionDisabled ? 'true' : undefined}
             >
-              {schema.blocks.map((block) => (
-                <RuntimeBlock
-                  key={block.id}
-                  block={block}
-                  runtimeServices={runtimeServices}
-                  pageContext={pageContext}
-                  blockPath={[block.id]}
-                />
-              ))}
-            </div>
-          </fieldset>
-        </RuntimePermissionContext.Provider>
-        </DesignerPageModelCodeContext.Provider>
-      </RuntimeModelFieldsContext.Provider>
+              <div
+                className="grid grid-cols-12 gap-4"
+                data-testid={`runtime-page-${schema.id}`}
+                data-schema-version={schema.schemaVersion}
+              >
+                {schema.blocks.map((block) => (
+                  <RuntimeBlock
+                    key={block.id}
+                    block={block}
+                    runtimeServices={runtimeServices}
+                    pageContext={pageContext}
+                    blockPath={[block.id]}
+                  />
+                ))}
+              </div>
+            </fieldset>
+          </RuntimePermissionContext.Provider>
+          </DesignerPageModelCodeContext.Provider>
+        </RuntimeModelFieldsContext.Provider>
+      </RuntimeInitialFormValuesContext.Provider>
     </RuntimeLocaleContext.Provider>
   );
 
@@ -137,6 +144,10 @@ interface RuntimeSelectionContextValue {
 const RuntimeListSelectionContext = React.createContext<RuntimeSelectionContextValue | null>(null);
 const RuntimePermissionContext = React.createContext<(permissionCode: string) => boolean>(
   () => false,
+);
+const EMPTY_PREVIEW_FORM_VALUES: Record<string, unknown> = {};
+const RuntimeInitialFormValuesContext = React.createContext<Record<string, unknown>>(
+  EMPTY_PREVIEW_FORM_VALUES,
 );
 
 /** Stable empty reference so the default context value never triggers re-renders. */
@@ -2302,7 +2313,10 @@ function RuntimeHelperDataStatus({
 
 function RuntimeForm({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
   const hasPermission = React.useContext(RuntimePermissionContext);
-  const [values, setValues] = React.useState<Record<string, unknown>>({});
+  const initialFormValues = React.useContext(RuntimeInitialFormValuesContext);
+  const [values, setValues] = React.useState<Record<string, unknown>>(() => ({
+    ...initialFormValues,
+  }));
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const validate = React.useCallback(() => {
     const formFields = collectRuntimeVisibleFormFields(block, values, hasPermission);

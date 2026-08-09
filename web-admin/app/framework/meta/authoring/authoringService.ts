@@ -15,6 +15,7 @@ import type {
   AuthoringSplitResult,
   AuthoringRolePreviewTarget,
   AuthoringRoleStructurePreview,
+  AuthoringSyntheticPreview,
 } from './types';
 
 export interface InteractionContext {
@@ -70,6 +71,15 @@ export async function loadAuthoringRoleStructurePreview(
     { params: { rolePid } },
   );
   return requireData(result, '无法生成角色权限结构预览');
+}
+
+export async function loadAuthoringSyntheticPreview(
+  sessionPid: string,
+): Promise<AuthoringSyntheticPreview> {
+  const result = await fetchResult<AuthoringSyntheticPreview>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/synthetic-preview`,
+  );
+  return requireData(result, '无法生成隔离合成数据');
 }
 
 export async function observeAuthoringChangeSet(

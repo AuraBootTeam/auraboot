@@ -10,6 +10,7 @@ import { UnifiedDesignerWorkbench } from '../workbench/UnifiedDesignerWorkbench'
 vi.mock('~/framework/meta/authoring/authoringService', () => ({
   loadAuthoringRolePreviewTargets: vi.fn(),
   loadAuthoringRoleStructurePreview: vi.fn(),
+  loadAuthoringSyntheticPreview: vi.fn(),
 }));
 
 describe('UnifiedDesignerWorkbench role structure preview', () => {

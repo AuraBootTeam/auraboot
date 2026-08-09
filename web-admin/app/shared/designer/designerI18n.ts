@@ -343,7 +343,8 @@ export const DESIGNER_I18N = {
       } as L,
       safeFailure: {
         'zh-CN': '无法安全生成目标角色结构；请退出角色预览后重试。',
-        'en-US': 'The target-role structure could not be generated safely. Exit role preview and retry.',
+        'en-US':
+          'The target-role structure could not be generated safely. Exit role preview and retry.',
       } as L,
       node: {
         menu: { 'zh-CN': '菜单', 'en-US': 'Menu' } as L,
@@ -351,6 +352,57 @@ export const DESIGNER_I18N = {
         field: { 'zh-CN': '字段', 'en-US': 'Field' } as L,
         action: { 'zh-CN': '动作', 'en-US': 'Action' } as L,
       },
+    },
+    syntheticPreview: {
+      option: {
+        'zh-CN': '合成数据 · 隔离预览',
+        'en-US': 'Synthetic data · isolated preview',
+      } as L,
+      calculating: {
+        'zh-CN': '正在生成隔离合成数据…',
+        'en-US': 'Generating isolated synthetic data...',
+      } as L,
+      title: {
+        'zh-CN': '合成数据预览',
+        'en-US': 'Synthetic data preview',
+      } as L,
+      source: {
+        'zh-CN': '仅由页面字段元数据在内存中生成',
+        'en-US': 'Generated in memory from page field metadata only',
+      } as L,
+      exit: {
+        'zh-CN': '退出合成预览',
+        'en-US': 'Exit synthetic preview',
+      } as L,
+      isolated: {
+        'zh-CN': '不查询真实租户记录',
+        'en-US': 'No tenant business records queried',
+      } as L,
+      notPersisted: {
+        'zh-CN': '合成值不保存',
+        'en-US': 'Synthetic values are not persisted',
+      } as L,
+      actionsOff: {
+        'zh-CN': '业务动作与导出关闭',
+        'en-US': 'Business actions and export disabled',
+      } as L,
+      recordCount: {
+        'zh-CN': '{count} 条合成记录',
+        'en-US': '{count} synthetic records',
+      } as L,
+      failed: {
+        'zh-CN': '合成数据生成失败，已停止隔离预览：{error}',
+        'en-US': 'Synthetic fixture generation failed; isolated preview stopped: {error}',
+      } as L,
+      safeLoading: {
+        'zh-CN': '正在建立不接触真实租户数据的预览边界…',
+        'en-US': 'Establishing a preview boundary without tenant business data...',
+      } as L,
+      safeFailure: {
+        'zh-CN': '无法安全生成合成数据；不会回退到实时数据。请退出后重试。',
+        'en-US':
+          'Synthetic data could not be generated safely. Live data will not be used as a fallback.',
+      } as L,
     },
 
     // Palette category headers
@@ -382,7 +434,10 @@ export const DESIGNER_I18N = {
     fieldCount: { 'zh-CN': '{count} 个字段', 'en-US': '{count} fields' } as L,
     virtualCount: { 'zh-CN': '{count} 虚拟', 'en-US': '{count} virtual' } as L,
     dragOrDoubleClick: { 'zh-CN': '拖拽或双击添加', 'en-US': 'Drag or double-click to add' } as L,
-    noModelBound: { 'zh-CN': '该页面未绑定模型，无可用字段', 'en-US': 'No model bound to this page' } as L,
+    noModelBound: {
+      'zh-CN': '该页面未绑定模型，无可用字段',
+      'en-US': 'No model bound to this page',
+    } as L,
 
     // Field library groups
     fieldGroup: {
@@ -817,14 +872,23 @@ export const DESIGNER_I18N = {
       'Disabled when JSON': { 'zh-CN': '禁用条件 JSON', 'en-US': 'Disabled when JSON' } as L,
       'Entries JSON': { 'zh-CN': '条目 JSON', 'en-US': 'Entries JSON' } as L,
       'Items JSON': { 'zh-CN': '项目 JSON', 'en-US': 'Items JSON' } as L,
-      'Named query params JSON': { 'zh-CN': '命名查询参数 JSON', 'en-US': 'Named query params JSON' } as L,
+      'Named query params JSON': {
+        'zh-CN': '命名查询参数 JSON',
+        'en-US': 'Named query params JSON',
+      } as L,
       'Options JSON': { 'zh-CN': '选项 JSON', 'en-US': 'Options JSON' } as L,
       'Params JSON': { 'zh-CN': '参数 JSON', 'en-US': 'Params JSON' } as L,
       'Payload JSON': { 'zh-CN': '负载 JSON', 'en-US': 'Payload JSON' } as L,
-      'Picker parameters JSON': { 'zh-CN': '选择器参数 JSON', 'en-US': 'Picker parameters JSON' } as L,
+      'Picker parameters JSON': {
+        'zh-CN': '选择器参数 JSON',
+        'en-US': 'Picker parameters JSON',
+      } as L,
       'Preview rows JSON': { 'zh-CN': '预览行 JSON', 'en-US': 'Preview rows JSON' } as L,
       'Query builder JSON': { 'zh-CN': '查询构建器 JSON', 'en-US': 'Query builder JSON' } as L,
-      'Rich text toolbar JSON': { 'zh-CN': '富文本工具栏 JSON', 'en-US': 'Rich text toolbar JSON' } as L,
+      'Rich text toolbar JSON': {
+        'zh-CN': '富文本工具栏 JSON',
+        'en-US': 'Rich text toolbar JSON',
+      } as L,
       'Rows JSON': { 'zh-CN': '行 JSON', 'en-US': 'Rows JSON' } as L,
       'Run query JSON': { 'zh-CN': '运行查询 JSON', 'en-US': 'Run query JSON' } as L,
       'Series JSON': { 'zh-CN': '系列 JSON', 'en-US': 'Series JSON' } as L,
