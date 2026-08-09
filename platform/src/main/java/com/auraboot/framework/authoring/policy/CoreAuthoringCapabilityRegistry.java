@@ -36,6 +36,7 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
             Set.copyOf(EnumSet.of(PatchOperation.ADD, PatchOperation.REPLACE, PatchOperation.REMOVE));
 
     private final Map<String, CapabilityManifest> manifests;
+    private final String registryChecksum;
 
     public CoreAuthoringCapabilityRegistry() {
         Map<String, Map<String, PropertyCapability>> definitions = new LinkedHashMap<>();
@@ -92,6 +93,7 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
                     MANIFEST_VERSION, checksum, propertyMap));
         });
         manifests = Map.copyOf(built);
+        registryChecksum = registryChecksum(built.values());
     }
 
     @Override
@@ -102,6 +104,11 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
     @Override
     public Collection<CapabilityManifest> all() {
         return manifests.values();
+    }
+
+    @Override
+    public String checksum() {
+        return registryChecksum;
     }
 
     private Map<String, PropertyCapability> listProperties() {
@@ -180,6 +187,20 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                     .digest(canonical.toString().getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is unavailable", e);
+        }
+    }
+
+    private String registryChecksum(Collection<CapabilityManifest> registry) {
+        String canonical = registry.stream()
+                .sorted(Comparator.comparing(CapabilityManifest::blockType))
+                .map(manifest -> manifest.blockType() + ':' + manifest.checksum())
+                .reduce((left, right) -> left + '|' + right)
+                .orElse("");
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(canonical.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 is unavailable", e);
         }

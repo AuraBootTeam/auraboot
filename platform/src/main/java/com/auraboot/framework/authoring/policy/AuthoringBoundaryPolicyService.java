@@ -47,25 +47,48 @@ public class AuthoringBoundaryPolicyService {
         if (manifest == null) {
             return denied(Reason.CAPABILITY_UNKNOWN, null);
         }
+        PropertyCapability capability = manifest.properties().get(input.propertyPath());
+        BoundaryDecision validationFailure = validationFailure(input, manifest, capability);
+        if (validationFailure != null) {
+            return validationFailure;
+        }
+        return allowedRoute(input, manifest, capability);
+    }
+
+    private BoundaryDecision validationFailure(
+            BoundaryEvaluationInput input,
+            CapabilityManifest manifest,
+            PropertyCapability capability) {
         if (input.manifestChecksum() == null
                 || !manifest.checksum().equals(input.manifestChecksum())) {
             return denied(Reason.MANIFEST_STALE, manifest.checksum());
         }
-
-        PropertyCapability capability = manifest.properties().get(input.propertyPath());
         if (capability == null) {
             return denied(Reason.CAPABILITY_UNKNOWN, manifest.checksum());
         }
         if (input.operation() == null || !capability.allowedOperations().contains(input.operation())) {
             return denied(Reason.OPERATION_NOT_ALLOWED, manifest.checksum());
         }
-        if (!input.impactKnown() || input.resourceScope() == null || input.securityImpact() == null
-                || input.securityImpact() == SecurityImpact.UNKNOWN) {
+        if (impactUnknown(input)) {
             return denied(Reason.IMPACT_UNKNOWN, manifest.checksum());
         }
         if (capability.protectedSemantic() && !input.protectedSemanticValid()) {
             return denied(Reason.PROTECTED_SEMANTIC_INVALID, manifest.checksum());
         }
+        return null;
+    }
+
+    private boolean impactUnknown(BoundaryEvaluationInput input) {
+        return !input.impactKnown()
+                || input.resourceScope() == null
+                || input.securityImpact() == null
+                || input.securityImpact() == SecurityImpact.UNKNOWN;
+    }
+
+    private BoundaryDecision allowedRoute(
+            BoundaryEvaluationInput input,
+            CapabilityManifest manifest,
+            PropertyCapability capability) {
         if (input.resourceScope() == ResourceScope.MULTI_RESOURCE
                 || input.resourceScope() == ResourceScope.NEW_RESOURCE) {
             return studio(Reason.CROSS_RESOURCE, manifest.checksum(), capability.rolePreviewRequired());

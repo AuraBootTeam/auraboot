@@ -11,4 +11,7 @@ public interface AuthoringCapabilityRegistry {
     Optional<CapabilityManifest> find(String blockType);
 
     Collection<CapabilityManifest> all();
+
+    /** Checksum over the complete server-owned registry snapshot. */
+    String checksum();
 }

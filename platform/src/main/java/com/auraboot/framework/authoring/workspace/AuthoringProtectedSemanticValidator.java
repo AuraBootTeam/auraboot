@@ -1,0 +1,110 @@
+package com.auraboot.framework.authoring.workspace;
+
+import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.springframework.stereotype.Component;
+
+import java.util.Locale;
+
+/** Prevents presentation edits from disguising the intent of protected business actions. */
+@Component
+public class AuthoringProtectedSemanticValidator {
+
+    private final CommandDefinitionMapper commandDefinitionMapper;
+
+    public AuthoringProtectedSemanticValidator(CommandDefinitionMapper commandDefinitionMapper) {
+        this.commandDefinitionMapper = commandDefinitionMapper;
+    }
+
+    public boolean isValid(ObjectNode block, String propertyPath, JsonNode proposedValue) {
+        if (proposedValue == null || proposedValue.isNull()) {
+            return false;
+        }
+        String commandCode = block.path("props").path("commandCode").asText("");
+        CommandDefinition command = commandCode.isBlank()
+                ? null
+                : commandDefinitionMapper.findCurrentByCode(commandCode);
+        boolean destructive = isDestructive(
+                commandCode, command == null ? "" : command.getCmdRiskLevel());
+        if ("/props/variant".equals(propertyPath)) {
+            return !destructive || "danger".equalsIgnoreCase(proposedValue.asText());
+        }
+        if ("/props/label".equals(propertyPath)) {
+            return validLabel(commandCode, proposedValue);
+        }
+        return true;
+    }
+
+    private boolean validLabel(String commandCode, JsonNode proposedValue) {
+        String text = flattenText(proposedValue).toLowerCase(Locale.ROOT);
+        if (text.isBlank()) {
+            return false;
+        }
+        String requiredIntent = destructiveIntent(commandCode);
+        return requiredIntent == null || containsIntent(text, requiredIntent);
+    }
+
+    private boolean isDestructive(String commandCode, String risk) {
+        return destructiveIntent(commandCode) != null
+                || "L4".equalsIgnoreCase(risk)
+                || "L3".equalsIgnoreCase(risk);
+    }
+
+    private String destructiveIntent(String commandCode) {
+        String code = commandCode == null ? "" : commandCode.toLowerCase(Locale.ROOT);
+        if (code.contains("delete") || code.contains("remove")) {
+            return "delete";
+        }
+        if (code.contains("cancel") || code.contains("void")) {
+            return "cancel";
+        }
+        if (code.contains("rollback") || code.contains("restore")) {
+            return "rollback";
+        }
+        if (code.contains("pay") || code.contains("payment")) {
+            return "pay";
+        }
+        if (code.contains("export")) {
+            return "export";
+        }
+        if (code.contains("publish")) {
+            return "publish";
+        }
+        return null;
+    }
+
+    private boolean containsIntent(String text, String intent) {
+        return switch (intent) {
+            case "delete" -> containsAny(text, "delete", "remove", "删除", "移除");
+            case "cancel" -> containsAny(text, "cancel", "void", "取消", "作废");
+            case "rollback" -> containsAny(text, "rollback", "restore", "回滚", "恢复");
+            case "pay" -> containsAny(text, "pay", "payment", "付款", "支付");
+            case "export" -> containsAny(text, "export", "导出");
+            case "publish" -> containsAny(text, "publish", "发布");
+            default -> false;
+        };
+    }
+
+    private boolean containsAny(String value, String... markers) {
+        for (String marker : markers) {
+            if (value.contains(marker)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String flattenText(JsonNode node) {
+        if (node.isTextual()) {
+            return node.asText();
+        }
+        if (node.isObject()) {
+            StringBuilder result = new StringBuilder();
+            node.elements().forEachRemaining(value -> result.append(' ').append(value.asText("")));
+            return result.toString();
+        }
+        return "";
+    }
+}
