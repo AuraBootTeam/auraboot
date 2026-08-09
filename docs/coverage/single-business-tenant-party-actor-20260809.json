@@ -4,8 +4,8 @@
     "target": "SINGLE Business Tenant + Party Actor foundation",
     "sot": "../auraboot-enterprise/docs/standards/decisions/DDR-2026-08-09-single-business-tenant-party-actor.md",
     "runtime": "auraboot-party-actor-long",
-    "commit": "c4933a381",
-    "fix_rounds": 3
+    "commit": "2104153bd",
+    "fix_rounds": 4
   },
   "groups": [
     {
@@ -38,6 +38,15 @@
           "verdict": "pass",
           "verdict_by": "spec-assert",
           "surface": "api", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
+        },
+        {
+          "id": "policy.tenant-service",
+          "action": "Enforce Tenant create and join policy below the controller boundary",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.tenant.service.impl.TenantApplicationServiceImplTest.xml"],
+          "assertion": "Service callers cannot create a Tenant when provisioning is disabled or join another Tenant in SINGLE mode",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
         }
       ]
     },
@@ -115,6 +124,15 @@
           "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
         },
         {
+          "id": "actor.channel-capabilities",
+          "action": "Filter Actor candidates by the current application/channel Party capabilities",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.party.service.impl.ActorCandidateResolverImplTest.xml", "platform/build/test-results/test/TEST-com.auraboot.framework.integration.PartyActorPersistenceIntegrationTest.xml"],
+          "assertion": "Only active Parties with an allowed capability are eligible; disabled, half-bound or cross-tenant channels fail closed; global channels remain valid",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "service", "dependencies": "real-stack", "authority": "blocking-release", "driver": "it"
+        },
+        {
           "id": "actor.extended-workflows",
           "action": "Run generic invitation, capability approval, relation and business-network workflows",
           "evidence": ["platform/src/main/resources/db/migration/core/V20260809120000__party_actor_and_login_application.sql", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
@@ -132,7 +150,7 @@
         {
           "id": "web.actor-switch",
           "action": "Log in to the unique business workspace and switch Business identity from the Header",
-          "evidence": ["web-admin/test-results/results.json", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "evidence": ["web-admin/test-results/results.json", "docs/coverage/evidence/single-business-tenant-party-actor-login.jpg", "docs/coverage/evidence/single-business-tenant-party-actor-selected.jpg", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
           "assertion": "No registration/Tenant self-service entry; Actor switch persists and current Actor is visibly selected; console has no errors",
           "verdict": "pass",
           "verdict_by": "agent-vision",
