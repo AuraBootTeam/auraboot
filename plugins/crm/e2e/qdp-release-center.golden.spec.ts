@@ -36,6 +36,7 @@ const PG = {
 let adminJwt = '';
 let staleCode = '';
 let releasedCode = '';
+let releasedBaselineStatus = '';
 let browserQdpPid = '';
 let browserQdpCode = '';
 let browserFilePid = '';
@@ -281,51 +282,75 @@ async function uiLogin(page: Page, email = RELEASE_MANAGER_EMAIL): Promise<void>
   await expect(page.locator('input#email')).toHaveCount(0, { timeout: 10_000 });
 }
 
-async function gotoReleaseCenter(page: Page): Promise<void> {
+async function gotoReleaseCenter(page: Page) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       await page.goto(`${BASE}/dashboards`, { waitUntil: 'domcontentloaded' });
       break;
     } catch (error) {
       if (attempt > 0 || !String(error).includes('ERR_ABORTED')) throw error;
-      await page.waitForTimeout(250);
     }
   }
   const nav = page.locator('nav, aside, [role="navigation"]').first();
   await expect(nav).toBeVisible({ timeout: 10_000 });
-  const releaseCenterLink = nav.locator('a[href="/p/crm_qdp_revision_common"]').first();
+  const releaseCenterLink = nav.locator('a[href="/p/c/crm_qdp_release_workbench"]').first();
   if (!(await releaseCenterLink.isVisible().catch(() => false))) {
     await nav.getByRole('button', { name: /客户关系管理|CRM/i }).first().click();
   }
   await expect(releaseCenterLink).toBeVisible({ timeout: 10_000 });
+  const statsResponsePromise = page.waitForResponse((response) =>
+    response.request().method() === 'GET'
+      && response.url().includes('/api/datasource/list')
+      && new URL(response.url()).searchParams.get('datasourceId')
+        === 'nq:crm_qdp_release_stats',
+  { timeout: 15_000 });
   await releaseCenterLink.click();
-  await expect(page).toHaveURL(/\/p\/crm_qdp_revision_common(?:[?#].*)?$/, { timeout: 15_000 });
-  await expect(page.getByText(/QDP 发布中心|QDP Release Center/).first()).toBeVisible({ timeout: 20_000 });
+  const statsResponse = await statsResponsePromise;
+  expect(statsResponse.ok(), `QDP stats returned HTTP ${statsResponse.status()}`).toBeTruthy();
+  await expect(page).toHaveURL(/\/p\/c\/crm_qdp_release_workbench(?:[?#].*)?$/, { timeout: 15_000 });
+  await expect(page.getByText(/QDP 发布工作台|QDP Release Workbench/).first())
+    .toBeVisible({ timeout: 20_000 });
+  return statsResponse;
+}
+
+async function searchReleaseWorkbench(page: Page, keyword: string): Promise<void> {
+  const search = page.getByTestId('field-crm_qdp_code').locator('input');
+  await expect(search).toBeVisible({ timeout: 15_000 });
+  const responsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/dynamic/crm_qdp_revision_common')
+      && new URL(response.url()).searchParams.get('keyword') === keyword);
+  await search.fill(keyword);
+  const response = await responsePromise;
+  expect(response.ok(), `QDP workbench search returned HTTP ${response.status()}`).toBeTruthy();
+  const refreshPromise = page.waitForResponse((candidate) =>
+    candidate.request().method() === 'GET'
+      && candidate.url().includes('/api/dynamic/crm_qdp_revision_common/list')
+      && new URL(candidate.url()).searchParams.get('keyword') === keyword);
+  await page.getByTestId('filter-btn-search').click();
+  const refresh = await refreshPromise;
+  expect(refresh.ok(), `QDP explicit search returned HTTP ${refresh.status()}`).toBeTruthy();
+}
+
+async function activateWorkbenchFilter(page: Page, testId: string): Promise<void> {
+  const responsePromise = page.waitForResponse((response) =>
+    response.request().method() === 'GET'
+      && response.url().includes('/api/dynamic/crm_qdp_revision_common/list'));
+  await page.getByTestId(testId).click();
+  const response = await responsePromise;
+  expect(response.ok(), `${testId} returned HTTP ${response.status()}`).toBeTruthy();
+  await expect(page.getByTestId(testId)).toHaveClass(/ring-2/);
 }
 
 async function openDetail(page: Page, code: string): Promise<void> {
   await gotoReleaseCenter(page);
-  // QDP runs are intentionally repeatable against a retained real-stack DB.
-  // Once enough revisions accumulate, an older lifecycle fixture can leave the
-  // first page, so locate the exact record through the product search instead
-  // of assuming every target remains in the initial page of rows.
-  await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
-  const search = page.getByTestId('list-search-input');
-  await search.fill(code);
-  const searchResponse = page.waitForResponse((response) =>
-    response.url().includes('/api/dynamic/crm_qdp_revision_common')
-      && new URL(response.url()).searchParams.get('keyword') === code);
-  await search.press('Enter');
-  const response = await searchResponse;
-  expect(response.ok(), `QDP detail search returned HTTP ${response.status()}`).toBeTruthy();
+  await searchReleaseWorkbench(page, code);
   const row = page.locator('tr').filter({ hasText: code }).first();
   await expect(row, `QDP row ${code}`).toBeVisible({ timeout: 20_000 });
-  const view = row.getByRole('button', { name: /查看|View/ }).first();
-  if (await view.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await view.click();
-  } else {
-    await row.getByText(code, { exact: true }).click();
-  }
+  await row.click();
+  await expect(page.getByTestId('status-banner-crm_qdp_selected_status')).toBeVisible();
+  const openRecord = row.getByTestId('row-action-open_qdp_record');
+  await expect(openRecord).toBeVisible();
+  await openRecord.click();
   await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
   await expect(
     page.getByText(code, { exact: true }).first(),
@@ -388,7 +413,10 @@ test.beforeAll(async () => {
   mkdirSync(EVIDENCE_DIR, { recursive: true });
   adminJwt = await loginApi(RELEASE_MANAGER_EMAIL);
   staleCode = String((await getRecord('crm_qdp_revision_common', STALE_QDP_PID)).crm_qdp_code);
-  releasedCode = String((await getRecord('crm_qdp_revision_common', RELEASED_QDP_PID)).crm_qdp_code);
+  const releasedBaseline = await getRecord('crm_qdp_revision_common', RELEASED_QDP_PID);
+  releasedCode = String(releasedBaseline.crm_qdp_code);
+  releasedBaselineStatus = String(releasedBaseline.crm_qdp_status);
+  expect(['released', 'superseded']).toContain(releasedBaselineStatus);
   await seedBrowserDraftRevision();
   await seedBrowserCompilationRevision();
 });
@@ -421,29 +449,77 @@ test.afterAll(async () => {
     `${JSON.stringify(evidence, null, 2)}\n`);
 });
 
-test('Release Center list and released detail show localized lifecycle, hash, diff and impact', async ({ page }, testInfo) => {
+test('Release Workbench and released record show task hierarchy, evidence and impact', async ({ page }, testInfo) => {
   await uiLogin(page);
-  await gotoReleaseCenter(page);
-  await expect(page.getByText(releasedCode, { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(/已发布|Released/).first()).toBeVisible();
-  await expect(page.getByText(/已取代|Superseded/).first()).toBeVisible();
-  await shot(page, testInfo, 'qdp-release-center-list.png');
+  const statsResponse = await gotoReleaseCenter(page);
+  const statsBody = await statsResponse.json();
+  const visibleQueueTotal = [
+    'action_required_count',
+    'ready_for_release_count',
+    'compiling_count',
+    'released_count',
+  ].reduce((sum, key) => sum + Number(findValue(statsBody, [key]) || 0), 0);
+  expect(visibleQueueTotal, 'the workbench metrics must be backed by retained QDP data')
+    .toBeGreaterThan(0);
+  for (const key of ['action_required', 'ready_for_release', 'compiling', 'released']) {
+    await expect(page.getByTestId(`metric-strip-item-${key}`)).toBeVisible();
+  }
+  await activateWorkbenchFilter(page, 'metric-strip-item-action_required');
+  await expect(page.locator('tr').filter({ hasText: browserQdpCode }).first()).toBeVisible();
+  await activateWorkbenchFilter(page, 'metric-strip-item-ready_for_release');
+  await expect(page.locator('tr').filter({ hasText: staleCode }).first()).toBeVisible();
+  await activateWorkbenchFilter(page, 'metric-strip-item-compiling');
+  await expect(page.getByTestId('table-block').first()).toContainText(/暂无数据|No data/);
+  await activateWorkbenchFilter(page, 'metric-strip-item-released');
+  await activateWorkbenchFilter(page, 'workbench-action-filter_history');
+  await expect(page.locator('tr').filter({ hasText: releasedCode }).first()).toBeVisible();
+  await activateWorkbenchFilter(page, 'workbench-action-filter_action_required');
+  await expect(page.locator('tr').filter({ hasText: browserQdpCode }).first()).toBeVisible();
+  await activateWorkbenchFilter(page, 'workbench-action-filter_ready');
+  await expect(page.locator('tr').filter({ hasText: staleCode }).first()).toBeVisible();
+  await activateWorkbenchFilter(page, 'workbench-action-filter_all');
+  await searchReleaseWorkbench(page, releasedCode);
+  const releasedBaselineRow = page.locator('tr').filter({ hasText: releasedCode }).first();
+  await expect(releasedBaselineRow).toBeVisible();
+  await expect(releasedBaselineRow).toContainText(
+    releasedBaselineStatus === 'released' ? /已发布|Released/ : /已取代|Superseded/,
+  );
+  await expect(page.getByTestId('status-banner-crm_qdp_selected_status')).toBeVisible();
+  await expect(page.getByTestId('status-banner-crm_qdp_selected_status')).toContainText(
+    releasedBaselineStatus === 'released'
+      ? /当前版本已发布|Current revision released/
+      : /历史版本，已被新版本取代|Historical revision superseded/,
+  );
+  await expect(page.getByText(/发布证据与影响范围|Release Evidence and Impact/).first())
+    .toBeVisible();
+  await shot(page, testInfo, 'qdp-release-workbench.png');
 
   await openDetail(page, releasedCode);
-  await expect(page.getByText(/已发布|Released/).first()).toBeVisible();
-  await expect(page.getByText(/需求版本与客户确认|Requirement Version and Customer Confirmation/).first()).toBeVisible();
-  await expect(page.getByText(/Pack Set 与下游影响|Pack Set and Downstream Impact/).first()).toBeVisible();
+  await expect(page.getByText(
+    releasedBaselineStatus === 'released' ? /已发布|Released/ : /已取代|Superseded/,
+  ).first()).toBeVisible();
+  await expect(page.getByText(/发布决策摘要|Release Decision Summary/).first()).toBeVisible();
+  await expect(page.getByText(/制造范围与下游影响|Manufacturing Scope and Downstream Impact/).first())
+    .toBeVisible();
   const body = await page.locator('body').innerText();
   expect(body).toContain(RELEASED_PACK_SUMMARY);
   expect(body).toContain('1 downstream object(s), 0 blocked');
-  expect(body).toMatch(/[0-9a-f]{64}/);
   expect(body).not.toMatch(/\bcrm_qdp_[a-z_]+\b/);
+  expect(body).not.toMatch(/\b\d{18,20}\b/);
   await shot(page, testInfo, 'qdp-release-center-released-detail.png');
-  const identitySection = page.getByText(/版本与生命周期|Revision and Lifecycle/).first();
-  await identitySection.evaluate((element) => element.scrollIntoView({ block: 'start' }));
-  await expect(identitySection).toBeVisible();
+  await page.getByText(/客户确认与文件证据|Customer and File Evidence/).first().click();
+  const identitySection = page.getByText(/版本与追溯证据|Revision and Trace Evidence/).first();
+  await expect(identitySection).toBeVisible({ timeout: 10_000 });
+  const evidenceBody = await page.locator('body').innerText();
+  expect(evidenceBody).toMatch(/[0-9a-f]{64}/);
+  expect(evidenceBody).not.toMatch(/\b\d{18,20}\b/);
   await shot(page, testInfo, 'qdp-release-center-released-identity.png');
-  const impactSection = page.getByText(/Pack Set 与下游影响|Pack Set and Downstream Impact/).first();
+  await page.getByText(/生命周期审计|Lifecycle Audit/).first().click();
+  const auditBody = await page.locator('main, [role="main"]').first().innerText();
+  expect(auditBody).not.toMatch(/\b\d{18,20}\b/);
+  await shot(page, testInfo, 'qdp-release-center-released-audit.png');
+  await page.getByText(/发布就绪度|Release Readiness/).first().click();
+  const impactSection = page.getByText(/制造范围与下游影响|Manufacturing Scope and Downstream Impact/).first();
   await impactSection.scrollIntoViewIfNeeded();
   await expect(impactSection).toBeVisible();
   await shot(page, testInfo, 'qdp-release-center-released-impact.png');
@@ -451,27 +527,18 @@ test('Release Center list and released detail show localized lifecycle, hash, di
   await expect(impactBlock).toContainText(RELEASED_PACK_SUMMARY);
   await expect(impactBlock).toContainText('1 downstream object(s), 0 blocked');
   await shotElement(impactBlock, testInfo, 'qdp-release-center-released-impact-section.png');
+  await page.getByTestId('toolbar-btn-back_to_release_workbench').click();
+  await expect(page).toHaveURL(/\/p\/c\/crm_qdp_release_workbench(?:[?#].*)?$/);
+  await expect(page.getByText(/QDP 发布工作台|QDP Release Workbench/).first()).toBeVisible();
   completedScenarios.add('release-center-list-and-detail');
 });
 
 test('Release Center search exposes a real empty state instead of an ambiguous blank table', async ({ page }, testInfo) => {
   await uiLogin(page);
   await gotoReleaseCenter(page);
-  // The default saved view hydrates asynchronously after the page shell. Wait for
-  // that initial list request to settle so it cannot overwrite the explicit search.
-  await expect(page.getByText(releasedCode, { exact: true }).first()).toBeVisible();
-  await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
-  const search = page.getByTestId('list-search-input');
   const noMatch = `NO-MATCH-${BROWSER_RUN}`;
-  await search.fill(noMatch);
-  const responsePromise = page.waitForResponse((response) =>
-    response.url().includes('/api/dynamic/crm_qdp_revision_common')
-      && new URL(response.url()).searchParams.get('keyword') === noMatch);
-  await search.press('Enter');
-  const response = await responsePromise;
-  expect(response.ok(), `empty-state query returned HTTP ${response.status()}`).toBeTruthy();
-  await expect(page.getByTestId('empty-state')).toBeVisible({ timeout: 15_000 });
-  const emptyContent = page.getByTestId('empty-state-content');
+  await searchReleaseWorkbench(page, noMatch);
+  const emptyContent = page.getByTestId('table-block').first();
   await expect(emptyContent).toBeVisible();
   await expect(emptyContent).toContainText(/暂无数据|No data/);
   const emptyBox = await emptyContent.boundingBox();
@@ -481,6 +548,14 @@ test('Release Center search exposes a real empty state instead of an ambiguous b
   expect(emptyBox!.x).toBeGreaterThanOrEqual(0);
   expect(emptyBox!.x + emptyBox!.width).toBeLessThanOrEqual(viewport!.width + 1);
   await shot(page, testInfo, 'qdp-release-center-empty-state.png');
+  const resetResponsePromise = page.waitForResponse((response) =>
+    response.request().method() === 'GET'
+      && response.url().includes('/api/dynamic/crm_qdp_revision_common/list')
+      && !new URL(response.url()).searchParams.get('keyword'));
+  await page.getByTestId('filter-btn-reset').click();
+  const resetResponse = await resetResponsePromise;
+  expect(resetResponse.ok(), `QDP workbench reset returned HTTP ${resetResponse.status()}`).toBeTruthy();
+  await expect(page.getByTestId('row-action-open_qdp_record').first()).toBeVisible();
   completedScenarios.add('empty-state');
 });
 
@@ -491,22 +566,22 @@ test('browser-driven async compilation shows loading, validation recovery and pa
   const failedDispatch = await submitCompilation(page);
   expect(failedDispatch.response.ok(), JSON.stringify(failedDispatch.body)).toBeTruthy();
   expect(String(failedDispatch.body?.code)).toBe('0');
-  await expect(page.getByRole('progressbar')).toBeVisible({ timeout: 5_000 });
-  await expect(page.getByText(/编制并校验.*进行中|Compile and Validate.*进行中|任务执行中/).first())
-    .toBeVisible();
-  await shot(page, testInfo, 'qdp-release-center-compiling-loading.png');
+  await expect(page.getByText(/已提交.*后台处理中|Submitted.*background/i).first())
+    .toBeVisible({ timeout: 5_000 });
+  await shot(page, testInfo, 'qdp-release-center-compilation-submitted.png');
 
   await expect(page.getByTestId('async-task-modal-failed')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('async-task-modal-error'))
-    .toContainText(/confirmation|customer|确认|hash/i);
+    .toContainText(/客户确认.*当前需求版本.*文件包.*重新确认/i);
   await shot(page, testInfo, 'qdp-release-center-validation-failed-modal.png');
   await page.getByRole('button', { name: /关闭/ }).last().click();
   await expect(page.getByText(/校验失败|Validation Failed/).first()).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/校验失败与恢复提示|Validation Failure and Recovery/).first())
     .toBeVisible();
   const failedBody = await page.locator('body').innerText();
-  expect(failedBody).toMatch(/confirmation|customer|确认|hash/i);
+  expect(failedBody).toMatch(/客户确认.*当前需求版本.*文件包.*重新确认/i);
   expect(failedBody).not.toMatch(/\bcrm_qdp_[a-z_]+\b/);
+  expect(failedBody).not.toMatch(/\b\d{18,20}\b/);
   await shot(page, testInfo, 'qdp-release-center-validation-failed-detail.png');
 
   setConfirmationHash(compileConfirmationPid, compileConfirmationHash);
@@ -558,7 +633,7 @@ test('browser review, real file-runtime failure, retry, release and supersede st
   const reviewed = await getRecord('crm_qdp_revision_common', browserQdpPid);
   expect(reviewed.crm_qdp_status).toBe('ready_for_review');
   expect(reviewed.crm_qdp_review_submitted_at).toBeTruthy();
-  await page.getByText(/版本与生命周期|Revision and Lifecycle/).first().scrollIntoViewIfNeeded();
+  await page.getByText(/发布决策摘要|Release Decision Summary/).first().scrollIntoViewIfNeeded();
   await shot(page, testInfo, 'qdp-release-center-review-submitted.png');
 
   setFileStatus(browserFilePid, 'failed');
@@ -577,7 +652,7 @@ test('browser review, real file-runtime failure, retry, release and supersede st
   expect(String(released.body?.code)).toBe('0');
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByText(/已发布|Released/).first()).toBeVisible({ timeout: 15_000 });
-  await page.getByText(/版本与生命周期|Revision and Lifecycle/).first().scrollIntoViewIfNeeded();
+  await page.getByText(/发布决策摘要|Release Decision Summary/).first().scrollIntoViewIfNeeded();
   await shot(page, testInfo, 'qdp-release-center-browser-released.png');
   expect((await getRecord('crm_qdp_revision_common', browserQdpPid)).crm_qdp_status).toBe('released');
   expect((await getRecord('crm_qdp_revision_common', RELEASED_QDP_PID)).crm_qdp_status).toBe('superseded');
@@ -593,7 +668,7 @@ test('no-permission user cannot see the menu, lifecycle actions or QDP data', as
   await expect(nav).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/暂无可用菜单|No available menus/i).first()).toBeVisible();
   await expect(page.getByText(/加载中|Loading/i).first()).toBeHidden();
-  await expect(nav.locator('a[href="/p/crm_qdp_revision_common"]')).toHaveCount(0);
+  await expect(nav.locator('a[href="/p/c/crm_qdp_release_workbench"]')).toHaveCount(0);
   await shot(page, testInfo, 'qdp-release-center-no-permission.png');
   const qdpResponses: number[] = [];
   page.on('response', (response) => {
@@ -601,7 +676,7 @@ test('no-permission user cannot see the menu, lifecycle actions or QDP data', as
   });
   // page-golden-audit allow-direct-page: this is the negative direct-URL authorization probe;
   // the release-manager path above independently proves the real sidebar entry.
-  await page.goto(`${BASE}/p/crm_qdp_revision_common`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE}/p/c/crm_qdp_release_workbench`, { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
   await expect(page.getByRole('button', { name: /发布 QDP|提交评审|Release QDP|Submit for Review/ }))
     .toHaveCount(0);

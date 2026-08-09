@@ -3982,7 +3982,7 @@
       { "value": "validation_failed", "label": "Validation Failed", "label:zh-CN": "校验失败", "sortNo": 30, "status": "enabled", "extension": { "color": "red" } },
       { "value": "ready_for_review", "label": "Ready for Review", "label:zh-CN": "待评审", "sortNo": 40, "status": "enabled", "extension": { "color": "amber" } },
       { "value": "released", "label": "Released", "label:zh-CN": "已发布", "sortNo": 50, "status": "enabled", "extension": { "color": "green" } },
-      { "value": "superseded", "label": "Superseded", "label:zh-CN": "已取代", "sortNo": 60, "status": "enabled", "extension": { "color": "purple" } }
+      { "value": "superseded", "label": "Superseded", "label:zh-CN": "已取代", "sortNo": 60, "status": "enabled", "extension": { "color": "gray" } }
     ]
   },
   {

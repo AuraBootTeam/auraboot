@@ -1,8 +1,9 @@
 {
   "pageKey": "crm_qdp_revision_common_list",
-  "name:zh-CN": "QDP 发布中心",
-  "name:en": "QDP Release Center",
+  "name:zh-CN": "QDP 版本清单",
+  "name:en": "QDP Revision List",
   "modelCode": "crm_qdp_revision_common",
+  "description": "Compact searchable QDP revision history; the sidebar entry uses the task-oriented release workbench.",
   "kind": "list",
   "schemaVersion": 4,
   "layout": {
@@ -20,54 +21,36 @@
           "sortable": true
         },
         {
-          "field": "crm_qdp_customer_request_id",
-          "width": 180
+          "field": "crm_qdp_requirement_version",
+          "width": 160
         },
         {
-          "field": "crm_qdp_revision_no",
-          "width": 100,
-          "sortable": true
+          "field": "crm_qdp_primary_filename",
+          "width": 220,
+          "ellipsis": true
         },
         {
           "field": "crm_qdp_status",
-          "width": 150,
+          "width": 140,
           "sortable": true,
           "renderType": "tag",
           "dictCode": "crm_qdp_lifecycle"
         },
         {
-          "field": "crm_qdp_compilation_outcome",
+          "field": "crm_qdp_gate_verdict",
           "width": 150,
           "renderType": "tag",
-          "dictCode": "crm_qdp_compilation_outcome"
+          "dictCode": "crm_qdp_gate_verdict"
         },
         {
           "field": "crm_qdp_compilation_progress",
-          "width": 110
+          "width": 120,
+          "renderType": "progress"
         },
         {
-          "field": "crm_qdp_requirement_version",
-          "width": 180
-        },
-        {
-          "field": "crm_qdp_file_package_hash",
-          "width": 260
-        },
-        {
-          "field": "crm_qdp_qualification_verdict",
-          "width": 140
-        },
-        {
-          "field": "crm_qdp_version_diff_summary",
-          "width": 240
-        },
-        {
-          "field": "crm_qdp_pack_set_summary",
-          "width": 220
-        },
-        {
-          "field": "crm_qdp_downstream_impact_summary",
-          "width": 240
+          "field": "crm_qdp_compilation_summary",
+          "width": 260,
+          "ellipsis": true
         },
         {
           "field": "crm_qdp_prepared_at",
@@ -94,9 +77,8 @@
       ],
       "searchFields": [
         "crm_qdp_code",
-        "crm_qdp_customer_request_id",
         "crm_qdp_requirement_version",
-        "crm_qdp_file_package_hash",
+        "crm_qdp_primary_filename",
         "crm_qdp_status"
       ],
       "defaultSort": {

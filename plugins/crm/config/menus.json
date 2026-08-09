@@ -518,13 +518,13 @@
     "parentCode": "crm_root",
     "name:zh-CN": "QDP 发布中心",
     "name:en": "QDP Release Center",
-    "path": "/p/crm_qdp_revision_common",
+    "path": "/p/c/crm_qdp_release_workbench",
     "component": null,
     "icon": "IconPackage",
     "type": 1,
     "permissionCode": "crm.qdp.read",
     "orderNo": 24,
     "visible": true,
-    "pageKey": "crm_qdp_revision_common_list"
+    "pageKey": "crm_qdp_release_workbench"
   }
 ]

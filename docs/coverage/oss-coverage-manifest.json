@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "3c4aecb43",
+    "commit": "fef426c6f",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -5002,6 +5002,19 @@
           "note": "kind=list model=crm_opportunity_common"
         },
         {
+          "id": "page:crm_qdp_release_workbench",
+          "action": "crm_qdp_release_workbench",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=crm_qdp_revision_common"
+        },
+        {
           "id": "page:crm_qdp_revision_common_detail",
           "action": "crm_qdp_revision_common_detail",
           "surface": "ui",
@@ -5020,11 +5033,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
           "note": "kind=list model=crm_qdp_revision_common"
         },
         {
@@ -10139,8 +10150,8 @@
   "stats": {
     "commands": 456,
     "untested": 318,
-    "pages": 260,
-    "pagesUntested": 167,
+    "pages": 261,
+    "pagesUntested": 168,
     "platformPages": 99,
     "platformPagesUntested": 41
   }

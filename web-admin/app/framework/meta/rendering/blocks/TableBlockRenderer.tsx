@@ -127,7 +127,7 @@ function renderLinkCell(
       target={target}
       rel={target === '_blank' ? 'noreferrer' : undefined}
       onClick={(event) => event.stopPropagation()}
-      className="text-accent font-medium underline decoration-border underline-offset-2 hover:text-accent-hover"
+      className="text-accent decoration-border hover:text-accent-hover font-medium underline underline-offset-2"
     >
       {label}
     </a>
@@ -261,8 +261,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
           command: inlineEditCommand,
           targetRecordPid: pid,
           payload: { [writeField]: value },
-          reload:
-            inlineEditConfig?.reload ?? (dataSourceId ? [dataSourceId] : []),
+          reload: inlineEditConfig?.reload ?? (dataSourceId ? [dataSourceId] : []),
         },
       });
     },
@@ -338,7 +337,21 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       Boolean(currentKey) &&
       data.some((row: any, index: number) => getRowIdentity(row, index) === currentKey);
 
-    if (data.length > 0 && !currentStillVisible) {
+    // A data-source reload can replace the selected row with a newer snapshot while
+    // preserving the same public id. Keep the bound workbench context current so
+    // sibling status banners and lifecycle actions do not evaluate stale fields.
+    if (currentStillVisible) {
+      const refreshedCurrent = data.find(
+        (row: any, index: number) => getRowIdentity(row, index) === currentKey,
+      );
+      if (refreshedCurrent && refreshedCurrent !== current) {
+        writeRuntimeState(runtime, selectionConfig.bind, refreshedCurrent);
+        setLocalSelectedRowKey(currentKey);
+      }
+      return;
+    }
+
+    if (data.length > 0) {
       const firstRow = data[0];
       writeRuntimeState(runtime, selectionConfig.bind, firstRow);
       setLocalSelectedRowKey(getRowIdentity(firstRow, 0));

@@ -1358,5 +1358,51 @@
         "sortable": true
       }
     ]
+  },
+  {
+    "code": "crm_qdp_release_stats",
+    "name:zh-CN": "QDP 发布队列统计",
+    "name:en": "QDP Release Queue Stats",
+    "description": "One-row aggregate of QDP revisions by actionable release lifecycle state.",
+    "purpose": "Feeds the QDP Release Workbench metric strip and deliberately returns one row.",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string",
+          "description": "Tenant ID (auto-injected)"
+        }
+      },
+      "required": [
+        "tenantId"
+      ]
+    },
+    "fromSql": "SELECT COUNT(*) FILTER (WHERE crm_qdp_status IN ('draft', 'validation_failed')) AS action_required_count, COUNT(*) FILTER (WHERE crm_qdp_status = 'ready_for_review') AS ready_for_release_count, COUNT(*) FILTER (WHERE crm_qdp_status = 'compiling') AS compiling_count, COUNT(*) FILTER (WHERE crm_qdp_status = 'released') AS released_count FROM mt_crm_qdp_revision_common WHERE tenant_id = #{params.tenantId}",
+    "outputFields": [
+      {
+        "code": "action_required_count",
+        "columnExpr": "action_required_count",
+        "dataType": "number",
+        "sortable": false
+      },
+      {
+        "code": "ready_for_release_count",
+        "columnExpr": "ready_for_release_count",
+        "dataType": "number",
+        "sortable": false
+      },
+      {
+        "code": "compiling_count",
+        "columnExpr": "compiling_count",
+        "dataType": "number",
+        "sortable": false
+      },
+      {
+        "code": "released_count",
+        "columnExpr": "released_count",
+        "dataType": "number",
+        "sortable": false
+      }
+    ]
   }
 ]

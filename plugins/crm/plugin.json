@@ -132,6 +132,14 @@
     {
       "type": "command",
       "code": "crm:publish_qdp_revision"
+    },
+    {
+      "type": "query",
+      "code": "crm_qdp_release_stats"
+    },
+    {
+      "type": "page",
+      "code": "crm_qdp_release_workbench"
     }
   ],
   "requires": [],

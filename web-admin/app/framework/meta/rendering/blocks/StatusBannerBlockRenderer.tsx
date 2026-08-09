@@ -7,7 +7,9 @@ import {
   readDataSourceRecord,
   readDataSourceState,
   readPath,
+  resolveRuntimeValue,
   useDataSourceSubscription,
+  useRuntimeStateSubscription,
 } from './workbenchBlockUtils';
 
 export interface StatusBannerBlockRendererProps {
@@ -181,9 +183,12 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
   const t = context.t || ((key: string) => key);
   const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
 
+  useRuntimeStateSubscription(runtime);
   useDataSourceSubscription(runtime, dataSourceId);
   const dataSourceState = readDataSourceState(runtime, dataSourceId);
-  const record = readDataSourceRecord(runtime, dataSourceId);
+  const record =
+    resolveRuntimeValue(runtime, (block as any).context) ||
+    readDataSourceRecord(runtime, dataSourceId);
 
   const statusField = String((block as any).statusField || 'status');
   const errorField = String((block as any).errorField || 'errorMessage');

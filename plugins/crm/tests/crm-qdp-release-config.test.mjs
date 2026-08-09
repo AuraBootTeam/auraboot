@@ -15,7 +15,8 @@ async function jsonDir(path) {
     Array.isArray(value) ? value : [value]);
 }
 
-const [models, fields, bindings, commands, pages, permissions, roles, menus, dicts, plugin, backendBuild] =
+const [models, fields, bindings, commands, pages, permissions, roles, menus, dicts, namedQueries,
+  plugin, backendBuild] =
   await Promise.all([
     json('models.json'),
     jsonDir('fields/'),
@@ -26,6 +27,7 @@ const [models, fields, bindings, commands, pages, permissions, roles, menus, dic
     json('roles.json'),
     json('menus.json'),
     json('dicts.json'),
+    json('named-queries.json'),
     JSON.parse(await readFile(new URL('../plugin.json', import.meta.url), 'utf8')),
     readFile(new URL('../backend/build.gradle', import.meta.url), 'utf8'),
   ]);
@@ -40,6 +42,7 @@ const permissionCodes = new Set(permissions.map((permission) => permission.code)
 const roleByCode = new Map(roles.map((role) => [role.code, role]));
 const menuByCode = new Map(menus.map((menu) => [menu.code, menu]));
 const dictByCode = new Map(dicts.map((dict) => [dict.code, dict]));
+const namedQueryByCode = new Map(namedQueries.map((query) => [query.code, query]));
 
 const QDP_CONTENT_FIELDS = [
   'crm_qdp_code',
@@ -95,6 +98,9 @@ const COMPILATION_FIELDS = [
   'crm_qdp_compiled_at',
   'crm_qdp_compiled_by',
 ];
+const VISIBLE_COMPILATION_FIELDS = COMPILATION_FIELDS.filter(
+  (field) => !field.endsWith('_by'),
+);
 
 function command(code) {
   const found = commandByCode.get(code);
@@ -108,8 +114,17 @@ function page(pageKey) {
   return found;
 }
 
+function pageBlocks(pageKey) {
+  const visit = (blocks) => blocks.flatMap((candidate) => [
+    candidate,
+    ...visit(candidate.blocks ?? []),
+    ...(candidate.tabs ?? []).flatMap((tab) => visit(tab.blocks ?? [])),
+  ]);
+  return visit(page(pageKey).blocks ?? []);
+}
+
 function block(pageKey, blockId) {
-  const found = (page(pageKey).blocks ?? []).find((candidate) => candidate.id === blockId);
+  const found = pageBlocks(pageKey).find((candidate) => candidate.id === blockId);
   assert.ok(found, `${pageKey} should expose ${blockId}`);
   return found;
 }
@@ -128,6 +143,8 @@ test('QDP Release Center is a discoverable CRM minor release with one internal h
     ['command', 'crm:compile_qdp_revision'],
     ['command', 'crm:submit_qdp_review'],
     ['command', 'crm:publish_qdp_revision'],
+    ['query', 'crm_qdp_release_stats'],
+    ['page', 'crm_qdp_release_workbench'],
   ]) {
     assert.ok(plugin.provides.some((entry) => entry.type === type && entry.code === code),
       `${type} ${code} should be advertised`);
@@ -305,10 +322,16 @@ test('Customer Request and Release Center pages expose complete lifecycle feedba
   assert.equal(historyStatus?.renderType, 'tag');
 
   const detail = page('crm_qdp_revision_common_detail');
+  assert.deepEqual(detail.extension?.hiddenSystemTabs, [
+    '__comments__', '__activity__', '__approval_comments__', '__field_history__',
+  ], 'the dedicated QDP audit hierarchy replaces unrelated generic system tabs');
+  assert.equal(block(detail.pageKey, 'crm_qdp_decision_summary').blockType, 'form-section');
   assert.equal(block(detail.pageKey, 'crm_qdp_identity').blockType, 'form-section',
     'frozen Core only preloads detail dictionaries from form-section blocks');
   const lifecycleButtons = new Map(block(detail.pageKey, 'crm_qdp_release_actions').buttons
     .map((button) => [button.code, button]));
+  assert.equal(lifecycleButtons.get('back_to_release_workbench')?.action?.to,
+    '/p/c/crm_qdp_release_workbench');
   assert.equal(lifecycleButtons.get('compile_qdp_revision')?.permissionCode, 'crm.qdp.review');
   assert.match(lifecycleButtons.get('compile_qdp_revision')?.visibleWhen, /draft/);
   assert.equal(lifecycleButtons.get('compile_qdp_revision')?.action?.command,
@@ -339,7 +362,21 @@ test('Customer Request and Release Center pages expose complete lifecycle feedba
   assert.equal(compilation.blockType, 'form-section',
     'frozen Core only preloads compilation outcome dictionaries from form-section blocks');
   assert.deepEqual(new Set(compilation.fields.map((field) => field.field)),
-    new Set(COMPILATION_FIELDS));
+    new Set(VISIBLE_COMPILATION_FIELDS));
+  const detailFieldCodes = new Set(pageBlocks(detail.pageKey)
+    .flatMap((candidate) => candidate.fields ?? [])
+    .map((field) => field.field));
+  for (const internalActorField of [
+    'crm_qdp_compilation_started_by',
+    'crm_qdp_compiled_by',
+    'crm_qdp_prepared_by',
+    'crm_qdp_review_submitted_by',
+    'crm_qdp_released_by',
+    'crm_qdp_superseded_by',
+  ]) {
+    assert.equal(detailFieldCodes.has(internalActorField), false,
+      `${internalActorField} must not expose an internal actor id as a business label`);
+  }
   assert.equal(fieldByCode.get('crm_qdp_status')?.dictCode, 'crm_qdp_lifecycle',
     'detail rendering resolves lifecycle labels from field metadata');
   assert.equal(fieldByCode.get('crm_qdp_gate_verdict')?.dictCode, 'crm_qdp_gate_verdict',
@@ -352,7 +389,7 @@ test('Customer Request and Release Center pages expose complete lifecycle feedba
     'crm_qdp_file_package_hash',
     'crm_qdp_customer_confirmed_hash',
   ]) {
-    const configured = detail.blocks.flatMap((candidate) => candidate.fields ?? [])
+    const configured = pageBlocks(detail.pageKey).flatMap((candidate) => candidate.fields ?? [])
       .find((field) => field.field === fieldCode);
     assert.equal(configured?.layout?.colSpan, 12,
       `${fieldCode} must use the renderer-supported full-width layout contract`);
@@ -373,8 +410,52 @@ test('Customer Request and Release Center pages expose complete lifecycle feedba
     assert.equal(detailText.includes(rawField), false, `${rawField} must not leak raw JSON into the UI`);
   }
 
+  const workbench = page('crm_qdp_release_workbench');
+  assert.equal(workbench.kind, 'detail');
+  assert.equal(workbench.dataSources?.qdpStats?.queryCode, 'crm_qdp_release_stats');
+  assert.equal(workbench.dataSources?.qdpList?.endpoint,
+    '/api/dynamic/crm_qdp_revision_common/list');
+  assert.equal(block(workbench.pageKey, 'crm_qdp_queue_search').onSearch?.action,
+    'dataSource.reload');
+  assert.equal(block(workbench.pageKey, 'crm_qdp_queue_search').onReset?.action, 'state.set');
+  assert.equal(block(workbench.pageKey, 'crm_qdp_queue_metrics').blockType, 'metric-strip');
+  assert.equal(block(workbench.pageKey, 'crm_qdp_queue_metrics').metrics.length, 4);
+  assert.equal(block(workbench.pageKey, 'crm_qdp_release_queue').selection.defaultFirst, true);
+  assert.deepEqual(block(workbench.pageKey, 'crm_qdp_release_queue').columns
+    .map((column) => column.field), [
+    'crm_qdp_code',
+    'crm_qdp_requirement_version',
+    'crm_qdp_primary_filename',
+    'crm_qdp_status',
+    'crm_qdp_gate_verdict',
+    'crm_qdp_prepared_at',
+  ]);
+  assert.equal(block(workbench.pageKey, 'crm_qdp_release_queue').rowActions?.[0]?.action?.to,
+    'crm_qdp_revision_common_detail');
+  const workbenchActions = new Map(block(workbench.pageKey, 'crm_qdp_next_actions').actions
+    .map((action) => [action.code, action]));
+  assert.equal(workbenchActions.get('compile_qdp_revision')?.onClick?.action, 'command.execute');
+  assert.deepEqual(workbenchActions.get('compile_qdp_revision')?.onClick?.args?.reload,
+    ['qdpStats', 'qdpList']);
+  assert.equal(workbenchActions.get('publish_qdp_revision')?.permissionCode, 'crm.qdp.release');
+  assert.equal(workbenchActions.get('publish_qdp_revision')?.onClick?.args?.inputFields?.[0]?.field,
+    'crm_qdp_release_note');
+  assert.ok(block(workbench.pageKey, 'crm_qdp_selected_status').failedStatuses
+    .includes('validation_failed'));
+  assert.equal(block(workbench.pageKey, 'crm_qdp_selected_status').context,
+    '${state.selectedQdp}');
+  assert.equal(block(workbench.pageKey, 'crm_qdp_release_evidence').blockType, 'evidence-panel');
+  assert.equal(workbench.dataSources?.selectedQdpDetail, undefined,
+    'selection-derived blocks must not race a duplicate detail query');
+  assert.ok(namedQueryByCode.has('crm_qdp_release_stats'));
+  assert.deepEqual(namedQueryByCode.get('crm_qdp_release_stats').outputFields
+    .map((field) => field.code), [
+    'action_required_count', 'ready_for_release_count', 'compiling_count', 'released_count',
+  ]);
+
   const menu = menuByCode.get('crm_qdp_release_center');
-  assert.equal(menu?.pageKey, 'crm_qdp_revision_common_list');
+  assert.equal(menu?.pageKey, 'crm_qdp_release_workbench');
+  assert.equal(menu?.path, '/p/c/crm_qdp_release_workbench');
   assert.equal(menu?.permissionCode, 'crm.qdp.read');
 });
 
@@ -396,6 +477,7 @@ test('all QDP page and binding references resolve', () => {
 
   for (const pageKey of [
     'crm_customer_request_common_detail',
+    'crm_qdp_release_workbench',
     'crm_qdp_revision_common_list',
     'crm_qdp_revision_common_detail',
   ]) {
