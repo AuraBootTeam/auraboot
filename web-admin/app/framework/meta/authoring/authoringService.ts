@@ -11,6 +11,7 @@ import type {
   AuthoringGovernanceAction,
   AuthoringChangeItem,
   AuthoringRelease,
+  AuthoringReleaseHistory,
   AuthoringSplitResult,
 } from './types';
 
@@ -225,6 +226,33 @@ export async function publishAuthoringChangeSet(
     { method: 'post', params: { expectedRevision: revision } },
   );
   return requireData(result, '发布失败；活动版本未改变，可检查状态后重试');
+}
+
+export async function loadAuthoringReleaseHistory(
+  changeSetPid: string,
+  page = 1,
+  size = 20,
+): Promise<AuthoringReleaseHistory> {
+  const result = await fetchResult<AuthoringReleaseHistory>(
+    `/api/authoring/change-sets/${encodeURIComponent(changeSetPid)}/releases`,
+    { params: { page, size } },
+  );
+  return requireData(result, '无法加载发布历史');
+}
+
+export async function rollbackAuthoringRelease(
+  activeReleasePid: string,
+  channelVersion: number,
+  reason: string,
+): Promise<AuthoringRelease> {
+  const result = await fetchResult<AuthoringRelease>(
+    `/api/authoring/releases/${encodeURIComponent(activeReleasePid)}/rollback`,
+    {
+      method: 'post',
+      params: { expectedChannelVersion: channelVersion, reason },
+    },
+  );
+  return requireData(result, '回滚失败；活动版本可能已变化，请刷新后重试');
 }
 
 export async function loadAuthoringChangeItems(sessionPid: string): Promise<AuthoringChangeItem[]> {

@@ -605,6 +605,125 @@ public class AuthoringGovernanceRepository {
                 row.tenantId(), row.envId(), row.resourcePid());
     }
 
+    public ReleaseHistorySnapshot findReleaseHistory(
+            GovernanceRow row,
+            int offset,
+            int limit) {
+        ReleaseChannelHistory channel = jdbcTemplate.query("""
+                        SELECT c.row_version,
+                               active.pid AS active_release_pid,
+                               previous.pid AS previous_release_pid,
+                               previous.status AS previous_release_status,
+                               COUNT(ci.id) FILTER (
+                                   WHERE ci.reversibility = 'REVERSIBLE') AS reversible_count,
+                               COUNT(ci.id) FILTER (
+                                   WHERE ci.reversibility = 'COMPENSATABLE') AS compensatable_count,
+                               COUNT(ci.id) FILTER (
+                                   WHERE ci.reversibility = 'FORWARD_ONLY') AS forward_only_count
+                        FROM ab_authoring_release_channel c
+                        JOIN ab_authoring_release active
+                          ON active.id = c.active_release_id
+                         AND active.tenant_id = c.tenant_id
+                         AND active.env_id = c.env_id
+                        LEFT JOIN ab_authoring_release previous
+                          ON previous.id = c.previous_release_id
+                         AND previous.tenant_id = c.tenant_id
+                         AND previous.env_id = c.env_id
+                        LEFT JOIN ab_authoring_change_item ci
+                          ON ci.change_set_id = active.change_set_id
+                         AND ci.tenant_id = active.tenant_id
+                         AND ci.env_id = active.env_id
+                         AND NOT EXISTS (
+                             SELECT 1 FROM ab_authoring_change_item_split split_item
+                             WHERE split_item.tenant_id = ci.tenant_id
+                               AND split_item.env_id = ci.env_id
+                               AND split_item.source_change_item_id = ci.id)
+                        WHERE c.tenant_id = ? AND c.env_id = ?
+                          AND c.resource_type = 'PAGE_SCHEMA' AND c.resource_pid = ?
+                        GROUP BY c.row_version, active.pid, previous.pid, previous.status
+                        """,
+                resultSet -> resultSet.next()
+                        ? new ReleaseChannelHistory(
+                            resultSet.getLong("row_version"),
+                            resultSet.getString("active_release_pid"),
+                            resultSet.getString("previous_release_pid"),
+                            resultSet.getString("previous_release_status"),
+                            resultSet.getLong("reversible_count"),
+                            resultSet.getLong("compensatable_count"),
+                            resultSet.getLong("forward_only_count"))
+                        : null,
+                row.tenantId(), row.envId(), row.resourcePid());
+        Long total = jdbcTemplate.queryForObject("""
+                SELECT COUNT(DISTINCT release.id)
+                FROM ab_authoring_release release
+                JOIN ab_authoring_release_item item
+                  ON item.release_id = release.id
+                 AND item.tenant_id = release.tenant_id
+                 AND item.env_id = release.env_id
+                WHERE release.tenant_id = ? AND release.env_id = ?
+                  AND item.resource_type = 'PAGE_SCHEMA' AND item.resource_pid = ?
+                """, Long.class, row.tenantId(), row.envId(), row.resourcePid());
+        List<ReleaseHistoryRow> releases = jdbcTemplate.query("""
+                        SELECT release.pid AS release_pid,
+                               change_set.pid AS change_set_pid,
+                               release.change_set_revision,
+                               release.previous_release_pid,
+                               release.status,
+                               release.manifest_checksum,
+                               release.created_at,
+                               release.activated_at,
+                               item_counts.reversible_count,
+                               item_counts.compensatable_count,
+                               item_counts.forward_only_count
+                        FROM ab_authoring_release release
+                        JOIN ab_authoring_change_set change_set
+                          ON change_set.id = release.change_set_id
+                         AND change_set.tenant_id = release.tenant_id
+                         AND change_set.env_id = release.env_id
+                        JOIN ab_authoring_release_item item
+                          ON item.release_id = release.id
+                         AND item.tenant_id = release.tenant_id
+                         AND item.env_id = release.env_id
+                        LEFT JOIN LATERAL (
+                            SELECT
+                                COUNT(ci.id) FILTER (
+                                    WHERE ci.reversibility = 'REVERSIBLE') AS reversible_count,
+                                COUNT(ci.id) FILTER (
+                                    WHERE ci.reversibility = 'COMPENSATABLE') AS compensatable_count,
+                                COUNT(ci.id) FILTER (
+                                    WHERE ci.reversibility = 'FORWARD_ONLY') AS forward_only_count
+                            FROM ab_authoring_change_item ci
+                            WHERE ci.tenant_id = release.tenant_id
+                              AND ci.env_id = release.env_id
+                              AND ci.change_set_id = release.change_set_id
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM ab_authoring_change_item_split split_item
+                                  WHERE split_item.tenant_id = ci.tenant_id
+                                    AND split_item.env_id = ci.env_id
+                                    AND split_item.source_change_item_id = ci.id)
+                        ) item_counts ON TRUE
+                        WHERE release.tenant_id = ? AND release.env_id = ?
+                          AND item.resource_type = 'PAGE_SCHEMA' AND item.resource_pid = ?
+                        ORDER BY release.created_at DESC, release.id DESC
+                        LIMIT ? OFFSET ?
+                        """,
+                (resultSet, rowNumber) -> new ReleaseHistoryRow(
+                        resultSet.getString("release_pid"),
+                        resultSet.getString("change_set_pid"),
+                        resultSet.getLong("change_set_revision"),
+                        resultSet.getString("previous_release_pid"),
+                        resultSet.getString("status"),
+                        resultSet.getString("manifest_checksum"),
+                        resultSet.getTimestamp("created_at").toInstant(),
+                        resultSet.getTimestamp("activated_at") == null
+                                ? null : resultSet.getTimestamp("activated_at").toInstant(),
+                        resultSet.getLong("reversible_count"),
+                        resultSet.getLong("compensatable_count"),
+                        resultSet.getLong("forward_only_count")),
+                row.tenantId(), row.envId(), row.resourcePid(), limit, offset);
+        return new ReleaseHistorySnapshot(channel, releases, total == null ? 0 : total);
+    }
+
     public ReleaseRow activateRelease(
             GovernanceRow row,
             ChannelRow channel,
@@ -936,6 +1055,36 @@ public class AuthoringGovernanceRepository {
             long rowVersion,
             long activeReleaseId,
             String activeReleasePid) {
+    }
+
+    public record ReleaseChannelHistory(
+            long channelVersion,
+            String activeReleasePid,
+            String previousReleasePid,
+            String previousReleaseStatus,
+            long reversibleItemCount,
+            long compensatableItemCount,
+            long forwardOnlyItemCount) {
+    }
+
+    public record ReleaseHistoryRow(
+            String releasePid,
+            String changeSetPid,
+            long changeSetRevision,
+            String previousReleasePid,
+            String status,
+            String manifestChecksum,
+            Instant createdAt,
+            Instant activatedAt,
+            long reversibleItemCount,
+            long compensatableItemCount,
+            long forwardOnlyItemCount) {
+    }
+
+    public record ReleaseHistorySnapshot(
+            ReleaseChannelHistory channel,
+            List<ReleaseHistoryRow> releases,
+            long total) {
     }
 
     public record ReleaseRow(

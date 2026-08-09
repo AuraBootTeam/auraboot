@@ -145,6 +145,45 @@ export interface AuthoringRelease {
   activatedAt: string;
 }
 
+export interface AuthoringRollbackEligibility {
+  eligible: boolean;
+  reasonCode:
+    | 'ELIGIBLE'
+    | 'NO_ACTIVE_RELEASE'
+    | 'NO_PREVIOUS_RELEASE'
+    | 'PREVIOUS_RELEASE_UNAVAILABLE'
+    | 'CONTAINS_COMPENSATABLE_CHANGES'
+    | 'CONTAINS_FORWARD_ONLY_CHANGES';
+  targetReleasePid?: string | null;
+  reversibleItemCount: number;
+  compensatableItemCount: number;
+  forwardOnlyItemCount: number;
+}
+
+export interface AuthoringReleaseHistoryItem {
+  releasePid: string;
+  changeSetPid: string;
+  changeSetRevision: number;
+  previousReleasePid?: string | null;
+  status: 'ACTIVE' | 'SUPERSEDED' | 'ROLLED_BACK' | 'FAILED' | 'PREPARING';
+  reversibility: 'REVERSIBLE' | 'COMPENSATABLE' | 'FORWARD_ONLY';
+  manifestChecksum: string;
+  createdAt: string;
+  activatedAt?: string | null;
+}
+
+export interface AuthoringReleaseHistory {
+  resourcePid: string;
+  activeReleasePid?: string | null;
+  previousReleasePid?: string | null;
+  channelVersion: number;
+  rollbackEligibility: AuthoringRollbackEligibility;
+  items: AuthoringReleaseHistoryItem[];
+  page: number;
+  size: number;
+  total: number;
+}
+
 export interface AuthoringNode {
   id: string;
   sourceId: string;

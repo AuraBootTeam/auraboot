@@ -35,6 +35,7 @@ import { AuthoringRiskSummary } from '~/framework/meta/authoring/AuthoringRiskSu
 import { AuthoringValidationNotice } from '~/framework/meta/authoring/AuthoringValidationNotice';
 import { AuthoringImpactNotice } from '~/framework/meta/authoring/AuthoringImpactNotice';
 import { AuthoringChangeSetSplitPanel } from '~/framework/meta/authoring/AuthoringChangeSetSplitPanel';
+import { AuthoringReleaseHistoryPanel } from '~/framework/meta/authoring/AuthoringReleaseHistoryPanel';
 import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
 import { AuthoringConflictResolutionPanel } from '../components/unified-designer/AuthoringConflictResolutionPanel';
 import type {
@@ -69,6 +70,7 @@ export default function UnifiedDesignerPage() {
   const canAdministerDesigner = usePermission('meta.designer.admin');
   const canManageDesigner = usePermission('meta.designer.update');
   const canReviewAuthoring = usePermission('meta.publish.update');
+  const canReadAuthoringReleases = usePermission('meta.publish.read');
   const canPublishAuthoring = usePermission('meta.publish.admin');
   const { user } = useUser();
   const [searchParams] = useSearchParams();
@@ -578,6 +580,15 @@ export default function UnifiedDesignerPage() {
     }
   };
 
+  const handleReleaseRolledBack = async () => {
+    if (!authoringSession || reviewWorkspaceMode) return;
+    const latest = await loadAuthoringSession(authoringSession.sessionPid);
+    documentBaselineRef.current = latest;
+    setAuthoringSession(latest);
+    setDocument(authoringSnapshotToPageSchemaV3(latest.snapshot));
+    setWorkbenchGeneration((current) => current + 1);
+  };
+
   const handleWriterLeaseTakeover = async (reason: string) => {
     if (
       reviewWorkspaceMode ||
@@ -796,6 +807,14 @@ export default function UnifiedDesignerPage() {
             onAction={handleGovernanceAction}
           />
         </div>
+        {!reviewWorkspaceMode && canReadAuthoringReleases && authoringSession ? (
+          <AuthoringReleaseHistoryPanel
+            changeSetPid={authoringSession.changeSetPid}
+            canRollback={canPublishAuthoring}
+            refreshKey={`${authoringSession.publishState}:${authoringSession.revision}`}
+            onRolledBack={handleReleaseRolledBack}
+          />
+        ) : null}
         <AuthoringChangeSetSplitPanel
           session={authoringSession!}
           enabled={Boolean(

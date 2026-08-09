@@ -11,12 +11,14 @@ import {
   consumeAuthoringHandoff,
   loadAuthoringCapabilities,
   loadAuthoringChangeItems,
+  loadAuthoringReleaseHistory,
   loadAuthoringReviewWorkspace,
   loadAuthoringSession,
   moveAuthoringStudioBlock,
   openAuthoringReviewWorkspace,
   observeAuthoringChangeSet,
   publishAuthoringChangeSet,
+  rollbackAuthoringRelease,
   splitAuthoringChangeSet,
   takeoverAuthoringWriterLease,
   transitionAuthoringGovernance,
@@ -60,11 +62,13 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   consumeAuthoringHandoff: vi.fn(),
   loadAuthoringCapabilities: vi.fn(),
   loadAuthoringChangeItems: vi.fn(),
+  loadAuthoringReleaseHistory: vi.fn(),
   loadAuthoringReviewWorkspace: vi.fn(),
   loadAuthoringSession: vi.fn(),
   moveAuthoringStudioBlock: vi.fn(),
   observeAuthoringChangeSet: vi.fn(),
   publishAuthoringChangeSet: vi.fn(),
+  rollbackAuthoringRelease: vi.fn(),
   splitAuthoringChangeSet: vi.fn(),
   openAuthoringReviewWorkspace: vi.fn(),
   takeoverAuthoringWriterLease: vi.fn(),
@@ -88,11 +92,31 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(loadAuthoringCapabilities).mockReset();
     vi.mocked(loadAuthoringChangeItems).mockReset();
     vi.mocked(loadAuthoringChangeItems).mockResolvedValue([]);
+    vi.mocked(loadAuthoringReleaseHistory).mockReset();
+    vi.mocked(loadAuthoringReleaseHistory).mockResolvedValue({
+      resourcePid: 'page_1',
+      activeReleasePid: null,
+      previousReleasePid: null,
+      channelVersion: 0,
+      rollbackEligibility: {
+        eligible: false,
+        reasonCode: 'NO_ACTIVE_RELEASE',
+        targetReleasePid: null,
+        reversibleItemCount: 0,
+        compensatableItemCount: 0,
+        forwardOnlyItemCount: 0,
+      },
+      items: [],
+      page: 1,
+      size: 10,
+      total: 0,
+    });
     vi.mocked(loadAuthoringReviewWorkspace).mockReset();
     vi.mocked(applyAuthoringStudioPatch).mockReset();
     vi.mocked(moveAuthoringStudioBlock).mockReset();
     vi.mocked(observeAuthoringChangeSet).mockReset();
     vi.mocked(publishAuthoringChangeSet).mockReset();
+    vi.mocked(rollbackAuthoringRelease).mockReset();
     vi.mocked(splitAuthoringChangeSet).mockReset();
     vi.mocked(openAuthoringReviewWorkspace).mockReset();
     vi.mocked(takeoverAuthoringWriterLease).mockReset();
@@ -345,6 +369,8 @@ describe('UnifiedDesignerPage', () => {
     );
     expect(screen.queryByTestId('authoring-governance-approve')).not.toBeInTheDocument();
     expect(screen.queryByTestId('authoring-governance-publish')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('authoring-release-history')).not.toBeInTheDocument();
+    expect(loadAuthoringReleaseHistory).not.toHaveBeenCalled();
     expect(String(window.location.search)).toContain('reviewSession=session_1');
     expect(observeAuthoringChangeSet).not.toHaveBeenCalled();
   });

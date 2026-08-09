@@ -200,6 +200,8 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"expectedRevision\":1}"))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/authoring/change-sets/missing/releases"))
+                .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/authoring/releases/missing/rollback")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"expectedChannelVersion\":1,\"reason\":\"test\"}"))

@@ -244,4 +244,37 @@ public final class AuthoringWorkspaceContracts {
             long channelVersion,
             Instant activatedAt) {
     }
+
+    public record RollbackEligibilityView(
+            boolean eligible,
+            String reasonCode,
+            String targetReleasePid,
+            long reversibleItemCount,
+            long compensatableItemCount,
+            long forwardOnlyItemCount) {
+    }
+
+    public record ReleaseHistoryItemView(
+            String releasePid,
+            String changeSetPid,
+            long changeSetRevision,
+            String previousReleasePid,
+            String status,
+            String reversibility,
+            String manifestChecksum,
+            Instant createdAt,
+            Instant activatedAt) {
+    }
+
+    public record ReleaseHistoryView(
+            String resourcePid,
+            String activeReleasePid,
+            String previousReleasePid,
+            long channelVersion,
+            RollbackEligibilityView rollbackEligibility,
+            List<ReleaseHistoryItemView> items,
+            int page,
+            int size,
+            long total) {
+    }
 }

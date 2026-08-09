@@ -7,13 +7,19 @@ import com.auraboot.framework.authoring.workspace.AuthoringDraftValidator.Valida
 import com.auraboot.framework.authoring.workspace.AuthoringImpactAnalyzer.ImpactResult;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.ChannelRow;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.GovernanceRow;
+import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.ReleaseChannelHistory;
+import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.ReleaseHistoryRow;
+import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.ReleaseHistorySnapshot;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.ReleaseRow;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.RollbackRow;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.SplitPersistenceCommand;
 import com.auraboot.framework.authoring.workspace.AuthoringGovernanceRepository.SplitPersistenceResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ChangeItemView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ChangeSetView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseHistoryItemView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseHistoryView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RollbackEligibilityView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RevisionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RollbackRequest;
@@ -332,6 +338,25 @@ public class AuthoringGovernanceService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public ReleaseHistoryView releaseHistory(String changeSetPid, int page, int size) {
+        Identity identity = identity();
+        GovernanceRow row = requireChangeSet(identity, changeSetPid, false);
+        int offset = (page - 1) * size;
+        ReleaseHistorySnapshot history = governanceRepository.findReleaseHistory(
+                row, offset, size);
+        ReleaseChannelHistory channel = history.channel();
+        RollbackEligibilityView eligibility = rollbackEligibility(channel);
+        return new ReleaseHistoryView(
+                row.resourcePid(),
+                channel == null ? null : channel.activeReleasePid(),
+                channel == null ? null : channel.previousReleasePid(),
+                channel == null ? 0 : channel.channelVersion(),
+                eligibility,
+                history.releases().stream().map(this::releaseHistoryItemView).toList(),
+                page, size, history.total());
+    }
+
     @Transactional
     public ReleaseView rollback(String releasePid, RollbackRequest request) {
         Identity identity = identity();
@@ -419,6 +444,49 @@ public class AuthoringGovernanceService {
                 row.releasePid(), row.changeSetPid(), row.changeSetRevision(),
                 row.previousReleasePid(), row.status(), row.manifestChecksum(),
                 row.channelVersion(), row.activatedAt());
+    }
+
+    private ReleaseHistoryItemView releaseHistoryItemView(ReleaseHistoryRow row) {
+        return new ReleaseHistoryItemView(
+                row.releasePid(), row.changeSetPid(), row.changeSetRevision(),
+                row.previousReleasePid(), row.status(), reversibility(row),
+                row.manifestChecksum(), row.createdAt(), row.activatedAt());
+    }
+
+    private RollbackEligibilityView rollbackEligibility(ReleaseChannelHistory channel) {
+        if (channel == null) {
+            return new RollbackEligibilityView(
+                    false, "NO_ACTIVE_RELEASE", null, 0, 0, 0);
+        }
+        String reasonCode = "ELIGIBLE";
+        boolean eligible = true;
+        if (channel.previousReleasePid() == null) {
+            eligible = false;
+            reasonCode = "NO_PREVIOUS_RELEASE";
+        } else if (!"SUPERSEDED".equals(channel.previousReleaseStatus())) {
+            eligible = false;
+            reasonCode = "PREVIOUS_RELEASE_UNAVAILABLE";
+        } else if (channel.forwardOnlyItemCount() > 0) {
+            eligible = false;
+            reasonCode = "CONTAINS_FORWARD_ONLY_CHANGES";
+        } else if (channel.compensatableItemCount() > 0) {
+            eligible = false;
+            reasonCode = "CONTAINS_COMPENSATABLE_CHANGES";
+        }
+        return new RollbackEligibilityView(
+                eligible, reasonCode, channel.previousReleasePid(),
+                channel.reversibleItemCount(), channel.compensatableItemCount(),
+                channel.forwardOnlyItemCount());
+    }
+
+    private String reversibility(ReleaseHistoryRow row) {
+        if (row.forwardOnlyItemCount() > 0) {
+            return "FORWARD_ONLY";
+        }
+        if (row.compensatableItemCount() > 0) {
+            return "COMPENSATABLE";
+        }
+        return "REVERSIBLE";
     }
 
     private ChangeItemView itemView(ChangeItem item) {
