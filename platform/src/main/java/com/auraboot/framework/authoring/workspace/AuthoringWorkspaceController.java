@@ -10,10 +10,12 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Ch
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateHandoffRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateAiPatchProposalRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateBlockRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateNewPageWorkspaceRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffContextView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffCreatedView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.IdentitySimulationView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.MoveBlockRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.NewPageWorkspaceOptions;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ObserveChangeSetRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
@@ -90,10 +92,24 @@ public class AuthoringWorkspaceController {
         return ApiResponse.success(workspaceService.capabilities());
     }
 
+    @GetMapping("/new-page-workspace-options")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<NewPageWorkspaceOptions> newPageWorkspaceOptions() {
+        return ApiResponse.success(workspaceService.newPageOptions());
+    }
+
     @PostMapping("/sessions")
     @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
     public ApiResponse<SessionView> open(@Valid @RequestBody OpenSessionRequest request) {
         return ApiResponse.success(workspaceService.open(request));
+    }
+
+    @PostMapping("/sessions/{sourceSessionPid}/new-page-workspaces")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<SessionView> createNewPageWorkspace(
+            @PathVariable String sourceSessionPid,
+            @Valid @RequestBody CreateNewPageWorkspaceRequest request) {
+        return ApiResponse.success(workspaceService.createNewPageWorkspace(sourceSessionPid, request));
     }
 
     @GetMapping("/sessions/{sessionPid}")

@@ -8,6 +8,7 @@ import com.auraboot.framework.environment.dao.mapper.EnvironmentMapper;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
+import com.auraboot.framework.menu.service.MenuEnvironmentScopeService;
 import com.auraboot.framework.promotion.dao.entity.Promotion;
 import com.auraboot.framework.promotion.dao.entity.PromotionUnit;
 import com.auraboot.framework.promotion.dao.mapper.PromotionMapper;
@@ -62,6 +63,7 @@ public class PromotionServiceImpl implements PromotionService {
     private final EnvironmentMapper environmentMapper;
     private final PageSchemaDiffService pageSchemaDiffService;
     private final ResourceReferenceService resourceReferenceService;
+    private final MenuEnvironmentScopeService menuEnvironmentScopeService;
     private final PromotionDriftCoordinator promotionDriftCoordinator;
     private final PlatformTransactionManager transactionManager;
     private final com.auraboot.framework.audit.service.AdminEventLogService adminEventLogService;
@@ -115,7 +117,9 @@ public class PromotionServiceImpl implements PromotionService {
             unit.setPromotionId(p.getId());
             unit.setResourceType(u.getResourceType());
             unit.setResourcePid(u.getResourcePid());
-            unit.setSourceVersion(u.getSourceVersion() != null ? u.getSourceVersion() : captureSourceVersion(p.getSourceEnvId(), u.getResourcePid()));
+            unit.setSourceVersion(u.getSourceVersion() != null
+                    ? u.getSourceVersion()
+                    : captureSourceVersion(p.getSourceEnvId(), u.getResourcePid()));
             unit.setSortOrder(u.getSortOrder() != null ? u.getSortOrder() : order++);
             unit.setCreatedAt(new Date());
             unit.setDeletedFlag(false);
@@ -159,7 +163,9 @@ public class PromotionServiceImpl implements PromotionService {
 
         List<PromotionUnit> units = listUnits(p.getId(), tenantId);
         for (PromotionUnit unit : units) {
-            if (!"PAGE_SCHEMA".equals(unit.getResourceType())) continue;
+            if (!"PAGE_SCHEMA".equals(unit.getResourceType())) {
+                continue;
+            }
 
             PageSchema source = withEnvId(p.getSourceEnvId(),
                     () -> pageSchemaMapper.selectByPid(unit.getResourcePid()));
@@ -328,7 +334,9 @@ public class PromotionServiceImpl implements PromotionService {
                     .reason(failure.getMessage())
                     .build());
             log.warn("Promotion {} failed during apply: {}", pid, failure.getMessage());
-            if (failure instanceof RuntimeException re) throw re;
+            if (failure instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
             throw new RuntimeException("Promotion apply failed", failure);
         }
 
@@ -463,6 +471,8 @@ public class PromotionServiceImpl implements PromotionService {
                     pageSchemaMapper.insert(clone);
                     // Refresh reverse references for the freshly written page (env-scoped)
                     resourceReferenceService.refresh(clone);
+                    menuEnvironmentScopeService.includeEnvironment(
+                            p.getTenantId(), source.getPageKey(), p.getTargetEnvId());
                     return null;
                 }));
 
@@ -597,7 +607,9 @@ public class PromotionServiceImpl implements PromotionService {
     }
 
     private String toJson(Object v) {
-        if (v == null) return null;
+        if (v == null) {
+            return null;
+        }
         try {
             return JSON.writeValueAsString(v);
         } catch (JsonProcessingException e) {
@@ -607,7 +619,9 @@ public class PromotionServiceImpl implements PromotionService {
     }
 
     private DryRunResult parseDryRunResult(String json) {
-        if (json == null || json.isBlank()) return null;
+        if (json == null || json.isBlank()) {
+            return null;
+        }
         try {
             return JSON.readValue(json, DryRunResult.class);
         } catch (JsonProcessingException e) {

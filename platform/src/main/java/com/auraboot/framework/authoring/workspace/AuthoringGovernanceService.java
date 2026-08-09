@@ -63,6 +63,7 @@ public class AuthoringGovernanceService {
     private final AuthoringGovernanceValidator governanceValidator;
     private final AuthoringPageSnapshotFactory snapshotFactory;
     private final AuthoringRuntimeSnapshotSanitizer runtimeSanitizer;
+    private final AuthoringNewPageMaterializer newPageMaterializer;
     private final AuthoringChangeSetSplitter changeSetSplitter;
     private final AuthoringAggregatePolicyService aggregatePolicyService;
     private final AuthoringDraftValidator draftValidator;
@@ -77,6 +78,7 @@ public class AuthoringGovernanceService {
             AuthoringGovernanceValidator governanceValidator,
             AuthoringPageSnapshotFactory snapshotFactory,
             AuthoringRuntimeSnapshotSanitizer runtimeSanitizer,
+            AuthoringNewPageMaterializer newPageMaterializer,
             AuthoringChangeSetSplitter changeSetSplitter,
             AuthoringAggregatePolicyService aggregatePolicyService,
             AuthoringDraftValidator draftValidator,
@@ -89,6 +91,7 @@ public class AuthoringGovernanceService {
         this.governanceValidator = governanceValidator;
         this.snapshotFactory = snapshotFactory;
         this.runtimeSanitizer = runtimeSanitizer;
+        this.newPageMaterializer = newPageMaterializer;
         this.changeSetSplitter = changeSetSplitter;
         this.aggregatePolicyService = aggregatePolicyService;
         this.draftValidator = draftValidator;
@@ -318,7 +321,10 @@ public class AuthoringGovernanceService {
             governanceValidator.requireFresh(row);
             governanceValidator.requirePublishable(row);
 
-            ObjectNode runtimeSnapshot = runtimeSanitizer.sanitize(row.snapshot());
+            ObjectNode sourceSnapshot = (ObjectNode) row.snapshot();
+            ObjectNode runtimeSnapshot = runtimeSanitizer.sanitize(sourceSnapshot);
+            newPageMaterializer.materialize(
+                    row, sourceSnapshot, runtimeSnapshot, identity.userId());
             ChannelRow channel = governanceRepository.lockChannel(row);
             String releasePid = UniqueIdGenerator.generate();
             ObjectNode manifest = releaseManifest(row, channel, releasePid, runtimeSnapshot);

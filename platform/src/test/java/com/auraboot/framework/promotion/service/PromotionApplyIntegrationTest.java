@@ -1,5 +1,6 @@
 package com.auraboot.framework.promotion.service;
 
+import com.auraboot.framework.application.database.snowflake.SnowflakeIdGeneratorConfig;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.environment.dao.entity.Environment;
@@ -18,6 +19,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Date;
 import java.util.List;
@@ -47,6 +49,12 @@ class PromotionApplyIntegrationTest extends BaseIntegrationTest {
     private PromotionMapper promotionMapper;
 
     @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private SnowflakeIdGeneratorConfig idGenerator;
+
+    @Autowired
     private com.auraboot.framework.audit.service.AdminEventLogService adminEventLogService;
 
     @AfterEach
@@ -61,6 +69,7 @@ class PromotionApplyIntegrationTest extends BaseIntegrationTest {
         PageSchema sourcePage = insertPage(sourceEnv,
                 "p_app_" + shortId(),
                 "[{\"blockType\":\"filters\",\"fields\":[{\"code\":\"name\"}]}]");
+        insertAuthoringManagedMenu(sourcePage, sourceEnv);
 
         PromotionResponse draft = promotionService.create(
                 buildRequest(sourceEnv, targetEnv, sourcePage.getPid()),
@@ -85,6 +94,8 @@ class PromotionApplyIntegrationTest extends BaseIntegrationTest {
         assertThat(targetPage.getVersion()).isEqualTo(1);
         assertThat(targetPage.getIsCurrent()).isTrue();
         assertSameJson(targetPage.getBlocks(), sourcePage.getBlocks());
+        assertThat(menuVisibleIn(sourcePage.getPageKey(), sourceEnv)).isTrue();
+        assertThat(menuVisibleIn(sourcePage.getPageKey(), targetEnv)).isTrue();
 
         // Audit event recorded: promotion.apply / success=true / reason carries through.
         List<com.auraboot.framework.audit.entity.AdminEventLog> events =
@@ -331,6 +342,26 @@ class PromotionApplyIntegrationTest extends BaseIntegrationTest {
         unit.setSortOrder(0);
         req.setUnits(List.of(unit));
         return req;
+    }
+
+    private void insertAuthoringManagedMenu(PageSchema page, long sourceEnvironmentId) {
+        String code = "authoring.promoted." + shortId();
+        jdbcTemplate.update("""
+                INSERT INTO ab_menu (
+                    id, pid, tenant_id, code, name, path, type, permission_code,
+                    visible, order_no, extension, page_pid, page_key, status, deleted_flag)
+                VALUES (?, ?, ?, ?, 'Promoted page', ?, 1, NULL,
+                        TRUE, 0, ?::jsonb, ?, ?, 'active', FALSE)
+                """, idGenerator.nextId(code), UniqueIdGenerator.generate(), testTenant.getId(), code,
+                "/promoted/" + code, "{\"authoringManaged\":true,\"authoringEnvironmentIds\":["
+                        + sourceEnvironmentId + "]}", page.getPid(), page.getPageKey());
+    }
+
+    private Boolean menuVisibleIn(String pageKey, long environmentId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT extension -> 'authoringEnvironmentIds' @> jsonb_build_array(CAST(? AS BIGINT))
+                FROM ab_menu WHERE tenant_id = ? AND page_key = ? AND deleted_flag = FALSE
+                """, Boolean.class, environmentId, testTenant.getId(), pageKey);
     }
 
     private static String shortId() {

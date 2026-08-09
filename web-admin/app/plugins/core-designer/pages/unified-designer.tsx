@@ -19,8 +19,10 @@ import type { ModelFieldsByModel, PageSchemaV3 } from '../components/unified-des
 import {
   applyAuthoringStudioPatch,
   consumeAuthoringHandoff,
+  createAuthoringNewPageWorkspace,
   createAuthoringStudioBlock,
   loadAuthoringCapabilities,
+  loadAuthoringNewPageWorkspaceOptions,
   loadAuthoringReviewWorkspace,
   loadAuthoringSession,
   moveAuthoringStudioBlock,
@@ -47,7 +49,9 @@ import type {
   AuthoringGovernanceAction,
   AuthoringSplitResult,
   CapabilityRegistry,
+  CreateNewPageWorkspaceInput,
   HandoffContext,
+  NewPageWorkspaceOptions,
 } from '~/framework/meta/authoring/types';
 import {
   authoringSnapshotToPageSchemaV3,
@@ -90,6 +94,7 @@ export default function UnifiedDesignerPage() {
   const observedChangeSetPid = searchParams.get('changeSetId');
   const observedReviewChangeSetPid = searchParams.get('reviewChangeSetId');
   const conflictContextId = searchParams.get('conflictContext');
+  const resumeStudioIntent = searchParams.get('studioIntent');
   const hasAuthoringContext = Boolean(
     contextId ||
       resumeSessionPid ||
@@ -111,6 +116,9 @@ export default function UnifiedDesignerPage() {
     null,
   );
   const [governanceError, setGovernanceError] = useState<string | null>(null);
+  const [newPageOptions, setNewPageOptions] = useState<NewPageWorkspaceOptions | null>(null);
+  const [newPagePending, setNewPagePending] = useState(false);
+  const [newPageError, setNewPageError] = useState<string | null>(null);
   const [reviewWorkspaceMode, setReviewWorkspaceMode] = useState(false);
   const [workbenchGeneration, setWorkbenchGeneration] = useState(0);
   const [document, setDocument] = useState<PageSchemaV3 | null>(null);
@@ -139,6 +147,8 @@ export default function UnifiedDesignerPage() {
       setStudioConflict(null);
       setConflictError(null);
       setReviewWorkspaceMode(false);
+      setNewPageOptions(null);
+      setNewPageError(null);
       documentBaselineRef.current = null;
       return;
     }
@@ -152,6 +162,8 @@ export default function UnifiedDesignerPage() {
     setStudioConflict(null);
     setConflictError(null);
     setReviewWorkspaceMode(false);
+    setNewPageOptions(null);
+    setNewPageError(null);
     documentBaselineRef.current = null;
     const resolveContext = contextId
       ? consumeAuthoringHandoff(contextId).then(async (consumed) => {
@@ -160,7 +172,7 @@ export default function UnifiedDesignerPage() {
             loadAuthoringCapabilities(),
           ]);
           assertHandoffMatchesSession(consumed, session);
-          replaceAuthoringContextUrl('contextId', consumed.sessionPid);
+          replaceAuthoringContextUrl('contextId', consumed.sessionPid, consumed.intent);
           return { handoff: consumed, session, capabilities, reviewWorkspace: false };
         })
       : observedReviewChangeSetPid
@@ -168,7 +180,7 @@ export default function UnifiedDesignerPage() {
             ({ session, capabilities }) => {
               replaceAuthoringReviewContextUrl('reviewChangeSetId', session.sessionPid);
               return {
-                handoff: resumeHandoffFromSession(session),
+                handoff: resumeHandoffFromSession(session, resumeStudioIntent),
                 session,
                 capabilities,
                 reviewWorkspace: true,
@@ -182,7 +194,7 @@ export default function UnifiedDesignerPage() {
             ]).then(([session, capabilities]) => {
               replaceAuthoringContextUrl('changeSetId', session.sessionPid);
               return {
-                handoff: resumeHandoffFromSession(session),
+                handoff: resumeHandoffFromSession(session, resumeStudioIntent),
                 session,
                 capabilities,
                 reviewWorkspace: false,
@@ -191,7 +203,7 @@ export default function UnifiedDesignerPage() {
           : resumeReviewSessionPid
             ? loadAuthoringReviewWorkspace(resumeReviewSessionPid).then(
                 ({ session, capabilities }) => ({
-                  handoff: resumeHandoffFromSession(session),
+                  handoff: resumeHandoffFromSession(session, resumeStudioIntent),
                   session,
                   capabilities,
                   reviewWorkspace: true,
@@ -201,7 +213,7 @@ export default function UnifiedDesignerPage() {
                 loadAuthoringSession(resumeSessionPid!),
                 loadAuthoringCapabilities(),
               ]).then(([session, capabilities]) => ({
-                handoff: resumeHandoffFromSession(session),
+                  handoff: resumeHandoffFromSession(session, resumeStudioIntent),
                 session,
                 capabilities,
                 reviewWorkspace: false,
@@ -272,6 +284,7 @@ export default function UnifiedDesignerPage() {
     observedReviewChangeSetPid,
     resumeReviewSessionPid,
     resumeSessionPid,
+    resumeStudioIntent,
   ]);
 
   useEffect(() => {
@@ -296,6 +309,26 @@ export default function UnifiedDesignerPage() {
       window.clearInterval(interval);
     };
   }, [activeAuthoringRevision, activeAuthoringSessionPid, reviewWorkspaceMode]);
+
+  useEffect(() => {
+    if (handoff?.intent !== 'NEW_PAGE' || !canAdministerDesigner) return;
+    let cancelled = false;
+    setNewPageError(null);
+    void loadAuthoringNewPageWorkspaceOptions()
+      .then((options) => {
+        if (!cancelled) setNewPageOptions(options);
+      })
+      .catch((optionsError) => {
+        if (!cancelled) {
+          setNewPageError(
+            optionsError instanceof Error ? optionsError.message : '无法加载新页面创建选项',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canAdministerDesigner, handoff?.intent]);
 
   useEffect(() => {
     let cancelled = false;
@@ -756,6 +789,47 @@ export default function UnifiedDesignerPage() {
     return loaded.document;
   };
 
+  const handleCreateNewPageWorkspace = async (input: CreateNewPageWorkspaceInput) => {
+    if (!handoff || !authoringSession || handoff.intent !== 'NEW_PAGE') return;
+    setNewPagePending(true);
+    setNewPageError(null);
+    try {
+      const created = await createAuthoringNewPageWorkspace(
+        authoringSession.sessionPid,
+        authoringSession.revision,
+        input,
+      );
+      const createdDocument = authoringSnapshotToPageSchemaV3(created.snapshot);
+      const createdHandoff: HandoffContext = {
+        ...handoff,
+        pagePid: created.pagePid,
+        changeSetPid: created.changeSetPid,
+        sessionPid: created.sessionPid,
+        revision: created.revision,
+        intent: 'PAGE_STRUCTURE',
+        blockId: null,
+        propertyPath: null,
+        interactionContext: created.interactionContext,
+        expiresAt: created.expiresAt,
+      };
+      replaceAuthoringContextUrl('contextId', created.sessionPid);
+      documentBaselineRef.current = created;
+      setHandoff(createdHandoff);
+      setAuthoringSession(created);
+      setDocument(createdDocument);
+      setSource({ type: 'page', pid: created.pagePid, pageKey: createdDocument.pageKey });
+      setPublished(false);
+      setNewPageOptions(null);
+      setWorkbenchGeneration((current) => current + 1);
+    } catch (createError) {
+      setNewPageError(
+        createError instanceof Error ? createError.message : '无法创建受治理的新页面工作区',
+      );
+    } finally {
+      setNewPagePending(false);
+    }
+  };
+
   if (handoffError || error) {
     return (
       <div className="grid min-h-[420px] place-items-center bg-slate-100 p-6 text-sm text-red-700">
@@ -773,6 +847,19 @@ export default function UnifiedDesignerPage() {
       <div className="grid min-h-[420px] place-items-center bg-slate-100 p-6 text-sm text-slate-500">
         {resolvingHandoff ? '正在验证一次性配置上下文…' : 'Loading unified designer...'}
       </div>
+    );
+  }
+
+  if (handoff?.intent === 'NEW_PAGE') {
+    return (
+      <NewPageWorkspaceWizard
+        options={newPageOptions}
+        pending={newPagePending}
+        error={newPageError}
+        canCreate={canAdministerDesigner && hasOwnedWriterLease(authoringSession)}
+        returnHref={authoringReturnHref(handoff.returnTo, handoff.sessionPid, handoff.blockId)}
+        onCreate={handleCreateNewPageWorkspace}
+      />
     );
   }
 
@@ -963,6 +1050,273 @@ export default function UnifiedDesignerPage() {
   );
 }
 
+function NewPageWorkspaceWizard({
+  options,
+  pending,
+  error,
+  canCreate,
+  returnHref,
+  onCreate,
+}: {
+  options: NewPageWorkspaceOptions | null;
+  pending: boolean;
+  error: string | null;
+  canCreate: boolean;
+  returnHref: string;
+  onCreate: (input: CreateNewPageWorkspaceInput) => Promise<void>;
+}) {
+  const [title, setTitle] = useState('');
+  const [pageKey, setPageKey] = useState('');
+  const [kind, setKind] = useState<CreateNewPageWorkspaceInput['kind']>('composite');
+  const [parentMenuCode, setParentMenuCode] = useState('');
+  const [permissionCode, setPermissionCode] = useState('');
+  const [description, setDescription] = useState('');
+  const [menuIcon, setMenuIcon] = useState('');
+  const [menuCode, setMenuCode] = useState('');
+  const [menuPath, setMenuPath] = useState('');
+
+  const derivedMenuCode = menuCode || pageKey;
+  const derivedMenuPath = menuPath || (pageKey ? `/${pageKey.replaceAll('_', '-')}` : '');
+  const valid = Boolean(
+    canCreate &&
+      options &&
+      title.trim() &&
+      /^[a-zA-Z][a-zA-Z0-9_-]{1,99}$/.test(pageKey) &&
+      parentMenuCode &&
+      permissionCode &&
+      derivedMenuCode &&
+      derivedMenuPath,
+  );
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!valid) return;
+    void onCreate({
+      pageKey,
+      name: pageKey,
+      title: title.trim(),
+      description: description.trim() || undefined,
+      kind,
+      parentMenuCode,
+      menuCode: derivedMenuCode,
+      menuName: title.trim(),
+      menuPath: derivedMenuPath,
+      menuIcon: menuIcon.trim() || undefined,
+      permissionCode,
+    });
+  };
+
+  return (
+    <main
+      className="min-h-[calc(100vh-4rem)] bg-slate-100 px-4 py-8 sm:px-6 lg:px-8"
+      data-testid="new-page-workspace-wizard"
+    >
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-blue-700">应用设计中心 · 新资源</div>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
+              创建页面并挂载菜单
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-600">
+              先确定资源身份和访问边界；页面结构随后在隔离草稿中设计，评审发布前不会出现在运行态。
+            </p>
+          </div>
+          <a
+            href={returnHref}
+            className="inline-flex min-h-10 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            返回现场
+          </a>
+        </div>
+
+        <div className="mb-4 grid gap-2 text-xs sm:grid-cols-3">
+          <div className="rounded-md border border-blue-300 bg-blue-50 px-3 py-2 font-semibold text-blue-800">
+            1. 定义页面与入口
+          </div>
+          <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-500">
+            2. 设计页面结构
+          </div>
+          <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-500">
+            3. 校验、评审、发布
+          </div>
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
+          <form onSubmit={submit} className="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h2 className="font-semibold text-slate-900">页面身份</h2>
+              <p className="mt-1 text-xs text-slate-500">标识发布后用于稳定路由，请使用英文、数字、下划线或短横线。</p>
+            </div>
+            <div className="grid gap-5 p-5 sm:grid-cols-2">
+              <label className="grid gap-1.5 text-sm font-medium text-slate-700 sm:col-span-2">
+                页面标题
+                <input
+                  required
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder="例如：生产异常看板"
+                  className="min-h-11 rounded-md border border-slate-300 px-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+              <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+                页面标识
+                <input
+                  required
+                  value={pageKey}
+                  onChange={(event) => setPageKey(event.target.value.trim())}
+                  placeholder="production_exception"
+                  aria-describedby="page-key-hint"
+                  className="min-h-11 rounded-md border border-slate-300 px-3 font-mono text-sm font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+                <span id="page-key-hint" className="text-xs font-normal text-slate-500">
+                  2–100 位，以英文字母开头
+                </span>
+              </label>
+              <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+                页面类型
+                <select
+                  value={kind}
+                  onChange={(event) => setKind(event.target.value as CreateNewPageWorkspaceInput['kind'])}
+                  className="min-h-11 rounded-md border border-slate-300 bg-white px-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="composite">综合页面</option>
+                  <option value="list">列表</option>
+                  <option value="form">表单</option>
+                  <option value="detail">详情</option>
+                  <option value="dashboard">看板</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="border-y border-slate-200 bg-slate-50 px-5 py-4">
+              <h2 className="font-semibold text-slate-900">菜单与访问边界</h2>
+              <p className="mt-1 text-xs text-slate-500">只允许选择已有目录和已有权限事实，不在此处隐式创建公开权限。</p>
+            </div>
+            <div className="grid gap-5 p-5 sm:grid-cols-2">
+              <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+                父菜单
+                <select
+                  required
+                  value={parentMenuCode}
+                  onChange={(event) => setParentMenuCode(event.target.value)}
+                  disabled={!options}
+                  className="min-h-11 rounded-md border border-slate-300 bg-white px-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                >
+                  <option value="">{options ? '请选择目录' : '正在加载…'}</option>
+                  {options?.parentMenus.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label} · {option.value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+                访问权限
+                <select
+                  required
+                  value={permissionCode}
+                  onChange={(event) => setPermissionCode(event.target.value)}
+                  disabled={!options}
+                  className="min-h-11 rounded-md border border-slate-300 bg-white px-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                >
+                  <option value="">{options ? '请选择权限' : '正在加载…'}</option>
+                  {options?.permissions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label} · {option.value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <details className="rounded-md border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+                <summary className="cursor-pointer text-sm font-medium text-slate-700">高级标识与说明</summary>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-1 text-xs font-medium text-slate-600">
+                    菜单编码
+                    <input
+                      value={menuCode}
+                      onChange={(event) => setMenuCode(event.target.value.trim())}
+                      placeholder={pageKey || '默认等于页面标识'}
+                      className="min-h-10 rounded-md border border-slate-300 bg-white px-3 font-mono font-normal"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs font-medium text-slate-600">
+                    路由路径
+                    <input
+                      value={menuPath}
+                      onChange={(event) => setMenuPath(event.target.value.trim())}
+                      placeholder={derivedMenuPath || '/production-exception'}
+                      className="min-h-10 rounded-md border border-slate-300 bg-white px-3 font-mono font-normal"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs font-medium text-slate-600">
+                    菜单图标
+                    <input
+                      value={menuIcon}
+                      onChange={(event) => setMenuIcon(event.target.value)}
+                      placeholder="可选，例如 LayoutDashboard"
+                      className="min-h-10 rounded-md border border-slate-300 bg-white px-3 font-normal"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs font-medium text-slate-600">
+                    页面说明
+                    <input
+                      value={description}
+                      onChange={(event) => setDescription(event.target.value)}
+                      placeholder="可选"
+                      className="min-h-10 rounded-md border border-slate-300 bg-white px-3 font-normal"
+                    />
+                  </label>
+                </div>
+              </details>
+            </div>
+
+            {error ? (
+              <div className="mx-5 mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+                {error}
+              </div>
+            ) : null}
+            {!canCreate ? (
+              <div className="mx-5 mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                当前会话没有应用设计中心管理员权限或 Writer lease，仅可返回现场。
+              </div>
+            ) : null}
+            <div className="flex justify-end gap-3 border-t border-slate-200 px-5 py-4">
+              <a href={returnHref} className="inline-flex min-h-10 items-center px-3 text-sm text-slate-600 hover:text-slate-900">
+                取消
+              </a>
+              <button
+                type="submit"
+                disabled={!valid || pending}
+                className="min-h-11 rounded-md bg-blue-700 px-5 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {pending ? '正在建立隔离草稿…' : '创建并进入页面设计'}
+              </button>
+            </div>
+          </form>
+
+          <aside className="h-fit rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="font-semibold text-slate-900">本次会发生什么</h2>
+            <ol className="mt-4 space-y-4 text-sm text-slate-600">
+              <li><strong className="text-slate-900">1. 预留身份</strong><br />页面和菜单分别记录为 ChangeItem。</li>
+              <li><strong className="text-slate-900">2. 隔离设计</strong><br />运行态数据库暂不创建页面或菜单。</li>
+              <li><strong className="text-slate-900">3. 强制评审</strong><br />L3 / Studio Approval，创建者不能自审。</li>
+              <li><strong className="text-slate-900">4. 原子发布</strong><br />页面、菜单与 release 同事务生效，失败不留半成品。</li>
+            </ol>
+            <div className="mt-5 rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
+              菜单只在页面已发布的环境显示；页面晋升到目标环境后，入口才会随之开放。
+            </div>
+            <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              新资源创建属于 Forward-only 变更；发布前可放弃，发布后不承诺一键回滚删除。
+            </div>
+          </aside>
+        </div>
+      </div>
+    </main>
+  );
+}
+
 function assertHandoffMatchesSession(
   handoff: HandoffContext,
   session: AuthoringSession,
@@ -976,7 +1330,10 @@ function assertHandoffMatchesSession(
   }
 }
 
-function resumeHandoffFromSession(session: AuthoringSession): HandoffContext {
+function resumeHandoffFromSession(
+  session: AuthoringSession,
+  resumeIntent?: string | null,
+): HandoffContext {
   const selection = safeContextString(session.interactionContext.selection);
   const outlinePath = Array.isArray(session.interactionContext.outlinePath)
     ? session.interactionContext.outlinePath.filter(
@@ -988,7 +1345,7 @@ function resumeHandoffFromSession(session: AuthoringSession): HandoffContext {
     changeSetPid: session.changeSetPid,
     sessionPid: session.sessionPid,
     revision: session.revision,
-    intent: 'PAGE_STRUCTURE',
+    intent: resumeIntent === 'NEW_PAGE' ? 'NEW_PAGE' : 'PAGE_STRUCTURE',
     targetRoute: '/unified-designer',
     returnTo: safeReturnTo(session.interactionContext.route),
     blockId: selection || outlinePath.at(-1) || null,
@@ -1001,12 +1358,18 @@ function resumeHandoffFromSession(session: AuthoringSession): HandoffContext {
 function replaceAuthoringContextUrl(
   parameter: 'contextId' | 'changeSetId' | 'conflictContext',
   sessionPid: string,
+  studioIntent?: string | null,
 ): void {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
   url.searchParams.delete(parameter);
   url.searchParams.delete('reviewSession');
   url.searchParams.set('authoringSession', sessionPid);
+  if (studioIntent === 'NEW_PAGE') {
+    url.searchParams.set('studioIntent', 'NEW_PAGE');
+  } else {
+    url.searchParams.delete('studioIntent');
+  }
   window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
 }
 

@@ -151,6 +151,12 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"pagePid\":\"hidden\"}"))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/authoring/new-page-workspace-options"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/sessions/missing/new-page-workspaces")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/authoring/sessions/missing/handoffs")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"expectedRevision\":1,\"intent\":\"PAGE_STRUCTURE\"}"))

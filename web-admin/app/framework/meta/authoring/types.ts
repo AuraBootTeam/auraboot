@@ -114,6 +114,30 @@ export interface CapabilityRegistry {
   manifests: CapabilityManifest[];
 }
 
+export interface NewPageWorkspaceOption {
+  value: string;
+  label: string;
+}
+
+export interface NewPageWorkspaceOptions {
+  parentMenus: NewPageWorkspaceOption[];
+  permissions: NewPageWorkspaceOption[];
+}
+
+export interface CreateNewPageWorkspaceInput {
+  pageKey: string;
+  name: string;
+  title: string;
+  description?: string;
+  kind: 'list' | 'form' | 'detail' | 'dashboard' | 'composite';
+  parentMenuCode: string;
+  menuCode: string;
+  menuName: string;
+  menuPath: string;
+  menuIcon?: string;
+  permissionCode: string;
+}
+
 export interface AuthoringReviewWorkspace {
   session: AuthoringSession;
   capabilities: CapabilityRegistry;

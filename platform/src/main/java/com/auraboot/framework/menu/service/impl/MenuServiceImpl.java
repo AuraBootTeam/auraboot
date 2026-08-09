@@ -1,13 +1,16 @@
 package com.auraboot.framework.menu.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.menu.entity.Menu;
 import com.auraboot.framework.menu.mapper.MenuMapper;
+import com.auraboot.framework.menu.service.MenuEnvironmentScopeService;
 import com.auraboot.framework.menu.service.MenuService;
-import com.auraboot.framework.menu.constant.MenuStatus;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
+import com.auraboot.framework.permission.service.AutoPermissionAssignmentService;
 import com.auraboot.framework.permission.service.SubjectPermissionService;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +18,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -29,7 +37,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
     private UserPermissionService userPermissionService;
 
     @Resource
-    private com.auraboot.framework.permission.service.AutoPermissionAssignmentService autoPermissionAssignmentService;
+    private AutoPermissionAssignmentService autoPermissionAssignmentService;
 
     @Resource
     private RolePermissionMapper rolePermissionMapper;
@@ -45,7 +53,8 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         }
 
         // 1. 查询所有可见的菜单(目录和菜单)
-        List<Menu> allMenus = baseMapper.findVisibleDirectoriesAndMenus();
+        List<Menu> allMenus = visibleInCurrentEnvironment(
+                baseMapper.findVisibleDirectoriesAndMenus());
         
         if (allMenus.isEmpty()) {
             return Collections.emptyList();
@@ -53,19 +62,19 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         
         // 2. 批量评估菜单可见性
         List<Long> menuIds = allMenus.stream()
-            .map(Menu::getId)
-            .collect(Collectors.toList());
+                .map(Menu::getId)
+                .collect(Collectors.toList());
         
         Map<Long, Boolean> visibilityMap = subjectPermissionService
-            .batchEvaluateVisibility("menu", menuIds, userId);
+                .batchEvaluateVisibility("menu", menuIds, userId);
 
         Set<String> userPermissionCodes = userPermissionService.getUserPermissionCodes(userId);
         
         // 3. 过滤出可见且满足 permission_code 的菜单
         List<Menu> visibleMenus = allMenus.stream()
-            .filter(menu -> visibilityMap.getOrDefault(menu.getId(), true))  // subject rules default visible
-            .filter(menu -> isAllowedByPermissionCode(menu, userPermissionCodes))
-            .collect(Collectors.toList());
+                .filter(menu -> visibilityMap.getOrDefault(menu.getId(), true))
+                .filter(menu -> isAllowedByPermissionCode(menu, userPermissionCodes))
+                .collect(Collectors.toList());
         
         // 4. 构建树结构，并移除权限过滤后没有任何可见子项的空目录
         return pruneEmptyDirectories(buildMenuTree(visibleMenus));
@@ -79,7 +88,7 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         }
 
         // Get all active menus
-        List<Menu> allMenus = baseMapper.findAllActiveMenus();
+        List<Menu> allMenus = visibleInCurrentEnvironment(baseMapper.findAllActiveMenus());
 
         if (allMenus.isEmpty()) {
             return Collections.emptyList();
@@ -91,45 +100,46 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         if (rolePermissionIds.isEmpty()) {
             // Role has no permissions, return only menus without permission requirements
             return allMenus.stream()
-                .filter(menu -> menu.getPermissionCode() == null || menu.getPermissionCode().isEmpty())
-                .collect(Collectors.toList());
+                    .filter(menu -> menu.getPermissionCode() == null
+                            || menu.getPermissionCode().isEmpty())
+                    .collect(Collectors.toList());
         }
 
         // Get permission codes for the role's permission IDs (batch query)
         List<com.auraboot.framework.permission.entity.Permission> permissions =
-            permissionMapper.findByIds(new ArrayList<>(rolePermissionIds));
+                permissionMapper.findByIds(new ArrayList<>(rolePermissionIds));
         Set<String> rolePermissionCodes = permissions.stream()
-            .map(p -> p.getCode())
-            .collect(Collectors.toSet());
+                .map(permission -> permission.getCode())
+                .collect(Collectors.toSet());
 
         // Filter menus based on role permissions
         return allMenus.stream()
-            .filter(menu -> {
-                // If menu has no permission requirement, it's visible to all roles
-                if (menu.getPermissionCode() == null || menu.getPermissionCode().isEmpty()) {
-                    return true;
-                }
-                // Check if the role has the required permission for this menu
-                return rolePermissionCodes.contains(menu.getPermissionCode());
-            })
-            .collect(Collectors.toList());
+                .filter(menu -> {
+                    // If menu has no permission requirement, it's visible to all roles
+                    if (menu.getPermissionCode() == null || menu.getPermissionCode().isEmpty()) {
+                        return true;
+                    }
+                    // Check if the role has the required permission for this menu
+                    return rolePermissionCodes.contains(menu.getPermissionCode());
+                })
+                .collect(Collectors.toList());
     }
     
     @Override
     public List<Menu> getAllMenuTree() {
-        List<Menu> menuList = baseMapper.findAllActiveMenus();
+        List<Menu> menuList = visibleInCurrentEnvironment(baseMapper.findAllActiveMenus());
         return buildMenuTree(menuList);
     }
     
     @Override
     public List<Menu> getMenusByType(Integer type) {
-        return baseMapper.findByType(type);
+        return visibleInCurrentEnvironment(baseMapper.findByType(type));
     }
     
     @Override
     public List<Menu> buildMenuTree(List<Menu> menuList) {
         Map<Long, Menu> menuMap = menuList.stream()
-            .collect(Collectors.toMap(Menu::getId, menu -> menu));
+                .collect(Collectors.toMap(Menu::getId, menu -> menu));
         
         List<Menu> rootMenus = new ArrayList<>();
         
@@ -158,6 +168,13 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         return userPermissionCodes != null && userPermissionCodes.contains(permissionCode);
     }
 
+    private List<Menu> visibleInCurrentEnvironment(List<Menu> menus) {
+        Long environmentId = MetaContext.getCurrentEnvironmentId();
+        return menus.stream()
+                .filter(menu -> MenuEnvironmentScopeService.isVisibleIn(menu, environmentId))
+                .collect(Collectors.toList());
+    }
+
     private List<Menu> pruneEmptyDirectories(List<Menu> menuList) {
         if (menuList == null || menuList.isEmpty()) {
             return Collections.emptyList();
@@ -181,7 +198,8 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         // 1. 通过permissionCode查询Menu
         Menu menu = baseMapper.findByPermissionCode(permissionCode);
 
-        if (menu == null) {
+        if (!MenuEnvironmentScopeService.isVisibleIn(
+                menu, MetaContext.getCurrentEnvironmentId())) {
             return false;
         }
 
@@ -208,26 +226,28 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         // Only auto-assign for dynamically created menus without existing permission
         try {
             if (menu.getPermissionCode() != null && !menu.getPermissionCode().isEmpty()) {
-                log.debug("Menu already has permissionCode, skipping auto-permission assignment: menuId={}, permissionCode={}",
-                    menu.getId(), menu.getPermissionCode());
+                log.debug(
+                        "Menu already has permissionCode, skipping auto-permission assignment: "
+                                + "menuId={}, permissionCode={}",
+                        menu.getId(), menu.getPermissionCode());
             } else if (menu.getPath() != null && !menu.getPath().isEmpty()) {
                 // Convert path to valid resourceCode: /meta/models -> meta_models
                 String resourceCode = convertPathToResourceCode(menu.getPath());
                 if (resourceCode != null) {
                     autoPermissionAssignmentService.autoAssignPermissions(resourceCode, null);
                     log.info("Auto-assigned permissions for menu: menuId={}, resourceCode={}",
-                        menu.getId(), resourceCode);
+                            menu.getId(), resourceCode);
                 } else {
                     log.warn("Could not convert path to valid resourceCode: menuId={}, path={}",
-                        menu.getId(), menu.getPath());
+                            menu.getId(), menu.getPath());
                 }
             } else {
                 log.warn("Menu has no permissionCode or path, skipping auto-permission assignment: menuId={}",
-                    menu.getId());
+                        menu.getId());
             }
         } catch (Exception e) {
             log.error("Failed to auto-assign permissions for menu: menuId={}, error={}",
-                menu.getId(), e.getMessage(), e);
+                    menu.getId(), e.getMessage(), e);
             // Don't throw exception - permission assignment failure should not block menu creation
         }
         
@@ -251,11 +271,12 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
         }
 
         // Check for child menus — prevent orphan nodes
-        List<Menu> children = list(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<Menu>()
-            .eq("parent_id", menuId));
+        List<Menu> children = list(new QueryWrapper<Menu>()
+                .eq("parent_id", menuId));
         if (children != null && !children.isEmpty()) {
             throw new IllegalStateException(
-                "Cannot delete menu with " + children.size() + " child menus. Delete children first.");
+                    "Cannot delete menu with " + children.size()
+                            + " child menus. Delete children first.");
         }
 
         return getBaseMapper().deleteById(menu.getId()) > 0;
@@ -272,21 +293,21 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
 
         // 2. 批量评估按钮可见性
         List<Long> buttonIds = allButtons.stream()
-            .map(Menu::getId)
-            .collect(Collectors.toList());
+                .map(Menu::getId)
+                .collect(Collectors.toList());
 
         Map<Long, Boolean> visibilityMap = subjectPermissionService
-            .batchEvaluateVisibility("menu", buttonIds, userId);
+                .batchEvaluateVisibility("menu", buttonIds, userId);
         Set<String> userPermissionCodes = userPermissionService.getUserPermissionCodes(userId);
 
         // 3. 返回用户真正拥有且可见的按钮 permission_code
         return allButtons.stream()
-            .filter(button -> visibilityMap.getOrDefault(button.getId(), true))  // 默认可见
-            .map(Menu::getPermissionCode)
-            .filter(Objects::nonNull)
-            .filter(permissionCode -> !permissionCode.isBlank())
-            .filter(userPermissionCodes::contains)
-            .collect(Collectors.toList());
+                .filter(button -> visibilityMap.getOrDefault(button.getId(), true))
+                .map(Menu::getPermissionCode)
+                .filter(Objects::nonNull)
+                .filter(permissionCode -> !permissionCode.isBlank())
+                .filter(userPermissionCodes::contains)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -357,6 +378,8 @@ public class MenuServiceImpl extends ServiceImpl<MenuMapper, Menu> implements Me
 
     @Override
     public Menu getByPath(Long tenantId, String path) {
-        return baseMapper.findByPath(tenantId, path);
+        Menu menu = baseMapper.findByPath(tenantId, path);
+        return MenuEnvironmentScopeService.isVisibleIn(
+                menu, MetaContext.getCurrentEnvironmentId()) ? menu : null;
     }
 }

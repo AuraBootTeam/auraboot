@@ -3,12 +3,23 @@ package com.auraboot.framework.authoring.workspace;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.authoring.policy.AuthoringCapabilityRegistry;
 import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.CapabilityManifest;
+import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.BoundaryDecision;
+import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.EffectTag;
+import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.PatchOperation;
+import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.PropertyCapability;
+import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.PublishPolicy;
+import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.Reason;
+import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.Reversibility;
+import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.RiskLevel;
+import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.Route;
 import com.auraboot.framework.authoring.workspace.AuthoringPatchEngine.PreparedPatch;
 import com.auraboot.framework.authoring.workspace.AuthoringActiveReleaseResolver.ActiveRelease;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ApplyPatchRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CapabilityRegistryView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateBlockRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateNewPageWorkspaceRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.MoveBlockRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.NewPageWorkspaceOptions;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ObserveChangeSetRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
@@ -36,9 +47,11 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.REORDER_WITHIN_PARENT_PATH;
 import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.CREATE_BLOCK_PATH;
@@ -55,6 +68,9 @@ public class AuthoringWorkspaceService {
     private static final Duration SESSION_TTL = Duration.ofHours(8);
     private static final Duration WRITER_LEASE = Duration.ofMinutes(5);
     private static final String REVIEW_WORKSPACE_MODE = "REVIEW";
+    private static final String RESOURCE_BLOCK_ID = "$resource";
+    private static final String CREATE_PAGE_PATH = "/$resource/page";
+    private static final String CREATE_MENU_PATH = "/$resource/menu";
     private final AuthoringCapabilityRegistry capabilityRegistry;
     private final AuthoringPatchEngine patchEngine;
     private final AuthoringWorkspaceRepository repository;
@@ -67,6 +83,7 @@ public class AuthoringWorkspaceService {
     private final AuthoringWorkspaceViewMapper viewMapper;
     private final AuthoringActiveReleaseResolver activeReleaseResolver;
     private final AuthoringOwnershipService ownershipService;
+    private final AuthoringNewPageMaterializer newPageMaterializer;
 
     public AuthoringWorkspaceService(
             AuthoringCapabilityRegistry capabilityRegistry,
@@ -80,7 +97,8 @@ public class AuthoringWorkspaceService {
             AuthoringAggregatePolicyService aggregatePolicyService,
             AuthoringWorkspaceViewMapper viewMapper,
             AuthoringActiveReleaseResolver activeReleaseResolver,
-            AuthoringOwnershipService ownershipService) {
+            AuthoringOwnershipService ownershipService,
+            AuthoringNewPageMaterializer newPageMaterializer) {
         this.capabilityRegistry = capabilityRegistry;
         this.patchEngine = patchEngine;
         this.repository = repository;
@@ -93,6 +111,7 @@ public class AuthoringWorkspaceService {
         this.viewMapper = viewMapper;
         this.activeReleaseResolver = activeReleaseResolver;
         this.ownershipService = ownershipService;
+        this.newPageMaterializer = newPageMaterializer;
     }
 
     public CapabilityRegistryView capabilities() {
@@ -100,6 +119,11 @@ public class AuthoringWorkspaceService {
                 .sorted(Comparator.comparing(CapabilityManifest::blockType))
                 .toList();
         return new CapabilityRegistryView(capabilityRegistry.checksum(), manifests);
+    }
+
+    public NewPageWorkspaceOptions newPageOptions() {
+        Identity identity = identity();
+        return newPageMaterializer.options(identity.tenantId(), identity.envId());
     }
 
     @Transactional
@@ -176,6 +200,121 @@ public class AuthoringWorkspaceService {
                     "ALLOW", "SHARED_SOURCE_IMMUTABLE", page.getPid(), null, null, metadata));
         }
         return viewMapper.toView(requireWorkspace(identity, sessionPid, false), identity.userId());
+    }
+
+    @Transactional
+    public SessionView createNewPageWorkspace(
+            String sourceSessionPid,
+            CreateNewPageWorkspaceRequest request) {
+        Identity identity = identity();
+        WorkspaceRow source = requireWorkspace(identity, sourceSessionPid, true);
+        validateWritable(source, identity, request.expectedSourceRevision());
+        newPageMaterializer.requireAvailable(
+                identity.tenantId(), identity.envId(), request.pageKey(), request.menuCode(),
+                request.menuPath(), request.parentMenuCode(), request.permissionCode());
+
+        String pagePid = UniqueIdGenerator.generate();
+        String sessionPid = UniqueIdGenerator.generate();
+        String changeSetPid = UniqueIdGenerator.generate();
+        ObjectNode pageDefinition = newPageDefinition(identity, pagePid, request);
+        ObjectNode menuDefinition = newMenuDefinition(request);
+        ObjectNode snapshot = pageDefinition.deepCopy();
+        ObjectNode resourceMetadata = snapshot.putObject(AuthoringNewPageMaterializer.RESOURCE_METADATA);
+        resourceMetadata.put("lifecycle", AuthoringNewPageMaterializer.NEW_LIFECYCLE);
+        resourceMetadata.set("menu", menuDefinition);
+
+        Instant now = Instant.now();
+        JsonNode absentBase = objectMapper.createObjectNode();
+        JsonNode interactionContext = source.interactionContext().deepCopy();
+        repository.create(new CreateWorkspace(
+                identity.tenantId(), identity.envId(), identity.userId(), sessionPid,
+                changeSetPid, UniqueIdGenerator.generate(), UniqueIdGenerator.generate(), pagePid,
+                "Create page " + request.pageKey(), "DESIGN_STUDIO", "TENANT", "TENANT",
+                pagePid, null, null, 1, snapshotFactory.checksum(absentBase),
+                capabilityRegistry.checksum(), snapshot, interactionContext,
+                now.plus(SESSION_TTL), now.plus(WRITER_LEASE)));
+
+        PropertyCapability pageCapability = newResourceCapability(
+                CREATE_PAGE_PATH, EffectTag.MODEL, EffectTag.NAVIGATION);
+        BoundaryDecision decision = newResourceDecision();
+        WorkspaceRow created = requireWorkspace(identity, sessionPid, true);
+        repository.persistPatch(
+                created, snapshot, capabilityRegistry.checksum(), UniqueIdGenerator.generate(),
+                RESOURCE_BLOCK_ID, CREATE_PAGE_PATH, "ADD", null, pageDefinition,
+                pageCapability, decision, identity.userId(),
+                aggregatePolicyService.aggregate(created, decision), now.plus(WRITER_LEASE));
+
+        PropertyCapability menuCapability = newResourceCapability(
+                CREATE_MENU_PATH, EffectTag.NAVIGATION, EffectTag.PERMISSION, EffectTag.SECURITY);
+        WorkspaceRow pageAdded = requireWorkspace(identity, sessionPid, true);
+        repository.persistPatch(
+                pageAdded, snapshot, capabilityRegistry.checksum(), UniqueIdGenerator.generate(),
+                RESOURCE_BLOCK_ID, CREATE_MENU_PATH, "ADD", null, menuDefinition,
+                menuCapability, decision, identity.userId(),
+                aggregatePolicyService.aggregate(pageAdded, decision), now.plus(WRITER_LEASE));
+
+        WorkspaceRow reloaded = requireWorkspace(identity, sessionPid, false);
+        ObjectNode auditMetadata = objectMapper.createObjectNode();
+        auditMetadata.put("sourceSessionPid", sourceSessionPid);
+        auditMetadata.put("sourcePagePid", source.pagePid());
+        auditMetadata.put("pageKey", request.pageKey());
+        auditMetadata.put("menuCode", request.menuCode());
+        auditMetadata.put("parentMenuCode", request.parentMenuCode());
+        auditMetadata.put("resultRevision", reloaded.changeSetRevision());
+        repository.audit(audit(
+                identity, changeSetPid, sessionPid, "NEW_PAGE_WORKSPACE_CREATED", "ALLOW",
+                "STUDIO_NEW_RESOURCE_RESERVED", pagePid, RESOURCE_BLOCK_ID,
+                CREATE_PAGE_PATH, auditMetadata));
+        return viewMapper.toView(reloaded, identity.userId());
+    }
+
+    private ObjectNode newPageDefinition(
+            Identity identity,
+            String pagePid,
+            CreateNewPageWorkspaceRequest request) {
+        ObjectNode page = objectMapper.createObjectNode();
+        page.put("pid", pagePid);
+        page.put("pageKey", request.pageKey());
+        page.put("name", request.name().trim());
+        if (request.description() != null && !request.description().isBlank()) {
+            page.put("description", request.description().trim());
+        }
+        page.put("kind", request.kind());
+        page.put("schemaVersion", 4);
+        page.put("profile", "admin");
+        page.put("isTemplate", false);
+        page.put("ownershipScope", "TENANT");
+        page.put("ownershipRef", "tenant:" + identity.tenantId());
+        page.putObject("title").put("zh-CN", request.title().trim());
+        page.putObject("layout").put("type", "stack");
+        page.putArray("blocks");
+        return page;
+    }
+
+    private ObjectNode newMenuDefinition(CreateNewPageWorkspaceRequest request) {
+        ObjectNode menu = objectMapper.createObjectNode();
+        menu.put("parentCode", request.parentMenuCode());
+        menu.put("code", request.menuCode());
+        menu.put("name", request.menuName().trim());
+        menu.put("path", request.menuPath());
+        if (request.menuIcon() != null && !request.menuIcon().isBlank()) {
+            menu.put("icon", request.menuIcon().trim());
+        }
+        menu.put("permissionCode", request.permissionCode());
+        menu.put("orderNo", 0);
+        return menu;
+    }
+
+    private PropertyCapability newResourceCapability(String path, EffectTag... effects) {
+        return new PropertyCapability(
+                path, Set.of(PatchOperation.ADD), Route.HANDOFF_STUDIO, RiskLevel.L3,
+                EnumSet.copyOf(List.of(effects)), Reversibility.FORWARD_ONLY, false, true);
+    }
+
+    private BoundaryDecision newResourceDecision() {
+        return new BoundaryDecision(
+                Route.HANDOFF_STUDIO, RiskLevel.L3, PublishPolicy.STUDIO_APPROVAL,
+                Reason.FORWARD_ONLY, capabilityRegistry.checksum(), true);
     }
 
     @Transactional(readOnly = true)

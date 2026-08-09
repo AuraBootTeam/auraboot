@@ -21,6 +21,7 @@ public class AuthoringGovernanceValidator {
     private final AuthoringImpactAnalyzer impactAnalyzer;
     private final AuthoringPageSnapshotFactory snapshotFactory;
     private final PageSchemaMapper pageSchemaMapper;
+    private final AuthoringNewPageMaterializer newPageMaterializer;
 
     public AuthoringGovernanceValidator(
             AuthoringCapabilityRegistry capabilityRegistry,
@@ -28,13 +29,15 @@ public class AuthoringGovernanceValidator {
             AuthoringGovernanceRepository governanceRepository,
             AuthoringImpactAnalyzer impactAnalyzer,
             AuthoringPageSnapshotFactory snapshotFactory,
-            PageSchemaMapper pageSchemaMapper) {
+            PageSchemaMapper pageSchemaMapper,
+            AuthoringNewPageMaterializer newPageMaterializer) {
         this.capabilityRegistry = capabilityRegistry;
         this.activeReleaseResolver = activeReleaseResolver;
         this.governanceRepository = governanceRepository;
         this.impactAnalyzer = impactAnalyzer;
         this.snapshotFactory = snapshotFactory;
         this.pageSchemaMapper = pageSchemaMapper;
+        this.newPageMaterializer = newPageMaterializer;
     }
 
     public void requireFresh(GovernanceRow row) {
@@ -43,7 +46,9 @@ public class AuthoringGovernanceValidator {
             AuthoringActiveReleaseResolver.ActiveRelease active =
                     activeReleaseResolver.findByResource(
                             row.tenantId(), row.envId(), "PAGE_SCHEMA", row.resourcePid());
-            if (row.baseReleasePid() != null) {
+            if (newPageMaterializer.isNewResource(row.snapshot())) {
+                requireCurrentNewResourceBase(row, active);
+            } else if (row.baseReleasePid() != null) {
                 requireCurrentReleaseBase(row, active);
             } else {
                 requireCurrentLegacyBase(row, active);
@@ -54,6 +59,16 @@ public class AuthoringGovernanceValidator {
         } catch (ResponseStatusException exception) {
             throw stale(row, exception.getReason());
         }
+    }
+
+    private void requireCurrentNewResourceBase(
+            GovernanceRow row,
+            AuthoringActiveReleaseResolver.ActiveRelease active) {
+        if (active != null || pageSchemaMapper.selectByPid(row.resourcePid()) != null
+                || !(row.snapshot() instanceof com.fasterxml.jackson.databind.node.ObjectNode snapshot)) {
+            throw conflict("authoring.validation.new-resource-stale");
+        }
+        newPageMaterializer.requireStillAvailable(row, snapshot);
     }
 
     public void requirePrepared(GovernanceRow row) {

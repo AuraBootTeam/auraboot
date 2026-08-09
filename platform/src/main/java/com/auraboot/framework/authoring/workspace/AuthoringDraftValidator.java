@@ -92,6 +92,10 @@ public class AuthoringDraftValidator {
             ChangeItem item,
             Map<String, JsonNode> blocksById,
             List<ValidationIssue> issues) {
+        if (item.propertyPath().startsWith("/$resource/")) {
+            validateResourceChange(item, issues);
+            return;
+        }
         if ("MOVE".equals(item.operation()) || "REMOVE".equals(item.operation())) {
             return;
         }
@@ -111,6 +115,13 @@ public class AuthoringDraftValidator {
         if (code != null) {
             issues.add(issue(code, item.pid(), item.blockId(), item.propertyPath(),
                     "authoring.validation." + code.toLowerCase().replace('_', '-')));
+        }
+    }
+
+    private void validateResourceChange(ChangeItem item, List<ValidationIssue> issues) {
+        if (!"ADD".equals(item.operation()) || item.newValue() == null || !item.newValue().isObject()) {
+            issues.add(issue("RESOURCE_ADD_INVALID", item.pid(), item.blockId(),
+                    item.propertyPath(), "authoring.validation.resource-add-invalid"));
         }
     }
 

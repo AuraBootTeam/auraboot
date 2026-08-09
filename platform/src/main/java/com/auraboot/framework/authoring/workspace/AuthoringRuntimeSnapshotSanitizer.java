@@ -26,6 +26,7 @@ public class AuthoringRuntimeSnapshotSanitizer {
             throw new IllegalArgumentException("authoring.runtime.snapshot-invalid");
         }
         ObjectNode copy = object.deepCopy();
+        copy.remove("_authoringResource");
         sanitizeNode(copy);
         return copy;
     }

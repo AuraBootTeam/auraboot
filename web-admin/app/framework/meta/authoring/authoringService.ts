@@ -20,6 +20,8 @@ import type {
   AuthoringAiPatchProposal,
   AuthoringAiPatchProposalItemRequest,
   ApplyAuthoringAiPatchProposalResult,
+  CreateNewPageWorkspaceInput,
+  NewPageWorkspaceOptions,
 } from './types';
 
 export interface InteractionContext {
@@ -48,6 +50,28 @@ export async function openAuthoringSession(
 export async function loadAuthoringCapabilities(): Promise<CapabilityRegistry> {
   const result = await fetchResult<CapabilityRegistry>('/api/authoring/capabilities');
   return requireData(result, '无法加载页面配置能力');
+}
+
+export async function loadAuthoringNewPageWorkspaceOptions(): Promise<NewPageWorkspaceOptions> {
+  const result = await fetchResult<NewPageWorkspaceOptions>(
+    '/api/authoring/new-page-workspace-options',
+  );
+  return requireData(result, '无法加载新页面的父菜单与权限选项');
+}
+
+export async function createAuthoringNewPageWorkspace(
+  sourceSessionPid: string,
+  expectedSourceRevision: number,
+  input: CreateNewPageWorkspaceInput,
+): Promise<AuthoringSession> {
+  const result = await fetchResult<AuthoringSession>(
+    `/api/authoring/sessions/${encodeURIComponent(sourceSessionPid)}/new-page-workspaces`,
+    {
+      method: 'post',
+      params: { expectedSourceRevision, ...input },
+    },
+  );
+  return requireData(result, '无法创建受治理的新页面工作区');
 }
 
 export async function loadAuthoringSession(sessionPid: string): Promise<AuthoringSession> {

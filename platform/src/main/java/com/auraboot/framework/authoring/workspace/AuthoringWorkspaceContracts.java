@@ -38,6 +38,43 @@ public final class AuthoringWorkspaceContracts {
             JsonNode interactionContext) {
     }
 
+    /**
+     * Creates a governed NEW_RESOURCE workspace. The request carries only resource identity and
+     * navigation metadata; page structure is authored afterwards in Studio.
+     */
+    public record CreateNewPageWorkspaceRequest(
+            @Positive long expectedSourceRevision,
+            @NotBlank @Size(min = 2, max = 100)
+            @jakarta.validation.constraints.Pattern(
+                    regexp = "^[a-zA-Z][a-zA-Z0-9_-]*$")
+            String pageKey,
+            @NotBlank @Size(min = 2, max = 100) String name,
+            @NotBlank @Size(max = 200) String title,
+            @Size(max = 1000) String description,
+            @NotBlank @jakarta.validation.constraints.Pattern(
+                    regexp = "^(list|form|detail|dashboard|composite)$")
+            String kind,
+            @NotBlank @Size(max = 100) String parentMenuCode,
+            @NotBlank @Size(max = 100)
+            @jakarta.validation.constraints.Pattern(
+                    regexp = "^[a-zA-Z][a-zA-Z0-9_.-]*$")
+            String menuCode,
+            @NotBlank @Size(max = 100) String menuName,
+            @NotBlank @Size(max = 500)
+            @jakarta.validation.constraints.Pattern(regexp = "^/[a-zA-Z0-9/_-]*$")
+            String menuPath,
+            @Size(max = 100) String menuIcon,
+            @NotBlank @Size(max = 100) String permissionCode) {
+    }
+
+    public record NewPageOption(String value, String label) {
+    }
+
+    public record NewPageWorkspaceOptions(
+            List<NewPageOption> parentMenus,
+            List<NewPageOption> permissions) {
+    }
+
     public record ApplyPatchRequest(
             @Positive long expectedRevision,
             @NotBlank String blockId,

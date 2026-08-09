@@ -10,8 +10,10 @@ import {
   applyAuthoringAiPatchProposal,
   applyAuthoringStudioPatch,
   consumeAuthoringHandoff,
+  createAuthoringNewPageWorkspace,
   createAuthoringAiPatchProposal,
   loadAuthoringCapabilities,
+  loadAuthoringNewPageWorkspaceOptions,
   loadAuthoringChangeItems,
   loadAuthoringReleaseHistory,
   loadAuthoringRolePreviewTargets,
@@ -68,8 +70,10 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   applyAuthoringAiPatchProposal: vi.fn(),
   applyAuthoringStudioPatch: vi.fn(),
   consumeAuthoringHandoff: vi.fn(),
+  createAuthoringNewPageWorkspace: vi.fn(),
   createAuthoringAiPatchProposal: vi.fn(),
   loadAuthoringCapabilities: vi.fn(),
+  loadAuthoringNewPageWorkspaceOptions: vi.fn(),
   loadAuthoringIdentitySimulation: vi.fn(),
   loadAuthoringChangeItems: vi.fn(),
   loadAuthoringReleaseHistory: vi.fn(),
@@ -105,6 +109,8 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(consumeAuthoringHandoff).mockReset();
     vi.mocked(loadAuthoringSession).mockReset();
     vi.mocked(loadAuthoringCapabilities).mockReset();
+    vi.mocked(loadAuthoringNewPageWorkspaceOptions).mockReset();
+    vi.mocked(createAuthoringNewPageWorkspace).mockReset();
     vi.mocked(loadAuthoringChangeItems).mockReset();
     vi.mocked(loadAuthoringChangeItems).mockResolvedValue([]);
     vi.mocked(loadAuthoringReleaseHistory).mockReset();
@@ -279,6 +285,77 @@ describe('UnifiedDesignerPage', () => {
     );
     expect(String(replaceState.mock.calls.at(-1)?.[2])).not.toContain('contextId');
     replaceState.mockRestore();
+  });
+
+  it('turns a NEW_PAGE handoff into a governed resource wizard and switches to the new ChangeSet', async () => {
+    setSearch('?contextId=ctx_new_page');
+    const handoff = createHandoff('field_customer_name', '/props/label');
+    handoff.intent = 'NEW_PAGE';
+    const sourceSession = createAuthoringSession(createDocument('source_page', 'Source page'));
+    const createdDocument = createDocument('production_exception', '生产异常看板');
+    createdDocument.blocks = [];
+    const createdSession = createAuthoringSession(
+      createdDocument,
+      3,
+      'L3',
+      'HANDOFF_STUDIO',
+    );
+    createdSession.sessionPid = 'session_new_page';
+    createdSession.changeSetPid = 'changeset_new_page';
+    createdSession.pagePid = 'page_new_page';
+    createdSession.snapshot = {
+      ...(createdDocument as unknown as Record<string, unknown>),
+      pid: 'page_new_page',
+      ownershipScope: 'TENANT',
+      _authoringResource: { lifecycle: 'NEW' },
+    };
+
+    vi.mocked(consumeAuthoringHandoff).mockResolvedValue(handoff);
+    vi.mocked(loadAuthoringSession).mockResolvedValue(sourceSession);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(loadAuthoringNewPageWorkspaceOptions).mockResolvedValue({
+      parentMenus: [{ value: 'manufacturing', label: '生产管理' }],
+      permissions: [{ value: 'page.production_exception.read', label: '查看生产异常' }],
+    });
+    vi.mocked(createAuthoringNewPageWorkspace).mockResolvedValue(createdSession);
+
+    render(<UnifiedDesignerPage />);
+
+    expect(await screen.findByTestId('new-page-workspace-wizard')).toHaveTextContent(
+      '创建页面并挂载菜单',
+    );
+    fireEvent.change(screen.getByLabelText('页面标题'), {
+      target: { value: '生产异常看板' },
+    });
+    fireEvent.change(screen.getByLabelText(/^页面标识/), {
+      target: { value: 'production_exception' },
+    });
+    fireEvent.change(screen.getByLabelText('页面类型'), { target: { value: 'dashboard' } });
+    fireEvent.change(screen.getByLabelText('父菜单'), { target: { value: 'manufacturing' } });
+    fireEvent.change(screen.getByLabelText('访问权限'), {
+      target: { value: 'page.production_exception.read' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '创建并进入页面设计' }));
+
+    await waitFor(() =>
+      expect(createAuthoringNewPageWorkspace).toHaveBeenCalledWith('session_1', 3, {
+        pageKey: 'production_exception',
+        name: 'production_exception',
+        title: '生产异常看板',
+        description: undefined,
+        kind: 'dashboard',
+        parentMenuCode: 'manufacturing',
+        menuCode: 'production_exception',
+        menuName: '生产异常看板',
+        menuPath: '/production-exception',
+        menuIcon: undefined,
+        permissionCode: 'page.production_exception.read',
+      }),
+    );
+    expect(await screen.findByTestId('studio-handoff-context')).toHaveTextContent(
+      'ChangeSet changeset_new_page',
+    );
+    expect(screen.queryByTestId('new-page-workspace-wizard')).not.toBeInTheDocument();
   });
 
   it('restores the isolated Studio session after a full-page reload without replaying the handoff', async () => {
