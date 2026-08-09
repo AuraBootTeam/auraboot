@@ -37,7 +37,8 @@ export function isBinaryDownloadPath(path: string): boolean {
   const pathname = path.split('?')[0];
   return (
     /\/download(?:\/|$)/.test(pathname) ||
-    /\/export\/(?:excel|xlsx|csv|pdf)(?:\/|$)/.test(pathname)
+    /\/export\/(?:excel|xlsx|csv|pdf)(?:\/|$)/.test(pathname) ||
+    /\.(?:csv|xlsx?|pdf|zip)$/i.test(pathname)
   );
 }
 

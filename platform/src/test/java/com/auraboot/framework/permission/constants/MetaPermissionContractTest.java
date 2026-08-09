@@ -22,4 +22,11 @@ class MetaPermissionContractTest {
         assertEquals("page.page.read", field.get(null));
         assertEquals("meta.page.read", MetaPermission.PAGE_READ);
     }
+
+    @Test
+    void qrAiPermissionCodesAreStable() {
+        assertEquals("qr.ai.generate", MetaPermission.QR_AI_GENERATE);
+        assertEquals("qr.ai.audit.read", MetaPermission.QR_AI_AUDIT_READ);
+        assertEquals("qr.ai.manage", MetaPermission.QR_AI_MANAGE);
+    }
 }

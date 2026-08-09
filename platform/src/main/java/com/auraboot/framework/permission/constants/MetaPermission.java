@@ -407,6 +407,15 @@ public final class MetaPermission {
      */
     public static final String QR_MANAGE = "meta.qr.manage";
 
+    /** Generate AI-assisted AuraQR label drafts. */
+    public static final String QR_AI_GENERATE = "qr.ai.generate";
+
+    /** Read and export AuraQR label AI audit trails. */
+    public static final String QR_AI_AUDIT_READ = "qr.ai.audit.read";
+
+    /** Manage tenant-level AuraQR label AI policy, quota, entitlement, and safety settings. */
+    public static final String QR_AI_MANAGE = "qr.ai.manage";
+
     // ==================== CS (embeddable customer service) permissions ====================
 
     /**

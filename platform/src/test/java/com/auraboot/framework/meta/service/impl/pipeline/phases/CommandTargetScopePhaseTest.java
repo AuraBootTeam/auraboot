@@ -11,6 +11,8 @@ import com.auraboot.framework.meta.service.impl.pipeline.CommandPipeline;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.permission.engine.model.PermissionResult;
 import com.auraboot.framework.permission.service.PermissionFacade;
+import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import org.junit.jupiter.api.Test;
@@ -26,6 +28,7 @@ import org.springframework.transaction.TransactionStatus;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,6 +55,8 @@ class CommandTargetScopePhaseTest {
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private TransactionStatus transactionStatus;
     @Mock private IdempotencyService idempotencyService;
+    @Mock private ExtensionRegistry extensionRegistry;
+    @Mock private CommandHandlerExtension commandHandler;
 
     /**
      * A cached response is data too. Revoking the caller's row scope must stop the request before
@@ -187,6 +192,21 @@ class CommandTargetScopePhaseTest {
         verifyNoInteractions(dynamicDataService);
     }
 
+    @Test
+    void skipsDynamicTargetGateWhenTheHandlerOwnsPersistence() {
+        CommandTargetScopePhase phase = phase();
+        CommandPipelineContext ctx = context("framework_record", "REC-1");
+        when(extensionRegistry.getCommandHandler(ctx.getCommandCode()))
+                .thenReturn(Optional.of(commandHandler));
+        when(commandHandler.requiresDslPersistence(
+                ctx.getCommandCode(), ctx.getExecConfig(), ctx.getRequest())).thenReturn(false);
+
+        assertThat(phase.shouldSkip(ctx)).isTrue();
+        assertThat(ctx.isHasPluginHandler()).isTrue();
+        assertThat(ctx.isPluginRequiresDslPersistence()).isFalse();
+        verifyNoInteractions(dynamicDataService);
+    }
+
     /**
      * An authorization read that cannot be evaluated must fail closed and roll back its isolated
      * transaction before the error reaches the outer command transaction.
@@ -312,7 +332,8 @@ class CommandTargetScopePhaseTest {
     private CommandTargetScopePhase phase() {
         when(transactionManager.getTransaction(any(TransactionDefinition.class)))
                 .thenReturn(transactionStatus);
-        return new CommandTargetScopePhase(dynamicDataService, applicationContext, transactionManager);
+        return new CommandTargetScopePhase(
+                dynamicDataService, applicationContext, transactionManager, extensionRegistry);
     }
 
     private void givenRecordIsReadable(boolean readable) {

@@ -39,6 +39,7 @@ export interface RootLoaderData {
   i18n: Record<string, string>;
   locale: string;
   initialTimezone?: string;
+  skipTenantPreferences?: boolean;
   edition: string;
   spaces: any[];
   bootstrapStatus: BootstrapStatus | null;
@@ -135,6 +136,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
       i18n: i18nData,
       locale,
       initialTimezone: initialTimezone ?? undefined,
+      skipTenantPreferences: true,
       edition,
       spaces: [],
       bootstrapStatus,
@@ -207,6 +209,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     i18n: i18nData,
     locale,
     initialTimezone: initialTimezone ?? undefined,
+    skipTenantPreferences: isAnonymousRuntimeProfile(runtimeProfile) || (isPublicRoute(pathname) && !user),
     edition,
     spaces,
     bootstrapStatus,
@@ -305,7 +308,7 @@ export default function App() {
     <RuntimeProfileProvider value={data.runtimeProfile}>
       <I18nProvider initialData={data.i18n || {}} initialLocale={data.locale}>
         <AppDirectionSync locale={data.locale} />
-        <TimezoneProvider initialTimezone={data.initialTimezone}>
+        <TimezoneProvider initialTimezone={data.initialTimezone} skipTenantPreferences={data.skipTenantPreferences}>
           <ToastProvider>
             <ConfirmDialogProvider>
               {bootCoreRuntime ? <AuraBotProvider>{appFrame}</AuraBotProvider> : appFrame}

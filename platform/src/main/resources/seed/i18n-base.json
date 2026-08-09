@@ -1052,6 +1052,13 @@
     "en-US": "AI Modeling Wizard"
   },
   {
+    "key": "aurabot.chat.send",
+    "zh-CN": "发送 (Cmd+Enter)",
+    "en-US": "Send (Cmd+Enter)",
+    "ja-JP": "送信 (Cmd+Enter)",
+    "ko-KR": "보내기 (Cmd+Enter)"
+  },
+  {
     "key": "aurabot.thinking.label",
     "zh-CN": "推理过程",
     "en-US": "Reasoning"
@@ -3046,6 +3053,11 @@
     "key": "workbench.subline",
     "zh-CN": "概览",
     "en-US": "Overview"
+  },
+  {
+    "key": "workbench.openInDashboard",
+    "zh-CN": "在仪表盘中打开",
+    "en-US": "Open in dashboard"
   },
   {
     "key": "workbench.export",
