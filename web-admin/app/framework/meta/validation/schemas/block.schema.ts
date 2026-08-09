@@ -30,6 +30,7 @@ export const BLOCK_TYPES = [
   'stat-card',
   'selection-info',
   'metric-strip',
+  'stage-rail',
   'record-inspector',
   'candidate-list',
   'workbench-action-bar',

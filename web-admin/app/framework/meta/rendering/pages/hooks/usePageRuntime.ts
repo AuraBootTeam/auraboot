@@ -55,8 +55,15 @@ export function decodeRouteContextFromSearch(search: string): Record<string, any
   }
 }
 
-function buildRouteContextState(routeContext: Record<string, any>): Record<string, any> {
+export function buildRouteContextState(routeContext: Record<string, any>): Record<string, any> {
+  const restoredState =
+    routeContext.state &&
+    typeof routeContext.state === 'object' &&
+    !Array.isArray(routeContext.state)
+      ? routeContext.state
+      : {};
   return {
+    ...restoredState,
     routeContext,
     routeContextSource: routeContext.source,
     routeContextDeviceCode: routeContext.deviceCode,

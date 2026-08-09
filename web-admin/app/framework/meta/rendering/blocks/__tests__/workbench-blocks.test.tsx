@@ -17,6 +17,7 @@ import { WorkbenchActionBarBlockRenderer } from '../WorkbenchActionBarBlockRende
 import { EvidencePanelBlockRenderer } from '../EvidencePanelBlockRenderer';
 import { ArtifactTimelineBlockRenderer } from '../ArtifactTimelineBlockRenderer';
 import { StatusBannerBlockRenderer } from '../StatusBannerBlockRenderer';
+import { StageRailBlockRenderer } from '../StageRailBlockRenderer';
 import { FiltersBlockRenderer } from '../FiltersBlockRenderer';
 import { useRuntimeStateSubscription } from '../workbenchBlockUtils';
 import { fetchResult } from '~/shared/services/http-client';
@@ -715,6 +716,64 @@ describe('WorkbenchActionBarBlockRenderer', () => {
     expect(runtime.__reload).toHaveBeenCalledWith(['taskSummary']);
   });
 
+  it('renders a command result receipt with links to created business records', async () => {
+    vi.mocked(fetchResult).mockResolvedValueOnce({
+      code: '0',
+      data: {
+        success: true,
+        accountId: 'ACC-1',
+        opportunityId: 'OPP-1',
+      },
+    } as any);
+    const navigateTo = vi.fn();
+    const runtime = makeRuntime({ navigateTo }) as any;
+    const block = {
+      id: 'lead_actions',
+      blockType: 'workbench-action-bar',
+      actions: [
+        {
+          code: 'convert_lead',
+          label: 'Convert',
+          onClick: {
+            action: 'command.execute',
+            args: {
+              command: 'crm:convert_lead',
+              targetRecordPid: 'LEAD-1',
+              resultReceipt: {
+                title: 'Conversion completed',
+                links: [
+                  {
+                    key: 'account',
+                    label: 'Open account',
+                    resultField: 'accountId',
+                    to: '/p/crm_account_common/view/${value}',
+                  },
+                  {
+                    key: 'opportunity',
+                    label: 'Open opportunity',
+                    resultField: 'opportunityId',
+                    to: '/p/crm_opportunity_common/view/${value}',
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ],
+    } as unknown as BlockConfig;
+
+    render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+    fireEvent.click(screen.getByTestId('workbench-action-convert_lead'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workbench-result-receipt')).toHaveTextContent(
+        'Conversion completed',
+      );
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open opportunity' }));
+    expect(navigateTo).toHaveBeenCalledWith('/p/crm_opportunity_common/view/OPP-1');
+  });
+
   it('shows configured rejected feedback when a command returns business failure', async () => {
     const showToast = vi.fn();
     vi.mocked(fetchResult).mockResolvedValueOnce({
@@ -1282,6 +1341,80 @@ describe('StatusBannerBlockRenderer', () => {
     render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
 
     expect(screen.queryByTestId('status-banner-task_status')).not.toBeInTheDocument();
+  });
+});
+
+describe('StageRailBlockRenderer', () => {
+  it('shows completed, current, upcoming, and lost outcome states from the detail record', () => {
+    const runtime = makeRuntime() as any;
+    runtime.getContext().record = { crm_opp_stage: 'proposal' };
+    const block = {
+      id: 'sales_stage',
+      blockType: 'stage-rail',
+      context: '${record}',
+      stageField: 'crm_opp_stage',
+      title: { 'zh-CN': '销售阶段', en: 'Sales stage' },
+      stages: [
+        { value: 'discovery', label: 'Discovery' },
+        { value: 'qualification', label: 'Qualification' },
+        { value: 'proposal', label: 'Proposal' },
+        { value: 'negotiation', label: 'Negotiation' },
+        { value: 'closed_won', label: 'Won' },
+      ],
+      terminalStages: [{ value: 'closed_lost', label: 'Lost', tone: 'red' }],
+    } as unknown as BlockConfig;
+
+    const { rerender } = render(<StageRailBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('stage-rail-sales_stage')).toHaveTextContent('Sales stage');
+    expect(screen.getByTestId('stage-rail-step-discovery')).toHaveAttribute(
+      'data-stage-state',
+      'complete',
+    );
+    expect(screen.getByTestId('stage-rail-step-proposal')).toHaveAttribute(
+      'data-stage-state',
+      'current',
+    );
+    expect(screen.getByTestId('stage-rail-step-negotiation')).toHaveAttribute(
+      'data-stage-state',
+      'upcoming',
+    );
+
+    runtime.getContext().record = { crm_opp_stage: 'closed_lost' };
+    rerender(<StageRailBlockRenderer block={block} runtime={runtime} />);
+    expect(screen.getByTestId('stage-rail-terminal-closed_lost')).toHaveAttribute(
+      'data-stage-state',
+      'current',
+    );
+  });
+
+  it('uses the detail page record binding before a stale runtime context', () => {
+    const runtime = makeRuntime() as any;
+    runtime.getContext().record = {};
+    const block = {
+      id: 'detail_stage',
+      blockType: 'stage-rail',
+      context: '${record}',
+      record: { crm_opp_stage: 'proposal' },
+      stageField: 'crm_opp_stage',
+      stages: [
+        { value: 'discovery', label: 'Discovery' },
+        { value: 'proposal', label: 'Proposal' },
+      ],
+      terminalStages: [{ value: 'closed_lost', label: 'Lost' }],
+    } as unknown as BlockConfig;
+
+    render(<StageRailBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('stage-rail-step-discovery')).toHaveAttribute(
+      'data-stage-state',
+      'complete',
+    );
+    expect(screen.getByTestId('stage-rail-step-proposal')).toHaveAttribute(
+      'data-stage-state',
+      'current',
+    );
+    expect(screen.queryByTestId('stage-rail-terminal-closed_lost')).not.toBeInTheDocument();
   });
 });
 

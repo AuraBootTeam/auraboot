@@ -354,6 +354,12 @@ class PageSchemaValidatorTest {
                         "metrics", List.of(Map.of("key", "pending", "label", localized("Pending"), "valueField", "pending_count"))
                 ),
                 Map.of(
+                        "id", "order_stage",
+                        "blockType", "stage-rail",
+                        "stageField", "pe_order_status",
+                        "stages", List.of(Map.of("value", "new", "label", localized("New")))
+                ),
+                Map.of(
                         "id", "order_inspector",
                         "blockType", "record-inspector",
                         "context", "${state.selectedOrder}",

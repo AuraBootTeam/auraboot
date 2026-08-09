@@ -57,6 +57,30 @@ describe('resolveLocalMenuRedirect', () => {
 });
 
 describe('DynamicField', () => {
+  it('formats read-only numeric and money controls with locale grouping', () => {
+    const { rerender } = render(
+      <DynamicField
+        field={{ field: 'amount', label: 'Amount', component: 'money' } as any}
+        value={680000}
+        onChange={vi.fn()}
+        readOnly
+        locale="zh-CN"
+      />,
+    );
+
+    expect(screen.getByText('680,000')).toBeInTheDocument();
+
+    rerender(
+      <DynamicField
+        field={{ field: 'probability', label: 'Probability', component: 'number' } as any}
+        value={35.5}
+        onChange={vi.fn()}
+        readOnly
+        locale="zh-CN"
+      />,
+    );
+    expect(screen.getByText('35.5')).toBeInTheDocument();
+  });
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {

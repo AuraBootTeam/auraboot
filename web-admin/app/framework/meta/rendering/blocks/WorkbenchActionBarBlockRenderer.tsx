@@ -3,7 +3,11 @@ import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
-import { executeSimpleWorkbenchAction, useRuntimeStateSubscription } from './workbenchBlockUtils';
+import {
+  executeSimpleWorkbenchAction,
+  readPath,
+  useRuntimeStateSubscription,
+} from './workbenchBlockUtils';
 import { LoadingOverlay } from '~/ui/LoadingOverlay';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { useAuth } from '~/contexts/AuthContext';
@@ -38,6 +42,7 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
   const { hasPermission } = useAuth();
   const actions = Array.isArray((block as any).actions) ? (block as any).actions : [];
   const [runningAction, setRunningAction] = useState<string | null>(null);
+  const [resultReceipt, setResultReceipt] = useState<{ config: any; data: any } | null>(null);
   useRuntimeStateSubscription(runtime);
 
   const visibleActions = actions.filter((actionConfig: any) => {
@@ -99,7 +104,11 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
 
       setRunningAction(code);
       try {
-        await executeSimpleWorkbenchAction(runtime, actionConfig.onClick);
+        const result = await executeSimpleWorkbenchAction(runtime, actionConfig.onClick);
+        const receiptConfig = actionConfig.onClick?.args?.resultReceipt;
+        if (receiptConfig && result && result.success !== false && result.applied !== false) {
+          setResultReceipt({ config: receiptConfig, data: result });
+        }
       } catch (error) {
         console.error('[WorkbenchActionBarBlockRenderer] action failed:', error);
       } finally {
@@ -127,24 +136,82 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
     );
   });
 
-  if (title) {
-    return (
-      <>
-        <LoadingOverlay visible={runningAction !== null} label={t('common.loading')} />
-        <div className={`${surfaceClass} justify-between`} data-testid="workbench-action-bar">
-          <h3 className="text-text text-base font-semibold">{title}</h3>
-          <div className={`flex flex-wrap items-center gap-2 ${alignClass}`}>{actionButtons}</div>
-        </div>
-      </>
-    );
-  }
+  const actionBar = title ? (
+    <div className={`${surfaceClass} justify-between`} data-testid="workbench-action-bar">
+      <h3 className="text-text text-base font-semibold">{title}</h3>
+      <div className={`flex flex-wrap items-center gap-2 ${alignClass}`}>{actionButtons}</div>
+    </div>
+  ) : (
+    <div className={`${surfaceClass} ${alignClass}`} data-testid="workbench-action-bar">
+      {actionButtons}
+    </div>
+  );
+
+  const receiptLinks = resultReceipt
+    ? (Array.isArray(resultReceipt.config?.links) ? resultReceipt.config.links : [])
+        .map((link: any) => {
+          const value = readPath(resultReceipt.data, String(link.resultField || link.field || ''));
+          if (value === undefined || value === null || value === '') return null;
+          const path = String(link.to || '').replace(
+            /\$\{value\}/g,
+            encodeURIComponent(String(value)),
+          );
+          if (!path) return null;
+          return {
+            key: String(link.key || link.resultField || path),
+            label: getLocalizedText(link.label || link.key || path, locale, t),
+            path,
+          };
+        })
+        .filter(Boolean)
+    : [];
 
   return (
     <>
       <LoadingOverlay visible={runningAction !== null} label={t('common.loading')} />
-      <div className={`${surfaceClass} ${alignClass}`} data-testid="workbench-action-bar">
-        {actionButtons}
-      </div>
+      {actionBar}
+      {resultReceipt ? (
+        <section
+          className="border-status-green bg-status-green-bg text-status-green mt-3 rounded-lg border px-4 py-3"
+          data-testid="workbench-result-receipt"
+          role="status"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h4 className="text-sm font-semibold">
+                {getLocalizedText(resultReceipt.config.title || 'Completed', locale, t)}
+              </h4>
+              {resultReceipt.config.description ? (
+                <p className="mt-1 text-xs opacity-80">
+                  {getLocalizedText(resultReceipt.config.description, locale, t)}
+                </p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              className="shrink-0 rounded px-2 py-1 text-xs font-medium hover:bg-white/60"
+              onClick={() => setResultReceipt(null)}
+              aria-label={t('action.close') !== 'action.close' ? t('action.close') : 'Close'}
+            >
+              ×
+            </button>
+          </div>
+          {receiptLinks.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {receiptLinks.map((link: any) => (
+                <button
+                  key={link.key}
+                  type="button"
+                  className="rounded-control border-status-green bg-panel hover:bg-hover border px-3 py-1.5 text-xs font-medium"
+                  onClick={() => runtime.navigateTo(link.path)}
+                >
+                  {link.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
     </>
   );
 };

@@ -21,6 +21,7 @@ export const DEFAULT_COL_SPAN_BY_TYPE: Record<string, number> = {
   'table': 12,
   'sub-table': 12,
   'metric-strip': 12,
+  'stage-rail': 12,
   'toolbar': 12,
   'form-buttons': 12,
   'filters': 12,

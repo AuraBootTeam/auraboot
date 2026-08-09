@@ -1,6 +1,6 @@
 {
     "version": "2.0",
-    "exportedAt": "2026-07-16T08:36:28.000000Z",
+    "exportedAt": "2026-08-09T17:50:38.000000Z",
     "enums": {
         "ModelType": [
             {
@@ -636,6 +636,11 @@
                 "code": "metric-strip",
                 "label": "Metric strip block",
                 "since": "1.4"
+            },
+            {
+                "code": "stage-rail",
+                "label": "Ordered business stage rail block",
+                "since": "1.8"
             },
             {
                 "code": "record-inspector",

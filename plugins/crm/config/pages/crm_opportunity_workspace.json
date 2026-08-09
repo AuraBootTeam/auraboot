@@ -106,16 +106,26 @@
           "permissionCode": "crm.opportunity.read",
           "label": { "zh-CN": "打开商机档案", "en": "Open Opportunity Record" },
           "variant": "secondary",
-          "permissionCode": "crm.opportunity.read",
           "visibleWhen": "state.selectedOpportunity != null",
-          "onClick": { "action": "navigate", "args": { "to": "/p/crm_opportunity_common/view/${state.selectedOpportunity.pid}" } }
+          "onClick": {
+            "action": "navigate",
+            "args": {
+              "to": "/p/crm_opportunity_common/view/${state.selectedOpportunity.pid}",
+              "context": {
+                "returnTo": "/p/c/crm_opportunity_workspace",
+                "state": {
+                  "searchKeyword": "${state.searchKeyword}",
+                  "viewFilter": "${state.viewFilter}"
+                }
+              }
+            }
+          }
         },
         {
           "code": "create_opportunity",
           "permissionCode": "crm.opportunity.manage",
           "label": { "zh-CN": "新建商机", "en": "Create Opportunity" },
           "variant": "primary",
-          "permissionCode": "crm.opportunity.manage",
           "onClick": { "action": "navigate", "args": { "to": "/p/crm_opportunity_common/new" } }
         }
       ]
@@ -131,6 +141,7 @@
       "columns": [
         { "field": "crm_opp_name", "width": 210, "label": { "zh-CN": "商机", "en": "Opportunity" } },
         { "field": "account_name", "width": 165, "label": { "zh-CN": "客户", "en": "Customer" } },
+        { "field": "owner_name", "width": 145, "label": { "zh-CN": "负责人", "en": "Owner" } },
         { "field": "crm_opp_stage", "width": 115, "dictCode": "crm_opp_stage", "label": { "zh-CN": "阶段", "en": "Stage" } },
         { "field": "crm_opp_expected_amount", "width": 130, "align": "right", "valueType": "currency", "label": { "zh-CN": "预计金额", "en": "Amount" } },
         { "field": "crm_opp_probability", "width": 95, "align": "right", "label": { "zh-CN": "概率", "en": "Probability" } },
@@ -188,7 +199,7 @@
         },
         { "field": "crm_opp_expected_amount", "label": { "zh-CN": "预计金额", "en": "Amount" } },
         { "field": "crm_opp_probability", "label": { "zh-CN": "概率", "en": "Probability" }, "unit": "%" },
-        { "field": "crm_opp_owner", "label": { "zh-CN": "负责人", "en": "Owner" } }
+        { "field": "owner_name", "label": { "zh-CN": "负责人", "en": "Owner" } }
       ]
     },
     {
@@ -203,7 +214,6 @@
           "permissionCode": "crm.opportunity.manage",
           "label": { "zh-CN": "进入资格确认", "en": "Move to Qualification" },
           "variant": "primary",
-          "permissionCode": "crm.opportunity.manage",
           "visibleWhen": "state.selectedOpportunity != null && state.selectedOpportunity.crm_opp_stage == 'discovery'",
           "onClick": { "action": "command.execute", "args": { "command": "crm:qualify_opportunity", "operationType": "update", "targetRecordPid": "${state.selectedOpportunity.pid}", "reload": ["opportunityStats", "opportunityQueue"] } }
         },
@@ -212,7 +222,6 @@
           "permissionCode": "crm.opportunity.manage",
           "label": { "zh-CN": "进入方案报价", "en": "Move to Proposal" },
           "variant": "primary",
-          "permissionCode": "crm.opportunity.manage",
           "visibleWhen": "state.selectedOpportunity != null && state.selectedOpportunity.crm_opp_stage == 'qualification'",
           "onClick": { "action": "command.execute", "args": { "command": "crm:advance_opp_to_proposal", "operationType": "update", "targetRecordPid": "${state.selectedOpportunity.pid}", "reload": ["opportunityStats", "opportunityQueue"] } }
         },
@@ -221,7 +230,6 @@
           "permissionCode": "crm.opportunity.manage",
           "label": { "zh-CN": "进入商务谈判", "en": "Move to Negotiation" },
           "variant": "primary",
-          "permissionCode": "crm.opportunity.manage",
           "visibleWhen": "state.selectedOpportunity != null && state.selectedOpportunity.crm_opp_stage == 'proposal'",
           "onClick": { "action": "command.execute", "args": { "command": "crm:advance_opp_to_negotiation", "operationType": "update", "targetRecordPid": "${state.selectedOpportunity.pid}", "reload": ["opportunityStats", "opportunityQueue"] } }
         },
@@ -230,7 +238,6 @@
           "permissionCode": "crm.opportunity.manage",
           "label": { "zh-CN": "标记赢单", "en": "Mark Won" },
           "variant": "primary",
-          "permissionCode": "crm.opportunity.manage",
           "visibleWhen": "state.selectedOpportunity != null && state.selectedOpportunity.crm_opp_stage == 'negotiation'",
           "confirm": { "zh-CN": "确认客户已经作出真实购买承诺吗？", "en": "Confirm that the customer made a real buying commitment?" },
           "onClick": { "action": "command.execute", "args": { "command": "crm:win_opportunity", "operationType": "update", "targetRecordPid": "${state.selectedOpportunity.pid}", "reload": ["opportunityStats", "opportunityQueue"] } }
@@ -240,7 +247,6 @@
           "permissionCode": "crm.opportunity.manage",
           "label": { "zh-CN": "标记丢单", "en": "Mark Lost" },
           "variant": "danger",
-          "permissionCode": "crm.opportunity.manage",
           "visibleWhen": "state.selectedOpportunity != null",
           "confirm": { "zh-CN": "丢单后将退出在途队列。请先在商机档案补充丢单原因。", "en": "The opportunity will leave the open queue. Record the loss reason first." },
           "onClick": { "action": "command.execute", "args": { "command": "crm:lose_opportunity", "operationType": "update", "targetRecordPid": "${state.selectedOpportunity.pid}", "reload": ["opportunityStats", "opportunityQueue"] } }

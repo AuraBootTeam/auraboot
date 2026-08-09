@@ -14,6 +14,14 @@ const PASSWORD = 'Test2026x';
 const SALES_EMAIL = `crm-sales-${Date.now()}@e2e.local`;
 const SERVICE_EMAIL = `crm-service-${Date.now()}@e2e.local`;
 const VIEWER_EMAIL = `crm-viewer-${Date.now()}@e2e.local`;
+const SALES_DISPLAY_NAME = `crm_sales ${RUN}`.slice(0, 50);
+const todayLocal = new Date();
+const TODAY_LOCAL_DATE =
+  `${todayLocal.getFullYear()}-${String(todayLocal.getMonth() + 1).padStart(2, '0')}-` +
+  `${String(todayLocal.getDate()).padStart(2, '0')}`;
+const JOURNEY_ACTIVITY_LOCAL =
+  `${TODAY_LOCAL_DATE}T14:30`;
+const EXPECTED_TODAY_DISPLAY = new Intl.DateTimeFormat('zh-CN').format(todayLocal);
 
 type WorkbenchKey =
   | 'customer-360'
@@ -76,6 +84,7 @@ const ids = {
   complaint: '',
   complaintResolve: '',
   complaintClose: '',
+  journeyOpportunity: '',
 };
 let adminJwt = '';
 let salesJwt = '';
@@ -85,6 +94,7 @@ let salesUserPid = '';
 let salesLeadPid = '';
 let adminControlLeadPid = '';
 let serviceComplaintPid = '';
+let journeyActivityPid = '';
 const screenshots: string[] = [];
 const completedScenarios = new Set<WorkbenchKey>();
 const completedActions = new Set<(typeof EXPECTED_ACTIONS)[number]>();
@@ -207,7 +217,9 @@ async function createComplaint(label: string): Promise<string> {
     crm_cmp_account_id: ids.account,
     crm_cmp_type: 'quality',
     crm_cmp_severity: 'high',
-    crm_cmp_date: new Date().toISOString(),
+    // Use a local business-time instant so a database session in UTC and a
+    // browser in Asia/Shanghai both present the intended calendar date.
+    crm_cmp_date: `${TODAY_LOCAL_DATE}T12:00:00+08:00`,
     crm_cmp_description: `${RUN} ${label}`,
   });
 }
@@ -216,6 +228,19 @@ async function getRecord(model: string, pid: string): Promise<Record<string, any
   const body = assertOk(await api(`/api/dynamic/${model}/${encodeURIComponent(pid)}`),
     `read ${model}/${pid}`);
   return body.data;
+}
+
+async function listRecords(
+  model: string,
+  filters: Array<{ fieldName: string; operator: string; value: unknown }>,
+): Promise<Record<string, any>[]> {
+  const params = new URLSearchParams({
+    pageNum: '1',
+    pageSize: '50',
+    filters: JSON.stringify(filters),
+  });
+  const body = assertOk(await api(`/api/dynamic/${model}/list?${params}`), `list ${model}`);
+  return body?.data?.records ?? body?.data?.content ?? [];
 }
 
 async function provisionRoleUser(email: string, roleCode: string): Promise<string> {
@@ -245,7 +270,6 @@ async function provisionRoleUser(email: string, roleCode: string): Promise<strin
 
 async function seedCoreWorkbenchData(): Promise<void> {
   const closeAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-  const today = new Date().toISOString().slice(0, 10);
   ids.account = await executeCreate('crm:create_account', {
     crm_acc_name: `${RUN} Customer`,
     crm_acc_industry: 'technology',
@@ -277,8 +301,8 @@ async function seedCoreWorkbenchData(): Promise<void> {
     crm_fcst_pipeline_amount: 300000,
     crm_fcst_notes: RUN,
   });
-  ids.task = await createTask('Task Start', today);
-  ids.taskComplete = await createTask('Task Complete', today);
+  ids.task = await createTask('Task Start', TODAY_LOCAL_DATE);
+  ids.taskComplete = await createTask('Task Complete', TODAY_LOCAL_DATE);
   ids.complaint = await createComplaint('Complaint Investigate');
   ids.complaintResolve = await createComplaint('Complaint Resolve');
   ids.complaintClose = await createComplaint('Complaint Close');
@@ -544,9 +568,23 @@ test.beforeAll(async () => {
     crm_cmp_account_id: ids.account,
     crm_cmp_type: 'service',
     crm_cmp_severity: 'medium',
-    crm_cmp_date: new Date().toISOString(),
+    crm_cmp_date: `${TODAY_LOCAL_DATE}T12:00:00+08:00`,
     crm_cmp_description: `${RUN} Service Role Complaint`,
   }, serviceJwt);
+
+  ids.journeyOpportunity = await executeCreate('crm:create_opportunity', {
+    crm_opp_name: `${RUN} 华东智造云 CRM 升级项目`,
+    crm_opp_account_id: ids.account,
+    crm_opp_currency_code: 'CNY',
+    crm_opp_expected_amount: 486000,
+    crm_opp_expected_close_date: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
+    crm_opp_probability: 55,
+    crm_opp_forecast_category: 'best_case',
+    crm_opp_owner: salesUserPid,
+    crm_opp_notes: '客户已完成需求澄清，等待方案评审与商务谈判。',
+  });
+  await executeSetupTransition('crm:qualify_opportunity', ids.journeyOpportunity);
+  await executeSetupTransition('crm:advance_opp_to_proposal', ids.journeyOpportunity);
 });
 
 test.afterAll(() => {
@@ -919,6 +957,16 @@ test('Lead Desk executes the next valid lifecycle action and persists the new st
     ]) {
       expect(convertedLead[field], `converted lead must persist ${field}`).toBeTruthy();
     }
+    const receipt = page.getByTestId('workbench-result-receipt');
+    await expect(receipt).toContainText(/线索转化完成|Lead Conversion Completed/);
+    for (const label of [
+      /^(?:打开客户|Open Account)$/,
+      /^(?:打开联系人|Open Contact)$/,
+      /^(?:打开商机|Open Opportunity)$/,
+      /^(?:打开客户需求|Open Customer Request)$/,
+    ]) {
+      await expect(receipt.getByRole('button', { name: label })).toBeVisible();
+    }
     completedActions.add('convert_lead');
 
     await selectRow(page, `${RUN} Lead Lose`);
@@ -996,12 +1044,139 @@ test('Opportunity Workspace advances a selected deal and keeps the decision cont
     completedScenarios.add('opportunity-workspace');
   });
 
-test('Forecast Cockpit submits a real forecast and shows both submission and team views',
+test('Cordys-parity journey keeps pipeline context, activity time, relation, and stage progression truthful',
+  async ({ page }, testInfo) => {
+    const journeyName = `${RUN} 华东智造云 CRM 升级项目`;
+    const activitySubject = `${RUN} 方案评审会`;
+    await uiLogin(page);
+    await gotoWorkbench(
+      page,
+      'crm_opportunity_workspace',
+      'crm_opportunity_workspace_stats',
+      /商机工作台|Opportunity Workspace/,
+    );
+    await searchNamedQueryQueue(
+      page,
+      'crm_opp_name',
+      'crm_opportunity_workspace_queue',
+      '华东智造云',
+    );
+    const journeyRow = page.locator('tr').filter({ hasText: journeyName }).first();
+    await expect(journeyRow).toBeVisible();
+    await expect(journeyRow).toContainText(SALES_DISPLAY_NAME);
+    await selectRow(page, journeyName);
+    await page.getByTestId('workbench-action-open_opportunity_record').click();
+    await expect(page).toHaveURL(
+      new RegExp(`/p/crm_opportunity_common/view/${ids.journeyOpportunity}`),
+    );
+
+    await expect(page.getByRole('heading', { name: journeyName })).toBeVisible();
+    const rail = page.getByTestId('stage-rail-crm_opp_stage_rail');
+    await expect(rail).toBeVisible();
+    await expect(page.getByTestId('stage-rail-step-discovery')).toHaveAttribute(
+      'data-stage-state',
+      'complete',
+    );
+    await expect(page.getByTestId('stage-rail-step-proposal')).toHaveAttribute(
+      'data-stage-state',
+      'current',
+    );
+    await expect(page.getByTestId('form-field-crm_opp_expected_amount')).toContainText('486,000');
+    await expect(page.getByTestId('toolbar-btn-advance_negotiation')).toBeVisible();
+    await expect(page.getByTestId('toolbar-btn-qualify')).toHaveCount(0);
+    await expect(page.getByTestId('toolbar-btn-advance_proposal')).toHaveCount(0);
+    await expect(page.getByTestId('toolbar-btn-win')).toHaveCount(0);
+    await dualViewportShots(page, testInfo, 'crm-cordys-journey-opportunity-detail-proposal');
+
+    await page.getByRole('button', { name: /返回|Back/ }).first().click();
+    await expect(page).toHaveURL(/\/p\/c\/crm_opportunity_workspace/);
+    await expect(page.getByTestId('field-crm_opp_name').locator('input')).toHaveValue('华东智造云');
+    await expect(page.locator('tr').filter({ hasText: journeyName }).first()).toBeVisible();
+
+    await selectRow(page, journeyName);
+    await page.getByTestId('workbench-action-open_opportunity_record').click();
+    await page.getByTestId('toolbar-btn-log_activity').click();
+    await expect(page).toHaveURL((url) =>
+      url.pathname === '/p/crm_activity_common/new'
+        && url.searchParams.get('commandCode') === 'crm:log_opp_activity'
+        && url.searchParams.get('sourceRecordPid') === ids.journeyOpportunity,
+    );
+    await page.getByTestId('select-trigger-crm_act_type').click();
+    await page.getByRole('option', { name: /会议|Meeting/ }).click();
+    await page.getByTestId('field-crm_act_subject').locator('input').fill(activitySubject);
+    const dateInput = page.getByTestId('date-picker-input-crm_act_date');
+    await expect(dateInput).toHaveAttribute('type', 'datetime-local');
+    await dateInput.fill(JOURNEY_ACTIVITY_LOCAL);
+
+    const createActivityResponse = page.waitForResponse((response) =>
+      response.request().method() === 'POST'
+        && response.url().includes('/api/meta/commands/execute/crm:log_opp_activity'),
+    { timeout: 20_000 });
+    await page.getByTestId('form-btn-submit').click();
+    const activityResponse = await createActivityResponse;
+    const activityBody = await activityResponse.json().catch(() => ({}));
+    expect(activityResponse.ok(), JSON.stringify(activityBody)).toBeTruthy();
+    expect(String(activityBody?.code), JSON.stringify(activityBody)).toBe('0');
+    journeyActivityPid = String(findValue(activityBody?.data, [
+      'recordId',
+      'recordPid',
+      'publicRecordId',
+      'pid',
+    ]) || '');
+    expect(journeyActivityPid).toBeTruthy();
+
+    const createdActivity = await getRecord('crm_activity_common', journeyActivityPid);
+    expect(createdActivity.crm_act_subject).toBe(activitySubject);
+    expect(new Date(createdActivity.crm_act_date).getTime()).toBe(
+      new Date(JOURNEY_ACTIVITY_LOCAL).getTime(),
+    );
+    const relations = await listRecords('crm_activity_relation_common', [
+      { fieldName: 'crm_ar_activity_id', operator: 'EQ', value: journeyActivityPid },
+      { fieldName: 'crm_ar_object_id', operator: 'EQ', value: ids.journeyOpportunity },
+    ]);
+    expect(relations).toHaveLength(1);
+    expect(relations[0].crm_ar_object_type).toBe('opportunity');
+
+    const activitiesResponse = page.waitForResponse((response) =>
+      response.request().method() === 'GET'
+        && response.url().includes('/api/datasource/list')
+        && new URL(response.url()).searchParams.get('datasourceId') ===
+          'nq:crm_activities_by_object',
+    { timeout: 20_000 });
+    await page.goto(`${BASE}/p/crm_opportunity_common/view/${ids.journeyOpportunity}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    expect((await activitiesResponse).ok()).toBeTruthy();
+    await expect(page.getByText(activitySubject, { exact: true }).first()).toBeVisible();
+    await expect(page.locator('main, [role="main"]').first()).not.toContainText(salesUserPid);
+
+    const stageResponse = page.waitForResponse((response) =>
+      response.request().method() === 'POST'
+        && response.url().includes('/api/meta/commands/execute/crm:advance_opp_to_negotiation'),
+    { timeout: 20_000 });
+    await page.getByTestId('toolbar-btn-advance_negotiation').click();
+    const transitionResponse = await stageResponse;
+    expect(transitionResponse.ok()).toBeTruthy();
+    await expect.poll(async () =>
+      (await getRecord('crm_opportunity_common', ids.journeyOpportunity)).crm_opp_stage)
+      .toBe('negotiation');
+    await expect(page.getByTestId('stage-rail-step-negotiation')).toHaveAttribute(
+      'data-stage-state',
+      'current',
+    );
+    await expect(page.getByTestId('toolbar-btn-win')).toBeVisible();
+    await dualViewportShots(page, testInfo, 'crm-cordys-journey-opportunity-detail-negotiation');
+  });
+
+  test('Forecast Cockpit submits a real forecast and shows both submission and team views',
   async ({ page }, testInfo) => {
     await uiLogin(page);
     await gotoWorkbench(page, 'crm_forecast_cockpit', 'crm_forecast_cockpit_stats', /预测驾驶舱|Forecast Cockpit/);
     await searchForecast(page, FORECAST_PERIOD);
     await selectRow(page, FORECAST_PERIOD);
+    const selectedForecastRow = page.locator('tr').filter({ hasText: FORECAST_PERIOD }).first();
+    await expect(selectedForecastRow).toContainText('Admin User');
+    await expect(selectedForecastRow).not.toContainText(/\b[0-9A-HJKMNP-TV-Z]{26}\b/);
     await expect(page.getByTestId('status-banner-crm_forecast_status')).toBeVisible();
     await expect(page.getByTestId('workbench-action-submit_forecast')).toBeVisible();
     await expect(page.getByText(/团队偏差|Team Rollup/).first()).toBeVisible();
@@ -1037,7 +1212,7 @@ test('Activity & Service Desk drives both task and complaint recovery actions',
     const taskRow = page.locator('tr').filter({ hasText: `${RUN} Task Start` }).first();
     await expect(taskRow).toContainText(/高|High/);
     await expect(taskRow).not.toContainText(/\bhigh\b/);
-    await expect(taskRow).toContainText(/2026\/8\/9/);
+    await expect(taskRow).toContainText(EXPECTED_TODAY_DISPLAY);
     await assertNoRawCodes(page);
     await dualViewportShots(page, testInfo, 'crm-activity-service-desk');
     await executeWorkbenchAction(page, 'start_task', 'crm:start_task');

@@ -9,7 +9,40 @@
   "layout": {
     "type": "stack"
   },
+  "extension": {
+    "showShare": false,
+    "showReport": false,
+    "showPrint": false,
+    "showEdit": false,
+    "headerTitleField": "crm_opp_name",
+    "headerSubtitleFields": [
+      "crm_opp_code",
+      "crm_opp_account_id"
+    ],
+    "preserveListContext": true
+  },
   "blocks": [
+    {
+      "id": "crm_opp_stage_rail",
+      "blockType": "stage-rail",
+      "detailPlacement": "header",
+      "context": "${record}",
+      "stageField": "crm_opp_stage",
+      "title": {
+        "zh-CN": "销售阶段",
+        "en-US": "Sales Stage"
+      },
+      "stages": [
+        { "value": "discovery", "label": { "zh-CN": "需求发现", "en-US": "Discovery" } },
+        { "value": "qualification", "label": { "zh-CN": "资格确认", "en-US": "Qualification" } },
+        { "value": "proposal", "label": { "zh-CN": "方案报价", "en-US": "Proposal" } },
+        { "value": "negotiation", "label": { "zh-CN": "商务谈判", "en-US": "Negotiation" } },
+        { "value": "closed_won", "label": { "zh-CN": "赢单", "en-US": "Won" } }
+      ],
+      "terminalStages": [
+        { "value": "closed_lost", "label": { "zh-CN": "已丢单", "en-US": "Lost" }, "tone": "red" }
+      ]
+    },
     {
       "id": "crm_opportunity_tabs",
       "blockType": "tabs",
@@ -105,6 +138,56 @@
                   "readOnly": true
                 }
               ]
+            },
+            {
+              "id": "block_recent_activities",
+              "blockType": "sub-table",
+              "title": {
+                "zh-CN": "最近活动与下一步",
+                "en-US": "Recent Activity and Next Steps"
+              },
+              "layout": {
+                "colSpan": 12
+              },
+              "subTable": {
+                "dataSource": {
+                  "type": "api",
+                  "url": "/api/datasource/list",
+                  "params": {
+                    "datasourceId": "nq:crm_activities_by_object",
+                    "objectType": "opportunity",
+                    "objectId": "${recordPid}",
+                    "format": "records"
+                  }
+                },
+                "readOnly": true,
+                "maxHeight": 280,
+                "columns": [
+                  {
+                    "field": "crm_act_type",
+                    "width": 110,
+                    "renderType": "tag",
+                    "dictCode": "crm_activity_type"
+                  },
+                  {
+                    "field": "crm_act_subject",
+                    "width": 260
+                  },
+                  {
+                    "field": "crm_act_date",
+                    "width": 170,
+                    "valueType": "datetime"
+                  },
+                  {
+                    "field": "owner_name",
+                    "width": 140,
+                    "label": {
+                      "zh-CN": "负责人",
+                      "en-US": "Owner"
+                    }
+                  }
+                ]
+              }
             }
           ]
         },
@@ -427,7 +510,7 @@
                     "format": "YYYY-MM-DD HH:mm"
                   },
                   {
-                    "field": "crm_act_owner",
+                    "field": "owner_name",
                     "width": 120
                   },
                   {
@@ -459,7 +542,10 @@
         {
           "code": "log_activity",
           "icon": "MessageSquare",
-          "label": "$i18n:common.button.create",
+          "label": {
+            "zh-CN": "记录活动",
+            "en-US": "Log Activity"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_activity_common_form",
@@ -469,7 +555,10 @@
         {
           "code": "create_task",
           "icon": "CheckSquare",
-          "label": "$i18n:common.button.create",
+          "label": {
+            "zh-CN": "创建任务",
+            "en-US": "Create Task"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_activity_common_form",
@@ -492,6 +581,8 @@
         },
         {
           "code": "qualify",
+          "primary": true,
+          "visibleWhen": "record.crm_opp_stage == 'discovery'",
           "label": {
             "zh-CN": "资格确认",
             "en-US": "Qualify Opportunity"
@@ -503,6 +594,8 @@
         },
         {
           "code": "advance_proposal",
+          "primary": true,
+          "visibleWhen": "record.crm_opp_stage == 'qualification'",
           "label": {
             "zh-CN": "推进到方案阶段",
             "en-US": "Advance to Proposal"
@@ -514,6 +607,8 @@
         },
         {
           "code": "advance_negotiation",
+          "primary": true,
+          "visibleWhen": "record.crm_opp_stage == 'proposal'",
           "label": {
             "zh-CN": "推进到谈判阶段",
             "en-US": "Advance to Negotiation"
@@ -526,6 +621,7 @@
         {
           "code": "win",
           "primary": true,
+          "visibleWhen": "record.crm_opp_stage == 'negotiation'",
           "label": {
             "zh-CN": "赢单",
             "en-US": "Win Opportunity"
@@ -539,6 +635,7 @@
         {
           "code": "lose",
           "danger": true,
+          "visibleWhen": "record.crm_opp_stage != 'closed_won' && record.crm_opp_stage != 'closed_lost'",
           "label": {
             "zh-CN": "丢单",
             "en-US": "Lose Opportunity"

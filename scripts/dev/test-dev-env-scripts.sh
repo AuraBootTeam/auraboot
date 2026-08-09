@@ -420,6 +420,7 @@ DEMO_OUTPUT="$(
     AURA_ENV_REGISTRY_ROOT="$REGISTRY_ROOT" scripts/dev/env.sh demo --mode=bugfix --product=oss --slug=scriptcheck-r2 --dry-run
 )"
 assert_contains "env demo dry-run names scenario" "$DEMO_OUTPUT" "scenario:        bugfix-oss-demo"
+assert_contains "env demo dry-run reuses host web server" "$DEMO_OUTPUT" "export PW_SKIP_WEBSERVER=1"
 assert_contains "env demo dry-run uses e2e plugin profile" "$DEMO_OUTPUT" "plugin profile:  e2e"
 assert_contains "env demo dry-run includes workflow data" "$DEMO_OUTPUT" "workflow data:"
 assert_contains "env demo dry-run includes invariants" "$DEMO_OUTPUT" "node scripts/oss-demo-invariants.mjs"

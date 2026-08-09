@@ -4,6 +4,7 @@ import { BLOCK_TYPES, blockTypeEnum } from '../schemas/block.schema';
 describe('block schema workbench block types', () => {
   it('allows workbench block types in the static fallback enum', () => {
     expect(BLOCK_TYPES).toContain('metric-strip');
+    expect(BLOCK_TYPES).toContain('stage-rail');
     expect(BLOCK_TYPES).toContain('record-inspector');
     expect(BLOCK_TYPES).toContain('candidate-list');
     expect(BLOCK_TYPES).toContain('workbench-action-bar');
@@ -22,6 +23,7 @@ describe('block schema workbench block types', () => {
     expect(blockTypeEnum.safeParse('code-snippet').success).toBe(true);
 
     expect(blockTypeEnum.safeParse('metric-strip').success).toBe(true);
+    expect(blockTypeEnum.safeParse('stage-rail').success).toBe(true);
     expect(blockTypeEnum.safeParse('record-inspector').success).toBe(true);
     expect(blockTypeEnum.safeParse('candidate-list').success).toBe(true);
     expect(blockTypeEnum.safeParse('workbench-action-bar').success).toBe(true);

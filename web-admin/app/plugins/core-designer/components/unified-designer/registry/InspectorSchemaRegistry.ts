@@ -507,6 +507,17 @@ const workbenchActionBarFields: PropertySchema<string>[] = [
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
+// StageRailBlockRenderer reads the current record from block.context, resolves
+// block.stageField, then displays ordered stages plus optional terminal outcomes.
+const stageRailFields: PropertySchema<string>[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'context', label: 'Context expression', type: 'text' },
+  { key: 'stageField', label: 'Stage field', type: 'text', required: true },
+  { key: 'stages', label: 'Stages JSON', type: 'json', required: true },
+  { key: 'terminalStages', label: 'Terminal stages JSON', type: 'json' },
+  { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
+];
+
 // EvidencePanelBlockRenderer reads block.dataSource (string id) / block.context /
 // block.sections / block.title / block.empty. Section: { key, field, label,
 // format, items? }. items maps paths inside a JSON section into semantic
@@ -993,6 +1004,7 @@ export function createDefaultInspectorSchemaRegistry(): InspectorSchemaRegistry 
     'activity-timeline': activityTimelineFields,
     'field-history': fieldHistoryFields,
     'metric-strip': metricStripFields,
+    'stage-rail': stageRailFields,
     'status-banner': statusBannerFields,
     'workbench-action-bar': workbenchActionBarFields,
     'review-drawer': reviewDrawerFields,

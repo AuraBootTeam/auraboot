@@ -208,7 +208,7 @@
         "submitted": { "zh-CN": "经理应对照团队汇总和商机工作台解释偏差。", "en": "The manager should explain variance against the team rollup and opportunity workspace." }
       },
       "summaryFields": [
-        { "field": "crm_fcst_owner", "label": { "zh-CN": "负责人", "en": "Owner" } },
+        { "field": "crm_fcst_owner_display", "label": { "zh-CN": "负责人", "en": "Owner" } },
         { "field": "crm_fcst_commit_amount", "label": { "zh-CN": "承诺", "en": "Commit" } },
         { "field": "crm_fcst_best_case_amount", "label": { "zh-CN": "最佳情况", "en": "Best Case" } },
         { "field": "crm_fcst_pipeline_amount", "label": { "zh-CN": "管道", "en": "Pipeline" } }
@@ -241,7 +241,7 @@
       "sections": [
         { "key": "code", "label": { "zh-CN": "预测编号", "en": "Forecast Code" }, "field": "crm_fcst_code" },
         { "key": "period", "label": { "zh-CN": "期间", "en": "Period" }, "field": "crm_fcst_period" },
-        { "key": "owner", "label": { "zh-CN": "负责人", "en": "Owner" }, "field": "crm_fcst_owner" },
+        { "key": "owner", "label": { "zh-CN": "负责人", "en": "Owner" }, "field": "crm_fcst_owner_display" },
         { "key": "commit", "label": { "zh-CN": "承诺金额", "en": "Commit" }, "field": "crm_fcst_commit_amount" },
         { "key": "best", "label": { "zh-CN": "最佳情况", "en": "Best Case" }, "field": "crm_fcst_best_case_amount" },
         { "key": "notes", "label": { "zh-CN": "偏差说明", "en": "Variance Notes" }, "field": "crm_fcst_notes" }

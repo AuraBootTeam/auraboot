@@ -47,6 +47,18 @@ public class CommandAutoSetExecutor {
             Map<String, Object> config = (Map<String, Object>) entry.getValue();
             String strategy = (String) config.get("strategy");
 
+            // Some business timestamps are defaults, not system-owned audit fields.
+            // `preserveInput` lets their command DSL keep an explicit user/API value while
+            // still filling the field for callers that omit it. Blank strings are treated
+            // as missing so the generated default remains useful.
+            Object suppliedValue = payload.get(fieldCode);
+            if (Boolean.TRUE.equals(config.get("preserveInput"))
+                    && suppliedValue != null
+                    && (!(suppliedValue instanceof String text) || !text.isBlank())) {
+                log.debug("AUTO_SET: preserving payload value for {}", fieldCode);
+                continue;
+            }
+
             // default_value only fills when payload omits the field — payload-provided value wins.
             // Distinct from fixed_value which always overrides (used for audit/system-managed fields).
             if ("default_value".equals(strategy) && payload.containsKey(fieldCode) && payload.get(fieldCode) != null) {

@@ -940,4 +940,64 @@ describe('ControlledFieldRenderer', () => {
     );
     expect(screen.getAllByText('Required')).toHaveLength(1);
   });
+
+  it('renders datetime metadata as a datetime-local control while preserving explicit picker types', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({
+        componentName,
+        props,
+      }: {
+        componentName: string;
+        props: Record<string, unknown>;
+      }) => {
+        capturedPropsSpy({ componentName, props });
+        return <div data-testid={`component-loader-${String(props.name)}`}>{componentName}</div>;
+      },
+    }));
+
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+    const context = { locale: 'zh-CN', t: (key: string) => key } as any;
+
+    render(
+      <>
+        <ControlledFieldRenderer
+          field={
+            {
+              field: 'expected_close_at',
+              component: 'SmartDatePicker',
+              dataType: 'datetime',
+            } as any
+          }
+          value="2026-10-30T16:30"
+          onChange={vi.fn()}
+          context={context}
+        />
+        <ControlledFieldRenderer
+          field={
+            {
+              field: 'billing_month',
+              component: 'SmartDatePicker',
+              dataType: 'datetime',
+              props: { dateType: 'month' },
+            } as any
+          }
+          value="2026-10"
+          onChange={vi.fn()}
+          context={context}
+        />
+      </>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('component-loader-expected_close_at')).toBeInTheDocument();
+      expect(screen.getByTestId('component-loader-billing_month')).toBeInTheDocument();
+    });
+
+    const calls = capturedPropsSpy.mock.calls.map((call) => call[0]);
+    expect(calls.find((call) => call.props.name === 'expected_close_at')?.props.dateType).toBe(
+      'datetime-local',
+    );
+    expect(calls.find((call) => call.props.name === 'billing_month')?.props.dateType).toBe('month');
+  });
 });

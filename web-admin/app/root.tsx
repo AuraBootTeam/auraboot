@@ -31,8 +31,10 @@ import { useFederationStore } from '~/plugins/FederationManager';
 import { resolveIcpComplianceConfig, type IcpComplianceConfig } from '~/config/icpCompliance';
 import {
   COMMUNITY_BRANDING,
+  isCommercialEdition,
   resolveBrandDisplayName,
   resolveBuildIdentity,
+  resolveCommunityBranding,
   type BrandingConfig,
   type BuildIdentity,
 } from '~/config/branding';
@@ -106,14 +108,33 @@ function getTimezoneFromRequest(request: Request): string {
   }
 }
 
+export async function resolveDeploymentBrandingFromBff(
+  environment: Record<string, string | undefined>,
+): Promise<BrandingConfig> {
+  if (!isCommercialEdition(environment.EDITION)) {
+    return resolveCommunityBranding();
+  }
+
+  const bffUrl =
+    environment.BFF_INTERNAL_URL || `http://127.0.0.1:${environment.BFF_PORT || '3500'}`;
+  const response = await fetch(`${bffUrl}/api/runtime/branding`);
+  if (!response.ok) {
+    throw new Error(`Unable to resolve deployment branding from BFF (${response.status}).`);
+  }
+  const payload = (await response.json()) as { branding?: BrandingConfig };
+  if (!payload.branding) {
+    throw new Error('BFF deployment branding response is missing the branding contract.');
+  }
+  return payload.branding;
+}
+
 export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoaderData | Response> {
   const locale = getLocaleFromRequest(request);
   const initialTimezone = getTimezoneFromRequest(request);
   const { pathname } = new URL(request.url);
   const runtimeProfile = getRuntimeProfileFromPathname(pathname);
   const icpCompliance = resolveIcpComplianceConfig(process.env);
-  const { resolveDeploymentBranding } = await import('~/config/branding.server');
-  const branding = await resolveDeploymentBranding(process.env);
+  const branding = await resolveDeploymentBrandingFromBff(process.env);
   const buildIdentity = resolveBuildIdentity(process.env);
 
   // Bootstrap status: never redirect; inject into loader data so the banner can render
