@@ -66,6 +66,10 @@ export function adminRuntimeEngineRoutes() {
     // the menu-driven catch-all route.
     route('/inbox', './routes/inbox/index.tsx'),
 
+    // Product identity is shell infrastructure: every authenticated user can
+    // reach it from the account menu without a tenant menu or permission grant.
+    route('/about', './plugins/core-settings/pages/settings/about.tsx'),
+
     // Static TSX feature pages that are present in the OSS source tree must be
     // registered before the catch-all menu route. Their plugin menus either have
     // no low-code pageKey or navigate by deep link, so falling through to /*
@@ -76,7 +80,10 @@ export function adminRuntimeEngineRoutes() {
     route('/crm/settings/web-forms', './routes/crm/settings/web-forms.tsx'),
     route('/crm/settings/web-form-editor/:pid', './routes/crm/settings/web-form-editor.$pid.tsx'),
     route('/crm/settings/calendar-sync', './routes/crm/settings/calendar-sync.tsx'),
-    route('/project-management/projects/:projectId', './routes/project-management/projects.$projectId.tsx'),
+    route(
+      '/project-management/projects/:projectId',
+      './routes/project-management/projects.$projectId.tsx',
+    ),
     route('/project-management/my-tasks', './routes/project-management/my-tasks.tsx'),
 
     // Page routes — /p/:pageKey based (V2, underscores)

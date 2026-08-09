@@ -29,6 +29,13 @@ import {
 } from '@auraboot/runtime-kernel';
 import { useFederationStore } from '~/plugins/FederationManager';
 import { resolveIcpComplianceConfig, type IcpComplianceConfig } from '~/config/icpCompliance';
+import {
+  COMMUNITY_BRANDING,
+  resolveBrandDisplayName,
+  resolveBuildIdentity,
+  type BrandingConfig,
+  type BuildIdentity,
+} from '~/config/branding';
 
 export interface RootLoaderData {
   runtimeProfile: RuntimeProfile;
@@ -44,6 +51,8 @@ export interface RootLoaderData {
   spaces: any[];
   bootstrapStatus: BootstrapStatus | null;
   icpCompliance: IcpComplianceConfig;
+  branding: BrandingConfig;
+  buildIdentity: BuildIdentity;
 }
 
 import '~/app.css';
@@ -103,6 +112,9 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   const { pathname } = new URL(request.url);
   const runtimeProfile = getRuntimeProfileFromPathname(pathname);
   const icpCompliance = resolveIcpComplianceConfig(process.env);
+  const { resolveDeploymentBranding } = await import('~/config/branding.server');
+  const branding = await resolveDeploymentBranding(process.env);
+  const buildIdentity = resolveBuildIdentity(process.env);
 
   // Bootstrap status: never redirect; inject into loader data so the banner can render
   const bootstrapStatus = await fetchBootstrapStatus();
@@ -141,6 +153,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
       spaces: [],
       bootstrapStatus,
       icpCompliance,
+      branding,
+      buildIdentity,
     };
     ssrLoaderCache.set(cacheKey, result);
     return result;
@@ -214,17 +228,38 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     spaces,
     bootstrapStatus,
     icpCompliance,
+    branding,
+    buildIdentity,
   };
 }
 
-export const meta = ({ data }: { data?: RootLoaderData }) =>
-  data?.icpCompliance.enabled ? [{ title: data.icpCompliance.siteDisplayName }] : [];
+export const meta = ({ data }: { data?: RootLoaderData }) => [
+  {
+    title: data
+      ? resolveBrandDisplayName(data.branding, data.icpCompliance)
+      : COMMUNITY_BRANDING.productName,
+  },
+];
 
 export function useRootLoaderData(): RootLoaderData | undefined {
   return useRouteLoaderData<typeof loader>('root') as RootLoaderData | undefined;
 }
 
+export function resolveBrandingDocumentLinks(branding: BrandingConfig) {
+  return [
+    { rel: 'icon', href: branding.faviconUrl },
+    { rel: 'icon', type: 'image/png', sizes: '32x32', href: branding.favicon32Url },
+    {
+      rel: 'apple-touch-icon',
+      sizes: '180x180',
+      href: branding.appleTouchIconUrl,
+    },
+    { rel: 'manifest', href: branding.manifestUrl },
+  ];
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
+  const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
   return (
     <html lang="zh-CN" className="h-full" suppressHydrationWarning>
       <head>
@@ -233,6 +268,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="color-scheme" content="light dark" />
         <Meta />
         <Links />
+        {resolveBrandingDocumentLinks(branding).map((link) => (
+          <link key={`${link.rel}:${link.href}`} {...link} />
+        ))}
       </head>
       <body className="h-full bg-gray-50 transition-colors duration-200 dark:bg-gray-900">
         {children}
@@ -288,8 +326,8 @@ export default function App() {
   // Capture uncaught front-end errors → /api/client-errors so they surface in the
   // in-app troubleshooting center (/ops/errors) instead of vanishing.
   useEffect(() => {
-    void import('~/shared/observability/clientErrorReporter').then(({ installClientErrorReporter }) =>
-      installClientErrorReporter(),
+    void import('~/shared/observability/clientErrorReporter').then(
+      ({ installClientErrorReporter }) => installClientErrorReporter(),
     );
   }, []);
 

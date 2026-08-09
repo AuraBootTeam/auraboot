@@ -147,6 +147,14 @@ describe('root loader authentication guard', () => {
         enabled: false,
         siteDisplayName: 'AuraBoot',
       },
+      branding: {
+        productName: 'AuraBoot',
+        poweredByText: 'Powered by AuraBoot',
+      },
+      buildIdentity: {
+        version: 'development',
+        revision: 'local',
+      },
     });
     expect(mocks.getUserInfo).not.toHaveBeenCalled();
     expect(mocks.getUserMenus).not.toHaveBeenCalled();
@@ -171,6 +179,47 @@ describe('root loader authentication guard', () => {
         siteDisplayName: 'AuraBoot Runtime title',
       },
     });
+  });
+
+  it('always emits a stable product title when ICP mode is disabled', async () => {
+    const { COMMUNITY_BRANDING } = await import('~/config/branding');
+    const { meta } = await import('~/root');
+
+    expect(
+      meta({
+        data: {
+          branding: COMMUNITY_BRANDING,
+          icpCompliance: { enabled: false },
+        } as any,
+      }),
+    ).toEqual([{ title: 'AuraBoot' }]);
+  });
+
+  it('keeps commercial branding in the title when ICP records are enabled', async () => {
+    const { COMMUNITY_BRANDING } = await import('~/config/branding');
+    const { meta } = await import('~/root');
+
+    expect(
+      meta({
+        data: {
+          branding: { ...COMMUNITY_BRANDING, mode: 'commercial', productName: 'Northstar' },
+          icpCompliance: { enabled: true, siteDisplayName: 'AuraBoot Filed Site' },
+        } as any,
+      }),
+    ).toEqual([{ title: 'Northstar' }]);
+  });
+
+  it('declares browser identity links from the resolved branding contract', async () => {
+    const { COMMUNITY_BRANDING } = await import('~/config/branding');
+    const { resolveBrandingDocumentLinks } = await import('~/root');
+
+    expect(resolveBrandingDocumentLinks(COMMUNITY_BRANDING)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rel: 'manifest', href: '/manifest.json' }),
+        expect.objectContaining({ rel: 'icon', href: '/favicon.ico' }),
+        expect.objectContaining({ rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }),
+      ]),
+    );
   });
 
   it('keeps storefront runtime public even when an admin token exists', async () => {
