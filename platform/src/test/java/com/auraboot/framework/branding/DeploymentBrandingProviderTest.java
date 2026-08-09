@@ -81,6 +81,21 @@ class DeploymentBrandingProviderTest {
                 .hasMessageContaining("schemaVersion must be 1");
     }
 
+    @Test
+    void commercialBrandingRejectsUnsupportedFields() throws IOException {
+        Path config = writeBranding("SO-2026-001", "https://northstar.example.com");
+        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectNode document = (ObjectNode) objectMapper.readTree(config.toFile());
+        document.put("licenseUrl", "https://northstar.example.com/license");
+        objectMapper.writeValue(config.toFile(), document);
+
+        assertThatThrownBy(() -> new DeploymentBrandingProvider(
+                environment("standard", config, "SO-2026-001"), objectMapper))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("unsupported fields")
+                .hasMessageContaining("licenseUrl");
+    }
+
     private MockEnvironment environment(String edition, Path config, String orderReference) {
         return new MockEnvironment()
                 .withProperty("EDITION", edition)
