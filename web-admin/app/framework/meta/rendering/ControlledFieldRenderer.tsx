@@ -427,6 +427,9 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     required: isRequired,
     error,
     context,
+    ...(componentLower === 'smartdatepicker' && fieldKind === 'datetime'
+      ? { dateType: 'datetime-local' }
+      : {}),
     ...field.props, // 合并字段配置的其他 props
   };
   // Owned by this wrapper (see resolvedHelpText); keep it out of the control's props so

@@ -111,6 +111,7 @@ describe('root loader authentication guard', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it('redirects anonymous private routes even when route middleware is bypassed', async () => {
@@ -179,6 +180,43 @@ describe('root loader authentication guard', () => {
         siteDisplayName: 'AuraBoot Runtime title',
       },
     });
+  });
+
+  it('loads commercial branding through the BFF-only runtime boundary', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          branding: {
+            mode: 'commercial',
+            productName: 'Northstar',
+            poweredByText: 'Powered by Northstar',
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { resolveDeploymentBrandingFromBff } = await import('~/root');
+    await expect(
+      resolveDeploymentBrandingFromBff({
+        EDITION: 'standard',
+        BFF_INTERNAL_URL: 'http://bff.internal:4000',
+      }),
+    ).resolves.toMatchObject({
+      mode: 'commercial',
+      productName: 'Northstar',
+    });
+    expect(fetchMock).toHaveBeenCalledWith('http://bff.internal:4000/api/runtime/branding');
+  });
+
+  it('fails closed when commercial branding cannot be resolved by the BFF', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
+
+    const { resolveDeploymentBrandingFromBff } = await import('~/root');
+    await expect(
+      resolveDeploymentBrandingFromBff({ EDITION: 'standard', BFF_PORT: '4001' }),
+    ).rejects.toThrow('Unable to resolve deployment branding from BFF (503).');
   });
 
   it('always emits a stable product title when ICP mode is disabled', async () => {

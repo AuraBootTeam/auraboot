@@ -182,6 +182,9 @@ const BlockContent: React.FC<{
     case 'metric-strip':
       return <MetricStripPreview block={block} />;
 
+    case 'stage-rail':
+      return <StageRailPreview block={block} />;
+
     case 'record-inspector':
       return <RecordInspectorPreview block={block} />;
 
@@ -212,6 +215,32 @@ const BlockContent: React.FC<{
     default:
       return <GenericPreview block={block} />;
   }
+};
+
+const StageRailPreview: React.FC<{ block: DslBlock }> = ({ block }) => {
+  const stages = Array.isArray((block as any).stages) ? (block as any).stages : [];
+  const visibleStages = stages.length > 0 ? stages.slice(0, 5) : [
+    { value: 'discovery', label: 'Discovery' },
+    { value: 'qualification', label: 'Qualification' },
+    { value: 'proposal', label: 'Proposal' },
+  ];
+  return (
+    <div className="bg-white p-4" data-testid="stage-rail-preview">
+      <div className="mb-3 text-sm font-medium text-gray-700">
+        {resolveLocalizedText(block.title) || 'Stage rail'}
+      </div>
+      <div className="flex items-center gap-2 overflow-hidden">
+        {visibleStages.map((stage: any, index: number) => (
+          <React.Fragment key={String(stage.value || index)}>
+            {index > 0 ? <div className="h-px min-w-4 flex-1 bg-gray-300" /> : null}
+            <div className="min-w-0 rounded-full border border-gray-300 bg-gray-50 px-3 py-1 text-xs text-gray-700">
+              {resolveLocalizedText(stage.label) || String(stage.value || `Stage ${index + 1}`)}
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 /**

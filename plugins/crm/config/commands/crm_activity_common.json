@@ -30,7 +30,8 @@
         "strategy": "current_user_pid"
       },
       "crm_act_date": {
-        "strategy": "current_datetime"
+        "strategy": "current_datetime",
+        "preserveInput": true
       }
     },
     "permissions": [

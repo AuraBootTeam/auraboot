@@ -284,6 +284,7 @@ public final class DslRegistry {
         FIELD_HISTORY("field-history", "Field history block", "1.3"),
         BPM_PANEL("bpm-panel", "BPM panel block", "1.3"),
         METRIC_STRIP("metric-strip", "Metric strip block", "1.4"),
+        STAGE_RAIL("stage-rail", "Ordered business stage rail block", "1.8"),
         RECORD_INSPECTOR("record-inspector", "Record inspector block", "1.4"),
         CANDIDATE_LIST("candidate-list", "Candidate list block", "1.4"),
         WORKBENCH_ACTION_BAR("workbench-action-bar", "Workbench action bar block", "1.4"),

@@ -105,7 +105,6 @@
           "permissionCode": "crm.activity.read",
           "label": { "zh-CN": "打开任务", "en": "Open Task" },
           "variant": "secondary",
-          "permissionCode": "crm.activity.read",
           "visibleWhen": "state.selectedWork != null && state.selectedWork.item_kind == 'task'",
           "onClick": { "action": "navigate", "args": { "to": "/p/crm_activity_common/view/${state.selectedWork.pid}" } }
         },
@@ -114,7 +113,6 @@
           "permissionCode": "crm.complaint.read",
           "label": { "zh-CN": "打开投诉", "en": "Open Complaint" },
           "variant": "secondary",
-          "permissionCode": "crm.complaint.read",
           "visibleWhen": "state.selectedWork != null && state.selectedWork.item_kind == 'complaint'",
           "onClick": { "action": "navigate", "args": { "to": "/p/crm_complaint/view/${state.selectedWork.pid}" } }
         },
@@ -123,7 +121,6 @@
           "permissionCode": "crm.activity.manage",
           "label": { "zh-CN": "新建任务", "en": "Create Task" },
           "variant": "primary",
-          "permissionCode": "crm.activity.manage",
           "onClick": { "action": "navigate", "args": { "to": "/p/crm_activity_common/new" } }
         }
       ]
@@ -142,7 +139,7 @@
         { "field": "item_status", "width": 110, "dictCode": "crm_work_item_status", "label": { "zh-CN": "状态", "en": "Status" } },
         { "field": "item_priority", "width": 105, "dictCode": "crm_task_priority", "label": { "zh-CN": "优先级", "en": "Priority" } },
         { "field": "due_date", "width": 125, "valueType": "date", "label": { "zh-CN": "到期/发生", "en": "Due / Opened" } },
-        { "field": "item_owner", "width": 130, "label": { "zh-CN": "负责人", "en": "Owner" } },
+        { "field": "owner_name", "width": 130, "label": { "zh-CN": "负责人", "en": "Owner" } },
         { "field": "attention_reason", "width": 130, "dictCode": "crm_work_attention_reason", "label": { "zh-CN": "关注原因", "en": "Attention" } }
       ]
     },
@@ -194,7 +191,7 @@
             "closed": { "zh-CN": "已关闭", "en": "Closed" }
           }
         },
-        { "field": "item_owner", "label": { "zh-CN": "负责人", "en": "Owner" } },
+        { "field": "owner_name", "label": { "zh-CN": "负责人", "en": "Owner" } },
         { "field": "due_date", "label": { "zh-CN": "到期/发生日期", "en": "Due / Opened" } }
       ]
     },
@@ -210,7 +207,6 @@
           "permissionCode": "crm.activity.manage",
           "label": { "zh-CN": "开始任务", "en": "Start Task" },
           "variant": "primary",
-          "permissionCode": "crm.activity.manage",
           "visibleWhen": "state.selectedWork != null && state.selectedWork.item_kind == 'task' && state.selectedWork.item_status == 'open'",
           "onClick": { "action": "command.execute", "args": { "command": "crm:start_task", "operationType": "update", "targetRecordPid": "${state.selectedWork.pid}", "reload": ["workStats", "workQueue"] } }
         },
@@ -219,7 +215,6 @@
           "permissionCode": "crm.activity.manage",
           "label": { "zh-CN": "完成任务", "en": "Complete Task" },
           "variant": "primary",
-          "permissionCode": "crm.activity.manage",
           "visibleWhen": "state.selectedWork != null && state.selectedWork.item_kind == 'task' && (state.selectedWork.item_status == 'open' || state.selectedWork.item_status == 'in_progress')",
           "confirm": { "zh-CN": "确认承诺内容已经真实完成吗？", "en": "Confirm that the commitment is actually complete?" },
           "onClick": { "action": "command.execute", "args": { "command": "crm:complete_task", "operationType": "update", "targetRecordPid": "${state.selectedWork.pid}", "reload": ["workStats", "workQueue"] } }
@@ -229,7 +224,6 @@
           "permissionCode": "crm.complaint.manage",
           "label": { "zh-CN": "开始调查", "en": "Start Investigation" },
           "variant": "primary",
-          "permissionCode": "crm.complaint.manage",
           "visibleWhen": "state.selectedWork != null && state.selectedWork.item_kind == 'complaint' && state.selectedWork.item_status == 'open'",
           "onClick": { "action": "command.execute", "args": { "command": "crm:investigate_complaint", "operationType": "update", "targetRecordPid": "${state.selectedWork.pid}", "reload": ["workStats", "workQueue"] } }
         },
@@ -238,7 +232,6 @@
           "permissionCode": "crm.complaint.manage",
           "label": { "zh-CN": "标记已解决", "en": "Mark Resolved" },
           "variant": "primary",
-          "permissionCode": "crm.complaint.manage",
           "visibleWhen": "state.selectedWork != null && state.selectedWork.item_kind == 'complaint' && state.selectedWork.item_status == 'investigating'",
           "confirm": { "zh-CN": "确认根因、纠正措施和客户沟通已经记录吗？", "en": "Confirm root cause, corrective action and customer communication are recorded?" },
           "onClick": { "action": "command.execute", "args": { "command": "crm:resolve_complaint", "operationType": "update", "targetRecordPid": "${state.selectedWork.pid}", "reload": ["workStats", "workQueue"] } }
@@ -248,7 +241,6 @@
           "permissionCode": "crm.complaint.manage",
           "label": { "zh-CN": "关闭投诉", "en": "Close Complaint" },
           "variant": "secondary",
-          "permissionCode": "crm.complaint.manage",
           "visibleWhen": "state.selectedWork != null && state.selectedWork.item_kind == 'complaint' && state.selectedWork.item_status == 'resolved'",
           "confirm": { "zh-CN": "确认客户已接受解决结果并关闭投诉吗？", "en": "Confirm customer acceptance and close the complaint?" },
           "onClick": { "action": "command.execute", "args": { "command": "crm:close_complaint", "operationType": "update", "targetRecordPid": "${state.selectedWork.pid}", "reload": ["workStats", "workQueue"] } }

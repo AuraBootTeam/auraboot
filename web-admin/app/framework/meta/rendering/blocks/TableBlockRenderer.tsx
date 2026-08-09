@@ -445,9 +445,22 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     }
 
     const value = row[column.field];
+    const enrichedDisplayValue = row?.[`${column.field}_display`];
 
     if (column.valueType === 'link' || column.valueType === 'url') {
       return renderLinkCell(column, row, value, locale, t);
+    }
+
+    // Dynamic list APIs enrich reference fields as `<field>_display`. A table
+    // block must prefer that business label; rendering the raw pid leaks an
+    // implementation identifier even though the backend already supplied the
+    // user-facing value.
+    if (
+      enrichedDisplayValue !== undefined &&
+      enrichedDisplayValue !== null &&
+      String(enrichedDisplayValue).trim() !== ''
+    ) {
+      return String(enrichedDisplayValue);
     }
 
     // Null/undefined 处理
@@ -551,7 +564,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   const getCellTitle = (column: ColumnConfig, row: any): string | undefined => {
     if (!column.ellipsis) return undefined;
-    const value = row[column.field];
+    const value = row[`${column.field}_display`] ?? row[column.field];
     if (value === null || value === undefined) return undefined;
     return typeof value === 'string' ? value : String(value);
   };
@@ -733,7 +746,11 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                     data-testid="table-select-all"
                     checked={allVisibleRowsSelected}
                     onChange={toggleAllVisibleRows}
-                    aria-label="Select all rows"
+                    aria-label={getLocalizedText(
+                      { 'zh-CN': '选择全部行', en: 'Select all rows' },
+                      locale,
+                      t,
+                    )}
                   />
                 </th>
               )}

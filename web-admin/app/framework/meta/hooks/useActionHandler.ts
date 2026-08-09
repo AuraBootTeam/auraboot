@@ -766,7 +766,17 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
           }
 
           case 'navigate': {
-            const path = resolveNavigateTo(actionDef.to, record);
+            const isEditAction =
+              normalizedButton.label === 'edit' ||
+              normalizedButton.label === 'update' ||
+              normalizedButton.code === 'edit' ||
+              normalizedButton.code === 'update';
+            // A navigate action carrying a non-edit command is a contextual
+            // create flow. The current record is the source object, not the
+            // target form record; passing it to a `*_form` page incorrectly
+            // resolves an edit route for the target model.
+            const isContextualCreate = Boolean(actionDef.command) && !isEditAction;
+            const path = resolveNavigateTo(actionDef.to, isContextualCreate ? undefined : record);
             // Absolute backend/external URLs (e.g. a file-download endpoint) are
             // real browser navigations, not client-side routes — open them so the
             // browser handles the Content-Disposition download.
@@ -779,11 +789,6 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               return;
             }
             if (actionDef.command) {
-              const isEditAction =
-                normalizedButton.label === 'edit' ||
-                normalizedButton.label === 'update' ||
-                normalizedButton.code === 'edit' ||
-                normalizedButton.code === 'update';
               const sep = path.includes('?') ? '&' : '?';
               const params = [`commandCode=${encodeURIComponent(actionDef.command)}`];
               const sourceRecordPid = record?.pid;

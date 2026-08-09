@@ -6,6 +6,7 @@ describe('dslRegistryService fallback registry', () => {
     const blockTypes = getEnumCodes(getFallbackRegistry(), 'BlockType');
 
     expect(blockTypes).toContain('metric-strip');
+    expect(blockTypes).toContain('stage-rail');
     expect(blockTypes).toContain('record-inspector');
     expect(blockTypes).toContain('candidate-list');
     expect(blockTypes).toContain('workbench-action-bar');

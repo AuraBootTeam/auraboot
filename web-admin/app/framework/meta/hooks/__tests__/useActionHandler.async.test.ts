@@ -575,6 +575,38 @@ describe('useActionHandler - handlerParams.async polling', () => {
     openSpy.mockRestore();
   });
 
+  it('opens a contextual command form in create mode and carries the source record pid', async () => {
+    const navigate = vi.fn();
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: navigate as any,
+        tableName: 'crm_opportunity_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: {} as any,
+      }),
+    );
+
+    const button = {
+      code: 'log_activity',
+      label: 'Log Activity',
+      action: {
+        type: 'navigate',
+        to: 'crm_activity_common_form',
+        command: 'crm:log_opp_activity',
+      },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button, { pid: 'OPP-123' });
+    });
+
+    expect(navigate).toHaveBeenCalledWith(
+      '/p/crm_activity_common/new?commandCode=crm%3Alog_opp_activity&sourceRecordPid=OPP-123',
+    );
+  });
+
   it('injects the original filename alongside promptUpload file ids', async () => {
     fetchResultMock.mockResolvedValueOnce({ code: '0', data: { importId: 'BOM-IMPORT-1' } });
     const pickFileSpy = vi

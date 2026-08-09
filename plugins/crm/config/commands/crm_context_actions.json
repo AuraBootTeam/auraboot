@@ -28,12 +28,27 @@
         "strategy": "current_user_pid"
       },
       "crm_act_date": {
-        "strategy": "current_datetime"
+        "strategy": "current_datetime",
+        "preserveInput": true
       }
     },
+    "preconditions": [
+      {
+        "field": "sourceRecordPid",
+        "operator": "NOT_NULL",
+        "message:zh-CN": "必须从业务记录上下文创建活动或任务",
+        "message:en": "A source business record is required"
+      },
+      {
+        "field": "sourceRecordPid",
+        "operator": "NEQ",
+        "value": "",
+        "message:zh-CN": "业务记录上下文不能为空",
+        "message:en": "The source business record cannot be blank"
+      }
+    ],
     "sideEffects": [
       {
-        "condition": "#sourceRecordId != null",
         "actions": [
           {
             "type": "create_record",
@@ -41,7 +56,7 @@
             "fields": {
               "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "opportunity",
-              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_object_id": "${sourceRecordPid}",
               "crm_ar_role": "primary"
             }
           }
@@ -83,12 +98,27 @@
         "strategy": "current_user_pid"
       },
       "crm_act_date": {
-        "strategy": "current_datetime"
+        "strategy": "current_datetime",
+        "preserveInput": true
       }
     },
+    "preconditions": [
+      {
+        "field": "sourceRecordPid",
+        "operator": "NOT_NULL",
+        "message:zh-CN": "必须从业务记录上下文创建活动或任务",
+        "message:en": "A source business record is required"
+      },
+      {
+        "field": "sourceRecordPid",
+        "operator": "NEQ",
+        "value": "",
+        "message:zh-CN": "业务记录上下文不能为空",
+        "message:en": "The source business record cannot be blank"
+      }
+    ],
     "sideEffects": [
       {
-        "condition": "#sourceRecordId != null",
         "actions": [
           {
             "type": "create_record",
@@ -96,7 +126,7 @@
             "fields": {
               "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "account",
-              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_object_id": "${sourceRecordPid}",
               "crm_ar_role": "primary"
             }
           }
@@ -138,12 +168,27 @@
         "strategy": "current_user_pid"
       },
       "crm_act_date": {
-        "strategy": "current_datetime"
+        "strategy": "current_datetime",
+        "preserveInput": true
       }
     },
+    "preconditions": [
+      {
+        "field": "sourceRecordPid",
+        "operator": "NOT_NULL",
+        "message:zh-CN": "必须从业务记录上下文创建活动或任务",
+        "message:en": "A source business record is required"
+      },
+      {
+        "field": "sourceRecordPid",
+        "operator": "NEQ",
+        "value": "",
+        "message:zh-CN": "业务记录上下文不能为空",
+        "message:en": "The source business record cannot be blank"
+      }
+    ],
     "sideEffects": [
       {
-        "condition": "#sourceRecordId != null",
         "actions": [
           {
             "type": "create_record",
@@ -151,7 +196,7 @@
             "fields": {
               "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "lead",
-              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_object_id": "${sourceRecordPid}",
               "crm_ar_role": "primary"
             }
           }
@@ -184,7 +229,8 @@
         "strategy": "current_user_pid"
       },
       "crm_act_date": {
-        "strategy": "current_datetime"
+        "strategy": "current_datetime",
+        "preserveInput": true
       },
       "crm_act_type": {
         "strategy": "fixed_value",
@@ -195,9 +241,23 @@
         "value": "open"
       }
     },
+    "preconditions": [
+      {
+        "field": "sourceRecordPid",
+        "operator": "NOT_NULL",
+        "message:zh-CN": "必须从业务记录上下文创建活动或任务",
+        "message:en": "A source business record is required"
+      },
+      {
+        "field": "sourceRecordPid",
+        "operator": "NEQ",
+        "value": "",
+        "message:zh-CN": "业务记录上下文不能为空",
+        "message:en": "The source business record cannot be blank"
+      }
+    ],
     "sideEffects": [
       {
-        "condition": "#sourceRecordId != null",
         "actions": [
           {
             "type": "create_record",
@@ -205,7 +265,7 @@
             "fields": {
               "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "opportunity",
-              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_object_id": "${sourceRecordPid}",
               "crm_ar_role": "primary"
             }
           }
@@ -238,7 +298,8 @@
         "strategy": "current_user_pid"
       },
       "crm_act_date": {
-        "strategy": "current_datetime"
+        "strategy": "current_datetime",
+        "preserveInput": true
       },
       "crm_act_type": {
         "strategy": "fixed_value",
@@ -249,9 +310,23 @@
         "value": "open"
       }
     },
+    "preconditions": [
+      {
+        "field": "sourceRecordPid",
+        "operator": "NOT_NULL",
+        "message:zh-CN": "必须从业务记录上下文创建活动或任务",
+        "message:en": "A source business record is required"
+      },
+      {
+        "field": "sourceRecordPid",
+        "operator": "NEQ",
+        "value": "",
+        "message:zh-CN": "业务记录上下文不能为空",
+        "message:en": "The source business record cannot be blank"
+      }
+    ],
     "sideEffects": [
       {
-        "condition": "#sourceRecordId != null",
         "actions": [
           {
             "type": "create_record",
@@ -259,7 +334,7 @@
             "fields": {
               "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "account",
-              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_object_id": "${sourceRecordPid}",
               "crm_ar_role": "primary"
             }
           }
@@ -292,7 +367,8 @@
         "strategy": "current_user_pid"
       },
       "crm_act_date": {
-        "strategy": "current_datetime"
+        "strategy": "current_datetime",
+        "preserveInput": true
       },
       "crm_act_type": {
         "strategy": "fixed_value",
@@ -303,9 +379,23 @@
         "value": "open"
       }
     },
+    "preconditions": [
+      {
+        "field": "sourceRecordPid",
+        "operator": "NOT_NULL",
+        "message:zh-CN": "必须从业务记录上下文创建活动或任务",
+        "message:en": "A source business record is required"
+      },
+      {
+        "field": "sourceRecordPid",
+        "operator": "NEQ",
+        "value": "",
+        "message:zh-CN": "业务记录上下文不能为空",
+        "message:en": "The source business record cannot be blank"
+      }
+    ],
     "sideEffects": [
       {
-        "condition": "#sourceRecordId != null",
         "actions": [
           {
             "type": "create_record",
@@ -313,7 +403,7 @@
             "fields": {
               "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "lead",
-              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_object_id": "${sourceRecordPid}",
               "crm_ar_role": "primary"
             }
           }
@@ -354,12 +444,27 @@
         "strategy": "current_user_pid"
       },
       "crm_act_date": {
-        "strategy": "current_datetime"
+        "strategy": "current_datetime",
+        "preserveInput": true
       }
     },
+    "preconditions": [
+      {
+        "field": "sourceRecordPid",
+        "operator": "NOT_NULL",
+        "message:zh-CN": "必须从业务记录上下文创建活动或任务",
+        "message:en": "A source business record is required"
+      },
+      {
+        "field": "sourceRecordPid",
+        "operator": "NEQ",
+        "value": "",
+        "message:zh-CN": "业务记录上下文不能为空",
+        "message:en": "The source business record cannot be blank"
+      }
+    ],
     "sideEffects": [
       {
-        "condition": "#sourceRecordId != null",
         "actions": [
           {
             "type": "create_record",
@@ -367,7 +472,7 @@
             "fields": {
               "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "contact",
-              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_object_id": "${sourceRecordPid}",
               "crm_ar_role": "primary"
             }
           }
@@ -399,7 +504,8 @@
         "strategy": "current_user_pid"
       },
       "crm_act_date": {
-        "strategy": "current_datetime"
+        "strategy": "current_datetime",
+        "preserveInput": true
       },
       "crm_act_type": {
         "strategy": "fixed_value",
@@ -410,9 +516,23 @@
         "value": "open"
       }
     },
+    "preconditions": [
+      {
+        "field": "sourceRecordPid",
+        "operator": "NOT_NULL",
+        "message:zh-CN": "必须从业务记录上下文创建活动或任务",
+        "message:en": "A source business record is required"
+      },
+      {
+        "field": "sourceRecordPid",
+        "operator": "NEQ",
+        "value": "",
+        "message:zh-CN": "业务记录上下文不能为空",
+        "message:en": "The source business record cannot be blank"
+      }
+    ],
     "sideEffects": [
       {
-        "condition": "#sourceRecordId != null",
         "actions": [
           {
             "type": "create_record",
@@ -420,7 +540,7 @@
             "fields": {
               "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "contact",
-              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_object_id": "${sourceRecordPid}",
               "crm_ar_role": "primary"
             }
           }
@@ -461,12 +581,27 @@
         "strategy": "current_user_pid"
       },
       "crm_act_date": {
-        "strategy": "current_datetime"
+        "strategy": "current_datetime",
+        "preserveInput": true
       }
     },
+    "preconditions": [
+      {
+        "field": "sourceRecordPid",
+        "operator": "NOT_NULL",
+        "message:zh-CN": "必须从业务记录上下文创建活动或任务",
+        "message:en": "A source business record is required"
+      },
+      {
+        "field": "sourceRecordPid",
+        "operator": "NEQ",
+        "value": "",
+        "message:zh-CN": "业务记录上下文不能为空",
+        "message:en": "The source business record cannot be blank"
+      }
+    ],
     "sideEffects": [
       {
-        "condition": "#sourceRecordId != null",
         "actions": [
           {
             "type": "create_record",
@@ -474,7 +609,7 @@
             "fields": {
               "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "complaint",
-              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_object_id": "${sourceRecordPid}",
               "crm_ar_role": "primary"
             }
           }
@@ -515,12 +650,27 @@
         "strategy": "current_user_pid"
       },
       "crm_act_date": {
-        "strategy": "current_datetime"
+        "strategy": "current_datetime",
+        "preserveInput": true
       }
     },
+    "preconditions": [
+      {
+        "field": "sourceRecordPid",
+        "operator": "NOT_NULL",
+        "message:zh-CN": "必须从业务记录上下文创建活动或任务",
+        "message:en": "A source business record is required"
+      },
+      {
+        "field": "sourceRecordPid",
+        "operator": "NEQ",
+        "value": "",
+        "message:zh-CN": "业务记录上下文不能为空",
+        "message:en": "The source business record cannot be blank"
+      }
+    ],
     "sideEffects": [
       {
-        "condition": "#sourceRecordId != null",
         "actions": [
           {
             "type": "create_record",
@@ -528,7 +678,7 @@
             "fields": {
               "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "campaign",
-              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_object_id": "${sourceRecordPid}",
               "crm_ar_role": "primary"
             }
           }
@@ -560,7 +710,8 @@
         "strategy": "current_user_pid"
       },
       "crm_act_date": {
-        "strategy": "current_datetime"
+        "strategy": "current_datetime",
+        "preserveInput": true
       },
       "crm_act_type": {
         "strategy": "fixed_value",
@@ -571,9 +722,23 @@
         "value": "open"
       }
     },
+    "preconditions": [
+      {
+        "field": "sourceRecordPid",
+        "operator": "NOT_NULL",
+        "message:zh-CN": "必须从业务记录上下文创建活动或任务",
+        "message:en": "A source business record is required"
+      },
+      {
+        "field": "sourceRecordPid",
+        "operator": "NEQ",
+        "value": "",
+        "message:zh-CN": "业务记录上下文不能为空",
+        "message:en": "The source business record cannot be blank"
+      }
+    ],
     "sideEffects": [
       {
-        "condition": "#sourceRecordId != null",
         "actions": [
           {
             "type": "create_record",
@@ -581,7 +746,7 @@
             "fields": {
               "crm_ar_activity_id": "${recordPid}",
               "crm_ar_object_type": "campaign",
-              "crm_ar_object_id": "${sourceRecordId}",
+              "crm_ar_object_id": "${sourceRecordPid}",
               "crm_ar_role": "primary"
             }
           }

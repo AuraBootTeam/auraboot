@@ -40,6 +40,27 @@ export interface SchemaRuntimeConfig {
 }
 
 /**
+ * Restore filter/search controls from page state when a field declares
+ * `bindState`. This keeps the visible form value aligned with the state used by
+ * data sources after a route round-trip (for example list -> detail -> list).
+ */
+export function buildBoundStateForm(
+  schema: UnifiedSchema,
+  state: Record<string, any>,
+): Record<string, any> {
+  const form: Record<string, any> = {};
+  for (const block of schema.blocks || []) {
+    for (const field of block.fields || []) {
+      const boundStateKey = field.bindState;
+      if (boundStateKey && Object.prototype.hasOwnProperty.call(state, boundStateKey)) {
+        form[field.field] = state[boundStateKey];
+      }
+    }
+  }
+  return form;
+}
+
+/**
  * Schema Runtime 类
  */
 export class SchemaRuntime {
@@ -64,13 +85,18 @@ export class SchemaRuntime {
     // 初始化状态管理器
     this.stateManager = new ScopedStateManager(config.globalState);
 
+    const initialState = {
+      ...(config.schema.state || {}),
+      ...((config.initialContext?.state as Record<string, any> | undefined) || {}),
+    };
+
     // 创建作用域
     this.stateManager.createScope(this.scopeId, {
-      state: {
-        ...(config.schema.state || {}),
-        ...((config.initialContext?.state as Record<string, any> | undefined) || {}),
+      state: initialState,
+      form: {
+        ...buildBoundStateForm(config.schema, initialState),
+        ...(config.initialContext?.form || {}),
       },
-      form: config.initialContext?.form || {},
       record: (config.initialContext as any)?.record,
       row: config.initialContext?.row,
       args: config.initialContext?.args,
@@ -361,8 +387,15 @@ export class SchemaRuntime {
   syncContext(context?: Partial<ExpressionContext>): void {
     if (!context) return;
     const current = this.stateManager.getScope(this.scopeId) || {};
+    const boundStateForm = context.state
+      ? buildBoundStateForm(this.schema, context.state as Record<string, any>)
+      : {};
     this.stateManager.updateScope(this.scopeId, {
-      ...(context.form !== undefined ? { form: context.form || {} } : {}),
+      ...(context.form !== undefined
+        ? { form: { ...boundStateForm, ...(context.form || {}) } }
+        : Object.keys(boundStateForm).length > 0
+          ? { form: { ...(current.form || {}), ...boundStateForm } }
+          : {}),
       ...(context.row !== undefined ? { row: context.row } : {}),
       ...(context.args !== undefined ? { args: context.args } : {}),
       ...((context as any).record !== undefined ? { record: (context as any).record } : {}),

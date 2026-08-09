@@ -132,6 +132,12 @@ export function initBlockRegistry(): void {
       'MetricStripBlockRenderer',
     ),
   });
+  BlockRegistry.register('stage-rail', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/StageRailBlockRenderer'),
+      'StageRailBlockRenderer',
+    ),
+  });
   BlockRegistry.register('record-inspector', {
     component: lazy(
       () => import('~/framework/meta/rendering/blocks/RecordInspectorBlockRenderer'),

@@ -9,6 +9,7 @@ import {
   injectDetailRecordValueIntoCustomBlock,
   mergeDetailDisplayFields,
   readDetailRecordField,
+  resolveDetailReturnTarget,
   resolveActiveDetailTab,
   resolveDetailFieldComponent,
   resolveDetailRecordEndpoint,
@@ -20,6 +21,27 @@ import {
   shouldRenderDefaultDetailEditAction,
   unwrapDetailRecord,
 } from '../DetailPageContent';
+
+describe('resolveDetailReturnTarget', () => {
+  it('returns to an internal workbench while carrying its route context', () => {
+    const search = `?routeContext=${encodeURIComponent(
+      JSON.stringify({
+        returnTo: '/p/c/crm_opportunity_workspace',
+        state: { searchKeyword: '华东智造云' },
+      }),
+    )}`;
+    expect(resolveDetailReturnTarget(search)).toBe(
+      `/p/c/crm_opportunity_workspace${search}`,
+    );
+  });
+
+  it('rejects external return targets', () => {
+    const search = `?routeContext=${encodeURIComponent(
+      JSON.stringify({ returnTo: '//example.com' }),
+    )}`;
+    expect(resolveDetailReturnTarget(search)).toBeNull();
+  });
+});
 
 describe('buildDetailRecordEndpoint', () => {
   it('builds the direct record endpoint used by detail pages', () => {

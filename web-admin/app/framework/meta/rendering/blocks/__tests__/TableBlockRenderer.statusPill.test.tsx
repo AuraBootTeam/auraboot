@@ -114,4 +114,28 @@ describe('TableBlockRenderer status-pill renderType', () => {
     expect(screen.getByText(new Date(date).toLocaleDateString('zh-CN'))).toBeInTheDocument();
     expect(screen.getByText(new Date(date).toLocaleString('zh-CN'))).toBeInTheDocument();
   });
+
+  it('prefers a backend-enriched reference display label over the raw pid', () => {
+    const block = {
+      id: 'reference-label',
+      blockType: 'table',
+      dataSource: 'rows',
+      columns: [{ field: 'crm_fcst_owner', label: '提交人' }],
+    } as unknown as BlockConfig;
+    render(
+      <TableBlockRenderer
+        block={block}
+        runtime={makeRuntime([
+          {
+            pid: 'forecast-1',
+            crm_fcst_owner: '01KZKV0T575BDJ3B3FT2QHBKDW',
+            crm_fcst_owner_display: 'Admin User',
+          },
+        ])}
+      />,
+    );
+
+    expect(screen.getByText('Admin User')).toBeInTheDocument();
+    expect(screen.queryByText('01KZKV0T575BDJ3B3FT2QHBKDW')).not.toBeInTheDocument();
+  });
 });
