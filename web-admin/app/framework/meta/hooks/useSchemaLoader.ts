@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
+import type { RuntimePageKind } from '~/framework/meta/schemas/pageKinds';
 import {
   canonicalizePageSchemaDto,
   type PageSchemaDTO,
@@ -80,7 +81,7 @@ export interface UseSchemaLoaderOptions {
    */
   tableName?: string;
   pageKey?: string;
-  type?: 'list' | 'form' | 'detail' | 'kanban';
+  type?: RuntimePageKind;
   token?: string;
   /**
    * The page may legitimately have no DSL schema.
@@ -130,10 +131,7 @@ export function useSchemaLoader(options: UseSchemaLoaderOptions): UseSchemaLoade
     throw new Error('Either pageKey or (tableName + type) must be provided');
   };
 
-  const loadSchema = async (
-    isStale: () => boolean = () => false,
-    signal?: AbortSignal,
-  ) => {
+  const loadSchema = async (isStale: () => boolean = () => false, signal?: AbortSignal) => {
     try {
       setError(null);
 

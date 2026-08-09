@@ -21,4 +21,18 @@ describe('admin render profile bootstrap', () => {
     const adminProfile = runtimeKernel.profileRegistry.get('admin');
     expect(adminProfile?.blockRenderers.get('custom')).toBeDefined();
   });
+
+  it.each(['page', 'kanban', 'dashboard', 'composite', 'page_layout'])(
+    'renders block-composed %s pages after publication',
+    async (kind) => {
+      vi.resetModules();
+
+      const runtimeKernel = await import('@auraboot/runtime-kernel');
+      await import('../index');
+
+      const adminProfile = runtimeKernel.profileRegistry.get('admin');
+      expect(adminProfile?.kinds).toContain(kind);
+      expect(adminProfile?.pageRenderers.get(kind)).toBeDefined();
+    },
+  );
 });

@@ -21,6 +21,11 @@ import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { isUnconfiguredStubPage } from './isUnconfiguredStubPage';
 import { StubPageError } from './StubPageError';
 import { ContextualAuthoringSurface } from '~/framework/meta/authoring/ContextualAuthoringSurface';
+import {
+  isRuntimePageKind,
+  RUNTIME_PAGE_KINDS,
+  type RuntimePageKind,
+} from '~/framework/meta/schemas/pageKinds';
 
 // Ensure profiles are registered
 import '~/framework/meta/profiles/admin';
@@ -30,7 +35,7 @@ export interface DynamicPageRendererProps {
   /** Model table name (e.g., "device", "pe-order") */
   tableName: string;
   /** Page kind — must match ab_page_schema.kind values */
-  pageType: 'list' | 'form' | 'detail' | 'kanban';
+  pageType: RuntimePageKind;
   /** Profile name override (default resolves from schema.profile or "admin") */
   profileName?: string;
   /** Record ID for edit/detail modes */
@@ -50,8 +55,7 @@ export function DynamicPageRenderer({
   pageKey,
 }: DynamicPageRendererProps) {
   // 1. Validate pageType matches DB kind values
-  const VALID_KINDS = ['list', 'form', 'detail', 'kanban'] as const;
-  const isValidPageType = VALID_KINDS.includes(pageType);
+  const isValidPageType = isRuntimePageKind(pageType);
   const schemaRequest = pageKey
     ? { pageKey, token: token || undefined }
     : {
@@ -63,10 +67,10 @@ export function DynamicPageRenderer({
   // 2. Load schema
   const { schema, loading, error } = useSchemaLoader(schemaRequest);
 
-  if (!VALID_KINDS.includes(pageType)) {
+  if (!isValidPageType) {
     return (
       <ErrorAlert
-        error={`Invalid pageType "${pageType}" for "${tableName}". Expected one of: ${VALID_KINDS.join(', ')}. If you see "new" or "edit", update the route to pass "form" instead.`}
+        error={`Invalid pageType "${pageType}" for "${tableName}". Expected one of: ${RUNTIME_PAGE_KINDS.join(', ')}. If you see "new" or "edit", update the route to pass "form" instead.`}
       />
     );
   }

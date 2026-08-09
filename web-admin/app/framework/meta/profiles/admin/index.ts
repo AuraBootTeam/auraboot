@@ -9,9 +9,14 @@
  */
 
 import React from 'react';
-import { profileRegistry, type BlockRendererProps, type RenderProfile } from '@auraboot/runtime-kernel';
+import {
+  profileRegistry,
+  type BlockRendererProps,
+  type RenderProfile,
+} from '@auraboot/runtime-kernel';
 import { initBlockRegistry } from '~/ui/schema-renderer/BlockRegistry';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
+import { RUNTIME_PAGE_KINDS } from '~/framework/meta/schemas/pageKinds';
 
 initBlockRegistry();
 
@@ -73,14 +78,23 @@ const TabsBlockRenderer = React.lazy(() =>
 );
 // Lazy page content renderers — largest components, biggest savings
 const ListPageContent = React.lazy(() =>
-  import('~/framework/meta/rendering/pages/ListPageContent').then((m) => ({ default: m.ListPageContent })),
+  import('~/framework/meta/rendering/pages/ListPageContent').then((m) => ({
+    default: m.ListPageContent,
+  })),
 );
 const FormPageContent = React.lazy(() =>
-  import('~/framework/meta/rendering/pages/FormPageContent').then((m) => ({ default: m.FormPageContent })),
+  import('~/framework/meta/rendering/pages/FormPageContent').then((m) => ({
+    default: m.FormPageContent,
+  })),
 );
 const DetailPageContent = React.lazy(() =>
   import('~/framework/meta/rendering/pages/DetailPageContent').then((m) => ({
     default: m.DetailPageContent,
+  })),
+);
+const ComposedPageContent = React.lazy(() =>
+  import('~/framework/meta/rendering/pages/ComposedPageContent').then((m) => ({
+    default: m.ComposedPageContent,
   })),
 );
 const CustomBlockRenderer = ({ block, runtime }: BlockRendererProps) => {
@@ -146,12 +160,17 @@ const adminProfile: RenderProfile = {
     // tabs, sub-table, monthly-grid are handled inline by page renderers
   ]),
 
-  kinds: ['page', 'list', 'form', 'detail', 'page_layout'],
+  kinds: [...RUNTIME_PAGE_KINDS],
 
   pageRenderers: new Map<string, any>([
+    ['page', ComposedPageContent],
     ['list', ListPageContent],
     ['form', FormPageContent],
     ['detail', DetailPageContent],
+    ['kanban', ComposedPageContent],
+    ['dashboard', ComposedPageContent],
+    ['composite', ComposedPageContent],
+    ['page_layout', ComposedPageContent],
   ]),
 
   skeletons: new Map<string, any>([

@@ -23,10 +23,12 @@ import {
   moveAuthoringStudioBlock,
   openAuthoringReviewWorkspace,
   observeAuthoringChangeSet,
+  prepareAuthoringSession,
   publishAuthoringChangeSet,
   rollbackAuthoringRelease,
   rejectAuthoringAiPatchProposal,
   splitAuthoringChangeSet,
+  submitAuthoringSession,
   takeoverAuthoringWriterLease,
   transitionAuthoringGovernance,
 } from '~/framework/meta/authoring/authoringService';
@@ -84,10 +86,12 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   loadAuthoringSession: vi.fn(),
   moveAuthoringStudioBlock: vi.fn(),
   observeAuthoringChangeSet: vi.fn(),
+  prepareAuthoringSession: vi.fn(),
   publishAuthoringChangeSet: vi.fn(),
   rollbackAuthoringRelease: vi.fn(),
   rejectAuthoringAiPatchProposal: vi.fn(),
   splitAuthoringChangeSet: vi.fn(),
+  submitAuthoringSession: vi.fn(),
   startAuthoringIdentitySimulation: vi.fn(),
   openAuthoringReviewWorkspace: vi.fn(),
   takeoverAuthoringWriterLease: vi.fn(),
@@ -141,10 +145,12 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(createAuthoringAiPatchProposal).mockReset();
     vi.mocked(moveAuthoringStudioBlock).mockReset();
     vi.mocked(observeAuthoringChangeSet).mockReset();
+    vi.mocked(prepareAuthoringSession).mockReset();
     vi.mocked(publishAuthoringChangeSet).mockReset();
     vi.mocked(rollbackAuthoringRelease).mockReset();
     vi.mocked(rejectAuthoringAiPatchProposal).mockReset();
     vi.mocked(splitAuthoringChangeSet).mockReset();
+    vi.mocked(submitAuthoringSession).mockReset();
     vi.mocked(openAuthoringReviewWorkspace).mockReset();
     vi.mocked(takeoverAuthoringWriterLease).mockReset();
     vi.mocked(transitionAuthoringGovernance).mockReset();
@@ -378,6 +384,57 @@ describe('UnifiedDesignerPage', () => {
     );
     await waitFor(() =>
       expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_customer_name'),
+    );
+  });
+
+  it('keeps new resources in Studio through prepare and submit without resuming them on the source page', async () => {
+    setSearch('?authoringSession=session_1');
+    const draft = createAuthoringSession(
+      createDocument('production_exception', 'Production Exception'),
+      3,
+      'L3',
+      'HANDOFF_STUDIO',
+    );
+    draft.snapshot = {
+      ...draft.snapshot,
+      _authoringResource: { lifecycle: 'NEW' },
+    };
+    const prepared = {
+      ...draft,
+      validationState: 'VALID',
+      impactState: 'KNOWN',
+    } as AuthoringSession;
+    const submitted = {
+      ...prepared,
+      changeSetStatus: 'IN_REVIEW',
+      state: 'READ_ONLY',
+      publishState: 'WAITING_APPROVAL',
+    } as AuthoringSession;
+    vi.mocked(loadAuthoringSession)
+      .mockResolvedValueOnce(draft)
+      .mockResolvedValueOnce(submitted);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(prepareAuthoringSession).mockResolvedValue(prepared);
+    vi.mocked(submitAuthoringSession).mockResolvedValue(undefined);
+
+    render(<UnifiedDesignerPage />);
+
+    expect(await screen.findByTestId('studio-submission-notice')).toHaveTextContent(
+      '校验与影响分析',
+    );
+    expect(screen.queryByTestId('designer-return-link')).not.toBeInTheDocument();
+    expect(screen.getByTestId('studio-return-source')).toHaveAttribute('href', '/orders?tab=open');
+
+    fireEvent.click(screen.getByTestId('studio-prepare-submit'));
+    await waitFor(() =>
+      expect(prepareAuthoringSession).toHaveBeenCalledWith('session_1', 3),
+    );
+    expect(await screen.findByTestId('studio-prepare-submit')).toHaveTextContent('提交评审');
+
+    fireEvent.click(screen.getByTestId('studio-prepare-submit'));
+    await waitFor(() => expect(submitAuthoringSession).toHaveBeenCalledWith('session_1', 3));
+    expect(await screen.findByTestId('authoring-governance-notice')).toHaveTextContent(
+      '评审中',
     );
   });
 

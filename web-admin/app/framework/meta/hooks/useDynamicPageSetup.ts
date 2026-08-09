@@ -49,8 +49,9 @@ import { fetchResult } from '~/shared/services/http-client';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
+import type { RuntimePageKind } from '~/framework/meta/schemas/pageKinds';
 
-export type PageType = 'list' | 'form' | 'detail' | 'kanban';
+export type PageType = RuntimePageKind;
 
 export interface UseDynamicPageSetupOptions {
   /** 表名 */

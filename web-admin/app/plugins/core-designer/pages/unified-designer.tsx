@@ -28,9 +28,11 @@ import {
   moveAuthoringStudioBlock,
   openAuthoringReviewWorkspace,
   observeAuthoringChangeSet,
+  prepareAuthoringSession,
   publishAuthoringChangeSet,
   relocateAuthoringStudioBlock,
   removeAuthoringStudioBlock,
+  submitAuthoringSession,
   takeoverAuthoringWriterLease,
   transitionAuthoringGovernance,
 } from '~/framework/meta/authoring/authoringService';
@@ -116,6 +118,8 @@ export default function UnifiedDesignerPage() {
     null,
   );
   const [governanceError, setGovernanceError] = useState<string | null>(null);
+  const [submissionPending, setSubmissionPending] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [newPageOptions, setNewPageOptions] = useState<NewPageWorkspaceOptions | null>(null);
   const [newPagePending, setNewPagePending] = useState(false);
   const [newPageError, setNewPageError] = useState<string | null>(null);
@@ -146,6 +150,7 @@ export default function UnifiedDesignerPage() {
       setLeaseTakeoverError(null);
       setStudioConflict(null);
       setConflictError(null);
+      setSubmissionError(null);
       setReviewWorkspaceMode(false);
       setNewPageOptions(null);
       setNewPageError(null);
@@ -161,6 +166,7 @@ export default function UnifiedDesignerPage() {
     setLeaseTakeoverError(null);
     setStudioConflict(null);
     setConflictError(null);
+    setSubmissionError(null);
     setReviewWorkspaceMode(false);
     setNewPageOptions(null);
     setNewPageError(null);
@@ -656,6 +662,45 @@ export default function UnifiedDesignerPage() {
     }
   };
 
+  const handlePrepareOrSubmit = async () => {
+    if (
+      reviewWorkspaceMode ||
+      !authoringSession ||
+      !canManageDesigner ||
+      authoringSession.state !== 'ACTIVE' ||
+      !hasOwnedWriterLease(authoringSession) ||
+      studioConflict ||
+      submissionPending
+    )
+      return;
+    setSubmissionPending(true);
+    setSubmissionError(null);
+    try {
+      const prepared =
+        authoringSession.validationState === 'VALID' &&
+        authoringSession.impactState === 'KNOWN';
+      const latest = prepared
+        ? await submitAndReloadAuthoringSession(authoringSession)
+        : await prepareAuthoringSession(
+            authoringSession.sessionPid,
+            authoringSession.revision,
+          );
+      const canonicalDocument = authoringSnapshotToPageSchemaV3(latest.snapshot);
+      documentBaselineRef.current = latest;
+      setAuthoringSession(latest);
+      setDocument(canonicalDocument);
+      setWorkbenchGeneration((current) => current + 1);
+    } catch (submissionFailure) {
+      setSubmissionError(
+        submissionFailure instanceof Error
+          ? submissionFailure.message
+          : '无法完成校验或提交评审',
+      );
+    } finally {
+      setSubmissionPending(false);
+    }
+  };
+
   const handleReleaseRolledBack = async () => {
     if (!authoringSession || reviewWorkspaceMode) return;
     const latest = await loadAuthoringSession(authoringSession.sessionPid);
@@ -896,6 +941,7 @@ export default function UnifiedDesignerPage() {
         !hasOwnedWriterLease(authoringSession) ||
         Boolean(studioConflict)),
   );
+  const newResource = isNewAuthoringResource(authoringSession);
 
   const workbench = (
     <UnifiedDesignerWorkbench
@@ -904,7 +950,9 @@ export default function UnifiedDesignerPage() {
       modelFieldsByModel={modelFieldsByModel}
       returnHref={
         handoff
-          ? authoringReturnHref(handoff.returnTo, handoff.sessionPid, handoff.blockId)
+          ? newResource
+            ? undefined
+            : authoringReturnHref(handoff.returnTo, handoff.sessionPid, handoff.blockId)
           : source.type === 'page'
             ? '/p/page_schema'
             : undefined
@@ -967,6 +1015,15 @@ export default function UnifiedDesignerPage() {
             高级属性和已声明的同级顺序调整将写回同一隔离草稿；跨父级、增删区块等治理操作仍不开放。
           </span>
         )}
+        {newResource ? (
+          <a
+            href={safeReturnTo(handoff.returnTo)}
+            className="ml-3 inline-flex font-semibold text-blue-800 underline-offset-2 hover:underline"
+            data-testid="studio-return-source"
+          >
+            返回来源页
+          </a>
+        ) : null}
       </div>
       <div className="px-4 pt-3">
         <AuthoringOwnershipNotice ownership={authoringSession?.ownership} />
@@ -980,6 +1037,22 @@ export default function UnifiedDesignerPage() {
         {authoringSession?.impactState !== 'KNOWN' && (authoringSession?.revision ?? 0) > 1 ? (
           <div className="mt-2">
             <AuthoringImpactNotice session={authoringSession!} />
+          </div>
+        ) : null}
+        {!reviewWorkspaceMode && authoringSession?.changeSetStatus === 'DRAFT' ? (
+          <div className="mt-2">
+            <StudioSubmissionNotice
+              session={authoringSession!}
+              pending={submissionPending}
+              error={submissionError}
+              enabled={Boolean(
+                canManageDesigner &&
+                  authoringSession?.state === 'ACTIVE' &&
+                  hasOwnedWriterLease(authoringSession) &&
+                  !studioConflict
+              )}
+              onSubmit={handlePrepareOrSubmit}
+            />
           </div>
         ) : null}
         <div className="mt-2">
@@ -1047,6 +1120,66 @@ export default function UnifiedDesignerPage() {
       ) : null}
       <div className="min-h-0 flex-1">{workbench}</div>
     </div>
+  );
+}
+
+function StudioSubmissionNotice({
+  session,
+  pending,
+  error,
+  enabled,
+  onSubmit,
+}: {
+  session: AuthoringSession;
+  pending: boolean;
+  error: string | null;
+  enabled: boolean;
+  onSubmit: () => Promise<void>;
+}) {
+  const prepared = session.validationState === 'VALID' && session.impactState === 'KNOWN';
+  const validationErrors = session.validation?.errorCount ?? 0;
+  const label = prepared ? '提交评审' : '校验与影响分析';
+  const disabled =
+    !enabled ||
+    pending ||
+    validationErrors > 0 ||
+    session.impactState === 'STALE' ||
+    session.revision <= 1;
+
+  return (
+    <section
+      className="rounded-md border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800"
+      aria-label="Studio 提交治理"
+      data-testid="studio-submission-notice"
+    >
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="mr-auto min-w-0">
+          <div className="font-semibold">3. 校验、评审、发布</div>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            {prepared
+              ? '服务端已确认当前 revision 为 VALID + KNOWN，可冻结并提交独立评审。'
+              : '先由服务端校验结构并计算影响；分析完成前不能提交评审。'}
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => void onSubmit()}
+          className="inline-flex min-h-9 items-center rounded-md bg-blue-700 px-3 font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+          data-testid="studio-prepare-submit"
+        >
+          {pending ? (prepared ? '提交中…' : '分析中…') : label}
+        </button>
+      </div>
+      {error ? (
+        <div
+          className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-2 text-xs text-red-800"
+          role="alert"
+        >
+          {error}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -1431,6 +1564,23 @@ function authoringReturnHref(
   url.searchParams.set('authoringReturn', sessionPid);
   if (focusBlockId) url.searchParams.set('authoringFocus', focusBlockId);
   return `${url.pathname}${url.search}${url.hash}`;
+}
+
+function isNewAuthoringResource(session: AuthoringSession | null): boolean {
+  const resource = session?.snapshot?._authoringResource;
+  return Boolean(
+    resource &&
+      typeof resource === 'object' &&
+      !Array.isArray(resource) &&
+      (resource as Record<string, unknown>).lifecycle === 'NEW',
+  );
+}
+
+async function submitAndReloadAuthoringSession(
+  session: AuthoringSession,
+): Promise<AuthoringSession> {
+  await submitAuthoringSession(session.sessionPid, session.revision);
+  return loadAuthoringSession(session.sessionPid);
 }
 
 function readLocalDocument(): PageSchemaV3 | null {
