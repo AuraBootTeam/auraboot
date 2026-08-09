@@ -180,6 +180,23 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/authoring/identity-simulations/missing/end"))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/authoring/sessions/missing/ai-patch-proposals")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":1,\"items\":[]}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get(
+                        "/api/authoring/sessions/missing/ai-patch-proposals/missing"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post(
+                        "/api/authoring/sessions/missing/ai-patch-proposals/missing/apply")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedRevision\":1}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post(
+                        "/api/authoring/sessions/missing/ai-patch-proposals/missing/reject")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"test\"}"))
+                .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/authoring/sessions/missing/writer-lease/takeover")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"expectedRevision\":1,\"reason\":\"test\"}"))

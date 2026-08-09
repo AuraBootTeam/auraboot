@@ -4,9 +4,11 @@ import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.Boundary
 import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.CapabilityManifest;
 import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.PatchOperation;
 import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
@@ -43,6 +45,66 @@ public final class AuthoringWorkspaceContracts {
             @NotNull PatchOperation operation,
             JsonNode value,
             @NotBlank String manifestChecksum) {
+    }
+
+    /** One typed property patch proposed by AI; structural creation is intentionally excluded. */
+    public record AiPatchProposalItemRequest(
+            @NotBlank @Size(max = 120) String blockId,
+            @NotBlank @Size(max = 240) String propertyPath,
+            @NotNull PatchOperation operation,
+            JsonNode value,
+            @NotBlank @Size(max = 64) String manifestChecksum) {
+    }
+
+    public record CreateAiPatchProposalRequest(
+            @Positive long expectedRevision,
+            @NotEmpty @Size(max = 50)
+            List<@Valid AiPatchProposalItemRequest> items) {
+    }
+
+    public record ApplyAiPatchProposalRequest(@Positive long expectedRevision) {
+    }
+
+    public record RejectAiPatchProposalRequest(
+            @NotBlank @Size(max = 1000) String reason) {
+    }
+
+    public record AiPatchProposalItemView(
+            int ordinal,
+            String blockId,
+            String propertyPath,
+            PatchOperation operation,
+            JsonNode previousValue,
+            JsonNode value,
+            String manifestChecksum,
+            BoundaryDecision decision) {
+    }
+
+    /** Server-validated proposal metadata; prompt and raw model output are never persisted. */
+    public record AiPatchProposalView(
+            String proposalPid,
+            String sourceSessionPid,
+            String changeSetPid,
+            String pagePid,
+            long baseRevision,
+            String registryChecksum,
+            String proposalHash,
+            String status,
+            String aggregateRisk,
+            String aggregateRoute,
+            String publishPolicy,
+            boolean typedPatchOnly,
+            boolean requiresHumanApproval,
+            List<AiPatchProposalItemView> items,
+            Long resultRevision,
+            Instant createdAt,
+            Instant appliedAt,
+            Instant rejectedAt) {
+    }
+
+    public record ApplyAiPatchProposalResult(
+            AiPatchProposalView proposal,
+            SessionView session) {
     }
 
     public record MoveBlockRequest(

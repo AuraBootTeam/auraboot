@@ -7,8 +7,10 @@ import { loadModelFieldsByModelCodes } from '../persistence/modelFieldsRepositor
 import { loadPageSchemaV3, savePageSchemaV3 } from '../persistence/pageSchemaV3Repository';
 import type { PageSchemaV3 } from '../types';
 import {
+  applyAuthoringAiPatchProposal,
   applyAuthoringStudioPatch,
   consumeAuthoringHandoff,
+  createAuthoringAiPatchProposal,
   loadAuthoringCapabilities,
   loadAuthoringChangeItems,
   loadAuthoringReleaseHistory,
@@ -21,11 +23,13 @@ import {
   observeAuthoringChangeSet,
   publishAuthoringChangeSet,
   rollbackAuthoringRelease,
+  rejectAuthoringAiPatchProposal,
   splitAuthoringChangeSet,
   takeoverAuthoringWriterLease,
   transitionAuthoringGovernance,
 } from '~/framework/meta/authoring/authoringService';
 import type {
+  AuthoringAiPatchProposal,
   AuthoringChangeItem,
   AuthoringSession,
   AuthoringSplitResult,
@@ -61,8 +65,10 @@ vi.mock('../persistence/modelFieldsRepository', async () => {
 
 vi.mock('~/framework/meta/authoring/authoringService', () => ({
   endAuthoringIdentitySimulation: vi.fn(),
+  applyAuthoringAiPatchProposal: vi.fn(),
   applyAuthoringStudioPatch: vi.fn(),
   consumeAuthoringHandoff: vi.fn(),
+  createAuthoringAiPatchProposal: vi.fn(),
   loadAuthoringCapabilities: vi.fn(),
   loadAuthoringIdentitySimulation: vi.fn(),
   loadAuthoringChangeItems: vi.fn(),
@@ -76,6 +82,7 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   observeAuthoringChangeSet: vi.fn(),
   publishAuthoringChangeSet: vi.fn(),
   rollbackAuthoringRelease: vi.fn(),
+  rejectAuthoringAiPatchProposal: vi.fn(),
   splitAuthoringChangeSet: vi.fn(),
   startAuthoringIdentitySimulation: vi.fn(),
   openAuthoringReviewWorkspace: vi.fn(),
@@ -123,11 +130,14 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(loadAuthoringRolePreviewTargets).mockResolvedValue([]);
     vi.mocked(loadAuthoringRoleStructurePreview).mockReset();
     vi.mocked(loadAuthoringReviewWorkspace).mockReset();
+    vi.mocked(applyAuthoringAiPatchProposal).mockReset();
     vi.mocked(applyAuthoringStudioPatch).mockReset();
+    vi.mocked(createAuthoringAiPatchProposal).mockReset();
     vi.mocked(moveAuthoringStudioBlock).mockReset();
     vi.mocked(observeAuthoringChangeSet).mockReset();
     vi.mocked(publishAuthoringChangeSet).mockReset();
     vi.mocked(rollbackAuthoringRelease).mockReset();
+    vi.mocked(rejectAuthoringAiPatchProposal).mockReset();
     vi.mocked(splitAuthoringChangeSet).mockReset();
     vi.mocked(openAuthoringReviewWorkspace).mockReset();
     vi.mocked(takeoverAuthoringWriterLease).mockReset();
@@ -621,6 +631,78 @@ describe('UnifiedDesignerPage', () => {
     expect(savePageSchemaV3).not.toHaveBeenCalled();
   });
 
+  it('routes Studio AI through a reviewed typed proposal before changing the isolated draft', async () => {
+    setSearch('?authoringSession=session_1');
+    const baseline = createDocument('document_one', 'AI Governed Draft');
+    const appliedDocument = JSON.parse(JSON.stringify(baseline)) as PageSchemaV3;
+    const target = findTestBlock(appliedDocument.blocks, 'field_customer_name');
+    target.props = { ...(target.props ?? {}), label: 'AI confirmed label' };
+    const originalSession = createAuthoringSession(baseline);
+    const appliedSession = createAuthoringSession(appliedDocument, 4);
+    const serverProposal = createAiProposal();
+    vi.mocked(loadAuthoringSession).mockResolvedValue(originalSession);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(createAuthoringAiPatchProposal).mockResolvedValue(serverProposal);
+    vi.mocked(applyAuthoringAiPatchProposal).mockResolvedValue({
+      proposal: { ...serverProposal, status: 'APPLIED', resultRevision: 4 },
+      session: appliedSession,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          content:
+            '{"items":[{"blockId":"field_customer_name",'
+            + '"propertyPath":"/props/label","operation":"REPLACE",'
+            + '"value":"AI confirmed label"}]}',
+        }),
+      }),
+    );
+
+    render(<UnifiedDesignerPage />);
+
+    fireEvent.click(await screen.findByTestId('designer-ai-copilot'));
+    fireEvent.change(screen.getByTestId('governed-ai-description'), {
+      target: { value: 'Rename the customer field' },
+    });
+    fireEvent.click(screen.getByTestId('governed-ai-proposal-generate'));
+
+    await screen.findByTestId('governed-ai-proposal-review');
+    expect(screen.getByTestId('canvas-block-field_customer_name')).toHaveTextContent(
+      'Customer name',
+    );
+    expect(screen.getByTestId('canvas-block-field_customer_name')).not.toHaveTextContent(
+      'AI confirmed label',
+    );
+    expect(applyAuthoringStudioPatch).not.toHaveBeenCalled();
+    expect(createAuthoringAiPatchProposal).toHaveBeenCalledWith(
+      'session_1',
+      3,
+      expect.arrayContaining([
+        expect.objectContaining({
+          blockId: 'field_customer_name',
+          propertyPath: '/props/label',
+          manifestChecksum: 'field-checksum',
+        }),
+      ]),
+    );
+
+    fireEvent.click(screen.getByTestId('governed-ai-proposal-apply'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('canvas-block-field_customer_name')).toHaveTextContent(
+        'AI confirmed label',
+      ),
+    );
+    expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4');
+    expect(applyAuthoringAiPatchProposal).toHaveBeenCalledWith(
+      'session_1',
+      'proposal_1',
+      3,
+    );
+  });
+
   it('stops a stale Studio save and requires an explicit Base Mine Latest resolution', async () => {
     setSearch('?contextId=ctx_secure_once');
     const handoff = createHandoff('list_customer', '/dataSource');
@@ -927,6 +1009,65 @@ function createCapabilities(): CapabilityRegistry {
       },
     ],
   };
+}
+
+function createAiProposal(): AuthoringAiPatchProposal {
+  return {
+    proposalPid: 'proposal_1',
+    sourceSessionPid: 'session_1',
+    changeSetPid: 'changeset_1',
+    pagePid: 'page_1',
+    baseRevision: 3,
+    registryChecksum: 'registry-checksum',
+    proposalHash: 'proposal-hash',
+    status: 'PROPOSED',
+    aggregateRisk: 'L0',
+    aggregateRoute: 'INLINE',
+    publishPolicy: 'DIRECT_ALLOWED',
+    typedPatchOnly: true,
+    requiresHumanApproval: true,
+    items: [
+      {
+        ordinal: 1,
+        blockId: 'field_customer_name',
+        propertyPath: '/props/label',
+        operation: 'REPLACE',
+        previousValue: 'Customer name',
+        value: 'AI confirmed label',
+        manifestChecksum: 'field-checksum',
+        decision: {
+          route: 'INLINE',
+          risk: 'L0',
+          publishPolicy: 'DIRECT_ALLOWED',
+          reason: 'CAPABILITY_ALLOWED',
+          manifestChecksum: 'field-checksum',
+          rolePreviewRequired: false,
+        },
+      },
+    ],
+    createdAt: '2026-08-09T00:00:00Z',
+  };
+}
+
+function findTestBlock(blocks: PageSchemaV3['blocks'], blockId: string): PageSchemaV3['blocks'][number] {
+  for (const block of blocks) {
+    if (block.id === blockId) return block;
+    const child = block.blocks ? findTestBlockOrNull(block.blocks, blockId) : null;
+    if (child) return child;
+  }
+  throw new Error(`Missing test block ${blockId}`);
+}
+
+function findTestBlockOrNull(
+  blocks: PageSchemaV3['blocks'],
+  blockId: string,
+): PageSchemaV3['blocks'][number] | null {
+  for (const block of blocks) {
+    if (block.id === blockId) return block;
+    const child = block.blocks ? findTestBlockOrNull(block.blocks, blockId) : null;
+    if (child) return child;
+  }
+  return null;
 }
 
 function createSplitItems(): AuthoringChangeItem[] {

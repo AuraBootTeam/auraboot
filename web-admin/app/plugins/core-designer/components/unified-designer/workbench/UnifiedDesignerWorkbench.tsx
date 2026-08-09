@@ -82,6 +82,8 @@ import {
   startAuthoringIdentitySimulation,
 } from '~/framework/meta/authoring/authoringService';
 import type {
+  AuthoringSession,
+  CapabilityRegistry,
   AuthoringIdentitySimulation,
   AuthoringRolePreviewTarget,
   AuthoringRoleStructureDecision,
@@ -90,6 +92,7 @@ import type {
 } from '~/framework/meta/authoring/types';
 import { AiDesignDialog } from '../ai/AiDesignDialog';
 import { buildDesignCopilotPrompt, applyDesignBlocks, type ParsedDesign } from '../ai/designCopilot';
+import { GovernedAiPatchProposalDialog } from '../ai/GovernedAiPatchProposalDialog';
 
 // Pointer-based collision for real users, with a closestCenter fallback when the
 // pointer isn't inside any droppable.
@@ -136,6 +139,12 @@ export interface UnifiedDesignerWorkbenchProps {
    * specific surface (e.g. a QR scan-landing page).
    */
   aiCopilot?: boolean | { domainGuidance?: string };
+  governedAiCopilot?: {
+    sessionPid: string;
+    revision: number;
+    capabilities: CapabilityRegistry;
+    onApplied: (session: AuthoringSession) => void;
+  };
   initialSelectedBlockId?: string;
   contextualReadOnly?: boolean;
   contextualEditablePropertyPaths?: Record<string, string[]>;
@@ -157,6 +166,7 @@ export function UnifiedDesignerWorkbench({
   onUnpublish,
   onReloadDocument,
   aiCopilot,
+  governedAiCopilot,
   initialSelectedBlockId,
   contextualReadOnly = false,
   contextualEditablePropertyPaths,
@@ -1099,13 +1109,17 @@ export function UnifiedDesignerWorkbench({
     reader.readAsText(file);
   };
 
-  const aiCopilotEnabled = !!aiCopilot && !contextualRestricted;
+  const legacyAiCopilotEnabled = !!aiCopilot && !contextualRestricted;
+  const governedAiCopilotEnabled = Boolean(
+    governedAiCopilot && contextualRestricted && !contextualReadOnly,
+  );
+  const aiCopilotEnabled = legacyAiCopilotEnabled || governedAiCopilotEnabled;
   const aiDomainGuidance =
     typeof aiCopilot === 'object' && aiCopilot ? aiCopilot.domainGuidance : undefined;
   const aiKindPolicy = getKindPolicy(document.kind);
   const aiRootBlockType = aiKindPolicy.rootBlockType;
   const aiSystemPrompt = useMemo(() => {
-    if (!aiCopilotEnabled) return '';
+    if (!legacyAiCopilotEnabled) return '';
     const allowed = aiKindPolicy.allowedBlockTypes
       ? [...aiKindPolicy.allowedBlockTypes].filter((type) => type !== aiRootBlockType)
       : blockDefinitions.map((definition) => definition.blockType);
@@ -1128,7 +1142,7 @@ export function UnifiedDesignerWorkbench({
       domainGuidance: aiDomainGuidance,
     });
   }, [
-    aiCopilotEnabled,
+    legacyAiCopilotEnabled,
     aiKindPolicy,
     aiRootBlockType,
     blockDefinitions,
@@ -1196,6 +1210,7 @@ export function UnifiedDesignerWorkbench({
         canRedo={canRedo}
         returnHref={returnHref}
         aiCopilotEnabled={aiCopilotEnabled}
+        aiCopilotGoverned={governedAiCopilotEnabled}
         pageId={pageId}
         publishStatus={publishStatus}
         publishError={publishError}
@@ -1223,7 +1238,17 @@ export function UnifiedDesignerWorkbench({
           onRolledBack={handleVersionRolledBack}
         />
       ) : null}
-      {aiCopilotEnabled ? (
+      {governedAiCopilotEnabled && governedAiCopilot ? (
+        <GovernedAiPatchProposalDialog
+          open={aiDialogOpen}
+          onClose={() => setAiDialogOpen(false)}
+          sessionPid={governedAiCopilot.sessionPid}
+          revision={governedAiCopilot.revision}
+          document={document}
+          capabilities={governedAiCopilot.capabilities}
+          onApplied={governedAiCopilot.onApplied}
+        />
+      ) : legacyAiCopilotEnabled ? (
         <AiDesignDialog
           open={aiDialogOpen}
           onClose={() => setAiDialogOpen(false)}

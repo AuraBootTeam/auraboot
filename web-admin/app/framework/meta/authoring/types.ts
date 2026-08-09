@@ -297,6 +297,48 @@ export interface BoundaryDecision {
   rolePreviewRequired: boolean;
 }
 
+export interface AuthoringAiPatchProposalItemRequest {
+  blockId: string;
+  propertyPath: string;
+  operation: PatchOperation;
+  value?: unknown;
+  manifestChecksum: string;
+}
+
+export interface AuthoringAiPatchProposalItem extends AuthoringAiPatchProposalItemRequest {
+  ordinal: number;
+  previousValue: unknown;
+  decision: BoundaryDecision;
+}
+
+export type AuthoringAiPatchProposalStatus = 'PROPOSED' | 'APPLIED' | 'REJECTED';
+
+export interface AuthoringAiPatchProposal {
+  proposalPid: string;
+  sourceSessionPid: string;
+  changeSetPid: string;
+  pagePid: string;
+  baseRevision: number;
+  registryChecksum: string;
+  proposalHash: string;
+  status: AuthoringAiPatchProposalStatus;
+  aggregateRisk: string;
+  aggregateRoute: string;
+  publishPolicy: string;
+  typedPatchOnly: true;
+  requiresHumanApproval: true;
+  items: AuthoringAiPatchProposalItem[];
+  resultRevision?: number | null;
+  createdAt: string;
+  appliedAt?: string | null;
+  rejectedAt?: string | null;
+}
+
+export interface ApplyAuthoringAiPatchProposalResult {
+  proposal: AuthoringAiPatchProposal;
+  session: AuthoringSession;
+}
+
 export interface PatchResult {
   session: AuthoringSession;
   changeItemPid: string;

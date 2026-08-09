@@ -24,6 +24,7 @@ interface WorkbenchToolbarProps {
   canRedo: boolean;
   returnHref?: string;
   aiCopilotEnabled?: boolean;
+  aiCopilotGoverned?: boolean;
   /**
    * The persisted page id (pid) when the document is page-bound. Publish /
    * unpublish are only available for a saved page; a local/new document has no
@@ -76,6 +77,7 @@ export function WorkbenchToolbar({
   canRedo,
   returnHref,
   aiCopilotEnabled,
+  aiCopilotGoverned,
   pageId,
   publishStatus = 'draft',
   publishError,
@@ -186,7 +188,10 @@ export function WorkbenchToolbar({
             onClick={onOpenAiCopilot}
             className="rounded-md border border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50 px-3 py-1.5 text-sm font-medium text-purple-700 hover:from-purple-100 hover:to-indigo-100"
           >
-            ✨ AI
+            ✨{' '}
+            {aiCopilotGoverned
+              ? resolveDesignerText(DESIGNER_I18N.unified.aiProposal.toolbar, locale)
+              : 'AI'}
           </button>
         ) : null}
         <button

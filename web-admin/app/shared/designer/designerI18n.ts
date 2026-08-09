@@ -456,6 +456,73 @@ export const DESIGNER_I18N = {
           'The simulation validity could not be confirmed, so simulated output is blocked. Live data will not be used as a fallback.',
       } as L,
     },
+    aiProposal: {
+      title: { 'zh-CN': '受治理 AI 变更提案', 'en-US': 'Governed AI change proposal' } as L,
+      toolbar: { 'zh-CN': 'AI 提案', 'en-US': 'AI proposal' } as L,
+      boundary: {
+        'zh-CN': 'AI 只能提议已声明的属性补丁，不会直接修改页面或绕过审批。',
+        'en-US':
+          'AI can only propose declared property patches. It cannot edit the page directly or bypass approval.',
+      } as L,
+      description: { 'zh-CN': '描述希望调整的内容', 'en-US': 'Describe the intended change' } as L,
+      placeholder: {
+        'zh-CN': '例如：把订单表格改为紧凑密度，并将标题调整为“待处理订单”',
+        'en-US': 'For example: use compact density and rename the table to Pending orders',
+      } as L,
+      generate: { 'zh-CN': '生成提案', 'en-US': 'Generate proposal' } as L,
+      generating: {
+        'zh-CN': 'AI 生成中，随后将由服务器独立裁决…',
+        'en-US': 'AI is generating; the server will then validate independently...',
+      } as L,
+      reviewTitle: { 'zh-CN': '人工确认', 'en-US': 'Human confirmation' } as L,
+      reviewHint: {
+        'zh-CN': '下列补丁已通过当前策略预检，但尚未写入草稿。确认时会再次检查权限、策略和修订。',
+        'en-US':
+          'These patches passed the current policy preflight but have not changed the draft. Permissions, policy, and revision are checked again on confirmation.',
+      } as L,
+      typedOnly: { 'zh-CN': '仅 typed patch', 'en-US': 'Typed patches only' } as L,
+      humanRequired: { 'zh-CN': '必须人工确认', 'en-US': 'Human confirmation required' } as L,
+      noDraftMutation: { 'zh-CN': '草稿尚未变化', 'en-US': 'Draft unchanged' } as L,
+      itemCount: { 'zh-CN': '{count} 项属性变更', 'en-US': '{count} property changes' } as L,
+      risk: { 'zh-CN': '风险', 'en-US': 'Risk' } as L,
+      route: { 'zh-CN': '处理路径', 'en-US': 'Route' } as L,
+      publish: { 'zh-CN': '发布策略', 'en-US': 'Publish policy' } as L,
+      operationAdd: { 'zh-CN': '新增属性', 'en-US': 'Add property' } as L,
+      operationReplace: { 'zh-CN': '替换属性', 'en-US': 'Replace property' } as L,
+      operationRemove: { 'zh-CN': '移除属性', 'en-US': 'Remove property' } as L,
+      beforeValue: { 'zh-CN': '变更前', 'en-US': 'Before' } as L,
+      afterValue: { 'zh-CN': '变更后', 'en-US': 'After' } as L,
+      notSetValue: { 'zh-CN': '未设置', 'en-US': 'Not set' } as L,
+      removedValue: { 'zh-CN': '移除', 'en-US': 'Removed' } as L,
+      apply: { 'zh-CN': '确认写入草稿', 'en-US': 'Confirm and apply to draft' } as L,
+      applying: { 'zh-CN': '正在重新校验并写入…', 'en-US': 'Revalidating and applying...' } as L,
+      discard: { 'zh-CN': '拒绝并关闭', 'en-US': 'Reject and close' } as L,
+      discarding: { 'zh-CN': '正在拒绝提案…', 'en-US': 'Rejecting proposal...' } as L,
+      cancel: { 'zh-CN': '取消', 'en-US': 'Cancel' } as L,
+      failed: {
+        'zh-CN': '提案未写入草稿：{error}',
+        'en-US': 'The proposal was not applied to the draft: {error}',
+      } as L,
+      rejectReason: {
+        'zh-CN': '实施人员在应用设计中心拒绝 AI 提案',
+        'en-US': 'Implementer rejected the AI proposal in Studio',
+      } as L,
+      riskL0: { 'zh-CN': 'L0 · 展示级', 'en-US': 'L0 · presentation' } as L,
+      riskL1: { 'zh-CN': 'L1 · 低风险', 'en-US': 'L1 · low risk' } as L,
+      riskL2: { 'zh-CN': 'L2 · 中风险', 'en-US': 'L2 · medium risk' } as L,
+      riskL3: { 'zh-CN': 'L3 · 高风险', 'en-US': 'L3 · high risk' } as L,
+      routeInline: { 'zh-CN': '原地配置', 'en-US': 'Inline' } as L,
+      routeGuided: { 'zh-CN': '引导式配置', 'en-US': 'Guided inline' } as L,
+      routeStudio: { 'zh-CN': '应用设计中心', 'en-US': 'Studio' } as L,
+      routePersonalize: { 'zh-CN': '个人化', 'en-US': 'Personalization' } as L,
+      publishDirect: { 'zh-CN': '允许直接发布', 'en-US': 'Direct publish allowed' } as L,
+      publishDefaultReview: { 'zh-CN': '默认评审', 'en-US': 'Default review' } as L,
+      publishRequiredReview: { 'zh-CN': '必须评审', 'en-US': 'Review required' } as L,
+      publishStudioApproval: {
+        'zh-CN': '必须由 Studio 审批',
+        'en-US': 'Studio approval required',
+      } as L,
+    },
 
     // Palette category headers
     category: {

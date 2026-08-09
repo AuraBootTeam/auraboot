@@ -665,6 +665,26 @@ export default function UnifiedDesignerPage() {
     );
   };
 
+  const handleAiProposalApplied = (appliedSession: AuthoringSession) => {
+    const canonicalDocument = authoringSnapshotToPageSchemaV3(appliedSession.snapshot);
+    documentBaselineRef.current = appliedSession;
+    setAuthoringSession(appliedSession);
+    setDocument(canonicalDocument);
+    setStudioConflict(null);
+    setConflictError(null);
+    setWorkbenchGeneration((current) => current + 1);
+    setHandoff((current) =>
+      current
+        ? {
+            ...current,
+            changeSetPid: appliedSession.changeSetPid,
+            sessionPid: appliedSession.sessionPid,
+            revision: appliedSession.revision,
+          }
+        : current,
+    );
+  };
+
   const handlePublish = async (pid: string): Promise<boolean> => {
     const result = await publishPageSchemaV3({ pid });
     if (!result.ok) {
@@ -758,6 +778,20 @@ export default function UnifiedDesignerPage() {
       contextualReadOnly={contextualReadOnly}
       contextualEditablePropertyPaths={contextualEditablePropertyPaths}
       contextualReorderableBlockTypes={contextualReorderableBlockTypes}
+      governedAiCopilot={
+        handoff &&
+        !contextualReadOnly &&
+        canAdministerDesigner &&
+        authoringSession &&
+        authoringCapabilities
+          ? {
+              sessionPid: authoringSession.sessionPid,
+              revision: authoringSession.revision,
+              capabilities: authoringCapabilities,
+              onApplied: handleAiProposalApplied,
+            }
+          : undefined
+      }
       roleStructurePreviewSessionPid={
         handoff && canManageDesigner ? authoringSession?.sessionPid : undefined
       }

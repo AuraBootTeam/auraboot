@@ -16,10 +16,18 @@ import java.util.List;
 public class AuthoringAggregatePolicyService {
 
     public AggregatePolicy aggregate(WorkspaceRow row, BoundaryDecision decision) {
-        RiskLevel risk = maxRisk(RiskLevel.valueOf(row.riskLevel()), decision.risk());
-        Route route = maxRoute(Route.valueOf(row.route()), decision.route());
-        PublishPolicy publishPolicy = maxPublishPolicy(
-                PublishPolicy.valueOf(row.publishPolicy()), decision.publishPolicy());
+        return aggregate(row, List.of(decision));
+    }
+
+    public AggregatePolicy aggregate(WorkspaceRow row, List<BoundaryDecision> decisions) {
+        RiskLevel risk = RiskLevel.valueOf(row.riskLevel());
+        Route route = Route.valueOf(row.route());
+        PublishPolicy publishPolicy = PublishPolicy.valueOf(row.publishPolicy());
+        for (BoundaryDecision decision : decisions) {
+            risk = maxRisk(risk, decision.risk());
+            route = maxRoute(route, decision.route());
+            publishPolicy = maxPublishPolicy(publishPolicy, decision.publishPolicy());
+        }
         return new AggregatePolicy(
                 risk.name(),
                 route.name(),

@@ -17,6 +17,9 @@ import type {
   AuthoringRoleStructurePreview,
   AuthoringSyntheticPreview,
   AuthoringIdentitySimulation,
+  AuthoringAiPatchProposal,
+  AuthoringAiPatchProposalItemRequest,
+  ApplyAuthoringAiPatchProposalResult,
 } from './types';
 
 export interface InteractionContext {
@@ -242,6 +245,64 @@ export async function moveAuthoringStudioBlock(
     },
   );
   return requireData(result, '无法保存区块顺序变更');
+}
+
+export async function createAuthoringAiPatchProposal(
+  sessionPid: string,
+  revision: number,
+  items: AuthoringAiPatchProposalItemRequest[],
+): Promise<AuthoringAiPatchProposal> {
+  const result = await fetchResult<AuthoringAiPatchProposal>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/ai-patch-proposals`,
+    {
+      method: 'post',
+      params: { expectedRevision: revision, items },
+    },
+  );
+  return requireData(result, '无法创建受治理 AI 变更提案');
+}
+
+export async function loadAuthoringAiPatchProposal(
+  sessionPid: string,
+  proposalPid: string,
+): Promise<AuthoringAiPatchProposal> {
+  const result = await fetchResult<AuthoringAiPatchProposal>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}` +
+      `/ai-patch-proposals/${encodeURIComponent(proposalPid)}`,
+  );
+  return requireData(result, '无法加载受治理 AI 变更提案');
+}
+
+export async function applyAuthoringAiPatchProposal(
+  sessionPid: string,
+  proposalPid: string,
+  revision: number,
+): Promise<ApplyAuthoringAiPatchProposalResult> {
+  const result = await fetchResult<ApplyAuthoringAiPatchProposalResult>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}` +
+      `/ai-patch-proposals/${encodeURIComponent(proposalPid)}/apply`,
+    {
+      method: 'post',
+      params: { expectedRevision: revision },
+    },
+  );
+  return requireData(result, '无法应用受治理 AI 变更提案');
+}
+
+export async function rejectAuthoringAiPatchProposal(
+  sessionPid: string,
+  proposalPid: string,
+  reason: string,
+): Promise<AuthoringAiPatchProposal> {
+  const result = await fetchResult<AuthoringAiPatchProposal>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}` +
+      `/ai-patch-proposals/${encodeURIComponent(proposalPid)}/reject`,
+    {
+      method: 'post',
+      params: { reason },
+    },
+  );
+  return requireData(result, '无法拒绝受治理 AI 变更提案');
 }
 
 export async function submitAuthoringSession(sessionPid: string, revision: number): Promise<void> {

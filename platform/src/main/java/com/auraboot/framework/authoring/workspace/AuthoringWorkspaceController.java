@@ -1,10 +1,14 @@
 package com.auraboot.framework.authoring.workspace;
 
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ApplyPatchRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.AiPatchProposalView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ApplyAiPatchProposalRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ApplyAiPatchProposalResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CapabilityRegistryView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ChangeItemView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ChangeSetView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateHandoffRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.CreateAiPatchProposalRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffContextView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffCreatedView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.IdentitySimulationView;
@@ -14,6 +18,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Op
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseHistoryView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseView;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RejectAiPatchProposalRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewWorkspaceView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.RolePreviewTargetView;
@@ -57,6 +62,7 @@ public class AuthoringWorkspaceController {
     private final AuthoringRoleStructurePreviewService roleStructurePreviewService;
     private final AuthoringSyntheticPreviewService syntheticPreviewService;
     private final AuthoringIdentitySimulationService identitySimulationService;
+    private final AuthoringAiPatchProposalService aiPatchProposalService;
 
     public AuthoringWorkspaceController(
             AuthoringWorkspaceService workspaceService,
@@ -64,13 +70,15 @@ public class AuthoringWorkspaceController {
             AuthoringHandoffService handoffService,
             AuthoringRoleStructurePreviewService roleStructurePreviewService,
             AuthoringSyntheticPreviewService syntheticPreviewService,
-            AuthoringIdentitySimulationService identitySimulationService) {
+            AuthoringIdentitySimulationService identitySimulationService,
+            AuthoringAiPatchProposalService aiPatchProposalService) {
         this.workspaceService = workspaceService;
         this.governanceService = governanceService;
         this.handoffService = handoffService;
         this.roleStructurePreviewService = roleStructurePreviewService;
         this.syntheticPreviewService = syntheticPreviewService;
         this.identitySimulationService = identitySimulationService;
+        this.aiPatchProposalService = aiPatchProposalService;
     }
 
     @GetMapping("/capabilities")
@@ -200,6 +208,40 @@ public class AuthoringWorkspaceController {
             @PathVariable String sessionPid,
             @Valid @RequestBody MoveBlockRequest request) {
         return ApiResponse.success(workspaceService.moveStudioBlock(sessionPid, request));
+    }
+
+    @PostMapping("/sessions/{sessionPid}/ai-patch-proposals")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<AiPatchProposalView> createAiPatchProposal(
+            @PathVariable String sessionPid,
+            @Valid @RequestBody CreateAiPatchProposalRequest request) {
+        return ApiResponse.success(aiPatchProposalService.create(sessionPid, request));
+    }
+
+    @GetMapping("/sessions/{sessionPid}/ai-patch-proposals/{proposalPid}")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<AiPatchProposalView> getAiPatchProposal(
+            @PathVariable String sessionPid,
+            @PathVariable String proposalPid) {
+        return ApiResponse.success(aiPatchProposalService.get(sessionPid, proposalPid));
+    }
+
+    @PostMapping("/sessions/{sessionPid}/ai-patch-proposals/{proposalPid}/apply")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<ApplyAiPatchProposalResult> applyAiPatchProposal(
+            @PathVariable String sessionPid,
+            @PathVariable String proposalPid,
+            @Valid @RequestBody ApplyAiPatchProposalRequest request) {
+        return ApiResponse.success(aiPatchProposalService.apply(sessionPid, proposalPid, request));
+    }
+
+    @PostMapping("/sessions/{sessionPid}/ai-patch-proposals/{proposalPid}/reject")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_ADMIN)
+    public ApiResponse<AiPatchProposalView> rejectAiPatchProposal(
+            @PathVariable String sessionPid,
+            @PathVariable String proposalPid,
+            @Valid @RequestBody RejectAiPatchProposalRequest request) {
+        return ApiResponse.success(aiPatchProposalService.reject(sessionPid, proposalPid, request));
     }
 
     @GetMapping("/sessions/{sessionPid}/change-items")
