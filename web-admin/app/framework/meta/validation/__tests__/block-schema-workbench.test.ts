@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BLOCK_TYPES, blockTypeEnum } from '../schemas/block.schema';
+import { BLOCK_TYPES, blockSchema, blockTypeEnum } from '../schemas/block.schema';
 
 describe('block schema workbench block types', () => {
   it('allows workbench block types in the static fallback enum', () => {
@@ -36,5 +36,37 @@ describe('block schema workbench block types', () => {
     expect(blockTypeEnum.safeParse('text').success).toBe(true);
     expect(blockTypeEnum.safeParse('chart-card').success).toBe(true);
     expect(blockTypeEnum.safeParse('selection-info').success).toBe(true);
+  });
+
+  it('accepts grouped multiple selection and rejects it for single selection', () => {
+    const base = {
+      id: 'grouped_decisions',
+      blockType: 'table',
+      table: {
+        columns: [{ field: 'action', label: 'Action' }],
+      },
+    };
+    expect(blockSchema.safeParse({
+      ...base,
+      table: {
+        ...base.table,
+        selection: {
+          mode: 'multiple',
+          bind: 'selectedDecisions',
+          exclusiveBy: 'issueId',
+        },
+      },
+    }).success).toBe(true);
+    expect(blockSchema.safeParse({
+      ...base,
+      table: {
+        ...base.table,
+        selection: {
+          mode: 'single',
+          bind: 'selectedDecision',
+          exclusiveBy: 'issueId',
+        },
+      },
+    }).success).toBe(false);
   });
 });

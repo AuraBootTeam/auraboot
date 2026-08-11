@@ -288,6 +288,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   const selectionMode = selectionConfig?.mode || 'single';
   const isMultipleSelection = selectionMode === 'multiple';
   const defaultFirstSelection = Boolean((selectionConfig as any)?.defaultFirst);
+  const exclusiveBy = String((selectionConfig as any)?.exclusiveBy || '').trim();
   const rowKeyField = block.table?.rowKey || (selectionConfig as any)?.keyField || 'pid';
   const selectionIdField = (selectionConfig as any)?.idField || rowKeyField;
   const [localSelectedRowKey, setLocalSelectedRowKey] = useState('');
@@ -397,25 +398,33 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       : data.filter((candidate: any, candidateIndex: number) =>
           effectiveSelectedRowKeySet.has(getRowIdentity(candidate, candidateIndex)),
         );
+    const exclusiveValue = exclusiveBy ? row?.[exclusiveBy] : undefined;
+    const rowsOutsideExclusiveGroup =
+      exclusiveBy && exclusiveValue !== undefined && exclusiveValue !== null && exclusiveValue !== ''
+        ? currentRows.filter((candidate: any) => candidate?.[exclusiveBy] !== exclusiveValue)
+        : currentRows;
     const nextRows = effectiveSelectedRowKeySet.has(identity)
       ? currentRows.filter((candidate: any, candidateIndex: number) => {
           const candidateIdentity =
             getRowIdentity(candidate) || getRowIdentity(candidate, candidateIndex);
           return candidateIdentity !== identity;
         })
-      : [...currentRows, row];
+      : [...rowsOutsideExclusiveGroup, row];
     writeMultipleSelection(nextRows);
   };
 
+  // Choosing every action in an exclusive group would invent a business decision.
+  // Keep the selection column, but require an explicit row choice per group.
+  const supportsSelectAll = isMultipleSelection && !exclusiveBy;
   const allVisibleRowsSelected =
-    isMultipleSelection &&
+    supportsSelectAll &&
     data.length > 0 &&
     data.every((row: any, index: number) =>
       effectiveSelectedRowKeySet.has(getRowIdentity(row, index)),
     );
 
   const toggleAllVisibleRows = () => {
-    if (!isMultipleSelection) return;
+    if (!supportsSelectAll) return;
     writeMultipleSelection(allVisibleRowsSelected ? [] : data);
   };
 
@@ -741,17 +750,19 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
             <tr>
               {isMultipleSelection && (
                 <th className={`${headerCellClass} w-12 text-left`}>
-                  <input
-                    type="checkbox"
-                    data-testid="table-select-all"
-                    checked={allVisibleRowsSelected}
-                    onChange={toggleAllVisibleRows}
-                    aria-label={getLocalizedText(
-                      { 'zh-CN': '选择全部行', en: 'Select all rows' },
-                      locale,
-                      t,
-                    )}
-                  />
+                  {supportsSelectAll && (
+                    <input
+                      type="checkbox"
+                      data-testid="table-select-all"
+                      checked={allVisibleRowsSelected}
+                      onChange={toggleAllVisibleRows}
+                      aria-label={getLocalizedText(
+                        { 'zh-CN': '选择全部行', en: 'Select all rows' },
+                        locale,
+                        t,
+                      )}
+                    />
+                  )}
                 </th>
               )}
               {columns.map(renderColumnHeader)}

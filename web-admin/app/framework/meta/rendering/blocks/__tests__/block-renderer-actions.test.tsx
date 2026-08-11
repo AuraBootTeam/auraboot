@@ -659,6 +659,44 @@ describe('TableBlockRenderer', () => {
     ]);
   });
 
+  it('keeps exactly one selected row per configured exclusive group', () => {
+    const rows = [
+      { pid: 'issue-a-keep', issueId: 'issue-a', action: 'keep' },
+      { pid: 'issue-a-return', issueId: 'issue-a', action: 'return' },
+      { pid: 'issue-b-keep', issueId: 'issue-b', action: 'keep' },
+    ];
+    const runtime = makeRuntimeWithRows(rows) as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: {
+          mode: 'multiple',
+          bind: 'selectedDecisions',
+          exclusiveBy: 'issueId',
+        },
+        columns: [{ field: 'action', label: 'Action' }],
+      },
+    };
+
+    const { getByTestId, queryByTestId } = render(
+      <TableBlockRenderer block={block as any} runtime={runtime} />,
+    );
+    expect(queryByTestId('table-select-all')).not.toBeInTheDocument();
+
+    fireEvent.click(getByTestId('table-select-row-issue-a-keep'));
+    fireEvent.click(getByTestId('table-select-row-issue-a-return'));
+    fireEvent.click(getByTestId('table-select-row-issue-b-keep'));
+
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedDecisions', [rows[0]]);
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedDecisions', [rows[1]]);
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedDecisions', [
+      rows[1],
+      rows[2],
+    ]);
+  });
+
   it('uses configured rowKey for row identity and highlights the clicked row immediately', () => {
     const row = { lineNo: 'L-001', name: 'Beta' };
     const runtime = makeRuntime({

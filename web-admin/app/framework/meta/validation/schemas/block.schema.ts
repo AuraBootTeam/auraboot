@@ -57,15 +57,26 @@ const blockLayoutConfigSchema = z.object({
   rowGap: z.number().optional(),
 });
 
-const selectionConfigSchema = z.object({
-  mode: z.enum(['single', 'multiple']),
-  bind: z.string(),
-  defaultFirst: z.boolean().optional(),
-  keyField: z.string().optional(),
-  detailBind: z.string().optional(),
-  idsBind: z.string().optional(),
-  idField: z.string().optional(),
-});
+const selectionConfigSchema = z
+  .object({
+    mode: z.enum(['single', 'multiple']),
+    bind: z.string(),
+    defaultFirst: z.boolean().optional(),
+    keyField: z.string().optional(),
+    exclusiveBy: z.string().min(1).optional(),
+    detailBind: z.string().optional(),
+    idsBind: z.string().optional(),
+    idField: z.string().optional(),
+  })
+  .superRefine((selection, context) => {
+    if (selection.exclusiveBy && selection.mode !== 'multiple') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['exclusiveBy'],
+        message: 'exclusiveBy requires selection.mode=multiple',
+      });
+    }
+  });
 
 const paginationConfigSchema = z.object({
   pageSize: z.number().optional(),

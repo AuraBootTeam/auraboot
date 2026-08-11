@@ -447,6 +447,11 @@ export interface SelectionConfig {
   bind: string;
   defaultFirst?: boolean;
   keyField?: string;
+  /**
+   * Field whose value defines an exclusive selection group. In multiple mode,
+   * selecting another row with the same value replaces the previous row.
+   */
+  exclusiveBy?: string;
   detailBind?: string;
   idsBind?: string;
   idField?: string;
