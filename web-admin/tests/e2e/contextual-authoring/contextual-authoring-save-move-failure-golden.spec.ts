@@ -208,6 +208,147 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
     });
   });
 
+  test('PC-AUTH-019 @critical — a failed authoritative reload keeps unknown-outcome dirty and later reconciles without replay', async ({
+    page,
+  }) => {
+    const session = await enterAuthoringFromRuntime(page);
+    const itemsBefore = await loadChangeItems(page, session.sessionPid);
+    const { editor, value } = await stageDensityEdit(page, session);
+    const patchPath = `/api/authoring/sessions/${session.sessionPid}/patches`;
+    const sessionPath = `/api/authoring/sessions/${session.sessionPid}`;
+    let patchRequests = 0;
+    let failedAuthoritativeReads = 0;
+    await page.route(`**${patchPath}`, async (route) => {
+      patchRequests += 1;
+      const committedResponse = await route.fetch();
+      expect(committedResponse.ok(), 'inline patch committed before both responses were lost').toBe(
+        true,
+      );
+      await route.abort('failed');
+    });
+    await page.route(`**${sessionPath}`, async (route) => {
+      if (route.request().method() === 'GET' && failedAuthoritativeReads === 0) {
+        failedAuthoritativeReads += 1;
+        await route.abort('failed');
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+
+    await expect(page.getByRole('alert')).toContainText(
+      '保存结果暂时无法确认；无法读取权威草稿，请联网后重试',
+    );
+    await expect(page.getByText('1 项未保存')).toBeVisible();
+    await expect(editor).toHaveValue(value);
+    await expect(page.getByRole('button', { name: '保存', exact: true })).toBeEnabled();
+    expect(patchRequests).toBe(1);
+    expect(failedAuthoritativeReads).toBe(1);
+    const committed = await reloadSession(page, session.sessionPid);
+    expect(committed.revision).toBe(session.revision + 1);
+    expect(await loadChangeItems(page, session.sessionPid)).toHaveLength(itemsBefore.length + 1);
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-019-authoritative-read-failed.png'),
+      fullPage: true,
+    });
+
+    await page.unroute(`**${patchPath}`);
+    await page.unroute(`**${sessionPath}`);
+    const staleRetry = page.waitForResponse(
+      (response) =>
+        response.request().method().toUpperCase() === 'PATCH' &&
+        apiPath(response.url()) === patchPath,
+    );
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    expect((await staleRetry).status()).toBe(409);
+
+    await expect(page.getByText('0 项未保存')).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(page.getByTestId('authoring-save-reconciliation-feedback')).toContainText(
+      '未重复写入',
+    );
+    const reconciled = await reloadSession(page, session.sessionPid);
+    expect(reconciled.revision).toBe(session.revision + 1);
+    expect(await loadChangeItems(page, session.sessionPid)).toHaveLength(itemsBefore.length + 1);
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-019-authoritative-read-reconciled.png'),
+      fullPage: true,
+    });
+  });
+
+  test('PC-AUTH-020 @critical — authority transfer during an interrupted save confirms no write and turns the dirty owner read-only', async ({
+    page,
+  }) => {
+    const session = await enterAuthoringFromRuntime(page);
+    const itemsBefore = await loadChangeItems(page, session.sessionPid);
+    const { editor, value } = await stageDensityEdit(page, session);
+    const secondTab = await page.context().newPage();
+    const patchPath = `/api/authoring/sessions/${session.sessionPid}/patches`;
+    let patchRequests = 0;
+    try {
+      const observerResponse = secondTab.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) === `/api/authoring/change-sets/${session.changeSetPid}/sessions`,
+      );
+      await secondTab.goto(
+        `/unified-designer?changeSetId=${encodeURIComponent(session.changeSetPid)}`,
+        { waitUntil: 'domcontentloaded' },
+      );
+      const observer = await expectApiData<AuthoringSession>(
+        await observerResponse,
+        'open same-account observer before interrupted save',
+      );
+      await expect(secondTab.getByTestId('authoring-writer-lease-notice')).toBeVisible();
+      await secondTab
+        .getByPlaceholder('填写接管原因（必填，将写入审计）')
+        .fill('PC 门禁：保存中断窗口接管');
+
+      await page.route(`**${patchPath}`, async (route) => {
+        patchRequests += 1;
+        const takeoverResponse = secondTab.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            apiPath(response.url()) ===
+              `/api/authoring/sessions/${observer.sessionPid}/writer-lease/takeover`,
+        );
+        await secondTab.getByTestId('authoring-writer-lease-takeover').click();
+        expect((await takeoverResponse).status()).toBe(200);
+        await route.abort('failed');
+      });
+
+      await page.getByRole('button', { name: '保存', exact: true }).click();
+
+      await expect(page.getByTestId('authoring-save-reconciliation-feedback')).toHaveAttribute(
+        'data-tone',
+        'warning',
+      );
+      await expect(page.getByTestId('authoring-save-reconciliation-feedback')).toContainText(
+        '保存未完成；ChangeSet 已进入 READ_ONLY 状态',
+      );
+      await expect(page.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+        'data-read-only',
+        'true',
+      );
+      await expect(page.getByText('1 项未保存')).toBeVisible();
+      await expect(editor).toHaveValue(value);
+      await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+      await expect(page.getByRole('alert')).toHaveCount(0);
+      expect(patchRequests).toBe(1);
+      const formerOwner = await reloadSession(page, session.sessionPid);
+      expect(formerOwner.revision).toBe(session.revision);
+      expect(await loadChangeItems(page, session.sessionPid)).toEqual(itemsBefore);
+      await page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-020-authority-moved-dirty-readonly.png'),
+        fullPage: true,
+      });
+    } finally {
+      await page.unroute(`**${patchPath}`).catch(() => {});
+      await secondTab.close();
+    }
+  });
+
   test('PC-AUTH-010 @critical — Studio moves one stable block through the atomic batch', async ({
     page,
   }) => {

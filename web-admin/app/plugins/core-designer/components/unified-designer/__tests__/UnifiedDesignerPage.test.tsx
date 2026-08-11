@@ -1187,6 +1187,84 @@ describe('UnifiedDesignerPage', () => {
     expect(applyAuthoringStudioBatch).toHaveBeenCalledTimes(1);
   });
 
+  it('confirms an atomic Studio save before turning read-only when authority moved', async () => {
+    setSearch('?contextId=ctx_secure_once');
+    const handoff = createHandoff('list_customer', '/dataSource');
+    const baseline = createDocument('document_one', 'Isolated Draft');
+    const committed = createDocument('document_one', 'Isolated Draft');
+    const committedList = findBlock(committed.blocks, 'list_customer');
+    if (!committedList) throw new Error('list_customer fixture missing');
+    committedList.dataSource = { model: 'payment' };
+    const transferred = createAuthoringSession(committed, 4, 'L3', 'HANDOFF_STUDIO');
+    transferred.writerLease = {
+      status: 'HELD_BY_OTHER',
+      revision: 5,
+      leasedUntil: '2026-08-09T12:10:00Z',
+    };
+
+    vi.mocked(consumeAuthoringHandoff).mockResolvedValue(handoff);
+    vi.mocked(loadAuthoringSession)
+      .mockResolvedValueOnce(createAuthoringSession(baseline, 3))
+      .mockResolvedValueOnce(transferred);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(applyAuthoringStudioBatch).mockRejectedValueOnce(new Error('Failed to fetch'));
+
+    render(<UnifiedDesignerPage />);
+
+    await screen.findByTestId('studio-handoff-context');
+    await waitFor(() =>
+      expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('list_customer'),
+    );
+    fireEvent.change(screen.getByTestId('inspector-field-dataSource.model-manual'), {
+      target: { value: 'payment' },
+    });
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    await waitFor(() => expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('已保存'));
+    expect(screen.getByTestId('studio-save-reconciliation-feedback')).toHaveAttribute(
+      'data-tone',
+      'warning',
+    );
+    expect(screen.getByTestId('studio-save-reconciliation-feedback')).toHaveTextContent(
+      '保存已在服务端完成；编辑权已转移到其他会话',
+    );
+    expect(screen.getByTestId('studio-handoff-read-only-reason')).toBeInTheDocument();
+    expect(screen.queryByTestId('designer-save-error')).not.toBeInTheDocument();
+    expect(applyAuthoringStudioBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the Studio document dirty when the authoritative reload also fails', async () => {
+    setSearch('?contextId=ctx_secure_once');
+    const handoff = createHandoff('list_customer', '/dataSource');
+    const baseline = createDocument('document_one', 'Isolated Draft');
+
+    vi.mocked(consumeAuthoringHandoff).mockResolvedValue(handoff);
+    vi.mocked(loadAuthoringSession)
+      .mockResolvedValueOnce(createAuthoringSession(baseline, 3))
+      .mockRejectedValueOnce(new Error('Network error'));
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(applyAuthoringStudioBatch).mockRejectedValueOnce(new Error('Failed to fetch'));
+
+    render(<UnifiedDesignerPage />);
+
+    await screen.findByTestId('studio-handoff-context');
+    await waitFor(() =>
+      expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('list_customer'),
+    );
+    fireEvent.change(screen.getByTestId('inspector-field-dataSource.model-manual'), {
+      target: { value: 'payment' },
+    });
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    expect(await screen.findByTestId('designer-save-error')).toHaveTextContent(
+      '保存结果暂时无法确认；无法读取权威草稿，请联网后重试',
+    );
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('保存失败');
+    expect(screen.getByTestId('inspector-field-dataSource.model-manual')).toHaveValue('payment');
+    expect(screen.getByTestId('designer-save')).toBeEnabled();
+    expect(applyAuthoringStudioBatch).toHaveBeenCalledTimes(1);
+  });
+
   it('preserves an unsaved Studio edit but blocks writes when admin permission is revoked', async () => {
     setSearch('?contextId=ctx_secure_once');
     const handoff = createHandoff('list_customer', '/dataSource');

@@ -126,9 +126,10 @@ export default function UnifiedDesignerPage() {
     tone: 'warning' | 'success';
     message: string;
   } | null>(null);
-  const [studioSaveReconciliationFeedback, setStudioSaveReconciliationFeedback] = useState<
-    string | null
-  >(null);
+  const [studioSaveReconciliationFeedback, setStudioSaveReconciliationFeedback] = useState<{
+    tone: 'warning' | 'success';
+    message: string;
+  } | null>(null);
   const [studioConflict, setStudioConflict] = useState<StudioConflictState | null>(null);
   const [conflictPending, setConflictPending] = useState(false);
   const [conflictError, setConflictError] = useState<string | null>(null);
@@ -595,13 +596,14 @@ export default function UnifiedDesignerPage() {
       try {
         latestSession = await loadAuthoringSession(baseSession.sessionPid);
       } catch {
-        // Preserve the original save error when the conflict probe cannot refresh.
+        throw new Error('保存结果暂时无法确认；无法读取权威草稿，请联网后重试');
       }
-      if (
-        latestSession &&
-        latestSession.revision > baseSession.revision &&
-        hasOwnedWriterLease(latestSession)
-      ) {
+      if (!latestSession) {
+        throw new Error('保存结果暂时无法确认；无法读取权威草稿，请联网后重试');
+      }
+      const latestSessionWritable =
+        latestSession.state === 'ACTIVE' && hasOwnedWriterLease(latestSession);
+      if (latestSession.revision > baseSession.revision) {
         const baseDocument = authoringSnapshotToPageSchemaV3(baseSession.snapshot);
         const latestDocument = authoringSnapshotToPageSchemaV3(latestSession.snapshot);
         if (
@@ -612,17 +614,34 @@ export default function UnifiedDesignerPage() {
           setAuthoringSession(latestSession);
           setDocument(latestDocument);
           setStudioConflict(null);
-          setStudioSaveReconciliationFeedback(
-            '保存已在服务端完成；响应虽中断，应用设计中心已按权威草稿恢复，未重复写入。',
-          );
+          setStudioSaveReconciliationFeedback({
+            tone: latestSessionWritable ? 'success' : 'warning',
+            message: latestSessionWritable
+              ? '保存已在服务端完成；响应虽中断，应用设计中心已按权威草稿恢复，未重复写入。'
+              : `保存已在服务端完成；${studioSaveAuthorityLabel(latestSession)}，应用设计中心已按权威草稿恢复为只读。`,
+          });
           studioSaveFeedbackTimerRef.current = window.setTimeout(() => {
             setStudioSaveReconciliationFeedback(null);
             studioSaveFeedbackTimerRef.current = null;
           }, 10_000);
           return latestDocument;
         }
+        if (!latestSessionWritable) {
+          setAuthoringSession(latestSession);
+          setStudioConflict(null);
+          throw new Error(
+            `保存未完成；${studioSaveAuthorityLabel(latestSession)}，本地未保存变更已保留且未重放`,
+          );
+        }
         openStudioConflict(baseSession, nextDocument, latestSession);
         throw new Error('旧修订未写入；已进入 Base / Mine / Latest 三方冲突裁决');
+      }
+      if (!latestSessionWritable) {
+        setAuthoringSession(latestSession);
+        setStudioConflict(null);
+        throw new Error(
+          `保存未完成；${studioSaveAuthorityLabel(latestSession)}，本地未保存变更已保留且未重放`,
+        );
       }
       throw saveError;
     }
@@ -1253,11 +1272,16 @@ export default function UnifiedDesignerPage() {
       ) : null}
       {studioSaveReconciliationFeedback ? (
         <div
-          className="mx-3 mt-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
+          className={`mx-3 mt-2 rounded-md border px-3 py-2 text-sm ${
+            studioSaveReconciliationFeedback.tone === 'success'
+              ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+              : 'border-amber-300 bg-amber-50 text-amber-900'
+          }`}
           data-testid="studio-save-reconciliation-feedback"
+          data-tone={studioSaveReconciliationFeedback.tone}
           role="status"
         >
-          {studioSaveReconciliationFeedback}
+          {studioSaveReconciliationFeedback.message}
         </div>
       ) : null}
       {studioConflict ? (
@@ -1796,6 +1820,12 @@ function replaceAuthoringSessionUrl(sessionPid: string): void {
 
 function hasOwnedWriterLease(session: AuthoringSession | null): boolean {
   return Boolean(session && (!session.writerLease || session.writerLease.status === 'OWNED'));
+}
+
+function studioSaveAuthorityLabel(session: AuthoringSession): string {
+  if (session.state !== 'ACTIVE') return `ChangeSet 已进入 ${session.state} 状态`;
+  if (session.writerLease?.status === 'EXPIRED') return 'Writer lease 已过期';
+  return '编辑权已转移到其他会话';
 }
 
 function studioReadOnlyReason(

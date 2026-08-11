@@ -598,13 +598,30 @@ export function ContextualAuthoringSurface({
           try {
             latestSession = await loadAuthoringSession(currentSession.sessionPid);
           } catch {
-            // Preserve the original save error when authoritative reconciliation cannot reload.
+            throw new Error('保存结果暂时无法确认；无法读取权威草稿，请联网后重试');
           }
-          if (
-            !latestSession ||
-            latestSession.revision <= currentSession.revision ||
-            (latestSession.writerLease && latestSession.writerLease.status !== 'OWNED')
-          ) {
+          if (!latestSession) {
+            throw new Error('保存结果暂时无法确认；无法读取权威草稿，请联网后重试');
+          }
+          const latestSessionWritable =
+            latestSession.state === 'ACTIVE' &&
+            (!latestSession.writerLease || latestSession.writerLease.status === 'OWNED');
+          if (latestSession.revision <= currentSession.revision) {
+            if (!latestSessionWritable) {
+              currentSession = latestSession;
+              setSession(currentSession);
+              setPendingEdits(new Map(remaining));
+              setWorkingSchema(
+                materializePendingSchema(schema, currentSession.snapshot, remaining),
+              );
+              setSaveReconciliationFeedback({
+                tone: 'warning',
+                message: saveAuthorityChangedMessage(latestSession, 0, remaining.size),
+              });
+              setStale(true);
+              setError(null);
+              return;
+            }
             throw saveFailure;
           }
 
@@ -636,6 +653,15 @@ export function ContextualAuthoringSurface({
           setSession(currentSession);
           setPendingEdits(new Map(remaining));
           setWorkingSchema(materializePendingSchema(schema, currentSession.snapshot, remaining));
+          if (!latestSessionWritable) {
+            setSaveReconciliationFeedback({
+              tone: 'warning',
+              message: saveAuthorityChangedMessage(latestSession, committedCount, remaining.size),
+            });
+            setStale(true);
+            setError(null);
+            return;
+          }
           const reconciliationConflicts = conflictingPendingEdits(
             currentSession.snapshot,
             remaining,
@@ -2350,6 +2376,25 @@ function cloneJson<T>(value: T): T {
 
 function valuesEqual(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function saveAuthorityChangedMessage(
+  latestSession: AuthoringSession,
+  committedCount: number,
+  remainingCount: number,
+): string {
+  const authority =
+    latestSession.state !== 'ACTIVE'
+      ? `ChangeSet 已进入 ${latestSession.state} 状态`
+      : latestSession.writerLease?.status === 'EXPIRED'
+        ? '编辑租约已过期'
+        : '编辑权已转移到其他会话';
+  if (committedCount > 0) {
+    return remainingCount > 0
+      ? `响应中断后已确认 ${committedCount} 项保存成功；${authority}，剩余 ${remainingCount} 项保留在本地且未重放。`
+      : `保存已在服务端完成；${authority}，当前页面已按权威草稿恢复为只读。`;
+  }
+  return `保存未完成；${authority}，本地未保存变更已保留且未重放。`;
 }
 
 function propertyEditorKind(
