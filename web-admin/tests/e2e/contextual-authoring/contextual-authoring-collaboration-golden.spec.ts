@@ -1,15 +1,14 @@
-import {
-  test,
-  expect,
-  type Browser,
-  type BrowserContext,
-  type Page,
-} from '@playwright/test';
+import { test, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { loginViaUI } from '../../helpers/wd-fixtures';
 
 const RUNTIME_ROUTE = '/production-exception-list-v4';
 const DEFAULT_PASSWORD = DEFAULT_TEST_ACCOUNT.password;
+const SCREENSHOT_DIR = resolve(
+  process.env.CONTEXTUAL_AUTHORING_SCREENSHOT_DIR ?? 'test-results/contextual-authoring',
+);
 
 const PERSONAS = {
   secondAdmin: {
@@ -95,6 +94,13 @@ type CapabilityRegistry = {
 
 type PatchResult = {
   session: AuthoringSession;
+};
+
+type ChangeItem = {
+  changeItemPid: string;
+  blockId: string;
+  propertyPath: string;
+  operation: string;
 };
 
 type ReviewWorkspace = {
@@ -200,18 +206,229 @@ test.describe('Contextual authoring PC collaboration golden', () => {
     }
   });
 
+  test('PC-AUTH-012 @critical — two admins resolve Base Mine Latest without last-write-wins', async ({
+    page,
+    browser,
+  }) => {
+    await ensurePersona(page, PERSONAS.secondAdmin);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const ownerSession = await enterAuthoringFromRuntime(page);
+    const table = findTableBlock(ownerSession.snapshot);
+    expect(table?.id, 'table block for Base Mine Latest').toBeTruthy();
+    const tableId = String(table!.id);
+    const baseTitleValue = readObjectPath(table!, '/title');
+    const baseTitle = typeof baseTitleValue === 'string' ? baseTitleValue : undefined;
+    const baseSpanValue = readObjectPath(table!, '/layout/span');
+    const baseSpan = typeof baseSpanValue === 'number' ? baseSpanValue : undefined;
+    const mineTitle = baseTitle === '生产异常（Mine）' ? '生产异常（Mine 2）' : '生产异常（Mine）';
+    const latestTitle =
+      baseTitle === '生产异常（Latest）' ? '生产异常（Latest 2）' : '生产异常（Latest）';
+    const mineSpan = distinctSpan(baseSpan ?? -1, []);
+    const latestSpan = distinctSpan(baseSpan ?? -1, [mineSpan]);
+    const itemsBefore = await loadChangeItems(page, ownerSession.sessionPid);
+
+    const staged = await stageLocalTitleAndSpanEdits(page, tableId, mineTitle, mineSpan);
+    await expect(page.getByText('2 项未保存')).toBeVisible();
+
+    const secondAdmin = await openAsPersona(browser, PERSONAS.secondAdmin);
+    try {
+      await secondAdmin.page.setViewportSize({ width: 1440, height: 900 });
+      const observerResponse = secondAdmin.page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/change-sets/${ownerSession.changeSetPid}/sessions`,
+      );
+      await secondAdmin.page.goto(
+        `/unified-designer?changeSetId=${encodeURIComponent(ownerSession.changeSetPid)}`,
+        { waitUntil: 'domcontentloaded' },
+      );
+      const observer = await expectApiData<AuthoringSession>(
+        await observerResponse,
+        'open conflict observer workspace',
+      );
+      expect(observer.writerLease?.status).toBe('HELD_BY_OTHER');
+
+      await secondAdmin.page
+        .getByPlaceholder('填写接管原因（必填，将写入审计）')
+        .fill('PC 门禁：写入 Latest 供三方冲突裁决');
+      const takeoverResponse = secondAdmin.page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${observer.sessionPid}/writer-lease/takeover`,
+      );
+      await secondAdmin.page.getByTestId('authoring-writer-lease-takeover').click();
+      const taken = await expectApiData<AuthoringSession>(
+        await takeoverResponse,
+        'second admin takes the writer lease for Latest',
+      );
+      expect(taken.writerLease?.status).toBe('OWNED');
+
+      await secondAdmin.page.getByTestId(`outline-item-${tableId}`).click();
+      await expect(secondAdmin.page.getByTestId('inspector-selected-id')).toContainText(tableId);
+      await secondAdmin.page.getByTestId('inspector-field-title').fill(latestTitle);
+      await secondAdmin.page.getByTestId('inspector-field-layout.span').fill(String(latestSpan));
+      await expect(secondAdmin.page.getByTestId('designer-dirty-state')).toContainText('未保存');
+
+      const latestSaveResponse = secondAdmin.page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${observer.sessionPid}/studio-batches`,
+      );
+      await secondAdmin.page.getByTestId('designer-save').click();
+      const latestSaved = await expectApiData<PatchResult>(
+        await latestSaveResponse,
+        'save the second admin Latest document',
+      );
+      expect(latestSaved.session.revision).toBeGreaterThan(ownerSession.revision);
+      expect(readObjectPath(findTableBlock(latestSaved.session.snapshot)!, '/title')).toBe(
+        latestTitle,
+      );
+      expect(readObjectPath(findTableBlock(latestSaved.session.snapshot)!, '/layout/span')).toBe(
+        latestSpan,
+      );
+      await expect(secondAdmin.page.getByTestId('designer-dirty-state')).toContainText('已保存');
+
+      await expect(page.getByTestId('contextual-authoring-conflict')).toBeVisible({
+        timeout: 25_000,
+      });
+      await expect(page.getByTestId('contextual-authoring-conflict')).toContainText(
+        `Base r${ownerSession.revision} / Latest r${latestSaved.session.revision}`,
+      );
+      await expect(page.getByTestId('contextual-authoring-conflict')).toContainText(
+        '已保留 2 项 Mine',
+      );
+      await expect(staged.titleEditor).toHaveValue(mineTitle);
+      await expect(staged.spanEditor).toHaveValue(String(mineSpan));
+      await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+
+      await page.getByTestId('contextual-authoring-conflict-studio').click();
+      await expect(page).toHaveURL(/unified-designer\?authoringSession=/);
+      await expect(page.getByTestId('authoring-conflict-panel')).toBeVisible();
+      await expect(page.getByTestId('studio-handoff-read-only-reason')).toContainText(
+        'Base / Mine / Latest',
+      );
+
+      const titleConflict = conflictCard(page, '标题');
+      const spanConflict = conflictCard(page, '布局宽度');
+      await expect(titleConflict.getByTestId('authoring-conflict-value-base')).toContainText(
+        baseTitle ?? '未设置',
+      );
+      await expect(titleConflict.getByTestId('authoring-conflict-value-mine')).toContainText(
+        mineTitle,
+      );
+      await expect(titleConflict.getByTestId('authoring-conflict-value-latest')).toContainText(
+        latestTitle,
+      );
+      await expect(spanConflict.getByTestId('authoring-conflict-value-base')).toContainText(
+        baseSpan == null ? '未设置' : String(baseSpan),
+      );
+      await expect(spanConflict.getByTestId('authoring-conflict-value-mine')).toContainText(
+        String(mineSpan),
+      );
+      await expect(spanConflict.getByTestId('authoring-conflict-value-latest')).toContainText(
+        String(latestSpan),
+      );
+      await expect(page.getByText(tableId, { exact: true })).toHaveCount(0);
+      await expect(page.getByText('/layout/span', { exact: true })).toHaveCount(0);
+      await mkdir(SCREENSHOT_DIR, { recursive: true });
+      await page.setViewportSize({ width: 1440, height: 1200 });
+      await page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-012-base-mine-latest.png'),
+        fullPage: true,
+      });
+
+      await page
+        .getByPlaceholder('填写接管原因（必填，将写入审计）')
+        .fill('PC 门禁：裁决 Base Mine Latest 并恢复保存');
+      const ownerTakeoverResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${ownerSession.sessionPid}/writer-lease/takeover`,
+      );
+      await page.getByTestId('authoring-writer-lease-takeover').click();
+      const ownerTaken = await expectApiData<AuthoringSession>(
+        await ownerTakeoverResponse,
+        'original admin retakes writer lease for conflict resolution',
+      );
+      expect(ownerTaken.writerLease?.status).toBe('OWNED');
+      expect(ownerTaken.revision).toBe(latestSaved.session.revision);
+
+      await titleConflict.getByLabel('保留 Mine').click();
+      await spanConflict.getByLabel('保留 Latest').click();
+      await expect(page.getByTestId('authoring-conflict-apply')).toBeEnabled();
+      const resolutionResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${ownerSession.sessionPid}/studio-batches`,
+      );
+      await page.getByTestId('authoring-conflict-apply').click();
+      const resolutionHttpResponse = await resolutionResponse;
+      const resolutionRequest = resolutionHttpResponse.request().postDataJSON() as {
+        expectedRevision: number;
+        patches: Array<{ blockId: string; propertyPath: string; value: unknown }>;
+      };
+      const resolved = await expectApiData<PatchResult>(
+        resolutionHttpResponse,
+        'persist explicit Mine and Latest decisions',
+      );
+
+      expect(resolutionRequest.expectedRevision).toBe(latestSaved.session.revision);
+      expect(resolutionRequest.patches).toEqual([
+        expect.objectContaining({
+          blockId: tableId,
+          propertyPath: '/title',
+          value: mineTitle,
+        }),
+      ]);
+      expect(resolved.session.revision).toBe(latestSaved.session.revision + 1);
+      const resolvedTable = findTableBlock(resolved.session.snapshot);
+      expect(readObjectPath(resolvedTable!, '/title')).toBe(mineTitle);
+      expect(readObjectPath(resolvedTable!, '/layout/span')).toBe(latestSpan);
+      await expect(page.getByTestId('authoring-conflict-panel')).toHaveCount(0);
+      await expect(page.getByTestId('studio-handoff-context')).toContainText(
+        `修订 r${resolved.session.revision}`,
+      );
+      await expect(page.getByTestId('designer-dirty-state')).toContainText('已保存');
+
+      const itemsAfter = await loadChangeItems(page, ownerSession.sessionPid);
+      expect(itemsAfter).toHaveLength(itemsBefore.length + 3);
+      expect(
+        itemsAfter
+          .slice(-3, -1)
+          .map(({ propertyPath }) => propertyPath)
+          .sort(),
+      ).toEqual(['/layout/span', '/title']);
+      expect(itemsAfter.at(-1)?.propertyPath).toBe('/title');
+      const canonical = await expectApiData<AuthoringSession>(
+        await page.request.get(`/api/authoring/sessions/${ownerSession.sessionPid}`),
+        'reload explicitly resolved authoring session',
+      );
+      expect(canonical.revision).toBe(resolved.session.revision);
+      expect(readObjectPath(findTableBlock(canonical.snapshot)!, '/title')).toBe(mineTitle);
+      expect(readObjectPath(findTableBlock(canonical.snapshot)!, '/layout/span')).toBe(latestSpan);
+      await page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-012-resolved.png'),
+        fullPage: true,
+      });
+    } finally {
+      await secondAdmin.close();
+    }
+  });
+
   test('PC-AUTH-006 @critical — independent reviewer approves the frozen revision but cannot publish', async ({
     page,
     browser,
   }) => {
     await ensurePersona(page, PERSONAS.reviewer);
     const ownerSession = await enterAuthoringFromRuntime(page);
-    const l2Patch = await buildTablePatch(
-      page,
-      ownerSession,
-      '/props/defaultFilter',
-      { status: 'OPEN' },
-    );
+    const l2Patch = await buildTablePatch(page, ownerSession, '/props/defaultFilter', {
+      status: 'OPEN',
+    });
     const patched = await expectApiData<PatchResult>(
       await page.request.patch(`/api/authoring/sessions/${ownerSession.sessionPid}/patches`, {
         data: { expectedRevision: ownerSession.revision, ...l2Patch },
@@ -313,12 +530,7 @@ test.describe('Contextual authoring PC collaboration golden', () => {
     try {
       await author.page.setViewportSize({ width: 1280, height: 720 });
       const session = await enterAuthoringFromRuntime(author.page);
-      const tablePatch = await buildTablePatch(
-        author.page,
-        session,
-        '/props/density',
-        'compact',
-      );
+      const tablePatch = await buildTablePatch(author.page, session, '/props/density', 'compact');
       const { editor: densityEditor, value: stagedDensity } = await stageLocalDensityEdit(
         author.page,
         session,
@@ -409,7 +621,8 @@ async function enterAuthoringFromRuntime(page: Page): Promise<AuthoringSession> 
   await openRuntimeFromMenu(page);
   const sessionResponse = page.waitForResponse(
     (response) =>
-      response.request().method() === 'POST' && apiPath(response.url()) === '/api/authoring/sessions',
+      response.request().method() === 'POST' &&
+      apiPath(response.url()) === '/api/authoring/sessions',
   );
   await page.getByRole('main').first().getByRole('button', { name: '配置此页' }).click();
   const session = await expectApiData<AuthoringSession>(
@@ -608,6 +821,42 @@ async function stageLocalDensityEdit(page: Page, session: AuthoringSession) {
   await expect(editor).toBeVisible();
   await editor.fill(value);
   return { editor, value };
+}
+
+async function stageLocalTitleAndSpanEdits(
+  page: Page,
+  tableId: string,
+  title: string,
+  span: number,
+) {
+  await page.getByTestId('authoring-outline-open').click();
+  await page.getByTestId(`authoring-outline-${tableId}`).click();
+  await page.getByRole('button', { name: '关闭页面大纲' }).click();
+  await page.getByTestId('authoring-inspector-open').click();
+  const titleEditor = page.getByTestId('authoring-property-/title').locator('input');
+  const spanEditor = page.getByTestId('authoring-property-/layout/span').locator('input');
+  await expect(titleEditor).toBeVisible();
+  await expect(spanEditor).toBeVisible();
+  await titleEditor.fill(title);
+  await spanEditor.fill(String(span));
+  return { titleEditor, spanEditor };
+}
+
+function conflictCard(page: Page, label: string) {
+  return page.locator('article[data-testid^="authoring-conflict-"]').filter({ hasText: label });
+}
+
+function distinctSpan(base: number, excluded: number[]): number {
+  const candidate = [12, 10, 8, 6].find((value) => value !== base && !excluded.includes(value));
+  if (candidate == null) throw new Error('unable to choose a distinct layout span');
+  return candidate;
+}
+
+async function loadChangeItems(page: Page, sessionPid: string): Promise<ChangeItem[]> {
+  return expectApiData<ChangeItem[]>(
+    await page.request.get(`/api/authoring/sessions/${sessionPid}/change-items`),
+    'load authoring ChangeItems',
+  );
 }
 
 function apiPath(url: string): string {
