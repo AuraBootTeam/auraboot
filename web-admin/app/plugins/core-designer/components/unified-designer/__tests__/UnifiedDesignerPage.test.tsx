@@ -24,6 +24,7 @@ import {
   observeAuthoringChangeSet,
   prepareAuthoringSession,
   publishAuthoringChangeSet,
+  renewAuthoringWriterLease,
   rollbackAuthoringRelease,
   rejectAuthoringAiPatchProposal,
   splitAuthoringChangeSet,
@@ -86,6 +87,7 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   observeAuthoringChangeSet: vi.fn(),
   prepareAuthoringSession: vi.fn(),
   publishAuthoringChangeSet: vi.fn(),
+  renewAuthoringWriterLease: vi.fn(),
   rollbackAuthoringRelease: vi.fn(),
   rejectAuthoringAiPatchProposal: vi.fn(),
   splitAuthoringChangeSet: vi.fn(),
@@ -144,6 +146,7 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(observeAuthoringChangeSet).mockReset();
     vi.mocked(prepareAuthoringSession).mockReset();
     vi.mocked(publishAuthoringChangeSet).mockReset();
+    vi.mocked(renewAuthoringWriterLease).mockReset();
     vi.mocked(rollbackAuthoringRelease).mockReset();
     vi.mocked(rejectAuthoringAiPatchProposal).mockReset();
     vi.mocked(splitAuthoringChangeSet).mockReset();
@@ -444,6 +447,37 @@ describe('UnifiedDesignerPage', () => {
     await waitFor(() =>
       expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_customer_name'),
     );
+  });
+
+  it('renews an owned Studio writer lease before its deadline without changing the draft revision', async () => {
+    setSearch('?authoringSession=session_1');
+    const session = createAuthoringSession(createDocument('document_one', 'Heartbeat Draft'), 6);
+    session.writerLease = {
+      status: 'OWNED',
+      revision: 1,
+      leasedUntil: new Date(Date.now() + 30_000).toISOString(),
+    };
+    const renewed = {
+      ...session,
+      writerLease: {
+        status: 'OWNED' as const,
+        revision: 2,
+        leasedUntil: new Date(Date.now() + 300_000).toISOString(),
+      },
+    };
+    vi.mocked(loadAuthoringSession).mockResolvedValue(session);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(renewAuthoringWriterLease).mockResolvedValue(renewed);
+
+    render(<UnifiedDesignerPage />);
+
+    expect(await screen.findByTestId('studio-handoff-context')).toHaveTextContent('修订 r6');
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() =>
+      expect(renewAuthoringWriterLease).toHaveBeenCalledWith('session_1'),
+    );
+    expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r6');
+    expect(screen.getByTestId('studio-handoff-editable-reason')).toBeInTheDocument();
   });
 
   it('keeps new resources in Studio through prepare and submit without resuming them on the source page', async () => {

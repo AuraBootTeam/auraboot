@@ -10,6 +10,7 @@ import {
   loadAuthoringSession,
   openAuthoringSession,
   prepareAuthoringSession,
+  renewAuthoringWriterLease,
   submitAuthoringSession,
   takeoverAuthoringWriterLease,
   transitionAuthoringGovernance,
@@ -44,6 +45,7 @@ vi.mock('../authoringService', () => ({
   loadAuthoringSession: vi.fn(),
   applyAuthoringPatch: vi.fn(),
   prepareAuthoringSession: vi.fn(),
+  renewAuthoringWriterLease: vi.fn(),
   submitAuthoringSession: vi.fn(),
   createAuthoringHandoff: vi.fn(),
   takeoverAuthoringWriterLease: vi.fn(),
@@ -190,6 +192,8 @@ describe('ContextualAuthoringSurface', () => {
     );
     vi.mocked(transitionAuthoringGovernance).mockResolvedValue(undefined);
     vi.mocked(loadAuthoringSession).mockResolvedValue(openedSession);
+    vi.mocked(renewAuthoringWriterLease).mockReset();
+    vi.mocked(renewAuthoringWriterLease).mockResolvedValue(openedSession);
     vi.mocked(takeoverAuthoringWriterLease).mockResolvedValue(
       createAuthoringSession({
         writerLease: {
@@ -528,16 +532,12 @@ describe('ContextualAuthoringSurface', () => {
     const prepare = await screen.findByText('校验与影响分析');
     fireEvent.click(prepare);
 
-    await waitFor(() =>
-      expect(prepareAuthoringSession).toHaveBeenCalledWith('session-1', 2),
-    );
+    await waitFor(() => expect(prepareAuthoringSession).toHaveBeenCalledWith('session-1', 2));
     expect(submitAuthoringSession).not.toHaveBeenCalled();
     const submit = await screen.findByText('提交评审');
     fireEvent.click(submit);
 
-    await waitFor(() =>
-      expect(submitAuthoringSession).toHaveBeenCalledWith('session-1', 2),
-    );
+    await waitFor(() => expect(submitAuthoringSession).toHaveBeenCalledWith('session-1', 2));
     expect(prepareAuthoringSession).toHaveBeenCalledTimes(1);
   });
 
@@ -552,9 +552,7 @@ describe('ContextualAuthoringSurface', () => {
     renderSurface(vi.fn(), vi.fn());
     fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
 
-    expect(await screen.findByTestId('authoring-impact-notice')).toHaveTextContent(
-      '依赖已变化',
-    );
+    expect(await screen.findByTestId('authoring-impact-notice')).toHaveTextContent('依赖已变化');
     expect(screen.getByText('校验与影响分析')).toBeDisabled();
     expect(prepareAuthoringSession).not.toHaveBeenCalled();
     expect(submitAuthoringSession).not.toHaveBeenCalled();
@@ -581,9 +579,7 @@ describe('ContextualAuthoringSurface', () => {
 
     fireEvent.click(await screen.findByText('重试影响分析'));
 
-    await waitFor(() =>
-      expect(prepareAuthoringSession).toHaveBeenCalledWith('session-1', 2),
-    );
+    await waitFor(() => expect(prepareAuthoringSession).toHaveBeenCalledWith('session-1', 2));
     expect(submitAuthoringSession).not.toHaveBeenCalled();
   });
 
@@ -619,6 +615,38 @@ describe('ContextualAuthoringSurface', () => {
         '原作者离线，继续紧急修复',
       ),
     );
+    expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument();
+    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+      'data-read-only',
+      'false',
+    );
+  });
+
+  it('renews an owned writer lease on resume when it is close to expiry', async () => {
+    const expiring = createAuthoringSession({
+      writerLease: {
+        status: 'OWNED',
+        revision: 7,
+        leasedUntil: new Date(Date.now() + 30_000).toISOString(),
+      },
+    });
+    const renewed = createAuthoringSession({
+      writerLease: {
+        status: 'OWNED',
+        revision: 8,
+        leasedUntil: new Date(Date.now() + 5 * 60_000).toISOString(),
+      },
+    });
+    vi.mocked(openAuthoringSession).mockResolvedValue(expiring);
+    vi.mocked(loadAuthoringSession).mockResolvedValue(expiring);
+    vi.mocked(renewAuthoringWriterLease).mockResolvedValue(renewed);
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+    await screen.findByTestId('contextual-authoring-surface');
+
+    act(() => window.dispatchEvent(new Event('focus')));
+
+    await waitFor(() => expect(renewAuthoringWriterLease).toHaveBeenCalledWith('session-1'));
     expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument();
     expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
       'data-read-only',

@@ -69,6 +69,7 @@ type RoleRecord = {
 type WriterLease = {
   status: 'OWNED' | 'HELD_BY_OTHER' | 'HELD_BY_OTHER_SESSION' | 'EXPIRED';
   revision: number;
+  leasedUntil: string;
 };
 
 type AuthoringSession = {
@@ -420,6 +421,130 @@ test.describe('Contextual authoring PC collaboration golden', () => {
     }
   });
 
+  test('PC-AUTH-013 @critical — a second tab is read-only until audited takeover', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const ownerSession = await enterAuthoringFromRuntime(page);
+    const staged = await stageLocalDensityEdit(page, ownerSession);
+    await expect(page.getByText('1 项未保存')).toBeVisible();
+
+    const secondTab = await page.context().newPage();
+    try {
+      await secondTab.setViewportSize({ width: 1440, height: 900 });
+      const observerResponse = secondTab.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/change-sets/${ownerSession.changeSetPid}/sessions`,
+      );
+      await secondTab.goto(
+        `/unified-designer?changeSetId=${encodeURIComponent(ownerSession.changeSetPid)}`,
+        { waitUntil: 'domcontentloaded' },
+      );
+      const observer = await expectApiData<AuthoringSession>(
+        await observerResponse,
+        'open the same ChangeSet in a second tab',
+      );
+      expect(observer.writerLease?.status).toBe('HELD_BY_OTHER_SESSION');
+      await expect(secondTab.getByTestId('authoring-writer-lease-notice')).toContainText(
+        '当前账号的另一个会话持有编辑权',
+      );
+      await expect(secondTab.getByTestId('studio-handoff-read-only-reason')).toContainText(
+        'Writer lease 由其他会话持有',
+      );
+      await expect(secondTab.getByTestId('designer-save')).toBeDisabled();
+      await mkdir(SCREENSHOT_DIR, { recursive: true });
+      await secondTab.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-013-second-tab-readonly.png'),
+        fullPage: true,
+      });
+
+      await secondTab
+        .getByPlaceholder('填写接管原因（必填，将写入审计）')
+        .fill('PC 门禁：同账号第二标签页继续编辑');
+      const takeoverResponse = secondTab.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${observer.sessionPid}/writer-lease/takeover`,
+      );
+      await secondTab.getByTestId('authoring-writer-lease-takeover').click();
+      const taken = await expectApiData<AuthoringSession>(
+        await takeoverResponse,
+        'take over editing from the second tab',
+      );
+      expect(taken.writerLease?.status).toBe('OWNED');
+      await expect(secondTab.getByTestId('authoring-writer-lease-notice')).toHaveCount(0);
+      await expect(secondTab.getByTestId('studio-handoff-editable-reason')).toBeVisible();
+
+      await expect(page.getByTestId('authoring-writer-lease-notice')).toContainText(
+        '当前账号的另一个会话持有编辑权',
+        { timeout: 20_000 },
+      );
+      await expect(page.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+        'data-read-only',
+        'true',
+      );
+      await expect(page.getByText('1 项未保存')).toBeVisible();
+      await expect(staged.editor).toHaveValue(staged.value);
+      await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+      const originalAfter = await expectApiData<AuthoringSession>(
+        await page.request.get(`/api/authoring/sessions/${ownerSession.sessionPid}`),
+        'reload the first tab after second-tab takeover',
+      );
+      expect(originalAfter.state).toBe('READ_ONLY');
+      expect(originalAfter.writerLease?.status).toBe('HELD_BY_OTHER_SESSION');
+      await page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-013-first-tab-retains-dirty.png'),
+        fullPage: true,
+      });
+    } finally {
+      await secondTab.close();
+    }
+  });
+
+  test('PC-AUTH-014 @critical — foreground heartbeat renews only the writer lease', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const ownerSession = await enterAuthoringFromRuntime(page);
+    expect(ownerSession.writerLease?.status).toBe('OWNED');
+    const itemsBefore = await loadChangeItems(page, ownerSession.sessionPid);
+    const renewResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${ownerSession.sessionPid}/writer-lease/renew`,
+    );
+
+    await page.evaluate(() => {
+      const originalNow = Date.now;
+      const clock = window as Window & { __authoringOriginalDateNow?: () => number };
+      clock.__authoringOriginalDateNow = originalNow;
+      Date.now = () => originalNow() + 4 * 60_000;
+      window.dispatchEvent(new Event('focus'));
+    });
+    const renewed = await expectApiData<AuthoringSession>(
+      await renewResponse,
+      'renew the writer lease after returning to the foreground',
+    );
+    await page.evaluate(() => {
+      const clock = window as Window & { __authoringOriginalDateNow?: () => number };
+      if (clock.__authoringOriginalDateNow) Date.now = clock.__authoringOriginalDateNow;
+      delete clock.__authoringOriginalDateNow;
+    });
+
+    expect(renewed.revision).toBe(ownerSession.revision);
+    expect(renewed.writerLease?.status).toBe('OWNED');
+    expect(renewed.writerLease?.revision).toBe((ownerSession.writerLease?.revision ?? 0) + 1);
+    expect(Date.parse(renewed.writerLease!.leasedUntil)).toBeGreaterThan(
+      Date.parse(ownerSession.writerLease!.leasedUntil),
+    );
+    expect(await loadChangeItems(page, ownerSession.sessionPid)).toEqual(itemsBefore);
+    await expect(page.getByText('0 项未保存')).toBeVisible();
+  });
+
   test('PC-AUTH-006 @critical — independent reviewer approves the frozen revision but cannot publish', async ({
     page,
     browser,
@@ -607,7 +732,7 @@ async function login(page: Page, email: string): Promise<void> {
 }
 
 async function openRuntimeFromMenu(page: Page): Promise<void> {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('nav')).toBeVisible({ timeout: 10_000 });
   const link = page.locator('nav').locator(`a[href="${RUNTIME_ROUTE}"]`).first();
   await expect(link).toBeVisible({ timeout: 10_000 });
   await link.click();

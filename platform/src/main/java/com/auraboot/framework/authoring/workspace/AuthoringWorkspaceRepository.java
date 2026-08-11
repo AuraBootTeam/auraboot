@@ -235,6 +235,30 @@ public class AuthoringWorkspaceRepository {
         requireOne(leaseUpdated, "authoring.writer-lease.conflict");
     }
 
+    public void renewWriterLease(
+            WorkspaceRow workspace,
+            long actorUserId,
+            Instant leaseUntil) {
+        int leaseUpdated = jdbcTemplate.update("""
+                UPDATE ab_authoring_writer_lease
+                SET leased_until = ?, lease_revision = lease_revision + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND tenant_id = ? AND env_id = ?
+                  AND session_id = ? AND holder_user_id = ?
+                  AND lease_revision = ? AND leased_until > CURRENT_TIMESTAMP
+                """,
+                Timestamp.from(leaseUntil), workspace.leaseId(), workspace.tenantId(),
+                workspace.envId(), workspace.sessionId(), actorUserId,
+                workspace.leaseRevision());
+        requireOne(leaseUpdated, "authoring.writer-lease.lost");
+        jdbcTemplate.update("""
+                UPDATE ab_authoring_config_session
+                SET last_seen_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND tenant_id = ? AND env_id = ? AND actor_user_id = ?
+                """,
+                workspace.sessionId(), workspace.tenantId(), workspace.envId(), actorUserId);
+    }
+
     public void persistPatch(
             WorkspaceRow workspace,
             JsonNode snapshot,

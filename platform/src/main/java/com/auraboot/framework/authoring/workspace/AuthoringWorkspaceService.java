@@ -452,6 +452,30 @@ public class AuthoringWorkspaceService {
     }
 
     @Transactional
+    public SessionView renewWriterLease(String sessionPid) {
+        Identity identity = identity();
+        WorkspaceRow workspace = requireWorkspace(identity, sessionPid, true);
+        requireNonReviewWorkspace(workspace);
+        Instant now = Instant.now();
+        if (workspace.leaseSessionId() != workspace.sessionId()
+                || workspace.leaseHolderUserId() != identity.userId()) {
+            throw new ResponseStatusException(CONFLICT, "authoring.writer-lease.lost");
+        }
+        if (!"ACTIVE".equals(workspace.sessionState())) {
+            throw new ResponseStatusException(CONFLICT, "authoring.session.read-only");
+        }
+        if (!workspace.expiresAt().isAfter(now)) {
+            throw new ResponseStatusException(CONFLICT, "authoring.session.expired");
+        }
+        if (!workspace.leasedUntil().isAfter(now)) {
+            throw new ResponseStatusException(CONFLICT, "authoring.writer-lease.expired");
+        }
+        repository.renewWriterLease(workspace, identity.userId(), now.plus(WRITER_LEASE));
+        WorkspaceRow reloaded = requireWorkspace(identity, sessionPid, false);
+        return viewMapper.toView(reloaded, identity.userId());
+    }
+
+    @Transactional
     public PatchResult apply(String sessionPid, ApplyPatchRequest request) {
         return apply(sessionPid, request, false);
     }

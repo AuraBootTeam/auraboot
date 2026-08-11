@@ -30,10 +30,15 @@ import {
   loadAuthoringCapabilities,
   openAuthoringSession,
   prepareAuthoringSession,
+  renewAuthoringWriterLease,
   submitAuthoringSession,
   takeoverAuthoringWriterLease,
   transitionAuthoringGovernance,
 } from './authoringService';
+import {
+  AUTHORING_WRITER_LEASE_HEARTBEAT_MS,
+  shouldRenewAuthoringWriterLease,
+} from './writerLeaseHeartbeat';
 import { AuthoringGovernanceNotice } from './AuthoringGovernanceNotice';
 import { AuthoringImpactNotice } from './AuthoringImpactNotice';
 import { AuthoringRiskSummary } from './AuthoringRiskSummary';
@@ -119,10 +124,7 @@ export function ContextualAuthoringSurface({
   const returnResumeAttemptedRef = useRef(false);
 
   const rootNode = useMemo(() => buildAuthoringTree(workingSchema), [workingSchema]);
-  const runtimeSchema = useMemo(
-    () => schemaForRuntimePreview(workingSchema),
-    [workingSchema],
-  );
+  const runtimeSchema = useMemo(() => schemaForRuntimePreview(workingSchema), [workingSchema]);
   const nodeIndex = useMemo(() => indexTree(rootNode), [rootNode]);
   const selectedNode = nodeIndex.byId.get(selectedId) ?? rootNode;
   const effectiveMode: AuthoringMode = altPressed
@@ -138,6 +140,8 @@ export function ContextualAuthoringSurface({
     Boolean(contextualConflict) || !isAuthoringSessionWritable(session, canConfigure);
   const activeSessionPid = session?.sessionPid;
   const activeSessionRevision = session?.revision;
+  const activeWriterLeaseStatus = session?.writerLease?.status;
+  const activeWriterLeaseUntil = session?.writerLease?.leasedUntil;
 
   useEffect(() => {
     if (returnResumeAttemptedRef.current) return;
@@ -281,6 +285,45 @@ export function ContextualAuthoringSurface({
       window.clearInterval(interval);
     };
   }, [activeSessionPid, activeSessionRevision, pendingEdits, schema]);
+
+  useEffect(() => {
+    if (!activeSessionPid || activeWriterLeaseStatus !== 'OWNED' || !activeWriterLeaseUntil) {
+      return;
+    }
+    let cancelled = false;
+    const refreshLease = () => {
+      if (!shouldRenewAuthoringWriterLease(activeWriterLeaseUntil)) return;
+      void renewAuthoringWriterLease(activeSessionPid)
+        .then((renewed) => {
+          if (!cancelled && renewed.revision >= (activeSessionRevision ?? -1)) {
+            setSession(renewed);
+          }
+        })
+        .catch(() => {
+          void loadAuthoringSession(activeSessionPid)
+            .then((latest) => {
+              if (!cancelled && latest.revision >= (activeSessionRevision ?? -1)) {
+                setSession(latest);
+              }
+            })
+            .catch(() => {
+              // Foreground actions own visible errors; heartbeat recovery stays fail-closed.
+            });
+        });
+    };
+    const onResume = () => {
+      if (window.document.visibilityState === 'visible') refreshLease();
+    };
+    const interval = window.setInterval(refreshLease, AUTHORING_WRITER_LEASE_HEARTBEAT_MS);
+    window.addEventListener('focus', refreshLease);
+    window.document.addEventListener('visibilitychange', onResume);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshLease);
+      window.document.removeEventListener('visibilitychange', onResume);
+    };
+  }, [activeSessionPid, activeSessionRevision, activeWriterLeaseStatus, activeWriterLeaseUntil]);
 
   useEffect(() => {
     if (!session) return;

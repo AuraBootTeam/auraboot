@@ -199,6 +199,14 @@ export async function takeoverAuthoringWriterLease(
   return requireData(result, '无法接管 ChangeSet 编辑权');
 }
 
+export async function renewAuthoringWriterLease(sessionPid: string): Promise<AuthoringSession> {
+  const result = await fetchResult<AuthoringSession>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/writer-lease/renew`,
+    { method: 'post' },
+  );
+  return requireData(result, '无法续租 ChangeSet 编辑权');
+}
+
 export async function applyAuthoringPatch(
   sessionPid: string,
   revision: number,

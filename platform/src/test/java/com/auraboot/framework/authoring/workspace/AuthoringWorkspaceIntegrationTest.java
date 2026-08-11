@@ -20,6 +20,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Se
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SplitChangeSetView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.StudioIntent;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.TakeoverWriterLeaseRequest;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
@@ -439,6 +440,97 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                   AND metadata ->> 'reason' = '继续处理紧急变更'
                 """, Integer.class,
                 testTenant.getId(), environmentId, original.changeSetPid());
+        assertThat(takeoverEvents).isEqualTo(1);
+    }
+
+    @Test
+    void activeWriterHeartbeatRenewsOnlyTheLeaseWithoutChangingTheDraftRevision() throws Exception {
+        grantDesignerManage();
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+
+        String renewedBody = mockMvc.perform(post(
+                        "/api/authoring/sessions/{sessionPid}/writer-lease/renew",
+                        opened.sessionPid()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sessionPid").value(opened.sessionPid()))
+                .andExpect(jsonPath("$.data.revision").value(opened.revision()))
+                .andExpect(jsonPath("$.data.writerLease.status").value("OWNED"))
+                .andExpect(jsonPath("$.data.writerLease.revision").value(2))
+                .andReturn().getResponse().getContentAsString();
+
+        Instant renewedUntil = Instant.parse(objectMapper.readTree(renewedBody)
+                .at("/data/writerLease/leasedUntil").asText());
+        assertThat(renewedUntil).isAfter(opened.writerLease().leasedUntil());
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT revision FROM ab_authoring_change_set WHERE pid = ?
+                """, Long.class, opened.changeSetPid())).isEqualTo(opened.revision());
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_change_item ci
+                JOIN ab_authoring_change_set cs ON cs.id = ci.change_set_id
+                WHERE cs.pid = ?
+                """, Integer.class, opened.changeSetPid())).isZero();
+    }
+
+    @Test
+    void expiredWriterCannotHeartbeatOrWriteAndAnotherTabMustTakeOverWithAudit() throws Exception {
+        grantDesignerAdmin();
+        grantDesignerManage();
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        jdbcTemplate.update("""
+                UPDATE ab_authoring_writer_lease wl
+                SET leased_until = CURRENT_TIMESTAMP - INTERVAL '1 second'
+                FROM ab_authoring_change_set cs
+                WHERE wl.change_set_id = cs.id AND cs.pid = ?
+                """, opened.changeSetPid());
+
+        assertThat(workspaceService.get(opened.sessionPid()).writerLease().status())
+                .isEqualTo("EXPIRED");
+        mockMvc.perform(post(
+                        "/api/authoring/sessions/{sessionPid}/writer-lease/renew",
+                        opened.sessionPid()))
+                .andExpect(status().isConflict());
+        applyTestMetaContext();
+        assertThatThrownBy(() -> workspaceService.apply(
+                opened.sessionPid(),
+                new ApplyPatchRequest(
+                        opened.revision(), "table-1", "/props/density", PatchOperation.REPLACE,
+                        objectMapper.getNodeFactory().textNode("compact"),
+                        capabilityRegistry.find("table").orElseThrow().checksum())))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("authoring.writer-lease.expired");
+
+        String observerBody = mockMvc.perform(post(
+                        "/api/authoring/change-sets/{changeSetPid}/sessions",
+                        opened.changeSetPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"interactionContext\":{\"tabId\":\"second-tab\"}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.state").value("READ_ONLY"))
+                .andExpect(jsonPath("$.data.writerLease.status").value("EXPIRED"))
+                .andReturn().getResponse().getContentAsString();
+        String observerSessionPid = objectMapper.readTree(observerBody)
+                .at("/data/sessionPid").asText();
+
+        applyTestMetaContext();
+        SessionView taken = workspaceService.takeoverWriterLease(
+                observerSessionPid,
+                new TakeoverWriterLeaseRequest(opened.revision(), "原标签页已离线，接管过期租约"));
+        assertThat(taken.state()).isEqualTo("ACTIVE");
+        assertThat(taken.writerLease().status()).isEqualTo("OWNED");
+        assertThat(taken.writerLease().revision()).isEqualTo(2);
+        SessionView originalAfter = workspaceService.get(opened.sessionPid());
+        assertThat(originalAfter.state()).isEqualTo("READ_ONLY");
+        assertThat(originalAfter.writerLease().status()).isEqualTo("HELD_BY_OTHER_SESSION");
+
+        Integer takeoverEvents = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_audit_event
+                WHERE tenant_id = ? AND env_id = ? AND change_set_pid = ?
+                  AND event_type = 'WRITER_LEASE_TAKEN_OVER'
+                  AND metadata ->> 'reason' = '原标签页已离线，接管过期租约'
+                """, Integer.class, testTenant.getId(), MetaContext.getCurrentEnvironmentId(),
+                opened.changeSetPid());
         assertThat(takeoverEvents).isEqualTo(1);
     }
 

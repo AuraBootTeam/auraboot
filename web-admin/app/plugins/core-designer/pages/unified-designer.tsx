@@ -31,10 +31,15 @@ import {
   observeAuthoringChangeSet,
   prepareAuthoringSession,
   publishAuthoringChangeSet,
+  renewAuthoringWriterLease,
   submitAuthoringSession,
   takeoverAuthoringWriterLease,
   transitionAuthoringGovernance,
 } from '~/framework/meta/authoring/authoringService';
+import {
+  AUTHORING_WRITER_LEASE_HEARTBEAT_MS,
+  shouldRenewAuthoringWriterLease,
+} from '~/framework/meta/authoring/writerLeaseHeartbeat';
 import { AuthoringWriterLeaseNotice } from '~/framework/meta/authoring/AuthoringWriterLeaseNotice';
 import { AuthoringGovernanceNotice } from '~/framework/meta/authoring/AuthoringGovernanceNotice';
 import { AuthoringRiskSummary } from '~/framework/meta/authoring/AuthoringRiskSummary';
@@ -141,6 +146,8 @@ export default function UnifiedDesignerPage() {
   );
   const activeAuthoringSessionPid = authoringSession?.sessionPid;
   const activeAuthoringRevision = authoringSession?.revision;
+  const activeWriterLeaseStatus = authoringSession?.writerLease?.status;
+  const activeWriterLeaseUntil = authoringSession?.writerLease?.leasedUntil;
 
   useEffect(() => {
     if (reviewWorkspaceMode) setGovernanceOpen(true);
@@ -322,6 +329,56 @@ export default function UnifiedDesignerPage() {
       window.clearInterval(interval);
     };
   }, [activeAuthoringRevision, activeAuthoringSessionPid, reviewWorkspaceMode]);
+
+  useEffect(() => {
+    if (
+      !activeAuthoringSessionPid ||
+      activeWriterLeaseStatus !== 'OWNED' ||
+      !activeWriterLeaseUntil ||
+      reviewWorkspaceMode
+    ) {
+      return;
+    }
+    let cancelled = false;
+    const refreshLease = () => {
+      if (!shouldRenewAuthoringWriterLease(activeWriterLeaseUntil)) return;
+      void renewAuthoringWriterLease(activeAuthoringSessionPid)
+        .then((renewed) => {
+          if (!cancelled && renewed.revision >= (activeAuthoringRevision ?? -1)) {
+            setAuthoringSession(renewed);
+          }
+        })
+        .catch(() => {
+          void loadAuthoringSession(activeAuthoringSessionPid)
+            .then((latest) => {
+              if (!cancelled && latest.revision >= (activeAuthoringRevision ?? -1)) {
+                setAuthoringSession(latest);
+              }
+            })
+            .catch(() => {
+              // Preserve the isolated document; the next foreground action remains fail-closed.
+            });
+        });
+    };
+    const onResume = () => {
+      if (window.document.visibilityState === 'visible') refreshLease();
+    };
+    const interval = window.setInterval(refreshLease, AUTHORING_WRITER_LEASE_HEARTBEAT_MS);
+    window.addEventListener('focus', refreshLease);
+    window.document.addEventListener('visibilitychange', onResume);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshLease);
+      window.document.removeEventListener('visibilitychange', onResume);
+    };
+  }, [
+    activeAuthoringRevision,
+    activeAuthoringSessionPid,
+    activeWriterLeaseStatus,
+    activeWriterLeaseUntil,
+    reviewWorkspaceMode,
+  ]);
 
   useEffect(() => {
     if (handoff?.intent !== 'NEW_PAGE' || !canAdministerDesigner) return;

@@ -193,6 +193,12 @@ public class AuthoringWorkspaceController {
         return ApiResponse.success(workspaceService.takeoverWriterLease(sessionPid, request));
     }
 
+    @PostMapping("/sessions/{sessionPid}/writer-lease/renew")
+    @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
+    public ApiResponse<SessionView> renewWriterLease(@PathVariable String sessionPid) {
+        return ApiResponse.success(workspaceService.renewWriterLease(sessionPid));
+    }
+
     @PostMapping("/sessions/{sessionPid}/handoffs")
     @RequirePermission(MetaPermission.PAGE_DESIGNER_MANAGE)
     public ApiResponse<HandoffCreatedView> createHandoff(
