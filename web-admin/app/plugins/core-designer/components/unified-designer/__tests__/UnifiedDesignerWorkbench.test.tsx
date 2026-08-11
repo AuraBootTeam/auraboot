@@ -436,9 +436,10 @@ describe('UnifiedDesignerWorkbench', () => {
     await waitFor(() => {
       expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('保存失败');
     });
-    expect(screen.getByTestId('designer-save-error')).toHaveTextContent(
-      'Backend rejected PageSchema V3.',
-    );
+    const saveError = screen.getByTestId('designer-save-error');
+    expect(saveError).toHaveTextContent('Backend rejected PageSchema V3.');
+    expect(saveError).toHaveAttribute('role', 'alert');
+    expect(saveError).not.toHaveClass('truncate');
     expect(screen.getByTestId('designer-save')).not.toBeDisabled();
 
     fireEvent.change(screen.getByTestId('inspector-field-props.label'), {

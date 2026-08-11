@@ -506,6 +506,124 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
       fullPage: true,
     });
   });
+
+  test('PC-AUTH-021 @critical — a failed Studio authority reload keeps the atomic document dirty and later reconciles without replay', async ({
+    page,
+  }) => {
+    const session = await enterAuthoringFromRuntime(page);
+    await page.getByTestId('authoring-inspector-open').click();
+    await page.getByRole('button', { name: '高级设置' }).click();
+    await page
+      .getByRole('dialog', { name: '进入应用设计中心' })
+      .getByRole('button', { name: '继续到应用设计中心' })
+      .click();
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+
+    const list = findBlock(session.snapshot, (candidate) => blockType(candidate) === 'list');
+    expect(list?.id, 'list root id for Studio authority-reload failure').toBeTruthy();
+    await page.getByTestId(`outline-item-${String(list!.id)}`).click();
+    await page.getByTestId('resource-tab-blocks').click();
+    const availableBlock = page
+      .locator(
+        'button[data-testid="palette-add-filter-bar"]:not([disabled]), button[data-testid="palette-add-action-bar"]:not([disabled])',
+      )
+      .first();
+    await expect(availableBlock).toBeVisible();
+    await availableBlock.click();
+    const batchPath = `/api/authoring/sessions/${session.sessionPid}/studio-batches`;
+    const sessionPath = `/api/authoring/sessions/${session.sessionPid}`;
+    const createResponse = page.waitForResponse(
+      (response) => response.request().method() === 'POST' && apiPath(response.url()) === batchPath,
+    );
+    await page.getByTestId('designer-save').click();
+    const created = await expectApiData<PatchResult>(
+      await createResponse,
+      'create Studio authority-reload fixture',
+    );
+    const itemsAfterCreate = await loadChangeItems(page, session.sessionPid);
+
+    await page.getByTestId('designer-mode-layout').click();
+    const moveButton = page.locator('[data-testid^="block-move-up-"]:not([disabled])').first();
+    await expect(moveButton).toBeVisible();
+    const testId = await moveButton.getAttribute('data-testid');
+    const blockId = testId!.slice('block-move-up-'.length);
+    const beforeOrder = siblingOrder(created.session.snapshot, blockId);
+    await moveButton.click();
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');
+
+    let failNextAuthorityRead = false;
+    let committedBatches = 0;
+    await page.route(`**${sessionPath}`, async (route) => {
+      if (
+        failNextAuthorityRead &&
+        route.request().method() === 'GET' &&
+        apiPath(route.request().url()) === sessionPath
+      ) {
+        failNextAuthorityRead = false;
+        await route.abort('failed');
+        return;
+      }
+      await route.continue();
+    });
+    await page.route(`**${batchPath}`, async (route) => {
+      const committedResponse = await route.fetch();
+      expect(committedResponse.ok(), 'Studio batch committed before dual response loss').toBe(true);
+      committedBatches += 1;
+      failNextAuthorityRead = true;
+      await route.abort('failed');
+    });
+
+    await page.getByTestId('designer-save').click();
+
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('保存失败');
+    await expect(page.getByTestId('designer-save-error')).toContainText(
+      '保存结果暂时无法确认；无法读取权威草稿，请联网后重试',
+    );
+    await expect(page.getByTestId('designer-save')).toBeEnabled();
+    await expect(page.getByTestId('authoring-conflict-panel')).toHaveCount(0);
+    expect(committedBatches).toBe(1);
+    const committedUnknown = await reloadSession(page, session.sessionPid);
+    expect(committedUnknown.revision).toBe(created.session.revision + 1);
+    expect(await loadChangeItems(page, session.sessionPid)).toHaveLength(
+      itemsAfterCreate.length + 1,
+    );
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-021-studio-authority-read-failed.png'),
+      fullPage: true,
+    });
+
+    await page.unroute(`**${batchPath}`);
+    await page.unroute(`**${sessionPath}`);
+    const staleRetry = page.waitForResponse(
+      (response) => response.request().method() === 'POST' && apiPath(response.url()) === batchPath,
+    );
+    await page.getByTestId('designer-save').click();
+    expect((await staleRetry).status()).toBe(409);
+
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('已保存');
+    await expect(page.getByTestId('studio-save-reconciliation-feedback')).toContainText(
+      '未重复写入',
+    );
+    await expect(page.getByTestId('designer-save-error')).toHaveCount(0);
+    await expect(page.getByTestId('authoring-conflict-panel')).toHaveCount(0);
+    const authoritative = await reloadSession(page, session.sessionPid);
+    expect(authoritative.revision).toBe(created.session.revision + 1);
+    const afterOrder = siblingOrder(authoritative.snapshot, blockId);
+    expect(afterOrder.ids).toEqual([
+      ...beforeOrder.ids.slice(0, beforeOrder.index - 1),
+      blockId,
+      beforeOrder.ids[beforeOrder.index - 1],
+      ...beforeOrder.ids.slice(beforeOrder.index + 1),
+    ]);
+    expect(countStableId(authoritative.snapshot, blockId)).toBe(1);
+    expect(await loadChangeItems(page, session.sessionPid)).toHaveLength(
+      itemsAfterCreate.length + 1,
+    );
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-021-studio-authority-read-reconciled.png'),
+      fullPage: true,
+    });
+  });
 });
 
 async function enterAuthoringFromRuntime(page: Page): Promise<AuthoringSession> {

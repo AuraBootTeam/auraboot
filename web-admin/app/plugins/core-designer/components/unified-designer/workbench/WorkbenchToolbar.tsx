@@ -119,12 +119,15 @@ export function WorkbenchToolbar({
   };
 
   return (
-    <div className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2">
-      <div className="min-w-[150px] flex-1">
-        <div className="text-sm font-semibold text-slate-900">{resolveTitle(document.title, locale)}</div>
-        <div className="font-mono text-xs text-slate-400">{document.id}</div>
-      </div>
-      <div className="flex max-w-full shrink-0 items-center gap-2 overflow-x-auto">
+    <div className="border-b border-slate-200 bg-white">
+      <div className="flex min-h-14 flex-wrap items-center justify-between gap-2 px-4 py-2">
+        <div className="min-w-[150px] flex-1">
+          <div className="text-sm font-semibold text-slate-900">
+            {resolveTitle(document.title, locale)}
+          </div>
+          <div className="font-mono text-xs text-slate-400">{document.id}</div>
+        </div>
+        <div className="flex max-w-full shrink-0 items-center gap-2 overflow-x-auto">
         {onSwitchKind ? (
           <label
             className="flex items-center gap-1.5 text-xs font-medium text-slate-500"
@@ -282,15 +285,6 @@ export function WorkbenchToolbar({
             同一 ChangeSet · 受治理编辑
           </span>
         ) : null}
-        {saveError ? (
-          <span
-            className="max-w-[320px] truncate rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700"
-            data-testid="designer-save-error"
-            title={saveError}
-          >
-            {saveError}
-          </span>
-        ) : null}
         {/* Export / import — pure client-side JSON round-trip, no backend. */}
         {onExport || onImportFile ? (
           <>
@@ -442,7 +436,17 @@ export function WorkbenchToolbar({
             locale,
           )}
         </button>
+        </div>
       </div>
+      {saveError ? (
+        <div
+          className="mx-4 mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-5 text-red-700"
+          data-testid="designer-save-error"
+          role="alert"
+        >
+          {saveError}
+        </div>
+      ) : null}
     </div>
   );
 }
