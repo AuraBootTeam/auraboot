@@ -409,7 +409,7 @@ describe('UnifiedDesignerPage', () => {
 
     const modelSelect = await screen.findByLabelText('业务模型');
     expect(modelSelect).toBeDisabled();
-    expect(modelSelect).toHaveTextContent('暂无已发布模型');
+    await waitFor(() => expect(modelSelect).toHaveTextContent('暂无已发布模型'));
     expect(screen.getByRole('button', { name: '创建并进入页面设计' })).toBeDisabled();
     expect(screen.getByRole('link', { name: '模型设计器' })).toHaveAttribute(
       'href',
