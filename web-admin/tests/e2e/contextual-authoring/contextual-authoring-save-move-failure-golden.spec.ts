@@ -51,7 +51,7 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
     const session = await enterAuthoringFromRuntime(page);
     const runtimeBefore = await readRuntimePage(page, session.pagePid);
     const itemsBefore = await loadChangeItems(page, session.sessionPid);
-    const { blockId } = await stageDensityEdit(page, session);
+    const { blockId } = await stageTitleEdit(page, session);
 
     await expect(page.getByText('1 项未保存')).toBeVisible();
     const patchResponse = page.waitForResponse((response) =>
@@ -76,7 +76,7 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
     expect(itemsAfter).toHaveLength(itemsBefore.length + 1);
     expect(itemsAfter.at(-1)).toMatchObject({
       blockId,
-      propertyPath: '/props/density',
+      propertyPath: '/title',
       operation: expect.stringMatching(/ADD|REPLACE/),
     });
     expect(await readRuntimePage(page, session.pagePid)).toEqual(runtimeBefore);
@@ -232,14 +232,32 @@ async function stageDensityEdit(page: Page, session: AuthoringSession) {
   const table = findBlock(session.snapshot, (candidate) => blockType(candidate) === 'table');
   expect(table?.id, 'table block id for density edit').toBeTruthy();
   const value = readObjectPath(table!, '/props/density') === 'compact' ? 'comfortable' : 'compact';
-  await page.getByTestId('authoring-outline-open').click();
-  await page.getByTestId(`authoring-outline-${String(table!.id)}`).click();
-  await page.getByRole('button', { name: '关闭页面大纲' }).click();
-  await page.getByTestId('authoring-inspector-open').click();
+  await openTableInspector(page, String(table!.id));
   const editor = page.getByTestId('authoring-property-/props/density').locator('input');
   await expect(editor).toBeVisible();
   await editor.fill(value);
   return { blockId: String(table!.id), editor, value };
+}
+
+async function stageTitleEdit(page: Page, session: AuthoringSession) {
+  const table = findBlock(session.snapshot, (candidate) => blockType(candidate) === 'table');
+  expect(table?.id, 'table block id for title edit').toBeTruthy();
+  const value =
+    readObjectPath(table!, '/title') === '生产异常（PC 验收）'
+      ? '生产异常清单（PC 验收）'
+      : '生产异常（PC 验收）';
+  await openTableInspector(page, String(table!.id));
+  const editor = page.getByTestId('authoring-property-/title').locator('input');
+  await expect(editor).toBeVisible();
+  await editor.fill(value);
+  return { blockId: String(table!.id), editor, value };
+}
+
+async function openTableInspector(page: Page, tableId: string): Promise<void> {
+  await page.getByTestId('authoring-outline-open').click();
+  await page.getByTestId(`authoring-outline-${tableId}`).click();
+  await page.getByRole('button', { name: '关闭页面大纲' }).click();
+  await page.getByTestId('authoring-inspector-open').click();
 }
 
 async function loadChangeItems(page: Page, sessionPid: string): Promise<ChangeItem[]> {
