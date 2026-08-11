@@ -44,6 +44,7 @@ import {
   reconcileWriterLeaseTakeover,
   type WriterLeaseTakeoverReconciliation,
 } from './writerLeaseTakeover';
+import { reconcileAuthoringSaveProperty } from './saveReconciliation';
 import { AuthoringGovernanceNotice } from './AuthoringGovernanceNotice';
 import { AuthoringImpactNotice } from './AuthoringImpactNotice';
 import { AuthoringRiskSummary } from './AuthoringRiskSummary';
@@ -121,6 +122,10 @@ export function ContextualAuthoringSurface({
     tone: 'warning' | 'success';
     message: string;
   } | null>(null);
+  const [saveReconciliationFeedback, setSaveReconciliationFeedback] = useState<{
+    tone: 'warning' | 'success';
+    message: string;
+  } | null>(null);
   const [governancePending, setGovernancePending] = useState<AuthoringGovernanceAction | null>(
     null,
   );
@@ -166,6 +171,7 @@ export function ContextualAuthoringSurface({
     setOpening(true);
     setError(null);
     setLeaseTakeoverFeedback(null);
+    setSaveReconciliationFeedback(null);
     void Promise.all([loadAuthoringSession(resume.sessionPid), loadAuthoringCapabilities()])
       .then(([restored, registry]) => {
         if (restored.pagePid !== schema.id) {
@@ -220,6 +226,7 @@ export function ContextualAuthoringSurface({
     setOpening(true);
     setError(null);
     setLeaseTakeoverFeedback(null);
+    setSaveReconciliationFeedback(null);
     entryScrollRef.current = { x: window.scrollX, y: window.scrollY };
     try {
       const interactionContext = captureInteractionContext(recordPid, schema.id);
@@ -253,6 +260,7 @@ export function ContextualAuthoringSurface({
     setExplain(null);
     setError(null);
     setLeaseTakeoverFeedback(null);
+    setSaveReconciliationFeedback(null);
     setWriteBlocked(false);
     setOutlineOpen(false);
     setInspectorOpen(false);
@@ -522,6 +530,7 @@ export function ContextualAuthoringSurface({
         return next;
       });
       setError(null);
+      setSaveReconciliationFeedback(null);
       setStale(false);
     },
     [canConfigure, contextualConflict, manifestByType, schema, session],
@@ -538,23 +547,27 @@ export function ContextualAuthoringSurface({
       return;
     setSaving(true);
     setError(null);
+    setSaveReconciliationFeedback(null);
     let currentSession = session;
-    const remaining = new Map(pendingEdits);
+    let remaining = new Map(pendingEdits);
+    const pendingCountAtSaveStart = pendingEdits.size;
+    let reconciledCommittedCount = 0;
     try {
-      const conflictingEdits = conflictingPendingEdits(currentSession.snapshot, remaining);
-      if (conflictingEdits.length > 0) {
-        setContextualConflict(
-          createContextualConflictState(
-            currentSession,
-            remaining,
-            Math.min(...conflictingEdits.map((edit) => edit.baseRevision)),
-          ),
-        );
-        setStale(true);
-        setError(null);
-        return;
-      }
-      for (const edit of pendingEdits.values()) {
+      while (remaining.size > 0) {
+        const conflictingEdits = conflictingPendingEdits(currentSession.snapshot, remaining);
+        if (conflictingEdits.length > 0) {
+          setContextualConflict(
+            createContextualConflictState(
+              currentSession,
+              remaining,
+              Math.min(...conflictingEdits.map((edit) => edit.baseRevision)),
+            ),
+          );
+          setStale(true);
+          setError(null);
+          return;
+        }
+        const edit = remaining.values().next().value as PendingAuthoringEdit;
         const latestValue = readSnapshotProperty(
           currentSession.snapshot,
           edit.blockId,
@@ -566,56 +579,120 @@ export function ContextualAuthoringSurface({
           setPendingEdits(new Map(remaining));
           continue;
         }
-        const result = await applyAuthoringPatch(
-          currentSession.sessionPid,
-          currentSession.revision,
-          edit.blockId,
-          edit.property.propertyPath,
-          edit.operation,
-          edit.value,
-          edit.manifestChecksum,
-        );
-        currentSession = result.session;
-        remaining.delete(edit.key);
-        setSession(currentSession);
-        setPendingEdits(new Map(remaining));
+        try {
+          const result = await applyAuthoringPatch(
+            currentSession.sessionPid,
+            currentSession.revision,
+            edit.blockId,
+            edit.property.propertyPath,
+            edit.operation,
+            edit.value,
+            edit.manifestChecksum,
+          );
+          currentSession = result.session;
+          remaining.delete(edit.key);
+          setSession(currentSession);
+          setPendingEdits(new Map(remaining));
+        } catch (saveFailure) {
+          let latestSession: AuthoringSession | null = null;
+          try {
+            latestSession = await loadAuthoringSession(currentSession.sessionPid);
+          } catch {
+            // Preserve the original save error when authoritative reconciliation cannot reload.
+          }
+          if (
+            !latestSession ||
+            latestSession.revision <= currentSession.revision ||
+            (latestSession.writerLease && latestSession.writerLease.status !== 'OWNED')
+          ) {
+            throw saveFailure;
+          }
+
+          const reconciledRemaining = new Map(remaining);
+          let committedCount = 0;
+          for (const candidate of remaining.values()) {
+            const candidateLatestValue = readSnapshotProperty(
+              latestSession.snapshot,
+              candidate.blockId,
+              candidate.property.propertyPath,
+            );
+            const candidateMineValue =
+              candidate.operation === 'REMOVE' ? undefined : candidate.value;
+            if (
+              reconcileAuthoringSaveProperty(
+                candidate.previousValue,
+                candidateMineValue,
+                candidateLatestValue,
+              ) === 'COMMITTED'
+            ) {
+              reconciledRemaining.delete(candidate.key);
+              committedCount += 1;
+            }
+          }
+
+          currentSession = latestSession;
+          remaining = reconciledRemaining;
+          reconciledCommittedCount += committedCount;
+          setSession(currentSession);
+          setPendingEdits(new Map(remaining));
+          setWorkingSchema(materializePendingSchema(schema, currentSession.snapshot, remaining));
+          const reconciliationConflicts = conflictingPendingEdits(
+            currentSession.snapshot,
+            remaining,
+          );
+          if (reconciliationConflicts.length > 0) {
+            setSaveReconciliationFeedback({
+              tone: 'warning',
+              message:
+                committedCount > 0
+                  ? `网络响应中断；已确认 ${committedCount} 项保存成功，剩余变更需要冲突裁决。`
+                  : '网络响应中断；权威草稿包含并发变更，剩余变更需要冲突裁决。',
+            });
+            setContextualConflict(
+              createContextualConflictState(
+                currentSession,
+                remaining,
+                Math.min(...reconciliationConflicts.map((candidate) => candidate.baseRevision)),
+              ),
+            );
+            setStale(true);
+            setError(null);
+            return;
+          }
+          if (committedCount > 0) {
+            setSaveReconciliationFeedback({
+              tone: 'success',
+              message:
+                remaining.size === 0
+                  ? '保存已在服务端完成；响应虽中断，当前页面已按权威草稿恢复，未重复写入。'
+                  : `响应中断后已确认 ${committedCount} 项保存成功；正在从最新修订继续保存剩余 ${remaining.size} 项。`,
+            });
+          }
+        }
       }
       setWorkingSchema(schemaFromSnapshot(schema, currentSession.snapshot));
       setStale(false);
+      if (reconciledCommittedCount > 0) {
+        setSaveReconciliationFeedback({
+          tone: 'success',
+          message:
+            remaining.size === 0
+              ? pendingCountAtSaveStart > reconciledCommittedCount
+                ? `保存已在服务端完成：响应中断的 ${reconciledCommittedCount} 项已由权威草稿确认，其余 ${pendingCountAtSaveStart - reconciledCommittedCount} 项已从最新修订继续保存，未重复写入。`
+                : `保存已在服务端完成：网络响应中断后已确认 ${reconciledCommittedCount} 项成功；当前页面已按最新修订恢复，未重复写入。`
+              : `已确认 ${reconciledCommittedCount} 项在服务端保存成功；${remaining.size} 项仍保留在本地。`,
+        });
+      }
     } catch (saveFailure) {
       setPendingEdits(new Map(remaining));
       setWorkingSchema(materializePendingSchema(schema, currentSession.snapshot, remaining));
       setStale(true);
-      let latestSession: AuthoringSession | null = null;
-      try {
-        latestSession = await loadAuthoringSession(currentSession.sessionPid);
-      } catch {
-        // Keep the original failure when the conflict probe cannot refresh.
-      }
-      if (
-        latestSession &&
-        latestSession.revision > currentSession.revision &&
-        (!latestSession.writerLease || latestSession.writerLease.status === 'OWNED')
-      ) {
-        setSession(latestSession);
-        setContextualConflict(
-          createContextualConflictState(
-            latestSession,
-            remaining,
-            remaining.size > 0
-              ? Math.min(...[...remaining.values()].map((edit) => edit.baseRevision))
-              : currentSession.revision,
-          ),
-        );
-        setError(null);
-      } else {
-        setSession(currentSession);
-        setError(
-          saveFailure instanceof Error
-            ? `${saveFailure.message}；本地未保存变更已保留`
-            : '保存失败；本地未保存变更已保留',
-        );
-      }
+      setSession(currentSession);
+      setError(
+        saveFailure instanceof Error
+          ? `${saveFailure.message}；本地未保存变更已保留`
+          : '保存失败；本地未保存变更已保留',
+      );
     } finally {
       setSaving(false);
     }
@@ -936,6 +1013,20 @@ export function ContextualAuthoringSurface({
           className="border-status-red bg-status-red-bg mx-3 mt-3 rounded-md border px-3 py-2 text-sm text-red-800"
         >
           {error}
+        </div>
+      ) : null}
+      {saveReconciliationFeedback ? (
+        <div
+          role="status"
+          className={`mx-3 mt-3 rounded-md border px-3 py-2 text-sm ${
+            saveReconciliationFeedback.tone === 'success'
+              ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+              : 'border-amber-300 bg-amber-50 text-amber-900'
+          }`}
+          data-testid="authoring-save-reconciliation-feedback"
+          data-tone={saveReconciliationFeedback.tone}
+        >
+          {saveReconciliationFeedback.message}
         </div>
       ) : null}
 

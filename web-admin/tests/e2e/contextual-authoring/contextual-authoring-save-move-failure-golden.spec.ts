@@ -1,8 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
+import { resolve } from 'node:path';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { loginViaUI } from '../../helpers/wd-fixtures';
 
 const RUNTIME_ROUTE = '/production-exception-list-v4';
+const SCREENSHOT_DIR = resolve(
+  process.env.CONTEXTUAL_AUTHORING_SCREENSHOT_DIR ?? 'test-results/contextual-authoring',
+);
 
 type ApiEnvelope<T> = {
   code?: number | string;
@@ -125,6 +129,85 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
     expect(await loadChangeItems(page, session.sessionPid)).toHaveLength(itemsBefore.length + 1);
   });
 
+  test('PC-AUTH-017 @critical — a lost inline-save response deduplicates the committed edit and continues the remainder', async ({
+    page,
+  }) => {
+    const session = await enterAuthoringFromRuntime(page);
+    const runtimeBefore = await readRuntimePage(page, session.pagePid);
+    const itemsBefore = await loadChangeItems(page, session.sessionPid);
+    const { blockId, value: titleValue } = await stageTitleEdit(page, session);
+    const table = findBlock(session.snapshot, (candidate) => String(candidate.id) === blockId);
+    expect(table, 'table block for interrupted two-property save').not.toBeNull();
+    const densityValue =
+      readObjectPath(table!, '/props/density') === 'compact' ? 'comfortable' : 'compact';
+    const densityEditor = page.getByTestId('authoring-property-/props/density').locator('input');
+    await densityEditor.fill(densityValue);
+    await expect(page.getByText('2 项未保存')).toBeVisible();
+
+    const patchPath = `/api/authoring/sessions/${session.sessionPid}/patches`;
+    let patchRequests = 0;
+    await page.route(`**${patchPath}`, async (route) => {
+      patchRequests += 1;
+      if (patchRequests === 1) {
+        const committedResponse = await route.fetch();
+        expect(committedResponse.ok(), 'first inline patch committed before response loss').toBe(
+          true,
+        );
+        await route.abort('failed');
+        return;
+      }
+      await route.continue();
+    });
+
+    const remainingPatchResponse = page.waitForResponse(
+      (response) =>
+        response.request().method().toUpperCase() === 'PATCH' &&
+        apiPath(response.url()) === patchPath,
+    );
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    const saved = await expectApiData<PatchResult>(
+      await remainingPatchResponse,
+      'save remaining inline edit after authoritative reconciliation',
+    );
+    await page.unroute(`**${patchPath}`);
+
+    expect(patchRequests).toBe(2);
+    expect(saved.session.revision).toBe(session.revision + 2);
+    await expect(page.getByText('0 项未保存')).toBeVisible();
+    await expect(page.getByTestId('authoring-save-reconciliation-feedback')).toHaveAttribute(
+      'data-tone',
+      'success',
+    );
+    await expect(page.getByTestId('authoring-save-reconciliation-feedback')).toContainText(
+      '未重复写入',
+    );
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(page.getByTestId('authoring-property-/title').locator('input')).toHaveValue(
+      titleValue,
+    );
+    await expect(densityEditor).toHaveValue(densityValue);
+
+    const authoritative = await reloadSession(page, session.sessionPid);
+    expect(authoritative.revision).toBe(session.revision + 2);
+    const authoritativeTable = findBlock(
+      authoritative.snapshot,
+      (candidate) => String(candidate.id) === blockId,
+    );
+    expect(readObjectPath(authoritativeTable!, '/title')).toBe(titleValue);
+    expect(readObjectPath(authoritativeTable!, '/props/density')).toBe(densityValue);
+    const itemsAfter = await loadChangeItems(page, session.sessionPid);
+    expect(itemsAfter).toHaveLength(itemsBefore.length + 2);
+    expect(itemsAfter.slice(-2).map((item) => item.propertyPath)).toEqual([
+      '/title',
+      '/props/density',
+    ]);
+    expect(await readRuntimePage(page, session.pagePid)).toEqual(runtimeBefore);
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-017-inline-save-reconciled.png'),
+      fullPage: true,
+    });
+  });
+
   test('PC-AUTH-010 @critical — Studio moves one stable block through the atomic batch', async ({
     page,
   }) => {
@@ -200,6 +283,86 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
     expect(itemsAfter.at(-1)).toMatchObject({
       blockId,
       operation: 'MOVE',
+    });
+  });
+
+  test('PC-AUTH-018 @critical — a lost atomic Studio response reconciles the complete document without replay', async ({
+    page,
+  }) => {
+    const session = await enterAuthoringFromRuntime(page);
+    await page.getByTestId('authoring-inspector-open').click();
+    await page.getByRole('button', { name: '高级设置' }).click();
+    await page
+      .getByRole('dialog', { name: '进入应用设计中心' })
+      .getByRole('button', { name: '继续到应用设计中心' })
+      .click();
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+
+    const list = findBlock(session.snapshot, (candidate) => blockType(candidate) === 'list');
+    expect(list?.id, 'list root id for Studio response-loss move').toBeTruthy();
+    await page.getByTestId(`outline-item-${String(list!.id)}`).click();
+    await page.getByTestId('resource-tab-blocks').click();
+    const availableBlock = page
+      .locator(
+        'button[data-testid="palette-add-filter-bar"]:not([disabled]), button[data-testid="palette-add-action-bar"]:not([disabled])',
+      )
+      .first();
+    await expect(availableBlock).toBeVisible();
+    await availableBlock.click();
+    const batchPath = `/api/authoring/sessions/${session.sessionPid}/studio-batches`;
+    const createResponse = page.waitForResponse(
+      (response) => response.request().method() === 'POST' && apiPath(response.url()) === batchPath,
+    );
+    await page.getByTestId('designer-save').click();
+    const created = await expectApiData<PatchResult>(
+      await createResponse,
+      'create Studio response-loss fixture',
+    );
+    const itemsAfterCreate = await loadChangeItems(page, session.sessionPid);
+
+    await page.getByTestId('designer-mode-layout').click();
+    const moveButton = page.locator('[data-testid^="block-move-up-"]:not([disabled])').first();
+    await expect(moveButton).toBeVisible();
+    const testId = await moveButton.getAttribute('data-testid');
+    const blockId = testId!.slice('block-move-up-'.length);
+    const beforeOrder = siblingOrder(created.session.snapshot, blockId);
+    await moveButton.click();
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');
+
+    let batchRequests = 0;
+    await page.route(`**${batchPath}`, async (route) => {
+      batchRequests += 1;
+      const committedResponse = await route.fetch();
+      expect(committedResponse.ok(), 'Studio batch committed before response loss').toBe(true);
+      await route.abort('failed');
+    });
+    await page.getByTestId('designer-save').click();
+
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('已保存');
+    await expect(page.getByTestId('studio-save-reconciliation-feedback')).toContainText(
+      '未重复写入',
+    );
+    await expect(page.getByTestId('designer-save-error')).toHaveCount(0);
+    await expect(page.getByTestId('authoring-conflict-panel')).toHaveCount(0);
+    await page.unroute(`**${batchPath}`);
+    expect(batchRequests).toBe(1);
+
+    const authoritative = await reloadSession(page, session.sessionPid);
+    expect(authoritative.revision).toBe(created.session.revision + 1);
+    const afterOrder = siblingOrder(authoritative.snapshot, blockId);
+    expect(afterOrder.ids).toEqual([
+      ...beforeOrder.ids.slice(0, beforeOrder.index - 1),
+      blockId,
+      beforeOrder.ids[beforeOrder.index - 1],
+      ...beforeOrder.ids.slice(beforeOrder.index + 1),
+    ]);
+    expect(countStableId(authoritative.snapshot, blockId)).toBe(1);
+    const itemsAfter = await loadChangeItems(page, session.sessionPid);
+    expect(itemsAfter).toHaveLength(itemsAfterCreate.length + 1);
+    expect(itemsAfter.at(-1)).toMatchObject({ blockId, operation: 'MOVE' });
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-018-studio-save-reconciled.png'),
+      fullPage: true,
     });
   });
 });

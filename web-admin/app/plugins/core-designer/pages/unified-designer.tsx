@@ -45,6 +45,7 @@ import {
   reconcileWriterLeaseTakeover,
   type WriterLeaseTakeoverReconciliation,
 } from '~/framework/meta/authoring/writerLeaseTakeover';
+import { reconcileAuthoringStudioDocument } from '~/framework/meta/authoring/saveReconciliation';
 import { AuthoringWriterLeaseNotice } from '~/framework/meta/authoring/AuthoringWriterLeaseNotice';
 import { AuthoringGovernanceNotice } from '~/framework/meta/authoring/AuthoringGovernanceNotice';
 import { AuthoringRiskSummary } from '~/framework/meta/authoring/AuthoringRiskSummary';
@@ -125,6 +126,9 @@ export default function UnifiedDesignerPage() {
     tone: 'warning' | 'success';
     message: string;
   } | null>(null);
+  const [studioSaveReconciliationFeedback, setStudioSaveReconciliationFeedback] = useState<
+    string | null
+  >(null);
   const [studioConflict, setStudioConflict] = useState<StudioConflictState | null>(null);
   const [conflictPending, setConflictPending] = useState(false);
   const [conflictError, setConflictError] = useState<string | null>(null);
@@ -146,6 +150,7 @@ export default function UnifiedDesignerPage() {
   const [modelFieldsByModel, setModelFieldsByModel] = useState<ModelFieldsByModel>({});
   const [error, setError] = useState<string | null>(null);
   const documentBaselineRef = useRef<AuthoringSession | null>(null);
+  const studioSaveFeedbackTimerRef = useRef<number | null>(null);
   const modelCodeKey = document ? collectModelCodesFromDocument(document).join('|') : '';
   const documentId = document?.id ?? null;
   const resolvingHandoff = Boolean(
@@ -162,6 +167,15 @@ export default function UnifiedDesignerPage() {
     if (reviewWorkspaceMode) setGovernanceOpen(true);
   }, [reviewWorkspaceMode]);
 
+  useEffect(
+    () => () => {
+      if (studioSaveFeedbackTimerRef.current != null) {
+        window.clearTimeout(studioSaveFeedbackTimerRef.current);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!hasAuthoringContext) {
       setHandoff(null);
@@ -170,6 +184,7 @@ export default function UnifiedDesignerPage() {
       setHandoffError(null);
       setLeaseTakeoverError(null);
       setLeaseTakeoverFeedback(null);
+      setStudioSaveReconciliationFeedback(null);
       setStudioConflict(null);
       setConflictError(null);
       setSubmissionError(null);
@@ -555,6 +570,11 @@ export default function UnifiedDesignerPage() {
     if (!hasOwnedWriterLease(authoringSession)) {
       throw new Error('当前会话不再持有 Writer lease，不能继续编辑');
     }
+    if (studioSaveFeedbackTimerRef.current != null) {
+      window.clearTimeout(studioSaveFeedbackTimerRef.current);
+      studioSaveFeedbackTimerRef.current = null;
+    }
+    setStudioSaveReconciliationFeedback(null);
 
     const baseSession = documentBaselineRef.current ?? authoringSession;
     if (authoringSession.revision !== baseSession.revision) {
@@ -582,6 +602,25 @@ export default function UnifiedDesignerPage() {
         latestSession.revision > baseSession.revision &&
         hasOwnedWriterLease(latestSession)
       ) {
+        const baseDocument = authoringSnapshotToPageSchemaV3(baseSession.snapshot);
+        const latestDocument = authoringSnapshotToPageSchemaV3(latestSession.snapshot);
+        if (
+          reconcileAuthoringStudioDocument(baseDocument, nextDocument, latestDocument) ===
+          'COMMITTED'
+        ) {
+          documentBaselineRef.current = latestSession;
+          setAuthoringSession(latestSession);
+          setDocument(latestDocument);
+          setStudioConflict(null);
+          setStudioSaveReconciliationFeedback(
+            '保存已在服务端完成；响应虽中断，应用设计中心已按权威草稿恢复，未重复写入。',
+          );
+          studioSaveFeedbackTimerRef.current = window.setTimeout(() => {
+            setStudioSaveReconciliationFeedback(null);
+            studioSaveFeedbackTimerRef.current = null;
+          }, 10_000);
+          return latestDocument;
+        }
         openStudioConflict(baseSession, nextDocument, latestSession);
         throw new Error('旧修订未写入；已进入 Base / Mine / Latest 三方冲突裁决');
       }
@@ -1210,6 +1249,15 @@ export default function UnifiedDesignerPage() {
           role="status"
         >
           {leaseTakeoverFeedback.message}
+        </div>
+      ) : null}
+      {studioSaveReconciliationFeedback ? (
+        <div
+          className="mx-3 mt-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
+          data-testid="studio-save-reconciliation-feedback"
+          role="status"
+        >
+          {studioSaveReconciliationFeedback}
         </div>
       ) : null}
       {studioConflict ? (

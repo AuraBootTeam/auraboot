@@ -1150,6 +1150,43 @@ describe('UnifiedDesignerPage', () => {
     expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r5');
   });
 
+  it('accepts an atomic Studio save that the authoritative draft proves committed after response loss', async () => {
+    setSearch('?contextId=ctx_secure_once');
+    const handoff = createHandoff('list_customer', '/dataSource');
+    const baseline = createDocument('document_one', 'Isolated Draft');
+    const committed = createDocument('document_one', 'Isolated Draft');
+    const committedList = findBlock(committed.blocks, 'list_customer');
+    if (!committedList) throw new Error('list_customer fixture missing');
+    committedList.dataSource = { model: 'payment' };
+
+    vi.mocked(consumeAuthoringHandoff).mockResolvedValue(handoff);
+    vi.mocked(loadAuthoringSession)
+      .mockResolvedValueOnce(createAuthoringSession(baseline, 3))
+      .mockResolvedValueOnce(createAuthoringSession(committed, 4, 'L3', 'HANDOFF_STUDIO'));
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(applyAuthoringStudioBatch).mockRejectedValueOnce(new Error('Failed to fetch'));
+
+    render(<UnifiedDesignerPage />);
+
+    await screen.findByTestId('studio-handoff-context');
+    await waitFor(() =>
+      expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('list_customer'),
+    );
+    fireEvent.change(screen.getByTestId('inspector-field-dataSource.model-manual'), {
+      target: { value: 'payment' },
+    });
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    await waitFor(() => expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('已保存'));
+    expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4');
+    expect(screen.getByTestId('studio-save-reconciliation-feedback')).toHaveTextContent(
+      '保存已在服务端完成',
+    );
+    expect(screen.queryByTestId('designer-save-error')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('authoring-conflict-panel')).not.toBeInTheDocument();
+    expect(applyAuthoringStudioBatch).toHaveBeenCalledTimes(1);
+  });
+
   it('preserves an unsaved Studio edit but blocks writes when admin permission is revoked', async () => {
     setSearch('?contextId=ctx_secure_once');
     const handoff = createHandoff('list_customer', '/dataSource');

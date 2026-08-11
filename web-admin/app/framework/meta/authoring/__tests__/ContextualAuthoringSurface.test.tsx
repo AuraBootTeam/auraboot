@@ -340,6 +340,93 @@ describe('ContextualAuthoringSurface', () => {
     expect(screen.getByText('1 项草稿变更')).toBeInTheDocument();
   });
 
+  it('deduplicates an inline save when the server committed but the success response was lost', async () => {
+    vi.mocked(applyAuthoringPatch).mockRejectedValueOnce(new Error('Failed to fetch'));
+    vi.mocked(loadAuthoringSession).mockResolvedValueOnce(
+      createAuthoringSession({
+        revision: 2,
+        snapshot: {
+          ...schema,
+          pid: 'page-1',
+          blocks: [{ ...schema.blocks[0], title: '生产订单' }],
+        },
+      }),
+    );
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+    await screen.findByTestId('contextual-authoring-surface');
+    fireEvent.click(screen.getByTestId('runtime-write'));
+    fireEvent.change(screen.getByLabelText(/标题/), { target: { value: '生产订单' } });
+
+    fireEvent.click(screen.getByText('保存'));
+
+    expect(await screen.findByTestId('authoring-save-reconciliation-feedback')).toHaveAttribute(
+      'data-tone',
+      'success',
+    );
+    expect(screen.getByTestId('authoring-save-reconciliation-feedback')).toHaveTextContent(
+      '保存已在服务端完成',
+    );
+    expect(screen.getByText('0 项未保存')).toBeInTheDocument();
+    expect(screen.getByText('1 项草稿变更')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(applyAuthoringPatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries an unchanged inline edit from an authoritative revision advanced by another change', async () => {
+    vi.mocked(applyAuthoringPatch)
+      .mockRejectedValueOnce(new Error('Failed to fetch'))
+      .mockResolvedValueOnce({
+        session: createAuthoringSession({
+          revision: 3,
+          snapshot: {
+            ...schema,
+            pid: 'page-1',
+            blocks: [{ ...schema.blocks[0], title: '生产订单' }],
+          },
+        }),
+        changeItemPid: 'item-retry',
+        decision: {
+          route: 'INLINE',
+          risk: 'L1',
+          publishPolicy: 'DIRECT_ALLOWED',
+          reason: 'CAPABILITY_ALLOWED',
+          manifestChecksum: 'table-1',
+          rolePreviewRequired: false,
+        },
+        previousValue: '订单表格',
+        savedValue: '生产订单',
+      });
+    vi.mocked(loadAuthoringSession).mockResolvedValueOnce(
+      createAuthoringSession({
+        revision: 2,
+        snapshot: { ...schema, pid: 'page-1' },
+      }),
+    );
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+    await screen.findByTestId('contextual-authoring-surface');
+    fireEvent.click(screen.getByTestId('runtime-write'));
+    fireEvent.change(screen.getByLabelText(/标题/), { target: { value: '生产订单' } });
+
+    fireEvent.click(screen.getByText('保存'));
+
+    await waitFor(() => expect(applyAuthoringPatch).toHaveBeenCalledTimes(2));
+    expect(applyAuthoringPatch).toHaveBeenNthCalledWith(
+      2,
+      'session-1',
+      2,
+      'table-1',
+      '/title',
+      'REPLACE',
+      '生产订单',
+      'table-1',
+    );
+    expect(screen.getByText('0 项未保存')).toBeInTheDocument();
+    expect(screen.queryByTestId('contextual-authoring-conflict')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('stops stale inline writes and transfers only an opaque conflict context to Studio', async () => {
     vi.mocked(applyAuthoringPatch).mockRejectedValueOnce(new Error('authoring.revision.conflict'));
     vi.mocked(loadAuthoringSession).mockResolvedValueOnce(
