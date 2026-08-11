@@ -99,6 +99,7 @@ rm -f /tmp/dev-env-infra-$$.out
 echo "Scenario 3: r2-env-export loads real slug"
 mkdir -p "$STACK_DIR"
 R2_REGISTRY_ROOT="$(mktemp -d)"
+R2_CORE_BRANCH="$(git -C "$PROJECT_ROOT" branch --show-current)"
 TMP_DIRS+=("$R2_REGISTRY_ROOT")
 (
     cd "$PROJECT_ROOT" &&
@@ -109,7 +110,7 @@ TMP_DIRS+=("$R2_REGISTRY_ROOT")
         --product enterprise \
         --core-root "$PROJECT_ROOT" \
         --enterprise-root /tmp/enterprise-scriptcheck \
-        --core-branch "$(git -C "$PROJECT_ROOT" branch --show-current)" \
+        --core-branch "$R2_CORE_BRANCH" \
         --enterprise-branch bugfix/enterprise-scriptcheck \
         --compose-project auraboot-scriptcheck-r2 \
         --status running \
@@ -299,6 +300,11 @@ assert_contains "env start dry-run names backend session" "$UNIFIED_START_OUTPUT
 assert_contains "env start dry-run names frontend session" "$UNIFIED_START_OUTPUT" "auraboot-scriptcheck-env-frontend"
 assert_contains "env start dry-run names bff session" "$UNIFIED_START_OUTPUT" "auraboot-scriptcheck-env-bff"
 assert_contains "env start dry-run disables startup bootstrap" "$UNIFIED_START_OUTPUT" "--auraboot.bootstrap.enabled=false"
+assert_contains "env start dry-run scopes Maven repository by slug" "$UNIFIED_START_OUTPUT" ".workspace/m2/scriptcheck-env"
+assert_contains "env start dry-run scopes Gradle user home by slug" "$UNIFIED_START_OUTPUT" ".workspace/gradle/scriptcheck-env"
+ENV_SCRIPT_SOURCE="$(cat scripts/dev/env.sh)"
+assert_contains "env backend binds runtime Maven repository" "$ENV_SCRIPT_SOURCE" "-Dmaven.repo.local='\$maven_repo'"
+assert_contains "env backend binds runtime Gradle user home" "$ENV_SCRIPT_SOURCE" "GRADLE_USER_HOME='\$gradle_home'"
 rm -f /tmp/dev-env-unified-start-$$.out
 
 echo "Scenario 12: unified env status reads slug env"
@@ -337,7 +343,7 @@ INSPECT_OUTPUT="$(
     AURA_ENV_REGISTRY_ROOT="$REGISTRY_ROOT" scripts/dev/env.sh inspect --slug=scriptcheck-r2
 )"
 assert_contains "env inspect includes auth root" "$INSPECT_OUTPUT" "\"authRoot\":\"$REGISTRY_ROOT/envs/scriptcheck-r2/auth\""
-assert_contains "env inspect includes branch" "$INSPECT_OUTPUT" "\"coreBranch\":\"bugfix/daily-core\""
+assert_contains "env inspect includes branch" "$INSPECT_OUTPUT" "\"coreBranch\":\"$R2_CORE_BRANCH\""
 
 REUSE_START_OUTPUT="$(
     cd "$PROJECT_ROOT" &&

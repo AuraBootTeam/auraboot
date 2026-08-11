@@ -158,6 +158,18 @@ registered_core_root() {
     echo "${root:-$PROJECT_ROOT}"
 }
 
+runtime_workspace_root() {
+    echo "$(aura_env__mono_root "$PROJECT_ROOT")/.workspace"
+}
+
+runtime_maven_repo() {
+    echo "$(runtime_workspace_root)/m2/$SLUG"
+}
+
+runtime_gradle_home() {
+    echo "$(runtime_workspace_root)/gradle/$SLUG"
+}
+
 current_branch_for_root() {
     local root="$1"
     git -C "$root" branch --show-current 2>/dev/null || echo "unknown"
@@ -276,6 +288,10 @@ print_start_plan() {
 
     local backend_root
     backend_root="$(backend_root_for_product || true)"
+    local maven_repo
+    maven_repo="$(runtime_maven_repo)"
+    local gradle_home
+    gradle_home="$(runtime_gradle_home)"
     if [ -f "$exports_file" ]; then
         # shellcheck disable=SC1090
         source "$exports_file"
@@ -289,6 +305,8 @@ Bugfix environment start plan
   slug:             $SLUG
   infra command:    $infra_cmd
   backend root:     ${backend_root:-unresolved}
+  Maven repository: $maven_repo
+  Gradle user home: $gradle_home
   backend session:  $(backend_session)
   frontend session: $(frontend_session)
   bff session:      $(bff_session)
@@ -334,8 +352,12 @@ start_backend_host() {
     if [ "$PRODUCT" = "enterprise" ]; then
         core_export="AURA_CORE_PROJECT_ROOT='$(registered_core_root)'"
     fi
+    local maven_repo
+    maven_repo="$(runtime_maven_repo)"
+    local gradle_home
+    gradle_home="$(runtime_gradle_home)"
     local cmd
-    cmd="cd '$backend_root' && $core_export SPRING_PROFILES_ACTIVE=dev PGHOST='$PG_HOST' PGPORT='$PG_PORT' PGDATABASE='$PG_DB' PGUSER='$PG_USER' PGPASSWORD='$PGPASSWORD' ./gradlew bootRun --no-daemon --args='--server.port=$BE_PORT --spring.datasource.url=jdbc:postgresql://$PG_HOST:$PG_PORT/$PG_DB --spring.datasource.username=$PG_USER --spring.datasource.password=$PGPASSWORD --spring.data.redis.host=127.0.0.1 --spring.data.redis.port=$REDIS_PORT --auraboot.bootstrap.enabled=false' >'$log_file' 2>&1"
+    cmd="cd '$backend_root' && $core_export GRADLE_USER_HOME='$gradle_home' SPRING_PROFILES_ACTIVE=dev PGHOST='$PG_HOST' PGPORT='$PG_PORT' PGDATABASE='$PG_DB' PGUSER='$PG_USER' PGPASSWORD='$PGPASSWORD' ./gradlew --no-daemon -Dmaven.repo.local='$maven_repo' bootRun --args='--server.port=$BE_PORT --spring.datasource.url=jdbc:postgresql://$PG_HOST:$PG_PORT/$PG_DB --spring.datasource.username=$PG_USER --spring.datasource.password=$PGPASSWORD --spring.data.redis.host=127.0.0.1 --spring.data.redis.port=$REDIS_PORT --auraboot.bootstrap.enabled=false' >'$log_file' 2>&1"
 
     if [ "$DRY_RUN" = "1" ]; then
         echo "tmux new-session -d -s $session \"$cmd\""
