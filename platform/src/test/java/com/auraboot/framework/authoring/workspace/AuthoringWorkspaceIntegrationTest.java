@@ -10,6 +10,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Cr
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffContextView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.HandoffCreatedView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.OpenSessionRequest;
+import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ObserveChangeSetRequest;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.PatchResult;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReleaseView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.ReviewRequest;
@@ -218,7 +219,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/authoring/sessions/missing/writer-lease/takeover")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"expectedRevision\":1,\"reason\":\"test\"}"))
+                        .content("{\"expectedRevision\":1,\"expectedLeaseRevision\":1,\"reason\":\"test\"}"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/authoring/sessions/missing/change-items"))
                 .andExpect(status().isForbidden());
@@ -398,7 +399,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         "/api/authoring/sessions/{sessionPid}/writer-lease/takeover",
                         observerSessionPid)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"expectedRevision\":1,\"reason\":\"继续处理紧急变更\"}"))
+                        .content("{\"expectedRevision\":1,\"expectedLeaseRevision\":1,\"reason\":\"继续处理紧急变更\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.sessionPid").value(observerSessionPid))
                 .andExpect(jsonPath("$.data.state").value("ACTIVE"))
@@ -441,6 +442,51 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 """, Integer.class,
                 testTenant.getId(), environmentId, original.changeSetPid());
         assertThat(takeoverEvents).isEqualTo(1);
+    }
+
+    @Test
+    void staleObservedLeaseRevisionAllowsOnlyOneTakeoverWinner() {
+        grantDesignerAdmin();
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        SessionView firstObserver = workspaceService.observe(
+                opened.changeSetPid(), new ObserveChangeSetRequest(null));
+        SessionView secondObserver = workspaceService.observe(
+                opened.changeSetPid(), new ObserveChangeSetRequest(null));
+
+        assertThat(firstObserver.writerLease().revision()).isEqualTo(1);
+        assertThat(secondObserver.writerLease().revision()).isEqualTo(1);
+        SessionView winner = workspaceService.takeoverWriterLease(
+                firstObserver.sessionPid(),
+                new TakeoverWriterLeaseRequest(
+                        firstObserver.revision(), firstObserver.writerLease().revision(),
+                        "第一个节点基于 lease r1 接管"));
+        assertThat(winner.state()).isEqualTo("ACTIVE");
+        assertThat(winner.writerLease().status()).isEqualTo("OWNED");
+        assertThat(winner.writerLease().revision()).isEqualTo(2);
+
+        assertThatThrownBy(() -> workspaceService.takeoverWriterLease(
+                secondObserver.sessionPid(),
+                new TakeoverWriterLeaseRequest(
+                        secondObserver.revision(), secondObserver.writerLease().revision(),
+                        "第二个节点仍基于 lease r1 接管")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("authoring.writer-lease.conflict");
+
+        SessionView loser = workspaceService.get(secondObserver.sessionPid());
+        assertThat(loser.state()).isEqualTo("READ_ONLY");
+        assertThat(loser.writerLease().status()).isEqualTo("HELD_BY_OTHER_SESSION");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_config_session session
+                JOIN ab_authoring_change_set change_set ON change_set.id = session.change_set_id
+                WHERE change_set.pid = ? AND session.state = 'ACTIVE'
+                """, Integer.class, opened.changeSetPid())).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_audit_event
+                WHERE tenant_id = ? AND env_id = ? AND change_set_pid = ?
+                  AND event_type = 'WRITER_LEASE_TAKEN_OVER'
+                """, Integer.class, testTenant.getId(), MetaContext.getCurrentEnvironmentId(),
+                opened.changeSetPid())).isEqualTo(1);
     }
 
     @Test
@@ -516,7 +562,9 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
         applyTestMetaContext();
         SessionView taken = workspaceService.takeoverWriterLease(
                 observerSessionPid,
-                new TakeoverWriterLeaseRequest(opened.revision(), "原标签页已离线，接管过期租约"));
+                new TakeoverWriterLeaseRequest(
+                        opened.revision(), opened.writerLease().revision(),
+                        "原标签页已离线，接管过期租约"));
         assertThat(taken.state()).isEqualTo("ACTIVE");
         assertThat(taken.writerLease().status()).isEqualTo("OWNED");
         assertThat(taken.writerLease().revision()).isEqualTo(2);
@@ -1055,7 +1103,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         "/api/authoring/sessions/{sessionPid}/writer-lease/takeover",
                         reviewSessionPid)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"expectedRevision\":2,\"reason\":\"reviewer must stay read-only\"}"))
+                        .content("{\"expectedRevision\":2,\"expectedLeaseRevision\":1,\"reason\":\"reviewer must stay read-only\"}"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(patch(
                         "/api/authoring/sessions/{sessionPid}/studio-patches", reviewSessionPid)

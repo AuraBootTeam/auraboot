@@ -612,6 +612,7 @@ describe('ContextualAuthoringSurface', () => {
       expect(takeoverAuthoringWriterLease).toHaveBeenCalledWith(
         'session-1',
         1,
+        7,
         '原作者离线，继续紧急修复',
       ),
     );
@@ -620,6 +621,47 @@ describe('ContextualAuthoringSurface', () => {
       'data-read-only',
       'false',
     );
+  });
+
+  it('reloads the authoritative lease when another node wins the observed revision', async () => {
+    const observed = createAuthoringSession({
+      writerLease: {
+        status: 'HELD_BY_OTHER',
+        revision: 7,
+        leasedUntil: '2026-08-09T12:05:00Z',
+      },
+    });
+    const winner = createAuthoringSession({
+      writerLease: {
+        status: 'HELD_BY_OTHER_SESSION',
+        revision: 8,
+        leasedUntil: '2026-08-09T12:10:00Z',
+      },
+    });
+    vi.mocked(openAuthoringSession).mockResolvedValue(observed);
+    vi.mocked(takeoverAuthoringWriterLease).mockRejectedValue(
+      new Error('该租约版本已由其他会话接管'),
+    );
+    vi.mocked(loadAuthoringSession).mockResolvedValue(winner);
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+
+    await screen.findByTestId('authoring-writer-lease-notice');
+    fireEvent.change(screen.getByLabelText('接管原因'), {
+      target: { value: '基于 lease r7 尝试接管' },
+    });
+    fireEvent.click(screen.getByTestId('authoring-writer-lease-takeover'));
+
+    await waitFor(() => expect(loadAuthoringSession).toHaveBeenCalledWith('session-1'));
+    expect(screen.getByTestId('authoring-writer-lease-notice')).toHaveTextContent(
+      '当前账号的另一个会话持有编辑权',
+    );
+    expect(screen.getByTestId('authoring-writer-lease-notice')).toHaveTextContent('租约版本 r8');
+    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+      'data-read-only',
+      'true',
+    );
+    expect(screen.getByText('该租约版本已由其他会话接管')).toBeVisible();
   });
 
   it('preserves local edits and requires an explicit audited takeover after lease expiry', async () => {

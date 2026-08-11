@@ -735,6 +735,7 @@ export default function UnifiedDesignerPage() {
       const taken = await takeoverAuthoringWriterLease(
         authoringSession.sessionPid,
         authoringSession.revision,
+        authoringSession.writerLease?.revision ?? 0,
         reason,
       );
       const canonicalDocument = authoringSnapshotToPageSchemaV3(taken.snapshot);
@@ -766,6 +767,16 @@ export default function UnifiedDesignerPage() {
       );
       replaceAuthoringSessionUrl(taken.sessionPid);
     } catch (takeoverError) {
+      try {
+        const latest = await loadAuthoringSession(authoringSession.sessionPid);
+        documentBaselineRef.current = latest;
+        setAuthoringSession(latest);
+        setHandoff((current) =>
+          current ? { ...current, revision: latest.revision } : current,
+        );
+      } catch {
+        // Keep the current read-only document when the authoritative reload also fails.
+      }
       setLeaseTakeoverError(
         takeoverError instanceof Error ? takeoverError.message : '无法接管 ChangeSet 编辑权',
       );

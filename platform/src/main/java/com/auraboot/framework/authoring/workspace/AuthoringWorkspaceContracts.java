@@ -235,6 +235,7 @@ public final class AuthoringWorkspaceContracts {
 
     public record TakeoverWriterLeaseRequest(
             @Positive long expectedRevision,
+            @Positive long expectedLeaseRevision,
             @NotBlank @Size(max = 1000) String reason) {
     }
 

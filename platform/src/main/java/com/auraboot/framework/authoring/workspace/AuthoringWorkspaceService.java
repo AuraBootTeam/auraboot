@@ -424,6 +424,9 @@ public class AuthoringWorkspaceService {
         if (alreadyOwned) {
             return viewMapper.toView(workspace, identity.userId());
         }
+        if (workspace.leaseRevision() != request.expectedLeaseRevision()) {
+            throw new ResponseStatusException(CONFLICT, "authoring.writer-lease.conflict");
+        }
 
         long previousHolderUserId = workspace.leaseHolderUserId();
         long previousLeaseRevision = workspace.leaseRevision();

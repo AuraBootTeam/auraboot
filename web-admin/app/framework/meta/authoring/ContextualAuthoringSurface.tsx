@@ -699,6 +699,7 @@ export function ContextualAuthoringSurface({
         const taken = await takeoverAuthoringWriterLease(
           session.sessionPid,
           session.revision,
+          session.writerLease?.revision ?? 0,
           reason,
         );
         setSession(taken);
@@ -717,6 +718,13 @@ export function ContextualAuthoringSurface({
           setStale(false);
         }
       } catch (takeoverFailure) {
+        try {
+          const latest = await loadAuthoringSession(session.sessionPid);
+          setSession(latest);
+          setWorkingSchema(materializePendingSchema(schema, latest.snapshot, pendingEdits));
+        } catch {
+          // Keep the current read-only snapshot when the authoritative reload also fails.
+        }
         setError(
           takeoverFailure instanceof Error ? takeoverFailure.message : '无法接管 ChangeSet 编辑权',
         );

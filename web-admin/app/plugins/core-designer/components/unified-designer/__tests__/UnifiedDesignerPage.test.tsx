@@ -567,6 +567,7 @@ describe('UnifiedDesignerPage', () => {
       expect(takeoverAuthoringWriterLease).toHaveBeenCalledWith(
         'session_1',
         3,
+        4,
         '经值班负责人确认接管',
       ),
     );

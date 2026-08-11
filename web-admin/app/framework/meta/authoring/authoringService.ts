@@ -187,13 +187,14 @@ export async function loadAuthoringReviewWorkspace(
 export async function takeoverAuthoringWriterLease(
   sessionPid: string,
   revision: number,
+  leaseRevision: number,
   reason: string,
 ): Promise<AuthoringSession> {
   const result = await fetchResult<AuthoringSession>(
     `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/writer-lease/takeover`,
     {
       method: 'post',
-      params: { expectedRevision: revision, reason },
+      params: { expectedRevision: revision, expectedLeaseRevision: leaseRevision, reason },
     },
   );
   return requireData(result, '无法接管 ChangeSet 编辑权');
