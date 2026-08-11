@@ -665,6 +665,50 @@ describe('ContextualAuthoringSurface', () => {
     expect(screen.queryByText('Business error')).not.toBeInTheDocument();
   });
 
+  it('restores contextual editing when a lost response already committed the takeover', async () => {
+    const observed = createAuthoringSession({
+      writerLease: {
+        status: 'HELD_BY_OTHER_SESSION',
+        revision: 7,
+        leasedUntil: '2026-08-09T12:05:00Z',
+      },
+    });
+    const committed = createAuthoringSession({
+      writerLease: {
+        status: 'OWNED',
+        revision: 8,
+        leasedUntil: '2026-08-09T12:10:00Z',
+      },
+    });
+    vi.mocked(openAuthoringSession).mockResolvedValue(observed);
+    vi.mocked(takeoverAuthoringWriterLease).mockRejectedValue(
+      new Error('Network error: Failed to fetch'),
+    );
+    vi.mocked(loadAuthoringSession).mockResolvedValue(committed);
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+
+    await screen.findByTestId('authoring-writer-lease-notice');
+    fireEvent.change(screen.getByLabelText('接管原因'), {
+      target: { value: '响应丢失后对账接管' },
+    });
+    fireEvent.click(screen.getByTestId('authoring-writer-lease-takeover'));
+
+    await waitFor(() => expect(loadAuthoringSession).toHaveBeenCalledWith('session-1'));
+    expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument();
+    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+      'data-read-only',
+      'false',
+    );
+    expect(screen.getByTestId('writer-lease-takeover-feedback')).toHaveAttribute(
+      'data-tone',
+      'success',
+    );
+    expect(screen.getByTestId('writer-lease-takeover-feedback')).toHaveTextContent(
+      '接管已在服务端完成，当前页面已恢复编辑',
+    );
+  });
+
   it('preserves local edits and requires an explicit audited takeover after lease expiry', async () => {
     let poll: (() => void) | undefined;
     const interval = vi.spyOn(window, 'setInterval').mockImplementation((handler) => {

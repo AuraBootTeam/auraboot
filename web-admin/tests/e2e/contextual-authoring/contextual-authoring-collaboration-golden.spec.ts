@@ -711,6 +711,108 @@ test.describe('Contextual authoring PC collaboration golden', () => {
     }
   });
 
+  test('PC-AUTH-016 @critical — a network-partitioned takeover stays retryable and a lost success response reconciles once', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const ownerSession = await enterAuthoringFromRuntime(page);
+    const itemsBefore = await loadChangeItems(page, ownerSession.sessionPid);
+    const observerPage = await page.context().newPage();
+    let takeoverPath = '';
+    try {
+      await observerPage.setViewportSize({ width: 1440, height: 900 });
+      const observerResponse = observerPage.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/change-sets/${ownerSession.changeSetPid}/sessions`,
+      );
+      await observerPage.goto(
+        `/unified-designer?changeSetId=${encodeURIComponent(ownerSession.changeSetPid)}`,
+        { waitUntil: 'domcontentloaded' },
+      );
+      const observer = await expectApiData<AuthoringSession>(
+        await observerResponse,
+        'open the network-partition observer',
+      );
+      expect(observer.writerLease?.status).toBe('HELD_BY_OTHER_SESSION');
+      takeoverPath = `/api/authoring/sessions/${observer.sessionPid}/writer-lease/takeover`;
+      const takeoverUrl = `**${takeoverPath}`;
+      const reason = 'PC 门禁：网络中断后对账接管';
+      await observerPage.getByPlaceholder('填写接管原因（必填，将写入审计）').fill(reason);
+
+      let partitionedRequests = 0;
+      await observerPage.route(takeoverUrl, async (route) => {
+        if (route.request().method() !== 'POST') return route.continue();
+        partitionedRequests += 1;
+        await route.abort('internetdisconnected');
+      });
+      await observerPage.getByTestId('authoring-writer-lease-takeover').click();
+      await expect(observerPage.getByRole('alert')).toContainText(
+        '网络中断，未取得编辑权；当前仍为只读',
+      );
+      expect(partitionedRequests).toBe(1);
+      await expect(observerPage.getByLabel('接管原因')).toHaveValue(reason);
+      await expect(observerPage.getByTestId('authoring-writer-lease-notice')).toContainText(
+        '当前账号的另一个会话持有编辑权',
+      );
+      await expect(observerPage.getByTestId('designer-save')).toBeDisabled();
+      const unchanged = await expectApiData<AuthoringSession>(
+        await page.request.get(`/api/authoring/sessions/${observer.sessionPid}`),
+        'reconcile the partitioned takeover before retry',
+      );
+      expect(unchanged.writerLease?.status).toBe('HELD_BY_OTHER_SESSION');
+      expect(unchanged.writerLease?.revision).toBe(observer.writerLease?.revision);
+      expect(unchanged.revision).toBe(observer.revision);
+      expect(await loadChangeItems(page, ownerSession.sessionPid)).toEqual(itemsBefore);
+      await mkdir(SCREENSHOT_DIR, { recursive: true });
+      await observerPage.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-016-network-partition-readonly.png'),
+        fullPage: true,
+      });
+      await observerPage.unroute(takeoverUrl);
+
+      let committedResponseStatus = 0;
+      await observerPage.route(takeoverUrl, async (route) => {
+        if (route.request().method() !== 'POST') return route.continue();
+        const committedResponse = await route.fetch();
+        committedResponseStatus = committedResponse.status();
+        await route.abort('connectionreset');
+      });
+      await observerPage.getByTestId('authoring-writer-lease-takeover').click();
+      await expect(observerPage.getByTestId('writer-lease-takeover-feedback')).toHaveAttribute(
+        'data-tone',
+        'success',
+      );
+      await expect(observerPage.getByTestId('writer-lease-takeover-feedback')).toContainText(
+        '接管已在服务端完成，当前页面已恢复编辑',
+      );
+      expect(committedResponseStatus).toBe(200);
+      await expect(observerPage.getByRole('alert')).toHaveCount(0);
+      await expect(observerPage.getByTestId('authoring-writer-lease-notice')).toHaveCount(0);
+      await expect(observerPage.getByTestId('studio-handoff-editable-reason')).toBeVisible();
+      const committed = await expectApiData<AuthoringSession>(
+        await page.request.get(`/api/authoring/sessions/${observer.sessionPid}`),
+        'reconcile the committed takeover after losing its response',
+      );
+      expect(committed.writerLease?.status).toBe('OWNED');
+      expect(committed.writerLease?.revision).toBe((observer.writerLease?.revision ?? 0) + 1);
+      expect(committed.revision).toBe(observer.revision);
+      expect(await loadChangeItems(page, ownerSession.sessionPid)).toEqual(itemsBefore);
+      await expect(page.getByTestId('authoring-writer-lease-notice')).toContainText(
+        '当前账号的另一个会话持有编辑权',
+        { timeout: 20_000 },
+      );
+      await observerPage.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-016-network-reconciled.png'),
+        fullPage: true,
+      });
+    } finally {
+      if (takeoverPath) await observerPage.unroute(`**${takeoverPath}`).catch(() => {});
+      await observerPage.close();
+    }
+  });
+
   test('PC-AUTH-006 @critical — independent reviewer approves the frozen revision but cannot publish', async ({
     page,
     browser,

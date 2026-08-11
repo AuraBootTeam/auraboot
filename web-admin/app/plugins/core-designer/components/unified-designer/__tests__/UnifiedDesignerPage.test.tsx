@@ -617,7 +617,7 @@ describe('UnifiedDesignerPage', () => {
     expect(screen.getByTestId('designer-save')).toBeDisabled();
   });
 
-  it('keeps a genuine takeover failure as an error when no newer lease exists', async () => {
+  it('keeps a network-partitioned takeover retryable when no newer lease exists', async () => {
     setSearch('?changeSetId=changeset_1');
     const observer = createAuthoringSession(createDocument('document_one', 'Observed Draft'));
     observer.state = 'READ_ONLY';
@@ -628,7 +628,9 @@ describe('UnifiedDesignerPage', () => {
     };
     vi.mocked(observeAuthoringChangeSet).mockResolvedValue(observer);
     vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
-    vi.mocked(takeoverAuthoringWriterLease).mockRejectedValue(new Error('Network unavailable'));
+    vi.mocked(takeoverAuthoringWriterLease).mockRejectedValue(
+      new Error('Network error: Failed to fetch'),
+    );
     vi.mocked(loadAuthoringSession).mockResolvedValue(observer);
 
     render(<UnifiedDesignerPage />);
@@ -639,9 +641,55 @@ describe('UnifiedDesignerPage', () => {
     });
     fireEvent.click(screen.getByTestId('authoring-writer-lease-takeover'));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Network unavailable');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '网络中断，未取得编辑权；当前仍为只读',
+    );
     expect(screen.queryByTestId('writer-lease-takeover-feedback')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('接管原因')).toHaveValue('尝试恢复编辑');
     expect(screen.getByTestId('designer-save')).toBeDisabled();
+  });
+
+  it('reconciles a committed takeover when the success response is lost', async () => {
+    setSearch('?changeSetId=changeset_1');
+    const observer = createAuthoringSession(createDocument('document_one', 'Observed Draft'));
+    observer.state = 'READ_ONLY';
+    observer.writerLease = {
+      status: 'HELD_BY_OTHER_SESSION',
+      revision: 4,
+      leasedUntil: '2026-08-09T12:05:00Z',
+    };
+    const committed = createAuthoringSession(createDocument('document_one', 'Observed Draft'));
+    committed.writerLease = {
+      status: 'OWNED',
+      revision: 5,
+      leasedUntil: '2026-08-09T12:10:00Z',
+    };
+    vi.mocked(observeAuthoringChangeSet).mockResolvedValue(observer);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(takeoverAuthoringWriterLease).mockRejectedValue(
+      new Error('Network error: Failed to fetch'),
+    );
+    vi.mocked(loadAuthoringSession).mockResolvedValue(committed);
+
+    render(<UnifiedDesignerPage />);
+
+    await screen.findByTestId('authoring-writer-lease-notice');
+    fireEvent.change(screen.getByLabelText('接管原因'), {
+      target: { value: '断网后对账接管' },
+    });
+    fireEvent.click(screen.getByTestId('authoring-writer-lease-takeover'));
+
+    await waitFor(() => expect(loadAuthoringSession).toHaveBeenCalledWith('session_1'));
+    expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument();
+    expect(screen.getByTestId('studio-handoff-editable-reason')).toBeVisible();
+    expect(screen.getByTestId('writer-lease-takeover-feedback')).toHaveAttribute(
+      'data-tone',
+      'success',
+    );
+    expect(screen.getByTestId('writer-lease-takeover-feedback')).toHaveTextContent(
+      '接管已在服务端完成，当前页面已恢复编辑',
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('lets a non-owner reviewer approve the exact frozen revision in Studio', async () => {

@@ -39,6 +39,11 @@ import {
   AUTHORING_WRITER_LEASE_HEARTBEAT_MS,
   shouldRenewAuthoringWriterLeaseInForeground,
 } from './writerLeaseHeartbeat';
+import {
+  describeWriterLeaseTakeoverFailure,
+  reconcileWriterLeaseTakeover,
+  type WriterLeaseTakeoverReconciliation,
+} from './writerLeaseTakeover';
 import { AuthoringGovernanceNotice } from './AuthoringGovernanceNotice';
 import { AuthoringImpactNotice } from './AuthoringImpactNotice';
 import { AuthoringRiskSummary } from './AuthoringRiskSummary';
@@ -112,7 +117,10 @@ export function ContextualAuthoringSurface({
   const [handoffPending, setHandoffPending] = useState(false);
   const [writeBlocked, setWriteBlocked] = useState(false);
   const [leaseTakeoverPending, setLeaseTakeoverPending] = useState(false);
-  const [leaseTakeoverFeedback, setLeaseTakeoverFeedback] = useState<string | null>(null);
+  const [leaseTakeoverFeedback, setLeaseTakeoverFeedback] = useState<{
+    tone: 'warning' | 'success';
+    message: string;
+  } | null>(null);
   const [governancePending, setGovernancePending] = useState<AuthoringGovernanceAction | null>(
     null,
   );
@@ -708,13 +716,7 @@ export function ContextualAuthoringSurface({
       setError(null);
       setLeaseTakeoverFeedback(null);
       const observedLeaseRevision = session.writerLease?.revision ?? 0;
-      try {
-        const taken = await takeoverAuthoringWriterLease(
-          session.sessionPid,
-          session.revision,
-          session.writerLease?.revision ?? 0,
-          reason,
-        );
+      const applyTakenSession = (taken: AuthoringSession) => {
         setSession(taken);
         setWorkingSchema(materializePendingSchema(schema, taken.snapshot, pendingEdits));
         if (pendingEdits.size > 0 && taken.revision > session.revision) {
@@ -730,26 +732,42 @@ export function ContextualAuthoringSurface({
           setContextualConflict(null);
           setStale(false);
         }
+      };
+      try {
+        const taken = await takeoverAuthoringWriterLease(
+          session.sessionPid,
+          session.revision,
+          session.writerLease?.revision ?? 0,
+          reason,
+        );
+        applyTakenSession(taken);
       } catch (takeoverFailure) {
-        let anotherSessionWon = false;
+        let authoritativeReloaded = false;
+        let reconciliation: WriterLeaseTakeoverReconciliation = 'UNCHANGED';
         try {
           const latest = await loadAuthoringSession(session.sessionPid);
-          setSession(latest);
-          setWorkingSchema(materializePendingSchema(schema, latest.snapshot, pendingEdits));
-          anotherSessionWon =
-            latest.writerLease?.status !== 'OWNED' &&
-            (latest.writerLease?.revision ?? 0) > observedLeaseRevision;
+          authoritativeReloaded = true;
+          reconciliation = reconcileWriterLeaseTakeover(observedLeaseRevision, latest.writerLease);
+          if (reconciliation === 'COMMITTED_HERE') applyTakenSession(latest);
+          else {
+            setSession(latest);
+            setWorkingSchema(materializePendingSchema(schema, latest.snapshot, pendingEdits));
+          }
         } catch {
           // Keep the current read-only snapshot when the authoritative reload also fails.
         }
-        if (anotherSessionWon) {
-          setLeaseTakeoverFeedback('编辑权刚被另一会话取得，已刷新为只读；当前页面未被覆盖。');
+        if (reconciliation === 'COMMITTED_HERE') {
+          setLeaseTakeoverFeedback({
+            tone: 'success',
+            message: '接管已在服务端完成，当前页面已恢复编辑；本地内容未被覆盖。',
+          });
+        } else if (reconciliation === 'COMMITTED_ELSEWHERE') {
+          setLeaseTakeoverFeedback({
+            tone: 'warning',
+            message: '编辑权刚被另一会话取得，已刷新为只读；当前页面未被覆盖。',
+          });
         } else {
-          setError(
-            takeoverFailure instanceof Error
-              ? takeoverFailure.message
-              : '无法接管 ChangeSet 编辑权',
-          );
+          setError(describeWriterLeaseTakeoverFailure(takeoverFailure, authoritativeReloaded));
         }
       } finally {
         setLeaseTakeoverPending(false);
@@ -873,11 +891,16 @@ export function ContextualAuthoringSurface({
       ) : null}
       {leaseTakeoverFeedback ? (
         <div
-          className="border-status-amber bg-status-amber-bg text-status-amber mx-3 mt-3 rounded-md border px-3 py-2 text-sm"
+          className={`mx-3 mt-3 rounded-md border px-3 py-2 text-sm ${
+            leaseTakeoverFeedback.tone === 'success'
+              ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+              : 'border-status-amber bg-status-amber-bg text-status-amber'
+          }`}
+          data-tone={leaseTakeoverFeedback.tone}
           data-testid="writer-lease-takeover-feedback"
           role="status"
         >
-          {leaseTakeoverFeedback}
+          {leaseTakeoverFeedback.message}
         </div>
       ) : null}
       {contextualConflict ? (
