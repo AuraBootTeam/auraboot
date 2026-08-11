@@ -2541,6 +2541,27 @@
     "refType": "ui"
   },
   {
+    "key": "crm.kanban.count",
+    "zh-CN": "数量",
+    "en-US": "Count",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.pipeline_board",
+    "zh-CN": "销售管道看板",
+    "en-US": "Pipeline Board",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.pipeline_board_description",
+    "zh-CN": "按销售阶段分组的商机管道看板",
+    "en-US": "Opportunity pipeline kanban board grouped by sales stage",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
     "key": "dashboard.crm.kpi.won_revenue",
     "zh-CN": "赢单金额",
     "en-US": "Won Revenue",

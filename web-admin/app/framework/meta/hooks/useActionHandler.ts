@@ -145,6 +145,19 @@ function resolveCommandTargetRecordId(
   );
 }
 
+function resolveNavigationRecord(
+  candidates: Array<Record<string, any> | null | undefined>,
+  pageRecordPid: unknown,
+): Record<string, any> | undefined {
+  const recordWithPublicPid = candidates.find((candidate) =>
+    Boolean(getLegacyCompatibleRecordPid(candidate)),
+  );
+  if (recordWithPublicPid) return recordWithPublicPid;
+
+  const fallbackPid = toNonBlankString(pageRecordPid);
+  return fallbackPid ? { pid: fallbackPid } : undefined;
+}
+
 function resolveCommandRefreshIds(
   actionDef: Record<string, unknown>,
   button: Record<string, unknown>,
@@ -776,7 +789,28 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             // target form record; passing it to a `*_form` page incorrectly
             // resolves an edit route for the target model.
             const isContextualCreate = Boolean(actionDef.command) && !isEditAction;
-            const path = resolveNavigateTo(actionDef.to, isContextualCreate ? undefined : record);
+            const runtimeContext = runtime?.getContext?.();
+            // Detail blocks can render before SchemaRuntime has synchronized the
+            // loaded record. In that frame `form` is an empty object, which must
+            // not hide the live record available by click time. Only a record
+            // carrying a public PID is valid navigation context; `$page.recordPid`
+            // remains a safe source-link fallback for contextual create actions.
+            const navigationRecord = resolveNavigationRecord(
+              [
+                record,
+                context.record,
+                context.data,
+                runtimeContext?.record,
+                runtimeContext?.row,
+                runtimeContext?.form,
+              ],
+              runtimeContext?.$page?.recordPid,
+            );
+            const target = String(actionDef.to ?? '');
+            const path = resolveNavigateTo(
+              actionDef.to,
+              isContextualCreate && !target.startsWith('/') ? undefined : navigationRecord,
+            );
             // Absolute backend/external URLs (e.g. a file-download endpoint) are
             // real browser navigations, not client-side routes — open them so the
             // browser handles the Content-Disposition download.
@@ -791,7 +825,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             if (actionDef.command) {
               const sep = path.includes('?') ? '&' : '?';
               const params = [`commandCode=${encodeURIComponent(actionDef.command)}`];
-              const sourceRecordPid = record?.pid;
+              const sourceRecordPid = getLegacyCompatibleRecordPid(navigationRecord);
               if (!isEditAction && sourceRecordPid) {
                 params.push(`sourceRecordPid=${encodeURIComponent(sourceRecordPid)}`);
               }

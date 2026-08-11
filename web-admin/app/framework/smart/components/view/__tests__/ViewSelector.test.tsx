@@ -24,6 +24,11 @@ const ZH = {
     saved_view_locked_preset: '预置',
     saved_view_capability_blocked: '需要配置',
   },
+  crm: {
+    saved_view: {
+      pipeline_board: '销售管道看板',
+    },
+  },
 };
 
 function makeView(overrides: Partial<SavedView> = {}): SavedView {
@@ -136,6 +141,45 @@ describe('ViewSelector', () => {
     expect(screen.getByLabelText('预置')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('view-selector-trigger'));
     expect(screen.getByTestId('view-option-plugin-view')).toHaveTextContent('预置');
+  });
+
+  it('names an active global plugin preset in the trigger without listing global views', () => {
+    const pipelinePreset = makeView({
+      pid: 'pipeline-board',
+      name: 'Pipeline Board',
+      scope: 'global',
+      viewType: 'kanban',
+      isDefault: true,
+      viewConfig: { meta: { managedBy: 'plugin', locked: true, allowUserCopy: true } },
+    });
+    renderSelector({ views: [], currentView: pipelinePreset });
+
+    const trigger = screen.getByTestId('view-selector-trigger');
+    expect(trigger).toHaveTextContent('Pipeline Board');
+    expect(screen.getByTestId('view-selector-scope-label')).toHaveTextContent('预置');
+    expect(trigger).toHaveAttribute('data-current-view-type', 'kanban');
+
+    fireEvent.click(trigger);
+    const listbox = screen.getByRole('listbox');
+    expect(listbox).not.toHaveTextContent('Pipeline Board');
+    expect(screen.getByTestId('view-option-default')).toBeInTheDocument();
+  });
+
+  it('localizes an i18n-backed plugin preset name in the trigger', () => {
+    const pipelinePreset = makeView({
+      pid: 'pipeline-board',
+      name: '$i18n:crm.saved_view.pipeline_board',
+      scope: 'global',
+      viewType: 'kanban',
+      isDefault: true,
+      viewConfig: { meta: { managedBy: 'plugin', locked: true, allowUserCopy: true } },
+    });
+    renderSelector({ views: [], currentView: pipelinePreset });
+
+    const trigger = screen.getByTestId('view-selector-trigger');
+    expect(trigger).toHaveTextContent('销售管道看板');
+    expect(trigger).toHaveAttribute('data-current-view-name', '销售管道看板');
+    expect(trigger).not.toHaveTextContent('$i18n:');
   });
 
   it('marks imported advanced views that need capability setup', () => {

@@ -25,6 +25,8 @@ import { useDictWithExtras } from '~/framework/smart/hooks/useDictWithExtras';
 import { KanbanCardItem } from './KanbanCardItem';
 import type { SmartKanbanProps, KanbanCard, KanbanColumn } from '~/framework/smart/types/kanban';
 import { cn } from '~/utils/cn';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 
 /**
  * SmartKanban - A Kanban board with drag-and-drop support
@@ -73,6 +75,14 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
   className,
   style,
 }) => {
+  const { locale, t } = useI18n();
+  const fallbackText = useCallback(
+    (key: string, zh: string, en: string) => {
+      const translated = t(key);
+      return translated && translated !== key ? translated : locale.startsWith('zh') ? zh : en;
+    },
+    [locale, t],
+  );
   // State for active drag
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null);
   const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
@@ -129,8 +139,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
   // mousemove / mouseup directly on document, which Playwright drives natively.
   // Activation constraint stays at 8px in both modes — user-perceived
   // semantics are unchanged.
-  const e2eMode =
-    typeof window !== 'undefined' && (window as Window).__AURA_E2E_MODE__ === true;
+  const e2eMode = typeof window !== 'undefined' && (window as Window).__AURA_E2E_MODE__ === true;
   const mouseSensor = useSensor(MouseSensor, {
     activationConstraint: { distance: 8 },
   });
@@ -285,7 +294,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
               <div className="mt-2 flex flex-wrap gap-2">
                 {Object.entries(column.aggregations).map(([key, value]) => (
                   <span key={key} className="text-xs text-gray-500">
-                    {key}: <span className="font-medium">{value}</span>
+                    {getLocalizedText(key, locale, t)}: <span className="font-medium">{value}</span>
                   </span>
                 ))}
               </div>
@@ -304,11 +313,12 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
             dataSource={dataSource}
             onCardClick={onCardClick}
             terminal={column.terminal}
+            emptyLabel={fallbackText('kanban.dropHere', '拖放到这里', 'Drop here')}
           />
         </div>
       );
     },
-    [dataSource, draggable, onCardClick, showAggregations, showCount],
+    [dataSource, draggable, fallbackText, locale, onCardClick, showAggregations, showCount, t],
   );
 
   // All column IDs for droppable targets
@@ -326,7 +336,9 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
       >
         <div className="flex flex-col items-center gap-2">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-          <span className="text-sm text-gray-500">Loading...</span>
+          <span className="text-sm text-gray-500">
+            {fallbackText('common.loading', '加载中...', 'Loading...')}
+          </span>
         </div>
       </div>
     );
@@ -344,7 +356,9 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
         role="alert"
       >
         <div className="text-center">
-          <div className="mb-2 text-lg text-red-500">Failed to load Kanban board</div>
+          <div className="mb-2 text-lg text-red-500">
+            {fallbackText('kanban.loadFailed', '看板加载失败', 'Failed to load Kanban board')}
+          </div>
           <div className="text-sm text-gray-500">{error.message}</div>
         </div>
       </div>
@@ -353,10 +367,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
 
   return (
     <div
-      className={cn(
-        'flex flex-col rounded-lg border border-gray-200 bg-white',
-        className,
-      )}
+      className={cn('flex flex-col rounded-lg border border-gray-200 bg-white', className)}
       data-testid="kanban-board"
       // Cap the board to the viewport so each column's internal
       // `overflow-y-auto` actually scrolls instead of letting the whole page
@@ -401,9 +412,8 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
                   cardFields={dataSource.cardFields}
                   draggable={false}
                   terminal={
-                    enrichedColumns.find((col) =>
-                      col.cards.some((c) => c.id === activeCard.id),
-                    )?.terminal
+                    enrichedColumns.find((col) => col.cards.some((c) => c.id === activeCard.id))
+                      ?.terminal
                   }
                 />
               </div>
@@ -414,7 +424,9 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
 
       {/* Empty state */}
       {enrichedColumns.length === 0 && (
-        <div className="p-8 text-center text-gray-500">No data available</div>
+        <div className="p-8 text-center text-gray-500">
+          {fallbackText('common.noData', '暂无数据', 'No data available')}
+        </div>
       )}
     </div>
   );
@@ -439,6 +451,7 @@ interface KanbanColumnDropZoneProps {
   dataSource: SmartKanbanProps['dataSource'];
   onCardClick?: SmartKanbanProps['onCardClick'];
   terminal?: 'won' | 'lost';
+  emptyLabel: string;
 }
 
 const KanbanColumnDropZone: React.FC<KanbanColumnDropZoneProps> = ({
@@ -449,16 +462,14 @@ const KanbanColumnDropZone: React.FC<KanbanColumnDropZoneProps> = ({
   dataSource,
   onCardClick,
   terminal,
+  emptyLabel,
 }) => {
   const { setNodeRef, isOver } = useDroppable({ id: columnId });
 
   return (
     <div
       ref={setNodeRef}
-      className={cn(
-        'flex-1 space-y-2 overflow-y-auto p-2',
-        isOver && 'bg-blue-50/50',
-      )}
+      className={cn('flex-1 space-y-2 overflow-y-auto p-2', isOver && 'bg-blue-50/50')}
       data-testid="kanban-column-body"
       data-column-id={columnId}
     >
@@ -479,7 +490,7 @@ const KanbanColumnDropZone: React.FC<KanbanColumnDropZoneProps> = ({
       {/* Empty column hint — the parent div is the actual droppable. */}
       {cards.length === 0 && (
         <div className="flex h-24 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-sm text-gray-400">
-          Drop here
+          {emptyLabel}
         </div>
       )}
     </div>

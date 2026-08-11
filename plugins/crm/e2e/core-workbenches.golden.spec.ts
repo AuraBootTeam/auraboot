@@ -1179,7 +1179,7 @@ test('Cordys-parity journey keeps pipeline context, activity time, relation, and
     await expect(selectedForecastRow).not.toContainText(/\b[0-9A-HJKMNP-TV-Z]{26}\b/);
     await expect(page.getByTestId('status-banner-crm_forecast_status')).toBeVisible();
     await expect(page.getByTestId('workbench-action-submit_forecast')).toBeVisible();
-    await expect(page.getByText(/团队偏差|Team Rollup/).first()).toBeVisible();
+    await expect(page.getByText(/团队下钻|Team Drill-down/).first()).toBeVisible();
     await assertNoRawCodes(page);
     await dualViewportShots(page, testInfo, 'crm-forecast-cockpit');
     await executeWorkbenchAction(page, 'submit_forecast', 'crm:submit_forecast', true);

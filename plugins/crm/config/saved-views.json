@@ -1,9 +1,10 @@
 [
   {
-    "name": "Pipeline Board",
-    "description": "Opportunity pipeline kanban board grouped by sales stage",
+    "name": "$i18n:crm.saved_view.pipeline_board",
+    "description": "$i18n:crm.saved_view.pipeline_board_description",
     "modelCode": "crm_opportunity_common",
-    "pageKey": "crm_opportunity_common",
+    "pageKey": "crm_opportunity_common_list",
+    "viewKey": "crm_opportunity_pipeline_board",
     "scope": "global",
     "viewType": "kanban",
     "isDefault": true,
@@ -14,15 +15,15 @@
       "titleField": "crm_opp_name",
       "idField": "pid",
       "cardFields": [
-        { "field": "crm_opp_account_id", "label": "Account", "type": "text" },
-        { "field": "crm_opp_expected_amount", "label": "Amount", "type": "currency", "currencyCode": "CNY" },
-        { "field": "crm_opp_probability", "label": "Probability", "type": "progress" },
-        { "field": "crm_opp_expected_close_date", "label": "Close", "type": "date-relative" },
-        { "field": "crm_opp_owner", "label": "Owner", "type": "avatar" }
+        { "field": "crm_opp_account_id", "label": "$i18n:model.crm_opportunity_common.crm_opp_account_id.label", "type": "text" },
+        { "field": "crm_opp_expected_amount", "label": "$i18n:model.crm_opportunity_common.crm_opp_expected_amount.label", "type": "currency", "currencyCode": "CNY" },
+        { "field": "crm_opp_probability", "label": "$i18n:model.crm_opportunity_common.crm_opp_probability.label", "type": "progress" },
+        { "field": "crm_opp_expected_close_date", "label": "$i18n:model.crm_opportunity_common.crm_opp_expected_close_date.label", "type": "date-relative" },
+        { "field": "crm_opp_owner", "label": "$i18n:model.crm_opportunity_common.crm_opp_owner.label", "type": "avatar" }
       ],
       "kanbanAggregations": [
-        { "field": "crm_opp_expected_amount", "function": "sum", "label": "Pipeline Value" },
-        { "field": null, "function": "count", "label": "Count" }
+        { "field": "crm_opp_expected_amount", "function": "sum", "label": "$i18n:dashboard.crm.kpi.pipeline_value" },
+        { "field": null, "function": "count", "label": "$i18n:crm.kanban.count" }
       ],
       "draggable": true,
       "showCount": true,
@@ -34,7 +35,8 @@
     "name": "Lead Board",
     "description": "Lead pipeline kanban board grouped by status",
     "modelCode": "crm_lead_common",
-    "pageKey": "crm_lead_common",
+    "pageKey": "crm_lead_common_list",
+    "viewKey": "crm_lead_pipeline_board",
     "scope": "global",
     "viewType": "kanban",
     "isDefault": false,
@@ -63,7 +65,8 @@
     "name": "Activity Calendar",
     "description": "CRM activities displayed in calendar view",
     "modelCode": "crm_activity_common",
-    "pageKey": "crm_activity_common",
+    "pageKey": "crm_activity_common_list",
+    "viewKey": "crm_activity_calendar",
     "scope": "global",
     "viewType": "calendar",
     "isDefault": false,

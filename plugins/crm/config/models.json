@@ -684,6 +684,7 @@
     "extension": {
       "icon": "FileArchive",
       "category": "crm",
+      "skipDetailPage": true,
       "titleField": "crm_fp_code",
       "subtitleField": "crm_fp_package_hash",
       "dataScope": { "ownerField": "created_by", "departmentField": null }
@@ -705,6 +706,7 @@
     "extension": {
       "icon": "FileCheck",
       "category": "crm",
+      "skipDetailPage": true,
       "titleField": "crm_reqv_code",
       "subtitleField": "crm_reqv_version_label",
       "dataScope": { "ownerField": "created_by", "departmentField": null }
@@ -726,6 +728,7 @@
     "extension": {
       "icon": "BadgeCheck",
       "category": "crm",
+      "skipDetailPage": true,
       "titleField": "crm_cc_code",
       "subtitleField": "crm_cc_confirmation_ref",
       "dataScope": { "ownerField": "created_by", "departmentField": null }

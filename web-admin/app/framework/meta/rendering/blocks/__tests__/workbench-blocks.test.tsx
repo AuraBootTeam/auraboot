@@ -83,9 +83,9 @@ describe('FiltersBlockRenderer', () => {
     await waitFor(() => expect(runtime.__reload).toHaveBeenCalledWith('queue'));
 
     fireEvent.click(screen.getByTestId('filter-btn-reset'));
-    await waitFor(() => expect(runtime.__updateState).toHaveBeenCalledWith(
-      'scope-1', 'searchKeyword', '',
-    ));
+    await waitFor(() =>
+      expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'searchKeyword', ''),
+    );
   });
 });
 
@@ -547,9 +547,32 @@ describe('MetricStripBlockRenderer', () => {
 
     render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
 
-    expect(screen.getByTestId('metric-strip')).toHaveStyle({
-      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-    });
+    expect(screen.getByTestId('metric-strip')).toHaveClass(
+      'grid-cols-1',
+      'sm:grid-cols-2',
+      'lg:grid-cols-3',
+    );
+  });
+
+  it('keeps a configured four-card strip responsive before the desktop breakpoint', () => {
+    const runtime = makeRuntime({
+      data: { summary: { a: 1, b: 2, c: 3, d: 4 } },
+    }) as any;
+    const block: BlockConfig = {
+      id: 'forecast_metrics',
+      blockType: 'metric-strip',
+      dataSource: 'summary',
+      columns: 4,
+      metrics: ['a', 'b', 'c', 'd'].map((key) => ({ key, label: key, valueField: key })),
+    };
+
+    render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('metric-strip')).toHaveClass(
+      'grid-cols-1',
+      'sm:grid-cols-2',
+      'xl:grid-cols-4',
+    );
   });
 });
 
@@ -1031,9 +1054,7 @@ describe('StatusBannerBlockRenderer', () => {
 
     render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
 
-    expect(screen.getByTestId('status-banner-qdp_status')).toHaveTextContent(
-      'Historical revision',
-    );
+    expect(screen.getByTestId('status-banner-qdp_status')).toHaveTextContent('Historical revision');
     expect(screen.getByTestId('status-banner-qdp_status')).toHaveTextContent('QDP-001');
   });
 

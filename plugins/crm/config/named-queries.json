@@ -4,7 +4,7 @@
     "name:zh-CN": "按对象查活动",
     "name:en": "Activities by Related Object",
     "description": "Get all activities related to a specific CRM object via association graph",
-    "fromSql": "SELECT a.*, r.crm_ar_role, COALESCE(u.nick_name, u.user_name, '未分配') AS owner_name FROM mt_crm_activity_common a JOIN mt_crm_activity_relation_common r ON a.pid = r.crm_ar_activity_id AND r.tenant_id = #{params.tenantId} LEFT JOIN ab_user u ON u.pid = a.crm_act_owner WHERE r.crm_ar_object_type = #{params.objectType} AND r.crm_ar_object_id = #{params.objectId} AND a.tenant_id = #{params.tenantId} ORDER BY a.crm_act_date DESC",
+    "fromSql": "SELECT a.*, a.crm_act_ext->>'status' AS crm_act_status, a.crm_act_ext->>'priority' AS crm_act_priority, NULLIF(a.crm_act_ext->>'dueDate', '')::date AS crm_act_due_date, r.crm_ar_role, COALESCE(u.nick_name, u.user_name, '未分配') AS owner_name FROM mt_crm_activity_common a JOIN mt_crm_activity_relation_common r ON a.pid = r.crm_ar_activity_id AND r.tenant_id = #{params.tenantId} LEFT JOIN ab_user u ON u.pid = a.crm_act_owner WHERE r.crm_ar_object_type = #{params.objectType} AND r.crm_ar_object_id = #{params.objectId} AND a.tenant_id = #{params.tenantId} ORDER BY a.crm_act_date DESC",
     "outputFields": [
       {
         "code": "pid",
@@ -26,6 +26,22 @@
       {
         "code": "crm_act_date",
         "columnExpr": "crm_act_date",
+        "dataType": "date",
+        "sortable": true
+      },
+      {
+        "code": "crm_act_status",
+        "columnExpr": "crm_act_status",
+        "dataType": "string"
+      },
+      {
+        "code": "crm_act_priority",
+        "columnExpr": "crm_act_priority",
+        "dataType": "string"
+      },
+      {
+        "code": "crm_act_due_date",
+        "columnExpr": "crm_act_due_date",
         "dataType": "date",
         "sortable": true
       },
@@ -1535,8 +1551,10 @@
     "name:zh-CN": "预测驾驶舱统计",
     "name:en": "Forecast Cockpit Stats",
     "description": "One-row sales forecast and submission-review summary.",
-    "fromSql": "SELECT o.total_pipeline, o.weighted_forecast, o.open_deals, f.draft_submissions, f.submitted_count FROM (SELECT COALESCE(SUM(CASE WHEN crm_opp_stage NOT IN ('closed_won','closed_lost') THEN crm_opp_expected_amount ELSE 0 END), 0) AS total_pipeline, COALESCE(SUM(CASE WHEN crm_opp_stage NOT IN ('closed_won','closed_lost') THEN crm_opp_expected_amount * COALESCE(crm_opp_probability, 0) / 100 ELSE 0 END), 0) AS weighted_forecast, COUNT(*) FILTER (WHERE crm_opp_stage NOT IN ('closed_won','closed_lost')) AS open_deals FROM mt_crm_opportunity_common WHERE tenant_id = #{params.tenantId}) o CROSS JOIN (SELECT COUNT(*) FILTER (WHERE crm_fcst_status = 'draft') AS draft_submissions, COUNT(*) FILTER (WHERE crm_fcst_status = 'submitted') AS submitted_count FROM mt_crm_forecast_submission WHERE tenant_id = #{params.tenantId}) f",
+    "fromSql": "SELECT o.commit_amount, o.best_case_amount, o.total_pipeline, o.weighted_forecast, o.open_deals, f.draft_submissions, f.submitted_count FROM (SELECT COALESCE(SUM(crm_opp_expected_amount) FILTER (WHERE crm_opp_stage NOT IN ('closed_won','closed_lost') AND crm_opp_forecast_category = 'commit'), 0) AS commit_amount, COALESCE(SUM(crm_opp_expected_amount) FILTER (WHERE crm_opp_stage NOT IN ('closed_won','closed_lost') AND crm_opp_forecast_category IN ('commit','best_case')), 0) AS best_case_amount, COALESCE(SUM(CASE WHEN crm_opp_stage NOT IN ('closed_won','closed_lost') THEN crm_opp_expected_amount ELSE 0 END), 0) AS total_pipeline, COALESCE(SUM(CASE WHEN crm_opp_stage NOT IN ('closed_won','closed_lost') THEN crm_opp_expected_amount * COALESCE(crm_opp_probability, 0) / 100 ELSE 0 END), 0) AS weighted_forecast, COUNT(*) FILTER (WHERE crm_opp_stage NOT IN ('closed_won','closed_lost')) AS open_deals FROM mt_crm_opportunity_common WHERE tenant_id = #{params.tenantId}) o CROSS JOIN (SELECT COUNT(*) FILTER (WHERE crm_fcst_status = 'draft') AS draft_submissions, COUNT(*) FILTER (WHERE crm_fcst_status = 'submitted') AS submitted_count FROM mt_crm_forecast_submission WHERE tenant_id = #{params.tenantId}) f",
     "outputFields": [
+      { "code": "commit_amount", "columnExpr": "commit_amount", "dataType": "number" },
+      { "code": "best_case_amount", "columnExpr": "best_case_amount", "dataType": "number" },
       { "code": "total_pipeline", "columnExpr": "total_pipeline", "dataType": "number" },
       { "code": "weighted_forecast", "columnExpr": "weighted_forecast", "dataType": "number" },
       { "code": "open_deals", "columnExpr": "open_deals", "dataType": "number" },

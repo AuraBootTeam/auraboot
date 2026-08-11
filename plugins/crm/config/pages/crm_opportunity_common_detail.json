@@ -192,6 +192,177 @@
           ]
         },
         {
+          "key": "plan_and_quotes",
+          "label": {
+            "zh-CN": "报价与计划",
+            "en-US": "Quotes & Plan"
+          },
+          "blocks": [
+            {
+              "id": "crm_opp_plan_quote_actions",
+              "blockType": "toolbar",
+              "buttons": [
+                {
+                  "code": "create_plan_task",
+                  "icon": "CheckSquare",
+                  "permissionCode": "crm.activity.manage",
+                  "label": {
+                    "zh-CN": "安排下一任务",
+                    "en-US": "Plan Next Task"
+                  },
+                  "action": {
+                    "type": "navigate",
+                    "to": "crm_activity_common_form",
+                    "command": "crm:create_opp_task"
+                  }
+                },
+                {
+                  "code": "log_plan_activity",
+                  "icon": "MessageSquare",
+                  "permissionCode": "crm.activity.manage",
+                  "label": {
+                    "zh-CN": "记录客户互动",
+                    "en-US": "Log Customer Activity"
+                  },
+                  "action": {
+                    "type": "navigate",
+                    "to": "crm_activity_common_form",
+                    "command": "crm:log_opp_activity"
+                  }
+                },
+                {
+                  "code": "create_quote_summary",
+                  "icon": "FileText",
+                  "primary": true,
+                  "permissionCode": "crm.quote_summary.manage",
+                  "label": {
+                    "zh-CN": "新建报价摘要",
+                    "en-US": "Create Quote Summary"
+                  },
+                  "action": {
+                    "type": "navigate",
+                    "to": "/p/crm_quote_summary_common/new?dv.crm_qs_opportunity_id={pid}&dv.crm_qs_account_id={crm_opp_account_id}",
+                    "command": "crm:create_quote_summary"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "block_opportunity_plan",
+              "blockType": "sub-table",
+              "title": {
+                "zh-CN": "计划与跟进",
+                "en-US": "Plan and Follow-up"
+              },
+              "layout": {
+                "colSpan": 12
+              },
+              "subTable": {
+                "dataSource": {
+                  "type": "api",
+                  "url": "/api/datasource/list",
+                  "params": {
+                    "datasourceId": "nq:crm_activities_by_object",
+                    "objectType": "opportunity",
+                    "objectId": "${recordPid}",
+                    "format": "records"
+                  }
+                },
+                "readOnly": true,
+                "maxHeight": 320,
+                "columns": [
+                  {
+                    "field": "crm_act_type",
+                    "width": 105,
+                    "renderType": "tag",
+                    "dictCode": "crm_activity_type"
+                  },
+                  {
+                    "field": "crm_act_subject",
+                    "width": 260
+                  },
+                  {
+                    "field": "crm_act_status",
+                    "width": 110,
+                    "renderType": "tag",
+                    "dictCode": "crm_task_status"
+                  },
+                  {
+                    "field": "crm_act_priority",
+                    "width": 105,
+                    "renderType": "tag",
+                    "dictCode": "crm_task_priority"
+                  },
+                  {
+                    "field": "crm_act_due_date",
+                    "width": 125,
+                    "valueType": "date"
+                  },
+                  {
+                    "field": "owner_name",
+                    "width": 140,
+                    "label": {
+                      "zh-CN": "负责人",
+                      "en-US": "Owner"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "block_opportunity_quotes",
+              "blockType": "sub-table",
+              "title": {
+                "zh-CN": "报价摘要",
+                "en-US": "Quote Summaries"
+              },
+              "layout": {
+                "colSpan": 12
+              },
+              "subTable": {
+                "childModel": "crm_quote_summary_common",
+                "parentField": "crm_qs_opportunity_id",
+                "readOnly": true,
+                "columns": [
+                  {
+                    "field": "crm_qs_code",
+                    "width": 150
+                  },
+                  {
+                    "field": "crm_qs_status",
+                    "width": 120,
+                    "renderType": "tag",
+                    "dictCode": "crm_quote_summary_status"
+                  },
+                  {
+                    "field": "crm_qs_quote_amount",
+                    "width": 145,
+                    "align": "right",
+                    "valueType": "currency"
+                  },
+                  {
+                    "field": "crm_qs_valid_until",
+                    "width": 130,
+                    "valueType": "date"
+                  },
+                  {
+                    "field": "crm_qs_customer_feedback_status",
+                    "width": 140,
+                    "renderType": "tag",
+                    "dictCode": "crm_quote_summary_feedback_status"
+                  },
+                  {
+                    "field": "crm_qs_won_lost_result",
+                    "width": 120,
+                    "renderType": "tag",
+                    "dictCode": "crm_quote_summary_result"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
           "key": "line_items",
           "label": {
             "zh-CN": "行项",
@@ -410,55 +581,6 @@
                       "type": "navigate",
                       "to": "crm_customer_request_common_detail"
                     }
-                  }
-                ]
-              }
-            },
-            {
-              "id": "block_quote_summaries",
-              "blockType": "sub-table",
-              "title": {
-                "zh-CN": "报价摘要",
-                "en-US": "Quote Summaries"
-              },
-              "layout": {
-                "colSpan": 12
-              },
-              "subTable": {
-                "childModel": "crm_quote_summary_common",
-                "parentField": "crm_qs_opportunity_id",
-                "readOnly": true,
-                "columns": [
-                  {
-                    "field": "crm_qs_code",
-                    "width": 150
-                  },
-                  {
-                    "field": "crm_qs_customer_request_id",
-                    "width": 180
-                  },
-                  {
-                    "field": "crm_qs_source_quote_type",
-                    "width": 140,
-                    "renderType": "tag",
-                    "dictCode": "crm_quote_summary_source_type"
-                  },
-                  {
-                    "field": "crm_qs_status",
-                    "width": 120,
-                    "renderType": "tag",
-                    "dictCode": "crm_quote_summary_status"
-                  },
-                  {
-                    "field": "crm_qs_quote_amount",
-                    "width": 140,
-                    "align": "right"
-                  },
-                  {
-                    "field": "crm_qs_won_lost_result",
-                    "width": 120,
-                    "renderType": "tag",
-                    "dictCode": "crm_quote_summary_result"
                   }
                 ]
               }

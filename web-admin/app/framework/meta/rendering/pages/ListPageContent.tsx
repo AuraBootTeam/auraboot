@@ -1077,6 +1077,7 @@ function ListPageContentInner(props: PageContentProps) {
     listExtensions?.hideQuickFilters ?? Boolean(schemaExtension.hideQuickFilters);
   const {
     views: savedViews,
+    accessibleViews,
     currentView,
     selectView,
     selectDefaultView,
@@ -1095,6 +1096,14 @@ function ListPageContentInner(props: PageContentProps) {
     scopeFilter: 'personal',
     autoLoad: !!schema && !hideSavedViews && !skipListData,
   });
+
+  const availableViewTypes = useMemo<ViewType[]>(() => {
+    const supported = new Set<ViewType>(['table']);
+    for (const view of accessibleViews) {
+      if (view.viewType === 'kanban') supported.add('kanban');
+    }
+    return ['table', 'kanban'].filter((type) => supported.has(type as ViewType)) as ViewType[];
+  }, [accessibleViews]);
 
   // Quick-filter chip pins (Half B): the current user's pinned views for this
   // model/page, merged into the chip row alongside built-in presets + global pins.
@@ -1180,6 +1189,63 @@ function ListPageContentInner(props: PageContentProps) {
         : undefined,
     [currentView, pendingViewConfig],
   );
+  const activeViewTemplate = useMemo(
+    () =>
+      accessibleViews.find((view) => view.viewType === activeViewType && view.isDefault) ??
+      accessibleViews.find((view) => view.viewType === activeViewType) ??
+      null,
+    [accessibleViews, activeViewType],
+  );
+  const activeTabViewFilter = useMemo<ViewFilterConfig | null>(() => {
+    const tabsBlock = schema?.blocks?.find((block: any) => block.blockType === 'tabs');
+    const tab = (tabsBlock?.tabs as any[] | undefined)?.find(
+      (candidate) => candidate.key === activeTab,
+    );
+    if (!tab?.filter) return null;
+    const fieldCode = tab.filter.fieldName || tab.filter.field;
+    if (!fieldCode) return null;
+    return {
+      fieldCode,
+      operator: String(tab.filter.operator || 'EQ').toLowerCase() as ViewFilterConfig['operator'],
+      value: tab.filter.value,
+    };
+  }, [activeTab, schema?.blocks]);
+  const activeRuntimeViewFilters = useMemo<ViewFilterConfig[]>(() => {
+    const merged = [
+      ...(effectiveViewConfig?.filters ?? []),
+      ...Object.entries(filters)
+        .filter(([, value]) => value != null && value !== '')
+        .map(([fieldCode, value]) => ({
+          fieldCode,
+          operator: 'eq' as const,
+          value,
+        })),
+      ...chipFilters,
+      ...(activeTabViewFilter ? [activeTabViewFilter] : []),
+    ];
+    const unique = new Map<string, ViewFilterConfig>();
+    for (const filter of merged) {
+      unique.set(`${filter.fieldCode}:${filter.operator}:${JSON.stringify(filter.value)}`, filter);
+    }
+    return Array.from(unique.values());
+  }, [activeTabViewFilter, chipFilters, effectiveViewConfig?.filters, filters]);
+  const effectiveNonNullViewConfig = useMemo<Partial<ViewConfig>>(
+    () =>
+      Object.fromEntries(
+        Object.entries(effectiveViewConfig ?? {}).filter(
+          ([, value]) => value !== null && value !== undefined,
+        ),
+      ),
+    [effectiveViewConfig],
+  );
+  const activeViewConfig = useMemo<ViewConfig>(
+    () => ({
+      ...(activeViewTemplate?.viewConfig ?? {}),
+      ...effectiveNonNullViewConfig,
+      filters: activeRuntimeViewFilters,
+    }),
+    [activeRuntimeViewFilters, activeViewTemplate?.viewConfig, effectiveNonNullViewConfig],
+  );
   const pendingViewSummary = useMemo(
     () => summarizeViewConfigPatch(pendingViewConfig),
     [pendingViewConfig],
@@ -1263,16 +1329,19 @@ function ListPageContentInner(props: PageContentProps) {
   // Restore view from URL ?view= parameter (highest priority).
   useRestoreSavedViewFromUrl({
     urlViewPid,
-    savedViews,
+    savedViews: accessibleViews,
     viewsLoading,
     selectView,
     setActiveViewType,
   });
 
+  const currentViewPid = currentView?.pid;
+  const currentViewType = currentView?.viewType;
+  const currentViewConfig = currentView?.viewConfig;
   useEffect(() => {
-    if (!currentView) return;
-    setActiveViewType((currentView.viewType as ViewType) || 'table');
-  }, [currentView?.pid, currentView?.viewType]);
+    if (!currentViewPid) return;
+    setActiveViewType((currentViewType as ViewType) || 'table');
+  }, [currentViewPid, currentViewType]);
 
   const applyViewConfigToListState = useCallback(
     (viewConfig: ViewConfig | undefined): Record<string, any> => {
@@ -1301,9 +1370,9 @@ function ListPageContentInner(props: PageContentProps) {
   // Empty config is meaningful: it restores the selected view back to a clean list state.
   useEffect(() => {
     if (activeQuickFilterRef.current) return;
-    if (!currentView) return;
-    applyViewConfigToListState(currentView.viewConfig);
-  }, [currentView?.pid, currentView?.viewConfig, applyViewConfigToListState]);
+    if (!currentViewPid) return;
+    applyViewConfigToListState(currentViewConfig);
+  }, [applyViewConfigToListState, currentViewConfig, currentViewPid]);
 
   const clearKeyword = useCallback(() => {
     keywordRef.current = '';
@@ -1755,7 +1824,8 @@ function ListPageContentInner(props: PageContentProps) {
     // full-page "加载失败" ErrorAlert (which is reserved for data/schema load failures), forcing a
     // reload to recover. Blocking a single row's action should never blank the table.
     onError: (err) => {
-      if (import.meta.env?.DEV) console.warn('[ListPageContent] action error (shown via toast):', err.message);
+      if (import.meta.env?.DEV)
+        console.warn('[ListPageContent] action error (shown via toast):', err.message);
     },
   });
 
@@ -1948,6 +2018,7 @@ function ListPageContentInner(props: PageContentProps) {
     [
       schema,
       buildFiltersParam,
+      chipFilters,
       filters,
       pagination.pageSize,
       tableName,
@@ -4066,11 +4137,9 @@ function ListPageContentInner(props: PageContentProps) {
             }}
             onViewTypeChange={(vt) => {
               setActiveViewType(vt);
-              if (vt !== 'table' && (!currentView || currentView.viewType !== vt)) {
-                const match = savedViews.find((v) => v.viewType === vt);
-                if (match) selectView(match.pid);
-              }
             }}
+            enableMultiView={Boolean(schemaExtension.enableMultiView)}
+            availableViewTypes={availableViewTypes}
             buttons={actionBlock?.buttons || []}
             toolbarActions={effectiveViewConfig?.toolbarActions}
             onAction={handleAction}
@@ -4800,10 +4869,10 @@ function ListPageContentInner(props: PageContentProps) {
             <SmartViewRenderer
               view={
                 {
-                  ...(currentView || {}),
+                  ...(activeViewTemplate || currentView || {}),
                   modelCode,
                   viewType: activeViewType,
-                  viewConfig: effectiveViewConfig || {},
+                  viewConfig: activeViewConfig,
                 } as any
               }
               onGanttTaskClick={navigateToRecordView}

@@ -1121,7 +1121,7 @@ function DetailPageContentInner(props: PageContentProps) {
                           button.primary
                             ? 'bg-accent hover:bg-accent-hover text-white'
                             : button.danger
-                              ? 'bg-status-red text-white hover:bg-status-red/90'
+                              ? 'bg-status-red hover:bg-status-red/90 text-white'
                               : 'border-border-strong bg-panel text-text-2 hover:bg-hover border'
                         } disabled:cursor-not-allowed disabled:opacity-50`}
                       >
@@ -1566,8 +1566,8 @@ function prepareDetailRuntimeBlock(
 ): BlockConfig {
   const valueBoundBlock = injectDetailRecordValueIntoCustomBlock(block, recordData);
   const recordBoundBlock =
-    valueBoundBlock.blockType === 'stage-rail'
-      ? ({ ...valueBoundBlock, record: recordData } as BlockConfig)
+    valueBoundBlock.blockType === 'stage-rail' || valueBoundBlock.blockType === 'toolbar'
+      ? ({ ...valueBoundBlock, record: recordData, recordPid } as BlockConfig)
       : valueBoundBlock;
   return resolveChartBlockRecordParams(recordBoundBlock, recordData, recordPid);
 }
