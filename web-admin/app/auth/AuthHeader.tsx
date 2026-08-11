@@ -5,7 +5,7 @@ import { useTheme } from '~/contexts/ThemeContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { useHydrated } from '~/hooks/useHydrated';
 import { useAuth } from '~/contexts/AuthContext';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData } from '~/root-data';
 import { COMMUNITY_BRANDING, resolveBrandDisplayName } from '~/config/branding';
 
 const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';

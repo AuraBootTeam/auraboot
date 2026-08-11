@@ -13,7 +13,7 @@ import { createUserSession, getTokenFromRequest } from '~/shared/services/sessio
 import { validateEmail } from '~/utils/utils';
 import { post } from '~/shared/services/http-client';
 import { ResultHelper, type User } from '~/utils/type';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData } from '~/root-data';
 import { COMMUNITY_BRANDING } from '~/config/branding';
 
 const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';

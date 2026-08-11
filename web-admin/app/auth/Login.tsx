@@ -16,7 +16,7 @@ import { post, fetchResult } from '~/shared/services/http-client';
 import { ResultHelper, type User } from '~/utils/type';
 import { getUserInfo } from '~/shared/services/userService';
 import { useI18n } from '~/contexts/I18nContext';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData } from '~/root-data';
 import { COMMUNITY_BRANDING, resolveBrandDisplayName } from '~/config/branding';
 import IcpComplianceFooter from './IcpComplianceFooter';
 import { getLoginFailureActionData } from './login-errors';
