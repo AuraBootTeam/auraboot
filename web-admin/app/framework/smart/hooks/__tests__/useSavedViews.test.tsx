@@ -54,9 +54,7 @@ describe('useSavedViews', () => {
   });
 
   it('does not fetch when autoLoad=false', () => {
-    const { result } = renderHook(() =>
-      useSavedViews({ modelCode: 'order', autoLoad: false }),
-    );
+    const { result } = renderHook(() => useSavedViews({ modelCode: 'order', autoLoad: false }));
     expect(mockService.getAccessibleViews).not.toHaveBeenCalled();
     expect(result.current.views).toEqual([]);
   });
@@ -93,6 +91,34 @@ describe('useSavedViews', () => {
     expect(result.current.currentView?.pid).toBe('personal');
     expect(result.current.groupedViews.team).toEqual([]);
     expect(result.current.groupedViews.global).toEqual([]);
+    expect(result.current.accessibleViews.map((view: SavedView) => view.pid)).toEqual([
+      'team',
+      'global',
+      'personal',
+    ]);
+  });
+
+  it('can activate an accessible plugin preset without exposing it as a personal view', async () => {
+    const personal = makeView({ pid: 'personal', name: 'My View', scope: 'personal' });
+    const globalKanban = makeView({
+      pid: 'pipeline-board',
+      name: 'Pipeline Board',
+      scope: 'global',
+      viewType: 'kanban',
+      isDefault: true,
+    });
+    mockService.getAccessibleViews.mockResolvedValue([personal, globalKanban]);
+    mockService.getDefaultView.mockResolvedValue(globalKanban);
+
+    const { result } = renderHook(() =>
+      useSavedViews({ modelCode: 'order', scopeFilter: 'personal' }),
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.views.map((view: SavedView) => view.pid)).toEqual(['personal']);
+    act(() => result.current.selectView('pipeline-board'));
+    expect(result.current.currentView?.pid).toBe('pipeline-board');
+    expect(result.current.currentView?.viewType).toBe('kanban');
   });
 
   it('auto-selects first view when no default view', async () => {
@@ -223,7 +249,13 @@ describe('useSavedViews', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      await result.current.createView({ name: 'My New View', modelCode: 'order', scope: 'personal', viewType: 'table', viewConfig: {} as any });
+      await result.current.createView({
+        name: 'My New View',
+        modelCode: 'order',
+        scope: 'personal',
+        viewType: 'table',
+        viewConfig: {} as any,
+      });
     });
 
     expect(result.current.views).toHaveLength(1);

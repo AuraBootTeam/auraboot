@@ -34,6 +34,7 @@ export interface ListModalsProps {
   modelCode: string;
   bulkEditFields: Array<{ code: string; name: string; dataType: string }>;
   onBulkEditComplete: () => void;
+  locale: string;
 
   // ImportModal
   importOpen: boolean;
@@ -125,6 +126,7 @@ export function ListModals({
   modelCode,
   bulkEditFields,
   onBulkEditComplete,
+  locale,
 
   // ImportModal
   importOpen,
@@ -211,6 +213,8 @@ export function ListModals({
           selectedIds={selectedIds}
           modelCode={modelCode}
           fields={bulkEditFields}
+          locale={locale}
+          t={t}
           onUpdateComplete={onBulkEditComplete}
         />
       )}

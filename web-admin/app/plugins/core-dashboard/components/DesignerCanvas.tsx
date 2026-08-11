@@ -14,13 +14,16 @@ import { renderWidget } from './WidgetRenderer';
 import type { Widget, WidgetType } from '../types';
 import type { Layout } from '~/framework/smart/types/dashboard';
 import type { DrillDownConfig, FilterConfig } from '~/framework/smart/types/chart';
+import {
+  buildDrillDownTarget,
+  type DrillDownPayload,
+} from '../utils/drillDownNavigation';
 import { createWidgetDraft } from '../utils/createWidgetDraft';
 
 /**
  * Linkage filters state - grouped by linkage group ID
  */
 type LinkageFiltersMap = Record<string, FilterConfig[]>;
-type DrillDownPayload = DrillDownConfig | FilterConfig[];
 
 interface DesignerCanvasProps {
   className?: string;
@@ -180,6 +183,11 @@ export const DesignerCanvas: React.FC<DesignerCanvasProps> = ({ className = '' }
     const isSelected = widget.id === selectedWidgetId;
     const linkageConfig = widget.config.linkage;
     const drillDownConfig = widget.config.drillDown;
+    const cardDrillDownEnabled = Array.isArray(widget.config.cards)
+      ? widget.config.cards.some(
+          (card) => (card as { drillDown?: DrillDownConfig }).drillDown?.enabled,
+        )
+      : false;
     const groupId = linkageConfig?.groupId || 'default';
 
     // Get linkage filters for this widget's group (if widget receives filters)
@@ -204,36 +212,16 @@ export const DesignerCanvas: React.FC<DesignerCanvasProps> = ({ className = '' }
           onLinkageEmit: linkageConfig?.emitFilter
             ? (filters: FilterConfig[]) => handleLinkageEmit(groupId, filters)
             : undefined,
-          onDrillDown: drillDownConfig?.enabled
+          onDrillDown: drillDownConfig?.enabled || cardDrillDownEnabled
             ? (payload: DrillDownPayload) => {
                 const activeDrillDownConfig = Array.isArray(payload) ? drillDownConfig : payload;
-                // Handle drilldown based on action type
-                if (activeDrillDownConfig.action === 'filter') {
-                  // Apply filter to same chart (already handled by the chart)
-                } else if (
-                  activeDrillDownConfig.action === 'navigate' &&
-                  activeDrillDownConfig.targetPage
-                ) {
-                  // Navigate to target page with parameters
-                  const params = new URLSearchParams();
-                  if (Array.isArray(payload)) {
-                    payload.forEach((f) => {
-                      const paramName = activeDrillDownConfig.paramMapping?.[f.field] || f.field;
-                      params.set(paramName, String(f.value));
-                    });
-                  } else {
-                    Object.entries(activeDrillDownConfig.paramMapping ?? {}).forEach(
-                      ([field, value]) => {
-                        params.set(`filter_${field}`, String(value));
-                      },
-                    );
-                  }
-                  const query = params.toString();
-                  window.location.href = query
-                    ? `${activeDrillDownConfig.targetPage}?${query}`
-                    : activeDrillDownConfig.targetPage;
-                } else if (activeDrillDownConfig.action === 'modal') {
-                  // TODO: Open modal with filtered data
+                if (!activeDrillDownConfig) return;
+                const target = buildDrillDownTarget(
+                  activeDrillDownConfig,
+                  Array.isArray(payload) ? payload : [],
+                );
+                if (target) {
+                  window.location.href = target;
                 }
               }
             : undefined,

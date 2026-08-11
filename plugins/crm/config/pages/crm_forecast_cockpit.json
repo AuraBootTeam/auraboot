@@ -45,37 +45,72 @@
     {
       "id": "crm_forecast_metrics",
       "blockType": "metric-strip",
+      "detailPlacement": "header",
       "dataSource": "forecastStats",
       "variant": "cards",
       "columns": 4,
       "metrics": [
         {
-          "key": "pipeline",
-          "label": { "zh-CN": "总管道", "en": "Total Pipeline" },
-          "valueField": "total_pipeline",
+          "key": "commit",
+          "label": { "zh-CN": "承诺", "en": "Commit" },
+          "valueField": "commit_amount",
+          "valueType": "currency",
           "precision": 0,
-          "subText": { "zh-CN": "所有在途商机", "en": "All open opportunities" },
-          "tone": "blue",
-          "icon": "ChartSpline",
-          "activeWhen": "state.statusFilter == null || state.statusFilter.length == 0",
-          "onClick": { "action": "state.set", "args": { "statusFilter": [] } }
+          "subText": { "zh-CN": "销售已明确承诺", "en": "Seller-committed opportunities" },
+          "tone": "green",
+          "icon": "BadgeCheck"
+        },
+        {
+          "key": "best_case",
+          "label": { "zh-CN": "最佳预期", "en": "Best Case" },
+          "valueField": "best_case_amount",
+          "valueType": "currency",
+          "precision": 0,
+          "subText": { "zh-CN": "承诺 + 最佳预期", "en": "Commit plus best-case opportunities" },
+          "tone": "amber",
+          "icon": "Target"
         },
         {
           "key": "weighted",
           "label": { "zh-CN": "加权预测", "en": "Weighted Forecast" },
           "valueField": "weighted_forecast",
+          "valueType": "currency",
           "precision": 0,
           "subText": { "zh-CN": "概率加权后的经营事实", "en": "Probability-weighted operating fact" },
-          "tone": "green",
-          "icon": "ChartNoAxesCombined",
-          "activeWhen": "state.statusFilter == null || state.statusFilter.length == 0",
-          "onClick": { "action": "state.set", "args": { "statusFilter": [] } }
+          "tone": "blue",
+          "icon": "ChartNoAxesCombined"
+        },
+        {
+          "key": "pipeline",
+          "label": { "zh-CN": "总管道", "en": "Total Pipeline" },
+          "valueField": "total_pipeline",
+          "valueType": "currency",
+          "precision": 0,
+          "subText": { "zh-CN": "全部在途商机", "en": "All open opportunities" },
+          "tone": "default",
+          "icon": "ChartSpline"
+        }
+      ]
+    },
+    {
+      "id": "crm_forecast_execution_metrics",
+      "blockType": "metric-strip",
+      "detailPlacement": "header",
+      "dataSource": "forecastStats",
+      "variant": "chips",
+      "title": { "zh-CN": "执行状态", "en": "Execution Status" },
+      "metrics": [
+        {
+          "key": "open_deals",
+          "label": { "zh-CN": "在途商机", "en": "Open Deals" },
+          "valueField": "open_deals",
+          "tone": "default",
+          "icon": "BriefcaseBusiness"
         },
         {
           "key": "drafts",
-          "label": { "zh-CN": "待提交预测", "en": "Draft Submissions" },
+          "label": { "zh-CN": "待提交", "en": "Drafts" },
           "valueField": "draft_submissions",
-          "subText": { "zh-CN": "销售仍可修订", "en": "Seller can still revise" },
           "tone": "amber",
           "icon": "FileClock",
           "activeWhen": "state.statusFilter != null && state.statusFilter.includes('draft')",
@@ -83,9 +118,8 @@
         },
         {
           "key": "submitted",
-          "label": { "zh-CN": "已提交预测", "en": "Submitted Forecasts" },
+          "label": { "zh-CN": "待复核", "en": "In Review" },
           "valueField": "submitted_count",
-          "subText": { "zh-CN": "进入经理复核", "en": "Ready for manager review" },
           "tone": "blue",
           "icon": "Send",
           "activeWhen": "state.statusFilter != null && state.statusFilter.includes('submitted')",
@@ -120,7 +154,6 @@
           "permissionCode": "crm.forecast.read",
           "label": { "zh-CN": "打开预测档案", "en": "Open Forecast Record" },
           "variant": "secondary",
-          "permissionCode": "crm.forecast.read",
           "visibleWhen": "state.selectedForecast != null",
           "onClick": { "action": "navigate", "args": { "to": "/p/crm_forecast_submission/view/${state.selectedForecast.pid}" } }
         },
@@ -129,7 +162,6 @@
           "permissionCode": "crm.forecast.manage",
           "label": { "zh-CN": "新建预测", "en": "Create Forecast" },
           "variant": "primary",
-          "permissionCode": "crm.forecast.manage",
           "onClick": { "action": "navigate", "args": { "to": "/p/crm_forecast_submission/new" } }
         }
       ]
@@ -140,7 +172,7 @@
       "tabs": [
         {
           "key": "submissions",
-          "label": { "zh-CN": "预测提交", "en": "Submissions" },
+          "label": { "zh-CN": "执行队列", "en": "Execution Queue" },
           "blocks": [
             {
               "id": "crm_forecast_submission_queue",
@@ -172,7 +204,7 @@
         },
         {
           "key": "owners",
-          "label": { "zh-CN": "团队偏差", "en": "Team Rollup" },
+          "label": { "zh-CN": "团队下钻", "en": "Team Drill-down" },
           "blocks": [
             {
               "id": "crm_forecast_owner_queue",
@@ -226,7 +258,6 @@
           "permissionCode": "crm.forecast.manage",
           "label": { "zh-CN": "提交预测", "en": "Submit Forecast" },
           "variant": "primary",
-          "permissionCode": "crm.forecast.manage",
           "visibleWhen": "state.selectedForecast != null && state.selectedForecast.crm_fcst_status == 'draft'",
           "confirm": { "zh-CN": "提交后该版本进入经理复核。确认继续吗？", "en": "The submission will enter manager review. Continue?" },
           "onClick": { "action": "command.execute", "args": { "command": "crm:submit_forecast", "operationType": "update", "targetRecordPid": "${state.selectedForecast.pid}", "reload": ["forecastStats", "forecastSubmissions", "forecastOwners"] } }

@@ -9,6 +9,7 @@
     "extension": {
       "icon": "Building",
       "category": "crm",
+      "activityTimelineEnabled": true,
       "titleField": "crm_acc_name",
       "subtitleField": "crm_acc_code",
       "dataScope": {
@@ -31,6 +32,7 @@
     "extension": {
       "icon": "User",
       "category": "crm",
+      "activityTimelineEnabled": true,
       "titleField": "crm_ct_name",
       "subtitleField": "crm_ct_email"
     },
@@ -49,6 +51,7 @@
     "extension": {
       "icon": "Radar",
       "category": "crm",
+      "activityTimelineEnabled": true,
       "titleField": "crm_lead_company",
       "subtitleField": "crm_lead_code",
       "dataScope": {
@@ -107,6 +110,7 @@
     "extension": {
       "icon": "TrendingUp",
       "category": "crm",
+      "activityTimelineEnabled": true,
       "titleField": "crm_opp_name",
       "subtitleField": "crm_opp_code",
       "dataScope": {
@@ -205,6 +209,7 @@
     "extension": {
       "icon": "AlertTriangle",
       "category": "crm",
+      "activityTimelineEnabled": true,
       "titleField": "crm_cmp_code",
       "subtitleField": "crm_cmp_status"
     },
@@ -223,6 +228,7 @@
     "extension": {
       "icon": "Megaphone",
       "category": "crm",
+      "activityTimelineEnabled": true,
       "titleField": "crm_cpn_name",
       "subtitleField": "crm_cpn_code",
       "dataScope": {
@@ -684,6 +690,7 @@
     "extension": {
       "icon": "FileArchive",
       "category": "crm",
+      "skipDetailPage": true,
       "titleField": "crm_fp_code",
       "subtitleField": "crm_fp_package_hash",
       "dataScope": { "ownerField": "created_by", "departmentField": null }
@@ -705,6 +712,7 @@
     "extension": {
       "icon": "FileCheck",
       "category": "crm",
+      "skipDetailPage": true,
       "titleField": "crm_reqv_code",
       "subtitleField": "crm_reqv_version_label",
       "dataScope": { "ownerField": "created_by", "departmentField": null }
@@ -726,6 +734,7 @@
     "extension": {
       "icon": "BadgeCheck",
       "category": "crm",
+      "skipDetailPage": true,
       "titleField": "crm_cc_code",
       "subtitleField": "crm_cc_confirmation_ref",
       "dataScope": { "ownerField": "created_by", "departmentField": null }

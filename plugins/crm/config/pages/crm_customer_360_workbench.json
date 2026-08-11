@@ -179,10 +179,10 @@
         "pipeline": { "zh-CN": "在同一客户上下文核对商机、联系人和最近活动。", "en": "Review opportunities, contacts and recent activity in one customer context." }
       },
       "summaryFields": [
-        { "field": "crm_acc_owner", "label": { "zh-CN": "客户负责人", "en": "Owner" } },
+        { "field": "owner_name", "label": { "zh-CN": "客户负责人", "en": "Owner" } },
         { "field": "contact_count", "label": { "zh-CN": "联系人", "en": "Contacts" } },
         { "field": "open_opportunities", "label": { "zh-CN": "在途商机", "en": "Open Deals" } },
-        { "field": "pipeline_amount", "label": { "zh-CN": "管道金额", "en": "Pipeline" } }
+        { "field": "pipeline_amount", "valueType": "currency", "precision": 0, "label": { "zh-CN": "管道金额", "en": "Pipeline" } }
       ]
     },
     {

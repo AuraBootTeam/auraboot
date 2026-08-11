@@ -169,6 +169,30 @@ export interface DrillDownLevel {
   nextDimension?: string;
 }
 
+export interface DrillDownFilterRule {
+  /** Field in the destination list model. */
+  targetField: string;
+  /** Field emitted by the clicked chart point/row. Omit for a static filter. */
+  sourceField?: string;
+  /** Static value used by KPI cards or cohort constraints. */
+  value?: unknown;
+  /** Destination list filter operator. */
+  operator?:
+    | 'eq'
+    | 'ne'
+    | 'gt'
+    | 'gte'
+    | 'lt'
+    | 'lte'
+    | 'like'
+    | 'in'
+    | 'between'
+    | 'isNull'
+    | 'isNotNull';
+  /** Convert a YYYY-MM chart dimension into [month start, next month start). */
+  transform?: 'identity' | 'month-range';
+}
+
 /**
  * Drill-down behavior configuration
  */
@@ -185,6 +209,8 @@ export interface DrillDownConfig {
   targetDashboard?: string;
   /** Parameter mapping for navigation */
   paramMapping?: Record<string, string>;
+  /** Exact destination-list cohort. Preferred over legacy equality-only paramMapping. */
+  filters?: DrillDownFilterRule[];
 }
 
 /**

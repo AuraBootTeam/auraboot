@@ -19,9 +19,12 @@ import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import {
+  buildDrillDownTarget,
+  type DrillDownPayload,
+} from '../utils/drillDownNavigation';
 
 type LinkageFiltersMap = Record<string, FilterConfig[]>;
-type DrillDownPayload = DrillDownConfig | FilterConfig[];
 
 interface DashboardViewerProps {
   widgets: Widget[];
@@ -99,6 +102,11 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
   const renderViewerWidget = (widget: Widget) => {
     const linkageConfig = widget.config.linkage;
     const drillDownConfig = widget.config.drillDown;
+    const cardDrillDownEnabled = Array.isArray(widget.config.cards)
+      ? widget.config.cards.some(
+          (card) => (card as { drillDown?: DrillDownConfig }).drillDown?.enabled,
+        )
+      : false;
     const groupId = linkageConfig?.groupId || 'default';
     const widgetTitle = getLocalizedText(widget.config.title, locale, t);
 
@@ -110,25 +118,16 @@ export const DashboardViewer: React.FC<DashboardViewerProps> = ({
       onLinkageEmit: linkageConfig?.emitFilter
         ? (filters: FilterConfig[]) => handleLinkageEmit(groupId, filters)
         : undefined,
-      onDrillDown: drillDownConfig?.enabled
+      onDrillDown: drillDownConfig?.enabled || cardDrillDownEnabled
         ? (payload: DrillDownPayload) => {
             const activeDrillDownConfig = Array.isArray(payload) ? drillDownConfig : payload;
-            if (activeDrillDownConfig.action === 'navigate' && activeDrillDownConfig.targetPage) {
-              const params = new URLSearchParams();
-              if (Array.isArray(payload)) {
-                payload.forEach((f) => {
-                  const paramName = activeDrillDownConfig.paramMapping?.[f.field] || f.field;
-                  params.set(paramName, String(f.value));
-                });
-              } else {
-                Object.entries(activeDrillDownConfig.paramMapping ?? {}).forEach(([field, value]) => {
-                  params.set(`filter_${field}`, String(value));
-                });
-              }
-              const query = params.toString();
-              window.location.href = query
-                ? `${activeDrillDownConfig.targetPage}?${query}`
-                : activeDrillDownConfig.targetPage;
+            if (!activeDrillDownConfig) return;
+            const target = buildDrillDownTarget(
+              activeDrillDownConfig,
+              Array.isArray(payload) ? payload : [],
+            );
+            if (target) {
+              window.location.href = target;
             }
           }
         : undefined,

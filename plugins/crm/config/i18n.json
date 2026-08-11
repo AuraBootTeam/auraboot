@@ -2303,6 +2303,13 @@
     "refType": "page"
   },
   {
+    "key": "page.crm_account_360.description",
+    "zh-CN": "客户关键指标、近期商机与活动全景",
+    "en-US": "Account metrics, recent opportunities, and activity overview",
+    "source": "import",
+    "refType": "page"
+  },
+  {
     "key": "crm.stat.contacts",
     "zh-CN": "联系人",
     "en-US": "Contacts",
@@ -2513,6 +2520,27 @@
     "refType": "page"
   },
   {
+    "key": "page.crm_dashboard.description",
+    "zh-CN": "销售全景、商机管道、线索来源与客户行动的一体化经营视图",
+    "en-US": "An integrated operating view of sales, pipeline, lead sources and customer actions",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_sales_forecast.title",
+    "zh-CN": "销售预测",
+    "en-US": "Sales Forecast",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_sales_forecast.description",
+    "zh-CN": "按阶段、月份、负责人和预测类别统一核对管道与加权预测",
+    "en-US": "Review pipeline and weighted forecasts by stage, month, owner and category",
+    "source": "import",
+    "refType": "page"
+  },
+  {
     "key": "menu.CRM_DASHBOARD.label",
     "zh-CN": "驾驶舱",
     "en-US": "Dashboard",
@@ -2537,6 +2565,27 @@
     "key": "dashboard.crm.kpi.pipeline_value",
     "zh-CN": "管道总额",
     "en-US": "Pipeline Value",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.kanban.count",
+    "zh-CN": "数量",
+    "en-US": "Count",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.pipeline_board",
+    "zh-CN": "销售管道看板",
+    "en-US": "Pipeline Board",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.pipeline_board_description",
+    "zh-CN": "按销售阶段分组的商机管道看板",
+    "en-US": "Opportunity pipeline kanban board grouped by sales stage",
     "source": "import",
     "refType": "ui"
   },

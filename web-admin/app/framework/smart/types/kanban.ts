@@ -58,7 +58,7 @@ export interface KanbanCardField {
   /** Field name from the data */
   field: string;
   /** Display label */
-  label?: string;
+  label?: string | Record<string, string>;
   /** Display type for formatting */
   type?: 'text' | 'number' | 'tag' | 'date' | 'currency' | 'avatar' | 'progress' | 'date-relative';
   /** Format string (e.g., date format) */

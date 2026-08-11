@@ -116,6 +116,66 @@
     {
       "id": "crm_act_table",
       "blockType": "table",
+      "table": {
+        "selection": {
+          "mode": "multiple",
+          "bind": "{{state.selectedIds}}"
+        },
+        "bulkCapabilities": {
+          "edit": {
+            "permissionCode": "crm.activity.manage"
+          },
+          "delete": {
+            "permissionCode": "crm.activity.manage"
+          },
+          "export": {
+            "permissionCode": "crm.activity.read"
+          }
+        },
+        "bulkActions": [
+          {
+            "code": "bulk_start",
+            "permissionCode": "crm.activity.manage",
+            "label": {
+              "zh-CN": "批量开始任务",
+              "en-US": "Start Selected Tasks"
+            },
+            "action": {
+              "type": "bulk_state_transition",
+              "command": "crm:start_task"
+            }
+          },
+          {
+            "code": "bulk_complete",
+            "permissionCode": "crm.activity.manage",
+            "label": {
+              "zh-CN": "批量完成任务",
+              "en-US": "Complete Selected Tasks"
+            },
+            "action": {
+              "type": "bulk_state_transition",
+              "command": "crm:complete_task"
+            }
+          },
+          {
+            "code": "bulk_cancel",
+            "permissionCode": "crm.activity.manage",
+            "variant": "danger",
+            "label": {
+              "zh-CN": "批量取消任务",
+              "en-US": "Cancel Selected Tasks"
+            },
+            "confirm": {
+              "zh-CN": "确定取消选中的任务吗？非任务活动和不符合状态的记录会被拒绝。",
+              "en-US": "Cancel selected tasks? Non-task activities and invalid states will be rejected."
+            },
+            "action": {
+              "type": "bulk_state_transition",
+              "command": "crm:cancel_task"
+            }
+          }
+        ]
+      },
       "columns": [
         {
           "field": "crm_act_type",

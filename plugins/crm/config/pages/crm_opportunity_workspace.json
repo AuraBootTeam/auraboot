@@ -70,6 +70,7 @@
           "key": "weighted_amount",
           "label": { "zh-CN": "加权预测", "en": "Weighted Forecast" },
           "valueField": "weighted_amount",
+          "valueType": "currency",
           "precision": 0,
           "subText": { "zh-CN": "按商机概率加权", "en": "Probability-weighted value" },
           "tone": "green",

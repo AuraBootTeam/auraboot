@@ -220,6 +220,54 @@ describe('ToolbarBlockRenderer', () => {
     expect(passedRecord).toBeUndefined();
   });
 
+  it('passes the current detail record to the shared action context', () => {
+    const detailRecord = { pid: 'DETAIL-1', account_id: 'ACCOUNT-1' };
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (key: string) => key,
+        record: detailRecord,
+        row: detailRecord,
+        form: detailRecord,
+        state: {},
+        global: {},
+      }),
+    });
+
+    render(
+      <ToolbarBlockRenderer block={{ type: 'toolbar', buttons: [] } as any} runtime={runtime} />,
+    );
+
+    const options = useActionHandlerOptionsSpy.mock.calls.at(-1)?.[0];
+    expect(options?.context?.record).toBe(detailRecord);
+  });
+
+  it('does not pass an empty early form as a detail record', () => {
+    const runtime = makeRuntime();
+
+    render(
+      <ToolbarBlockRenderer block={{ type: 'toolbar', buttons: [] } as any} runtime={runtime} />,
+    );
+
+    const options = useActionHandlerOptionsSpy.mock.calls.at(-1)?.[0];
+    expect(options?.context?.record).toBeUndefined();
+  });
+
+  it('prefers a detail-bound toolbar record over unsynchronized runtime context', () => {
+    const detailRecord = { pid: 'DETAIL-BOUND-1', crm_opp_account_id: 'ACCOUNT-BOUND-1' };
+    const runtime = makeRuntime();
+
+    render(
+      <ToolbarBlockRenderer
+        block={{ type: 'toolbar', record: detailRecord, buttons: [] } as any}
+        runtime={runtime}
+      />,
+    );
+
+    const options = useActionHandlerOptionsSpy.mock.calls.at(-1)?.[0];
+    expect(options?.context?.record).toBe(detailRecord);
+  });
+
   it('disables the button while its action is in flight and ignores re-entrant double-clicks', async () => {
     const runtime = makeRuntime();
     let resolveAction: () => void = () => {};

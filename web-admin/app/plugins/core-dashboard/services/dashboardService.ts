@@ -176,8 +176,17 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
   if (rawConfig.table !== undefined) {
     passthrough.table = rawConfig.table as Record<string, unknown>;
   }
-  if (rawConfig.defaultSort !== undefined) {
-    passthrough.defaultSort = rawConfig.defaultSort as Widget['config']['defaultSort'];
+  for (const key of [
+    'defaultSort',
+    'filters',
+    'pageSize',
+    'showPagination',
+    'sortable',
+    'striped',
+  ] as const) {
+    if (rawConfig[key] !== undefined) {
+      (passthrough as Record<string, unknown>)[key] = rawConfig[key];
+    }
   }
   // Presentation keys consumed directly by chart components (notably smart-number-card's
   // `cards[].label` KPI eyebrows). These live at the top level of the authored config —
@@ -197,6 +206,18 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
     'label',
     'trend',
     'shortcuts',
+    'orientation',
+    'stacked',
+    'showLabel',
+    'ring',
+    'innerRadius',
+    'outerRadius',
+    'labelPosition',
+    'roseType',
+    'xField',
+    'yField',
+    'seriesConfig',
+    'chartOptions',
   ] as const) {
     if (rawConfig[key] !== undefined) {
       (passthrough as Record<string, unknown>)[key] = rawConfig[key];

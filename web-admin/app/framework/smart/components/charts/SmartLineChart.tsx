@@ -20,6 +20,7 @@ import type { MetricLabels } from '~/framework/smart/utils/chartLabels';
 import { chartSpecToEChartsOption } from '~/framework/smart/charts/chart-spec-echarts';
 import { cn } from '~/utils/cn';
 import { ChartEmptyState } from './ChartEmptyState';
+import { enrichDrillDownFilters } from '~/framework/smart/utils/drillDownFilters';
 
 /**
  * Props for SmartLineChart component
@@ -143,13 +144,7 @@ function specFromLineChartData(
   data: LineChartData | null | undefined,
   props: LineOptionProps,
 ): ChartSpec {
-  const {
-    title,
-    smooth = false,
-    areaStyle = false,
-    showSymbol = true,
-    showLabel = false,
-  } = props;
+  const { title, smooth = false, areaStyle = false, showSymbol = true, showLabel = false } = props;
   const dimensions = data?.meta?.dimensions ?? [];
   const metrics = data?.meta?.metrics ?? [];
   return {
@@ -338,7 +333,11 @@ export const SmartLineChart: React.FC<SmartLineChartProps> = ({
 
       // Handle drill-down
       if (drillDown?.enabled && onDrillDown) {
-        onDrillDown([filter]);
+        const row =
+          params.dataIndex == null
+            ? data.rows.find((candidate) => candidate[dimension] === clickedValue)
+            : data.rows[params.dataIndex];
+        onDrillDown(enrichDrillDownFilters(filter, row, drillDown));
       }
 
       // Handle linkage

@@ -415,7 +415,7 @@
           "blocks": [
             {
               "id": "block_activities",
-              "blockType": "sub-table",
+              "blockType": "activity-timeline",
               "title": {
                 "zh-CN": "活动",
                 "en-US": "Activities"
@@ -506,7 +506,7 @@
           "variant": "default",
           "action": {
             "type": "navigate",
-            "to": "/dashboards/view/crm_account_360"
+            "to": "/dashboards/view/crm_account_360?recordPid={pid}"
           }
         },
         {

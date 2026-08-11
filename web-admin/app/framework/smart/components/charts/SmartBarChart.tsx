@@ -20,6 +20,7 @@ import type { MetricLabels } from '~/framework/smart/utils/chartLabels';
 import { chartSpecToEChartsOption } from '~/framework/smart/charts/chart-spec-echarts';
 import { cn } from '~/utils/cn';
 import { ChartEmptyState } from './ChartEmptyState';
+import { enrichDrillDownFilters } from '~/framework/smart/utils/drillDownFilters';
 
 /**
  * Props for SmartBarChart component
@@ -167,8 +168,13 @@ export function buildBarOptionLegacy(
   data: BarChartData | null | undefined,
   props: BarOptionProps,
 ): EChartsOption {
-  const { title, orientation = 'vertical', stacked = false, showLabel = false, chartOptions } =
-    props;
+  const {
+    title,
+    orientation = 'vertical',
+    stacked = false,
+    showLabel = false,
+    chartOptions,
+  } = props;
 
   if (!data?.rows?.length) {
     return {
@@ -304,7 +310,7 @@ export const SmartBarChart: React.FC<SmartBarChartProps> = ({
    * Handle chart click events for drill-down and linkage
    */
   const handleChartClick = useCallback(
-    (params: { name?: string; seriesName?: string; data?: unknown }) => {
+    (params: { name?: string; seriesName?: string; data?: unknown; dataIndex?: number }) => {
       if (!data?.meta?.dimensions?.length) return;
 
       const dimension = data.meta.dimensions[0];
@@ -320,7 +326,11 @@ export const SmartBarChart: React.FC<SmartBarChartProps> = ({
 
       // Handle drill-down
       if (drillDown?.enabled && onDrillDown) {
-        onDrillDown([filter]);
+        const row =
+          params.dataIndex == null
+            ? data.rows.find((candidate) => candidate[dimension] === clickedValue)
+            : data.rows[params.dataIndex];
+        onDrillDown(enrichDrillDownFilters(filter, row, drillDown));
       }
 
       // Handle linkage

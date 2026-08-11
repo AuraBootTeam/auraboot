@@ -5,8 +5,8 @@
  * Route: /dashboards/view/:code
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link } from 'react-router';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useParams, useSearchParams, Link } from 'react-router';
 import { ArrowPathIcon, PencilSquareIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { ChartBarSquareIcon } from '@heroicons/react/24/outline';
 import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportPdfButton';
@@ -14,16 +14,31 @@ import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { DashboardViewer } from '~/plugins/core-dashboard/components/DashboardViewer';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
+import { resolveDashboardRuntimeValue } from '~/plugins/core-dashboard/utils/drillDownNavigation';
 import type { Dashboard } from '~/plugins/core-dashboard/types';
 
 export default function DashboardViewByCode() {
   const { showSuccessToast } = useToastContext();
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const { code } = useParams<{ code: string }>();
+  const [searchParams] = useSearchParams();
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const dashboardRef = useRef<HTMLDivElement>(null);
+  const recordPid = searchParams.get('recordPid');
+  const runtimeWidgets = useMemo(
+    () => resolveDashboardRuntimeValue(dashboard?.widgets ?? [], { recordPid }),
+    [dashboard?.widgets, recordPid],
+  );
+  const dashboardTitle = useMemo(() => {
+    const value = dashboard?.title || code || '';
+    return value.startsWith('$i18n:') ? t(value.slice(6)) : value;
+  }, [code, dashboard?.title, t]);
+  const dashboardDescription = useMemo(() => {
+    const value = dashboard?.description || '';
+    return value.startsWith('$i18n:') ? t(value.slice(6)) : value;
+  }, [dashboard?.description, t]);
   const l = useCallback(
     (zh: string, en: string) => (locale === 'zh-CN' ? zh : en),
     [locale],
@@ -63,9 +78,9 @@ export default function DashboardViewByCode() {
           </Link>
           <ChartBarSquareIcon className="mr-3 h-7 w-7 text-blue-600" />
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold text-gray-900">{dashboard?.title || code}</h1>
-            {dashboard?.description && (
-              <p className="truncate text-sm text-gray-500">{dashboard.description}</p>
+            <h1 className="truncate text-xl font-semibold text-gray-900">{dashboardTitle}</h1>
+            {dashboardDescription && (
+              <p className="truncate text-sm text-gray-500">{dashboardDescription}</p>
             )}
           </div>
         </div>
@@ -82,7 +97,7 @@ export default function DashboardViewByCode() {
           {dashboard && (
             <ExportPdfButton
               targetRef={dashboardRef}
-              fileName={dashboard.title || 'dashboard'}
+              fileName={dashboardTitle || 'dashboard'}
               orientation="landscape"
             />
           )}
@@ -119,8 +134,10 @@ export default function DashboardViewByCode() {
         {!loading && !error && dashboard && (
           <div ref={dashboardRef}>
             <DashboardViewer
-              widgets={dashboard.widgets || []}
+              widgets={runtimeWidgets}
               layoutConfig={dashboard.layoutConfig || { columns: 12, rowHeight: 80, gap: 16 }}
+              title={dashboardTitle}
+              hideWidgetActions
               className="min-h-[calc(100vh-140px)]"
             />
           </div>

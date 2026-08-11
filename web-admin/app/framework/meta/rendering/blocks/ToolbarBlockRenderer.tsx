@@ -13,6 +13,7 @@ import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useAuth } from '~/contexts/AuthContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { LoadingOverlay } from '~/ui/LoadingOverlay';
+import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
 
 export interface ToolbarBlockRendererProps {
   block: BlockConfig;
@@ -40,6 +41,18 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
   const schema = runtime.getSchema();
   const tableName = (schema as any).modelCode || schema.id || '';
   const dataSourceManager = runtime.getDataSourceManager();
+  // DetailPageContent binds the loaded parent record onto nested toolbars. This
+  // is intentionally preferred over runtime form state because deeply nested
+  // blocks can mount before SchemaRuntime context synchronization completes.
+  const initialRecordCandidates = [
+    (block as any).record,
+    context.record,
+    context.row,
+    context.form,
+  ];
+  const initialRecord = initialRecordCandidates.find((candidate) =>
+    Boolean(getLegacyCompatibleRecordPid(candidate)),
+  );
   const showToast = React.useCallback(
     (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
       switch (type) {
@@ -64,7 +77,9 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
     runtime,
     navigate,
     tableName,
-    context: {},
+    context: {
+      record: initialRecord,
+    },
     dataSourceManager,
     locale,
     t,
@@ -118,38 +133,38 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
     <>
       <LoadingOverlay visible={busy} label={t('common.loading')} />
       <div className="toolbar-block flex space-x-2">
-      {buttons.map((button) => {
-        // 条件渲染
-        if (button.visibleWhen) {
-          const visible = evaluator.evaluateCondition(button.visibleWhen, context);
-          if (!visible) return null;
-        }
+        {buttons.map((button) => {
+          // 条件渲染
+          if (button.visibleWhen) {
+            const visible = evaluator.evaluateCondition(button.visibleWhen, context);
+            if (!visible) return null;
+          }
 
-        const label = getLocalizedText(button.label || button.content || button.code, locale, t);
-        const isRunning = runningCode === button.code;
-        const isDisabled = Boolean(button.disabled) || busy;
-        const loadingLabel = t('common.loading') || '加载中...';
+          const label = getLocalizedText(button.label || button.content || button.code, locale, t);
+          const isRunning = runningCode === button.code;
+          const isDisabled = Boolean(button.disabled) || busy;
+          const loadingLabel = t('common.loading') || '加载中...';
 
-        return (
-          <button
-            key={button.code}
-            data-testid={`toolbar-btn-${button.code}`}
-            onClick={() => handleButtonClick(button)}
-            disabled={isDisabled}
-            aria-busy={isRunning}
-            className={`rounded-control inline-flex items-center px-4 py-2 text-sm font-medium ${
-              button.variant === 'primary'
-                ? 'bg-accent hover:bg-accent-hover text-white'
-                : button.variant === 'danger'
-                  ? 'bg-status-red hover:opacity-90 text-white'
-                  : 'border-border-strong bg-panel text-text-2 hover:bg-hover border'
-            } ${isDisabled ? 'cursor-not-allowed opacity-50' : ''}`}
-          >
-            {!isRunning && renderIcon(button.icon)}
-            {isRunning ? loadingLabel : label}
-          </button>
-        );
-      })}
+          return (
+            <button
+              key={button.code}
+              data-testid={`toolbar-btn-${button.code}`}
+              onClick={() => handleButtonClick(button)}
+              disabled={isDisabled}
+              aria-busy={isRunning}
+              className={`rounded-control inline-flex items-center px-4 py-2 text-sm font-medium ${
+                button.variant === 'primary'
+                  ? 'bg-accent hover:bg-accent-hover text-white'
+                  : button.variant === 'danger'
+                    ? 'bg-status-red text-white hover:opacity-90'
+                    : 'border-border-strong bg-panel text-text-2 hover:bg-hover border'
+              } ${isDisabled ? 'cursor-not-allowed opacity-50' : ''}`}
+            >
+              {!isRunning && renderIcon(button.icon)}
+              {isRunning ? loadingLabel : label}
+            </button>
+          );
+        })}
       </div>
     </>
   );

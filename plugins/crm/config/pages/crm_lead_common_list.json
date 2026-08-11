@@ -133,7 +133,61 @@
         "selection": {
           "mode": "multiple",
           "bind": "{{state.selectedIds}}"
-        }
+        },
+        "bulkCapabilities": {
+          "edit": {
+            "permissionCode": "crm.lead.manage"
+          },
+          "delete": {
+            "permissionCode": "crm.lead.manage"
+          },
+          "export": {
+            "permissionCode": "crm.lead.read"
+          }
+        },
+        "bulkActions": [
+          {
+            "code": "bulk_contact",
+            "permissionCode": "crm.lead.manage",
+            "label": {
+              "zh-CN": "批量标记已联系",
+              "en-US": "Mark Selected Contacted"
+            },
+            "action": {
+              "type": "bulk_state_transition",
+              "command": "crm:contact_lead"
+            }
+          },
+          {
+            "code": "bulk_qualify",
+            "permissionCode": "crm.lead.manage",
+            "label": {
+              "zh-CN": "批量标记合格",
+              "en-US": "Qualify Selected"
+            },
+            "action": {
+              "type": "bulk_state_transition",
+              "command": "crm:qualify_lead"
+            }
+          },
+          {
+            "code": "bulk_lose",
+            "permissionCode": "crm.lead.manage",
+            "variant": "danger",
+            "label": {
+              "zh-CN": "批量标记丢失",
+              "en-US": "Mark Selected Lost"
+            },
+            "confirm": {
+              "zh-CN": "确定将选中的线索标记为丢失吗？不符合当前状态的记录会被拒绝。",
+              "en-US": "Mark selected leads as lost? Records in an invalid state will be rejected."
+            },
+            "action": {
+              "type": "bulk_state_transition",
+              "command": "crm:lose_lead"
+            }
+          }
+        ]
       },
       "selection": {
         "type": "checkbox"
@@ -162,8 +216,7 @@
           "field": "crm_lead_source",
           "width": 120,
           "renderType": "tag",
-          "dictCode": "crm_lead_source",
-          "editable": true
+          "dictCode": "crm_lead_source"
         },
         {
           "field": "crm_lead_score",
@@ -175,13 +228,11 @@
           "field": "crm_lead_status",
           "width": 120,
           "renderType": "tag",
-          "dictCode": "crm_lead_status",
-          "editable": true
+          "dictCode": "crm_lead_status"
         },
         {
           "field": "crm_lead_assigned_to",
-          "width": 120,
-          "editable": true
+          "width": 120
         },
         {
           "field": "actions",

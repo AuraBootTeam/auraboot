@@ -103,6 +103,78 @@
     {
       "id": "crm_opp_table",
       "blockType": "table",
+      "table": {
+        "selection": {
+          "mode": "multiple",
+          "bind": "{{state.selectedIds}}"
+        },
+        "bulkCapabilities": {
+          "edit": {
+            "permissionCode": "crm.opportunity.manage"
+          },
+          "delete": {
+            "permissionCode": "crm.opportunity.manage"
+          },
+          "export": {
+            "permissionCode": "crm.opportunity.read"
+          }
+        },
+        "bulkActions": [
+          {
+            "code": "bulk_qualify",
+            "permissionCode": "crm.opportunity.manage",
+            "label": {
+              "zh-CN": "批量资格确认",
+              "en-US": "Qualify Selected"
+            },
+            "action": {
+              "type": "bulk_state_transition",
+              "command": "crm:qualify_opportunity"
+            }
+          },
+          {
+            "code": "bulk_advance_proposal",
+            "permissionCode": "crm.opportunity.manage",
+            "label": {
+              "zh-CN": "批量推进方案",
+              "en-US": "Advance to Proposal"
+            },
+            "action": {
+              "type": "bulk_state_transition",
+              "command": "crm:advance_opp_to_proposal"
+            }
+          },
+          {
+            "code": "bulk_advance_negotiation",
+            "permissionCode": "crm.opportunity.manage",
+            "label": {
+              "zh-CN": "批量推进谈判",
+              "en-US": "Advance to Negotiation"
+            },
+            "action": {
+              "type": "bulk_state_transition",
+              "command": "crm:advance_opp_to_negotiation"
+            }
+          },
+          {
+            "code": "bulk_mark_lost",
+            "permissionCode": "crm.opportunity.manage",
+            "variant": "danger",
+            "label": {
+              "zh-CN": "批量标记丢单",
+              "en-US": "Mark Selected Lost"
+            },
+            "confirm": {
+              "zh-CN": "确定将选中的商机标记为丢单吗？不符合当前阶段的记录会被拒绝。",
+              "en-US": "Mark selected opportunities as lost? Records in an invalid stage will be rejected."
+            },
+            "action": {
+              "type": "bulk_state_transition",
+              "command": "crm:lose_opportunity"
+            }
+          }
+        ]
+      },
       "columns": [
         {
           "field": "crm_opp_code",
@@ -122,15 +194,13 @@
           "field": "crm_opp_stage",
           "width": 120,
           "renderType": "tag",
-          "dictCode": "crm_opp_stage",
-          "editable": true
+          "dictCode": "crm_opp_stage"
         },
         {
           "field": "crm_opp_forecast_category",
           "width": 120,
           "renderType": "tag",
-          "dictCode": "crm_forecast_category",
-          "editable": true
+          "dictCode": "crm_forecast_category"
         },
         {
           "field": "crm_opp_expected_amount",
@@ -151,8 +221,7 @@
         },
         {
           "field": "crm_opp_owner",
-          "width": 120,
-          "editable": true
+          "width": 120
         },
         {
           "field": "actions",

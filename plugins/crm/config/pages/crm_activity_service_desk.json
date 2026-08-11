@@ -256,8 +256,8 @@
         { "key": "type", "label": { "zh-CN": "类型", "en": "Type" }, "field": "item_kind", "valueMap": { "task": { "zh-CN": "任务", "en": "Task" }, "complaint": { "zh-CN": "投诉", "en": "Complaint" } } },
         { "key": "status", "label": { "zh-CN": "状态", "en": "Status" }, "field": "item_status", "valueMap": { "open": { "zh-CN": "待处理", "en": "Open" }, "in_progress": { "zh-CN": "进行中", "en": "In progress" }, "investigating": { "zh-CN": "调查中", "en": "Investigating" }, "resolved": { "zh-CN": "已解决", "en": "Resolved" } } },
         { "key": "priority", "label": { "zh-CN": "优先级", "en": "Priority" }, "field": "item_priority", "valueMap": { "critical": { "zh-CN": "紧急", "en": "Critical" }, "high": { "zh-CN": "高", "en": "High" }, "medium": { "zh-CN": "中", "en": "Medium" }, "low": { "zh-CN": "低", "en": "Low" } } },
-        { "key": "owner", "label": { "zh-CN": "负责人", "en": "Owner" }, "field": "item_owner" },
-        { "key": "related", "label": { "zh-CN": "关联对象", "en": "Related Object" }, "field": "related_model" },
+        { "key": "owner", "label": { "zh-CN": "负责人", "en": "Owner" }, "field": "owner_name" },
+        { "key": "related", "label": { "zh-CN": "关联对象", "en": "Related Object" }, "field": "related_model", "valueMap": { "crm_account_common": { "zh-CN": "客户", "en": "Customer" }, "crm_contact_common": { "zh-CN": "联系人", "en": "Contact" }, "crm_lead_common": { "zh-CN": "线索", "en": "Lead" }, "crm_opportunity_common": { "zh-CN": "商机", "en": "Opportunity" } } },
         { "key": "reason", "label": { "zh-CN": "关注原因", "en": "Attention" }, "field": "attention_reason", "valueMap": { "sla_breach": { "zh-CN": "SLA 违规", "en": "SLA breach" }, "overdue": { "zh-CN": "已逾期", "en": "Overdue" }, "due_today": { "zh-CN": "今日到期", "en": "Due today" }, "service": { "zh-CN": "服务处理", "en": "Service action" }, "ready_to_close": { "zh-CN": "等待关闭", "en": "Ready to close" }, "task": { "zh-CN": "计划任务", "en": "Planned task" } } }
       ],
       "empty": { "title": { "zh-CN": "选择一个任务或投诉，查看状态和下一步", "en": "Select a task or complaint to review status and next action" } }
