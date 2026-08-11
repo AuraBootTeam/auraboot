@@ -901,6 +901,7 @@ describe('ContextualAuthoringSurface', () => {
   });
 
   it('renews an owned writer lease on resume when it is close to expiry', async () => {
+    const focusListener = vi.spyOn(window, 'addEventListener');
     const expiring = createAuthoringSession({
       writerLease: {
         status: 'OWNED',
@@ -918,18 +919,25 @@ describe('ContextualAuthoringSurface', () => {
     vi.mocked(openAuthoringSession).mockResolvedValue(expiring);
     vi.mocked(loadAuthoringSession).mockResolvedValue(expiring);
     vi.mocked(renewAuthoringWriterLease).mockResolvedValue(renewed);
-    renderSurface(vi.fn(), vi.fn());
-    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
-    await screen.findByTestId('contextual-authoring-surface');
+    try {
+      renderSurface(vi.fn(), vi.fn());
+      fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+      await screen.findByTestId('contextual-authoring-surface');
+      await waitFor(() =>
+        expect(focusListener).toHaveBeenCalledWith('focus', expect.any(Function)),
+      );
 
-    act(() => window.dispatchEvent(new Event('focus')));
+      act(() => window.dispatchEvent(new Event('focus')));
 
-    await waitFor(() => expect(renewAuthoringWriterLease).toHaveBeenCalledWith('session-1'));
-    expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument();
-    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
-      'data-read-only',
-      'false',
-    );
+      await waitFor(() => expect(renewAuthoringWriterLease).toHaveBeenCalledWith('session-1'));
+      expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument();
+      expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+        'data-read-only',
+        'false',
+      );
+    } finally {
+      focusListener.mockRestore();
+    }
   });
 
   it('does not renew an expiring writer lease from a hidden heartbeat', async () => {
@@ -954,7 +962,7 @@ describe('ContextualAuthoringSurface', () => {
       renderSurface(vi.fn(), vi.fn());
       fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
       await screen.findByTestId('contextual-authoring-surface');
-      expect(intervalHandlers.size).toBe(1);
+      await waitFor(() => expect(intervalHandlers.size).toBe(1));
 
       await act(async () => {
         for (const handler of intervalHandlers.values()) {
