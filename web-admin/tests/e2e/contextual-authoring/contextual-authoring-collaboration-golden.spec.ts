@@ -1,4 +1,11 @@
-import { test, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import {
+  test,
+  expect,
+  type Browser,
+  type BrowserContext,
+  type Page,
+  type Request,
+} from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
@@ -545,6 +552,161 @@ test.describe('Contextual authoring PC collaboration golden', () => {
     await expect(page.getByText('0 项未保存')).toBeVisible();
   });
 
+  test('PC-AUTH-015 @critical @soak — a naturally expired background writer stays dirty while three tabs arbitrate one takeover', async ({
+    page,
+  }) => {
+    test.slow();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const ownerSession = await enterAuthoringFromRuntime(page);
+    expect(ownerSession.writerLease?.status).toBe('OWNED');
+    const staged = await stageLocalDensityEdit(page, ownerSession);
+    await expect(page.getByText('1 项未保存')).toBeVisible();
+
+    const renewRequests: string[] = [];
+    const recordRenewRequest = (request: Request) => {
+      if (
+        request.method() === 'POST' &&
+        apiPath(request.url()) ===
+          `/api/authoring/sessions/${ownerSession.sessionPid}/writer-lease/renew`
+      ) {
+        renewRequests.push(request.url());
+      }
+    };
+    page.on('request', recordRenewRequest);
+
+    const secondTab = await page.context().newPage();
+    const thirdTab = await page.context().newPage();
+    try {
+      const openObserver = async (observerPage: Page, label: string) => {
+        await observerPage.setViewportSize({ width: 1440, height: 900 });
+        const observerResponse = observerPage.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            apiPath(response.url()) ===
+              `/api/authoring/change-sets/${ownerSession.changeSetPid}/sessions`,
+        );
+        await observerPage.goto(
+          `/unified-designer?changeSetId=${encodeURIComponent(ownerSession.changeSetPid)}`,
+          { waitUntil: 'domcontentloaded' },
+        );
+        const observer = await expectApiData<AuthoringSession>(await observerResponse, label);
+        expect(observer.writerLease?.status).toBe('HELD_BY_OTHER_SESSION');
+        await expect(observerPage.getByTestId('authoring-writer-lease-notice')).toContainText(
+          '当前账号的另一个会话持有编辑权',
+        );
+        return observer;
+      };
+
+      const secondObserver = await openObserver(secondTab, 'open the second tab observer');
+      const thirdObserver = await openObserver(thirdTab, 'open the third tab observer');
+      expect(secondObserver.writerLease?.revision).toBe(ownerSession.writerLease?.revision);
+      expect(thirdObserver.writerLease?.revision).toBe(ownerSession.writerLease?.revision);
+
+      await thirdTab.bringToFront();
+      await setControlledVisibility(page, 'hidden');
+      expect(await page.evaluate(() => document.visibilityState)).toBe('hidden');
+      const naturalWaitMs = Date.parse(ownerSession.writerLease!.leasedUntil) - Date.now() + 12_000;
+      expect(naturalWaitMs).toBeGreaterThan(240_000);
+      expect(naturalWaitMs).toBeLessThan(330_000);
+      await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, naturalWaitMs));
+
+      expect(renewRequests, 'a hidden tab must not renew its writer lease').toEqual([]);
+      page.off('request', recordRenewRequest);
+      const expired = await expectApiData<AuthoringSession>(
+        await page.request.get(`/api/authoring/sessions/${ownerSession.sessionPid}`),
+        'read the naturally expired owner session',
+      );
+      expect(expired.writerLease?.status).toBe('EXPIRED');
+      expect(expired.writerLease?.revision).toBe(ownerSession.writerLease?.revision);
+      expect(expired.revision).toBe(ownerSession.revision);
+      expect(await loadChangeItems(page, ownerSession.sessionPid)).toEqual([]);
+
+      await setControlledVisibility(page, 'visible');
+      await page.bringToFront();
+      await expect(page.getByTestId('authoring-writer-lease-notice')).toContainText(
+        'Writer lease 已过期',
+        { timeout: 20_000 },
+      );
+      await expect(page.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+        'data-read-only',
+        'true',
+      );
+      await expect(page.getByText('1 项未保存')).toBeVisible();
+      await expect(staged.editor).toHaveValue(staged.value);
+      await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+
+      await secondTab
+        .getByPlaceholder('填写接管原因（必填，将写入审计）')
+        .fill('PC soak：第二标签基于自然过期租约尝试接管');
+      await thirdTab
+        .getByPlaceholder('填写接管原因（必填，将写入审计）')
+        .fill('PC soak：第三标签基于自然过期租约尝试接管');
+      const secondTakeoverResponse = secondTab.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${secondObserver.sessionPid}/writer-lease/takeover`,
+      );
+      const thirdTakeoverResponse = thirdTab.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${thirdObserver.sessionPid}/writer-lease/takeover`,
+      );
+      await Promise.all([
+        secondTab.getByTestId('authoring-writer-lease-takeover').click(),
+        thirdTab.getByTestId('authoring-writer-lease-takeover').click(),
+      ]);
+      const takeoverResponses = await Promise.all([secondTakeoverResponse, thirdTakeoverResponse]);
+      expect(takeoverResponses.map((response) => response.status()).sort()).toEqual([200, 409]);
+
+      const winnerIndex = takeoverResponses.findIndex((response) => response.status() === 200);
+      const winnerPage = winnerIndex === 0 ? secondTab : thirdTab;
+      const loserPage = winnerIndex === 0 ? thirdTab : secondTab;
+      const winner = await expectApiData<AuthoringSession>(
+        takeoverResponses[winnerIndex]!,
+        'one of three tabs wins the naturally expired lease',
+      );
+      expect(winner.writerLease?.status).toBe('OWNED');
+      expect(winner.writerLease?.revision).toBe((ownerSession.writerLease?.revision ?? 0) + 1);
+      const loserResponse = takeoverResponses[winnerIndex === 0 ? 1 : 0]!;
+      const loserBody = await loserResponse.text();
+      expect(loserBody).toContain('authoring.writer-lease.conflict');
+      expect(loserBody).not.toContain('snapshot');
+
+      await expect(winnerPage.getByTestId('authoring-writer-lease-notice')).toHaveCount(0);
+      await expect(loserPage.getByTestId('authoring-writer-lease-notice')).toContainText(
+        '当前账号的另一个会话持有编辑权',
+        { timeout: 20_000 },
+      );
+      await expect(loserPage.getByTestId('designer-save')).toBeDisabled();
+      await expect(page.getByTestId('authoring-writer-lease-notice')).toContainText(
+        '当前账号的另一个会话持有编辑权',
+        { timeout: 20_000 },
+      );
+      await expect(page.getByText('1 项未保存')).toBeVisible();
+      await expect(staged.editor).toHaveValue(staged.value);
+
+      await mkdir(SCREENSHOT_DIR, { recursive: true });
+      await winnerPage.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-015-three-tab-winner.png'),
+        fullPage: true,
+      });
+      await loserPage.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-015-three-tab-loser.png'),
+        fullPage: true,
+      });
+      await page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-015-expired-owner-dirty.png'),
+        fullPage: true,
+      });
+    } finally {
+      await setControlledVisibility(page, 'visible').catch(() => {});
+      page.off('request', recordRenewRequest);
+      await Promise.all([secondTab.close(), thirdTab.close()]);
+    }
+  });
+
   test('PC-AUTH-006 @critical — independent reviewer approves the frozen revision but cannot publish', async ({
     page,
     browser,
@@ -982,6 +1144,23 @@ async function loadChangeItems(page: Page, sessionPid: string): Promise<ChangeIt
     await page.request.get(`/api/authoring/sessions/${sessionPid}/change-items`),
     'load authoring ChangeItems',
   );
+}
+
+async function setControlledVisibility(
+  page: Page,
+  visibilityState: DocumentVisibilityState,
+): Promise<void> {
+  await page.evaluate((nextVisibilityState) => {
+    const controlledWindow = window as Window & {
+      __authoringTestVisibilityState?: DocumentVisibilityState;
+    };
+    controlledWindow.__authoringTestVisibilityState = nextVisibilityState;
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => controlledWindow.__authoringTestVisibilityState ?? 'visible',
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, visibilityState);
 }
 
 function apiPath(url: string): string {

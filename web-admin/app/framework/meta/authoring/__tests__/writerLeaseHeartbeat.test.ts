@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AUTHORING_WRITER_LEASE_RENEW_WINDOW_MS,
   shouldRenewAuthoringWriterLease,
+  shouldRenewAuthoringWriterLeaseInForeground,
 } from '../writerLeaseHeartbeat';
 
 describe('writerLeaseHeartbeat', () => {
@@ -20,5 +21,12 @@ describe('writerLeaseHeartbeat', () => {
       ),
     ).toBe(true);
     expect(shouldRenewAuthoringWriterLease('invalid-deadline', now)).toBe(true);
+  });
+
+  it('attempts renewal inside the safety window only while the document is visible', () => {
+    const now = Date.parse('2026-08-11T12:00:00.000Z');
+    const deadline = new Date(now + 30_000).toISOString();
+    expect(shouldRenewAuthoringWriterLeaseInForeground(deadline, 'visible', now)).toBe(true);
+    expect(shouldRenewAuthoringWriterLeaseInForeground(deadline, 'hidden', now)).toBe(false);
   });
 });

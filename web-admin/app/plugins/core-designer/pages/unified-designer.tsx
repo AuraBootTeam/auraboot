@@ -38,7 +38,7 @@ import {
 } from '~/framework/meta/authoring/authoringService';
 import {
   AUTHORING_WRITER_LEASE_HEARTBEAT_MS,
-  shouldRenewAuthoringWriterLease,
+  shouldRenewAuthoringWriterLeaseInForeground,
 } from '~/framework/meta/authoring/writerLeaseHeartbeat';
 import { AuthoringWriterLeaseNotice } from '~/framework/meta/authoring/AuthoringWriterLeaseNotice';
 import { AuthoringGovernanceNotice } from '~/framework/meta/authoring/AuthoringGovernanceNotice';
@@ -341,7 +341,14 @@ export default function UnifiedDesignerPage() {
     }
     let cancelled = false;
     const refreshLease = () => {
-      if (!shouldRenewAuthoringWriterLease(activeWriterLeaseUntil)) return;
+      if (
+        !shouldRenewAuthoringWriterLeaseInForeground(
+          activeWriterLeaseUntil,
+          window.document.visibilityState,
+        )
+      ) {
+        return;
+      }
       void renewAuthoringWriterLease(activeAuthoringSessionPid)
         .then((renewed) => {
           if (!cancelled && renewed.revision >= (activeAuthoringRevision ?? -1)) {

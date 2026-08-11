@@ -8,3 +8,11 @@ export function shouldRenewAuthoringWriterLease(
   const deadline = new Date(leasedUntil).getTime();
   return !Number.isFinite(deadline) || deadline - now <= AUTHORING_WRITER_LEASE_RENEW_WINDOW_MS;
 }
+
+export function shouldRenewAuthoringWriterLeaseInForeground(
+  leasedUntil: string,
+  visibilityState: DocumentVisibilityState,
+  now: number = Date.now(),
+): boolean {
+  return visibilityState === 'visible' && shouldRenewAuthoringWriterLease(leasedUntil, now);
+}

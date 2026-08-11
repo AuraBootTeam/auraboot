@@ -37,7 +37,7 @@ import {
 } from './authoringService';
 import {
   AUTHORING_WRITER_LEASE_HEARTBEAT_MS,
-  shouldRenewAuthoringWriterLease,
+  shouldRenewAuthoringWriterLeaseInForeground,
 } from './writerLeaseHeartbeat';
 import { AuthoringGovernanceNotice } from './AuthoringGovernanceNotice';
 import { AuthoringImpactNotice } from './AuthoringImpactNotice';
@@ -292,7 +292,14 @@ export function ContextualAuthoringSurface({
     }
     let cancelled = false;
     const refreshLease = () => {
-      if (!shouldRenewAuthoringWriterLease(activeWriterLeaseUntil)) return;
+      if (
+        !shouldRenewAuthoringWriterLeaseInForeground(
+          activeWriterLeaseUntil,
+          window.document.visibilityState,
+        )
+      ) {
+        return;
+      }
       void renewAuthoringWriterLease(activeSessionPid)
         .then((renewed) => {
           if (!cancelled && renewed.revision >= (activeSessionRevision ?? -1)) {
