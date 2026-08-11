@@ -1,7 +1,6 @@
 import {
   test,
   expect,
-  type APIResponse,
   type Browser,
   type BrowserContext,
   type Page,
@@ -50,6 +49,12 @@ type ApiEnvelope<T> = {
   code?: number | string;
   data?: T;
   message?: string;
+};
+
+type ReadableHttpResponse = {
+  ok(): boolean;
+  status(): number;
+  text(): Promise<string>;
 };
 
 type PermissionRecord = {
@@ -415,13 +420,13 @@ async function enterAuthoringFromRuntime(page: Page): Promise<AuthoringSession> 
   return session;
 }
 
-async function expectApiData<T>(response: APIResponse, label: string): Promise<T> {
+async function expectApiData<T>(response: ReadableHttpResponse, label: string): Promise<T> {
   const body = await expectApiSuccess<T>(response, label);
   return body.data as T;
 }
 
 async function expectApiSuccess<T = unknown>(
-  response: APIResponse,
+  response: ReadableHttpResponse,
   label: string,
 ): Promise<ApiEnvelope<T>> {
   const text = await response.text();
