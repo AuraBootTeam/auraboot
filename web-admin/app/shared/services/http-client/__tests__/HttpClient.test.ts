@@ -89,7 +89,7 @@ describe('HttpClient integration', () => {
 
       const [url, init] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain('/api/users');
-      expect(init.method).toBe('get');
+      expect(init.method).toBe('GET');
     });
 
     it('should make a POST request with body', async () => {
@@ -102,7 +102,7 @@ describe('HttpClient integration', () => {
 
       expect(result.success).toBe(true);
       const [, init] = (globalThis.fetch as any).mock.calls[0];
-      expect(init.method).toBe('post');
+      expect(init.method).toBe('POST');
       expect(init.body).toBe('{"name":"John"}');
     });
 
@@ -175,7 +175,7 @@ describe('HttpClient integration', () => {
 
       expect(result.success).toBe(true);
       const [, init] = (globalThis.fetch as any).mock.calls[0];
-      expect(init.method).toBe('post');
+      expect(init.method).toBe('POST');
       expect(JSON.parse(init.body)).toEqual({ name: 'John' });
     });
   });
@@ -192,7 +192,7 @@ describe('HttpClient integration', () => {
       expect(result.success).toBe(true);
       const [url, init] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain('/api/user/1');
-      expect(init.method).toBe('put');
+      expect(init.method).toBe('PUT');
       expect(JSON.parse(init.body)).toEqual({ name: 'Updated' });
     });
 
@@ -204,7 +204,7 @@ describe('HttpClient integration', () => {
       const [url, init] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain('/api/dynamic/page_schema/batch');
       expect(url).not.toContain('?0=');
-      expect(init.method).toBe('put');
+      expect(init.method).toBe('PUT');
       expect(JSON.parse(init.body)).toEqual([{ pid: 'pid-1', name: 'Updated' }]);
     });
   });
@@ -218,7 +218,7 @@ describe('HttpClient integration', () => {
       const [url, init] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain('/api/user/123');
       expect(url).toContain('reason=inactive');
-      expect(init.method).toBe('delete');
+      expect(init.method).toBe('DELETE');
       expect(init.body).toBeUndefined();
     });
 
@@ -228,7 +228,7 @@ describe('HttpClient integration', () => {
       await del('/api/user/{userId}', { userId: 123 });
 
       const [, init] = (globalThis.fetch as any).mock.calls[0];
-      expect(init.method).toBe('delete');
+      expect(init.method).toBe('DELETE');
       expect(init.body).toBeUndefined();
     });
 
@@ -240,7 +240,7 @@ describe('HttpClient integration', () => {
       const [url, init] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain('/api/dynamic/page_schema/batch');
       expect(url).not.toContain('?0=');
-      expect(init.method).toBe('delete');
+      expect(init.method).toBe('DELETE');
       expect(JSON.parse(init.body)).toEqual(['pid-1', 'pid-2']);
     });
   });
@@ -257,7 +257,7 @@ describe('HttpClient integration', () => {
       expect(result.success).toBe(true);
       const [url, init] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain('/api/user/1');
-      expect(init.method).toBe('patch');
+      expect(init.method).toBe('PATCH');
       expect(JSON.parse(init.body)).toEqual({ name: 'Patched' });
     });
   });
