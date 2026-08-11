@@ -1000,7 +1000,7 @@ export function buildReleaseManifest() {
     run: {
       id: 'crm-full-product-denominator-v2',
       target: 'All AuraBoot CRM product pages and Cordys-parity action surfaces',
-      sot: 'auraboot-enterprise/docs/system-reference/subsystems/16-CRM系统与销售流程.md',
+      sot: 'plugins/crm/README.md',
       runtime: 'static denominator; qualifying pass rows point to real-stack evidence sources',
       commit: 'source-tree',
       fix_rounds: 0,

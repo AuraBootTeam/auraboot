@@ -13,6 +13,8 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   const generated = buildReleaseManifest();
   const committed = JSON.parse(await readFile(new URL('../coverage-manifest.json', import.meta.url), 'utf8'));
   assertManifestMatches(committed, generated);
+  assert.equal(committed.run.sot, 'plugins/crm/README.md');
+  assert.doesNotMatch(JSON.stringify(committed.run), /auraboot-enterprise/);
 
   assert.equal(committed.axes.semanticActions.length, 26);
   assert.equal(committed.axes.commands.length, 29);
