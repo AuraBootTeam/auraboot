@@ -116,6 +116,7 @@ export default function UnifiedDesignerPage() {
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [leaseTakeoverPending, setLeaseTakeoverPending] = useState(false);
   const [leaseTakeoverError, setLeaseTakeoverError] = useState<string | null>(null);
+  const [leaseTakeoverFeedback, setLeaseTakeoverFeedback] = useState<string | null>(null);
   const [studioConflict, setStudioConflict] = useState<StudioConflictState | null>(null);
   const [conflictPending, setConflictPending] = useState(false);
   const [conflictError, setConflictError] = useState<string | null>(null);
@@ -160,6 +161,7 @@ export default function UnifiedDesignerPage() {
       setAuthoringCapabilities(null);
       setHandoffError(null);
       setLeaseTakeoverError(null);
+      setLeaseTakeoverFeedback(null);
       setStudioConflict(null);
       setConflictError(null);
       setSubmissionError(null);
@@ -177,6 +179,7 @@ export default function UnifiedDesignerPage() {
     setAuthoringCapabilities(null);
     setHandoffError(null);
     setLeaseTakeoverError(null);
+    setLeaseTakeoverFeedback(null);
     setStudioConflict(null);
     setConflictError(null);
     setSubmissionError(null);
@@ -738,6 +741,8 @@ export default function UnifiedDesignerPage() {
       return;
     setLeaseTakeoverPending(true);
     setLeaseTakeoverError(null);
+    setLeaseTakeoverFeedback(null);
+    const observedLeaseRevision = authoringSession.writerLease?.revision ?? 0;
     try {
       const taken = await takeoverAuthoringWriterLease(
         authoringSession.sessionPid,
@@ -774,19 +779,27 @@ export default function UnifiedDesignerPage() {
       );
       replaceAuthoringSessionUrl(taken.sessionPid);
     } catch (takeoverError) {
+      let anotherSessionWon = false;
       try {
         const latest = await loadAuthoringSession(authoringSession.sessionPid);
         documentBaselineRef.current = latest;
         setAuthoringSession(latest);
+        anotherSessionWon =
+          latest.writerLease?.status !== 'OWNED' &&
+          (latest.writerLease?.revision ?? 0) > observedLeaseRevision;
         setHandoff((current) =>
           current ? { ...current, revision: latest.revision } : current,
         );
       } catch {
         // Keep the current read-only document when the authoritative reload also fails.
       }
-      setLeaseTakeoverError(
-        takeoverError instanceof Error ? takeoverError.message : '无法接管 ChangeSet 编辑权',
-      );
+      if (anotherSessionWon) {
+        setLeaseTakeoverFeedback('编辑权刚被另一会话取得，已刷新为只读；当前页面未被覆盖。');
+      } else {
+        setLeaseTakeoverError(
+          takeoverError instanceof Error ? takeoverError.message : '无法接管 ChangeSet 编辑权',
+        );
+      }
     } finally {
       setLeaseTakeoverPending(false);
     }
@@ -1158,6 +1171,15 @@ export default function UnifiedDesignerPage() {
           role="alert"
         >
           {leaseTakeoverError}
+        </div>
+      ) : null}
+      {leaseTakeoverFeedback ? (
+        <div
+          className="mx-3 mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          data-testid="writer-lease-takeover-feedback"
+          role="status"
+        >
+          {leaseTakeoverFeedback}
         </div>
       ) : null}
       {studioConflict ? (

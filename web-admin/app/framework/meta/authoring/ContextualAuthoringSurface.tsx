@@ -112,6 +112,7 @@ export function ContextualAuthoringSurface({
   const [handoffPending, setHandoffPending] = useState(false);
   const [writeBlocked, setWriteBlocked] = useState(false);
   const [leaseTakeoverPending, setLeaseTakeoverPending] = useState(false);
+  const [leaseTakeoverFeedback, setLeaseTakeoverFeedback] = useState<string | null>(null);
   const [governancePending, setGovernancePending] = useState<AuthoringGovernanceAction | null>(
     null,
   );
@@ -156,6 +157,7 @@ export function ContextualAuthoringSurface({
     let cancelled = false;
     setOpening(true);
     setError(null);
+    setLeaseTakeoverFeedback(null);
     void Promise.all([loadAuthoringSession(resume.sessionPid), loadAuthoringCapabilities()])
       .then(([restored, registry]) => {
         if (restored.pagePid !== schema.id) {
@@ -209,6 +211,7 @@ export function ContextualAuthoringSurface({
     if (!canConfigure || opening) return;
     setOpening(true);
     setError(null);
+    setLeaseTakeoverFeedback(null);
     entryScrollRef.current = { x: window.scrollX, y: window.scrollY };
     try {
       const interactionContext = captureInteractionContext(recordPid, schema.id);
@@ -241,6 +244,7 @@ export function ContextualAuthoringSurface({
     setCapabilities(null);
     setExplain(null);
     setError(null);
+    setLeaseTakeoverFeedback(null);
     setWriteBlocked(false);
     setOutlineOpen(false);
     setInspectorOpen(false);
@@ -702,6 +706,8 @@ export function ContextualAuthoringSurface({
       if (!canAdministerDesigner || !session || leaseTakeoverPending) return;
       setLeaseTakeoverPending(true);
       setError(null);
+      setLeaseTakeoverFeedback(null);
+      const observedLeaseRevision = session.writerLease?.revision ?? 0;
       try {
         const taken = await takeoverAuthoringWriterLease(
           session.sessionPid,
@@ -725,16 +731,26 @@ export function ContextualAuthoringSurface({
           setStale(false);
         }
       } catch (takeoverFailure) {
+        let anotherSessionWon = false;
         try {
           const latest = await loadAuthoringSession(session.sessionPid);
           setSession(latest);
           setWorkingSchema(materializePendingSchema(schema, latest.snapshot, pendingEdits));
+          anotherSessionWon =
+            latest.writerLease?.status !== 'OWNED' &&
+            (latest.writerLease?.revision ?? 0) > observedLeaseRevision;
         } catch {
           // Keep the current read-only snapshot when the authoritative reload also fails.
         }
-        setError(
-          takeoverFailure instanceof Error ? takeoverFailure.message : '无法接管 ChangeSet 编辑权',
-        );
+        if (anotherSessionWon) {
+          setLeaseTakeoverFeedback('编辑权刚被另一会话取得，已刷新为只读；当前页面未被覆盖。');
+        } else {
+          setError(
+            takeoverFailure instanceof Error
+              ? takeoverFailure.message
+              : '无法接管 ChangeSet 编辑权',
+          );
+        }
       } finally {
         setLeaseTakeoverPending(false);
       }
@@ -853,6 +869,15 @@ export function ContextualAuthoringSurface({
             pending={leaseTakeoverPending}
             onTakeover={takeoverWriterLease}
           />
+        </div>
+      ) : null}
+      {leaseTakeoverFeedback ? (
+        <div
+          className="border-status-amber bg-status-amber-bg text-status-amber mx-3 mt-3 rounded-md border px-3 py-2 text-sm"
+          data-testid="writer-lease-takeover-feedback"
+          role="status"
+        >
+          {leaseTakeoverFeedback}
         </div>
       ) : null}
       {contextualConflict ? (

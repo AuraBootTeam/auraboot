@@ -580,6 +580,70 @@ describe('UnifiedDesignerPage', () => {
     replaceState.mockRestore();
   });
 
+  it('refreshes a losing takeover attempt without exposing a generic business error', async () => {
+    setSearch('?changeSetId=changeset_1');
+    const observer = createAuthoringSession(createDocument('document_one', 'Observed Draft'));
+    observer.state = 'READ_ONLY';
+    observer.writerLease = {
+      status: 'HELD_BY_OTHER_SESSION',
+      revision: 4,
+      leasedUntil: '2026-08-09T12:05:00Z',
+    };
+    const winner = createAuthoringSession(createDocument('document_one', 'Observed Draft'));
+    winner.state = 'READ_ONLY';
+    winner.writerLease = {
+      status: 'HELD_BY_OTHER_SESSION',
+      revision: 5,
+      leasedUntil: '2026-08-09T12:10:00Z',
+    };
+    vi.mocked(observeAuthoringChangeSet).mockResolvedValue(observer);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(takeoverAuthoringWriterLease).mockRejectedValue(new Error('Business error'));
+    vi.mocked(loadAuthoringSession).mockResolvedValue(winner);
+
+    render(<UnifiedDesignerPage />);
+
+    await screen.findByTestId('authoring-writer-lease-notice');
+    fireEvent.change(screen.getByLabelText('接管原因'), {
+      target: { value: '基于 lease r4 尝试接管' },
+    });
+    fireEvent.click(screen.getByTestId('authoring-writer-lease-takeover'));
+
+    await waitFor(() => expect(loadAuthoringSession).toHaveBeenCalledWith('session_1'));
+    expect(screen.getByTestId('writer-lease-takeover-feedback')).toHaveTextContent(
+      '编辑权刚被另一会话取得，已刷新为只读',
+    );
+    expect(screen.queryByText('Business error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('designer-save')).toBeDisabled();
+  });
+
+  it('keeps a genuine takeover failure as an error when no newer lease exists', async () => {
+    setSearch('?changeSetId=changeset_1');
+    const observer = createAuthoringSession(createDocument('document_one', 'Observed Draft'));
+    observer.state = 'READ_ONLY';
+    observer.writerLease = {
+      status: 'HELD_BY_OTHER_SESSION',
+      revision: 4,
+      leasedUntil: '2026-08-09T12:05:00Z',
+    };
+    vi.mocked(observeAuthoringChangeSet).mockResolvedValue(observer);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(takeoverAuthoringWriterLease).mockRejectedValue(new Error('Network unavailable'));
+    vi.mocked(loadAuthoringSession).mockResolvedValue(observer);
+
+    render(<UnifiedDesignerPage />);
+
+    await screen.findByTestId('authoring-writer-lease-notice');
+    fireEvent.change(screen.getByLabelText('接管原因'), {
+      target: { value: '尝试恢复编辑' },
+    });
+    fireEvent.click(screen.getByTestId('authoring-writer-lease-takeover'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Network unavailable');
+    expect(screen.queryByTestId('writer-lease-takeover-feedback')).not.toBeInTheDocument();
+    expect(screen.getByTestId('designer-save')).toBeDisabled();
+  });
+
   it('lets a non-owner reviewer approve the exact frozen revision in Studio', async () => {
     setSearch('?reviewChangeSetId=changeset_1');
     const observer = createAuthoringSession(createDocument('document_one', 'Review Draft'), 7);

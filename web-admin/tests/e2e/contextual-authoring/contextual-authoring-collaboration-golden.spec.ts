@@ -679,6 +679,10 @@ test.describe('Contextual authoring PC collaboration golden', () => {
         '当前账号的另一个会话持有编辑权',
         { timeout: 20_000 },
       );
+      await expect(loserPage.getByTestId('writer-lease-takeover-feedback')).toContainText(
+        '编辑权刚被另一会话取得，已刷新为只读',
+      );
+      await expect(loserPage.getByText('Business error')).toHaveCount(0);
       await expect(loserPage.getByTestId('designer-save')).toBeDisabled();
       await expect(page.getByTestId('authoring-writer-lease-notice')).toContainText(
         '当前账号的另一个会话持有编辑权',

@@ -639,9 +639,7 @@ describe('ContextualAuthoringSurface', () => {
       },
     });
     vi.mocked(openAuthoringSession).mockResolvedValue(observed);
-    vi.mocked(takeoverAuthoringWriterLease).mockRejectedValue(
-      new Error('该租约版本已由其他会话接管'),
-    );
+    vi.mocked(takeoverAuthoringWriterLease).mockRejectedValue(new Error('Business error'));
     vi.mocked(loadAuthoringSession).mockResolvedValue(winner);
     renderSurface(vi.fn(), vi.fn());
     fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
@@ -661,7 +659,10 @@ describe('ContextualAuthoringSurface', () => {
       'data-read-only',
       'true',
     );
-    expect(screen.getByText('该租约版本已由其他会话接管')).toBeVisible();
+    expect(screen.getByTestId('writer-lease-takeover-feedback')).toHaveTextContent(
+      '编辑权刚被另一会话取得，已刷新为只读',
+    );
+    expect(screen.queryByText('Business error')).not.toBeInTheDocument();
   });
 
   it('preserves local edits and requires an explicit audited takeover after lease expiry', async () => {
