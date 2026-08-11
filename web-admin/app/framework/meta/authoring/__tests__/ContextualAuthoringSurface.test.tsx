@@ -622,6 +622,50 @@ describe('ContextualAuthoringSurface', () => {
     );
   });
 
+  it('preserves local edits and requires an explicit audited takeover after lease expiry', async () => {
+    let poll: (() => void) | undefined;
+    const interval = vi.spyOn(window, 'setInterval').mockImplementation((handler) => {
+      if (typeof handler === 'function') poll = handler;
+      return {} as ReturnType<typeof window.setInterval>;
+    });
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+    await screen.findByTestId('contextual-authoring-surface');
+    fireEvent.click(screen.getByTestId('runtime-write'));
+    fireEvent.change(screen.getByLabelText(/标题/), { target: { value: '过期前的本地标题' } });
+    expect(screen.getByText('1 项未保存')).toBeVisible();
+    vi.mocked(loadAuthoringSession).mockResolvedValueOnce(
+      createAuthoringSession({
+        writerLease: {
+          status: 'EXPIRED',
+          revision: 7,
+          leasedUntil: '2026-08-09T12:05:00Z',
+        },
+      }),
+    );
+
+    await act(async () => {
+      poll?.();
+      await Promise.resolve();
+    });
+
+    expect(await screen.findByTestId('authoring-writer-lease-notice')).toHaveTextContent(
+      'Writer lease 已过期',
+    );
+    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+      'data-read-only',
+      'true',
+    );
+    expect(screen.getByLabelText(/标题/)).toHaveValue('过期前的本地标题');
+    expect(screen.getByText('1 项未保存')).toBeVisible();
+    expect(screen.getByText('保存')).toBeDisabled();
+    expect(screen.getByTestId('authoring-writer-lease-takeover')).toHaveTextContent(
+      '重新取得编辑权',
+    );
+    expect(takeoverAuthoringWriterLease).not.toHaveBeenCalled();
+    interval.mockRestore();
+  });
+
   it('renews an owned writer lease on resume when it is close to expiry', async () => {
     const expiring = createAuthoringSession({
       writerLease: {
