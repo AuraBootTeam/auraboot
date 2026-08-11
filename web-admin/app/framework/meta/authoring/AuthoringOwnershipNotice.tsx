@@ -22,8 +22,7 @@ export function AuthoringOwnershipNotice({ ownership }: { ownership?: AuthoringO
             </span>
           </div>
           <p className="mt-1 text-xs leading-5">
-            当前 ChangeSet 与发布只作用于本租户和当前环境；来源页面 {ownership.sourcePagePid}
-            保持不变。
+            当前 ChangeSet 与发布只作用于本租户和当前环境；共享来源页面保持不变。
           </p>
           <p className="mt-1 flex items-center gap-1 text-xs text-indigo-800">
             <LockKeyhole className="h-3.5 w-3.5 shrink-0" />

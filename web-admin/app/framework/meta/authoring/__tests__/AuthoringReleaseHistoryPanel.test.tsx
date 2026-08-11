@@ -194,13 +194,16 @@ describe('AuthoringReleaseHistoryPanel', () => {
         }),
       );
     });
-    expect(await screen.findAllByText('release_new')).not.toHaveLength(0);
+    expect(await screen.findByTestId('authoring-release-release_new')).toHaveTextContent(
+      '发布版本 · revision r2',
+    );
+    expect(screen.queryByText('release_new')).not.toBeInTheDocument();
 
     await act(async () => {
       oldHistory.resolve(releaseHistory({ activeReleasePid: 'release_old' }));
     });
     expect(screen.queryByText('release_old')).not.toBeInTheDocument();
-    expect(screen.getAllByText('release_new')).not.toHaveLength(0);
+    expect(screen.getByTestId('authoring-release-release_new')).toBeInTheDocument();
   });
 });
 

@@ -158,6 +158,17 @@ describe('UnifiedDesignerPage', () => {
     );
   });
 
+  it('fails closed when a direct visitor lacks designer read permission', async () => {
+    setSearch('');
+    permissionMock.canAdministerDesigner.mockReturnValue(false);
+
+    render(<UnifiedDesignerPage />);
+
+    expect(await screen.findByText('应用设计中心不可用')).toBeInTheDocument();
+    expect(screen.getByText(/meta\.designer\.read/)).toBeInTheDocument();
+    expect(screen.queryByTestId('unified-designer-workbench')).not.toBeInTheDocument();
+  });
+
   it('loads a pageId document and saves edits through the V3 repository', async () => {
     setSearch('?pageId=page_1');
     vi.mocked(loadPageSchemaV3).mockResolvedValue({
@@ -252,9 +263,8 @@ describe('UnifiedDesignerPage', () => {
 
     render(<UnifiedDesignerPage />);
 
-    expect(await screen.findByTestId('studio-handoff-context')).toHaveTextContent(
-      'ChangeSet changeset_1',
-    );
+    expect(await screen.findByTestId('studio-handoff-context')).toHaveTextContent('修订 r3');
+    expect(screen.getByTestId('studio-handoff-context')).not.toHaveTextContent('changeset_1');
     expect(consumeAuthoringHandoff).toHaveBeenCalledWith('ctx_secure_once');
     expect(loadAuthoringSession).toHaveBeenCalledWith('session_1');
     expect(loadPageSchemaV3).not.toHaveBeenCalled();
@@ -263,8 +273,9 @@ describe('UnifiedDesignerPage', () => {
       '正在编辑租户派生层',
     );
     expect(screen.getByTestId('authoring-ownership-notice')).toHaveTextContent(
-      '来源页面 page_1保持不变',
+      '共享来源页面保持不变',
     );
+    expect(screen.getByTestId('authoring-ownership-notice')).not.toHaveTextContent('page_1');
     expect(screen.getByTestId('studio-handoff-read-only-reason')).toHaveTextContent(
       '缺少高级设计权限',
     );
@@ -371,8 +382,9 @@ describe('UnifiedDesignerPage', () => {
         permissionCode: 'page.production_exception.read',
       }),
     );
-    expect(await screen.findByTestId('studio-handoff-context')).toHaveTextContent(
-      'ChangeSet changeset_new_page',
+    expect(await screen.findByTestId('studio-handoff-context')).toHaveTextContent('生产异常看板');
+    expect(screen.getByTestId('studio-handoff-context')).not.toHaveTextContent(
+      'changeset_new_page',
     );
     expect(screen.queryByTestId('new-page-workspace-wizard')).not.toBeInTheDocument();
   });
@@ -645,11 +657,35 @@ describe('UnifiedDesignerPage', () => {
 
     render(<UnifiedDesignerPage />);
 
+    fireEvent.click(await screen.findByTestId('studio-governance-open'));
     fireEvent.click(await screen.findByTestId('authoring-governance-publish'));
     expect(await screen.findByRole('alert')).toHaveTextContent('活动版本未改变');
     expect(screen.getByTestId('authoring-governance-publish')).toBeEnabled();
     expect(screen.getByText('revision r7 已批准')).toBeInTheDocument();
     expect(loadAuthoringSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps one embedded workbench and exposes governance only through its drawer', async () => {
+    setSearch('?authoringSession=session_1');
+    vi.mocked(loadAuthoringSession).mockResolvedValue(
+      createAuthoringSession(createDocument('document_one', 'Governed Draft')),
+    );
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+
+    render(<UnifiedDesignerPage />);
+
+    await screen.findByTestId('studio-handoff-context');
+    expect(screen.getAllByTestId('unified-designer-workbench')).toHaveLength(1);
+    expect(screen.getByTestId('unified-designer-workbench')).toHaveClass('h-full');
+    expect(screen.getByTestId('studio-governance-drawer')).toHaveAttribute('hidden');
+
+    fireEvent.click(screen.getByTestId('studio-governance-open'));
+    expect(screen.getByTestId('studio-governance-drawer')).not.toHaveAttribute('hidden');
+    expect(screen.getByTestId('studio-governance-open')).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(screen.getByTestId('studio-governance-close'));
+    expect(screen.getByTestId('studio-governance-drawer')).toHaveAttribute('hidden');
+    expect(screen.getByTestId('studio-governance-open')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('restores the dedicated review workspace after a full-page reload', async () => {

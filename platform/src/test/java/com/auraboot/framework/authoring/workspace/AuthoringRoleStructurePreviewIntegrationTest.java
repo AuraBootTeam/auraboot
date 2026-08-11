@@ -231,7 +231,7 @@ class AuthoringRoleStructurePreviewIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(get("/api/authoring/identity-simulations/{pid}", simulationPid))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.data.decisions.length()").value(4));
+                .andExpect(jsonPath("$.data.decisions.length()").value(5));
         assertThat(auditEventCount(simulationPid, "IDENTITY_SIMULATION_ACCESSED")).isEqualTo(1);
 
         mockMvc.perform(post("/api/authoring/identity-simulations/{pid}/end", simulationPid))

@@ -96,6 +96,15 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('canvas-block-dashboard_sales')).toBeInTheDocument();
   });
 
+  it('fills its parent when embedded in the governed Studio shell', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} embedded />);
+
+    expect(screen.getByTestId('unified-designer-workbench')).toHaveClass('h-full', 'min-h-[36rem]');
+    expect(screen.getByTestId('unified-designer-workbench')).not.toHaveClass(
+      'h-[calc(100vh-64px)]',
+    );
+  });
+
   it('opens only server-declared structure actions in contextual Studio mode', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     const document: PageSchemaV3 = {

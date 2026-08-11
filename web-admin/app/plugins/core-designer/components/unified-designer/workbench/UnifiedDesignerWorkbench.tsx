@@ -156,6 +156,8 @@ export interface UnifiedDesignerWorkbenchProps {
   roleStructurePreviewSessionPid?: string;
   /** Security-admin capability for starting a short-lived, audited, read-only role simulation. */
   identitySimulationAllowed?: boolean;
+  /** Fill a parent shell instead of claiming another viewport-height workspace. */
+  embedded?: boolean;
 }
 
 export function UnifiedDesignerWorkbench({
@@ -179,6 +181,7 @@ export function UnifiedDesignerWorkbench({
   contextualRelocatableBlockTypes,
   roleStructurePreviewSessionPid,
   identitySimulationAllowed = false,
+  embedded = false,
 }: UnifiedDesignerWorkbenchProps) {
   const { locale } = useI18n();
   const initialSnapshot = serializeDocument(initialDocument);
@@ -1260,7 +1263,9 @@ export function UnifiedDesignerWorkbench({
 
   return (
     <div
-      className="flex h-[calc(100vh-64px)] min-h-[656px] flex-col overflow-hidden bg-slate-100 text-slate-900"
+      className={`flex flex-col overflow-hidden bg-slate-100 text-slate-900 ${
+        embedded ? 'h-full min-h-[36rem]' : 'h-[calc(100vh-64px)] min-h-[656px]'
+      }`}
       data-testid="unified-designer-workbench"
       data-mode={mode}
     >

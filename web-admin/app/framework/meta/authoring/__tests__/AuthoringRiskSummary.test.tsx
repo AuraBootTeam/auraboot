@@ -26,6 +26,14 @@ describe('AuthoringRiskSummary', () => {
     expect(screen.getByText(/新增低风险项不会降低既有等级/)).toBeInTheDocument();
     expect(screen.getByText('普通展示变更，默认进入评审')).toBeInTheDocument();
   });
+
+  it('keeps the decision visible while removing long copy in compact shells', () => {
+    render(<AuthoringRiskSummary session={session('L3', 'STUDIO_APPROVAL')} compact />);
+
+    expect(screen.getByText('专业变更，必须批准后发布')).toBeInTheDocument();
+    expect(screen.getByText(/专业批准/)).toBeInTheDocument();
+    expect(screen.queryByText(/整个 ChangeSet 失去低风险直发资格/)).not.toBeInTheDocument();
+  });
 });
 
 function session(riskLevel: string, publishPolicy: string): AuthoringSession {

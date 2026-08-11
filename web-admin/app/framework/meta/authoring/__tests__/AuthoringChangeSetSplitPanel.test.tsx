@@ -35,13 +35,12 @@ describe('AuthoringChangeSetSplitPanel', () => {
         'session-source',
         3,
         ['item-l3'],
-        '拆分自 changeset-source',
+        '拆分自当前 ChangeSet',
         'L3 数据源单独评审',
       ),
     );
-    expect(await screen.findByTestId('authoring-split-success')).toHaveTextContent(
-      'changeset-target',
-    );
+    expect(await screen.findByTestId('authoring-split-success')).toHaveTextContent('已创建新的 ChangeSet');
+    expect(screen.getByTestId('authoring-split-success')).not.toHaveTextContent('changeset-target');
     expect(screen.getByTestId('authoring-split-target-link')).toHaveAttribute(
       'href',
       expect.stringContaining('authoringSession=session-target'),

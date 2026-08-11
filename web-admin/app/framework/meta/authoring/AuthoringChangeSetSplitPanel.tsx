@@ -28,7 +28,7 @@ export function AuthoringChangeSetSplitPanel({
   useEffect(() => {
     setResult(null);
     setSelected(new Set());
-    setTitle(`拆分自 ${session.changeSetPid}`);
+    setTitle('拆分自当前 ChangeSet');
     setReason('');
   }, [session.changeSetPid, session.sessionPid]);
 
@@ -151,14 +151,14 @@ export function AuthoringChangeSetSplitPanel({
                 />
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-2 font-medium text-slate-800">
-                    <span>{item.blockId}</span>
+                    <span>页面变更</span>
                     <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
                       {item.operation}
                     </span>
                     <span className={riskBadge(item.riskLevel)}>{item.riskLevel}</span>
                   </span>
-                  <span className="mt-0.5 block font-mono text-xs break-all text-slate-600">
-                    {item.propertyPath}
+                  <span className="mt-0.5 block text-xs text-slate-600">
+                    {changeItemLocationLabel(item.propertyPath)}
                   </span>
                 </span>
               </label>
@@ -224,7 +224,7 @@ export function AuthoringChangeSetSplitPanel({
             role="status"
             data-testid="authoring-split-success"
           >
-            已创建 ChangeSet {result.targetSession.changeSetPid}，原 ChangeSet 已重建为剩余变更。
+            已创建新的 ChangeSet，原 ChangeSet 已重建为剩余变更。
             <a
               className="ml-2 font-semibold text-emerald-800 underline"
               href={splitTargetHref(result.targetSession.sessionPid)}
@@ -251,6 +251,14 @@ function riskBadge(risk: string): string {
   return risk === 'L3'
     ? 'rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-800'
     : 'rounded bg-blue-100 px-1.5 py-0.5 text-xs font-semibold text-blue-800';
+}
+
+function changeItemLocationLabel(propertyPath?: string | null): string {
+  if (!propertyPath) return '结构变更';
+  if (propertyPath.includes('title') || propertyPath.includes('label')) return '标题与文案';
+  if (propertyPath.includes('field')) return '字段配置';
+  if (propertyPath.includes('$structure')) return '页面结构';
+  return '展示属性';
 }
 
 function splitTargetHref(sessionPid: string): string {

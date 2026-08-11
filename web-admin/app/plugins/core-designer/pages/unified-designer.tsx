@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { Settings2, ShieldCheck, X } from 'lucide-react';
 import { usePermission, useUser } from '~/contexts/AuthContext';
+import { RouteAccessDenied } from '~/ui/PermissionGuard';
 import { UnifiedDesignerWorkbench } from '../components/unified-designer/workbench/UnifiedDesignerWorkbench';
 import { sampleModelFieldsByModel } from '../components/unified-designer/fixtures/sampleModelFields';
 import { samplePageSchemaV3 } from '../components/unified-designer/fixtures/samplePageSchemaV3';
@@ -77,6 +79,7 @@ interface StudioConflictState {
 }
 
 export default function UnifiedDesignerPage() {
+  const canReadDesigner = usePermission('meta.designer.read');
   const canAdministerDesigner = usePermission('meta.designer.admin');
   const canManageDesigner = usePermission('meta.designer.update');
   const canReviewAuthoring = usePermission('meta.publish.update');
@@ -121,6 +124,7 @@ export default function UnifiedDesignerPage() {
   const [newPagePending, setNewPagePending] = useState(false);
   const [newPageError, setNewPageError] = useState<string | null>(null);
   const [reviewWorkspaceMode, setReviewWorkspaceMode] = useState(false);
+  const [governanceOpen, setGovernanceOpen] = useState(false);
   const [workbenchGeneration, setWorkbenchGeneration] = useState(0);
   const [document, setDocument] = useState<PageSchemaV3 | null>(null);
   const [source, setSource] = useState<PageSchemaV3Source>({ type: 'local' });
@@ -139,6 +143,10 @@ export default function UnifiedDesignerPage() {
   const activeAuthoringRevision = authoringSession?.revision;
 
   useEffect(() => {
+    if (reviewWorkspaceMode) setGovernanceOpen(true);
+  }, [reviewWorkspaceMode]);
+
+  useEffect(() => {
     if (!hasAuthoringContext) {
       setHandoff(null);
       setAuthoringSession(null);
@@ -149,6 +157,7 @@ export default function UnifiedDesignerPage() {
       setConflictError(null);
       setSubmissionError(null);
       setReviewWorkspaceMode(false);
+      setGovernanceOpen(false);
       setNewPageOptions(null);
       setNewPageError(null);
       documentBaselineRef.current = null;
@@ -165,6 +174,7 @@ export default function UnifiedDesignerPage() {
     setConflictError(null);
     setSubmissionError(null);
     setReviewWorkspaceMode(false);
+    setGovernanceOpen(false);
     setNewPageOptions(null);
     setNewPageError(null);
     documentBaselineRef.current = null;
@@ -818,6 +828,15 @@ export default function UnifiedDesignerPage() {
     }
   };
 
+  if (!hasAuthoringContext && !canReadDesigner) {
+    return (
+      <RouteAccessDenied
+        title="应用设计中心不可用"
+        message="当前账号缺少应用设计中心读取权限（meta.designer.read）"
+      />
+    );
+  }
+
   if (handoffError || error) {
     return (
       <div className="grid min-h-[420px] place-items-center bg-slate-100 p-6 text-sm text-red-700">
@@ -939,122 +958,133 @@ export default function UnifiedDesignerPage() {
       identitySimulationAllowed={Boolean(
         handoff && canManageDesigner && canAuditIdentitySimulation && authoringSession?.sessionPid,
       )}
+      embedded={Boolean(handoff)}
     />
   );
 
   if (!handoff) return workbench;
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] flex-col" data-testid="studio-handoff-context">
-      <div className="border-b border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-        <strong>已从现场配置安全移交</strong>
-        {contextualReadOnly ? (
-          <span className="ml-2" data-testid="studio-handoff-read-only-reason">
-            ChangeSet {handoff.changeSetPid} · 修订 r{authoringSession?.revision ?? handoff.revision} ·
-            {studioReadOnlyReason(
-              authoringSession,
-              canAdministerDesigner,
-              Boolean(studioConflict),
-              reviewWorkspaceMode,
-            )}，当前仅可查看隔离草稿。
-          </span>
-        ) : (
-          <span className="ml-2" data-testid="studio-handoff-editable-reason">
-            ChangeSet {handoff.changeSetPid} · 修订 r{authoringSession?.revision ?? handoff.revision} ·
-            已声明的属性、区块增删、同级排序和跨父级移动将写回同一隔离草稿，并按最高风险统一校验、评审和发布。
-          </span>
-        )}
+    <div
+      className="relative flex h-[calc(100dvh-4rem)] min-h-[40rem] flex-col overflow-hidden bg-slate-100"
+      data-testid="studio-handoff-context"
+    >
+      <header className="flex min-h-14 flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-3 py-2 sm:px-4">
+        <ShieldCheck className="h-5 w-5 shrink-0 text-blue-700" aria-hidden="true" />
+        <div className="mr-auto min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <strong className="text-sm text-slate-950">应用设计中心</strong>
+            <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-700">
+              隔离 ChangeSet
+            </span>
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700">
+              修订 r{authoringSession?.revision ?? handoff.revision}
+            </span>
+            {authoringSession?.ownership?.tenantOverride ? (
+              <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-700">
+                租户派生层
+              </span>
+            ) : null}
+          </div>
+          {contextualReadOnly ? (
+            <p
+              className="mt-0.5 truncate text-xs text-slate-600"
+              data-testid="studio-handoff-read-only-reason"
+            >
+              {studioReadOnlyReason(
+                authoringSession,
+                canAdministerDesigner,
+                Boolean(studioConflict),
+                reviewWorkspaceMode,
+              )}，当前仅可查看隔离草稿。
+            </p>
+          ) : (
+            <p
+              className="mt-0.5 truncate text-xs text-slate-600"
+              data-testid="studio-handoff-editable-reason"
+            >
+              已从现场配置安全移交；所有修改写回同一隔离草稿，评审与发布继续沿用当前版本。
+            </p>
+          )}
+        </div>
         {newResource ? (
           <a
             href={safeReturnTo(handoff.returnTo)}
-            className="ml-3 inline-flex font-semibold text-blue-800 underline-offset-2 hover:underline"
+            className="inline-flex min-h-9 items-center rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
             data-testid="studio-return-source"
           >
             返回来源页
           </a>
         ) : null}
-      </div>
-      <div className="px-4 pt-3">
-        <AuthoringOwnershipNotice ownership={authoringSession?.ownership} />
-        {authoringSession?.ownership?.tenantOverride ? <div className="h-2" /> : null}
-        <AuthoringRiskSummary session={authoringSession!} />
-        {authoringSession?.validationState === 'INVALID' ? (
-          <div className="mt-2">
-            <AuthoringValidationNotice session={authoringSession} />
-          </div>
-        ) : null}
-        {authoringSession?.impactState !== 'KNOWN' && (authoringSession?.revision ?? 0) > 1 ? (
-          <div className="mt-2">
-            <AuthoringImpactNotice session={authoringSession!} />
-          </div>
-        ) : null}
+        <button
+          type="button"
+          onClick={() => setGovernanceOpen(true)}
+          aria-expanded={governanceOpen}
+          className="inline-flex min-h-9 items-center gap-2 rounded-md bg-blue-700 px-3 text-sm font-semibold text-white hover:bg-blue-800"
+          data-testid="studio-governance-open"
+        >
+          <Settings2 className="h-4 w-4" aria-hidden="true" />
+          治理与发布
+        </button>
+      </header>
+
+      <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,auto)]">
+        <AuthoringRiskSummary session={authoringSession!} compact />
         {!reviewWorkspaceMode && authoringSession?.changeSetStatus === 'DRAFT' ? (
-          <div className="mt-2">
-            <StudioSubmissionNotice
-              session={authoringSession!}
-              pending={submissionPending}
-              error={submissionError}
-              enabled={Boolean(
-                canManageDesigner &&
-                  authoringSession?.state === 'ACTIVE' &&
-                  hasOwnedWriterLease(authoringSession) &&
-                  !studioConflict
-              )}
-              onSubmit={handlePrepareOrSubmit}
-            />
-          </div>
-        ) : null}
-        <div className="mt-2">
-          <AuthoringGovernanceNotice
+          <StudioSubmissionNotice
             session={authoringSession!}
-            currentUserId={user?.id}
-            canManage={!reviewWorkspaceMode && canManageDesigner}
-            canReview={reviewWorkspaceMode && canReviewAuthoring}
-            canPublish={!reviewWorkspaceMode && canPublishAuthoring}
-            pendingAction={governancePending}
-            error={governanceError}
-            onAction={handleGovernanceAction}
+            pending={submissionPending}
+            error={submissionError}
+            enabled={Boolean(
+              canManageDesigner &&
+                authoringSession?.state === 'ACTIVE' &&
+                hasOwnedWriterLease(authoringSession) &&
+                !studioConflict
+            )}
+            onSubmit={handlePrepareOrSubmit}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setGovernanceOpen(true)}
+            className="flex min-h-10 items-center justify-between rounded-md border border-slate-200 bg-white px-3 text-left text-sm text-slate-700 hover:border-blue-300"
+          >
+            <span>当前状态：{authoringSession?.changeSetStatus}</span>
+            <span className="font-semibold text-blue-700">查看治理动作 →</span>
+          </button>
+        )}
+      </div>
+
+      {authoringSession?.validationState === 'INVALID' ? (
+        <div className="px-3 pt-2">
+          <AuthoringValidationNotice session={authoringSession} maxVisibleIssues={4} />
+        </div>
+      ) : null}
+      {authoringSession?.impactState !== 'KNOWN' && (authoringSession?.revision ?? 0) > 1 ? (
+        <div className="px-3 pt-2">
+          <AuthoringImpactNotice session={authoringSession!} />
+        </div>
+      ) : null}
+      {!reviewWorkspaceMode &&
+      authoringSession?.writerLease &&
+      authoringSession.writerLease.status !== 'OWNED' ? (
+        <div className="px-3 pt-2">
+          <AuthoringWriterLeaseNotice
+            lease={authoringSession.writerLease}
+            canTakeover={canAdministerDesigner}
+            pending={leaseTakeoverPending}
+            onTakeover={handleWriterLeaseTakeover}
           />
         </div>
-        {!reviewWorkspaceMode && canReadAuthoringReleases && authoringSession ? (
-          <AuthoringReleaseHistoryPanel
-            changeSetPid={authoringSession.changeSetPid}
-            canRollback={canPublishAuthoring}
-            refreshKey={`${authoringSession.publishState}:${authoringSession.revision}`}
-            onRolledBack={handleReleaseRolledBack}
-          />
-        ) : null}
-        <AuthoringChangeSetSplitPanel
-          session={authoringSession!}
-          enabled={Boolean(
-            !reviewWorkspaceMode &&
-              canAdministerDesigner &&
-              user?.id != null &&
-              String(user.id) === String(authoringSession?.ownerUserId) &&
-              authoringSession?.state === 'ACTIVE' &&
-              hasOwnedWriterLease(authoringSession) &&
-              !studioConflict
-          )}
-          onSplit={handleChangeSetSplit}
-        />
-        {!reviewWorkspaceMode &&
-        authoringSession?.writerLease &&
-        authoringSession.writerLease.status !== 'OWNED' ? (
-          <div className="mt-2">
-            <AuthoringWriterLeaseNotice
-              lease={authoringSession.writerLease}
-              canTakeover={canAdministerDesigner}
-              pending={leaseTakeoverPending}
-              onTakeover={handleWriterLeaseTakeover}
-            />
-          </div>
-        ) : null}
-        {leaseTakeoverError ? (
-          <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
-            {leaseTakeoverError}
-          </div>
-        ) : null}
-      </div>
+      ) : null}
+      {leaseTakeoverError ? (
+        <div
+          className="mx-3 mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          role="alert"
+        >
+          {leaseTakeoverError}
+        </div>
+      ) : null}
       {studioConflict ? (
         <AuthoringConflictResolutionPanel
           key={`${studioConflict.baseRevision}:${studioConflict.latestSession.revision}`}
@@ -1068,6 +1098,76 @@ export default function UnifiedDesignerPage() {
         />
       ) : null}
       <div className="min-h-0 flex-1">{workbench}</div>
+
+      {governanceOpen ? (
+        <button
+          type="button"
+          aria-label="关闭治理与发布"
+          className="absolute inset-0 z-40 bg-slate-950/25"
+          onClick={() => setGovernanceOpen(false)}
+        />
+      ) : null}
+      <aside
+        aria-label="治理与发布"
+        hidden={!governanceOpen}
+        className={`absolute inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-200 ${
+          governanceOpen ? 'translate-x-0' : 'invisible translate-x-full'
+        }`}
+        data-testid="studio-governance-drawer"
+      >
+        <div className="flex min-h-14 items-center justify-between border-b border-slate-200 px-4">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-950">治理与发布</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              风险、评审、发布历史、回滚与变更集拆分
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setGovernanceOpen(false)}
+            className="rounded-md p-2 text-slate-500 hover:bg-slate-100"
+            aria-label="关闭治理与发布"
+            data-testid="studio-governance-close"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-2 overflow-auto p-3">
+          <AuthoringOwnershipNotice ownership={authoringSession?.ownership} />
+          <AuthoringRiskSummary session={authoringSession!} />
+          <AuthoringGovernanceNotice
+            session={authoringSession!}
+            currentUserId={user?.id}
+            canManage={!reviewWorkspaceMode && canManageDesigner}
+            canReview={reviewWorkspaceMode && canReviewAuthoring}
+            canPublish={!reviewWorkspaceMode && canPublishAuthoring}
+            pendingAction={governancePending}
+            error={governanceError}
+            onAction={handleGovernanceAction}
+          />
+          {!reviewWorkspaceMode && canReadAuthoringReleases && authoringSession ? (
+            <AuthoringReleaseHistoryPanel
+              changeSetPid={authoringSession.changeSetPid}
+              canRollback={canPublishAuthoring}
+              refreshKey={`${authoringSession.publishState}:${authoringSession.revision}`}
+              onRolledBack={handleReleaseRolledBack}
+            />
+          ) : null}
+          <AuthoringChangeSetSplitPanel
+            session={authoringSession!}
+            enabled={Boolean(
+              !reviewWorkspaceMode &&
+                canAdministerDesigner &&
+                user?.id != null &&
+                String(user.id) === String(authoringSession?.ownerUserId) &&
+                authoringSession?.state === 'ACTIVE' &&
+                hasOwnedWriterLease(authoringSession) &&
+                !studioConflict
+            )}
+            onSplit={handleChangeSetSplit}
+          />
+        </div>
+      </aside>
     </div>
   );
 }

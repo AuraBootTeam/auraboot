@@ -128,7 +128,7 @@ class AuthoringOwnershipOverrideIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(objectMapper.readTree(sourceBlocks));
         assertThat(unchanged.getRowVersion()).isEqualTo(sourceRowVersion);
         assertThat(unchanged.getOwnershipScope()).isEqualTo("APPLICATION");
-        assertThat(changed.snapshot().at("/blocks/0/dataSource/model").asText())
+        assertThat(changed.snapshot().at("/blocks/0/blocks/0/dataSource/model").asText())
                 .isEqualTo("payments");
     }
 

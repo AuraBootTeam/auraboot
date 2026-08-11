@@ -717,7 +717,7 @@ export function ContextualAuthoringSurface({
 
   return (
     <section
-      className="border-border bg-subtle relative flex min-h-[calc(100vh-4rem)] flex-col overflow-hidden border"
+      className="border-border bg-subtle relative flex h-[calc(100dvh-4rem)] min-h-[36rem] flex-col overflow-hidden border"
       data-testid="contextual-authoring-surface"
       data-mode={effectiveMode}
       data-read-only={authoringReadOnly ? 'true' : 'false'}
@@ -760,8 +760,8 @@ export function ContextualAuthoringSurface({
           </span>
         </div>
       ) : null}
-      <div className="mx-3 mt-3">
-        <AuthoringRiskSummary session={session} />
+      <div className="mx-3 mt-2">
+        <AuthoringRiskSummary session={session} compact />
       </div>
       {session.validationState === 'INVALID' ? (
         <div className="mx-3 mt-3">
@@ -842,7 +842,7 @@ export function ContextualAuthoringSurface({
               setOutlineOpen(false);
               setInspectorOpen(false);
             }}
-            className="absolute inset-0 z-30 bg-slate-950/20 lg:hidden"
+            className="absolute inset-0 z-30 bg-slate-950/20 2xl:hidden"
           />
         )}
         <OutlinePanel
@@ -965,8 +965,9 @@ function AuthoringToolbar({
       </div>
       <button
         type="button"
-        className="border-border inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm text-slate-700 hover:bg-slate-50 lg:hidden"
+        className="border-border inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm text-slate-700 hover:bg-slate-50 2xl:hidden"
         onClick={onOutline}
+        data-testid="authoring-outline-open"
       >
         <PanelLeft className="h-4 w-4" />
         大纲
@@ -1003,8 +1004,9 @@ function AuthoringToolbar({
       </button>
       <button
         type="button"
-        className="border-border inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm text-slate-700 hover:bg-slate-50 lg:hidden"
+        className="border-border inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm text-slate-700 hover:bg-slate-50 2xl:hidden"
         onClick={onInspector}
+        data-testid="authoring-inspector-open"
       >
         <PanelRight className="h-4 w-4" />
         属性
@@ -1061,7 +1063,7 @@ function OutlinePanel({
 }) {
   return (
     <aside
-      className={`border-border bg-panel z-40 w-[280px] shrink-0 overflow-auto border-r lg:relative lg:block ${
+      className={`border-border bg-panel z-40 w-64 shrink-0 overflow-auto border-r 2xl:relative 2xl:block ${
         open ? 'absolute inset-y-0 left-0 block shadow-2xl' : 'hidden'
       }`}
       aria-label="页面大纲"
@@ -1141,7 +1143,7 @@ function InspectorPanel({
   );
   return (
     <aside
-      className={`border-border bg-panel z-40 w-[360px] max-w-[calc(100vw-2rem)] shrink-0 overflow-auto border-l lg:relative lg:block ${
+      className={`border-border bg-panel z-40 w-80 max-w-[calc(100vw-2rem)] shrink-0 overflow-auto border-l 2xl:relative 2xl:block ${
         open ? 'absolute inset-y-0 right-0 block shadow-2xl' : 'hidden'
       }`}
       aria-label="属性检查器"
@@ -1154,7 +1156,7 @@ function InspectorPanel({
             当前对象
           </div>
           <div className="mt-1 text-base font-semibold text-slate-900">{node.label}</div>
-          <div className="mt-1 font-mono text-xs break-all text-slate-500">{node.sourceId}</div>
+          <div className="mt-1 text-xs text-slate-500">{objectTypeLabel(node.blockType)}</div>
         </div>
         <div className="grid grid-cols-2 gap-2 text-xs">
           <StatusCell label="风险" value={session.riskLevel} />
@@ -1636,7 +1638,7 @@ function PanelHeader({ title, onClose }: { title: string; onClose: () => void })
       <button
         type="button"
         onClick={onClose}
-        className="rounded p-1 text-slate-500 hover:bg-slate-100 lg:hidden"
+        className="rounded p-1 text-slate-500 hover:bg-slate-100 2xl:hidden"
         aria-label={`关闭${title}`}
       >
         <X className="h-4 w-4" />
@@ -1651,6 +1653,21 @@ function StatusCell({ label, value }: { label: string; value: string }) {
       <div className="text-slate-400">{label}</div>
       <div className="mt-0.5 font-semibold text-slate-700">{value}</div>
     </div>
+  );
+}
+
+function objectTypeLabel(blockType: string): string {
+  return (
+    {
+      page: '页面',
+      list: '列表',
+      table: '表格',
+      form: '表单',
+      detail: '详情',
+      column: '字段列',
+      field: '字段',
+      action: '动作',
+    }[blockType] ?? '页面对象'
   );
 }
 

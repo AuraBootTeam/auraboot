@@ -70,9 +70,9 @@ class AuthoringAiPatchProposalIntegrationTest extends BaseIntegrationTest {
         assertThat(applied.proposal().status()).isEqualTo("APPLIED");
         assertThat(applied.proposal().resultRevision()).isEqualTo(3);
         assertThat(applied.session().revision()).isEqualTo(3);
-        assertThat(applied.session().snapshot().at("/blocks/0/props/density").asText())
+        assertThat(applied.session().snapshot().at("/blocks/0/blocks/0/props/density").asText())
                 .isEqualTo("compact");
-        assertThat(applied.session().snapshot().at("/blocks/0/dataSource/model").asText())
+        assertThat(applied.session().snapshot().at("/blocks/0/blocks/0/dataSource/model").asText())
                 .isEqualTo("payments");
         assertThat(applied.session().validationState()).isEqualTo("UNVALIDATED");
         assertThat(applied.session().impactState()).isEqualTo("UNKNOWN");
@@ -112,9 +112,9 @@ class AuthoringAiPatchProposalIntegrationTest extends BaseIntegrationTest {
 
         SessionView unchanged = workspaceService.get(opened.sessionPid());
         assertThat(unchanged.revision()).isEqualTo(advanced.revision());
-        assertThat(unchanged.snapshot().at("/blocks/0/title").asText())
+        assertThat(unchanged.snapshot().at("/blocks/0/blocks/0/title").asText())
                 .isEqualTo("Current title");
-        assertThat(unchanged.snapshot().at("/blocks/0/dataSource").isMissingNode()).isTrue();
+        assertThat(unchanged.snapshot().at("/blocks/0/blocks/0/dataSource").isMissingNode()).isTrue();
         assertThat(changeItemCount(opened.changeSetPid())).isEqualTo(1);
         assertThat(proposalService.get(opened.sessionPid(), proposal.proposalPid()).status())
                 .isEqualTo("PROPOSED");

@@ -2,14 +2,20 @@ import React from 'react';
 import { AlertTriangle, ShieldCheck } from 'lucide-react';
 import type { AuthoringSession } from './types';
 
-export function AuthoringRiskSummary({ session }: { session: AuthoringSession }) {
+export function AuthoringRiskSummary({
+  session,
+  compact = false,
+}: {
+  session: AuthoringSession;
+  compact?: boolean;
+}) {
   const copy = riskCopy(session.riskLevel, session.publishPolicy);
   const elevated = session.riskLevel === 'L2' || session.riskLevel === 'L3';
   const Icon = elevated ? AlertTriangle : ShieldCheck;
 
   return (
     <section
-      className={`rounded-md border px-3 py-2 text-sm ${
+      className={`rounded-md border px-3 text-sm ${compact ? 'py-1.5' : 'py-2'} ${
         elevated
           ? 'border-amber-300 bg-amber-50 text-amber-950'
           : 'border-sky-200 bg-sky-50 text-sky-950'
@@ -26,10 +32,14 @@ export function AuthoringRiskSummary({ session }: { session: AuthoringSession })
             <span>{copy.title}</span>
             <span className="font-normal text-current/75">· {publishLabel(session.publishPolicy)}</span>
           </div>
-          <p className="mt-1 text-xs leading-5">{copy.description}</p>
-          <p className="mt-1 text-xs leading-5 text-current/75">
-            ChangeSet 始终按全部变更项中的最高风险治理；新增低风险项不会降低既有等级。
-          </p>
+          {compact ? null : (
+            <>
+              <p className="mt-1 text-xs leading-5">{copy.description}</p>
+              <p className="mt-1 text-xs leading-5 text-current/75">
+                ChangeSet 始终按全部变更项中的最高风险治理；新增低风险项不会降低既有等级。
+              </p>
+            </>
+          )}
         </div>
       </div>
     </section>

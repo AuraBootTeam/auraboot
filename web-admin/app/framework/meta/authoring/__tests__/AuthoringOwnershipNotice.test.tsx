@@ -22,7 +22,8 @@ describe('AuthoringOwnershipNotice', () => {
     const notice = screen.getByTestId('authoring-ownership-notice');
     expect(notice).toHaveTextContent('正在编辑租户派生层');
     expect(screen.getByText(/APPLICATION → TENANT/)).toBeInTheDocument();
-    expect(notice).toHaveTextContent(/来源页面 page-shared-1保持不变/);
+    expect(notice).toHaveTextContent(/共享来源页面保持不变/);
+    expect(notice).not.toHaveTextContent('page-shared-1');
     expect(notice).toHaveTextContent(/恢复默认时应回到 APPLICATION 层/);
   });
 

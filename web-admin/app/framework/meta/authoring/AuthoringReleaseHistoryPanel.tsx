@@ -149,8 +149,8 @@ export function AuthoringReleaseHistoryPanel({
       {history ? (
         <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
           <ReleaseFact
-            label="活动 Release"
-            value={shortPid(history.activeReleasePid) || '尚未发布'}
+            label="活动版本"
+            value={history.activeReleasePid ? `v${history.channelVersion}` : '尚未发布'}
           />
           <ReleaseFact label="Channel version" value={`v${history.channelVersion}`} />
           <ReleaseFact label="历史数量" value={`${history.total}`} />
@@ -214,13 +214,10 @@ export function AuthoringReleaseHistoryPanel({
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-xs font-semibold text-slate-900">
-                  {shortPid(item.releasePid)}
+                <span className="text-xs font-semibold text-slate-900">
+                  发布版本 · revision r{item.changeSetRevision}
                 </span>
                 <StatusBadge status={item.status} />
-                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700">
-                  revision r{item.changeSetRevision}
-                </span>
                 <span className="text-[11px] text-slate-500">
                   {reversibilityLabel(item.reversibility)}
                 </span>
@@ -395,7 +392,7 @@ function StatusBadge({ status }: { status: string }) {
 function rollbackExplanation(eligibility: AuthoringRollbackEligibility): string {
   switch (eligibility.reasonCode) {
     case 'ELIGIBLE':
-      return `只能切回 ${shortPid(eligibility.targetReleasePid)}；执行时会重判 channelVersion 和可逆性。`;
+      return '只能切回前一发布版本；执行时会重判 channelVersion 和可逆性。';
     case 'NO_ACTIVE_RELEASE':
       return '当前资源尚无活动 Release。';
     case 'NO_PREVIOUS_RELEASE':
@@ -421,11 +418,6 @@ function reversibilityLabel(reversibility: string): string {
   if (reversibility === 'FORWARD_ONLY') return '仅前向';
   if (reversibility === 'COMPENSATABLE') return '需补偿';
   return '可逆';
-}
-
-function shortPid(pid?: string | null): string {
-  if (!pid) return '';
-  return pid.length <= 12 ? pid : `${pid.slice(0, 6)}…${pid.slice(-4)}`;
 }
 
 function formatDateTime(value: string): string {
