@@ -114,6 +114,18 @@ test('CRM release coverage gate rejects a controlled missing-action mutation', a
   assert.ok(proof.phases.every((phase) => phase.result === 'pass'));
 });
 
+test('CRM dashboard evidence defaults to a worktree-owned directory', async () => {
+  const source = await readFile(
+    new URL('../e2e/crm-dashboards.golden.spec.ts', import.meta.url),
+    'utf8',
+  );
+  assert.doesNotMatch(source, /['"]\/tmp\//);
+  assert.match(
+    source,
+    /path\.resolve\(process\.cwd\(\), '\.workspace', 'evidence', 'crm-dashboard'\)/,
+  );
+});
+
 test('CRM operating dashboards fill each authored row without overlap or half-page dead space', async () => {
   const cases = [
     ['crm_dashboard.json', [0, 1, 3, 5, 7, 9]],

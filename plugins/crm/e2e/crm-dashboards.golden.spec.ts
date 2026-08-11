@@ -6,7 +6,8 @@ import path from 'node:path';
 const BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5196';
 const BE = process.env.BACKEND_URL || 'http://127.0.0.1:6466';
 const RUN = process.env.CRM_DASHBOARD_RUN_ID || `dashboard-${Date.now()}`;
-const EVIDENCE_DIR = process.env.CRM_DASHBOARD_EVIDENCE_DIR || '/tmp/crm-dashboard-evidence';
+const EVIDENCE_DIR = process.env.CRM_DASHBOARD_EVIDENCE_DIR
+  || path.resolve(process.cwd(), '.workspace', 'evidence', 'crm-dashboard');
 const REUSE_DATA = process.env.CRM_DASHBOARD_REUSE_DATA === '1';
 const SEED_RECEIPT = process.env.CRM_DASHBOARD_SEED_RECEIPT || '';
 const ADMIN_EMAIL = 'admin@auraboot.com';
