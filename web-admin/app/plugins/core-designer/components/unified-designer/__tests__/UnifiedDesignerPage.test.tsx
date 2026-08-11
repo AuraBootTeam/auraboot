@@ -354,12 +354,17 @@ describe('UnifiedDesignerPage', () => {
       'href',
       '/meta/models/new',
     );
+    const modelSelect = screen.getByLabelText('业务模型');
+    await waitFor(() => {
+      expect(modelSelect).toBeEnabled();
+      expect(modelSelect).toHaveTextContent('生产异常');
+    });
     fireEvent.change(screen.getByLabelText('父菜单'), { target: { value: 'manufacturing' } });
     fireEvent.change(screen.getByLabelText('访问权限'), {
       target: { value: 'page.production_exception.read' },
     });
     expect(screen.getByRole('button', { name: '创建并进入页面设计' })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('业务模型'), {
+    fireEvent.change(modelSelect, {
       target: { value: 'manufacturing_exception' },
     });
     const createPageButton = screen.getByRole('button', { name: '创建并进入页面设计' });

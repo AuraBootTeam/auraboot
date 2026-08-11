@@ -4,6 +4,7 @@ import {
   activateAuthoringPreviewGuard,
   AUTHORING_WRITE_BLOCKED_EVENT,
   resetAuthoringPreviewGuardForTests,
+  withAuthoringPreviewContext,
 } from '../AuthoringPreviewGuard';
 
 // Mock session module to prevent SSR session resolution errors
@@ -76,6 +77,36 @@ describe('HttpClient integration', () => {
 
       deactivate();
       window.removeEventListener(AUTHORING_WRITE_BLOCKED_EVENT, blockedEvents);
+    });
+
+    it('binds command requests to the active authoring session for the backend guard', () => {
+      const deactivate = activateAuthoringPreviewGuard('session-owned-by-current-actor');
+      const commandOptions = withAuthoringPreviewContext(
+        '/api/meta/commands/execute/announcement:publish',
+        {
+          method: 'post',
+          params: {
+            payload: {},
+          },
+          headers: {
+            'X-Aura-Authoring-Session': 'caller-must-not-override-the-active-session',
+          },
+        },
+      );
+
+      expect(commandOptions.headers).toEqual({
+        'X-Aura-Authoring-Session': 'session-owned-by-current-actor',
+      });
+      expect(commandOptions.params).toEqual({ payload: {} });
+
+      deactivate();
+      const usageOptions = { method: 'post', params: { payload: {} } } as const;
+      expect(
+        withAuthoringPreviewContext(
+          '/api/meta/commands/execute/announcement:publish',
+          usageOptions,
+        ),
+      ).toBe(usageOptions);
     });
 
     it('should make a GET request by default', async () => {

@@ -1,6 +1,7 @@
 import type { FetchOptions, Result } from './types';
 
 export const AUTHORING_WRITE_BLOCKED_EVENT = 'auraboot:authoring-write-blocked';
+export const AUTHORING_SESSION_HEADER = 'X-Aura-Authoring-Session';
 
 const activeSessions = new Set<string>();
 const AUTHORING_PATH = '/api/authoring/';
@@ -13,6 +14,24 @@ export function activateAuthoringPreviewGuard(sessionPid: string): () => void {
 
 export function resetAuthoringPreviewGuardForTests(): void {
   activeSessions.clear();
+}
+
+/**
+ * Bind every guarded write to the active authoring workspace. The normal
+ * client-side guard still returns before fetch; this header lets the backend
+ * reject the same request if a caller bypasses or regresses that first layer.
+ */
+export function withAuthoringPreviewContext(path: string, options: FetchOptions): FetchOptions {
+  if (activeSessions.size === 0 || isSafeRequest(path, options)) return options;
+  const sessionPid = [...activeSessions].at(-1);
+  if (!sessionPid) return options;
+  return {
+    ...options,
+    headers: {
+      ...options.headers,
+      [AUTHORING_SESSION_HEADER]: sessionPid,
+    },
+  };
 }
 
 export function authoringPreviewBlockedResult<T>(

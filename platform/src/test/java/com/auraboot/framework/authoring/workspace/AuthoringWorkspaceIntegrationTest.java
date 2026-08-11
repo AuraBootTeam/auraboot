@@ -22,8 +22,10 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.Sp
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.StudioIntent;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
+import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.service.PageSchemaService;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
@@ -61,10 +63,15 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -75,6 +82,9 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
 
     @MockitoSpyBean
     private AuthoringWorkspaceRepository workspaceRepository;
+
+    @MockitoSpyBean
+    private CommandExecutor commandExecutor;
 
     @Autowired
     private AuthoringHandoffService handoffService;
@@ -260,6 +270,42 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"pagePid\":\"hidden\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void ownedAuthoringSessionDeniesDirectCommandBeforeBusinessSideEffects() throws Exception {
+        grantDesignerManage();
+        grantCommandExecute();
+        PageSchema page = insertPage("normal");
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        Map<String, Long> before = businessWriteCounts();
+
+        doThrow(new IllegalStateException("command executor must not run in authoring preview"))
+                .when(commandExecutor)
+                .execute(eq("authoring:no-op"), any(CommandExecuteRequest.class));
+
+        mockMvc.perform(post("/api/meta/commands/execute/authoring:no-op")
+                        .header(AuthoringBusinessWriteInterceptor.SESSION_HEADER,
+                                opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "payload", Map.of()))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.context")
+                        .value("authoring.preview.business-write-denied"));
+
+        mockMvc.perform(put("/api/dynamic/authoring_missing/record-missing")
+                        .header(AuthoringBusinessWriteInterceptor.SESSION_HEADER,
+                                opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"published\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.context")
+                        .value("authoring.preview.business-write-denied"));
+
+        verify(commandExecutor, never())
+                .execute(eq("authoring:no-op"), any(CommandExecuteRequest.class));
+        assertThat(businessWriteCounts()).isEqualTo(before);
     }
 
     @Test
@@ -2462,6 +2508,30 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 "admin",
                 "Page Designer Admin");
         userPermissionService.evictUserPermissions(getTestUser().getId());
+    }
+
+    private void grantCommandExecute() {
+        grantCommittedPermissionToTestRole(
+                MetaPermission.COMMAND_EXECUTE,
+                "meta",
+                "command",
+                "execute",
+                "Command Execute");
+        userPermissionService.evictUserPermissions(getTestUser().getId());
+    }
+
+    private Map<String, Long> businessWriteCounts() {
+        return Map.of(
+                "announcement", jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM ab_announcement", Long.class),
+                "outbox", jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM ab_outbox", Long.class),
+                "behaviorOutcomeOutbox", jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM ab_behavior_outcome_outbox", Long.class),
+                "imMessage", jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM ab_im_message", Long.class),
+                "webhookDelivery", jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM ab_webhook_delivery_log", Long.class));
     }
 
     private void grantPublisherManage() {
