@@ -1,10 +1,7 @@
 {
   "code": "crm_sales_forecast",
-  "title": {
-    "zh-CN": "销售预测",
-    "en": "Sales Forecast"
-  },
-  "description": "Sales forecasting dashboard with pipeline analysis, weighted forecast by stage/month/owner",
+  "title": "$i18n:page.crm_sales_forecast.title",
+  "description": "$i18n:page.crm_sales_forecast.description",
   "scope": "global",
   "status": "published",
   "sortOrder": 0,
@@ -49,7 +46,16 @@
             },
             "icon": "IconCurrencyDollar",
             "color": "#3b82f6",
-            "format": "currency"
+            "format": "currency",
+            "drillDown": {
+              "enabled": true,
+              "action": "navigate",
+              "targetPage": "/p/crm_opportunity_common",
+              "filters": [
+                { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_won" },
+                { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_lost" }
+              ]
+            }
           },
           {
             "field": "weighted_forecast",
@@ -59,7 +65,16 @@
             },
             "icon": "IconTrendingUp",
             "color": "#10b981",
-            "format": "currency"
+            "format": "currency",
+            "drillDown": {
+              "enabled": true,
+              "action": "navigate",
+              "targetPage": "/p/crm_opportunity_common",
+              "filters": [
+                { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_won" },
+                { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_lost" }
+              ]
+            }
           },
           {
             "field": "won_revenue",
@@ -69,7 +84,15 @@
             },
             "icon": "IconTrophy",
             "color": "#8b5cf6",
-            "format": "currency"
+            "format": "currency",
+            "drillDown": {
+              "enabled": true,
+              "action": "navigate",
+              "targetPage": "/p/crm_opportunity_common",
+              "filters": [
+                { "targetField": "crm_opp_stage", "value": "closed_won" }
+              ]
+            }
           },
           {
             "field": "win_rate",
@@ -79,7 +102,19 @@
             },
             "icon": "IconChartPie",
             "color": "#f59e0b",
-            "format": "percent"
+            "format": "percent",
+            "drillDown": {
+              "enabled": true,
+              "action": "navigate",
+              "targetPage": "/p/crm_opportunity_common",
+              "filters": [
+                {
+                  "targetField": "crm_opp_stage",
+                  "operator": "in",
+                  "value": ["closed_won", "closed_lost"]
+                }
+              ]
+            }
           },
           {
             "field": "avg_deal_size",
@@ -89,7 +124,16 @@
             },
             "icon": "IconReceipt",
             "color": "#06b6d4",
-            "format": "currency"
+            "format": "currency",
+            "drillDown": {
+              "enabled": true,
+              "action": "navigate",
+              "targetPage": "/p/crm_opportunity_common",
+              "filters": [
+                { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_won" },
+                { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_lost" }
+              ]
+            }
           },
           {
             "field": "open_deals",
@@ -98,24 +142,33 @@
               "en": "Open Deals"
             },
             "icon": "IconTargetArrow",
-            "color": "#ec4899"
+            "color": "#ec4899",
+            "drillDown": {
+              "enabled": true,
+              "action": "navigate",
+              "targetPage": "/p/crm_opportunity_common",
+              "filters": [
+                { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_won" },
+                { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_lost" }
+              ]
+            }
           }
         ]
       }
     },
     {
-      "id": "chart_forecast_by_stage",
+    "id": "chart_forecast_by_stage",
       "type": "smart-bar-chart",
       "x": 0,
       "y": 1,
-      "w": 6,
-      "h": 1,
+      "w": 8,
+      "h": 2,
       "title": {
         "zh-CN": "按阶段预测",
         "en": "Forecast by Stage"
       },
       "config": {
-        "orientation": "horizontal",
+    "orientation": "vertical",
         "showLabel": true,
         "visualization": {
           "metricLabels": {
@@ -148,16 +201,24 @@
         "title": {
           "zh-CN": "按阶段预测",
           "en": "Forecast by Stage"
+        },
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_opportunity_common",
+          "filters": [
+            { "sourceField": "stage", "targetField": "crm_opp_stage" }
+          ]
         }
       }
     },
     {
-      "id": "chart_forecast_by_month",
+    "id": "chart_forecast_by_month",
       "type": "smart-line-chart",
       "x": 0,
-      "y": 2,
-      "w": 6,
-      "h": 1,
+      "y": 3,
+    "w": 7,
+      "h": 2,
       "title": {
         "zh-CN": "按月预测趋势",
         "en": "Monthly Forecast Trend"
@@ -194,23 +255,53 @@
         "title": {
           "zh-CN": "按月预测趋势",
           "en": "Monthly Forecast Trend"
+        },
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_opportunity_common",
+          "filters": [
+            {
+              "sourceField": "month",
+              "targetField": "crm_opp_expected_close_date",
+              "transform": "month-range"
+            },
+            { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_won" },
+            { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_lost" }
+          ]
         }
       }
     },
     {
-      "id": "chart_forecast_by_owner",
+    "id": "chart_forecast_by_owner",
       "type": "smart-bar-chart",
-      "x": 0,
+    "x": 7,
       "y": 3,
-      "w": 6,
-      "h": 1,
+    "w": 5,
+      "h": 2,
       "title": {
         "zh-CN": "按销售人员预测",
         "en": "Forecast by Sales Rep"
       },
       "config": {
-        "orientation": "vertical",
-        "showLabel": true,
+        "orientation": "horizontal",
+        "showLabel": false,
+        "chartOptions": {
+          "grid": {
+            "left": "4%",
+            "right": "10%",
+            "top": "18%",
+            "bottom": "10%",
+            "containLabel": true
+          },
+          "xAxis": {
+            "type": "value",
+            "splitNumber": 3,
+            "axisLabel": {
+              "hideOverlap": true
+            }
+          }
+        },
         "visualization": {
           "metricLabels": {
             "weighted_forecast": { "zh-CN": "加权预测", "en": "Weighted Forecast" }
@@ -233,6 +324,16 @@
         "title": {
           "zh-CN": "按销售人员预测",
           "en": "Forecast by Sales Rep"
+        },
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_opportunity_common",
+          "filters": [
+            { "sourceField": "owner_pid", "targetField": "crm_opp_owner" },
+            { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_won" },
+            { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_lost" }
+          ]
         }
       }
     },
@@ -240,9 +341,9 @@
       "id": "table_stage_detail",
       "type": "smart-table-chart",
       "x": 0,
-      "y": 4,
+      "y": 5,
       "w": 6,
-      "h": 1,
+      "h": 2,
       "title": {
         "zh-CN": "阶段预测明细",
         "en": "Stage Forecast Details"
@@ -252,10 +353,13 @@
           "zh-CN": "阶段预测明细",
           "en": "Stage Forecast Detail"
         },
-        "dataSource": {
-          "type": "api",
-          "url": "/api/datasource/list",
-          "params": {
+    "dataSource": {
+      "type": "api",
+      "url": "/api/datasource/list",
+      "dimensionDicts": {
+        "stage": "crm_opp_stage"
+      },
+      "params": {
             "datasourceId": "nq:crm_sales_forecast_by_stage",
             "format": "records",
             "maxItems": "10"
@@ -317,18 +421,18 @@
       }
     },
     {
-      "id": "chart_forecast_by_category",
+    "id": "chart_forecast_by_category",
       "type": "smart-bar-chart",
-      "x": 6,
+      "x": 8,
       "y": 1,
-      "w": 6,
-      "h": 1,
+      "w": 4,
+      "h": 2,
       "title": {
         "zh-CN": "按预测类别",
         "en": "Forecast by Category"
       },
       "config": {
-        "orientation": "horizontal",
+        "orientation": "vertical",
         "showLabel": true,
         "visualization": {
           "metricLabels": {
@@ -361,16 +465,29 @@
         "title": {
           "zh-CN": "按预测类别",
           "en": "Forecast by Category"
+        },
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_opportunity_common",
+          "filters": [
+            {
+              "sourceField": "forecast_category",
+              "targetField": "crm_opp_forecast_category"
+            },
+            { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_won" },
+            { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_lost" }
+          ]
         }
       }
     },
     {
       "id": "table_forecast_by_category_detail",
       "type": "smart-table-chart",
-      "x": 0,
-      "y": 3,
+      "x": 6,
+      "y": 5,
       "w": 6,
-      "h": 1,
+      "h": 2,
       "title": {
         "zh-CN": "预测类别明细",
         "en": "Forecast Category Detail"
@@ -380,10 +497,13 @@
           "zh-CN": "预测类别明细",
           "en": "Forecast Category Detail"
         },
-        "dataSource": {
-          "type": "api",
-          "url": "/api/datasource/list",
-          "params": {
+    "dataSource": {
+      "type": "api",
+      "url": "/api/datasource/list",
+      "dimensionDicts": {
+        "forecast_category": "crm_forecast_category"
+      },
+      "params": {
             "datasourceId": "nq:crm_sales_forecast_by_category",
             "format": "records",
             "maxItems": "10"
@@ -438,9 +558,9 @@
       "id": "table_open_opportunities",
       "type": "smart-table-chart",
       "x": 0,
-      "y": 6,
+      "y": 7,
       "w": 12,
-      "h": 1,
+      "h": 3,
       "title": {
         "zh-CN": "进行中商机明细",
         "en": "In-Progress Opportunity Details"
@@ -450,10 +570,13 @@
           "zh-CN": "进行中商机明细",
           "en": "Open Opportunities Detail"
         },
-        "dataSource": {
-          "type": "api",
-          "url": "/api/datasource/list",
-          "params": {
+    "dataSource": {
+      "type": "api",
+      "url": "/api/datasource/list",
+      "dimensionDicts": {
+        "crm_opp_stage": "crm_opp_stage"
+      },
+      "params": {
             "datasourceId": "nq:crm_open_opportunities_detail",
             "format": "records",
             "maxItems": "50"
@@ -517,10 +640,11 @@
                 "en": "Weighted"
               }
             },
-            {
-              "field": "crm_opp_expected_close_date",
-              "width": 110,
-              "label": {
+        {
+          "field": "crm_opp_expected_close_date",
+          "width": 110,
+          "format": "date",
+          "label": {
                 "zh-CN": "预计成交",
                 "en": "Close Date"
               }

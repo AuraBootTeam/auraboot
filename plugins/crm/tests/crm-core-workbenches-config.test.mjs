@@ -196,7 +196,7 @@ test('formal CRM roles align the five workbench menu and action contracts', () =
     'crm_service must not gain unrelated forecast access');
 });
 
-test('CRM navigation prioritizes workspaces and contains record breadth below secondary groups', () => {
+test('CRM navigation exposes operating dashboards and keeps superseded workbenches hidden', () => {
   assert.equal(menus.get('crm_records')?.parentCode, 'crm_root');
   assert.equal(menus.get('crm_operations')?.parentCode, 'crm_root');
   for (const code of ['crm_accounts', 'crm_contacts', 'crm_leads', 'crm_opportunities',
@@ -205,8 +205,11 @@ test('CRM navigation prioritizes workspaces and contains record breadth below se
     'crm_review_common_menu', 'crm_risk_common_menu', 'crm_clarification_common_menu']) {
     assert.equal(menus.get(code)?.parentCode, 'crm_records', `${code} belongs under business records`);
   }
-  for (const code of ['crm_dashboard', 'crm_sales_forecast', 'crm_sales_workbench',
-    'crm_manager_workbench']) {
+  for (const code of ['crm_dashboard', 'crm_sales_forecast']) {
+    assert.equal(menus.get(code)?.visible, true, `${code} must be reachable from CRM operations`);
+    assert.match(menus.get(code)?.path ?? '', /^\/dashboards\/view\//);
+  }
+  for (const code of ['crm_sales_workbench', 'crm_manager_workbench']) {
     assert.equal(menus.get(code)?.visible, false, `${code} legacy entry must not compete with workspaces`);
   }
   assert.equal(menus.get('crm_qdp_release_center')?.orderNo, 6);

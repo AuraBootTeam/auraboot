@@ -103,6 +103,11 @@ import {
   getExplicitIds as selectionGetExplicitIds,
   isAllMatching as selectionIsAllMatching,
 } from './list/selectionModel';
+import {
+  resolveBuiltInBulkCapabilities,
+  selectBulkEditableColumns,
+  type BuiltInBulkCapabilitiesConfig,
+} from './list/bulkCapabilities';
 import { savedViewService, type ChipPin } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
@@ -864,6 +869,11 @@ function ListPageContentInner(props: PageContentProps) {
     const configured =
       (tableBlock as any)?.table?.bulkActions ?? (tableBlock as any)?.bulkActions ?? [];
     return Array.isArray(configured) ? configured : [];
+  }, [tableBlock]);
+  const tableBulkCapabilities = useMemo<BuiltInBulkCapabilitiesConfig | undefined>(() => {
+    const configured =
+      (tableBlock as any)?.table?.bulkCapabilities ?? (tableBlock as any)?.bulkCapabilities;
+    return configured && typeof configured === 'object' ? configured : undefined;
   }, [tableBlock]);
   // T9 — ids of the rows currently loaded on this page (cross-page selection
   // accumulates across these as the user pages).
@@ -3517,6 +3527,16 @@ function ListPageContentInner(props: PageContentProps) {
     tableBulkActions,
   ]);
 
+  const bulkEditColumns = useMemo(
+    () => selectBulkEditableColumns(tableColumns, tableBulkCapabilities !== undefined),
+    [tableBulkCapabilities, tableColumns],
+  );
+  const builtInBulkCapabilities = useMemo(
+    () =>
+      resolveBuiltInBulkCapabilities(tableBulkCapabilities, hasPermission, bulkEditColumns.length),
+    [bulkEditColumns.length, hasPermission, tableBulkCapabilities],
+  );
+
   // Build export filter conditions for toolbar
   const exportFilterConditions = useMemo(() => {
     const conditions: Array<{ field: string; operator: string; value: unknown }> = [];
@@ -4856,9 +4876,11 @@ function ListPageContentInner(props: PageContentProps) {
                 selectedCount={effectiveSelectedCount}
                 selectedIds={selectedIdList}
                 modelCode={modelCode}
-                onBulkEdit={() => setBulkEditOpen(true)}
-                onBulkDelete={handleBulkDelete}
-                onBulkExport={() => handleExportSelected('xlsx')}
+                onBulkEdit={builtInBulkCapabilities.edit ? () => setBulkEditOpen(true) : undefined}
+                onBulkDelete={builtInBulkCapabilities.delete ? handleBulkDelete : undefined}
+                onBulkExport={
+                  builtInBulkCapabilities.export ? () => handleExportSelected('xlsx') : undefined
+                }
                 bulkActions={visibleBulkActions}
                 onBulkAction={handleBulkAction}
                 resolveBulkActionLabel={resolveButtonLabel}
@@ -4894,14 +4916,13 @@ function ListPageContentInner(props: PageContentProps) {
             onBulkEditClose={() => setBulkEditOpen(false)}
             selectedIds={selectedIdList}
             modelCode={modelCode}
-            bulkEditFields={tableColumns
-              .filter((c) => !c.isActionColumn && c.field)
-              .map((c) => ({
-                code: c.field,
-                name: c.field,
-                dataType: c.valueType || 'string',
-              }))}
+            bulkEditFields={bulkEditColumns.map((c) => ({
+              code: c.field,
+              name: resolveColumnLabel(c),
+              dataType: c.valueType || 'string',
+            }))}
             onBulkEditComplete={handleBulkEditComplete}
+            locale={locale}
             // ImportModal
             importOpen={importOpen}
             onImportClose={() => setImportOpen(false)}

@@ -120,7 +120,7 @@
     "type": 1,
     "permissionCode": "crm.account.read",
     "orderNo": 1,
-    "visible": false
+    "visible": true
   },
   {
     "code": "crm_sales_forecast",
@@ -134,7 +134,7 @@
     "type": 1,
     "permissionCode": "crm.opportunity.read",
     "orderNo": 2,
-    "visible": false
+    "visible": true
   },
   {
     "code": "crm_sales_workbench",

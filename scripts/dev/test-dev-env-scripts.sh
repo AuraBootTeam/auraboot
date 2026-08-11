@@ -383,6 +383,9 @@ assert_contains "env reset dry-run uses registered enterprise root" "$RESET_OUTP
 assert_contains "env reset dry-run names isolated database" "$RESET_OUTPUT" "localhost:15432/aura_boot"
 assert_contains "env reset dry-run documents no global process cleanup" "$RESET_OUTPUT" "no global pkill"
 assert_contains "env reset dry-run documents bootstrap setup" "$RESET_OUTPUT" "/api/bootstrap/setup"
+ENV_SH_SOURCE="$(cat "$PROJECT_ROOT/scripts/dev/env.sh")"
+assert_contains "env reset implementation invokes shared bootstrap helper" "$ENV_SH_SOURCE" "aura_bootstrap_setup_if_needed"
+assert_contains "env reset implementation waits for backend recovery" "$ENV_SH_SOURCE" "backend did not recover after database reset"
 
 echo "Scenario 14: unified env stop dry-run uses exact tmux sessions and ports"
 STOP_OUTPUT="$(

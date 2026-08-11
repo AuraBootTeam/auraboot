@@ -34,9 +34,10 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Real-stack coverage IT for {@link ActivityEventListener} additional branches: a non-trackable
- * model category short-circuits (no activity), and a trackable model records a state_transition
- * activity carrying payload metadata. Complements the happy/guard IT. @Async unwrapped via AopTestUtils.
+ * Real-stack coverage IT for {@link ActivityEventListener} additional branches: an unflagged
+ * entity short-circuits, an opted-in entity records activity, and a trackable category records a
+ * state_transition carrying payload metadata. Complements the happy/guard IT. @Async unwrapped via
+ * AopTestUtils.
  */
 @Slf4j
 @SpringBootTest(classes = TestApplication.class)
@@ -63,6 +64,7 @@ class ActivityEventListenerBranchesIT {
     private ActivityEventListener target;
     private Model trackable;
     private Model nonTrackable;
+    private Model optedInEntity;
     private boolean inited = false;
 
     @BeforeEach
@@ -71,8 +73,10 @@ class ActivityEventListenerBranchesIT {
         target = AopTestUtils.getTargetObject(listener);
         if (!inited) {
             purge();
-            trackable = newModel("aelb_doc_" + Math.abs(System.nanoTime() % 1_000_000), "document");
-            nonTrackable = newModel("aelb_ent_" + Math.abs(System.nanoTime() % 1_000_000), "entity");
+            trackable = newModel("aelb_doc_" + Math.abs(System.nanoTime() % 1_000_000), "document", false);
+            nonTrackable = newModel("aelb_ent_" + Math.abs(System.nanoTime() % 1_000_000), "entity", false);
+            optedInEntity = newModel(
+                    "aelb_timeline_" + Math.abs(System.nanoTime() % 1_000_000), "entity", true);
             inited = true;
         }
     }
@@ -86,7 +90,7 @@ class ActivityEventListenerBranchesIT {
         }
     }
 
-    private Model newModel(String code, String category) {
+    private Model newModel(String code, String category, boolean activityTimelineEnabled) {
         Model m = new Model();
         m.setPid(UniqueIdGenerator.generate());
         m.setTenantId(testTenant.getId());
@@ -103,6 +107,9 @@ class ActivityEventListenerBranchesIT {
         ext.put("displayName", "AELB " + category);
         ext.put("modelType", "entity");
         ext.put("modelCategory", category);
+        if (activityTimelineEnabled) {
+            ext.put("activityTimelineEnabled", true);
+        }
         e.setExtension(ext);
         m.setExtension(e);
         metaModelMapper.insert(m);
@@ -141,6 +148,15 @@ class ActivityEventListenerBranchesIT {
                 target.onCommandCompleted(event(trackable.getCode(), "rec_st", "state_transition")));
         assertEquals(before + 1, activityCount(trackable.getCode()),
                 "state_transition on a trackable model records one activity");
+    }
+
+    @Test
+    @DisplayName("an opted-in entity model records activity")
+    void optedInEntityRecorded() {
+        long before = activityCount(optedInEntity.getCode());
+        target.onCommandCompleted(event(optedInEntity.getCode(), "rec_entity", "create"));
+        assertEquals(before + 1, activityCount(optedInEntity.getCode()),
+                "entity model with activityTimelineEnabled=true records activity");
     }
 
     private void purge() {

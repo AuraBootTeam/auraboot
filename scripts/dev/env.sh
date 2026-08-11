@@ -19,6 +19,8 @@ source "$SCRIPT_DIR/lib/env-loader.sh"
 source "$SCRIPT_DIR/lib/process-manager.sh"
 # shellcheck source=scripts/dev/lib/health.sh
 source "$SCRIPT_DIR/lib/health.sh"
+# shellcheck source=../lib/reset-init-common.sh
+source "$PROJECT_ROOT/scripts/lib/reset-init-common.sh"
 
 COMMAND="${1:-}"
 if [ -n "$COMMAND" ]; then
@@ -583,6 +585,36 @@ PLAN
         PG_DB="$PG_DB" \
         PGPASSWORD="$PGPASSWORD" \
         "$reset_script"
+
+    # The reset plan has always promised a usable, bootstrapped environment.
+    # Keep that contract executable: Flyway only recreates schema; the explicit
+    # bootstrap endpoint creates the default tenant/admin required by plugin
+    # import and Playwright auth. Give the already-running host backend a short
+    # reconnect window after its database connections were terminated.
+    local health_url="$BACKEND_URL/actuator/health"
+    local backend_ready=0
+    local attempt
+    for attempt in $(seq 1 30); do
+        if NO_PROXY=localhost,127.0.0.1 curl -fsS --max-time 2 "$health_url" >/dev/null 2>&1; then
+            backend_ready=1
+            break
+        fi
+        sleep 1
+    done
+    if [ "$backend_ready" != "1" ]; then
+        echo "ERROR: backend did not recover after database reset: $health_url" >&2
+        echo "       start it with scripts/dev/env.sh start --slug=$SLUG, then retry reset" >&2
+        return 1
+    fi
+
+    aura_bootstrap_setup_if_needed \
+        "$BACKEND_URL" \
+        "AuraBoot Dev" \
+        "admin@auraboot.com" \
+        "Test2026x" \
+        "Admin User" \
+        "single" \
+        "[env reset:$SLUG]"
 }
 
 command_stop() {

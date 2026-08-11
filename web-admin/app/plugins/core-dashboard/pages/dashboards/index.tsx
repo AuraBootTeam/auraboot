@@ -30,6 +30,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { DashboardViewer } from '~/plugins/core-dashboard/components/DashboardViewer';
+import { resolveDashboardRuntimeValue } from '~/plugins/core-dashboard/utils/drillDownNavigation';
 import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportPdfButton';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 import type { Dashboard } from '~/plugins/core-dashboard/types';
@@ -200,6 +201,13 @@ export default function DashboardViewerPage() {
   const activeDashboard = useMemo(
     () => sortedList.find((d) => d.code === activeCode) ?? null,
     [sortedList, activeCode],
+  );
+  const runtimeWidgets = useMemo(
+    () =>
+      resolveDashboardRuntimeValue(activeDashboard?.widgets ?? [], {
+        recordPid: searchParams.get('recordPid'),
+      }),
+    [activeDashboard?.widgets, searchParams],
   );
 
   // dnd-kit sensors — require 5px movement to distinguish click from drag
@@ -423,7 +431,7 @@ export default function DashboardViewerPage() {
         {!loading && !error && activeDashboard && (
           <div ref={dashboardRef}>
             <DashboardViewer
-              widgets={activeDashboard.widgets || []}
+              widgets={runtimeWidgets}
               layoutConfig={activeDashboard.layoutConfig || { columns: 12, rowHeight: 80, gap: 16 }}
               className="min-h-[calc(100vh-140px)]"
             />

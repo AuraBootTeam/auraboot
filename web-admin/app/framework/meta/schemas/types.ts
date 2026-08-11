@@ -383,6 +383,14 @@ export interface TableConfig {
   density?: 'default' | 'compact';
   pagination?: PaginationConfig;
   selection?: SelectionConfig;
+  /** Permission-aware controls for the generic edit/delete/export bulk bar. */
+  bulkCapabilities?: {
+    edit?: boolean | { enabled?: boolean; permissionCode?: string };
+    delete?: boolean | { enabled?: boolean; permissionCode?: string };
+    export?: boolean | { enabled?: boolean; permissionCode?: string };
+  };
+  /** DSL-configured business bulk actions, executed through commands. */
+  bulkActions?: ButtonConfig[];
   columns: ColumnConfig[];
   /** Row-level action buttons (displayed in each row) */
   rowActions?: ButtonConfig[];

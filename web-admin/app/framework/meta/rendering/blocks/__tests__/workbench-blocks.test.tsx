@@ -203,6 +203,7 @@ describe('MetricStripBlockRenderer', () => {
         summary: {
           matchability: 68.23529411764706,
           complete: '100.0000',
+          revenue: 1234,
         },
       },
     }) as any;
@@ -226,6 +227,14 @@ describe('MetricStripBlockRenderer', () => {
           precision: 2,
           unit: '%',
         },
+        {
+          key: 'revenue',
+          label: 'Revenue',
+          valueField: 'revenue',
+          valueType: 'currency',
+          currencyCode: 'CNY',
+          precision: 0,
+        },
       ],
     };
 
@@ -233,6 +242,7 @@ describe('MetricStripBlockRenderer', () => {
 
     expect(screen.getByTestId('metric-strip-item-matchability')).toHaveTextContent('68.24 %');
     expect(screen.getByTestId('metric-strip-item-complete')).toHaveTextContent('100 %');
+    expect(screen.getByTestId('metric-strip-item-revenue')).toHaveTextContent('CN¥1,234');
   });
 
   it('surfaces metric cards on a white token surface, not a large tinted fill', () => {
@@ -1037,6 +1047,36 @@ describe('WorkbenchActionBarBlockRenderer', () => {
 });
 
 describe('StatusBannerBlockRenderer', () => {
+  it('formats configured currency summary values as readable business amounts', () => {
+    const runtime = makeRuntime() as any;
+    runtime.getContext().state.selectedAccount = {
+      attention_reason: 'pipeline',
+      pipeline_amount: 1886000,
+    };
+    const block: BlockConfig = {
+      id: 'account_attention',
+      blockType: 'status-banner',
+      context: '${state.selectedAccount}',
+      statusField: 'attention_reason',
+      titleMap: { pipeline: 'Open pipeline' },
+      summaryFields: [
+        {
+          label: 'Pipeline',
+          field: 'pipeline_amount',
+          valueType: 'currency',
+          currencyCode: 'CNY',
+          precision: 0,
+        },
+      ],
+    };
+
+    render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('status-banner-account_attention')).toHaveTextContent(
+      'CN¥1,886,000',
+    );
+  });
+
   it('renders directly from a runtime-state context without a duplicate detail query', () => {
     const runtime = makeRuntime() as any;
     runtime.getContext().state.selectedQdp = {

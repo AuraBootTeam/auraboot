@@ -596,7 +596,7 @@
           "blocks": [
             {
               "id": "block_activities",
-              "blockType": "sub-table",
+              "blockType": "activity-timeline",
               "title": {
                 "zh-CN": "活动",
                 "en-US": "Activities"

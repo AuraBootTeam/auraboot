@@ -1942,6 +1942,11 @@ function DetailBlockRenderer({
         token={token}
         locale={locale}
         t={t}
+        businessDataSource={
+          (block as any).businessDataSource ??
+          (block as any).dataSource ??
+          (block as any).subTable?.dataSource
+        }
       />
     );
   }

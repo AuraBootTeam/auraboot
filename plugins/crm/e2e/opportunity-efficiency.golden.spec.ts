@@ -18,12 +18,15 @@ const names = {
   proposal: `${RUN} 华东智造云方案提报`,
   negotiation: `${RUN} 华东智造云商务谈判`,
   task: `${RUN} 完成技术方案复核`,
+  contact: `${RUN} 王敏`,
+  bulkDiscovery: `${RUN} 华东智造云批量资格确认`,
   forecastPeriod: `FY26Q3-${RUN.slice(-10)}`,
 };
 
 const ids = {
   account: '',
   discovery: '',
+  bulkDiscovery: '',
   proposal: '',
   negotiation: '',
   task: '',
@@ -31,6 +34,7 @@ const ids = {
   forecast: '',
   personalView: '',
   pipelineBoard: '',
+  contact: '',
 };
 
 const expectedScenarios = [
@@ -38,10 +42,85 @@ const expectedScenarios = [
   'personal-view-persistence',
   'opportunity-plan-quote-context',
   'forecast-first-screen-hierarchy',
+  'merged-customer-activity-timeline',
+  'account-dashboard-drilldown-fact',
+  'safe-bulk-opportunity-lifecycle',
 ] as const;
 const completedScenarios = new Set<(typeof expectedScenarios)[number]>();
+const expectedCoverage = {
+  pages: [
+    'crm_contact_common_list',
+    'crm_forecast_cockpit',
+    'crm_opportunity_common_detail',
+    'crm_opportunity_common_list',
+  ],
+  commands: [
+    'crm:advance_opp_to_negotiation',
+    'crm:advance_opp_to_proposal',
+    'crm:create_account',
+    'crm:create_contact',
+    'crm:create_forecast',
+    'crm:create_opp_task',
+    'crm:create_opportunity',
+    'crm:create_quote_summary',
+    'crm:qualify_opportunity',
+  ],
+  queries: ['crm_account_stats', 'crm_account_timeline'],
+  dashboardTargets: [
+    'crm_account_360:recent_activities:recent_activities',
+    'crm_account_360:recent_opportunities:recent_opportunities',
+    'crm_account_360:stats_contacts:stats_contacts',
+  ],
+  uiActions: [
+    'crm_opportunity_common_detail:crm_opp_plan_quote_actions:create_plan_task',
+    'crm_opportunity_common_detail:crm_opp_plan_quote_actions:create_quote_summary',
+    'crm_opportunity_common_detail:crm_opportunity_tabs:activities',
+    'crm_opportunity_common_detail:crm_opportunity_tabs:plan_and_quotes',
+    'crm_opportunity_common_list:crm_opp_table:bulk_qualify',
+    'crm_opportunity_common_list:crm_opp_tabs:proposal',
+  ],
+  blocks: [
+    'crm_contact_common_list:crm_contact_table',
+    'crm_forecast_cockpit:crm_forecast_execution_metrics',
+    'crm_forecast_cockpit:crm_forecast_metrics',
+    'crm_forecast_cockpit:crm_forecast_owner_queue',
+    'crm_forecast_cockpit:crm_forecast_submission_queue',
+    'crm_forecast_cockpit:crm_forecast_tabs',
+    'crm_opportunity_common_detail:block_activities',
+    'crm_opportunity_common_detail:block_opportunity_plan',
+    'crm_opportunity_common_detail:block_opportunity_quotes',
+    'crm_opportunity_common_detail:crm_opp_plan_quote_actions',
+    'crm_opportunity_common_detail:crm_opp_stage_rail',
+    'crm_opportunity_common_detail:crm_opportunity_tabs',
+    'crm_opportunity_common_list:crm_opp_table',
+    'crm_opportunity_common_list:crm_opp_tabs',
+  ],
+  fields: [
+    'crm_contact_common_list:crm_contact_table:crm_ct_name',
+    'crm_forecast_cockpit:crm_forecast_submission_queue:crm_fcst_best_case_amount',
+    'crm_forecast_cockpit:crm_forecast_submission_queue:crm_fcst_commit_amount',
+    'crm_forecast_cockpit:crm_forecast_submission_queue:crm_fcst_period',
+    'crm_forecast_cockpit:crm_forecast_submission_queue:crm_fcst_pipeline_amount',
+    'crm_opportunity_common_detail:block_activities:crm_act_subject',
+    'crm_opportunity_common_detail:block_opportunity_plan:crm_act_subject',
+    'crm_opportunity_common_detail:block_opportunity_quotes:crm_qs_quote_amount',
+    'crm_opportunity_common_list:crm_opp_table:crm_opp_expected_amount',
+    'crm_opportunity_common_list:crm_opp_table:crm_opp_expected_close_date',
+    'crm_opportunity_common_list:crm_opp_table:crm_opp_name',
+    'crm_opportunity_common_list:crm_opp_table:crm_opp_probability',
+    'crm_opportunity_common_list:crm_opp_table:crm_opp_stage',
+  ],
+} as const;
+type CoverageAxis = keyof typeof expectedCoverage;
+const completedCoverage: Record<CoverageAxis, Set<string>> = Object.fromEntries(
+  Object.keys(expectedCoverage).map((axis) => [axis, new Set<string>()]),
+) as Record<CoverageAxis, Set<string>>;
 const screenshots: string[] = [];
 let adminJwt = '';
+
+function cover(axis: CoverageAxis, ...items: string[]): void {
+  for (const item of items) completedCoverage[axis].add(item);
+}
 
 function findValue(value: unknown, keys: string[]): unknown {
   if (Array.isArray(value)) {
@@ -92,6 +171,7 @@ async function executeCreate(code: string, payload: Record<string, unknown>): Pr
     'pid',
   ]);
   expect(pid, `${code} must return a public record id`).toBeTruthy();
+  cover('commands', code);
   return String(pid);
 }
 
@@ -100,6 +180,7 @@ async function executeTransition(code: string, targetRecordPid: string): Promise
     method: 'POST',
     body: JSON.stringify({ payload: {}, targetRecordPid, operationType: 'update' }),
   }), code);
+  cover('commands', code);
 }
 
 async function listRecords(
@@ -113,6 +194,23 @@ async function listRecords(
   });
   const body = assertOk(await api(`/api/dynamic/${model}/list?${params}`), `list ${model}`);
   return body?.data?.records ?? body?.data?.content ?? [];
+}
+
+async function getRecord(model: string, pid: string): Promise<Record<string, any>> {
+  return assertOk(
+    await api(`/api/dynamic/${model}/${encodeURIComponent(pid)}`),
+    `read ${model}/${pid}`,
+  ).data;
+}
+
+function decodeListFilters(url: string): Array<{
+  fieldCode: string;
+  operator: string;
+  value: unknown;
+}> {
+  const encoded = new URL(url).searchParams.get('filters');
+  expect(encoded, 'drill-down URL must carry exact list filters').toBeTruthy();
+  return JSON.parse(Buffer.from(String(encoded), 'base64').toString('utf8'));
 }
 
 async function seedJourney(): Promise<void> {
@@ -130,6 +228,15 @@ async function seedJourney(): Promise<void> {
     crm_opp_expected_amount: 480000,
     crm_opp_expected_close_date: NEXT_MONTH,
     crm_opp_probability: 25,
+    crm_opp_forecast_category: 'pipeline',
+  });
+  ids.bulkDiscovery = await executeCreate('crm:create_opportunity', {
+    crm_opp_name: names.bulkDiscovery,
+    crm_opp_account_id: ids.account,
+    crm_opp_currency_code: 'CNY',
+    crm_opp_expected_amount: 260000,
+    crm_opp_expected_close_date: NEXT_MONTH,
+    crm_opp_probability: 20,
     crm_opp_forecast_category: 'pipeline',
   });
   ids.proposal = await executeCreate('crm:create_opportunity', {
@@ -184,6 +291,13 @@ async function seedJourney(): Promise<void> {
     crm_fcst_pipeline_amount: 980000,
     crm_fcst_notes: 'Commit 由商务谈判商机组成，Best Case 包含方案提报商机。',
   });
+  ids.contact = await executeCreate('crm:create_contact', {
+    crm_ct_account_id: ids.account,
+    crm_ct_name: names.contact,
+    crm_ct_title: '信息化负责人',
+    crm_ct_email: `${RUN}@customer.example`,
+    crm_ct_is_primary: true,
+  });
 }
 
 async function uiLogin(page: Page): Promise<void> {
@@ -192,7 +306,10 @@ async function uiLogin(page: Page): Promise<void> {
     maxRedirects: 0,
   });
   expect([302, 303], `UI login: HTTP ${response.status()}`).toContain(response.status());
-  await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
+  // Wait for the authenticated shell's full load (including the / -> /home redirect)
+  // before a scenario starts its own navigation. Starting a second navigation while
+  // that redirect is still completing makes Chromium abort the scenario URL.
+  await page.goto(`${BASE}/`, { waitUntil: 'load' });
   if (page.url().includes('tenant-selection')) {
     await page.getByRole('button', { name: /进入|选择|Enter|AuraBoot/ }).first().click();
     await page.waitForURL((url) => !url.pathname.includes('tenant-selection'), { timeout: 15_000 });
@@ -292,6 +409,15 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(() => {
+  const coverage = Object.fromEntries(
+    Object.entries(expectedCoverage).map(([axis, expected]) => [axis, {
+      expected: [...expected].sort(),
+      completed: [...completedCoverage[axis as CoverageAxis]].sort(),
+    }]),
+  );
+  const coverageComplete = Object.values(coverage).every(({ expected, completed }) =>
+    JSON.stringify(expected) === JSON.stringify(completed),
+  );
   const evidence = {
     schemaVersion: 1,
     release: 'CRM Release B',
@@ -302,7 +428,9 @@ test.afterAll(() => {
     screenshots,
     expectedScenarios,
     completedScenarios: [...completedScenarios].sort(),
+    coverage,
     technicalVerdict: expectedScenarios.every((scenario) => completedScenarios.has(scenario))
+      && coverageComplete
       ? 'pass'
       : 'incomplete',
     productOwnerScreenshotSignOff: 'pending-human-signature',
@@ -357,6 +485,21 @@ test('list and kanban share the same stage-filtered opportunity fact', async ({ 
   await expect(page.getByTestId('kanban-card').filter({ hasText: names.discovery })).toHaveCount(0);
   await assertNoRawCodes(page);
   await compactShot(page, testInfo, 'release-b-opportunity-board-compact.png');
+  cover('pages', 'crm_opportunity_common_list');
+  cover(
+    'blocks',
+    'crm_opportunity_common_list:crm_opp_tabs',
+    'crm_opportunity_common_list:crm_opp_table',
+  );
+  cover(
+    'fields',
+    'crm_opportunity_common_list:crm_opp_table:crm_opp_name',
+    'crm_opportunity_common_list:crm_opp_table:crm_opp_stage',
+    'crm_opportunity_common_list:crm_opp_table:crm_opp_expected_amount',
+    'crm_opportunity_common_list:crm_opp_table:crm_opp_probability',
+    'crm_opportunity_common_list:crm_opp_table:crm_opp_expected_close_date',
+  );
+  cover('uiActions', 'crm_opportunity_common_list:crm_opp_tabs:proposal');
   completedScenarios.add('shared-list-kanban-fact');
 });
 
@@ -428,7 +571,168 @@ test('opportunity keeps the next task and quote in one navigable context', async
       && url.searchParams.get('commandCode') === 'crm:create_quote_summary'
       && url.searchParams.get('sourceRecordPid') === ids.proposal,
   );
+  cover('pages', 'crm_opportunity_common_detail');
+  cover(
+    'blocks',
+    'crm_opportunity_common_detail:crm_opp_stage_rail',
+    'crm_opportunity_common_detail:crm_opportunity_tabs',
+    'crm_opportunity_common_detail:crm_opp_plan_quote_actions',
+    'crm_opportunity_common_detail:block_opportunity_plan',
+    'crm_opportunity_common_detail:block_opportunity_quotes',
+  );
+  cover(
+    'fields',
+    'crm_opportunity_common_detail:block_opportunity_plan:crm_act_subject',
+    'crm_opportunity_common_detail:block_opportunity_quotes:crm_qs_quote_amount',
+  );
+  cover(
+    'uiActions',
+    'crm_opportunity_common_detail:crm_opportunity_tabs:plan_and_quotes',
+    'crm_opportunity_common_detail:crm_opp_plan_quote_actions:create_plan_task',
+    'crm_opportunity_common_detail:crm_opp_plan_quote_actions:create_quote_summary',
+  );
   completedScenarios.add('opportunity-plan-quote-context');
+});
+
+test('opportunity activity tab merges business follow-up with system changes', async ({ page }, testInfo) => {
+  await uiLogin(page);
+  await page.goto(`${BASE}/p/crm_opportunity_common/view/${ids.proposal}`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await expect(page.getByRole('heading', { name: names.proposal })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('tab', { name: /活动|Activities/ }).click();
+
+  const timeline = page.getByTestId('activity-timeline');
+  await expect(timeline).toBeVisible({ timeout: 20_000 });
+  await expect(timeline.getByText(/客户互动时间线|Customer activity timeline/)).toBeVisible();
+  await page.getByTestId('activity-timeline-filter-task').click();
+  await expect(timeline.getByText(names.task, { exact: true })).toBeVisible();
+  await page.getByTestId('activity-timeline-filter-system').click();
+  await expect(timeline.locator('[data-activity-type]').first()).toBeVisible();
+  await page.getByTestId('activity-timeline-filter-all').click();
+  await expect(timeline.getByText(names.task, { exact: true })).toBeVisible();
+  await assertNoRawCodes(page);
+  await shot(page, testInfo, 'release-b-opportunity-merged-activity-timeline.png');
+  cover('pages', 'crm_opportunity_common_detail');
+  cover(
+    'blocks',
+    'crm_opportunity_common_detail:crm_opp_stage_rail',
+    'crm_opportunity_common_detail:crm_opportunity_tabs',
+    'crm_opportunity_common_detail:block_activities',
+  );
+  cover('fields', 'crm_opportunity_common_detail:block_activities:crm_act_subject');
+  cover('queries', 'crm_account_timeline');
+  cover('uiActions', 'crm_opportunity_common_detail:crm_opportunity_tabs:activities');
+  completedScenarios.add('merged-customer-activity-timeline');
+});
+
+test('account dashboard keeps the account fact when drilling into contacts', async ({ page }, testInfo) => {
+  const accountStats = assertOk(
+    await api(
+      `/api/datasource/list?datasourceId=nq:crm_account_stats&accountId=${encodeURIComponent(ids.account)}&format=records&maxItems=1`,
+    ),
+    'account dashboard stats',
+  );
+  const statsRecord = accountStats?.data?.records?.[0] ?? accountStats?.data?.[0] ?? {};
+  expect(Number(statsRecord.total_contacts)).toBeGreaterThanOrEqual(1);
+
+  await uiLogin(page);
+  await page.goto(
+    `${BASE}/dashboards/view/crm_account_360?recordPid=${encodeURIComponent(ids.account)}`,
+    { waitUntil: 'domcontentloaded' },
+  );
+  const contactWidget = page.getByTestId('dashboard-block-stats_contacts');
+  await expect(contactWidget).toContainText(/联系人|Contacts/, { timeout: 20_000 });
+  await expect(contactWidget).toContainText(String(statsRecord.total_contacts));
+  const recentOpportunities = page.getByTestId('dashboard-block-recent_opportunities');
+  await expect(recentOpportunities.getByText(names.proposal, { exact: true })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(recentOpportunities).not.toContainText('crm_opp_name');
+  const recentActivities = page.getByTestId('dashboard-block-recent_activities');
+  await expect(recentActivities.getByText(names.task, { exact: true })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(recentActivities).not.toContainText('crm_act_subject');
+  cover('queries', 'crm_account_stats', 'crm_account_timeline');
+  cover(
+    'dashboardTargets',
+    'crm_account_360:stats_contacts:stats_contacts',
+    'crm_account_360:recent_opportunities:recent_opportunities',
+    'crm_account_360:recent_activities:recent_activities',
+  );
+  await shot(page, testInfo, 'release-b-account-360-record-scoped-kpis.png');
+
+  await contactWidget.locator('[data-card-style="metric"][role="button"]').click();
+  await expect(page).toHaveURL(/\/p\/crm_contact_common\?/, { timeout: 15_000 });
+  expect(decodeListFilters(page.url())).toEqual([
+    { fieldCode: 'crm_ct_account_id', operator: 'eq', value: ids.account },
+  ]);
+  await expect(page.getByTestId('dynamic-list')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('tr').filter({ hasText: names.contact })).toBeVisible();
+  await shot(page, testInfo, 'release-b-account-360-contact-drilldown.png');
+  cover('pages', 'crm_contact_common_list');
+  cover('blocks', 'crm_contact_common_list:crm_contact_table');
+  cover('fields', 'crm_contact_common_list:crm_contact_table:crm_ct_name');
+  completedScenarios.add('account-dashboard-drilldown-fact');
+});
+
+test('bulk opportunity actions protect lifecycle fields and execute state commands', async ({ page }, testInfo) => {
+  await uiLogin(page);
+  await page.goto(`${BASE}/p/crm_opportunity_common?keyword=${encodeURIComponent(RUN)}`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await expect(page.getByTestId('dynamic-list')).toBeVisible({ timeout: 20_000 });
+  const tableMode = page.getByTestId('list-view-mode-table');
+  if ((await tableMode.getAttribute('aria-checked')) !== 'true') {
+    await tableMode.click();
+  }
+
+  const discoveryRow = page.locator('tr').filter({ hasText: names.discovery });
+  const bulkDiscoveryRow = page.locator('tr').filter({ hasText: names.bulkDiscovery });
+  await expect(discoveryRow).toBeVisible();
+  await expect(bulkDiscoveryRow).toBeVisible();
+  await discoveryRow.locator('input[type="checkbox"]').click();
+  await bulkDiscoveryRow.locator('input[type="checkbox"]').click();
+  await expect(page.getByTestId('bulk-edit-btn')).toBeVisible();
+
+  await page.getByTestId('bulk-edit-btn').click();
+  const bulkDialog = page.getByTestId('bulk-edit-dialog');
+  await expect(bulkDialog).toBeVisible();
+  const editableValues = await page
+    .getByTestId('bulk-edit-field')
+    .locator('option')
+    .evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value));
+  expect(editableValues).toEqual(
+    expect.arrayContaining([
+      'crm_opp_expected_amount',
+      'crm_opp_expected_close_date',
+      'crm_opp_probability',
+    ]),
+  );
+  expect(editableValues).not.toEqual(
+    expect.arrayContaining(['crm_opp_stage', 'crm_opp_forecast_category', 'crm_opp_owner']),
+  );
+  await shot(page, testInfo, 'release-b-opportunity-safe-bulk-edit-fields.png');
+  await bulkDialog.getByRole('button', { name: /取消|Cancel/ }).click();
+
+  await page.getByTestId('bulk-action-bulk_qualify').click();
+  await expect(page.getByTestId('bulk-clear-selection-btn')).toHaveCount(0, { timeout: 20_000 });
+  await expect
+    .poll(
+      async () => {
+        const [first, second] = await Promise.all([
+          getRecord('crm_opportunity_common', ids.discovery),
+          getRecord('crm_opportunity_common', ids.bulkDiscovery),
+        ]);
+        return [first.crm_opp_stage, second.crm_opp_stage];
+      },
+      { timeout: 20_000 },
+    )
+    .toEqual(['qualification', 'qualification']);
+  await shot(page, testInfo, 'release-b-opportunity-bulk-qualified.png');
+  cover('uiActions', 'crm_opportunity_common_list:crm_opp_table:bulk_qualify');
+  completedScenarios.add('safe-bulk-opportunity-lifecycle');
 });
 
 test('forecast first screen prioritizes operating facts over execution counters', async ({ page }, testInfo) => {
@@ -465,6 +769,11 @@ test('forecast first screen prioritizes operating facts over execution counters'
   await expect(page.getByTestId('metric-strip-item-drafts')).toContainText(/待提交|Drafts/);
   await expect(page.getByTestId('metric-strip-item-submitted')).toContainText(/待复核|In Review/);
   await expect(page.getByText(/团队下钻|Team Drill-down/).first()).toBeVisible();
+  const forecastRow = page.locator('tr').filter({ hasText: names.forecastPeriod }).first();
+  await expect(forecastRow).toBeVisible();
+  await expect(forecastRow).toContainText(/180,000/);
+  await expect(forecastRow).toContainText(/500,000/);
+  await expect(forecastRow).toContainText(/980,000/);
   await assertNoRawCodes(page);
   await assertNoPageOverflow(page);
   await shot(page, testInfo, 'release-b-forecast-cockpit-desktop.png');
@@ -485,5 +794,21 @@ test('forecast first screen prioritizes operating facts over execution counters'
   }
   await shot(page, testInfo, 'release-b-forecast-cockpit-compact.png');
   await page.setViewportSize({ width: 1280, height: 720 });
+  cover('pages', 'crm_forecast_cockpit');
+  cover(
+    'blocks',
+    'crm_forecast_cockpit:crm_forecast_metrics',
+    'crm_forecast_cockpit:crm_forecast_execution_metrics',
+    'crm_forecast_cockpit:crm_forecast_tabs',
+    'crm_forecast_cockpit:crm_forecast_submission_queue',
+    'crm_forecast_cockpit:crm_forecast_owner_queue',
+  );
+  cover(
+    'fields',
+    'crm_forecast_cockpit:crm_forecast_submission_queue:crm_fcst_period',
+    'crm_forecast_cockpit:crm_forecast_submission_queue:crm_fcst_commit_amount',
+    'crm_forecast_cockpit:crm_forecast_submission_queue:crm_fcst_best_case_amount',
+    'crm_forecast_cockpit:crm_forecast_submission_queue:crm_fcst_pipeline_amount',
+  );
   completedScenarios.add('forecast-first-screen-hierarchy');
 });

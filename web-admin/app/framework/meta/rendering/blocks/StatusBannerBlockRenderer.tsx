@@ -81,6 +81,20 @@ function formatSummaryValue(
   const precision = Number(field?.precision);
   const numericValue = typeof value === 'number' ? value : Number(String(value).trim());
   if (
+    (field?.valueType === 'currency' || field?.format === 'currency') &&
+    Number.isFinite(numericValue)
+  ) {
+    const fractionDigits = Number.isInteger(precision) && precision >= 0 && precision <= 20
+      ? precision
+      : 2;
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: String(field?.currencyCode || 'CNY').toUpperCase(),
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    }).format(numericValue);
+  }
+  if (
     Number.isInteger(precision) &&
     precision >= 0 &&
     precision <= 20 &&

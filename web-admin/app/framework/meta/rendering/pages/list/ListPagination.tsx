@@ -19,8 +19,8 @@ export interface ListPaginationProps {
   selectedCount: number;
   selectedIds: string[];
   modelCode: string;
-  onBulkEdit: () => void;
-  onBulkDelete: (ids: string[]) => Promise<void>;
+  onBulkEdit?: () => void;
+  onBulkDelete?: (ids: string[]) => Promise<void>;
   /** Export only the selected records (T9). */
   onBulkExport?: (ids: string[]) => void;
   bulkActions?: ButtonConfig[];

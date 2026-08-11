@@ -86,6 +86,20 @@ function mappedMetricValue(
   const precision = Number(metric?.precision);
   const numericValue = typeof value === 'number' ? value : Number(String(value).trim());
   if (
+    (metric?.valueType === 'currency' || metric?.format === 'currency') &&
+    Number.isFinite(numericValue)
+  ) {
+    const fractionDigits = Number.isInteger(precision) && precision >= 0 && precision <= 20
+      ? precision
+      : 2;
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: String(metric?.currencyCode || 'CNY').toUpperCase(),
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    }).format(numericValue);
+  }
+  if (
     Number.isInteger(precision) &&
     precision >= 0 &&
     precision <= 20 &&

@@ -14,7 +14,12 @@ const PASSWORD = 'Test2026x';
 const SALES_EMAIL = `crm-sales-${Date.now()}@e2e.local`;
 const SERVICE_EMAIL = `crm-service-${Date.now()}@e2e.local`;
 const VIEWER_EMAIL = `crm-viewer-${Date.now()}@e2e.local`;
-const SALES_DISPLAY_NAME = `crm_sales ${RUN}`.slice(0, 50);
+const ROLE_DISPLAY_NAMES: Record<string, string> = {
+  crm_sales: '华东区销售代表',
+  crm_service: '客户服务专员',
+  crm_viewer: '经营分析访客',
+};
+const SALES_DISPLAY_NAME = ROLE_DISPLAY_NAMES.crm_sales;
 const todayLocal = new Date();
 const TODAY_LOCAL_DATE =
   `${todayLocal.getFullYear()}-${String(todayLocal.getMonth() + 1).padStart(2, '0')}-` +
@@ -67,6 +72,205 @@ const EXPECTED_ACTIONS = [
   'close_complaint',
 ] as const;
 
+const WORKBENCH_COVERAGE = {
+  crm_customer_360_workbench: {
+    queries: ['crm_customer_360_stats', 'crm_customer_360_queue'],
+    blocks: [
+      'crm_customer_metrics',
+      'crm_customer_search',
+      'crm_customer_actions',
+      'crm_customer_queue',
+      'crm_customer_attention',
+      'crm_customer_evidence',
+    ],
+    fields: [
+      'crm_customer_search:crm_acc_name',
+      'crm_customer_queue:crm_acc_name',
+      'crm_customer_queue:crm_acc_status',
+      'crm_customer_queue:pipeline_amount',
+      'crm_customer_queue:open_complaints',
+      'crm_customer_attention:owner_name',
+      'crm_customer_attention:contact_count',
+      'crm_customer_attention:pipeline_amount',
+    ],
+  },
+  crm_lead_desk_workbench: {
+    queries: ['crm_lead_desk_stats', 'crm_lead_desk_queue'],
+    blocks: [
+      'crm_lead_desk_metrics',
+      'crm_lead_desk_search',
+      'crm_lead_desk_header_actions',
+      'crm_lead_desk_queue',
+      'crm_lead_next_action_banner',
+      'crm_lead_lifecycle_actions',
+      'crm_lead_context',
+    ],
+    fields: [
+      'crm_lead_desk_search:crm_lead_company',
+      'crm_lead_desk_queue:crm_lead_company',
+      'crm_lead_desk_queue:crm_lead_contact_name',
+      'crm_lead_desk_queue:crm_lead_status',
+      'crm_lead_desk_queue:crm_lead_score',
+      'crm_lead_desk_queue:owner_name',
+      'crm_lead_next_action_banner:crm_lead_status',
+      'crm_lead_next_action_banner:owner_name',
+    ],
+  },
+  crm_opportunity_workspace: {
+    queries: ['crm_opportunity_workspace_stats', 'crm_opportunity_workspace_queue'],
+    blocks: [
+      'crm_opportunity_metrics',
+      'crm_opportunity_search',
+      'crm_opportunity_header_actions',
+      'crm_opportunity_queue',
+      'crm_opportunity_attention',
+      'crm_opportunity_stage_actions',
+      'crm_opportunity_context',
+    ],
+    fields: [
+      'crm_opportunity_search:crm_opp_name',
+      'crm_opportunity_queue:crm_opp_name',
+      'crm_opportunity_queue:account_name',
+      'crm_opportunity_queue:owner_name',
+      'crm_opportunity_queue:crm_opp_stage',
+      'crm_opportunity_queue:crm_opp_expected_amount',
+      'crm_opportunity_queue:crm_opp_probability',
+      'crm_opportunity_queue:crm_opp_expected_close_date',
+      'crm_opportunity_attention:crm_opp_stage',
+      'crm_opportunity_attention:owner_name',
+    ],
+  },
+  crm_forecast_cockpit: {
+    queries: ['crm_forecast_cockpit_stats', 'crm_sales_forecast_by_owner'],
+    blocks: [
+      'crm_forecast_metrics',
+      'crm_forecast_execution_metrics',
+      'crm_forecast_search',
+      'crm_forecast_header_actions',
+      'crm_forecast_tabs',
+      'crm_forecast_submission_queue',
+      'crm_forecast_owner_queue',
+      'crm_forecast_status',
+      'crm_forecast_actions',
+      'crm_forecast_context',
+    ],
+    fields: [
+      'crm_forecast_search:crm_fcst_period',
+      'crm_forecast_submission_queue:crm_fcst_period',
+      'crm_forecast_submission_queue:crm_fcst_owner',
+      'crm_forecast_submission_queue:crm_fcst_status',
+      'crm_forecast_submission_queue:crm_fcst_commit_amount',
+      'crm_forecast_submission_queue:crm_fcst_best_case_amount',
+      'crm_forecast_submission_queue:crm_fcst_pipeline_amount',
+      'crm_forecast_owner_queue:owner_name',
+      'crm_forecast_owner_queue:total_amount',
+      'crm_forecast_owner_queue:weighted_forecast',
+      'crm_forecast_status:crm_fcst_owner_display',
+    ],
+  },
+  crm_activity_service_desk: {
+    queries: ['crm_activity_service_stats', 'crm_activity_service_queue'],
+    blocks: [
+      'crm_activity_service_metrics',
+      'crm_activity_service_search',
+      'crm_activity_service_header_actions',
+      'crm_activity_service_queue',
+      'crm_activity_service_attention',
+      'crm_activity_service_actions',
+      'crm_activity_service_context',
+    ],
+    fields: [
+      'crm_activity_service_search:item_title',
+      'crm_activity_service_queue:item_kind',
+      'crm_activity_service_queue:item_title',
+      'crm_activity_service_queue:item_status',
+      'crm_activity_service_queue:item_priority',
+      'crm_activity_service_queue:due_date',
+      'crm_activity_service_queue:owner_name',
+      'crm_activity_service_queue:attention_reason',
+      'crm_activity_service_attention:item_kind',
+      'crm_activity_service_attention:item_status',
+      'crm_activity_service_attention:owner_name',
+      'crm_activity_service_context:owner_name',
+      'crm_activity_service_context:related_model',
+    ],
+  },
+} as const;
+
+const COMMAND_BY_ACTION: Partial<Record<(typeof EXPECTED_ACTIONS)[number], string>> = {
+  contact_lead: 'crm:contact_lead',
+  qualify_lead: 'crm:qualify_lead',
+  convert_lead: 'crm:convert_lead',
+  lose_lead: 'crm:lose_lead',
+  qualify_opportunity: 'crm:qualify_opportunity',
+  advance_to_proposal: 'crm:advance_opp_to_proposal',
+  advance_to_negotiation: 'crm:advance_opp_to_negotiation',
+  win_opportunity: 'crm:win_opportunity',
+  lose_opportunity: 'crm:lose_opportunity',
+  submit_forecast: 'crm:submit_forecast',
+  start_task: 'crm:start_task',
+  complete_task: 'crm:complete_task',
+  investigate_complaint: 'crm:investigate_complaint',
+  resolve_complaint: 'crm:resolve_complaint',
+  close_complaint: 'crm:close_complaint',
+};
+
+const EXPECTED_UI_ACTIONS = [
+  'crm_customer_360_workbench:crm_customer_actions:open_customer_record',
+  'crm_customer_360_workbench:crm_customer_actions:create_customer',
+  'crm_lead_desk_workbench:crm_lead_desk_header_actions:open_lead_record',
+  'crm_lead_desk_workbench:crm_lead_desk_header_actions:create_lead',
+  'crm_lead_desk_workbench:crm_lead_lifecycle_actions:contact_lead',
+  'crm_lead_desk_workbench:crm_lead_lifecycle_actions:qualify_lead',
+  'crm_lead_desk_workbench:crm_lead_lifecycle_actions:convert_lead',
+  'crm_lead_desk_workbench:crm_lead_lifecycle_actions:lose_lead',
+  'crm_opportunity_workspace:crm_opportunity_header_actions:open_opportunity_record',
+  'crm_opportunity_workspace:crm_opportunity_header_actions:create_opportunity',
+  'crm_opportunity_workspace:crm_opportunity_stage_actions:qualify_opportunity',
+  'crm_opportunity_workspace:crm_opportunity_stage_actions:advance_to_proposal',
+  'crm_opportunity_workspace:crm_opportunity_stage_actions:advance_to_negotiation',
+  'crm_opportunity_workspace:crm_opportunity_stage_actions:win_opportunity',
+  'crm_opportunity_workspace:crm_opportunity_stage_actions:lose_opportunity',
+  'crm_forecast_cockpit:crm_forecast_header_actions:open_forecast_record',
+  'crm_forecast_cockpit:crm_forecast_header_actions:create_forecast',
+  'crm_forecast_cockpit:crm_forecast_actions:submit_forecast',
+  'crm_activity_service_desk:crm_activity_service_header_actions:open_task_record',
+  'crm_activity_service_desk:crm_activity_service_header_actions:open_complaint_record',
+  'crm_activity_service_desk:crm_activity_service_header_actions:create_task',
+  'crm_activity_service_desk:crm_activity_service_actions:start_task',
+  'crm_activity_service_desk:crm_activity_service_actions:complete_task',
+  'crm_activity_service_desk:crm_activity_service_actions:investigate_complaint',
+  'crm_activity_service_desk:crm_activity_service_actions:resolve_complaint',
+  'crm_activity_service_desk:crm_activity_service_actions:close_complaint',
+] as const;
+
+const expectedCoverage = {
+  pages: Object.keys(WORKBENCH_COVERAGE),
+  commands: [...Object.values(COMMAND_BY_ACTION), 'crm:log_opp_activity'],
+  queries: Object.values(WORKBENCH_COVERAGE).flatMap((entry) => [...entry.queries]),
+  blocks: Object.entries(WORKBENCH_COVERAGE).flatMap(([pageKey, entry]) =>
+    entry.blocks.map((blockId) => `${pageKey}:${blockId}`)),
+  fields: Object.entries(WORKBENCH_COVERAGE).flatMap(([pageKey, entry]) =>
+    entry.fields.map((field) => `${pageKey}:${field}`)),
+  uiActions: [...EXPECTED_UI_ACTIONS],
+} as const;
+type CoverageAxis = keyof typeof expectedCoverage;
+const completedCoverage: Record<CoverageAxis, Set<string>> = Object.fromEntries(
+  Object.keys(expectedCoverage).map((axis) => [axis, new Set<string>()]),
+) as Record<CoverageAxis, Set<string>>;
+
+function cover(axis: CoverageAxis, ...items: string[]): void {
+  for (const item of items) completedCoverage[axis].add(item);
+}
+
+function coverWorkbench(pageKey: keyof typeof WORKBENCH_COVERAGE): void {
+  const entry = WORKBENCH_COVERAGE[pageKey];
+  cover('pages', pageKey);
+  cover('queries', ...entry.queries);
+  cover('blocks', ...entry.blocks.map((blockId) => `${pageKey}:${blockId}`));
+  cover('fields', ...entry.fields.map((field) => `${pageKey}:${field}`));
+}
+
 const ids = {
   account: '',
   lead: '',
@@ -90,6 +294,7 @@ let adminJwt = '';
 let salesJwt = '';
 let serviceJwt = '';
 let viewerJwt = '';
+let adminDisplayName = '';
 let salesUserPid = '';
 let salesLeadPid = '';
 let adminControlLeadPid = '';
@@ -248,7 +453,7 @@ async function provisionRoleUser(email: string, roleCode: string): Promise<strin
     method: 'POST',
     body: JSON.stringify({
       email,
-      displayName: `${roleCode} ${RUN}`.slice(0, 50),
+      displayName: ROLE_DISPLAY_NAMES[roleCode] || 'CRM 业务用户',
       initialPassword: PASSWORD,
       roleCodes: [roleCode],
       sendInviteEmail: false,
@@ -478,7 +683,9 @@ async function openCreateRouteWithKeyboard(
 async function assertNoRawCodes(page: Page): Promise<void> {
   const body = await page.locator('main, [role="main"]').first().innerText();
   expect(body).not.toMatch(/\bcrm_(?:acc|lead|opp|fcst|act|cmp)_[a-z_]+\b/);
+  expect(body).not.toMatch(/\bcrm_[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/i);
   expect(body).not.toMatch(/\b\d{18,20}\b/);
+  expect(body).not.toMatch(/\b[0-9A-HJKMNP-TV-Z]{26}\b/);
   expect(body).not.toMatch(/加载失败|Page not found/i);
 }
 
@@ -544,6 +751,9 @@ test.describe.configure({ mode: 'serial' });
 test.beforeAll(async () => {
   mkdirSync(EVIDENCE_DIR, { recursive: true });
   adminJwt = await loginApi();
+  const currentUser = assertOk(await api('/api/auth/me'), 'read current admin identity')?.data?.user;
+  adminDisplayName = String(currentUser?.name || '').trim();
+  expect(adminDisplayName, 'current admin must expose a readable display name').toBeTruthy();
   salesUserPid = await provisionRoleUser(SALES_EMAIL, 'crm_sales');
   await provisionRoleUser(SERVICE_EMAIL, 'crm_service');
   await provisionRoleUser(VIEWER_EMAIL, 'crm_viewer');
@@ -588,8 +798,23 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(() => {
+  for (const action of completedActions) {
+    const uiAction = expectedCoverage.uiActions.find((candidate) =>
+      candidate.endsWith(`:${action}`));
+    if (uiAction) cover('uiActions', uiAction);
+    const command = COMMAND_BY_ACTION[action];
+    if (command) cover('commands', command);
+  }
+  const coverage = Object.fromEntries(
+    Object.entries(expectedCoverage).map(([axis, expected]) => [axis, {
+      expected: [...expected].sort(),
+      completed: [...completedCoverage[axis as CoverageAxis]].sort(),
+    }]),
+  );
+  const coverageComplete = Object.values(coverage).every(({ expected, completed }) =>
+    expected.length === completed.length && expected.every((item, index) => item === completed[index]));
   const evidence = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     runId: RUN,
     baseUrl: BASE,
     backendUrl: BE,
@@ -599,8 +824,10 @@ test.afterAll(() => {
     expectedScenarios: EXPECTED_SCENARIOS,
     completedActions: [...completedActions].sort(),
     expectedActions: EXPECTED_ACTIONS,
+    coverage,
     verdict: EXPECTED_SCENARIOS.every((scenario) => completedScenarios.has(scenario))
       && EXPECTED_ACTIONS.every((action) => completedActions.has(action))
+      && coverageComplete
       ? 'pass'
       : 'incomplete',
   };
@@ -911,6 +1138,7 @@ test('Customer 360 exposes a prioritized relationship context and opens the sele
     await expect(page.getByText(`${RUN} Customer`, { exact: true }).first()).toBeVisible();
     await page.goBack({ waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL(/\/p\/c\/crm_customer_360_workbench/);
+    coverWorkbench('crm_customer_360_workbench');
     completedScenarios.add('customer-360');
   });
 
@@ -975,6 +1203,7 @@ test('Lead Desk executes the next valid lifecycle action and persists the new st
       (await getRecord('crm_lead_common', ids.leadLose)).crm_lead_status)
       .toBe('lost');
     completedActions.add('lose_lead');
+    coverWorkbench('crm_lead_desk_workbench');
     completedScenarios.add('lead-desk');
   });
 
@@ -1041,6 +1270,7 @@ test('Opportunity Workspace advances a selected deal and keeps the decision cont
       (await getRecord('crm_opportunity_common', ids.opportunityLose)).crm_opp_stage)
       .toBe('closed_lost');
     completedActions.add('lose_opportunity');
+    coverWorkbench('crm_opportunity_workspace');
     completedScenarios.add('opportunity-workspace');
   });
 
@@ -1114,15 +1344,22 @@ test('Cordys-parity journey keeps pipeline context, activity time, relation, and
     { timeout: 20_000 });
     await page.getByTestId('form-btn-submit').click();
     const activityResponse = await createActivityResponse;
-    const activityBody = await activityResponse.json().catch(() => ({}));
-    expect(activityResponse.ok(), JSON.stringify(activityBody)).toBeTruthy();
-    expect(String(activityBody?.code), JSON.stringify(activityBody)).toBe('0');
-    journeyActivityPid = String(findValue(activityBody?.data, [
-      'recordId',
-      'recordPid',
-      'publicRecordId',
-      'pid',
-    ]) || '');
+    expect(activityResponse.ok(), `log activity: HTTP ${activityResponse.status()}`).toBeTruthy();
+
+    // Submitting the command navigates immediately, so Chromium may release the
+    // response body before Playwright can read it. Prove the user-visible result
+    // through the persisted business record instead of coupling this journey to
+    // the transport response lifetime.
+    await expect.poll(async () => {
+      const records = await listRecords('crm_activity_common', [
+        { fieldName: 'crm_act_subject', operator: 'EQ', value: activitySubject },
+      ]);
+      return records.length;
+    }, { message: `persist activity ${activitySubject}`, timeout: 10_000 }).toBe(1);
+    const [persistedActivity] = await listRecords('crm_activity_common', [
+      { fieldName: 'crm_act_subject', operator: 'EQ', value: activitySubject },
+    ]);
+    journeyActivityPid = String(persistedActivity?.pid || '');
     expect(journeyActivityPid).toBeTruthy();
 
     const createdActivity = await getRecord('crm_activity_common', journeyActivityPid);
@@ -1136,6 +1373,7 @@ test('Cordys-parity journey keeps pipeline context, activity time, relation, and
     ]);
     expect(relations).toHaveLength(1);
     expect(relations[0].crm_ar_object_type).toBe('opportunity');
+    cover('commands', 'crm:log_opp_activity');
 
     const activitiesResponse = page.waitForResponse((response) =>
       response.request().method() === 'GET'
@@ -1175,7 +1413,7 @@ test('Cordys-parity journey keeps pipeline context, activity time, relation, and
     await searchForecast(page, FORECAST_PERIOD);
     await selectRow(page, FORECAST_PERIOD);
     const selectedForecastRow = page.locator('tr').filter({ hasText: FORECAST_PERIOD }).first();
-    await expect(selectedForecastRow).toContainText('Admin User');
+    await expect(selectedForecastRow).toContainText(adminDisplayName);
     await expect(selectedForecastRow).not.toContainText(/\b[0-9A-HJKMNP-TV-Z]{26}\b/);
     await expect(page.getByTestId('status-banner-crm_forecast_status')).toBeVisible();
     await expect(page.getByTestId('workbench-action-submit_forecast')).toBeVisible();
@@ -1187,6 +1425,7 @@ test('Cordys-parity journey keeps pipeline context, activity time, relation, and
       (await getRecord('crm_forecast_submission', ids.forecast)).crm_fcst_status)
       .toBe('submitted');
     completedActions.add('submit_forecast');
+    coverWorkbench('crm_forecast_cockpit');
     completedScenarios.add('forecast-cockpit');
   });
 
@@ -1257,6 +1496,7 @@ test('Activity & Service Desk drives both task and complaint recovery actions',
       (await getRecord('crm_complaint', ids.complaintClose)).crm_cmp_status)
       .toBe('closed');
     completedActions.add('close_complaint');
+    coverWorkbench('crm_activity_service_desk');
     completedScenarios.add('activity-service-desk');
   });
 

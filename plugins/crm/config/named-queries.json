@@ -24,6 +24,11 @@
         "searchable": true
       },
       {
+        "code": "crm_act_content",
+        "columnExpr": "crm_act_content",
+        "dataType": "string"
+      },
+      {
         "code": "crm_act_date",
         "columnExpr": "crm_act_date",
         "dataType": "date",
@@ -321,7 +326,7 @@
     "name:zh-CN": "客户时间线",
     "name:en": "Account Timeline",
     "description": "All activities related to an account (direct + via contacts + via opportunities)",
-    "fromSql": "SELECT DISTINCT a.*, r.crm_ar_object_type, r.crm_ar_role FROM mt_crm_activity_common a JOIN mt_crm_activity_relation_common r ON a.pid = r.crm_ar_activity_id AND r.tenant_id = #{params.tenantId} WHERE a.tenant_id = #{params.tenantId} AND ((r.crm_ar_object_type = 'account' AND r.crm_ar_object_id = #{params.objectId}) OR (r.crm_ar_object_type = 'contact' AND r.crm_ar_object_id IN (SELECT pid FROM mt_crm_contact_common WHERE crm_ct_account_id = #{params.objectId} AND tenant_id = #{params.tenantId})) OR (r.crm_ar_object_type = 'opportunity' AND r.crm_ar_object_id IN (SELECT pid FROM mt_crm_opportunity_common WHERE crm_opp_account_id = #{params.objectId} AND tenant_id = #{params.tenantId}))) ORDER BY a.crm_act_date DESC",
+    "fromSql": "SELECT DISTINCT a.*, a.crm_act_ext->>'status' AS crm_act_status, a.crm_act_ext->>'priority' AS crm_act_priority, r.crm_ar_object_type, r.crm_ar_role, COALESCE(u.nick_name, u.user_name, '未分配') AS owner_name FROM mt_crm_activity_common a JOIN mt_crm_activity_relation_common r ON a.pid = r.crm_ar_activity_id AND r.tenant_id = #{params.tenantId} LEFT JOIN ab_user u ON u.pid = a.crm_act_owner WHERE a.tenant_id = #{params.tenantId} AND ((r.crm_ar_object_type = 'account' AND r.crm_ar_object_id = #{params.objectId}) OR (r.crm_ar_object_type = 'contact' AND r.crm_ar_object_id IN (SELECT pid FROM mt_crm_contact_common WHERE crm_ct_account_id = #{params.objectId} AND tenant_id = #{params.tenantId})) OR (r.crm_ar_object_type = 'opportunity' AND r.crm_ar_object_id IN (SELECT pid FROM mt_crm_opportunity_common WHERE crm_opp_account_id = #{params.objectId} AND tenant_id = #{params.tenantId}))) ORDER BY a.crm_act_date DESC",
     "outputFields": [
       {
         "code": "pid",
@@ -341,6 +346,11 @@
         "searchable": true
       },
       {
+        "code": "crm_act_content",
+        "columnExpr": "crm_act_content",
+        "dataType": "string"
+      },
+      {
         "code": "crm_act_date",
         "columnExpr": "crm_act_date",
         "dataType": "date",
@@ -349,6 +359,21 @@
       {
         "code": "crm_act_owner",
         "columnExpr": "crm_act_owner",
+        "dataType": "string"
+      },
+      {
+        "code": "owner_name",
+        "columnExpr": "owner_name",
+        "dataType": "string"
+      },
+      {
+        "code": "crm_act_status",
+        "columnExpr": "crm_act_status",
+        "dataType": "string"
+      },
+      {
+        "code": "crm_act_priority",
+        "columnExpr": "crm_act_priority",
         "dataType": "string"
       },
       {
@@ -416,7 +441,7 @@
     "name:zh-CN": "CRM 关键指标",
     "name:en": "CRM Dashboard KPI",
     "description": "Overall CRM KPI: total leads, open opportunities, won revenue, active accounts, pending complaints, and pending quote summaries",
-    "fromSql": "SELECT (SELECT COUNT(*) FROM mt_crm_lead_common WHERE tenant_id = #{params.tenantId}) AS total_leads, (SELECT COUNT(*) FROM mt_crm_lead_common WHERE crm_lead_status = 'new' AND tenant_id = #{params.tenantId}) AS new_leads, (SELECT COUNT(*) FROM mt_crm_opportunity_common WHERE crm_opp_stage NOT IN ('closed_won', 'closed_lost') AND tenant_id = #{params.tenantId}) AS open_opportunities, (SELECT COALESCE(SUM(crm_opp_expected_amount::numeric), 0) FROM mt_crm_opportunity_common WHERE crm_opp_stage NOT IN ('closed_won', 'closed_lost') AND tenant_id = #{params.tenantId}) AS pipeline_value, (SELECT COALESCE(SUM(crm_opp_expected_amount::numeric), 0) FROM mt_crm_opportunity_common WHERE crm_opp_stage = 'closed_won' AND tenant_id = #{params.tenantId}) AS won_revenue, (SELECT COUNT(*) FROM mt_crm_account_common WHERE crm_acc_status = 'active' AND tenant_id = #{params.tenantId}) AS active_accounts, (SELECT COUNT(*) FROM mt_crm_complaint WHERE crm_cmp_status IN ('new', 'investigating') AND tenant_id = #{params.tenantId}) AS pending_complaints, (SELECT COUNT(*) FROM mt_crm_quote_summary_common WHERE crm_qs_status IN ('draft', 'pricing', 'approval') AND tenant_id = #{params.tenantId}) AS pending_quotes",
+    "fromSql": "SELECT (SELECT COUNT(*) FROM mt_crm_lead_common WHERE tenant_id = #{params.tenantId}) AS total_leads, (SELECT COUNT(*) FROM mt_crm_lead_common WHERE crm_lead_status = 'new' AND tenant_id = #{params.tenantId}) AS new_leads, (SELECT COUNT(*) FROM mt_crm_opportunity_common WHERE crm_opp_stage NOT IN ('closed_won', 'closed_lost') AND tenant_id = #{params.tenantId}) AS open_opportunities, (SELECT COALESCE(SUM(crm_opp_expected_amount::numeric), 0) FROM mt_crm_opportunity_common WHERE crm_opp_stage NOT IN ('closed_won', 'closed_lost') AND tenant_id = #{params.tenantId}) AS pipeline_value, (SELECT COALESCE(SUM(crm_opp_expected_amount::numeric), 0) FROM mt_crm_opportunity_common WHERE crm_opp_stage = 'closed_won' AND tenant_id = #{params.tenantId}) AS won_revenue, (SELECT COUNT(*) FROM mt_crm_account_common WHERE crm_acc_status = 'active' AND tenant_id = #{params.tenantId}) AS active_accounts, (SELECT COUNT(*) FROM mt_crm_complaint WHERE crm_cmp_status IN ('open', 'investigating') AND tenant_id = #{params.tenantId}) AS pending_complaints, (SELECT COUNT(*) FROM mt_crm_quote_summary_common WHERE crm_qs_status IN ('draft', 'pricing', 'approval') AND tenant_id = #{params.tenantId}) AS pending_quotes",
     "outputFields": [
       {
         "code": "total_leads",
@@ -465,7 +490,7 @@
     "name:zh-CN": "最近活动",
     "name:en": "Recent Activities",
     "description": "Recent CRM activities across all objects for dashboard",
-    "fromSql": "SELECT a.pid, a.crm_act_type, a.crm_act_subject, a.crm_act_date, a.crm_act_owner, a.crm_act_source, r.crm_ar_object_type FROM mt_crm_activity_common a LEFT JOIN mt_crm_activity_relation_common r ON a.pid = r.crm_ar_activity_id AND r.tenant_id = #{params.tenantId} WHERE a.tenant_id = #{params.tenantId} ORDER BY a.crm_act_date DESC LIMIT 20",
+    "fromSql": "SELECT a.pid, a.crm_act_type, a.crm_act_subject, a.crm_act_date, a.crm_act_owner, a.crm_act_source, COALESCE(r.crm_ar_object_type, CASE a.crm_act_related_model WHEN 'crm_account_common' THEN 'account' WHEN 'crm_contact_common' THEN 'contact' WHEN 'crm_lead_common' THEN 'lead' WHEN 'crm_opportunity_common' THEN 'opportunity' WHEN 'crm_quote_summary_common' THEN 'quote' WHEN 'crm_complaint' THEN 'complaint' ELSE NULL END) AS crm_ar_object_type FROM mt_crm_activity_common a LEFT JOIN mt_crm_activity_relation_common r ON a.pid = r.crm_ar_activity_id AND r.tenant_id = #{params.tenantId} WHERE a.tenant_id = #{params.tenantId} ORDER BY a.crm_act_date DESC LIMIT 20",
     "outputFields": [
       {
         "code": "pid",
@@ -505,6 +530,37 @@
         "columnExpr": "crm_ar_object_type",
         "dataType": "string"
       }
+    ]
+  },
+  {
+    "code": "crm_dashboard_recent_opportunities",
+    "name:zh-CN": "驾驶舱最新商机",
+    "name:en": "Dashboard Recent Opportunities",
+    "description": "Recent opportunities with business account names for the CRM dashboard.",
+    "fromSql": "SELECT o.pid, o.crm_opp_name, COALESCE(a.crm_acc_name, '未关联客户') AS account_name, o.crm_opp_stage, o.crm_opp_expected_amount, o.created_at FROM mt_crm_opportunity_common o LEFT JOIN mt_crm_account_common a ON a.pid = o.crm_opp_account_id AND a.tenant_id = o.tenant_id WHERE o.tenant_id = #{params.tenantId} ORDER BY o.created_at DESC LIMIT 50",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "crm_opp_name", "columnExpr": "crm_opp_name", "dataType": "string", "searchable": true },
+      { "code": "account_name", "columnExpr": "account_name", "dataType": "string", "searchable": true },
+      { "code": "crm_opp_stage", "columnExpr": "crm_opp_stage", "dataType": "string", "searchable": true },
+      { "code": "crm_opp_expected_amount", "columnExpr": "crm_opp_expected_amount", "dataType": "number", "sortable": true },
+      { "code": "created_at", "columnExpr": "created_at", "dataType": "date", "sortable": true }
+    ]
+  },
+  {
+    "code": "crm_dashboard_pending_quotes",
+    "name:zh-CN": "驾驶舱待处理报价",
+    "name:en": "Dashboard Pending Quotes",
+    "description": "Pending quote summaries with business account names for the CRM dashboard.",
+    "fromSql": "SELECT q.pid, q.crm_qs_code, COALESCE(a.crm_acc_name, '未关联客户') AS account_name, q.crm_qs_source_quote_type, q.crm_qs_quote_amount, q.crm_qs_status, q.created_at FROM mt_crm_quote_summary_common q LEFT JOIN mt_crm_account_common a ON a.pid = q.crm_qs_account_id AND a.tenant_id = q.tenant_id WHERE q.tenant_id = #{params.tenantId} AND q.crm_qs_status IN ('draft', 'pricing', 'approval') ORDER BY q.created_at DESC LIMIT 50",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "crm_qs_code", "columnExpr": "crm_qs_code", "dataType": "string", "searchable": true },
+      { "code": "account_name", "columnExpr": "account_name", "dataType": "string", "searchable": true },
+      { "code": "crm_qs_source_quote_type", "columnExpr": "crm_qs_source_quote_type", "dataType": "string" },
+      { "code": "crm_qs_quote_amount", "columnExpr": "crm_qs_quote_amount", "dataType": "number", "sortable": true },
+      { "code": "crm_qs_status", "columnExpr": "crm_qs_status", "dataType": "string", "searchable": true },
+      { "code": "created_at", "columnExpr": "created_at", "dataType": "date", "sortable": true }
     ]
   },
   {
@@ -802,8 +858,13 @@
     "name:zh-CN": "按销售人员预测",
     "name:en": "Sales Forecast by Owner",
     "description": "Pipeline forecast grouped by opportunity owner for team comparison",
-    "fromSql": "SELECT COALESCE(u.nick_name, u.user_name, o.crm_opp_owner, 'Unassigned') AS owner_name, COUNT(*) AS opportunity_count, COALESCE(SUM(o.crm_opp_expected_amount), 0) AS total_amount, COALESCE(SUM(o.crm_opp_expected_amount * COALESCE(o.crm_opp_probability, CASE o.crm_opp_stage WHEN 'discovery' THEN 10 WHEN 'qualification' THEN 25 WHEN 'proposal' THEN 50 WHEN 'negotiation' THEN 75 ELSE 10 END) / 100), 0) AS weighted_forecast FROM mt_crm_opportunity_common o LEFT JOIN ab_user u ON o.crm_opp_owner = u.pid WHERE o.tenant_id = #{params.tenantId} AND o.crm_opp_stage NOT IN ('closed_won', 'closed_lost') GROUP BY COALESCE(u.nick_name, u.user_name, o.crm_opp_owner, 'Unassigned') ORDER BY weighted_forecast DESC",
+    "fromSql": "SELECT u.pid AS owner_pid, COALESCE(u.nick_name, u.user_name, '未分配') AS owner_name, COUNT(*) AS opportunity_count, COALESCE(SUM(o.crm_opp_expected_amount), 0) AS total_amount, COALESCE(SUM(o.crm_opp_expected_amount * COALESCE(o.crm_opp_probability, CASE o.crm_opp_stage WHEN 'discovery' THEN 10 WHEN 'qualification' THEN 25 WHEN 'proposal' THEN 50 WHEN 'negotiation' THEN 75 ELSE 10 END) / 100), 0) AS weighted_forecast FROM mt_crm_opportunity_common o LEFT JOIN ab_user u ON o.crm_opp_owner = u.pid WHERE o.tenant_id = #{params.tenantId} AND o.crm_opp_stage NOT IN ('closed_won', 'closed_lost') GROUP BY u.pid, COALESCE(u.nick_name, u.user_name, '未分配') ORDER BY weighted_forecast DESC",
     "outputFields": [
+      {
+        "code": "owner_pid",
+        "columnExpr": "owner_pid",
+        "dataType": "string"
+      },
       {
         "code": "owner_name",
         "columnExpr": "owner_name",
@@ -1447,7 +1508,7 @@
     "description": "Customer portfolio queue with relationship, pipeline, activity and service risk context.",
     "resourceCode": "crm_account_common",
     "actionCode": "read",
-    "fromSql": "SELECT * FROM (SELECT a.pid, a.crm_acc_code, a.crm_acc_name, a.crm_acc_industry, a.crm_acc_rating, a.crm_acc_status, a.crm_acc_owner, a.crm_acc_health_score, a.crm_acc_health_band, COALESCE(ct.contact_count, 0) AS contact_count, COALESCE(o.open_opportunities, 0) AS open_opportunities, COALESCE(o.pipeline_amount, 0) AS pipeline_amount, act.last_activity_at, CASE WHEN act.last_activity_at IS NULL THEN NULL ELSE EXTRACT(DAY FROM (now() - act.last_activity_at))::int END AS days_since_activity, COALESCE(c.open_complaints, 0) AS open_complaints, CASE WHEN COALESCE(c.open_complaints, 0) > 0 THEN 'service_risk' WHEN a.crm_acc_health_band = 'red' THEN 'health_risk' WHEN COALESCE(o.open_opportunities, 0) > 0 THEN 'pipeline' WHEN a.crm_acc_status = 'active' THEN 'active' ELSE 'watch' END AS attention_reason FROM mt_crm_account_common a LEFT JOIN (SELECT crm_ct_account_id AS account_id, COUNT(*) AS contact_count FROM mt_crm_contact_common WHERE tenant_id = #{params.tenantId} GROUP BY crm_ct_account_id) ct ON ct.account_id = a.pid LEFT JOIN (SELECT crm_opp_account_id AS account_id, COUNT(*) FILTER (WHERE crm_opp_stage NOT IN ('closed_won', 'closed_lost')) AS open_opportunities, COALESCE(SUM(crm_opp_expected_amount) FILTER (WHERE crm_opp_stage NOT IN ('closed_won', 'closed_lost')), 0) AS pipeline_amount FROM mt_crm_opportunity_common WHERE tenant_id = #{params.tenantId} GROUP BY crm_opp_account_id) o ON o.account_id = a.pid LEFT JOIN (SELECT r.crm_ar_object_id AS account_id, MAX(ac.crm_act_date) AS last_activity_at FROM mt_crm_activity_relation_common r JOIN mt_crm_activity_common ac ON ac.pid = r.crm_ar_activity_id AND ac.tenant_id = #{params.tenantId} WHERE r.tenant_id = #{params.tenantId} AND r.crm_ar_object_type = 'account' GROUP BY r.crm_ar_object_id) act ON act.account_id = a.pid LEFT JOIN (SELECT crm_cmp_account_id AS account_id, COUNT(*) FILTER (WHERE crm_cmp_status IN ('open', 'investigating')) AS open_complaints FROM mt_crm_complaint WHERE tenant_id = #{params.tenantId} GROUP BY crm_cmp_account_id) c ON c.account_id = a.pid WHERE a.tenant_id = #{params.tenantId}) q WHERE (COALESCE(CAST(#{params.customerKeyword} AS text), '') = '' OR q.crm_acc_code ILIKE CONCAT('%', CAST(#{params.customerKeyword} AS text), '%') OR q.crm_acc_name ILIKE CONCAT('%', CAST(#{params.customerKeyword} AS text), '%')) AND (COALESCE(CAST(#{params.viewFilter} AS text), '') = '' OR CAST(#{params.viewFilter} AS text) = 'all' OR (CAST(#{params.viewFilter} AS text) = 'active' AND q.crm_acc_status = 'active') OR (CAST(#{params.viewFilter} AS text) = 'pipeline' AND q.open_opportunities > 0) OR (CAST(#{params.viewFilter} AS text) = 'service_risk' AND q.open_complaints > 0)) ORDER BY CASE q.attention_reason WHEN 'service_risk' THEN 1 WHEN 'health_risk' THEN 2 WHEN 'pipeline' THEN 3 WHEN 'active' THEN 4 ELSE 5 END, q.pipeline_amount DESC, q.crm_acc_name",
+    "fromSql": "SELECT * FROM (SELECT a.pid, a.crm_acc_code, a.crm_acc_name, a.crm_acc_industry, a.crm_acc_rating, a.crm_acc_status, a.crm_acc_owner, COALESCE(u.nick_name, u.user_name, '未分配') AS owner_name, a.crm_acc_health_score, a.crm_acc_health_band, COALESCE(ct.contact_count, 0) AS contact_count, COALESCE(o.open_opportunities, 0) AS open_opportunities, COALESCE(o.pipeline_amount, 0) AS pipeline_amount, act.last_activity_at, CASE WHEN act.last_activity_at IS NULL THEN NULL ELSE EXTRACT(DAY FROM (now() - act.last_activity_at))::int END AS days_since_activity, COALESCE(c.open_complaints, 0) AS open_complaints, CASE WHEN COALESCE(c.open_complaints, 0) > 0 THEN 'service_risk' WHEN a.crm_acc_health_band = 'red' THEN 'health_risk' WHEN COALESCE(o.open_opportunities, 0) > 0 THEN 'pipeline' WHEN a.crm_acc_status = 'active' THEN 'active' ELSE 'watch' END AS attention_reason FROM mt_crm_account_common a LEFT JOIN ab_user u ON u.pid = a.crm_acc_owner LEFT JOIN (SELECT crm_ct_account_id AS account_id, COUNT(*) AS contact_count FROM mt_crm_contact_common WHERE tenant_id = #{params.tenantId} GROUP BY crm_ct_account_id) ct ON ct.account_id = a.pid LEFT JOIN (SELECT crm_opp_account_id AS account_id, COUNT(*) FILTER (WHERE crm_opp_stage NOT IN ('closed_won', 'closed_lost')) AS open_opportunities, COALESCE(SUM(crm_opp_expected_amount) FILTER (WHERE crm_opp_stage NOT IN ('closed_won', 'closed_lost')), 0) AS pipeline_amount FROM mt_crm_opportunity_common WHERE tenant_id = #{params.tenantId} GROUP BY crm_opp_account_id) o ON o.account_id = a.pid LEFT JOIN (SELECT r.crm_ar_object_id AS account_id, MAX(ac.crm_act_date) AS last_activity_at FROM mt_crm_activity_relation_common r JOIN mt_crm_activity_common ac ON ac.pid = r.crm_ar_activity_id AND ac.tenant_id = #{params.tenantId} WHERE r.tenant_id = #{params.tenantId} AND r.crm_ar_object_type = 'account' GROUP BY r.crm_ar_object_id) act ON act.account_id = a.pid LEFT JOIN (SELECT crm_cmp_account_id AS account_id, COUNT(*) FILTER (WHERE crm_cmp_status IN ('open', 'investigating')) AS open_complaints FROM mt_crm_complaint WHERE tenant_id = #{params.tenantId} GROUP BY crm_cmp_account_id) c ON c.account_id = a.pid WHERE a.tenant_id = #{params.tenantId}) q WHERE (COALESCE(CAST(#{params.customerKeyword} AS text), '') = '' OR q.crm_acc_code ILIKE CONCAT('%', CAST(#{params.customerKeyword} AS text), '%') OR q.crm_acc_name ILIKE CONCAT('%', CAST(#{params.customerKeyword} AS text), '%')) AND (COALESCE(CAST(#{params.viewFilter} AS text), '') = '' OR CAST(#{params.viewFilter} AS text) = 'all' OR (CAST(#{params.viewFilter} AS text) = 'active' AND q.crm_acc_status = 'active') OR (CAST(#{params.viewFilter} AS text) = 'pipeline' AND q.open_opportunities > 0) OR (CAST(#{params.viewFilter} AS text) = 'service_risk' AND q.open_complaints > 0)) ORDER BY CASE q.attention_reason WHEN 'service_risk' THEN 1 WHEN 'health_risk' THEN 2 WHEN 'pipeline' THEN 3 WHEN 'active' THEN 4 ELSE 5 END, q.pipeline_amount DESC, q.crm_acc_name",
     "outputFields": [
       { "code": "pid", "columnExpr": "pid", "dataType": "string" },
       { "code": "crm_acc_code", "columnExpr": "crm_acc_code", "dataType": "string", "searchable": true },
@@ -1456,6 +1517,7 @@
       { "code": "crm_acc_rating", "columnExpr": "crm_acc_rating", "dataType": "string" },
       { "code": "crm_acc_status", "columnExpr": "crm_acc_status", "dataType": "string" },
       { "code": "crm_acc_owner", "columnExpr": "crm_acc_owner", "dataType": "string" },
+      { "code": "owner_name", "columnExpr": "owner_name", "dataType": "string" },
       { "code": "crm_acc_health_score", "columnExpr": "crm_acc_health_score", "dataType": "number" },
       { "code": "crm_acc_health_band", "columnExpr": "crm_acc_health_band", "dataType": "string" },
       { "code": "contact_count", "columnExpr": "contact_count", "dataType": "number" },

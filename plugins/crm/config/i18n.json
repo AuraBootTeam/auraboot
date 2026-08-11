@@ -2303,6 +2303,13 @@
     "refType": "page"
   },
   {
+    "key": "page.crm_account_360.description",
+    "zh-CN": "客户关键指标、近期商机与活动全景",
+    "en-US": "Account metrics, recent opportunities, and activity overview",
+    "source": "import",
+    "refType": "page"
+  },
+  {
     "key": "crm.stat.contacts",
     "zh-CN": "联系人",
     "en-US": "Contacts",
@@ -2509,6 +2516,27 @@
     "key": "page.crm_dashboard.title",
     "zh-CN": "CRM 驾驶舱",
     "en-US": "CRM Dashboard",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_dashboard.description",
+    "zh-CN": "销售全景、商机管道、线索来源与客户行动的一体化经营视图",
+    "en-US": "An integrated operating view of sales, pipeline, lead sources and customer actions",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_sales_forecast.title",
+    "zh-CN": "销售预测",
+    "en-US": "Sales Forecast",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_sales_forecast.description",
+    "zh-CN": "按阶段、月份、负责人和预测类别统一核对管道与加权预测",
+    "en-US": "Review pipeline and weighted forecasts by stage, month, owner and category",
     "source": "import",
     "refType": "page"
   },

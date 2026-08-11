@@ -172,8 +172,15 @@ export interface WidgetConfig {
   modelCode?: string;
   /** Optional widget-level table config (column order, labels, alignment). */
   table?: Record<string, unknown>;
-  /** Optional default sort applied client-side (e.g. for table widgets). */
+  /** Optional record filters for model-table widgets. */
+  filters?: FilterConfig[];
+  /** Optional default sort applied by model-table widgets. */
   defaultSort?: { field: string; order: 'asc' | 'desc' };
+  /** Model-table paging and presentation options. */
+  pageSize?: number;
+  showPagination?: boolean;
+  sortable?: boolean;
+  striped?: boolean;
   /**
    * Multi-KPI configuration for `smart-number-card`. Each entry binds one column from
    * the data source row to a labelled tile; `label` carries the human-readable eyebrow

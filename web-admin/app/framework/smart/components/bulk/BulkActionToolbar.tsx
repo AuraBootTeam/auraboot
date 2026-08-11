@@ -130,6 +130,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
             <button
               key={button.code}
               type="button"
+              data-testid={`bulk-action-${button.code}`}
               onClick={() => handleCustomBulkAction(button)}
               disabled={isRunning}
               className={cn(

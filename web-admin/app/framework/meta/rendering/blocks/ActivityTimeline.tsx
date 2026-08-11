@@ -6,7 +6,7 @@
  * Actor types: USER, SYSTEM, AGENT
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { fetchResult } from '~/shared/services/http-client';
@@ -18,7 +18,7 @@ const INTERNAL_ID_PATTERN =
   /\b(?:01[0-9A-HJKMNP-TV-Z]{24}|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\b/gi;
 
 interface ActivityRecord {
-  id: number;
+  id: number | string;
   pid: string;
   objectModel: string;
   objectRecord: string;
@@ -33,6 +33,15 @@ interface ActivityRecord {
   metadata: string | null;
   occurredAt: string;
   createdAt: string;
+  source?: 'audit' | 'business';
+}
+
+export interface BusinessActivityDataSource {
+  endpoint?: string;
+  url?: string;
+  method?: 'get' | 'post';
+  queryCode?: string;
+  params?: Record<string, unknown>;
 }
 
 export interface ActivityTimelineProps {
@@ -41,6 +50,8 @@ export interface ActivityTimelineProps {
   token?: string;
   locale?: string;
   t?: (key: string) => string;
+  /** Optional CRM business-activity query merged with the platform audit log. */
+  businessDataSource?: BusinessActivityDataSource;
 }
 
 // Activity type → [icon, zh label, en label, dot color class]
@@ -55,6 +66,10 @@ const ACTIVITY_TYPE_CONFIG: Record<string, [React.ReactNode, string, string, str
   CALL: [<PhoneIcon key="p" />, 'Call', 'Call', 'bg-status-blue'],
   EMAIL: [<EmailIcon key="e" />, 'Email', 'Email', 'bg-status-blue'],
   MEETING: [<MeetingIcon key="m" />, 'Meeting', 'Meeting', 'bg-status-amber'],
+  VISIT: [<MeetingIcon key="v" />, 'Visit', 'Visit', 'bg-status-green'],
+  TASK: [<NoteIcon key="t" />, 'Task', 'Task', 'bg-status-amber'],
+  SMS: [<EmailIcon key="sms" />, 'Message', 'Message', 'bg-status-blue'],
+  CHAT: [<EmailIcon key="chat" />, 'Chat', 'Chat', 'bg-status-blue'],
   SYSTEM: [<SystemIcon key="sys" />, 'System', 'System', 'bg-status-gray'],
 };
 
@@ -63,10 +78,14 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   recordPid,
   token,
   locale = 'zh-CN',
+  businessDataSource,
 }) => {
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'interaction' | 'task' | 'system'>(
+    'all',
+  );
 
   const loadActivities = useCallback(async () => {
     if (!modelCode || !recordPid) {
@@ -76,31 +95,82 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
 
     setLoading(true);
     setError(null);
+    const auditRequest = fetchResult<ActivityRecord[]>('/api/activities', {
+      method: 'get',
+      params: { objectModel: modelCode, objectRecord: recordPid, limit: 100 },
+      token,
+    });
+    const businessRequest = businessDataSource
+      ? fetchResult<unknown>(
+          businessDataSource.endpoint ?? businessDataSource.url ?? '/api/datasource/list',
+          {
+            method: businessDataSource.method ?? 'get',
+            params: resolveBusinessParams(businessDataSource, modelCode, recordPid),
+            token,
+          },
+        )
+      : null;
+
     try {
-      const result = await fetchResult<ActivityRecord[]>('/api/activities', {
-        method: 'get',
-        params: { objectModel: modelCode, objectRecord: recordPid, limit: 50 },
-        token,
-      });
-      if (ResultHelper.isSuccess(result) && Array.isArray(result.data)) {
-        setActivities(result.data);
-      } else {
-        setActivities([]);
+      const [auditOutcome, businessOutcome] = await Promise.all([
+        settle(auditRequest),
+        businessRequest ? settle(businessRequest) : Promise.resolve(null),
+      ]);
+      const auditRows =
+        auditOutcome.ok &&
+        ResultHelper.isSuccess(auditOutcome.value) &&
+        Array.isArray(auditOutcome.value.data)
+          ? auditOutcome.value.data.map((row) => ({ ...row, source: 'audit' as const }))
+          : [];
+      const businessRows =
+        businessOutcome?.ok && ResultHelper.isSuccess(businessOutcome.value)
+          ? extractBusinessRecords(businessOutcome.value.data).map(normalizeBusinessActivity)
+          : [];
+      const merged = [...auditRows, ...businessRows].sort(
+        (left, right) => dayjs(right.occurredAt).valueOf() - dayjs(left.occurredAt).valueOf(),
+      );
+      setActivities(merged);
+
+      if (
+        merged.length === 0 &&
+        (!auditOutcome.ok || (businessOutcome != null && !businessOutcome.ok))
+      ) {
+        const denied =
+          (!auditOutcome.ok && auditOutcome.error?.status === 403) ||
+          (businessOutcome != null && !businessOutcome.ok && businessOutcome.error?.status === 403);
+        setError(
+          denied
+            ? locale === 'zh-CN'
+              ? '无活动记录查看权限'
+              : 'No permission to view activities'
+            : locale === 'zh-CN'
+              ? '活动时间线加载失败，请重试'
+              : 'Failed to load the activity timeline. Try again.',
+        );
       }
     } catch (e: any) {
-      if (e?.status === 403) {
-        setError(locale === 'zh-CN' ? '无活动记录查看权限' : 'No permission to view activities');
-      } else {
-        setError(e?.message || 'Failed to load activities');
-      }
+      setError(
+        e?.status === 403
+          ? locale === 'zh-CN'
+            ? '无活动记录查看权限'
+            : 'No permission to view activities'
+          : e?.message || (locale === 'zh-CN' ? '活动时间线加载失败' : 'Failed to load activities'),
+      );
     } finally {
       setLoading(false);
     }
-  }, [modelCode, recordPid, token, locale]);
+  }, [businessDataSource, modelCode, recordPid, token, locale]);
 
   useEffect(() => {
     loadActivities();
   }, [loadActivities]);
+
+  const counts = useMemo(() => summarizeActivities(activities), [activities]);
+  const filteredActivities = useMemo(
+    () => activities.filter((activity) => matchesTimelineFilter(activity, activeFilter)),
+    [activeFilter, activities],
+  );
+  const groups = groupByDate(filteredActivities);
 
   if (loading) {
     return (
@@ -108,7 +178,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
         className="text-text-3 flex items-center justify-center py-12"
         data-testid="activity-timeline-loading"
       >
-        <div className="rounded-pill border-border-strong mr-2 h-5 w-5 animate-spin border-2 border-t-accent" />
+        <div className="rounded-pill border-border-strong border-t-accent mr-2 h-5 w-5 animate-spin border-2" />
         {locale === 'zh-CN' ? '加载活动记录...' : 'Loading activities...'}
       </div>
     );
@@ -133,83 +203,132 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
     );
   }
 
-  // Group activities by date
-  const groups = groupByDate(activities);
+  const filterOptions = [
+    { key: 'all' as const, zh: '全部', en: 'All', count: counts.all },
+    { key: 'interaction' as const, zh: '客户互动', en: 'Interactions', count: counts.interaction },
+    { key: 'task' as const, zh: '任务', en: 'Tasks', count: counts.task },
+    { key: 'system' as const, zh: '系统变更', en: 'System changes', count: counts.system },
+  ];
 
   return (
-    <div className="relative" data-testid="activity-timeline">
-      {/* Timeline line */}
-      <div className="absolute top-0 bottom-0 left-4 w-px bg-border-strong" />
-
-      <div className="space-y-6 pl-10">
-        {groups.map((group) => (
-          <div key={group.date}>
-            {/* Date header */}
-            <div className="relative mb-3">
-              <div className="rounded-pill border-border-strong bg-panel absolute top-0.5 -left-10 h-3 w-3 border-2" />
-              <span className="text-text-3 text-xs font-medium tracking-wide uppercase">
-                {formatDateHeader(group.date, locale)}
-              </span>
-            </div>
-
-            {/* Activity entries for this date */}
-            <div className="space-y-3">
-              {group.entries.map((activity) => {
-                const activityType = normalizeActivityType(activity.activityType);
-                const actorType = normalizeActorType(activity.actorType);
-                const actorLabel = resolveActorLabel(activity, locale);
-                const subject = sanitizeVisibleText(activity.subject);
-                const content = sanitizeVisibleText(activity.content);
-                const config = ACTIVITY_TYPE_CONFIG[activityType] || ACTIVITY_TYPE_CONFIG.SYSTEM;
-                const [icon, _zhLabel, _enLabel, dotColor] = config;
-
-                return (
-                  <div
-                    key={activity.id}
-                    className="relative"
-                    data-testid={`activity-timeline-item-${activity.id}`}
-                    data-activity-type={activityType}
-                  >
-                    {/* Timeline dot */}
-                    <div className={`absolute top-1.5 -left-10 h-3 w-3 rounded-full ${dotColor}`} />
-
-                    <div className="rounded-card bg-subtle border border-border px-4 py-3">
-                      {/* Header: icon + type badge + actor + time */}
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="text-text-3 flex-shrink-0">{icon}</span>
-                        <ActivityTypeBadge type={activityType} locale={locale} />
-                        <span className="text-text-2 font-medium">{actorLabel}</span>
-                        {actorType === 'agent' && (
-                          <span className="rounded bg-status-blue-bg px-1.5 py-0.5 text-[10px] font-medium text-status-blue">
-                            AI
-                          </span>
-                        )}
-                        <span className="text-text-3">&middot;</span>
-                        <time className="text-text-3 text-xs" title={activity.occurredAt}>
-                          {formatTime(activity.occurredAt)}
-                        </time>
-                      </div>
-
-                      {/* Subject */}
-                      {subject && <p className="text-text mt-1.5 text-sm">{subject}</p>}
-
-                      {/* Content */}
-                      {content && (
-                        <p className="text-text-2 mt-1 text-xs whitespace-pre-wrap">{content}</p>
-                      )}
-
-                      {/* Metadata (state transitions) */}
-                      {activity.metadata && (
-                        <MetadataDisplay metadata={activity.metadata} locale={locale} />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+    <div data-testid="activity-timeline">
+      <div className="border-border mb-5 flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h3 className="text-text text-base font-semibold">
+            {locale === 'zh-CN' ? '客户互动时间线' : 'Customer activity timeline'}
+          </h3>
+          <p className="text-text-3 mt-1 text-xs">
+            {locale === 'zh-CN'
+              ? '业务跟进、待办任务与系统变更按时间合并展示'
+              : 'Business interactions, tasks, and system changes in one chronological view'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Timeline filters">
+          {filterOptions.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              role="tab"
+              aria-selected={activeFilter === option.key}
+              data-testid={`activity-timeline-filter-${option.key}`}
+              onClick={() => setActiveFilter(option.key)}
+              className={`rounded-pill px-3 py-1.5 text-xs font-medium transition-colors ${
+                activeFilter === option.key
+                  ? 'bg-accent text-white'
+                  : 'bg-subtle text-text-2 hover:bg-hover'
+              }`}
+            >
+              {locale === 'zh-CN' ? option.zh : option.en}
+              <span className="ml-1 opacity-75">{option.count}</span>
+            </button>
+          ))}
+        </div>
       </div>
+
+      {filteredActivities.length === 0 ? (
+        <div className="text-text-3 rounded-card bg-subtle py-10 text-center text-sm">
+          {locale === 'zh-CN' ? '当前筛选下暂无活动' : 'No activity in this filter'}
+        </div>
+      ) : (
+        <div className="relative">
+          <div className="bg-border-strong absolute top-0 bottom-0 left-4 w-px" />
+
+          <div className="space-y-6 pl-10">
+            {groups.map((group) => (
+              <div key={group.date}>
+                {/* Date header */}
+                <div className="relative mb-3">
+                  <div className="rounded-pill border-border-strong bg-panel absolute top-0.5 -left-10 h-3 w-3 border-2" />
+                  <span className="text-text-3 text-xs font-medium tracking-wide uppercase">
+                    {formatDateHeader(group.date, locale)}
+                  </span>
+                </div>
+
+                {/* Activity entries for this date */}
+                <div className="space-y-3">
+                  {group.entries.map((activity) => {
+                    const activityType = normalizeActivityType(activity.activityType);
+                    const actorType = normalizeActorType(activity.actorType);
+                    const actorLabel = resolveActorLabel(activity, locale);
+                    const subject = sanitizeVisibleText(activity.subject);
+                    const content = sanitizeVisibleText(activity.content);
+                    const config =
+                      ACTIVITY_TYPE_CONFIG[activityType] || ACTIVITY_TYPE_CONFIG.SYSTEM;
+                    const [icon, _zhLabel, _enLabel, dotColor] = config;
+
+                    return (
+                      <div
+                        key={activity.id}
+                        className="relative"
+                        data-testid={`activity-timeline-item-${activity.id}`}
+                        data-activity-type={activityType}
+                      >
+                        {/* Timeline dot */}
+                        <div
+                          className={`absolute top-1.5 -left-10 h-3 w-3 rounded-full ${dotColor}`}
+                        />
+
+                        <div className="rounded-card bg-panel border-border border px-4 py-3 shadow-sm">
+                          {/* Header: icon + type badge + actor + time */}
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-text-3 flex-shrink-0">{icon}</span>
+                            <ActivityTypeBadge type={activityType} locale={locale} />
+                            <span className="text-text-2 font-medium">{actorLabel}</span>
+                            {actorType === 'agent' && (
+                              <span className="bg-status-blue-bg text-status-blue rounded px-1.5 py-0.5 text-[10px] font-medium">
+                                AI
+                              </span>
+                            )}
+                            <span className="text-text-3">&middot;</span>
+                            <time className="text-text-3 text-xs" title={activity.occurredAt}>
+                              {formatTime(activity.occurredAt)}
+                            </time>
+                          </div>
+
+                          {/* Subject */}
+                          {subject && <p className="text-text mt-1.5 text-sm">{subject}</p>}
+
+                          {/* Content */}
+                          {content && (
+                            <p className="text-text-2 mt-1 text-xs whitespace-pre-wrap">
+                              {content}
+                            </p>
+                          )}
+
+                          {/* Metadata (state transitions and business activity context) */}
+                          {activity.metadata && (
+                            <MetadataDisplay metadata={activity.metadata} locale={locale} />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -228,6 +347,10 @@ function ActivityTypeBadge({ type, locale }: { type: string; locale: string }) {
     CALL: ['通话', 'Call', 'bg-status-blue-bg text-status-blue'],
     EMAIL: ['邮件', 'Email', 'bg-status-blue-bg text-status-blue'],
     MEETING: ['会议', 'Meeting', 'bg-status-amber-bg text-status-amber'],
+    VISIT: ['拜访', 'Visit', 'bg-status-green-bg text-status-green'],
+    TASK: ['任务', 'Task', 'bg-status-amber-bg text-status-amber'],
+    SMS: ['短信', 'Message', 'bg-status-blue-bg text-status-blue'],
+    CHAT: ['在线沟通', 'Chat', 'bg-status-blue-bg text-status-blue'],
     SYSTEM: ['系统', 'System', 'bg-status-gray-bg text-status-gray'],
   };
   const [zh, en, cls] = labels[type] || ['—', '—', 'bg-status-gray-bg text-status-gray'];
@@ -300,7 +423,9 @@ function MetadataDisplay({ metadata, locale }: { metadata: string; locale: strin
       }
       return (
         <div className="mt-1.5 flex items-center gap-1.5 text-xs">
-          <span className="rounded bg-status-gray-bg px-1.5 py-0.5 text-status-gray">{fromState}</span>
+          <span className="bg-status-gray-bg text-status-gray rounded px-1.5 py-0.5">
+            {fromState}
+          </span>
           <svg
             className="text-text-3 h-3 w-3 flex-shrink-0"
             fill="none"
@@ -310,7 +435,9 @@ function MetadataDisplay({ metadata, locale }: { metadata: string; locale: strin
           >
             <path d="M5 12h14m-4-4 4 4-4 4" />
           </svg>
-          <span className="rounded bg-status-blue-bg px-1.5 py-0.5 text-status-blue">{toState}</span>
+          <span className="bg-status-blue-bg text-status-blue rounded px-1.5 py-0.5">
+            {toState}
+          </span>
         </div>
       );
     }
@@ -325,6 +452,31 @@ function MetadataDisplay({ metadata, locale }: { metadata: string; locale: strin
           {locale === 'zh-CN'
             ? `${parsed.changedFields.length} 个字段变更`
             : `${parsed.changedFields.length} field(s) changed`}
+        </div>
+      );
+    }
+    const contextItems = [
+      parsed.status && {
+        label: locale === 'zh-CN' ? '状态' : 'Status',
+        value: localizeBusinessValue(String(parsed.status), locale),
+      },
+      parsed.priority && {
+        label: locale === 'zh-CN' ? '优先级' : 'Priority',
+        value: localizeBusinessValue(String(parsed.priority), locale),
+      },
+      parsed.role && {
+        label: locale === 'zh-CN' ? '参与角色' : 'Role',
+        value: sanitizeVisibleText(String(parsed.role)),
+      },
+    ].filter((item): item is { label: string; value: string } => Boolean(item?.value));
+    if (contextItems.length > 0) {
+      return (
+        <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+          {contextItems.map((item) => (
+            <span key={item.label} className="rounded-pill bg-subtle text-text-2 px-2 py-1">
+              <span className="text-text-3">{item.label}</span> {item.value}
+            </span>
+          ))}
         </div>
       );
     }
@@ -472,6 +624,142 @@ function SystemIcon() {
 interface DateGroup {
   date: string; // YYYY-MM-DD
   entries: ActivityRecord[];
+}
+
+type Settled<T> = { ok: true; value: T } | { ok: false; error: any };
+
+async function settle<T>(promise: Promise<T>): Promise<Settled<T>> {
+  try {
+    return { ok: true, value: await promise };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
+function resolveBusinessParams(
+  dataSource: BusinessActivityDataSource,
+  modelCode: string,
+  recordPid: string,
+): Record<string, unknown> {
+  const interpolate = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      return value.replaceAll('${modelCode}', modelCode).replaceAll('${recordPid}', recordPid);
+    }
+    if (Array.isArray(value)) {
+      return value.map(interpolate);
+    }
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+          key,
+          interpolate(entry),
+        ]),
+      );
+    }
+    return value;
+  };
+
+  const params = interpolate(dataSource.params ?? {}) as Record<string, unknown>;
+  return {
+    ...(dataSource.queryCode
+      ? { datasourceId: `nq:${dataSource.queryCode}`, format: 'records', maxItems: 100 }
+      : {}),
+    ...params,
+  };
+}
+
+function extractBusinessRecords(data: unknown): Record<string, unknown>[] {
+  if (Array.isArray(data)) {
+    return data as Record<string, unknown>[];
+  }
+  if (!data || typeof data !== 'object') {
+    return [];
+  }
+  const payload = data as Record<string, unknown>;
+  if (Array.isArray(payload.records)) {
+    return payload.records as Record<string, unknown>[];
+  }
+  if (payload.data && typeof payload.data === 'object') {
+    const nested = payload.data as Record<string, unknown>;
+    if (Array.isArray(nested.records)) {
+      return nested.records as Record<string, unknown>[];
+    }
+  }
+  return [];
+}
+
+function normalizeBusinessActivity(row: Record<string, unknown>, index: number): ActivityRecord {
+  const pid = String(row.pid ?? row.crm_act_pid ?? `row-${index}`);
+  const occurredAt = String(
+    row.crm_act_date ??
+      row.occurred_at ??
+      row.occurredAt ??
+      row.created_at ??
+      new Date(0).toISOString(),
+  );
+  const metadata = Object.fromEntries(
+    [
+      ['status', row.crm_act_status ?? row.status],
+      ['priority', row.crm_act_priority ?? row.priority],
+      ['role', row.crm_act_role ?? row.role],
+    ].filter(([, value]) => value != null && String(value).trim() !== ''),
+  );
+
+  return {
+    id: `business-${pid}`,
+    pid,
+    objectModel: String(row.crm_act_object_type ?? 'crm_activity_common'),
+    objectRecord: String(row.crm_act_object_id ?? ''),
+    activityType: String(row.crm_act_type ?? row.activity_type ?? 'NOTE'),
+    subject: String(row.crm_act_subject ?? row.subject ?? '').trim() || null,
+    content: String(row.crm_act_content ?? row.content ?? row.description ?? '').trim() || null,
+    actorType: row.owner_name ? 'USER' : 'SYSTEM',
+    actorId: null,
+    actorName: String(row.owner_name ?? '').trim() || null,
+    commandCode: null,
+    operationType: null,
+    metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null,
+    occurredAt,
+    createdAt: String(row.created_at ?? occurredAt),
+    source: 'business',
+  };
+}
+
+function matchesTimelineFilter(
+  activity: ActivityRecord,
+  filter: 'all' | 'interaction' | 'task' | 'system',
+): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'system') return activity.source !== 'business';
+  const type = normalizeActivityType(activity.activityType);
+  if (filter === 'task') return activity.source === 'business' && type === 'TASK';
+  return activity.source === 'business' && type !== 'TASK';
+}
+
+function summarizeActivities(activities: ActivityRecord[]) {
+  return {
+    all: activities.length,
+    interaction: activities.filter((activity) => matchesTimelineFilter(activity, 'interaction'))
+      .length,
+    task: activities.filter((activity) => matchesTimelineFilter(activity, 'task')).length,
+    system: activities.filter((activity) => matchesTimelineFilter(activity, 'system')).length,
+  };
+}
+
+function localizeBusinessValue(value: string, locale: string): string {
+  const normalized = value.trim().toUpperCase();
+  const labels: Record<string, [string, string]> = {
+    PLANNED: ['计划中', 'Planned'],
+    IN_PROGRESS: ['进行中', 'In progress'],
+    COMPLETED: ['已完成', 'Completed'],
+    CANCELLED: ['已取消', 'Cancelled'],
+    LOW: ['低', 'Low'],
+    MEDIUM: ['中', 'Medium'],
+    HIGH: ['高', 'High'],
+    URGENT: ['紧急', 'Urgent'],
+  };
+  const label = labels[normalized];
+  return label ? (locale === 'zh-CN' ? label[0] : label[1]) : sanitizeVisibleText(value) || '—';
 }
 
 function groupByDate(activities: ActivityRecord[]): DateGroup[] {

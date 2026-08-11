@@ -75,7 +75,7 @@
           "blocks": [
             {
               "id": "block_activities",
-              "blockType": "sub-table",
+              "blockType": "activity-timeline",
               "subTable": {
                 "dataSource": {
                   "type": "api",

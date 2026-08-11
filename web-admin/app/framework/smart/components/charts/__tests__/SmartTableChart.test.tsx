@@ -107,6 +107,8 @@ describe('SmartTableChart - widget config columns + i18n', () => {
     render(
       <SmartTableChart
         modelCode="crm_opportunity"
+        filters={[{ field: 'crm_opp_account_id', operator: 'eq', value: 'ACC-001' }]}
+        defaultSort={{ field: 'created_at', order: 'desc' }}
         table={{
           columns: [
             { field: 'crm_opp_name', label: { 'zh-CN': '商机名称', en: 'Opportunity' } },
@@ -120,6 +122,15 @@ describe('SmartTableChart - widget config columns + i18n', () => {
     // The fetch should target the dynamic list endpoint for the model.
     const firstCallUrl = (mockFetchResult.mock.calls[0]?.[0] as string) || '';
     expect(firstCallUrl).toContain('/api/dynamic/crm_opportunity/list');
+    expect(mockFetchResult.mock.calls[0]?.[1]).toMatchObject({
+      params: {
+        filters: JSON.stringify([
+          { fieldName: 'crm_opp_account_id', operator: 'EQ', value: 'ACC-001' },
+        ]),
+        sortField: 'created_at',
+        sortOrder: 'desc',
+      },
+    });
 
     // Header labels should render in the active locale, no placeholder.
     expect(screen.getByText('商机名称')).toBeInTheDocument();
@@ -129,6 +140,36 @@ describe('SmartTableChart - widget config columns + i18n', () => {
     expect(screen.getByText('Beta')).toBeInTheDocument();
     // Placeholder must not be shown when the shorthand is configured.
     expect(screen.queryByText('Please configure data source')).not.toBeInTheDocument();
+  });
+
+  it('formats business currency, percent, and date columns for compact dashboard reading', () => {
+    mockUseChartData.mockReturnValue({
+      data: {
+        rows: [{ amount: 120000, probability: 65, close_date: '2026-05-08T12:30:00Z' }],
+        summary: {},
+        meta: { dimensions: ['amount', 'probability', 'close_date'], metrics: [] },
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(
+      <SmartTableChart
+        dataSource={{ type: 'static', staticData: [] }}
+        table={{
+          columns: [
+            { field: 'amount', label: '金额', format: 'currency', currency: 'CNY' },
+            { field: 'probability', label: '赢率', format: 'percent' },
+            { field: 'close_date', label: '日期', format: 'date' },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/120,000/)).toBeInTheDocument();
+    expect(screen.getByText('65%')).toBeInTheDocument();
+    expect(screen.getByText(/2026.*05.*08/)).toBeInTheDocument();
   });
 
   it('uses drillDown paramMapping source field for identity named-query rows', () => {
