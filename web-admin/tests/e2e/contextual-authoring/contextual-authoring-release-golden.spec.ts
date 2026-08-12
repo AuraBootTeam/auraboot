@@ -27,11 +27,26 @@ type AuthoringSession = {
   sessionPid: string;
   changeSetPid: string;
   pagePid?: string;
+  ownerUserId?: string | number;
+  state: string;
   revision: number;
   riskLevel?: string;
   publishPolicy?: string;
   validationState: string;
+  validation?: {
+    errorCount: number;
+    issues: Array<{ code: string; blockId?: string; propertyPath: string }>;
+  } | null;
   impactState: string;
+  impact?: {
+    failureCode?: string | null;
+    dependencies: Array<{
+      resourceType: string;
+      resourceCode: string;
+      resourcePid: string;
+      rowVersion: number;
+    }>;
+  } | null;
   changeSetStatus: string;
   approvalState?: string;
   publishState: string;
@@ -70,6 +85,29 @@ type GatePage = {
 type PermissionRecord = { pid: string; code: string };
 type RoleRecord = { pid: string; code: string };
 type ReviewWorkspace = { session: AuthoringSession };
+type CapabilityRegistry = {
+  manifests: Array<{ blockType: string; checksum: string }>;
+};
+type ChangeItem = {
+  changeItemPid: string;
+  sourceChangeItemPid?: string | null;
+  blockId: string;
+  propertyPath: string;
+  riskLevel: string;
+};
+type SplitResult = {
+  sourceSession: AuthoringSession;
+  targetSession: AuthoringSession;
+  sourceItems: ChangeItem[];
+  targetItems: ChangeItem[];
+  lineage: Array<{ changeSetPid: string; revision: number; relation: string }>;
+};
+type AuditRow = {
+  event_type: string;
+  result: string;
+  reason_code: string | null;
+  metadata: Record<string, unknown>;
+};
 
 const REVIEWER = {
   roleCode: 'e2e_authoring_release_reviewer',
@@ -77,6 +115,15 @@ const REVIEWER = {
   email: 'e2e-authoring-release-reviewer@test.com',
   permissions: ['page.page.read', 'meta.publish.read', 'meta.publish.update'],
 } as const;
+
+const ADMIN_AUTHORING_PERMISSIONS = [
+  'meta.designer.read',
+  'meta.designer.update',
+  'meta.designer.admin',
+  'meta.publish.read',
+  'meta.publish.update',
+  'meta.publish.admin',
+] as const;
 
 let gatePage: GatePage;
 
@@ -172,6 +219,476 @@ test.describe('Contextual authoring release PC golden', () => {
       path: resolve(SCREENSHOT_DIR, 'pc-auth-017-release-history-rollback.png'),
       fullPage: true,
     });
+
+    const releaseAudits = [
+      ...(await loadAuditRows(first.release.changeSetPid)),
+      ...(await loadAuditRows(second.release.changeSetPid)),
+    ];
+    expect(releaseAudits.map((row) => row.event_type)).toEqual(
+      expect.arrayContaining(['RELEASE_PUBLISHED', 'RELEASE_ROLLED_BACK']),
+    );
+    const rollbackAudit = releaseAudits.find((row) => row.event_type === 'RELEASE_ROLLED_BACK');
+    expect(rollbackAudit?.metadata).toEqual(
+      expect.objectContaining({
+        activeReleasePid: first.release.releasePid,
+        rolledBackReleasePid: second.release.releasePid,
+      }),
+    );
+    expect(JSON.stringify(releaseAudits)).not.toContain(DEFAULT_TEST_ACCOUNT.password);
+  });
+
+  test('PC-AUTH-036 @critical — exact validation, L2 freeze, denial and owner withdrawal stay governed', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const opened = await enterAuthoringFromMenu(page);
+    const table = await selectTableInContextualInspector(page, opened);
+    const filterEditor = page
+      .getByTestId('authoring-property-/props/defaultFilter')
+      .locator('textarea');
+    const sensitiveInvalid = 'PC-AUTH-036-SENSITIVE-FILTER';
+    await expect(filterEditor).toBeVisible();
+    await filterEditor.fill(JSON.stringify(sensitiveInvalid));
+    const invalidSave = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PATCH' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/patches`,
+    );
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    const invalidSaved = await expectApiData<PatchResult>(await invalidSave, 'save invalid filter');
+    expect(invalidSaved.session.riskLevel).toBe('L2');
+    expect(invalidSaved.session.publishPolicy).toBe('REQUIRED_REVIEW');
+    await expect(page.getByTestId('authoring-risk-summary')).toContainText('L2');
+    await expect(page.getByTestId('authoring-risk-summary')).toContainText('强制评审');
+
+    const invalidPrepare = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/prepare`,
+    );
+    await page.getByRole('button', { name: '校验与影响分析', exact: true }).click();
+    const invalid = await expectApiData<AuthoringSession>(
+      await invalidPrepare,
+      'validate invalid exact revision',
+    );
+    expect(invalid.validationState).toBe('INVALID');
+    expect(invalid.state).toBe('ACTIVE');
+    expect(invalid.validation?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'DEFAULT_FILTER_INVALID',
+          blockId: String(table.id),
+          propertyPath: '/props/defaultFilter',
+        }),
+      ]),
+    );
+    const validationNotice = page.getByTestId('authoring-validation-notice');
+    await expect(validationNotice).toContainText('草稿已保存');
+    await expect(page.getByTestId('authoring-validation-issues')).toContainText(
+      'code: DEFAULT_FILTER_INVALID',
+    );
+    await expect(page.getByRole('button', { name: '提交评审', exact: true })).toHaveCount(0);
+
+    await filterEditor.fill(JSON.stringify({ status: 'OPEN' }));
+    const validSave = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PATCH' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/patches`,
+    );
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    const fixed = await expectApiData<PatchResult>(await validSave, 'save structured filter');
+    expect(fixed.session.validationState).toBe('UNVALIDATED');
+    const validPrepare = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/prepare`,
+    );
+    await page.getByRole('button', { name: '校验与影响分析', exact: true }).click();
+    const prepared = await expectApiData<AuthoringSession>(
+      await validPrepare,
+      'validate and analyze L2 exact revision',
+    );
+    expect(prepared.validationState).toBe('VALID');
+    expect(prepared.impactState).toBe('KNOWN');
+    expect(prepared.revision).toBe(fixed.session.revision);
+    await expect(page.getByRole('button', { name: '提交评审', exact: true })).toBeEnabled();
+
+    const submitResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/submit`,
+    );
+    await page.getByRole('button', { name: '提交评审', exact: true }).click();
+    expect((await submitResponse).status()).toBe(200);
+    const frozen = await loadSession(page, opened.sessionPid, 'load frozen L2 revision');
+    expect(frozen.changeSetStatus).toBe('IN_REVIEW');
+    expect(frozen.state).toBe('READ_ONLY');
+    expect(frozen.revision).toBe(prepared.revision);
+    await expect(page.getByTestId('authoring-governance-notice')).toContainText(
+      `revision r${prepared.revision} 已冻结`,
+    );
+    await expect(filterEditor).toBeDisabled();
+    await expect(page.getByTestId('authoring-governance-approve')).toHaveCount(0);
+
+    const ownerDenied = await page.request.post(
+      `/api/authoring/change-sets/${opened.changeSetPid}/approve`,
+      {
+        data: {
+          expectedRevision: prepared.revision,
+          reason: 'PC-AUTH-036-SELF-APPROVAL-SENSITIVE',
+        },
+      },
+    );
+    expect(ownerDenied.status(), 'owner must not approve their own revision').toBe(403);
+    const afterDenial = await loadSession(page, opened.sessionPid, 'reload after self denial');
+    expect(afterDenial.changeSetStatus).toBe('IN_REVIEW');
+    expect(afterDenial.approvalState).toBe('PENDING');
+
+    await page.getByTestId('authoring-governance-reason').fill('PC 门禁：撤回后补充异常状态说明');
+    const withdrawResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/review/withdraw`,
+    );
+    await page.getByTestId('authoring-governance-withdraw').click();
+    expect((await withdrawResponse).status()).toBe(200);
+    await expect(filterEditor).toBeEnabled();
+    const withdrawn = await loadSession(page, opened.sessionPid, 'reload withdrawn revision');
+    expect(withdrawn.changeSetStatus).toBe('DRAFT');
+    expect(withdrawn.state).toBe('ACTIVE');
+    expect(withdrawn.revision).toBe(prepared.revision + 1);
+    expect(withdrawn.validationState).toBe('UNVALIDATED');
+    expect(withdrawn.approvalState).toBe('STALE');
+
+    const audits = await loadAuditRows(opened.changeSetPid);
+    expect(audits.map((row) => `${row.event_type}:${row.result}:${row.reason_code ?? ''}`)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('SESSION_OPENED:ALLOW'),
+        expect.stringContaining('PATCH_SAVED:ALLOW'),
+        'CHANGE_SET_VALIDATION_FAILED:DENY:REVISION_INVALID',
+        'CHANGE_SET_VALIDATED:ALLOW:REVISION_VALID',
+        'CHANGE_SET_IMPACT_KNOWN:ALLOW:DEPENDENCIES_RESOLVED',
+        'CHANGE_SET_SUBMITTED:ALLOW:REVIEW_REQUIRED',
+        'CHANGE_SET_APPROVAL_DENIED:DENY:FOUR_EYES_REQUIRED',
+        'CHANGE_SET_REVIEW_WITHDRAWN:ALLOW:OWNER_RESUMED_EDITING',
+      ]),
+    );
+    const auditJson = JSON.stringify(audits);
+    expect(auditJson).not.toContain(sensitiveInvalid);
+    expect(auditJson).not.toContain('PC-AUTH-036-SELF-APPROVAL-SENSITIVE');
+    expect(auditJson).not.toContain(DEFAULT_TEST_ACCOUNT.password);
+
+    await mkdir(SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-036-withdrawn-editable.png'),
+      fullPage: true,
+    });
+  });
+
+  test('PC-AUTH-037 @critical — real dependency timeout and drift fail closed with a retryable Studio state', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const opened = await enterAuthoringFromMenu(page);
+    await stageDensityEdit(page, opened);
+    const saveResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PATCH' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/patches`,
+    );
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await expectApiData<PatchResult>(await saveResponse, 'save timeout gate revision');
+    await enterStudioFromContextual(page);
+
+    const blocker = new PgClient(PG_CONN);
+    await blocker.connect();
+    try {
+      await blocker.query('BEGIN');
+      await blocker.query('LOCK TABLE ab_meta_model IN ACCESS EXCLUSIVE MODE');
+      const timeoutResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/prepare`,
+      );
+      await page.getByTestId('studio-prepare-submit').click();
+      const timedOut = await expectApiData<AuthoringSession>(
+        await timeoutResponse,
+        'real dependency analysis timeout',
+      );
+      expect(timedOut.validationState).toBe('VALID');
+      expect(timedOut.impactState).toBe('FAILED');
+      expect(timedOut.impact?.failureCode).toBe('ANALYSIS_TIMEOUT');
+      await expect(page.getByTestId('authoring-impact-notice')).toContainText(
+        '影响分析失败，不能提交评审或发布',
+      );
+      await expect(page.getByTestId('authoring-impact-notice')).toContainText(
+        'code: ANALYSIS_TIMEOUT',
+      );
+      await expect(page.getByTestId('studio-prepare-submit')).toHaveText('校验与影响分析');
+      await blocker.query('ROLLBACK');
+    } finally {
+      await blocker.query('ROLLBACK').catch(() => {});
+      await blocker.end();
+    }
+
+    const retryResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/prepare`,
+    );
+    await page.getByTestId('studio-prepare-submit').click();
+    const prepared = await expectApiData<AuthoringSession>(
+      await retryResponse,
+      'retry dependency analysis after lock release',
+    );
+    expect(prepared.validationState).toBe('VALID');
+    expect(prepared.impactState).toBe('KNOWN');
+    const modelDependency = prepared.impact?.dependencies.find(
+      (dependency) => dependency.resourceType === 'MODEL',
+    );
+    expect(modelDependency?.resourcePid, 'prepared model dependency').toBeTruthy();
+    await expect(page.getByTestId('authoring-impact-notice')).toHaveCount(0);
+    await expect(page.getByTestId('studio-prepare-submit')).toHaveText('提交评审');
+
+    const restoreDependency = await driftModelBinding(modelDependency!.resourcePid);
+    try {
+      const staleResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/submit`,
+      );
+      await page.getByTestId('studio-prepare-submit').click();
+      const stale = await staleResponse;
+      expect(stale.status(), 'dependency drift must reject exact revision submission').toBe(409);
+      await expect(page.getByTestId('authoring-impact-notice')).toContainText(
+        '依赖已变化，当前校验与影响结果已失效',
+      );
+      await expect(page.getByTestId('studio-prepare-submit')).toBeDisabled();
+      const authoritative = await loadSession(page, opened.sessionPid, 'load stale session');
+      expect(authoritative.validationState).toBe('STALE');
+      expect(authoritative.impactState).toBe('STALE');
+      expect(authoritative.changeSetStatus).toBe('DRAFT');
+
+      await mkdir(SCREENSHOT_DIR, { recursive: true });
+      await page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-037-impact-stale.png'),
+        fullPage: true,
+      });
+    } finally {
+      await restoreDependency();
+    }
+
+    const audits = await loadAuditRows(opened.changeSetPid);
+    expect(audits.map((row) => `${row.event_type}:${row.result}:${row.reason_code ?? ''}`)).toEqual(
+      expect.arrayContaining([
+        'CHANGE_SET_IMPACT_FAILED:DENY:ANALYSIS_TIMEOUT',
+        'CHANGE_SET_IMPACT_KNOWN:ALLOW:DEPENDENCIES_RESOLVED',
+      ]),
+    );
+  });
+
+  test('PC-AUTH-038 @critical — L0 and L3 changes split through Studio with durable lineage', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const opened = await enterAuthoringFromMenu(page);
+    const table = findTableBlock(opened.snapshot);
+    expect(table?.id, 'table for L0/L3 split').toBeTruthy();
+    await stageDensityEdit(page, opened);
+    const lowRiskSave = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PATCH' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/patches`,
+    );
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    const lowRisk = await expectApiData<PatchResult>(await lowRiskSave, 'save L0 density change');
+    expect(lowRisk.session.riskLevel).toBe('L0');
+    await enterStudioFromContextual(page);
+    await expect(page.getByTestId('inspector-selected-id')).toContainText(String(table!.id));
+    const modelEditor = page.getByTestId('inspector-field-dataSource.model-manual');
+    await expect(modelEditor).toBeVisible();
+    const currentModel = String(readObjectPath(table!, '/dataSource/model') ?? 'e2et_record');
+    const l3Model = currentModel === 'payments' ? 'e2et_record' : 'payments';
+    await modelEditor.fill(l3Model);
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');
+    const highRiskSave = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/studio-batches`,
+    );
+    await page.getByTestId('designer-save').click();
+    const highRisk = await expectApiData<PatchResult>(await highRiskSave, 'save L3 data source');
+    expect(highRisk.session.riskLevel).toBe('L3');
+    expect(highRisk.session.publishPolicy).toBe('STUDIO_APPROVAL');
+    await expect(page.getByTestId('authoring-risk-summary').first()).toContainText('L3');
+
+    await page.getByTestId('studio-governance-open').click();
+    const splitPanel = page.getByTestId('authoring-split-panel');
+    await expect(splitPanel).toBeVisible();
+    await splitPanel.locator('summary').click();
+    await expect(splitPanel).toContainText('2 项');
+    const l3Item = splitPanel.locator('label', { hasText: 'L3' }).locator('input[type="checkbox"]');
+    await expect(l3Item).toHaveCount(1);
+    await l3Item.check();
+    await page.getByTestId('authoring-split-title').fill('PC L3 数据源独立评审');
+    await page
+      .getByTestId('authoring-split-reason')
+      .fill('PC 门禁：L0 密度与 L3 数据源没有跨分组依赖');
+    const splitResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/split`,
+    );
+    await page.getByTestId('authoring-split-submit').click();
+    const split = await expectApiData<SplitResult>(await splitResponse, 'split L0 and L3 changes');
+    expect(split.sourceSession.changeSetPid).toBe(opened.changeSetPid);
+    expect(split.sourceSession.riskLevel).toBe('L0');
+    expect(split.sourceSession.publishPolicy).toBe('DIRECT_ALLOWED');
+    expect(split.targetSession.riskLevel).toBe('L3');
+    expect(split.targetSession.publishPolicy).toBe('STUDIO_APPROVAL');
+    expect(split.sourceItems).toEqual([
+      expect.objectContaining({ propertyPath: '/props/density', riskLevel: 'L0' }),
+    ]);
+    expect(split.targetItems).toEqual([
+      expect.objectContaining({
+        sourceChangeItemPid: expect.any(String),
+        propertyPath: '/dataSource',
+        riskLevel: 'L3',
+      }),
+    ]);
+    expect(split.lineage).toEqual([
+      expect.objectContaining({
+        changeSetPid: opened.changeSetPid,
+        relation: 'SPLIT_FROM',
+      }),
+    ]);
+    await expect(page.getByTestId('authoring-split-success')).toContainText('已创建新的 ChangeSet');
+    const targetLink = page.getByTestId('authoring-split-target-link');
+    await expect(targetLink).toHaveAttribute(
+      'href',
+      `/unified-designer?authoringSession=${split.targetSession.sessionPid}`,
+    );
+    await assertSplitPersistence(split);
+
+    await mkdir(SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-038-split-success.png'),
+      fullPage: true,
+    });
+    await targetLink.click();
+    await expect(page).toHaveURL(
+      new RegExp(`authoringSession=${encodeURIComponent(split.targetSession.sessionPid)}`),
+    );
+    await expect(page.getByTestId('authoring-risk-summary').first()).toContainText('L3');
+  });
+
+  test('PC-AUTH-039 @critical — reviewer rejection and approval reopening each create a new editable revision', async ({
+    page,
+    browser,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await ensureReviewer(page);
+    const opened = await enterAuthoringFromMenu(page);
+    await selectTableInContextualInspector(page, opened);
+    const filterEditor = page
+      .getByTestId('authoring-property-/props/defaultFilter')
+      .locator('textarea');
+    await filterEditor.fill(JSON.stringify({ status: 'OPEN', owner: 'CURRENT' }));
+    const saveResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PATCH' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/patches`,
+    );
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await expectApiData<PatchResult>(await saveResponse, 'save review lifecycle filter');
+    await enterStudioFromContextual(page);
+    const firstPrepared = await prepareAndSubmitInStudio(page, opened.sessionPid);
+    expect(firstPrepared.riskLevel).toBe('L2');
+
+    const reviewer = await openReviewer(browser);
+    try {
+      await openReviewWorkspace(reviewer, opened.changeSetPid, firstPrepared.revision);
+      await reviewer
+        .getByTestId('authoring-governance-reason')
+        .fill('PC 门禁：默认筛选会隐藏需要人工复核的订单');
+      const rejectResponse = reviewer.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) === `/api/authoring/change-sets/${opened.changeSetPid}/reject`,
+      );
+      await reviewer.getByTestId('authoring-governance-reject').click();
+      expect((await rejectResponse).status()).toBe(200);
+
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+      await expect(page.getByTestId('authoring-governance-notice')).toContainText(
+        '评审已驳回 · 已进入可编辑 revision',
+      );
+      await expect(page.getByTestId('studio-handoff-editable-reason')).toBeVisible();
+      await expect(page.getByTestId('studio-submission-notice')).toBeVisible();
+      await expect(page.getByTestId('studio-prepare-submit')).toBeEnabled();
+      await expect(page.getByTestId('designer-contextual-read-only')).toHaveCount(0);
+      const rejected = await loadSession(page, opened.sessionPid, 'load rejected owner revision');
+      expect(rejected.changeSetStatus).toBe('REJECTED');
+      expect(rejected.state).toBe('ACTIVE');
+      expect(rejected.revision).toBe(firstPrepared.revision + 1);
+      expect(rejected.approvalState).toBe('REJECTED');
+
+      const secondPrepared = await prepareAndSubmitInStudio(page, opened.sessionPid);
+      await openReviewWorkspace(reviewer, opened.changeSetPid, secondPrepared.revision);
+      await reviewer
+        .getByTestId('authoring-governance-reason')
+        .fill('PC 门禁：补充说明后批准当前精确 revision');
+      const approveResponse = reviewer.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) === `/api/authoring/change-sets/${opened.changeSetPid}/approve`,
+      );
+      await reviewer.getByTestId('authoring-governance-approve').click();
+      expect((await approveResponse).status()).toBe(200);
+
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('button', { name: /当前状态：APPROVED/ })).toBeVisible();
+      await page.getByTestId('studio-governance-open').click();
+      const governance = page.getByTestId('studio-governance-drawer');
+      await governance
+        .getByTestId('authoring-governance-reason')
+        .fill('PC 门禁：批准后发现还需补充页面说明');
+      const reopenResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${opened.sessionPid}/approved/reopen`,
+      );
+      await governance.getByTestId('authoring-governance-reopen').click();
+      expect((await reopenResponse).status()).toBe(200);
+      await expect(page.getByTestId('studio-submission-notice')).toBeVisible();
+      await expect(page.getByTestId('studio-prepare-submit')).toBeEnabled();
+      await expect(page.getByTestId('studio-handoff-editable-reason')).toBeVisible();
+      await expect(page.getByTestId('designer-contextual-read-only')).toHaveCount(0);
+      const reopened = await loadSession(page, opened.sessionPid, 'load reopened owner revision');
+      expect(reopened.changeSetStatus).toBe('DRAFT');
+      expect(reopened.state).toBe('ACTIVE');
+      expect(reopened.revision).toBe(secondPrepared.revision + 1);
+      expect(reopened.approvalState).toBe('STALE');
+      expect(reopened.validationState).toBe('UNVALIDATED');
+
+      const audits = await loadAuditRows(opened.changeSetPid);
+      expect(audits.map((row) => row.event_type)).toEqual(
+        expect.arrayContaining([
+          'CHANGE_SET_REJECTED',
+          'CHANGE_SET_APPROVED',
+          'CHANGE_SET_APPROVAL_INVALIDATED',
+        ]),
+      );
+      await mkdir(SCREENSHOT_DIR, { recursive: true });
+      await page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-039-approved-reopened.png'),
+        fullPage: true,
+      });
+    } finally {
+      await reviewer.context().close();
+    }
   });
 
   test('PC-AUTH-028 @critical — governed new page stays private until independent review and atomic publish', async ({
@@ -542,6 +1059,188 @@ async function openReviewer(browser: Browser): Promise<Page> {
   return page;
 }
 
+async function enterStudioFromContextual(page: Page): Promise<void> {
+  await page.getByRole('button', { name: '高级设置', exact: true }).click();
+  const explain = page.getByRole('dialog', { name: '进入应用设计中心' });
+  await expect(explain).toContainText('当前 ChangeSet、选择对象、返回位置');
+  await explain.getByRole('button', { name: '继续到应用设计中心' }).click();
+  await expect(page).toHaveURL(/\/unified-designer\?authoringSession=/);
+  await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+}
+
+async function selectTableInContextualInspector(
+  page: Page,
+  session: AuthoringSession,
+): Promise<Record<string, unknown>> {
+  const table = findTableBlock(session.snapshot);
+  expect(table?.id, 'table block in contextual authoring gate').toBeTruthy();
+  await page.getByTestId('authoring-outline-open').click();
+  await page.getByTestId(`authoring-outline-${String(table!.id)}`).click();
+  await page.getByRole('button', { name: '关闭页面大纲' }).click();
+  await page.getByTestId('authoring-inspector-open').click();
+  return table!;
+}
+
+async function prepareAndSubmitInStudio(page: Page, sessionPid: string): Promise<AuthoringSession> {
+  const prepareResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      apiPath(response.url()) === `/api/authoring/sessions/${sessionPid}/prepare`,
+  );
+  await page.getByTestId('studio-prepare-submit').click();
+  const prepared = await expectApiData<AuthoringSession>(
+    await prepareResponse,
+    'prepare exact governed Studio revision',
+  );
+  expect(prepared.validationState).toBe('VALID');
+  expect(prepared.impactState).toBe('KNOWN');
+  await expect(page.getByTestId('studio-prepare-submit')).toHaveText('提交评审');
+  const submitResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      apiPath(response.url()) === `/api/authoring/sessions/${sessionPid}/submit`,
+  );
+  await page.getByTestId('studio-prepare-submit').click();
+  expect((await submitResponse).status()).toBe(200);
+  await expect(page.getByRole('button', { name: /当前状态：IN_REVIEW/ })).toBeVisible();
+  return prepared;
+}
+
+async function openReviewWorkspace(
+  page: Page,
+  changeSetPid: string,
+  expectedRevision: number,
+): Promise<ReviewWorkspace> {
+  const response = page.waitForResponse(
+    (candidate) =>
+      candidate.request().method() === 'POST' &&
+      apiPath(candidate.url()) === `/api/authoring/change-sets/${changeSetPid}/review-workspaces`,
+  );
+  await page.goto(`/unified-designer?reviewChangeSetId=${encodeURIComponent(changeSetPid)}`, {
+    waitUntil: 'domcontentloaded',
+  });
+  const workspace = await expectApiData<ReviewWorkspace>(await response, 'open review workspace');
+  expect(workspace.session.revision).toBe(expectedRevision);
+  await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+  await expect(page.getByTestId('authoring-governance-approve')).toBeVisible();
+  return workspace;
+}
+
+async function loadSession(
+  page: Page,
+  sessionPid: string,
+  label: string,
+): Promise<AuthoringSession> {
+  return expectApiData<AuthoringSession>(
+    await page.request.get(`/api/authoring/sessions/${sessionPid}`),
+    label,
+  );
+}
+
+async function driftModelBinding(modelPid: string): Promise<() => Promise<void>> {
+  const client = new PgClient(PG_CONN);
+  await client.connect();
+  try {
+    const target = await client.query<{
+      pid: string;
+      updated_at: Date;
+    }>(
+      `SELECT b.pid, b.updated_at
+         FROM ab_meta_model_field_binding b
+         JOIN ab_meta_model m ON m.id = b.model_id AND m.tenant_id = b.tenant_id
+        WHERE m.pid = $1 AND b.deleted_flag = FALSE
+        ORDER BY b.id
+        LIMIT 1`,
+      [modelPid],
+    );
+    expect(target.rows[0]?.pid, 'model dependency binding for drift').toBeTruthy();
+    const row = target.rows[0];
+    await client.query(
+      `UPDATE ab_meta_model_field_binding
+          SET updated_at = updated_at + INTERVAL '1 second'
+        WHERE pid = $1`,
+      [row.pid],
+    );
+    return async () => {
+      try {
+        await client.query(
+          `UPDATE ab_meta_model_field_binding SET updated_at = $2 WHERE pid = $1`,
+          [row.pid, row.updated_at],
+        );
+      } finally {
+        await client.end();
+      }
+    };
+  } catch (error) {
+    await client.end();
+    throw error;
+  }
+}
+
+async function assertSplitPersistence(split: SplitResult): Promise<void> {
+  const client = new PgClient(PG_CONN);
+  await client.connect();
+  try {
+    const persistence = await client.query<{
+      mapping_count: string;
+      split_count: string;
+      audit_count: string;
+      reason: string;
+    }>(
+      `SELECT
+         (SELECT COUNT(*)::text
+            FROM ab_authoring_change_item_split item_split
+            JOIN ab_authoring_change_item target_item
+              ON target_item.id = item_split.target_change_item_id
+           WHERE target_item.pid = $1) AS mapping_count,
+         (SELECT COUNT(*)::text
+            FROM ab_authoring_change_set_split split_row
+            JOIN ab_authoring_change_set target_set
+              ON target_set.id = split_row.target_change_set_id
+           WHERE target_set.pid = $2) AS split_count,
+         (SELECT COUNT(*)::text
+            FROM ab_authoring_audit_event
+           WHERE change_set_pid IN ($2, $3)
+             AND event_type IN ('CHANGE_SET_SPLIT_SOURCE', 'CHANGE_SET_SPLIT_TARGET')) AS audit_count,
+         (SELECT split_row.reason
+            FROM ab_authoring_change_set_split split_row
+            JOIN ab_authoring_change_set target_set
+              ON target_set.id = split_row.target_change_set_id
+           WHERE target_set.pid = $2) AS reason`,
+      [
+        split.targetItems[0].changeItemPid,
+        split.targetSession.changeSetPid,
+        split.sourceSession.changeSetPid,
+      ],
+    );
+    expect(persistence.rows[0]).toEqual({
+      mapping_count: '1',
+      split_count: '1',
+      audit_count: '2',
+      reason: 'PC 门禁：L0 密度与 L3 数据源没有跨分组依赖',
+    });
+  } finally {
+    await client.end();
+  }
+}
+
+async function loadAuditRows(changeSetPid: string): Promise<AuditRow[]> {
+  const client = new PgClient(PG_CONN);
+  await client.connect();
+  try {
+    const result = await client.query<AuditRow>(
+      `SELECT event_type, result, reason_code, metadata
+         FROM ab_authoring_audit_event
+        WHERE change_set_pid = $1
+        ORDER BY created_at, id`,
+      [changeSetPid],
+    );
+    return result.rows;
+  } finally {
+    await client.end();
+  }
+}
+
 async function cleanupMaterializedNewPage(pageKey: string): Promise<void> {
   const client = new PgClient(PG_CONN);
   await client.connect();
@@ -684,12 +1383,14 @@ async function enterAuthoringFromMenu(page: Page): Promise<AuthoringSession> {
   await expect(runtime.getByRole('heading', { name: gatePage.title })).toBeVisible();
   await expect(runtime.getByText(gatePage.recordMarker)).toBeVisible();
 
+  const entry = page.getByTestId('contextual-authoring-enter');
+  await expect(entry).toHaveText('配置此页', { timeout: 15_000 });
   const sessionResponse = page.waitForResponse(
     (response) =>
       response.request().method() === 'POST' &&
       apiPath(response.url()) === '/api/authoring/sessions',
   );
-  await runtime.getByRole('button', { name: '配置此页' }).click();
+  await entry.click();
   const session = await expectApiData<AuthoringSession>(
     await sessionResponse,
     'enter release gate authoring from its menu',
@@ -794,7 +1495,69 @@ function readObjectPath(root: Record<string, unknown>, path: string): unknown {
 
 async function login(page: Page): Promise<void> {
   await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  const spaces = await expectApiData<
+    Array<{
+      tenantId: string | number;
+      tenantName?: string;
+      spaceType?: string;
+    }>
+  >(await page.request.get('/api/tenant-selection/my-spaces'), 'load admin tenant spaces');
+  const businessSpace =
+    spaces.find(
+      (space) => space.spaceType === 'business' && space.tenantName === 'AuraBoot Demo',
+    ) ?? spaces.find((space) => space.spaceType === 'business');
+  expect(businessSpace?.tenantId, 'business tenant for contextual authoring golden').toBeTruthy();
+
+  const currentAuth = await loadAuthSnapshot(page);
+  if (String(currentAuth.user.tenantId) !== String(businessSpace!.tenantId)) {
+    const switchResponse = await page.request.post('/_action/switch-space', {
+      form: {
+        tenantId: String(businessSpace!.tenantId),
+        redirectTo: '/home',
+      },
+      maxRedirects: 0,
+    });
+    expect(
+      [302, 303].includes(switchResponse.status()),
+      `switch to business tenant: HTTP ${switchResponse.status()} ${await switchResponse.text()}`,
+    ).toBe(true);
+    const sessionCookie = switchResponse.headers()['set-cookie']?.match(/__session=([^;]+)/)?.[1];
+    expect(sessionCookie, 'business tenant switch must refresh __session').toBeTruthy();
+    const cookieBase = {
+      name: '__session',
+      value: sessionCookie!,
+      path: '/',
+      httpOnly: true,
+      sameSite: 'Lax' as const,
+    };
+    await page.context().addCookies([
+      { ...cookieBase, domain: 'localhost' },
+      { ...cookieBase, domain: '127.0.0.1' },
+    ]);
+    await page.goto('/home', { waitUntil: 'domcontentloaded' });
+  }
+
+  const auth = await loadAuthSnapshot(page);
+  expect(String(auth.user.tenantId)).toBe(String(businessSpace!.tenantId));
+  const roleCodes = auth.permissions.roles.map((role) => role.code);
+  expect(roleCodes).toContain('tenant_admin');
+  expect(auth.permissions.permissionCodes).toEqual(
+    expect.arrayContaining([...ADMIN_AUTHORING_PERMISSIONS]),
+  );
   await expect(page.locator('nav')).toBeVisible({ timeout: 15_000 });
+}
+
+async function loadAuthSnapshot(page: Page): Promise<{
+  user: { tenantId?: string | number };
+  permissions: {
+    roles: Array<{ code: string }>;
+    permissionCodes: string[];
+  };
+}> {
+  return expectApiData(
+    await page.request.get('/api/auth/me'),
+    'load contextual authoring auth snapshot',
+  );
 }
 
 async function expectApiData<T>(response: ReadableHttpResponse, label: string): Promise<T> {

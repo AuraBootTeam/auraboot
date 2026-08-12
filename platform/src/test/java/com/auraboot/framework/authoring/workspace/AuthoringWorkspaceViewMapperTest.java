@@ -2,6 +2,8 @@ package com.auraboot.framework.authoring.workspace;
 
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceContracts.SessionView;
 import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.WorkspaceRow;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import org.junit.jupiter.api.Test;
 
@@ -18,6 +20,7 @@ class AuthoringWorkspaceViewMapperTest {
     private final AuthoringDatabaseClock databaseClock = mock(AuthoringDatabaseClock.class);
     private final AuthoringWorkspaceViewMapper mapper =
             new AuthoringWorkspaceViewMapper(databaseClock);
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @Test
     void databaseClockAheadOfTheNodeExpiresOnlyTheLeaseItHasPassed() {
@@ -43,13 +46,31 @@ class AuthoringWorkspaceViewMapperTest {
         assertThat(view.writerLease().status()).isEqualTo("OWNED");
     }
 
+    @Test
+    void serializesSnowflakeOwnerIdentityWithoutJavaScriptPrecisionLoss() throws Exception {
+        when(databaseClock.now()).thenReturn(Instant.parse("2000-01-01T00:00:00Z"));
+        long snowflakeUserId = 345780496019623936L;
+
+        SessionView view = mapper.toView(row(
+                Instant.parse("2001-01-01T00:00:00Z"),
+                Instant.parse("2001-01-01T00:00:00Z"),
+                snowflakeUserId), snowflakeUserId);
+
+        assertThat(objectMapper.writeValueAsString(view))
+                .contains("\"ownerUserId\":\"345780496019623936\"");
+    }
+
     private WorkspaceRow row(Instant expiresAt, Instant leasedUntil) {
+        return row(expiresAt, leasedUntil, CURRENT_USER_ID);
+    }
+
+    private WorkspaceRow row(Instant expiresAt, Instant leasedUntil, long ownerUserId) {
         return new WorkspaceRow(
                 11L,
                 "session-1",
                 1L,
                 2L,
-                CURRENT_USER_ID,
+                ownerUserId,
                 "page-1",
                 "ACTIVE",
                 "AUTHOR",
@@ -58,7 +79,7 @@ class AuthoringWorkspaceViewMapperTest {
                 1L,
                 21L,
                 "change-set-1",
-                CURRENT_USER_ID,
+                ownerUserId,
                 "DRAFT",
                 "CONTEXTUAL",
                 1L,

@@ -20,7 +20,7 @@ export interface AuthoringSession {
   changeSetPid: string;
   pagePid: string;
   ownership?: AuthoringOwnership;
-  ownerUserId: number;
+  ownerUserId: string | number;
   changeSetStatus: string;
   workspaceMode: 'AUTHORING' | 'OBSERVER' | 'REVIEW';
   state: string;
@@ -225,7 +225,7 @@ export interface AuthoringChangeItem {
   route: string;
   publishPolicy: string;
   reversibility: string;
-  actorUserId: number;
+  actorUserId: string | number;
   dependencySnapshot: string[];
   createdAt: string;
 }

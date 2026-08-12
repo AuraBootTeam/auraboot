@@ -1074,7 +1074,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.session.state").value("READ_ONLY"))
                 .andExpect(jsonPath("$.data.session.workspaceMode").value("REVIEW"))
-                .andExpect(jsonPath("$.data.session.ownerUserId").value(authorUserId))
+                .andExpect(jsonPath("$.data.session.ownerUserId").value(String.valueOf(authorUserId)))
                 .andExpect(jsonPath("$.data.session.changeSetStatus").value("IN_REVIEW"))
                 .andExpect(jsonPath("$.data.session.revision").value(2))
                 .andExpect(jsonPath("$.data.capabilities.checksum").isNotEmpty())
@@ -1545,6 +1545,23 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 opened.changeSetPid(), new ReviewRequest(2, "self approval")))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("four-eyes-required");
+        Map<String, Object> denied = jdbcTemplate.queryForMap("""
+                SELECT actor_user_id, result, reason_code, metadata::text AS metadata
+                FROM ab_authoring_audit_event
+                WHERE change_set_pid = ?
+                  AND event_type = 'CHANGE_SET_APPROVAL_DENIED'
+                ORDER BY created_at DESC, id DESC LIMIT 1
+                """, opened.changeSetPid());
+        assertThat(((Number) denied.get("actor_user_id")).longValue())
+                .isEqualTo(testUser.getId());
+        assertThat(denied.get("result")).isEqualTo("DENY");
+        assertThat(denied.get("reason_code")).isEqualTo("FOUR_EYES_REQUIRED");
+        assertThat((String) denied.get("metadata"))
+                .contains("\"expectedRevision\": 2")
+                .contains("\"failureCategory\": \"REJECTED\"")
+                .doesNotContain("self approval")
+                .doesNotContain("four-eyes-required");
+        assertThat(approvalStatus(opened.changeSetPid(), 2)).isEqualTo("PENDING");
 
         long environmentId = MetaContext.getCurrentEnvironmentId();
         try {

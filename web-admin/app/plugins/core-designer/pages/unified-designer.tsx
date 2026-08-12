@@ -1053,6 +1053,16 @@ export default function UnifiedDesignerPage() {
           ? submissionFailure.message
           : '无法完成校验或提交评审',
       );
+      try {
+        const latest = await loadAuthoringSession(authoringSession.sessionPid);
+        const canonicalDocument = authoringSnapshotToPageSchemaV3(latest.snapshot);
+        documentBaselineRef.current = latest;
+        setAuthoringSession(latest);
+        setDocument(canonicalDocument);
+        setWorkbenchGeneration((current) => current + 1);
+      } catch {
+        // Keep the original prepare/submit failure visible when the refresh also fails.
+      }
     } finally {
       setSubmissionPending(false);
     }
@@ -1526,7 +1536,8 @@ export default function UnifiedDesignerPage() {
 
       <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,auto)]">
         <AuthoringRiskSummary session={authoringSession!} compact />
-        {!reviewWorkspaceMode && authoringSession?.changeSetStatus === 'DRAFT' ? (
+        {!reviewWorkspaceMode &&
+        ['DRAFT', 'REJECTED'].includes(authoringSession?.changeSetStatus ?? '') ? (
           <StudioSubmissionNotice
             session={authoringSession!}
             pending={submissionPending}

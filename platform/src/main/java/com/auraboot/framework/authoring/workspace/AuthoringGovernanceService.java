@@ -172,15 +172,21 @@ public class AuthoringGovernanceService {
     @Transactional(noRollbackFor = AuthoringStaleStateException.class)
     public ChangeSetView approve(String changeSetPid, ReviewRequest request) {
         Identity identity = identity();
-        GovernanceRow row = requireChangeSet(identity, changeSetPid, true);
-        governanceValidator.requireRevision(row, request.expectedRevision());
-        governanceValidator.requireStatus(row, "IN_REVIEW");
-        governanceValidator.requireFourEyes(row, identity.userId());
-        governanceValidator.requireFresh(row);
-        governanceRepository.approve(row, identity.userId(), safeReason(request.reason()));
-        audit(identity, row, null, "CHANGE_SET_APPROVED", "ALLOW", "REVISION_APPROVED",
-                objectMapper.valueToTree(Map.of("approvedRevision", row.revision())));
-        return view(requireChangeSet(identity, changeSetPid, false));
+        GovernanceRow row = null;
+        try {
+            row = requireChangeSet(identity, changeSetPid, true);
+            governanceValidator.requireRevision(row, request.expectedRevision());
+            governanceValidator.requireStatus(row, "IN_REVIEW");
+            governanceValidator.requireFourEyes(row, identity.userId());
+            governanceValidator.requireFresh(row);
+            governanceRepository.approve(row, identity.userId(), safeReason(request.reason()));
+            audit(identity, row, null, "CHANGE_SET_APPROVED", "ALLOW", "REVISION_APPROVED",
+                    objectMapper.valueToTree(Map.of("approvedRevision", row.revision())));
+            return view(requireChangeSet(identity, changeSetPid, false));
+        } catch (RuntimeException failure) {
+            recordApprovalDenial(identity, row, changeSetPid, request, failure);
+            throw failure;
+        }
     }
 
     @Transactional
@@ -667,6 +673,71 @@ public class AuthoringGovernanceService {
         } catch (RuntimeException auditFailure) {
             failure.addSuppressed(auditFailure);
         }
+    }
+
+    private void recordApprovalDenial(
+            Identity identity,
+            GovernanceRow row,
+            String changeSetPid,
+            ReviewRequest request,
+            RuntimeException failure) {
+        ObjectNode metadata = objectMapper.createObjectNode();
+        if (request != null) {
+            metadata.put("expectedRevision", request.expectedRevision());
+        }
+        metadata.put("failureCategory", approvalFailureCategory(failure));
+        AuditEntry entry = new AuditEntry(
+                UniqueIdGenerator.generate(), identity.tenantId(), identity.envId(),
+                identity.userId(), changeSetPid, null,
+                "CHANGE_SET_APPROVAL_DENIED", approvalFailureResult(failure),
+                approvalFailureReason(failure),
+                "PAGE_SCHEMA", row == null ? null : row.resourcePid(), null, null,
+                MetaContext.getOtelTraceId(), metadata);
+        try {
+            auditService.recordDenied(entry);
+        } catch (RuntimeException auditFailure) {
+            failure.addSuppressed(auditFailure);
+        }
+    }
+
+    private String approvalFailureReason(RuntimeException failure) {
+        if (failure instanceof AuthoringStaleStateException) {
+            return "APPROVAL_STALE";
+        }
+        if (failure instanceof ResponseStatusException response) {
+            if ("authoring.approval.four-eyes-required".equals(response.getReason())) {
+                return "FOUR_EYES_REQUIRED";
+            }
+            if (response.getReason() == null) {
+                return "APPROVAL_REJECTED";
+            }
+            String reason = response.getReason().toUpperCase(Locale.ROOT)
+                    .replace('.', '_')
+                    .replace('-', '_');
+            return reason.length() <= 80 ? reason : "APPROVAL_REJECTED";
+        }
+        if (failure instanceof DataAccessException) {
+            return "APPROVAL_PERSISTENCE_FAILED";
+        }
+        return "APPROVAL_FAILED";
+    }
+
+    private String approvalFailureResult(RuntimeException failure) {
+        return failure instanceof AuthoringStaleStateException
+                || failure instanceof ResponseStatusException ? "DENY" : "FAIL";
+    }
+
+    private String approvalFailureCategory(RuntimeException failure) {
+        if (failure instanceof AuthoringStaleStateException) {
+            return "STALE";
+        }
+        if (failure instanceof ResponseStatusException) {
+            return "REJECTED";
+        }
+        if (failure instanceof DataAccessException) {
+            return "PERSISTENCE";
+        }
+        return "UNEXPECTED";
     }
 
     private String publishFailureReason(RuntimeException failure) {

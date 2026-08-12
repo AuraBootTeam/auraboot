@@ -4,6 +4,8 @@ import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.Boundary
 import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.CapabilityManifest;
 import com.auraboot.framework.authoring.policy.AuthoringPolicyContracts.PatchOperation;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -298,6 +300,7 @@ public final class AuthoringWorkspaceContracts {
             String changeSetPid,
             String pagePid,
             OwnershipView ownership,
+            @JsonSerialize(using = ToStringSerializer.class)
             long ownerUserId,
             String changeSetStatus,
             String workspaceMode,
@@ -479,6 +482,7 @@ public final class AuthoringWorkspaceContracts {
             String route,
             String publishPolicy,
             String reversibility,
+            @JsonSerialize(using = ToStringSerializer.class)
             long actorUserId,
             JsonNode dependencySnapshot,
             Instant createdAt) {
@@ -500,6 +504,7 @@ public final class AuthoringWorkspaceContracts {
     public record ChangeSetView(
             String changeSetPid,
             String pagePid,
+            @JsonSerialize(using = ToStringSerializer.class)
             long ownerUserId,
             String status,
             long revision,
