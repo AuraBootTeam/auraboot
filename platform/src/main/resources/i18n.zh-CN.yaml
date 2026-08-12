@@ -35,6 +35,27 @@ common:
   view: 查看
   sort: 排序
   fields: 字段
+  column_settings_title: 配置视图字段
+  column_settings_help: 选择字段、调整顺序与列宽；配置会随当前视图保存
+  column_settings_search: 搜索字段名称或编码
+  column_settings_restore: 恢复默认
+  column_settings_density: 行高密度
+  column_settings_density_help: 仅应用于当前视图
+  column_settings_visible_summary: "已显示 {visible}/{total} 个字段"
+  column_settings_show_all: 显示全部
+  column_settings_system: 系统
+  column_settings_pin_left: 固定到左侧
+  column_settings_pin_right: 固定到右侧
+  column_settings_width: 列宽
+  column_settings_minimum: 至少保留一个可见字段
+  column_settings_unsaved: 变更将随当前视图保存
+  column_settings_unchanged: 暂无变更
+  column_settings_apply: 应用到视图
+  column_settings_save_failed: 保存视图配置失败
+  row_height_short: 紧凑
+  row_height_medium: 标准
+  row_height_tall: 宽松
+  row_height_extra_tall: 超宽松
   filter: 筛选
   search: 搜索
   add_filter: 添加筛选

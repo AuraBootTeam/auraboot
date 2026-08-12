@@ -182,7 +182,9 @@ export const ListTable = React.memo(function ListTable({
     [renderCellContent],
   );
 
-  // Separate action column from data columns, then order data columns
+  // Separate action column from data columns, then order data columns. Frozen
+  // columns must also move to their physical edge: sticky positioning alone
+  // leaves a "left-pinned" field stranded in the middle until horizontal scroll.
   const { orderedDataColumns, actionColumn } = useMemo(() => {
     const actionCol = columns.find((c) => c.isActionColumn);
     const dataCols = columns.filter((c) => !c.isActionColumn);
@@ -196,6 +198,12 @@ export const ListTable = React.memo(function ListTable({
         return idxA - idxB;
       });
     }
+
+    const frozenRank = (column: ColumnConfig) => {
+      const position = column.fixed || (column as any).frozenPosition;
+      return position === 'left' ? 0 : position === 'right' ? 2 : 1;
+    };
+    dataCols.sort((left, right) => frozenRank(left) - frozenRank(right));
 
     return { orderedDataColumns: dataCols, actionColumn: actionCol };
   }, [columns, columnOrder]);
@@ -216,7 +224,7 @@ export const ListTable = React.memo(function ListTable({
     return estimateActionColumnWidth(inline.map(resolveButtonLabel), {
       hasOverflow: overflow.length > 0,
     });
-  }, [actionColumn, resolveButtonLabel]);
+  }, [actionColumn, getColumnWidth, resolveButtonLabel]);
 
   const baseTableWidth = useMemo(() => {
     const selectionWidth = enableSelection ? SELECTION_COLUMN_WIDTH : 0;
@@ -251,6 +259,24 @@ export const ListTable = React.memo(function ListTable({
     [getColumnWidth, renderedColumnWidths],
   );
 
+  const frozenOffsets = useMemo(() => {
+    const offsets = new Map<string, number>();
+    let leftOffset = enableSelection ? SELECTION_COLUMN_WIDTH : 0;
+    for (const column of orderedDataColumns) {
+      if ((column.fixed || (column as any).frozenPosition) !== 'left') continue;
+      offsets.set(column.field, leftOffset);
+      leftOffset += getRenderedColumnWidth(column);
+    }
+
+    let rightOffset = actionColumnWidth;
+    for (const column of [...orderedDataColumns].reverse()) {
+      if ((column.fixed || (column as any).frozenPosition) !== 'right') continue;
+      offsets.set(column.field, rightOffset);
+      rightOffset += getRenderedColumnWidth(column);
+    }
+    return offsets;
+  }, [actionColumnWidth, enableSelection, getRenderedColumnWidth, orderedDataColumns]);
+
   const renderedTableWidth = useMemo(() => {
     const selectionWidth = enableSelection ? SELECTION_COLUMN_WIDTH : 0;
     const dataWidth = orderedDataColumns.reduce(
@@ -263,12 +289,17 @@ export const ListTable = React.memo(function ListTable({
   const getCellStyle = useCallback(
     (column: ColumnConfig): React.CSSProperties => {
       const width = getRenderedColumnWidth(column);
+      const frozenPosition = column.fixed || (column as any).frozenPosition;
       return {
         width: `${width}px`,
         maxWidth: `${width}px`,
+        ...(frozenPosition === 'left' ? { left: `${frozenOffsets.get(column.field) ?? 0}px` } : {}),
+        ...(frozenPosition === 'right'
+          ? { right: `${frozenOffsets.get(column.field) ?? 0}px` }
+          : {}),
       };
     },
-    [getRenderedColumnWidth],
+    [frozenOffsets, getRenderedColumnWidth],
   );
 
   useEffect(() => {
@@ -479,7 +510,10 @@ export const ListTable = React.memo(function ListTable({
             <thead className={`bg-subtle ${enableVirtualization ? 'sticky top-0 z-20' : ''}`}>
               <tr>
                 {enableSelection && (
-                  <th className="print-hide w-10 px-3 py-3" data-print="hide">
+                  <th
+                    className="border-border bg-subtle print-hide sticky left-0 z-30 w-10 border-r px-3 py-3"
+                    data-print="hide"
+                  >
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -522,6 +556,7 @@ export const ListTable = React.memo(function ListTable({
                       onContextMenu={onContextMenu}
                       draggable
                       width={colWidth}
+                      frozenOffset={frozenOffsets.get(column.field) ?? 0}
                     />
                   );
                 })}
@@ -647,7 +682,7 @@ export const ListTable = React.memo(function ListTable({
                       >
                         {enableSelection && (
                           <td
-                            className={`px-3 ${rowHeightCfg.pyClass} print-hide w-10`}
+                            className={`px-3 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover print-hide sticky left-0 z-20 w-10 border-r`}
                             data-print="hide"
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -775,7 +810,7 @@ export const ListTable = React.memo(function ListTable({
                       >
                         {enableSelection && (
                           <td
-                            className={`px-3 ${rowHeightCfg.pyClass} print-hide w-10`}
+                            className={`px-3 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover print-hide sticky left-0 z-20 w-10 border-r`}
                             data-print="hide"
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -888,7 +923,7 @@ export const ListTable = React.memo(function ListTable({
                     >
                       {enableSelection && (
                         <td
-                          className={`px-3 ${rowHeightCfg.pyClass} print-hide w-10`}
+                          className={`px-3 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover print-hide sticky left-0 z-20 w-10 border-r`}
                           data-print="hide"
                           onClick={(e) => e.stopPropagation()}
                         >

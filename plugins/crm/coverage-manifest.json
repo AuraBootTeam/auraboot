@@ -1593,8 +1593,8 @@
     {
       "id": "RELEASE-B-OPPORTUNITY",
       "filePrefix": "crm-opportunity-efficiency-",
-      "expectedScenarios": 7,
-      "minimumScreenshots": 12,
+      "expectedScenarios": 10,
+      "minimumScreenshots": 21,
       "expectedCoverage": {
         "pages": [
           "crm_contact_common_list",
@@ -1628,8 +1628,12 @@
           "crm_opportunity_common_detail:crm_opportunity_tabs:activities",
           "crm_opportunity_common_detail:crm_opportunity_tabs:plan_and_quotes",
           "crm_opportunity_common_list:crm_opp_table:bulk_qualify",
+          "crm_opportunity_common_list:platform:add_advanced_filter",
+          "crm_opportunity_common_list:platform:configure_view_columns",
+          "crm_opportunity_common_list:platform:export_filtered_csv",
           "crm_opportunity_common_list:platform:analyze_current_view",
           "crm_opportunity_common_list:platform:drill_chart_to_list",
+          "crm_opportunity_common_list:platform:save_advanced_filters",
           "crm_opportunity_common_list:crm_opp_tabs:proposal"
         ],
         "blocks": [

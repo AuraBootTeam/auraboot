@@ -40,6 +40,7 @@ const ids = {
 const expectedScenarios = [
   'shared-list-kanban-fact',
   'personal-view-persistence',
+  'personal-view-column-configuration',
   'advanced-filter-saved-view-export',
   'current-view-self-service-analysis',
   'opportunity-plan-quote-context',
@@ -80,6 +81,7 @@ const expectedCoverage = {
     'crm_opportunity_common_detail:crm_opportunity_tabs:plan_and_quotes',
     'crm_opportunity_common_list:crm_opp_table:bulk_qualify',
     'crm_opportunity_common_list:platform:add_advanced_filter',
+    'crm_opportunity_common_list:platform:configure_view_columns',
     'crm_opportunity_common_list:platform:export_filtered_csv',
     'crm_opportunity_common_list:platform:analyze_current_view',
     'crm_opportunity_common_list:platform:drill_chart_to_list',
@@ -254,6 +256,7 @@ async function seedJourney(): Promise<void> {
     crm_opp_expected_close_date: NEXT_MONTH,
     crm_opp_probability: 60,
     crm_opp_forecast_category: 'best_case',
+    crm_opp_competitor: 'CordysCRM',
   });
   ids.negotiation = await executeCreate('crm:create_opportunity', {
     crm_opp_name: names.negotiation,
@@ -539,6 +542,97 @@ test('a personal saved view persists while list and board presentation changes',
   await expect(page.getByTestId('kanban-card').filter({ hasText: names.discovery })).toHaveCount(0);
   await shot(page, testInfo, 'release-b-personal-view-shared-fact.png');
   completedScenarios.add('personal-view-persistence');
+});
+
+test('a personal view owns its visible fields, pinned amount and row density', async ({ page }, testInfo) => {
+  await uiLogin(page);
+  await gotoOpportunityList(page, ids.personalView);
+  const tableMode = page.getByTestId('list-view-mode-table');
+  if ((await tableMode.getAttribute('aria-checked')) !== 'true') await tableMode.click();
+
+  await page.getByTestId('column-settings-btn').click();
+  const panel = page.getByTestId('column-settings-panel');
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText(/配置.*字段/);
+  await expect(page.getByTestId('column-settings-density-short')).toBeVisible();
+
+  const search = page.getByTestId('column-settings-search');
+  await search.fill('竞争对手');
+  const competitorRow = page.getByTestId('column-settings-row-crm_opp_competitor');
+  await expect(competitorRow).toBeVisible();
+  await expect(competitorRow).toContainText('竞争对手');
+  await expect(competitorRow).not.toContainText('crm_opp_competitor');
+  await page.getByTestId('column-settings-visible-crm_opp_competitor').check();
+  await page.getByTestId('column-settings-width-crm_opp_competitor').fill('180');
+  await page.getByTestId('column-settings-density-short').click();
+  await shot(page, testInfo, 'release-c-column-settings-desktop.png');
+
+  await search.clear();
+  await page.getByTestId('column-settings-pin-left-crm_opp_expected_amount').click();
+  await page.getByTestId('column-settings-pin-right-crm_opp_competitor').click();
+  await page.getByTestId('column-settings-save').click();
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByTestId('personal-view-draft-banner')).toBeVisible();
+  await page.getByTestId('personal-view-save-current').click();
+  await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
+
+  const competitorHeader = page.getByTestId('table-header-crm_opp_competitor');
+  const amountHeader = page.getByTestId('table-header-crm_opp_expected_amount');
+  await expect(competitorHeader).toBeVisible();
+  await expect(competitorHeader).toContainText('竞争对手');
+  await expect(page.locator('tr').filter({ hasText: names.proposal })).toContainText('CordysCRM');
+  await expect.poll(() => page.getByTestId('table-row-0').evaluate((element) =>
+    (element as HTMLElement).style.height,
+  )).toBe('32px');
+  await expect.poll(() => amountHeader.evaluate((element) => ({
+    position: getComputedStyle(element).position,
+    left: getComputedStyle(element).left,
+  }))).toEqual({ position: 'sticky', left: '40px' });
+  await assertNoRawCodes(page);
+  await shot(page, testInfo, 'release-c-column-view-applied-desktop.png');
+
+  const personalViews = assertOk(await api(
+    '/api/views/personal?modelCode=crm_opportunity_common&pageKey=crm_opportunity_common_list',
+  ), 'personal views after column configuration').data ?? [];
+  const savedView = personalViews.find((view: any) => view.pid === ids.personalView);
+  expect(savedView?.viewConfig?.rowHeight).toBe('short');
+  expect(savedView?.viewConfig?.columns).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      fieldCode: 'crm_opp_competitor',
+      visible: true,
+      width: 180,
+      frozen: true,
+      frozenPosition: 'right',
+    }),
+    expect.objectContaining({
+      fieldCode: 'crm_opp_expected_amount',
+      frozen: true,
+      frozenPosition: 'left',
+    }),
+  ]));
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('table-header-crm_opp_competitor')).toBeVisible();
+  await expect.poll(() => page.getByTestId('table-row-0').evaluate((element) =>
+    (element as HTMLElement).style.height,
+  )).toBe('32px');
+  await expect.poll(() => page.getByTestId('table-header-crm_opp_expected_amount')
+    .evaluate((element) => getComputedStyle(element).left)).toBe('40px');
+  await expect.poll(() => page.getByTestId('table-header-crm_opp_competitor')
+    .evaluate((element) => getComputedStyle(element).right)).not.toBe('auto');
+
+  await page.setViewportSize({ width: 960, height: 900 });
+  await closeCompactNavigation(page);
+  await page.getByTestId('column-settings-btn').click();
+  await page.getByTestId('column-settings-search').fill('竞争对手');
+  await expect(page.getByTestId('column-settings-visible-crm_opp_competitor')).toBeChecked();
+  await assertNoPageOverflow(page);
+  await shot(page, testInfo, 'release-c-column-settings-compact.png');
+  await page.getByTestId('column-settings-close').click();
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  cover('uiActions', 'crm_opportunity_common_list:platform:configure_view_columns');
+  completedScenarios.add('personal-view-column-configuration');
 });
 
 test('advanced filters persist and drive the exact exported opportunity fact', async ({ page }, testInfo) => {

@@ -11,7 +11,11 @@ import type { ColumnConfig } from '~/framework/meta/schemas/types';
 import { ImportModal } from '~/framework/smart/components/data-tools/ImportModal';
 import FormDialog from '~/framework/meta/runtime/actions/FormDialog';
 import { ViewManagePanel } from '~/framework/smart/components/view/ViewManagePanel';
-import { ColumnSettingsPanel } from '~/framework/smart/components/view/ColumnSettingsPanel';
+import {
+  ColumnSettingsPanel,
+  type ColumnSettingsDefinition,
+  type ColumnSettingsSavePayload,
+} from '~/framework/smart/components/view/ColumnSettingsPanel';
 import { FilterFieldPicker } from '~/framework/smart/components/view/FilterFieldPicker';
 import { FilterValuePopover } from '~/framework/smart/components/view/FilterValuePopover';
 import { BulkEditModal } from '~/framework/smart/components/bulk/BulkEditModal';
@@ -73,9 +77,10 @@ export interface ListModalsProps {
   // ColumnSettingsPanel
   columnSettingsOpen: boolean;
   onColumnSettingsClose: () => void;
-  allColumnDefs: Array<{ field: string; label: string }>;
+  allColumnDefs: ColumnSettingsDefinition[];
   viewColumns?: ViewColumnConfig[];
-  onColumnSettingsSave: (columns: ViewColumnConfig[]) => Promise<void>;
+  columnSettingsRowHeight?: import('~/framework/smart/types/savedView').RowHeight;
+  onColumnSettingsSave: (payload: ColumnSettingsSavePayload) => Promise<void>;
   t: (key: string) => string;
 
   // FilterFieldPicker
@@ -162,6 +167,7 @@ export function ListModals({
   onColumnSettingsClose,
   allColumnDefs,
   viewColumns,
+  columnSettingsRowHeight,
   onColumnSettingsSave,
   t,
 
@@ -265,6 +271,7 @@ export function ListModals({
         onClose={onColumnSettingsClose}
         allColumns={allColumnDefs}
         viewColumns={viewColumns}
+        rowHeight={columnSettingsRowHeight}
         onSave={onColumnSettingsSave}
         t={t}
       />

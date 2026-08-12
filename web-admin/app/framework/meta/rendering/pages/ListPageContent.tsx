@@ -50,7 +50,6 @@ import {
   type RowHeight,
   type SavedView,
   type SavedViewCreateRequest,
-  type ColumnConfig as ViewColumnConfig,
   type ViewType,
   type ViewScope,
   type ViewConfig,
@@ -70,6 +69,12 @@ import { ListPagination } from './list/ListPagination';
 import { ListModals } from './list/ListModals';
 import { ListToolbar } from './list/ListToolbar';
 import { ViewAnalysisDrawer } from './list/ViewAnalysisDrawer';
+import {
+  buildColumnSettingsRows,
+  serializeColumnSettings,
+  type ColumnSettingsDefinition,
+  type ColumnSettingsSavePayload,
+} from '~/framework/smart/components/view/ColumnSettingsPanel';
 import { ListTable } from './list/ListTable';
 import {
   BulkActionResultDialog,
@@ -616,6 +621,57 @@ export function buildViewManageFieldOptions(
   }
 
   return Array.from(byCode.values());
+}
+
+export function buildListColumnSettingsDefinitions(
+  baseColumns: ColumnConfig[],
+  modelFieldMap: Map<string, any> | undefined,
+  systemColumns: ColumnConfig[],
+  resolveLabel: (column: ColumnConfig) => string,
+): ColumnSettingsDefinition[] {
+  const definitions = new Map<string, ColumnSettingsDefinition>();
+
+  for (const column of baseColumns) {
+    if (!column.field || column.isActionColumn) continue;
+    definitions.set(column.field, {
+      field: column.field,
+      label: resolveLabel(column),
+      dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
+      group: 'business',
+      defaultVisible: true,
+      defaultWidth:
+        typeof column.width === 'number'
+          ? column.width
+          : typeof column.width === 'string'
+            ? Number.parseInt(column.width, 10) || undefined
+            : undefined,
+      defaultFrozenPosition: column.fixed,
+    });
+  }
+
+  for (const [fieldCode, meta] of modelFieldMap?.entries() ?? []) {
+    if (!fieldCode || meta?.visible === false || definitions.has(fieldCode)) continue;
+    definitions.set(fieldCode, {
+      field: fieldCode,
+      label: resolveFieldMetaDisplayName(fieldCode, modelFieldMap) ?? fieldCode,
+      dataType: resolveFieldMetaDataType(fieldCode, modelFieldMap) ?? 'text',
+      group: 'business',
+      defaultVisible: false,
+    });
+  }
+
+  for (const column of systemColumns) {
+    if (!column.field || definitions.has(column.field)) continue;
+    definitions.set(column.field, {
+      field: column.field,
+      label: resolveLabel(column),
+      dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
+      group: 'system',
+      defaultVisible: false,
+    });
+  }
+
+  return Array.from(definitions.values());
 }
 
 export function collectListReferenceDisplayConfigs(
@@ -2959,26 +3015,29 @@ function ListPageContentInner(props: PageContentProps) {
   }, [allBlocks]);
 
   // System fields on every dynamic entity — not in DSL but available in API response
-  const SYSTEM_FIELD_DEFS: ColumnConfig[] = [
-    {
-      field: 'created_at',
-      label: t(getSystemFieldI18nKey('created_at') || 'common.created_at') || 'Created At',
-      valueType: 'datetime' as any,
-    },
-    {
-      field: 'updated_at',
-      label: t(getSystemFieldI18nKey('updated_at') || 'common.updated_at') || 'Updated At',
-      valueType: 'datetime' as any,
-    },
-    {
-      field: 'created_by',
-      label: t('common.creator') || 'Created By',
-    },
-    {
-      field: 'updated_by',
-      label: t('common.modifier') || 'Updated By',
-    },
-  ];
+  const SYSTEM_FIELD_DEFS: ColumnConfig[] = useMemo(
+    () => [
+      {
+        field: 'created_at',
+        label: t(getSystemFieldI18nKey('created_at') || 'common.created_at') || 'Created At',
+        valueType: 'datetime' as any,
+      },
+      {
+        field: 'updated_at',
+        label: t(getSystemFieldI18nKey('updated_at') || 'common.updated_at') || 'Updated At',
+        valueType: 'datetime' as any,
+      },
+      {
+        field: 'created_by',
+        label: t('common.creator') || 'Created By',
+      },
+      {
+        field: 'updated_by',
+        label: t('common.modifier') || 'Updated By',
+      },
+    ],
+    [t],
+  );
 
   // Get columns: prefer table.columns, fallback to block-level columns
   // Then apply SavedView column visibility/order overrides
@@ -3024,22 +3083,46 @@ function ListPageContentInner(props: PageContentProps) {
 
     const viewColMap = new Map(viewColumns.map((vc) => [vc.fieldCode, vc]));
     // Filter visible columns and apply order
-    // Include system fields that are explicitly enabled in viewConfig
+    // Include model and system fields that are explicitly enabled in viewConfig.
+    // This lets SavedView promote a valid model field that the DSL table does
+    // not show by default, while the page schema remains the default layout.
     const baseFields = new Set(baseCols.map((c) => c.field));
+    const modelCols: ColumnConfig[] = [];
+    for (const vc of viewColumns) {
+      if (vc.visible === false || baseFields.has(vc.fieldCode)) continue;
+      const meta = modelFieldMap.get(vc.fieldCode);
+      if (!meta) continue;
+      const renderComponent = resolveFieldMetaRenderComponent(vc.fieldCode, modelFieldMap);
+      const dataType = resolveFieldMetaDataType(vc.fieldCode, modelFieldMap);
+      modelCols.push({
+        field: vc.fieldCode,
+        label: resolveFieldMetaDisplayName(vc.fieldCode, modelFieldMap) ?? vc.fieldCode,
+        valueType: renderComponentToValueType(renderComponent),
+        sorter: dataType,
+        sortable: true,
+        dictCode: meta.dictCode || meta.extension?.dictCode || undefined,
+        refTarget: meta.refTarget || meta.extension?.refTarget || undefined,
+      } as ColumnConfig);
+      baseFields.add(vc.fieldCode);
+    }
     const sysCols = SYSTEM_FIELD_DEFS.filter((sf) => {
       const vc = viewColMap.get(sf.field);
       return vc && vc.visible !== false && !baseFields.has(sf.field);
     });
-    const allCols = [...baseCols, ...sysCols];
+    const allCols = [...baseCols, ...modelCols, ...sysCols];
     const visibleCols = allCols
       .map((col) => {
         const vc = viewColMap.get(col.field);
         if (vc && vc.visible === false) return null;
-        // Apply width override
-        if (vc?.width) {
-          return { ...col, width: vc.width };
-        }
-        return col;
+        return {
+          ...col,
+          ...(vc?.width ? { width: vc.width } : {}),
+          ...(vc?.frozen && vc.frozenPosition
+            ? { fixed: vc.frozenPosition }
+            : vc?.frozen === false
+              ? { fixed: undefined }
+              : {}),
+        };
       })
       .filter((col): col is ColumnConfig => col !== null);
 
@@ -3054,7 +3137,7 @@ function ListPageContentInner(props: PageContentProps) {
     }
 
     return visibleCols;
-  }, [tableBlock, effectiveViewConfig]);
+  }, [tableBlock, effectiveViewConfig, modelFieldMap, SYSTEM_FIELD_DEFS]);
 
   const referenceDisplayConfigs = useMemo(
     () => collectListReferenceDisplayConfigs(tableColumns, modelFieldMap),
@@ -3302,44 +3385,19 @@ function ListPageContentInner(props: PageContentProps) {
     [appendListSearch, schema, tableBlock, tableName, navigate, listExtensions?.disableRowClick],
   );
 
-  // All column definitions for ColumnSettingsPanel (with labels)
+  // All model-backed column definitions for ColumnSettingsPanel. DSL columns
+  // define the default visible subset; other readable model fields begin hidden.
   const allColumnDefs = useMemo(() => {
     if (!tableBlock) return [];
     const cols = (tableBlock as BlockConfig).table?.columns || tableBlock.columns;
     if (!Array.isArray(cols)) return [];
-    const dslCols = (cols as ColumnConfig[])
-      .filter((c) => !c.isActionColumn)
-      .map((col) => ({
-        field: col.field,
-        label: col.label
-          ? typeof col.label === 'string'
-            ? col.label
-            : getLocalizedText(col.label, locale, t)
-          : (() => {
-              const systemKey = getSystemFieldI18nKey(col.field);
-              if (systemKey) {
-                const systemLabel = t(systemKey);
-                if (systemLabel !== systemKey) return systemLabel;
-              }
-              const mc = schema?.modelCode || tableName;
-              const modelKey = `model.${mc}.${col.field}.label`;
-              const modelLabel = t(modelKey);
-              if (modelLabel !== modelKey) return modelLabel;
-              const fieldKey = `field.${col.field}.label`;
-              const fieldLabel = t(fieldKey);
-              if (fieldLabel !== fieldKey) return fieldLabel;
-              const commonKey = `common.field.${col.field}`;
-              const commonLabel = t(commonKey);
-              return commonLabel !== commonKey ? commonLabel : col.field;
-            })(),
-      }));
-    // Append system fields (hidden by default in ColumnSettingsPanel)
-    const sysDefs = SYSTEM_FIELD_DEFS.map((sf) => ({
-      field: sf.field,
-      label: typeof sf.label === 'string' ? sf.label : sf.field,
-    }));
-    return [...dslCols, ...sysDefs];
-  }, [tableBlock, locale, t, tableName, schema?.modelCode]);
+    return buildListColumnSettingsDefinitions(
+      cols as ColumnConfig[],
+      modelFieldMap,
+      SYSTEM_FIELD_DEFS,
+      resolveColumnLabel,
+    );
+  }, [tableBlock, modelFieldMap, resolveColumnLabel, SYSTEM_FIELD_DEFS]);
 
   const viewManageFields = useMemo(() => {
     const fieldMap = new Map(
@@ -3621,25 +3679,35 @@ function ListPageContentInner(props: PageContentProps) {
     },
   });
 
+  const buildCurrentColumnSettings = useCallback(
+    () =>
+      serializeColumnSettings(buildColumnSettingsRows(allColumnDefs, effectiveViewConfig?.columns)),
+    [allColumnDefs, effectiveViewConfig?.columns],
+  );
+
   // Handle column reorder via drag-and-drop
   const handleColumnReorder = useCallback(
     (newOrder: string[]) => {
       setColumnOrder(newOrder);
-      // Persist to SavedView
-      const cols = newOrder.map((fieldCode, idx) => {
-        const existing = effectiveViewConfig?.columns?.find((c) => c.fieldCode === fieldCode);
-        return { ...(existing || { fieldCode }), fieldCode, order: idx };
-      });
-      autoSave({ columns: cols });
+      const existing = buildCurrentColumnSettings();
+      const byField = new Map(existing.map((column) => [column.fieldCode, column]));
+      const reordered = newOrder.map((fieldCode, order) => ({
+        ...(byField.get(fieldCode) || { fieldCode }),
+        fieldCode,
+        order,
+      }));
+      const trailing = existing
+        .filter((column) => !newOrder.includes(column.fieldCode))
+        .map((column, index) => ({ ...column, order: newOrder.length + index }));
+      autoSave({ columns: [...reordered, ...trailing] });
     },
-    [effectiveViewConfig, autoSave],
+    [autoSave, buildCurrentColumnSettings],
   );
 
   // Handle column resize
   const handleColumnResize = useCallback(
     (field: string, width: number) => {
-      if (!currentView) return;
-      const cols = [...(effectiveViewConfig?.columns || [])];
+      const cols = buildCurrentColumnSettings();
       const idx = cols.findIndex((c) => c.fieldCode === field);
       if (idx >= 0) {
         cols[idx] = { ...cols[idx], width };
@@ -3648,13 +3716,13 @@ function ListPageContentInner(props: PageContentProps) {
       }
       autoSave({ columns: cols });
     },
-    [currentView, effectiveViewConfig, autoSave],
+    [autoSave, buildCurrentColumnSettings],
   );
 
   // Handle column settings save -> update SavedView
   const handleColumnSettingsSave = useCallback(
-    async (columns: ViewColumnConfig[]) => {
-      await ensureViewAndUpdateConfig({ columns });
+    async ({ columns, rowHeight }: ColumnSettingsSavePayload) => {
+      await ensureViewAndUpdateConfig({ columns, rowHeight }, { rethrow: true });
     },
     [ensureViewAndUpdateConfig],
   );
@@ -5247,6 +5315,7 @@ function ListPageContentInner(props: PageContentProps) {
             onColumnSettingsClose={() => setColumnSettingsOpen(false)}
             allColumnDefs={allColumnDefs}
             viewColumns={effectiveViewConfig?.columns}
+            columnSettingsRowHeight={effectiveRowHeight}
             onColumnSettingsSave={handleColumnSettingsSave}
             t={t}
             // FilterFieldPicker
@@ -5305,20 +5374,33 @@ function ListPageContentInner(props: PageContentProps) {
                 ]);
               }
             }}
-            onFreeze={(_pos) => {
-              // Column freeze is handled via DSL config; for runtime, update SavedView
-              // This would require extending ViewColumnConfig with frozen support
+            onFreeze={(position) => {
+              if (!contextMenu) return;
+              const fieldCode = contextMenu.column.field;
+              const columns = buildCurrentColumnSettings().map((column) => {
+                if (column.fieldCode === fieldCode) {
+                  return position === 'none'
+                    ? { ...column, frozen: false, frozenPosition: undefined }
+                    : {
+                        ...column,
+                        visible: true,
+                        frozen: true,
+                        frozenPosition: position,
+                      };
+                }
+                return column;
+              });
+              void ensureViewAndUpdateConfig({ columns });
             }}
             onHide={() => {
               if (!contextMenu) return;
-              const cols = (effectiveViewConfig?.columns || []).map((c) =>
-                c.fieldCode === contextMenu.column.field ? { ...c, visible: false } : c,
+              if (tableColumns.filter((column) => !column.isActionColumn).length <= 1) return;
+              const columns = buildCurrentColumnSettings().map((column) =>
+                column.fieldCode === contextMenu.column.field
+                  ? { ...column, visible: false, frozen: false, frozenPosition: undefined }
+                  : column,
               );
-              // If column not in saved config yet, add it as hidden
-              if (!cols.find((c) => c.fieldCode === contextMenu.column.field)) {
-                cols.push({ fieldCode: contextMenu.column.field, visible: false });
-              }
-              void ensureViewAndUpdateConfig({ columns: cols });
+              void ensureViewAndUpdateConfig({ columns });
             }}
             onFilterByColumn={() => {
               // Placeholder — will be connected to FilterChipBar in integration step

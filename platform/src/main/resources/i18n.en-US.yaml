@@ -996,6 +996,27 @@ common:
   submit: Submit
   sort: Sort
   fields: Fields
+  column_settings_title: Configure view fields
+  column_settings_help: Choose fields, order and width; settings are saved with the current view
+  column_settings_search: Search field name or code
+  column_settings_restore: Restore default
+  column_settings_density: Row density
+  column_settings_density_help: Applied to this view only
+  column_settings_visible_summary: "{visible} of {total} fields visible"
+  column_settings_show_all: Show all
+  column_settings_system: System
+  column_settings_pin_left: Pin left
+  column_settings_pin_right: Pin right
+  column_settings_width: Column width
+  column_settings_minimum: Keep at least one field visible
+  column_settings_unsaved: Changes will be saved with this view
+  column_settings_unchanged: No changes
+  column_settings_apply: Apply to view
+  column_settings_save_failed: Failed to save view settings
+  row_height_short: Compact
+  row_height_medium: Standard
+  row_height_tall: Spacious
+  row_height_extra_tall: Extra spacious
   filter: Filter
   search: Search
   add_filter: Add Filter

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildListReferenceDisplayCacheKey,
   buildViewManageFieldOptions,
+  buildListColumnSettingsDefinitions,
   buildListFilterFieldMetadata,
   collectListReferenceDisplayConfigs,
   findPersonalPresetSavedView,
@@ -34,6 +35,49 @@ describe('renderComponentToValueType', () => {
     expect(renderComponentToValueType('moneyinput')).toBe('currency');
     expect(renderComponentToValueType('input')).toBeUndefined();
     expect(renderComponentToValueType(undefined)).toBeUndefined();
+  });
+});
+
+describe('buildListColumnSettingsDefinitions', () => {
+  it('combines DSL defaults, hidden readable model fields and system fields', () => {
+    const modelFields = new Map<string, any>([
+      ['name', { code: 'name', dataType: 'string', extension: { displayName: '名称' } }],
+      ['amount', { code: 'amount', dataType: 'decimal', extension: { displayName: '金额' } }],
+      ['private_note', { code: 'private_note', dataType: 'string', visible: false }],
+    ]);
+
+    expect(
+      buildListColumnSettingsDefinitions(
+        [{ field: 'name', width: 180, fixed: 'left' }],
+        modelFields,
+        [{ field: 'updated_at', label: '更新时间', valueType: 'datetime' }],
+        (column) => (typeof column.label === 'string' ? column.label : '名称'),
+      ),
+    ).toEqual([
+      {
+        field: 'name',
+        label: '名称',
+        dataType: 'string',
+        group: 'business',
+        defaultVisible: true,
+        defaultWidth: 180,
+        defaultFrozenPosition: 'left',
+      },
+      {
+        field: 'amount',
+        label: '金额',
+        dataType: 'decimal',
+        group: 'business',
+        defaultVisible: false,
+      },
+      {
+        field: 'updated_at',
+        label: '更新时间',
+        dataType: 'datetime',
+        group: 'system',
+        defaultVisible: false,
+      },
+    ]);
   });
 });
 
