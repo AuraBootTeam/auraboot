@@ -38,6 +38,8 @@ export interface GroupedViews {
   personal: SavedView[];
   /** Team views shared within team */
   team: SavedView[];
+  /** Role views shared with current user's roles */
+  role: SavedView[];
   /** Global views accessible to all users */
   global: SavedView[];
 }
@@ -132,6 +134,11 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
         scopeFilter === 'all'
           ? accessibleViews
           : accessibleViews.filter((view) => view.scope === scopeFilter);
+      // The backend returns one synthetic effective default whose identity is the
+      // highest applicable layer and whose config already contains the governed
+      // tenant → team → role → personal merge. Keep that object even though it is
+      // not part of the ordinary accessible list, otherwise a personal-only picker
+      // silently replaces the merged default with the first raw personal row.
       const scopedDefaultView =
         scopeFilter === 'all' || defaultView?.scope === scopeFilter ? defaultView : null;
 
@@ -145,8 +152,11 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
       // applies — so a personal view still wins under scopeFilter='personal', but a list
       // page with only a global default (e.g. a plugin's kanban preset) renders it instead
       // of silently falling back to the implicit table view.
-      const nextView =
-        preservedView ?? scopedDefaultView ?? scopedViews[0] ?? defaultView ?? null;
+      const selectedDefaultStillApplies =
+        scopedDefaultView != null && selectedViewPidRef.current === scopedDefaultView.pid;
+      const nextView = selectedDefaultStillApplies
+        ? scopedDefaultView
+        : (preservedView ?? scopedDefaultView ?? scopedViews[0] ?? defaultView ?? null);
       selectedViewPidRef.current = nextView?.pid ?? null;
       setCurrentView(nextView);
     } catch (err) {
@@ -352,6 +362,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
     const scopeGroups: Record<ViewScope, SavedView[]> = {
       personal: [],
       team: [],
+      role: [],
       global: [],
     };
 
@@ -364,6 +375,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
     return {
       personal: scopeGroups.personal,
       team: scopeGroups.team,
+      role: scopeGroups.role,
       global: scopeGroups.global,
     };
   }, [views]);

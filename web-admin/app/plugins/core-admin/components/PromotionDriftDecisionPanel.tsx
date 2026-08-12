@@ -18,6 +18,8 @@ export interface PromotionDrift {
   status: 'PENDING' | 'RESOLVED' | 'STALE' | 'APPLIED';
   fingerprint: string;
   decision: PromotionDriftDecision | null;
+  executionStatus?: 'NONE' | 'PREPARED' | 'DEFERRED' | 'BACKPORTED' | 'APPLIED';
+  executionPid?: string | null;
   applyReady: boolean;
   nextAction: string;
   activeReleasePid: string;
@@ -37,19 +39,19 @@ const OPTIONS: Array<{
   {
     value: 'REBASE',
     title: '重放本地变更',
-    description: '登记进入专业三方合并；当前不会直接放行发布。',
+    description: '服务端按稳定 ID 做三方合并；同路径冲突会失败关闭。',
     icon: ArrowPathIcon,
   },
   {
     value: 'BACKPORT',
     title: '回迁源环境',
-    description: '登记创建反向发布计划；当前 promotion 保持阻塞。',
+    description: '立即创建目标到源的反向发布计划；当前晋升保持暂停。',
     icon: ArrowUturnLeftIcon,
   },
   {
     value: 'KEEP_OVERRIDE',
     title: '保留租户覆盖',
-    description: '保留现场版本并暂停本次 promotion，稍后再处理。',
+    description: '保留现场活动版本并持久延期；可改选其他处置恢复流程。',
     icon: PauseCircleIcon,
   },
   {
@@ -151,8 +153,8 @@ export function PromotionDriftDecisionPanel({
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-amber-800 dark:text-amber-300">
           {drift.applyReady
-            ? '已明确选择覆盖；服务端仍会在 apply 前重算指纹。'
-            : '未完成可执行处置前，服务端会继续阻止 apply。'}
+            ? `处置已准备${drift.executionStatus ? `（${drift.executionStatus}）` : ''}；apply 前仍会重算指纹。`
+            : '三方合并冲突或执行器未准备完成时，服务端会继续阻止 apply。'}
         </p>
         <button
           type="button"

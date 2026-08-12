@@ -8,7 +8,7 @@
 /**
  * View scope determines visibility and access permissions
  */
-export type ViewScope = 'personal' | 'team' | 'global';
+export type ViewScope = 'personal' | 'team' | 'role' | 'global';
 
 /**
  * Team option available to the current user for SavedView sharing.
@@ -615,6 +615,8 @@ export interface SavedView {
   ownerId?: string;
   /** Team ID (for TEAM views) */
   teamId?: string;
+  /** Role PID (for ROLE views) */
+  roleId?: string;
   /** View configuration */
   viewConfig?: ViewConfig;
   /** Whether to allow access to full model fields */
@@ -643,6 +645,8 @@ export interface SavedView {
   ownerName?: string;
   /** Team display name (populated by service) */
   teamName?: string;
+  /** Role display name (populated by service) */
+  roleName?: string;
 }
 
 /**
@@ -663,6 +667,8 @@ export interface SavedViewCreateRequest {
   viewType?: ViewType;
   /** Team ID (required when scope is TEAM) */
   teamId?: string;
+  /** Role PID (required when scope is ROLE) */
+  roleId?: string;
   /** View configuration */
   viewConfig?: ViewConfig;
   /** Whether to allow full model field access */
@@ -686,6 +692,8 @@ export interface SavedViewUpdateRequest {
   scope?: ViewScope;
   /** Team ID (required when scope is TEAM) */
   teamId?: string;
+  /** Role PID (required when scope is ROLE) */
+  roleId?: string;
   /** View configuration */
   viewConfig?: ViewConfig;
   /** Whether to allow full model field access */

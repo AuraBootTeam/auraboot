@@ -62,11 +62,13 @@ public class SavedViewOverlayPolicy {
     /** Validate a client write against the current page and stamp server-owned lineage. */
     public ViewConfig validateAndStamp(String pageKey, ViewConfig requested) {
         ViewConfig config = copy(requested);
+        sanitizeNullOverlayItems(config);
         if (!StringUtils.hasText(pageKey)) {
             return config;
         }
         PageSchemaDTO page = requireRuntimePage(pageKey);
         SchemaFacts facts = schemaFacts(page);
+        rejectUnknownReferences(config, facts);
         rejectMandatoryHiding(config, facts);
         stampCurrent(config, page, facts);
         return config;
@@ -79,6 +81,7 @@ public class SavedViewOverlayPolicy {
      */
     public ViewConfig replay(String pageKey, ViewConfig stored) {
         ViewConfig effective = copy(stored);
+        sanitizeNullOverlayItems(effective);
         if (!StringUtils.hasText(pageKey)) {
             return effective;
         }
@@ -163,6 +166,51 @@ public class SavedViewOverlayPolicy {
         meta.setOverlayReasonCodes(List.of(REASON_BASE_PAGE_UNAVAILABLE));
         meta.setOverlayStalePaths(List.of());
         return config;
+    }
+
+    private void rejectUnknownReferences(ViewConfig config, SchemaFacts facts) {
+        if (config.getColumns() != null) {
+            config.getColumns().stream()
+                    .filter(java.util.Objects::nonNull)
+                    .map(ColumnConfig::getFieldCode)
+                    .filter(StringUtils::hasText)
+                    .filter(field -> !facts.fieldCodes().contains(field))
+                    .findFirst()
+                    .ifPresent(field -> { throw unknownReference("field", field); });
+        }
+        if (config.getSorts() != null) {
+            config.getSorts().stream()
+                    .filter(java.util.Objects::nonNull)
+                    .map(ViewConfig.SortConfig::getFieldCode)
+                    .filter(StringUtils::hasText)
+                    .filter(field -> !facts.fieldCodes().contains(field))
+                    .findFirst()
+                    .ifPresent(field -> { throw unknownReference("field", field); });
+        }
+        if (config.getFilters() != null) {
+            config.getFilters().stream()
+                    .filter(java.util.Objects::nonNull)
+                    .map(ViewConfig.FilterConfig::getFieldCode)
+                    .filter(StringUtils::hasText)
+                    .filter(field -> !facts.fieldCodes().contains(field))
+                    .findFirst()
+                    .ifPresent(field -> { throw unknownReference("field", field); });
+        }
+        if (config.getToolbarActions() != null) {
+            config.getToolbarActions().stream()
+                    .filter(java.util.Objects::nonNull)
+                    .map(ToolbarActionConfig::getCode)
+                    .filter(StringUtils::hasText)
+                    .filter(action -> !facts.actionCodes().contains(action))
+                    .findFirst()
+                    .ifPresent(action -> { throw unknownReference("action", action); });
+        }
+    }
+
+    private ValidationException unknownReference(String type, String identity) {
+        return new ValidationException(
+                ResponseCode.CommonValidationFailed,
+                "view.overlay.unknown-" + type + ":" + identity);
     }
 
     private void rejectMandatoryHiding(ViewConfig config, SchemaFacts facts) {
@@ -272,6 +320,10 @@ public class SavedViewOverlayPolicy {
             List<String> stalePaths) {
         for (int index = array.size() - 1; index >= 0; index--) {
             JsonNode item = array.get(index);
+            if (item.isNull() && isStructuredOverlayArray(path)) {
+                array.remove(index);
+                continue;
+            }
             if (item.isTextual() && path.endsWith("DisplayFields")
                     && removedFields.contains(item.textValue())) {
                 addStalePath(stalePaths, path + "/" + item.textValue());
@@ -296,6 +348,29 @@ public class SavedViewOverlayPolicy {
                 prune(object, path + "/" + index,
                         removedFields, removedActions, stalePaths);
             }
+        }
+    }
+
+    private boolean isStructuredOverlayArray(String path) {
+        return path.endsWith("/columns")
+                || path.endsWith("/sorts")
+                || path.endsWith("/filters")
+                || path.endsWith("/toolbarActions");
+    }
+
+    private void sanitizeNullOverlayItems(ViewConfig config) {
+        if (config.getColumns() != null) {
+            config.setColumns(config.getColumns().stream().filter(java.util.Objects::nonNull).toList());
+        }
+        if (config.getSorts() != null) {
+            config.setSorts(config.getSorts().stream().filter(java.util.Objects::nonNull).toList());
+        }
+        if (config.getFilters() != null) {
+            config.setFilters(config.getFilters().stream().filter(java.util.Objects::nonNull).toList());
+        }
+        if (config.getToolbarActions() != null) {
+            config.setToolbarActions(config.getToolbarActions().stream()
+                    .filter(java.util.Objects::nonNull).toList());
         }
     }
 

@@ -13,6 +13,7 @@ import com.auraboot.framework.organization.entity.Team;
 import com.auraboot.framework.organization.mapper.TeamMapper;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.tenant.service.CurrentUserTeamResolver;
 import com.auraboot.framework.user.dto.UserSearchDTO;
 import com.auraboot.framework.user.service.UserService;
@@ -55,6 +56,7 @@ class SavedViewServiceImplTest {
     @Mock UserPermissionService userPermissionService;
     @Mock CurrentUserTeamResolver currentUserTeamResolver;
     @Mock TeamMapper teamMapper;
+    @Mock RoleMapper roleMapper;
     @Mock AuditTrailService auditTrailService;
     @Mock UserService userService;
     @Mock SavedViewOverlayPolicy savedViewOverlayPolicy;
@@ -64,6 +66,8 @@ class SavedViewServiceImplTest {
     @BeforeEach
     void setUp() {
         MetaContext.setContext(100L, 7L, "user_pid", "alice");
+        MetaContext.setMemberId(17L);
+        when(roleMapper.findByMemberIdAndTenantId(17L, 100L)).thenReturn(List.of());
         when(savedViewOverlayPolicy.validateAndStamp(any(), any()))
                 .thenAnswer(invocation -> {
                     ViewConfig config = invocation.getArgument(1);
@@ -148,7 +152,7 @@ class SavedViewServiceImplTest {
         when(savedViewMapper.countByNameForUser(anyString(), anyString(), anyString(), anyString(), isNull()))
                 .thenReturn(0);
         when(savedViewMapper.countActiveNonImplicitViewsForScope(
-                eq("crm.lead"), eq("crm/leads"), eq("personal"), eq("user_pid"), isNull()))
+                eq("crm.lead"), eq("crm/leads"), eq("personal"), eq("user_pid"), isNull(), isNull()))
                 .thenReturn(10);
 
         ValidationException ex = assertThrows(
@@ -167,7 +171,7 @@ class SavedViewServiceImplTest {
         when(savedViewMapper.countByNameForUser(anyString(), anyString(), anyString(), anyString(), isNull()))
                 .thenReturn(0);
         when(savedViewMapper.countActiveNonImplicitViewsForScope(
-                eq("crm.lead"), eq("crm/leads"), eq("team"), isNull(), eq("teamA")))
+                eq("crm.lead"), eq("crm/leads"), eq("team"), isNull(), eq("teamA"), isNull()))
                 .thenReturn(20);
 
         ValidationException ex = assertThrows(
@@ -185,7 +189,7 @@ class SavedViewServiceImplTest {
         when(savedViewMapper.countByNameForUser(anyString(), anyString(), anyString(), anyString(), isNull()))
                 .thenReturn(0);
         when(savedViewMapper.countActiveNonImplicitViewsForScope(
-                eq("crm.lead"), eq("crm/leads"), eq("global"), isNull(), isNull()))
+                eq("crm.lead"), eq("crm/leads"), eq("global"), isNull(), isNull(), isNull()))
                 .thenReturn(20);
 
         ValidationException ex = assertThrows(
@@ -985,7 +989,8 @@ class SavedViewServiceImplTest {
         when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of("tA"));
         SavedView v = new SavedView();
         v.setPid("p1"); v.setScope("personal"); v.setOwnerId("user_pid");
-        when(savedViewMapper.findAccessibleViews(eq("m"), eq("k"), eq("user_pid"), eq(List.of("tA"))))
+        when(savedViewMapper.findAccessibleViews(
+                eq("m"), eq("k"), eq("user_pid"), eq(List.of("tA")), eq(List.of())))
                 .thenReturn(List.of(v));
         List<SavedViewDTO> result = service.getAccessibleViews("m", "k");
         assertEquals(1, result.size());
@@ -994,7 +999,8 @@ class SavedViewServiceImplTest {
     @Test
     void getDefaultView_null_returnsNull() {
         when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of());
-        when(savedViewMapper.findDefaultView(any(), any(), any(), any())).thenReturn(null);
+        when(savedViewMapper.findDefaultOverlayStack(any(), any(), any(), any(), any()))
+                .thenReturn(List.of());
         assertNull(service.getDefaultView("m", "k"));
     }
 
@@ -1098,7 +1104,7 @@ class SavedViewServiceImplTest {
         when(savedViewMapper.countByNameForUser(eq("m"), eq("k"), eq("My Copy"), eq("user_pid"), isNull()))
                 .thenReturn(0);
         when(savedViewMapper.countActiveNonImplicitViewsForScope(
-                eq("m"), eq("k"), eq("personal"), eq("user_pid"), isNull()))
+                eq("m"), eq("k"), eq("personal"), eq("user_pid"), isNull(), isNull()))
                 .thenReturn(10);
         PageSchema page = new PageSchema();
         when(pageSchemaMapper.selectAnyByPageKey("k")).thenReturn(page);
@@ -1168,7 +1174,8 @@ class SavedViewServiceImplTest {
 
         verify(savedViewMapper).clearPersonalDefaultFlag("m", "k", "user_pid");
         verify(savedViewMapper).insertSavedView(any(SavedView.class));
-        verify(savedViewMapper, never()).countActiveNonImplicitViewsForScope(any(), any(), any(), any(), any());
+        verify(savedViewMapper, never()).countActiveNonImplicitViewsForScope(
+                any(), any(), any(), any(), any(), any());
     }
 
     @Test

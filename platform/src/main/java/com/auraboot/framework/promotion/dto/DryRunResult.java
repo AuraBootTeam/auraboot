@@ -63,6 +63,8 @@ public class DryRunResult {
         private String status;
         private String fingerprint;
         private String decision;
+        private String executionStatus;
+        private String executionPid;
         private boolean applyReady;
         private String nextAction;
         private String activeReleasePid;

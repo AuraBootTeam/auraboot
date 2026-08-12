@@ -89,20 +89,6 @@ class PromotionDriftDecisionIntegrationTest extends BaseIntegrationTest {
         assertThat(drift.getOptions())
                 .containsExactly("REBASE", "BACKPORT", "KEEP_OVERRIDE", "OVERWRITE");
 
-        PromotionResponse rebaseRecorded = promotionService.resolveDrift(
-                draft.getPid(), drift.getUnitPid(),
-                decision(drift.getFingerprint(), "REBASE", "先进入专业三方合并"),
-                testTenant.getId(), testUser.getId());
-        assertThat(rebaseRecorded.getStatus()).isEqualTo("DRAFT");
-        assertThat(rebaseRecorded.getDryRunResult().getDrifts().getFirst().getDecision())
-                .isEqualTo("REBASE");
-        assertThat(rebaseRecorded.getDryRunResult().getDrifts().getFirst().isApplyReady())
-                .isFalse();
-        assertThatThrownBy(() -> promotionService.apply(
-                draft.getPid(), testTenant.getId(), testUser.getId(), "must remain blocked"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("DRAFT");
-
         PromotionResponse overwriteRecorded = promotionService.resolveDrift(
                 draft.getPid(), drift.getUnitPid(),
                 decision(drift.getFingerprint(), "OVERWRITE", "源版本已正式吸收现场修复"),
@@ -141,9 +127,111 @@ class PromotionDriftDecisionIntegrationTest extends BaseIntegrationTest {
                 ORDER BY id
                 """, testTenant.getId(), drift.getUnitPid());
         assertThat(events).extracting(row -> row.get("event_type"))
-                .containsExactly("DETECTED", "DECIDED", "DECIDED", "APPLIED");
+                .containsExactly("DETECTED", "DECIDED", "EXECUTED", "APPLIED");
         assertThat(events).extracting(row -> row.get("decision"))
-                .containsExactly(null, "REBASE", "OVERWRITE", "OVERWRITE");
+                .containsExactly(null, "OVERWRITE", "OVERWRITE", "OVERWRITE");
+    }
+
+    @Test
+    void rebaseMergesIndependentTargetReleaseAndSourceChangesThenApplies() throws Exception {
+        Long sourceEnv = createEnvironment("rebase_source_");
+        Long targetEnv = createEnvironment("rebase_target_");
+        String pageKey = "rebase_" + shortId();
+        PageSchema source = insertApplicationPage(sourceEnv, pageKey, "normal", "plugin-rebase");
+        PageSchema target = insertApplicationPage(targetEnv, pageKey, "normal", "plugin-rebase");
+        PublishedOverride published = publishTargetOverride(targetEnv, target);
+        MetaContext.setEnvironmentId(sourceEnv);
+        source.setTitle("{\"en\":\"Incoming title\"}");
+        pageSchemaMapper.updateById(source);
+        PromotionResponse draft = promotionService.create(
+                request(sourceEnv, targetEnv, source.getPid()),
+                testTenant.getId(), testUser.getId());
+        DryRunResult.Drift drift = promotionService
+                .validate(draft.getPid(), testTenant.getId()).getDrifts().getFirst();
+
+        PromotionResponse prepared = promotionService.resolveDrift(
+                draft.getPid(), drift.getUnitPid(),
+                decision(drift.getFingerprint(), "REBASE", "merge independent changes"),
+                testTenant.getId(), testUser.getId());
+        assertThat(prepared.getStatus()).isEqualTo("VALIDATED");
+        assertThat(prepared.getUnits().getFirst().getDriftExecutionStatus()).isEqualTo("PREPARED");
+
+        promotionService.apply(draft.getPid(), testTenant.getId(), testUser.getId(), "apply rebase");
+        MetaContext.setEnvironmentId(targetEnv);
+        PageSchema current = currentPage(pageKey);
+        assertThat(objectMapper.readTree(current.getTitle()).path("en").asText())
+                .isEqualTo("Incoming title");
+        assertThat(objectMapper.readTree(current.getBlocks()).get(0).path("dataSource").path("model").asText())
+                .isEqualTo("payments");
+        assertThat(statusOf("ab_authoring_release", published.releasePid())).isEqualTo("SUPERSEDED");
+    }
+
+    @Test
+    void backportCreatesOneReversePromotionAndKeepsForwardPromotionBlocked() {
+        Long sourceEnv = createEnvironment("backport_source_");
+        Long targetEnv = createEnvironment("backport_target_");
+        String pageKey = "backport_" + shortId();
+        PageSchema source = insertApplicationPage(sourceEnv, pageKey, "compact", "plugin-backport");
+        PageSchema target = insertApplicationPage(targetEnv, pageKey, "normal", "plugin-backport");
+        publishTargetOverride(targetEnv, target);
+        PromotionResponse draft = promotionService.create(
+                request(sourceEnv, targetEnv, source.getPid()), testTenant.getId(), testUser.getId());
+        DryRunResult.Drift drift = promotionService
+                .validate(draft.getPid(), testTenant.getId()).getDrifts().getFirst();
+
+        PromotionResponse backported = promotionService.resolveDrift(
+                draft.getPid(), drift.getUnitPid(),
+                decision(drift.getFingerprint(), "BACKPORT", "send production fix upstream"),
+                testTenant.getId(), testUser.getId());
+
+        assertThat(backported.getStatus()).isEqualTo("DRAFT");
+        assertThat(backported.getUnits().getFirst().getDriftExecutionStatus()).isEqualTo("BACKPORTED");
+        String reversePid = backported.getUnits().getFirst().getDriftExecutionPid();
+        PromotionResponse reverse = promotionService.getByPid(reversePid, testTenant.getId());
+        assertThat(reverse.getSourceEnvId()).isEqualTo(targetEnv);
+        assertThat(reverse.getTargetEnvId()).isEqualTo(sourceEnv);
+        assertThat(reverse.getParentPromotionPid()).isEqualTo(draft.getPid());
+        assertThat(reverse.getUnits().getFirst().getResourcePid()).isEqualTo(target.getPid());
+
+        PromotionResponse idempotent = promotionService.resolveDrift(
+                draft.getPid(), drift.getUnitPid(),
+                decision(drift.getFingerprint(), "BACKPORT", "retry same decision"),
+                testTenant.getId(), testUser.getId());
+        assertThat(idempotent.getUnits().getFirst().getDriftExecutionPid()).isEqualTo(reversePid);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_promotion
+                WHERE tenant_id = ? AND parent_promotion_pid = ? AND deleted_flag = FALSE
+                """, Integer.class, testTenant.getId(), draft.getPid())).isEqualTo(1);
+        assertThatThrownBy(() -> promotionService.resolveDrift(
+                draft.getPid(), drift.getUnitPid(),
+                decision(drift.getFingerprint(), "OVERWRITE", "cannot replace created reverse plan"),
+                testTenant.getId(), testUser.getId()))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("promotion.drift.backport-already-created");
+    }
+
+    @Test
+    void keepOverridePersistsDeferredStateAndLeavesActiveReleaseUntouched() {
+        Long sourceEnv = createEnvironment("keep_source_");
+        Long targetEnv = createEnvironment("keep_target_");
+        String pageKey = "keep_" + shortId();
+        PageSchema source = insertApplicationPage(sourceEnv, pageKey, "compact", "plugin-keep");
+        PageSchema target = insertApplicationPage(targetEnv, pageKey, "normal", "plugin-keep");
+        PublishedOverride published = publishTargetOverride(targetEnv, target);
+        PromotionResponse draft = promotionService.create(
+                request(sourceEnv, targetEnv, source.getPid()), testTenant.getId(), testUser.getId());
+        DryRunResult.Drift drift = promotionService
+                .validate(draft.getPid(), testTenant.getId()).getDrifts().getFirst();
+
+        PromotionResponse deferred = promotionService.resolveDrift(
+                draft.getPid(), drift.getUnitPid(),
+                decision(drift.getFingerprint(), "KEEP_OVERRIDE", "keep production behavior"),
+                testTenant.getId(), testUser.getId());
+
+        assertThat(deferred.getStatus()).isEqualTo("DRAFT");
+        assertThat(deferred.getUnits().getFirst().getDriftExecutionStatus()).isEqualTo("DEFERRED");
+        assertThat(statusOf("ab_authoring_release", published.releasePid())).isEqualTo("ACTIVE");
+        assertThat(statusOf("ab_authoring_tenant_override", published.overridePid())).isEqualTo("ACTIVE");
     }
 
     @Test
@@ -357,6 +445,13 @@ class PromotionDriftDecisionIntegrationTest extends BaseIntegrationTest {
     private String statusOf(String table, String pid) {
         return jdbcTemplate.queryForObject(
                 "SELECT status FROM " + table + " WHERE pid = ?", String.class, pid);
+    }
+
+    private PageSchema currentPage(String pageKey) {
+        return pageSchemaMapper.selectOne(new QueryWrapper<PageSchema>()
+                .eq("page_key", pageKey)
+                .eq("is_current", true)
+                .eq("deleted_flag", false));
     }
 
     private static String shortId() {

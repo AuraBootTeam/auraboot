@@ -2,6 +2,8 @@ package com.auraboot.framework.promotion.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.promotion.dto.DryRunResult;
 import com.auraboot.framework.promotion.dto.PromotionApplyRequest;
 import com.auraboot.framework.promotion.dto.PromotionDriftDecisionRequest;
@@ -25,7 +27,8 @@ import java.util.List;
  * REST controller for {@link PromotionService} (env-layering #11 wire-up).
  *
  * <p>Mounted under {@code /api/admin/promotions/**} alongside environments, so the same
- * AdminRoleInterceptor coarse gate applies. Per-action permissions enforced inside the service.
+ * AdminRoleInterceptor coarse gate applies. Each endpoint also declares the least-privilege
+ * {@link RequirePermission} contract required for its action.
  */
 @Slf4j
 @RestController
@@ -36,18 +39,21 @@ public class PromotionController {
     private final PromotionService promotionService;
 
     @GetMapping
+    @RequirePermission(MetaPermission.PAGE_PUBLISH_READ)
     public ApiResponse<List<PromotionResponse>> list(@RequestParam(required = false) String status) {
         Long tenantId = MetaContext.getCurrentTenantId();
         return ApiResponse.success(promotionService.listByStatus(tenantId, status));
     }
 
     @GetMapping("/{pid}")
+    @RequirePermission(MetaPermission.PAGE_PUBLISH_READ)
     public ApiResponse<PromotionResponse> getByPid(@PathVariable String pid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         return ApiResponse.success(promotionService.getByPid(pid, tenantId));
     }
 
     @PostMapping
+    @RequirePermission(MetaPermission.PAGE_PUBLISH_MANAGE)
     public ApiResponse<PromotionResponse> create(@Valid @RequestBody PromotionRequest request) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
@@ -55,12 +61,14 @@ public class PromotionController {
     }
 
     @PostMapping("/{pid}/validate")
+    @RequirePermission(MetaPermission.PAGE_PUBLISH_MANAGE)
     public ApiResponse<DryRunResult> validate(@PathVariable String pid) {
         Long tenantId = MetaContext.getCurrentTenantId();
         return ApiResponse.success(promotionService.validate(pid, tenantId));
     }
 
     @PostMapping("/{pid}/drifts/{unitPid}/decision")
+    @RequirePermission(MetaPermission.PAGE_PUBLISH_MANAGE)
     public ApiResponse<PromotionResponse> resolveDrift(
             @PathVariable String pid,
             @PathVariable String unitPid,
@@ -71,6 +79,7 @@ public class PromotionController {
     }
 
     @PostMapping("/{pid}/apply")
+    @RequirePermission(MetaPermission.PAGE_PUBLISH_ADMIN)
     public ApiResponse<PromotionResponse> apply(
             @PathVariable String pid,
             @Valid @RequestBody PromotionApplyRequest request) {

@@ -15,6 +15,8 @@ const drift: PromotionDrift = {
   status: 'PENDING',
   fingerprint: 'a'.repeat(64),
   decision: null,
+  executionStatus: 'NONE',
+  executionPid: null,
   applyReady: false,
   nextAction: 'SELECT_DECISION',
   activeReleasePid: 'release-1',
@@ -61,5 +63,14 @@ describe('PromotionDriftDecisionPanel', () => {
       decision: 'OVERWRITE',
       reason: '目标环境现场修复已被源版本正式吸收',
     });
+  });
+
+  it('explains that each decision executes a distinct governed outcome', () => {
+    render(<PromotionDriftDecisionPanel drift={drift} onResolve={vi.fn()} />);
+
+    expect(screen.getByText(/稳定 ID 做三方合并/)).toBeInTheDocument();
+    expect(screen.getByText(/反向发布计划/)).toBeInTheDocument();
+    expect(screen.getByText(/持久延期/)).toBeInTheDocument();
+    expect(screen.getByText(/显式废止目标活动覆盖/)).toBeInTheDocument();
   });
 });

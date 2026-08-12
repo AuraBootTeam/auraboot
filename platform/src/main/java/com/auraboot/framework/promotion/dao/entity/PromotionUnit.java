@@ -1,10 +1,12 @@
 package com.auraboot.framework.promotion.dao.entity;
 
+import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.apache.ibatis.type.JdbcType;
 
 import java.util.Date;
 
@@ -42,6 +44,11 @@ public class PromotionUnit {
     private String driftFingerprint;
     private String driftDecision;
     private String driftDecisionPid;
+    private String driftExecutionStatus;
+    private String driftExecutionPid;
+    @TableField(value = "drift_execution_payload", typeHandler = JsonbStringTypeHandler.class,
+            jdbcType = JdbcType.OTHER)
+    private String driftExecutionPayload;
 
     private Integer sortOrder;
 

@@ -68,6 +68,30 @@ class SavedViewOverlayPolicyTest {
     }
 
     @Test
+    void newWritesRejectUnknownFieldAndActionReferences() {
+        when(pageSchemaService.findByPageKey("orders"))
+                .thenReturn(page("release-1", 4, "checksum-1", true, true));
+
+        ViewConfig unknownColumn = new ViewConfig();
+        unknownColumn.setColumns(List.of(column("removed-field", true)));
+        assertThatThrownBy(() -> policy.validateAndStamp("orders", unknownColumn))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("view.overlay.unknown-field:removed-field");
+
+        ViewConfig unknownSort = new ViewConfig();
+        unknownSort.setSorts(List.of(sort("removed-sort-field")));
+        assertThatThrownBy(() -> policy.validateAndStamp("orders", unknownSort))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("view.overlay.unknown-field:removed-sort-field");
+
+        ViewConfig unknownAction = new ViewConfig();
+        unknownAction.setToolbarActions(List.of(action("removed-action", true)));
+        assertThatThrownBy(() -> policy.validateAndStamp("orders", unknownAction))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("view.overlay.unknown-action:removed-action");
+    }
+
+    @Test
     void staleReplayDropsDeletedReferencesAndRestoresMandatoryElements() {
         when(pageSchemaService.findByPageKey("orders"))
                 .thenReturn(page("release-1", 1, "checksum-1", true, true));
@@ -77,7 +101,13 @@ class SavedViewOverlayPolicyTest {
         stored.setFilters(List.of(filter("optional")));
         stored.setToolbarActions(List.of(action("export", true)));
         stored = policy.validateAndStamp("orders", stored);
-        stored.getColumns().get(0).setVisible(false);
+        List<ColumnConfig> legacyColumns = new java.util.ArrayList<>(stored.getColumns());
+        legacyColumns.addFirst(null);
+        stored.setColumns(legacyColumns);
+        List<ToolbarActionConfig> legacyActions = new java.util.ArrayList<>(stored.getToolbarActions());
+        legacyActions.addFirst(null);
+        stored.setToolbarActions(legacyActions);
+        stored.getColumns().get(1).setVisible(false);
 
         when(pageSchemaService.findByPageKey("orders"))
                 .thenReturn(page("release-2", 2, "checksum-2", false, false));

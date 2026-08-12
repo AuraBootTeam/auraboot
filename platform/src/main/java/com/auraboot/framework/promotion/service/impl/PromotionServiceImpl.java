@@ -29,6 +29,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -425,6 +426,8 @@ public class PromotionServiceImpl implements PromotionService {
                 p, unit, source, existingTarget, approverId);
 
         int targetVersion = (existingTarget == null) ? 1 : existingTarget.getVersion() + 1;
+        ObjectNode sourceSnapshot = promotionDriftCoordinator.sourceForApply(
+                unit, pageSnapshot(source));
 
         // Mark prior is_current row as not_current (only if there's a prior)
         if (existingTarget != null) {
@@ -441,15 +444,17 @@ public class PromotionServiceImpl implements PromotionService {
         PageSchema clone = new PageSchema();
         clone.setPid(UniqueIdGenerator.generate());
         clone.setTenantId(p.getTenantId());
-        clone.setPageKey(source.getPageKey());
-        clone.setModelCode(source.getModelCode());
-        clone.setName(source.getName() + "_v" + targetVersion);  // tenant-namespace uniqueness on name
-        clone.setKind(source.getKind());
-        clone.setProfile(source.getProfile());
-        clone.setSchemaVersion(source.getSchemaVersion());
-        clone.setTitle(source.getTitle());
-        clone.setLayout(source.getLayout());
-        clone.setBlocks(source.getBlocks());
+        clone.setPageKey(sourceSnapshot.path("pageKey").asText(source.getPageKey()));
+        clone.setModelCode(sourceSnapshot.path("modelCode").asText(source.getModelCode()));
+        clone.setName(sourceSnapshot.path("name").asText(source.getName())
+                + "_v" + targetVersion);  // tenant-namespace uniqueness on name
+        clone.setDescription(sourceSnapshot.path("description").asText(source.getDescription()));
+        clone.setKind(sourceSnapshot.path("kind").asText(source.getKind()));
+        clone.setProfile(sourceSnapshot.path("profile").asText(source.getProfile()));
+        clone.setSchemaVersion(sourceSnapshot.path("schemaVersion").asInt(source.getSchemaVersion()));
+        clone.setTitle(toJson(sourceSnapshot.path("title")));
+        clone.setLayout(toJson(sourceSnapshot.path("layout")));
+        clone.setBlocks(toJson(runtimeBlocks(sourceSnapshot)));
         clone.setMetaInfo(source.getMetaInfo());
         clone.setIsTemplate(source.getIsTemplate());
         clone.setTemplateCategory(source.getTemplateCategory());
@@ -476,7 +481,7 @@ public class PromotionServiceImpl implements PromotionService {
                     return null;
                 }));
 
-        drift.ifPresent(assessment -> promotionDriftCoordinator.applyOverwrite(
+        drift.ifPresent(assessment -> promotionDriftCoordinator.applyDecision(
                 p, unit, assessment, approverId, reason));
 
         // Stamp target_version on the unit
@@ -518,6 +523,43 @@ public class PromotionServiceImpl implements PromotionService {
         return !Objects.equals(a.getBlocks(), b.getBlocks())
                 || !Objects.equals(a.getTitle(), b.getTitle())
                 || !Objects.equals(a.getLayout(), b.getLayout());
+    }
+
+    private ObjectNode pageSnapshot(PageSchema page) {
+        ObjectNode snapshot = JSON.createObjectNode();
+        snapshot.put("pid", page.getPid());
+        snapshot.put("pageKey", page.getPageKey());
+        snapshot.put("modelCode", page.getModelCode());
+        snapshot.put("name", page.getName());
+        if (page.getDescription() != null) snapshot.put("description", page.getDescription());
+        snapshot.put("kind", page.getKind());
+        snapshot.put("profile", page.getProfile());
+        snapshot.put("schemaVersion", page.getSchemaVersion());
+        snapshot.set("title", parseNode(page.getTitle(), JSON.createObjectNode()));
+        snapshot.set("layout", parseNode(page.getLayout(), JSON.createObjectNode()));
+        snapshot.set("blocks", parseNode(page.getBlocks(), JSON.createArrayNode()));
+        return snapshot;
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode runtimeBlocks(ObjectNode snapshot) {
+        com.fasterxml.jackson.databind.JsonNode blocks = snapshot.path("blocks");
+        if (blocks.isArray() && blocks.size() == 1) {
+            com.fasterxml.jackson.databind.JsonNode root = blocks.get(0);
+            if (snapshot.path("kind").asText().equals(root.path("blockType").asText())
+                    && root.path("blocks").isArray()) {
+                return root.path("blocks");
+            }
+        }
+        return blocks;
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode parseNode(
+            String value, com.fasterxml.jackson.databind.JsonNode fallback) {
+        try {
+            return value == null ? fallback : JSON.readTree(value);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("promotion.page.snapshot-invalid", exception);
+        }
     }
 
     private List<PromotionUnit> listUnits(Long promotionId, Long tenantId) {
@@ -580,6 +622,8 @@ public class PromotionServiceImpl implements PromotionService {
         r.setRejectedBy(p.getRejectedBy());
         r.setRejectedReason(p.getRejectedReason());
         r.setFailureReason(p.getFailureReason());
+        r.setParentPromotionPid(p.getParentPromotionPid());
+        r.setOriginDriftDecisionPid(p.getOriginDriftDecisionPid());
         r.setDryRunResult(parseDryRunResult(p.getDryRunResult()));
         r.setUnits(listUnits(p.getId(), p.getTenantId()).stream().map(u -> {
             PromotionResponse.PromotionUnitView v = new PromotionResponse.PromotionUnitView();
@@ -592,6 +636,8 @@ public class PromotionServiceImpl implements PromotionService {
             v.setDriftStatus(u.getDriftStatus());
             v.setDriftFingerprint(u.getDriftFingerprint());
             v.setDriftDecision(u.getDriftDecision());
+            v.setDriftExecutionStatus(u.getDriftExecutionStatus());
+            v.setDriftExecutionPid(u.getDriftExecutionPid());
             v.setSortOrder(u.getSortOrder());
             return v;
         }).collect(Collectors.toList()));
