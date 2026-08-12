@@ -65,6 +65,7 @@ public class AuthoringAiPatchProposalService {
     private final AuthoringWorkspaceViewMapper viewMapper;
     private final AuthoringAuditService auditService;
     private final ObjectMapper objectMapper;
+    private final AuthoringDatabaseClock databaseClock;
 
     public AuthoringAiPatchProposalService(
             AuthoringCapabilityRegistry capabilityRegistry,
@@ -75,7 +76,8 @@ public class AuthoringAiPatchProposalService {
             AuthoringAggregatePolicyService aggregatePolicyService,
             AuthoringWorkspaceViewMapper viewMapper,
             AuthoringAuditService auditService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            AuthoringDatabaseClock databaseClock) {
         this.capabilityRegistry = capabilityRegistry;
         this.patchEngine = patchEngine;
         this.workspaceRepository = workspaceRepository;
@@ -85,6 +87,7 @@ public class AuthoringAiPatchProposalService {
         this.viewMapper = viewMapper;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
+        this.databaseClock = databaseClock;
     }
 
     @Transactional
@@ -171,13 +174,13 @@ public class AuthoringAiPatchProposalService {
                         prepared.decision(),
                         identity.userId(),
                         aggregate,
-                        Instant.now().plus(WRITER_LEASE));
+                        databaseClock.now().plus(WRITER_LEASE));
                 auditItemApplied(
                         identity, current, proposal, item, prepared, changeItemPid, index + 1);
                 current = requireWorkspace(identity, sessionPid, true);
             }
 
-            Instant appliedAt = Instant.now();
+            Instant appliedAt = databaseClock.now();
             if (!proposalRepository.markApplied(
                     proposal, current.changeSetRevision(), appliedAt)) {
                 throw new ResponseStatusException(CONFLICT, "authoring.ai-proposal.stale");
@@ -204,7 +207,7 @@ public class AuthoringAiPatchProposalService {
         if (!PROPOSED.equals(proposal.status())) {
             throw new ResponseStatusException(CONFLICT, "authoring.ai-proposal.not-proposed");
         }
-        Instant rejectedAt = Instant.now();
+        Instant rejectedAt = databaseClock.now();
         if (!proposalRepository.markRejected(proposal, request.reason().trim(), rejectedAt)) {
             throw new ResponseStatusException(CONFLICT, "authoring.ai-proposal.stale");
         }
@@ -294,7 +297,7 @@ public class AuthoringAiPatchProposalService {
         if (REVIEW_WORKSPACE_MODE.equals(workspace.workspaceMode())) {
             throw new ResponseStatusException(FORBIDDEN, "authoring.review.workspace-read-only");
         }
-        Instant now = Instant.now();
+        Instant now = databaseClock.now();
         if (!workspace.expiresAt().isAfter(now)) {
             throw new ResponseStatusException(CONFLICT, "authoring.session.expired");
         }

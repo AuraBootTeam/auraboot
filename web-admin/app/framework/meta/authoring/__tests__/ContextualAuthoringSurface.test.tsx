@@ -83,6 +83,7 @@ describe('ContextualAuthoringSurface', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true);
     window.sessionStorage.clear();
     permissionMock.canRead = true;
     permissionMock.canManage = true;
@@ -1106,6 +1107,46 @@ describe('ContextualAuthoringSurface', () => {
       await waitFor(() => expect(renewAuthoringWriterLease).toHaveBeenCalledWith('session-1'));
     } finally {
       visibility.mockRestore();
+      interval.mockRestore();
+    }
+  });
+
+  it('does not renew an expiring writer lease when the page is visible but not focused', async () => {
+    const intervalHandlers = new Map<number, TimerHandler>();
+    let intervalId = 0;
+    const interval = vi.spyOn(window, 'setInterval').mockImplementation((handler, timeout) => {
+      intervalId += 1;
+      if (timeout === 60_000) intervalHandlers.set(intervalId, handler);
+      return intervalId as unknown as ReturnType<typeof window.setInterval>;
+    });
+    vi.mocked(document.hasFocus).mockReturnValue(false);
+    vi.mocked(openAuthoringSession).mockResolvedValue(
+      createAuthoringSession({
+        writerLease: {
+          status: 'OWNED',
+          revision: 7,
+          leasedUntil: new Date(Date.now() + 30_000).toISOString(),
+        },
+      }),
+    );
+    try {
+      renderSurface(vi.fn(), vi.fn());
+      fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+      await screen.findByTestId('contextual-authoring-surface');
+      await waitFor(() => expect(intervalHandlers.size).toBe(1));
+
+      await act(async () => {
+        for (const handler of intervalHandlers.values()) {
+          if (typeof handler === 'function') handler();
+        }
+        await Promise.resolve();
+      });
+
+      expect(renewAuthoringWriterLease).not.toHaveBeenCalled();
+      vi.mocked(document.hasFocus).mockReturnValue(true);
+      act(() => window.dispatchEvent(new Event('focus')));
+      await waitFor(() => expect(renewAuthoringWriterLease).toHaveBeenCalledWith('session-1'));
+    } finally {
       interval.mockRestore();
     }
   });

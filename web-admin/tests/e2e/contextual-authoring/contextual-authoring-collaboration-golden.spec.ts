@@ -6,8 +6,9 @@ import {
   type Page,
   type Request,
 } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { loginViaUI } from '../../helpers/wd-fixtures';
 
@@ -813,6 +814,151 @@ test.describe('Contextual authoring PC collaboration golden', () => {
     }
   });
 
+  test('PC-AUTH-029 @critical — two persistent browser profiles arbitrate one cross-device writer', async ({
+    page,
+    browser,
+  }) => {
+    const sourcePage = await expectApiData<{ pid: string }>(
+      await page.request.get('/api/pages/key/e2et_record_list'),
+      'load stable published source page for cross-device arbitration',
+    );
+    const ownerSession = await expectApiData<AuthoringSession>(
+      await page.request.post('/api/authoring/sessions', {
+        data: {
+          pagePid: sourcePage.pid,
+          interactionContext: { route: '/cross-device-writer-gate' },
+        },
+      }),
+      'open the same-account owner before cross-device arbitration',
+    );
+    const profileRoot = await mkdtemp(join(tmpdir(), 'aura-authoring-cross-device-'));
+    const deviceA = await openPersistentProfile(
+      browser,
+      resolve(profileRoot, 'device-a'),
+      DEFAULT_TEST_ACCOUNT.email,
+    );
+    const deviceB = await openPersistentProfile(
+      browser,
+      resolve(profileRoot, 'device-b'),
+      DEFAULT_TEST_ACCOUNT.email,
+    );
+    try {
+      const openObserver = async (devicePage: Page, device: string) => {
+        const observerResponse = devicePage.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            apiPath(response.url()) ===
+              `/api/authoring/change-sets/${ownerSession.changeSetPid}/sessions`,
+        );
+        await devicePage.goto(
+          `/unified-designer?changeSetId=${encodeURIComponent(ownerSession.changeSetPid)}`,
+          { waitUntil: 'domcontentloaded' },
+        );
+        const observer = await expectApiData<AuthoringSession>(
+          await observerResponse,
+          `open ${device} persistent-profile observer`,
+        );
+        expect(observer.state).toBe('READ_ONLY');
+        expect(observer.writerLease?.status).toBe('HELD_BY_OTHER_SESSION');
+        await expect(devicePage.getByTestId('authoring-writer-lease-notice')).toContainText(
+          '当前账号的另一个会话持有编辑权',
+        );
+        return observer;
+      };
+
+      const [observerA, observerB] = await Promise.all([
+        openObserver(deviceA.page, 'device A'),
+        openObserver(deviceB.page, 'device B'),
+      ]);
+      expect(observerA.writerLease?.revision).toBe(ownerSession.writerLease?.revision);
+      expect(observerB.writerLease?.revision).toBe(ownerSession.writerLease?.revision);
+
+      await deviceA.page
+        .getByPlaceholder('填写接管原因（必填，将写入审计）')
+        .fill('跨设备门禁：持久 profile A 接管');
+      await deviceB.page
+        .getByPlaceholder('填写接管原因（必填，将写入审计）')
+        .fill('跨设备门禁：持久 profile B 接管');
+      const responseA = deviceA.page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${observerA.sessionPid}/writer-lease/takeover`,
+      );
+      const responseB = deviceB.page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${observerB.sessionPid}/writer-lease/takeover`,
+      );
+      await Promise.all([
+        deviceA.page.getByTestId('authoring-writer-lease-takeover').click(),
+        deviceB.page.getByTestId('authoring-writer-lease-takeover').click(),
+      ]);
+      const responses = await Promise.all([responseA, responseB]);
+      expect(responses.map((response) => response.status()).sort()).toEqual([200, 409]);
+
+      const winnerIndex = responses.findIndex((response) => response.status() === 200);
+      const winnerDevice = winnerIndex === 0 ? deviceA : deviceB;
+      const loserDevice = winnerIndex === 0 ? deviceB : deviceA;
+      const winnerObserver = winnerIndex === 0 ? observerA : observerB;
+      const loserObserver = winnerIndex === 0 ? observerB : observerA;
+      const winner = await expectApiData<AuthoringSession>(
+        responses[winnerIndex]!,
+        'cross-device single winner',
+      );
+      expect(winner.writerLease?.revision).toBe((ownerSession.writerLease?.revision ?? 0) + 1);
+      expect(winner.writerLease?.status).toBe('OWNED');
+      expect(await responses[winnerIndex === 0 ? 1 : 0]!.text()).toContain(
+        'authoring.writer-lease.conflict',
+      );
+
+      await expect(winnerDevice.page.getByTestId('authoring-writer-lease-notice')).toHaveCount(0);
+      await expect(loserDevice.page.getByTestId('writer-lease-takeover-feedback')).toContainText(
+        '编辑权刚被另一会话取得，已刷新为只读',
+      );
+      await expect(loserDevice.page.getByTestId('designer-save')).toBeDisabled();
+      const loserAuthoritative = await expectApiData<AuthoringSession>(
+        await loserDevice.page.request.get(`/api/authoring/sessions/${loserObserver.sessionPid}`),
+        'reload losing persistent profile',
+      );
+      expect(loserAuthoritative.writerLease?.status).toBe('HELD_BY_OTHER_SESSION');
+      expect(loserAuthoritative.writerLease?.revision).toBe(winner.writerLease?.revision);
+
+      const staleRetry = await loserDevice.page.request.post(
+        `/api/authoring/sessions/${loserObserver.sessionPid}/writer-lease/takeover`,
+        {
+          data: {
+            expectedRevision: loserObserver.revision,
+            expectedLeaseRevision: loserObserver.writerLease?.revision,
+            reason: '跨设备门禁：loser 使用 stale revision 重试',
+          },
+        },
+      );
+      expect(staleRetry.status()).toBe(409);
+      expect(await staleRetry.text()).toContain('authoring.writer-lease.conflict');
+      const winnerStillOwns = await expectApiData<AuthoringSession>(
+        await winnerDevice.page.request.get(`/api/authoring/sessions/${winnerObserver.sessionPid}`),
+        'confirm persistent-profile winner after stale retry',
+      );
+      expect(winnerStillOwns.writerLease?.status).toBe('OWNED');
+      expect(winnerStillOwns.writerLease?.revision).toBe(winner.writerLease?.revision);
+
+      await mkdir(SCREENSHOT_DIR, { recursive: true });
+      await winnerDevice.page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-029-persistent-profile-winner.png'),
+        fullPage: true,
+      });
+      await loserDevice.page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-029-persistent-profile-loser.png'),
+        fullPage: true,
+      });
+    } finally {
+      await Promise.all([deviceA.close(), deviceB.close()]);
+      await rm(profileRoot, { recursive: true, force: true });
+    }
+  });
+
   test('PC-AUTH-006 @critical — independent reviewer approves the frozen revision but cannot publish', async ({
     page,
     browser,
@@ -1367,6 +1513,22 @@ async function openAsPersona(browser: Browser, persona: Persona): Promise<Opened
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
   await login(page, persona.email);
+  return { context, page, close: () => context.close() };
+}
+
+async function openPersistentProfile(
+  browser: Browser,
+  userDataDir: string,
+  email: string,
+): Promise<OpenedActor> {
+  const context = await browser.browserType().launchPersistentContext(userDataDir, {
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5173',
+    headless: true,
+    viewport: { width: 1440, height: 900 },
+    args: ['--no-proxy-server'],
+  });
+  const page = context.pages()[0] ?? (await context.newPage());
+  await login(page, email);
   return { context, page, close: () => context.close() };
 }
 

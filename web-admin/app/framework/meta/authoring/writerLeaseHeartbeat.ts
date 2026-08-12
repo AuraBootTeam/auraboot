@@ -12,7 +12,10 @@ export function shouldRenewAuthoringWriterLease(
 export function shouldRenewAuthoringWriterLeaseInForeground(
   leasedUntil: string,
   visibilityState: DocumentVisibilityState,
+  hasFocus: boolean,
   now: number = Date.now(),
 ): boolean {
-  return visibilityState === 'visible' && shouldRenewAuthoringWriterLease(leasedUntil, now);
+  return (
+    visibilityState === 'visible' && hasFocus && shouldRenewAuthoringWriterLease(leasedUntil, now)
+  );
 }

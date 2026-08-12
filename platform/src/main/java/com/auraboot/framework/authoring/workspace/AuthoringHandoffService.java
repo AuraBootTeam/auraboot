@@ -35,16 +35,19 @@ public class AuthoringHandoffService {
     private final ObjectMapper objectMapper;
     private final AuthoringHandoffTokenCodec tokenCodec;
     private final AuthoringHandoffContextMapper contextMapper;
+    private final AuthoringDatabaseClock databaseClock;
 
     public AuthoringHandoffService(
             AuthoringWorkspaceRepository repository,
             ObjectMapper objectMapper,
             AuthoringHandoffTokenCodec tokenCodec,
-            AuthoringHandoffContextMapper contextMapper) {
+            AuthoringHandoffContextMapper contextMapper,
+            AuthoringDatabaseClock databaseClock) {
         this.repository = repository;
         this.objectMapper = objectMapper;
         this.tokenCodec = tokenCodec;
         this.contextMapper = contextMapper;
+        this.databaseClock = databaseClock;
     }
 
     @Transactional
@@ -54,7 +57,7 @@ public class AuthoringHandoffService {
         validateSource(workspace, request.expectedRevision());
 
         String contextId = tokenCodec.create();
-        Instant expiresAt = Instant.now().plus(HANDOFF_TTL);
+        Instant expiresAt = databaseClock.now().plus(HANDOFF_TTL);
         JsonNode payload = contextMapper.createPayload(workspace, request);
         repository.createHandoff(new CreateHandoff(
                 UniqueIdGenerator.generate(), identity.tenantId(), identity.envId(), identity.userId(),
@@ -83,7 +86,7 @@ public class AuthoringHandoffService {
         if (handoff.consumedAt() != null) {
             throw new ResponseStatusException(CONFLICT, "authoring.handoff.consumed");
         }
-        if (!handoff.expiresAt().isAfter(Instant.now())) {
+        if (!handoff.expiresAt().isAfter(databaseClock.now())) {
             throw new ResponseStatusException(GONE, "authoring.handoff.expired");
         }
         if (!PAGE_DESIGNER_ROUTE.equals(handoff.targetRoute()) || !repository.consumeHandoff(handoff)) {
@@ -118,7 +121,7 @@ public class AuthoringHandoffService {
             throw new ResponseStatusException(FORBIDDEN, "authoring.review.workspace-read-only");
         }
         if (!"ACTIVE".equals(workspace.sessionState())
-                || !workspace.expiresAt().isAfter(Instant.now())) {
+                || !workspace.expiresAt().isAfter(databaseClock.now())) {
             throw new ResponseStatusException(CONFLICT, "authoring.session.expired");
         }
         if (workspace.changeSetRevision() != expectedRevision

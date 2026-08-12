@@ -33,18 +33,21 @@ public class AuthoringIdentitySimulationService {
     private final AuthoringIdentitySimulationRepository simulationRepository;
     private final AuthoringWorkspaceRepository workspaceRepository;
     private final ObjectMapper objectMapper;
+    private final AuthoringDatabaseClock databaseClock;
 
     public AuthoringIdentitySimulationService(
             AuthoringWorkspaceService workspaceService,
             AuthoringRoleStructurePreviewService roleStructurePreviewService,
             AuthoringIdentitySimulationRepository simulationRepository,
             AuthoringWorkspaceRepository workspaceRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            AuthoringDatabaseClock databaseClock) {
         this.workspaceService = workspaceService;
         this.roleStructurePreviewService = roleStructurePreviewService;
         this.simulationRepository = simulationRepository;
         this.workspaceRepository = workspaceRepository;
         this.objectMapper = objectMapper;
+        this.databaseClock = databaseClock;
     }
 
     @Transactional
@@ -55,7 +58,7 @@ public class AuthoringIdentitySimulationService {
         RoleStructurePreviewView structure = roleStructurePreviewService.preview(
                 sourceSessionPid, request.rolePid());
         Identity identity = identity();
-        Instant startedAt = Instant.now();
+        Instant startedAt = databaseClock.now();
         Instant expiresAt = startedAt.plus(Duration.ofMinutes(request.durationMinutes()));
         String simulationPid = UniqueIdGenerator.generate();
         simulationRepository.create(new CreateSimulation(
@@ -96,7 +99,7 @@ public class AuthoringIdentitySimulationService {
     public IdentitySimulationView get(String simulationPid) {
         Identity identity = identity();
         SimulationRow row = requireRow(identity, simulationPid, true);
-        Instant now = Instant.now();
+        Instant now = databaseClock.now();
         if ("ACTIVE".equals(row.status()) && !now.isBefore(row.expiresAt())) {
             simulationRepository.end(row, "EXPIRED", now);
             audit(
@@ -141,7 +144,7 @@ public class AuthoringIdentitySimulationService {
         if (!"ACTIVE".equals(row.status())) {
             return terminalView(row, row.status(), row.endedAt());
         }
-        Instant now = Instant.now();
+        Instant now = databaseClock.now();
         String status = now.isBefore(row.expiresAt()) ? "ENDED" : "EXPIRED";
         if (!simulationRepository.end(row, status, now)) {
             throw new ResponseStatusException(NOT_FOUND, "authoring.identity-simulation.stale");

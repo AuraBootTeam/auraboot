@@ -29,10 +29,15 @@ public class AuthoringGovernanceRepository {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final AuthoringDatabaseClock databaseClock;
 
-    public AuthoringGovernanceRepository(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    public AuthoringGovernanceRepository(
+            JdbcTemplate jdbcTemplate,
+            ObjectMapper objectMapper,
+            AuthoringDatabaseClock databaseClock) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.databaseClock = databaseClock;
     }
 
     public GovernanceRow findChangeSet(long tenantId, long envId, String changeSetPid, boolean lock) {
@@ -790,7 +795,7 @@ public class AuthoringGovernanceRepository {
                 """, row.changeSetId(), row.tenantId(), row.envId());
         return new ReleaseRow(releaseId, releasePid, row.changeSetPid(), row.revision(),
                 channel == null ? null : channel.activeReleasePid(), "ACTIVE",
-                manifestChecksum, channelVersion, Instant.now());
+                manifestChecksum, channelVersion, databaseClock.now());
     }
 
     public RollbackRow lockRollback(String releasePid, long tenantId, long envId) {
@@ -861,7 +866,7 @@ public class AuthoringGovernanceRepository {
                 rollback.priorChangeSetPid(), rollback.priorChangeSetRevision(),
                 rollback.activeReleasePid(), "ACTIVE", rollback.priorManifestChecksum(),
                 channelVersion == null ? rollback.channelVersion() + 1 : channelVersion,
-                Instant.now());
+                databaseClock.now());
     }
 
     public boolean hasApprovedRevision(GovernanceRow row) {

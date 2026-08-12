@@ -526,6 +526,7 @@ export default function UnifiedDesignerPage() {
         !shouldRenewAuthoringWriterLeaseInForeground(
           activeWriterLeaseUntil,
           window.document.visibilityState,
+          window.document.hasFocus(),
         )
       ) {
         return;
@@ -549,7 +550,9 @@ export default function UnifiedDesignerPage() {
         });
     };
     const onResume = () => {
-      if (window.document.visibilityState === 'visible') refreshLease();
+      if (window.document.visibilityState === 'visible' && window.document.hasFocus()) {
+        refreshLease();
+      }
     };
     const interval = window.setInterval(refreshLease, AUTHORING_WRITER_LEASE_HEARTBEAT_MS);
     window.addEventListener('focus', refreshLease);

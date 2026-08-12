@@ -42,19 +42,24 @@ class AuthoringIdentitySimulationServiceTest {
     private AuthoringIdentitySimulationRepository simulationRepository;
     @Mock
     private AuthoringWorkspaceRepository workspaceRepository;
+    @Mock
+    private AuthoringDatabaseClock databaseClock;
 
     private AuthoringIdentitySimulationService service;
+    private final Instant databaseNow = Instant.parse("2042-03-04T05:06:07Z");
 
     @BeforeEach
     void setUp() {
         MetaContext.setContext(7L, 11L, "user-11", "security-admin");
         MetaContext.setEnvironmentId(1L);
+        when(databaseClock.now()).thenReturn(databaseNow);
         service = new AuthoringIdentitySimulationService(
                 workspaceService,
                 roleStructurePreviewService,
                 simulationRepository,
                 workspaceRepository,
-                new ObjectMapper());
+                new ObjectMapper(),
+                databaseClock);
     }
 
     @AfterEach
@@ -107,7 +112,7 @@ class AuthoringIdentitySimulationServiceTest {
 
     @Test
     void activeAccessReevaluatesIntersectionAndAppendsAccessAudit() {
-        SimulationRow row = activeRow(Instant.now().plusSeconds(300));
+        SimulationRow row = activeRow(databaseNow.plusSeconds(300));
         when(simulationRepository.find(7L, 1L, 11L, "simulation-1", true)).thenReturn(row);
         when(roleStructurePreviewService.preview("session-1", "role-operator"))
                 .thenReturn(structure());
@@ -126,7 +131,7 @@ class AuthoringIdentitySimulationServiceTest {
 
     @Test
     void expiredAndForeignSessionsFailClosedWithoutReevaluatingRole() {
-        SimulationRow expired = activeRow(Instant.now().minusSeconds(1));
+        SimulationRow expired = activeRow(databaseNow.minusSeconds(1));
         when(simulationRepository.find(7L, 1L, 11L, "expired", true)).thenReturn(expired);
         when(simulationRepository.end(eq(expired), eq("EXPIRED"), any())).thenReturn(true);
 

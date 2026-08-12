@@ -89,6 +89,7 @@ public class AuthoringWorkspaceService {
     private final AuthoringActiveReleaseResolver activeReleaseResolver;
     private final AuthoringOwnershipService ownershipService;
     private final AuthoringNewPageMaterializer newPageMaterializer;
+    private final AuthoringDatabaseClock databaseClock;
 
     public AuthoringWorkspaceService(
             AuthoringCapabilityRegistry capabilityRegistry,
@@ -103,7 +104,8 @@ public class AuthoringWorkspaceService {
             AuthoringWorkspaceViewMapper viewMapper,
             AuthoringActiveReleaseResolver activeReleaseResolver,
             AuthoringOwnershipService ownershipService,
-            AuthoringNewPageMaterializer newPageMaterializer) {
+            AuthoringNewPageMaterializer newPageMaterializer,
+            AuthoringDatabaseClock databaseClock) {
         this.capabilityRegistry = capabilityRegistry;
         this.patchEngine = patchEngine;
         this.repository = repository;
@@ -117,6 +119,7 @@ public class AuthoringWorkspaceService {
         this.activeReleaseResolver = activeReleaseResolver;
         this.ownershipService = ownershipService;
         this.newPageMaterializer = newPageMaterializer;
+        this.databaseClock = databaseClock;
     }
 
     public CapabilityRegistryView capabilities() {
@@ -160,7 +163,7 @@ public class AuthoringWorkspaceService {
         JsonNode interactionContext = interactionContextSanitizer.sanitize(request.interactionContext());
         String sessionPid = UniqueIdGenerator.generate();
         String changeSetPid = UniqueIdGenerator.generate();
-        Instant now = Instant.now();
+        Instant now = databaseClock.now();
         repository.create(new CreateWorkspace(
                 identity.tenantId(),
                 identity.envId(),
@@ -230,7 +233,7 @@ public class AuthoringWorkspaceService {
         resourceMetadata.put("lifecycle", AuthoringNewPageMaterializer.NEW_LIFECYCLE);
         resourceMetadata.set("menu", menuDefinition);
 
-        Instant now = Instant.now();
+        Instant now = databaseClock.now();
         JsonNode absentBase = objectMapper.createObjectNode();
         JsonNode interactionContext = source.interactionContext().deepCopy();
         repository.create(new CreateWorkspace(
@@ -360,7 +363,7 @@ public class AuthoringWorkspaceService {
                 sessionPid,
                 workspaceMode,
                 interactionContext,
-                Instant.now().plus(SESSION_TTL)));
+                databaseClock.now().plus(SESSION_TTL)));
         if (created == null) {
             throw new ResponseStatusException(NOT_FOUND, "authoring.change-set.not-found");
         }
@@ -416,7 +419,7 @@ public class AuthoringWorkspaceService {
                 && !"REJECTED".equals(workspace.changeSetStatus())) {
             throw new ResponseStatusException(CONFLICT, "authoring.writer-lease.change-set-frozen");
         }
-        Instant now = Instant.now();
+        Instant now = databaseClock.now();
         boolean alreadyOwned = workspace.leaseSessionId() == workspace.sessionId()
                 && workspace.leaseHolderUserId() == identity.userId()
                 && workspace.leasedUntil().isAfter(now)
@@ -459,7 +462,7 @@ public class AuthoringWorkspaceService {
         Identity identity = identity();
         WorkspaceRow workspace = requireWorkspace(identity, sessionPid, true);
         requireNonReviewWorkspace(workspace);
-        Instant now = Instant.now();
+        Instant now = databaseClock.now();
         if (workspace.leaseSessionId() != workspace.sessionId()
                 || workspace.leaseHolderUserId() != identity.userId()) {
             throw new ResponseStatusException(CONFLICT, "authoring.writer-lease.lost");
@@ -533,7 +536,7 @@ public class AuthoringWorkspaceService {
                 prepared.decision(),
                 identity.userId(),
                 aggregate,
-                Instant.now().plus(WRITER_LEASE));
+                databaseClock.now().plus(WRITER_LEASE));
         repository.audit(audit(
                 identity,
                 workspace.changeSetPid(),
@@ -714,7 +717,7 @@ public class AuthoringWorkspaceService {
                 workspace, prepared.snapshot(), capabilityRegistry.checksum(), changeItemPid,
                 blockId, propertyPath, operation, prepared.previousValue(), prepared.savedValue(),
                 prepared.capability(), prepared.decision(), identity.userId(), aggregate,
-                Instant.now().plus(WRITER_LEASE));
+                databaseClock.now().plus(WRITER_LEASE));
         ((ObjectNode) metadata).put("changeItemPid", changeItemPid);
         ((ObjectNode) metadata).put("resultRevision", workspace.changeSetRevision() + 1);
         repository.audit(audit(
@@ -781,7 +784,7 @@ public class AuthoringWorkspaceService {
                 prepared.decision(),
                 identity.userId(),
                 aggregate,
-                Instant.now().plus(WRITER_LEASE));
+                databaseClock.now().plus(WRITER_LEASE));
         repository.audit(audit(
                 identity,
                 workspace.changeSetPid(),
@@ -819,7 +822,7 @@ public class AuthoringWorkspaceService {
 
     private void validateWritable(WorkspaceRow row, Identity identity, long expectedRevision) {
         requireNonReviewWorkspace(row);
-        Instant now = Instant.now();
+        Instant now = databaseClock.now();
         if (!row.expiresAt().isAfter(now)) {
             throw new ResponseStatusException(CONFLICT, "authoring.session.expired");
         }

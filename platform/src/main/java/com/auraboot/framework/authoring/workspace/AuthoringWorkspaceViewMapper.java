@@ -20,8 +20,14 @@ import java.util.stream.StreamSupport;
 @Component
 public class AuthoringWorkspaceViewMapper {
 
+    private final AuthoringDatabaseClock databaseClock;
+
+    public AuthoringWorkspaceViewMapper(AuthoringDatabaseClock databaseClock) {
+        this.databaseClock = databaseClock;
+    }
+
     public SessionView toView(WorkspaceRow row, long currentUserId) {
-        Instant now = Instant.now();
+        Instant now = databaseClock.now();
         String sessionState = row.expiresAt().isAfter(now) ? row.sessionState() : "EXPIRED";
         String leaseStatus;
         if (!row.leasedUntil().isAfter(now)) {

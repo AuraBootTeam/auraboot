@@ -114,6 +114,7 @@ vi.mock('~/framework/meta/authoring/authoringConflictTransfer', () => ({
 describe('UnifiedDesignerPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true);
     window.sessionStorage.clear();
     vi.mocked(loadModelFieldsByModelCodes).mockResolvedValue({});
     vi.mocked(savePageSchemaV3).mockResolvedValue({

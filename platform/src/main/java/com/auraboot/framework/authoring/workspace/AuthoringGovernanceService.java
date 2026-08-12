@@ -71,6 +71,7 @@ public class AuthoringGovernanceService {
     private final AuthoringWorkspaceViewMapper viewMapper;
     private final AuthoringAuditService auditService;
     private final ObjectMapper objectMapper;
+    private final AuthoringDatabaseClock databaseClock;
 
     public AuthoringGovernanceService(
             AuthoringGovernanceRepository governanceRepository,
@@ -85,7 +86,8 @@ public class AuthoringGovernanceService {
             AuthoringImpactAnalyzer impactAnalyzer,
             AuthoringWorkspaceViewMapper viewMapper,
             AuthoringAuditService auditService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            AuthoringDatabaseClock databaseClock) {
         this.governanceRepository = governanceRepository;
         this.workspaceRepository = workspaceRepository;
         this.governanceValidator = governanceValidator;
@@ -99,6 +101,7 @@ public class AuthoringGovernanceService {
         this.viewMapper = viewMapper;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
+        this.databaseClock = databaseClock;
     }
 
     @Transactional(noRollbackFor = AuthoringStaleStateException.class)
@@ -190,7 +193,10 @@ public class AuthoringGovernanceService {
         requireOwner(row, identity);
         requireResumableSession(workspace, request.expectedRevision());
         governanceRepository.withdrawReview(
-                row, workspace.sessionId(), identity.userId(), Instant.now().plus(WRITER_LEASE));
+                row,
+                workspace.sessionId(),
+                identity.userId(),
+                databaseClock.now().plus(WRITER_LEASE));
         audit(identity, row, sessionPid, "CHANGE_SET_REVIEW_WITHDRAWN", "ALLOW",
                 "OWNER_RESUMED_EDITING", revisionTransition(row, request.reason()));
         return view(requireChangeSet(identity, row.changeSetPid(), false));
@@ -206,7 +212,10 @@ public class AuthoringGovernanceService {
         requireOwner(row, identity);
         requireResumableSession(workspace, request.expectedRevision());
         governanceRepository.reopenApproved(
-                row, workspace.sessionId(), identity.userId(), Instant.now().plus(WRITER_LEASE));
+                row,
+                workspace.sessionId(),
+                identity.userId(),
+                databaseClock.now().plus(WRITER_LEASE));
         audit(identity, row, sessionPid, "CHANGE_SET_APPROVAL_INVALIDATED", "ALLOW",
                 "OWNER_RESUMED_EDITING", revisionTransition(row, request.reason()));
         return view(requireChangeSet(identity, row.changeSetPid(), false));
@@ -222,7 +231,7 @@ public class AuthoringGovernanceService {
         String reason = requireReason(request.reason());
         governanceRepository.reject(
                 row, identity.userId(), reason,
-                Instant.now().plus(WRITER_LEASE));
+                databaseClock.now().plus(WRITER_LEASE));
         audit(identity, row, null, "CHANGE_SET_REJECTED", "ALLOW", "REVISION_REJECTED",
                 revisionTransition(row, reason));
         return view(requireChangeSet(identity, changeSetPid, false));
@@ -259,7 +268,7 @@ public class AuthoringGovernanceService {
         String targetSessionPid = UniqueIdGenerator.generate();
         ArrayNode lineage = splitLineage(row);
         ObjectNode dependencies = splitDependencySnapshot(plan);
-        Instant now = Instant.now();
+        Instant now = databaseClock.now();
 
         SplitPersistenceResult persisted = governanceRepository.split(new SplitPersistenceCommand(
                 row,
@@ -560,7 +569,7 @@ public class AuthoringGovernanceService {
 
     private void requireResumableSession(WorkspaceRow workspace, long expectedRevision) {
         requireNonReviewWorkspace(workspace);
-        if (!workspace.expiresAt().isAfter(Instant.now())
+        if (!workspace.expiresAt().isAfter(databaseClock.now())
                 || (!"ACTIVE".equals(workspace.sessionState())
                 && !"READ_ONLY".equals(workspace.sessionState()))) {
             throw conflict("authoring.session.expired");
@@ -577,7 +586,7 @@ public class AuthoringGovernanceService {
             Identity identity,
             long expectedRevision) {
         requireNonReviewWorkspace(workspace);
-        Instant now = Instant.now();
+        Instant now = databaseClock.now();
         if (!workspace.expiresAt().isAfter(now)) {
             throw conflict("authoring.session.expired");
         }

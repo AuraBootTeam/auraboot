@@ -23,10 +23,13 @@ describe('writerLeaseHeartbeat', () => {
     expect(shouldRenewAuthoringWriterLease('invalid-deadline', now)).toBe(true);
   });
 
-  it('attempts renewal inside the safety window only while the document is visible', () => {
+  it('attempts renewal inside the safety window only while the document is visible and focused', () => {
     const now = Date.parse('2026-08-11T12:00:00.000Z');
     const deadline = new Date(now + 30_000).toISOString();
-    expect(shouldRenewAuthoringWriterLeaseInForeground(deadline, 'visible', now)).toBe(true);
-    expect(shouldRenewAuthoringWriterLeaseInForeground(deadline, 'hidden', now)).toBe(false);
+    expect(shouldRenewAuthoringWriterLeaseInForeground(deadline, 'visible', true, now)).toBe(true);
+    expect(shouldRenewAuthoringWriterLeaseInForeground(deadline, 'hidden', true, now)).toBe(false);
+    expect(shouldRenewAuthoringWriterLeaseInForeground(deadline, 'visible', false, now)).toBe(
+      false,
+    );
   });
 });
