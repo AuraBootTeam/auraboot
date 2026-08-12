@@ -22,6 +22,11 @@ import com.auraboot.framework.tenant.dto.TenantMemberImportResult;
 import com.auraboot.framework.tenant.dto.TenantMemberImportRow;
 import com.auraboot.framework.tenant.service.TenantMemberApplicationService;
 import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.tenant.dto.TenantMemberOffboardingImpactResponse;
+import com.auraboot.framework.tenant.dto.TenantMemberOffboardingCandidate;
+import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
+import com.auraboot.framework.tenant.offboarding.TenantMemberOffboardingAction;
+import com.auraboot.framework.tenant.offboarding.TenantMemberOffboardingCoordinator;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -97,6 +102,12 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
 
     @Autowired
     private UserRoleService userRoleService;
+
+    @Autowired
+    private TenantMemberOffboardingCoordinator offboardingCoordinator;
+
+    @Autowired
+    private TenantMemberMapper tenantMemberMapper;
     
     @Override
     public PaginationResult<MemberResponse> searchMembers(MemberQueryRequest request, Long userId) {
@@ -241,6 +252,12 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
     
     @Override
     public boolean updateMemberStatus(String memberPid, String status, String reason, Long userId) {
+        return updateMemberStatus(memberPid, status, reason, null, userId);
+    }
+
+    @Override
+    public boolean updateMemberStatus(String memberPid, String status, String reason,
+                                      String targetMemberPid, Long userId) {
         try {
             TenantMember member = tenantMemberService.findByPid(memberPid);
             if (member == null) {
@@ -264,10 +281,14 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
                     result = tenantMemberService.activateMember(member.getId());
                     break;
                 case StatusConstants.INACTIVE:
+                    offboardingCoordinator.prepare(member, targetMemberPid, userId,
+                            TenantMemberOffboardingAction.DEACTIVATE);
                     result = tenantMemberService.deactivateMember(member.getId());
                     applyMemberOffboardingSideEffects(member);
                     break;
                 case StatusConstants.SUSPENDED:
+                    offboardingCoordinator.prepare(member, targetMemberPid, userId,
+                            TenantMemberOffboardingAction.SUSPEND);
                     result = tenantMemberService.suspendMember(member.getId(), reason);
                     revokeUserSessions(member);
                     break;
@@ -288,6 +309,11 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
     
     @Override
     public boolean removeMember(String memberPid, Long userId) {
+        return removeMember(memberPid, null, userId);
+    }
+
+    @Override
+    public boolean removeMember(String memberPid, String targetMemberPid, Long userId) {
         try {
             TenantMember member = tenantMemberService.findByPid(memberPid);
             if (member == null) {
@@ -309,6 +335,8 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
                 throw new BusinessException(ResponseCode.BadParam, "不能删除自己");
             }
             
+            offboardingCoordinator.prepare(member, targetMemberPid, userId,
+                    TenantMemberOffboardingAction.REMOVE);
             boolean result = tenantMemberService.removeMember(member.getId());
             log.info("用户 {} 移除成员 {}", userId, memberPid);
             return result;
@@ -319,6 +347,50 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
             log.error("移除成员失败，memberPid: {}", memberPid, e);
             throw new BusinessException(ResponseCode.BUSINESS_ERROR, "移除成员失败: " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public TenantMemberOffboardingImpactResponse inspectOffboardingImpact(
+            String memberPid, String targetMemberPid, String action, Long userId) {
+        TenantMember member = tenantMemberService.findByPid(memberPid);
+        if (member == null) {
+            throw new BusinessException(ResponseCode.NOT_FOUND, "成员不存在");
+        }
+        Long currentTenantId = MetaContext.getCurrentTenantId();
+        if (currentTenantId == null) {
+            currentTenantId = tenantMemberService.getTenantIdByUserId(userId);
+        }
+        if (!member.getTenantId().equals(currentTenantId)) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "无权限操作该成员");
+        }
+        TenantMemberOffboardingAction parsedAction;
+        try {
+            parsedAction = TenantMemberOffboardingAction.valueOf(action.trim().toUpperCase());
+        } catch (RuntimeException ex) {
+            throw new BusinessException(ResponseCode.BadParam, "Invalid offboarding action: " + action);
+        }
+        return offboardingCoordinator.inspect(member, targetMemberPid, userId, parsedAction);
+    }
+
+    @Override
+    public List<TenantMemberOffboardingCandidate> listOffboardingCandidates(String memberPid, Long userId) {
+        TenantMember member = tenantMemberService.findByPid(memberPid);
+        if (member == null) {
+            throw new BusinessException(ResponseCode.NOT_FOUND, "成员不存在");
+        }
+        Long currentTenantId = MetaContext.getCurrentTenantId();
+        if (currentTenantId == null) {
+            currentTenantId = tenantMemberService.getTenantIdByUserId(userId);
+        }
+        if (!member.getTenantId().equals(currentTenantId)) {
+            throw new BusinessException(ResponseCode.FORBIDDEN, "无权限操作该成员");
+        }
+        return tenantMemberMapper.findActiveOffboardingCandidates(currentTenantId, memberPid).stream()
+                .map(row -> new TenantMemberOffboardingCandidate(
+                        String.valueOf(row.get("memberPid")),
+                        String.valueOf(row.get("displayName")),
+                        row.get("email") == null ? null : String.valueOf(row.get("email"))))
+                .toList();
     }
 
     @Override
@@ -468,25 +540,28 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
                 currentTenantId = tenantMemberService.getTenantIdByUserId(userId);
             }
             
+            List<TenantMember> removable = new ArrayList<>();
             for (String memberPid : memberPids) {
                 TenantMember member = tenantMemberService.findByPid(memberPid);
                 if (member == null) {
-                    log.warn("成员不存在: {}", memberPid);
-                    continue;
+                    throw new BusinessException(ResponseCode.NOT_FOUND, "成员不存在: " + memberPid);
                 }
                 
                 // 验证权限
                 if (!member.getTenantId().equals(currentTenantId)) {
-                    log.warn("无权限操作成员: {}", memberPid);
-                    continue;
+                    throw new BusinessException(ResponseCode.FORBIDDEN, "无权限操作成员: " + memberPid);
                 }
                 
                 // 不能删除自己
                 if (member.getUserId().equals(userId)) {
-                    log.warn("不能删除自己: {}", memberPid);
-                    continue;
+                    throw new BusinessException(ResponseCode.BadParam, "不能删除自己: " + memberPid);
                 }
-                
+
+                offboardingCoordinator.prepare(member, null, userId,
+                        TenantMemberOffboardingAction.REMOVE);
+                removable.add(member);
+            }
+            for (TenantMember member : removable) {
                 tenantMemberService.removeMember(member.getId());
             }
             

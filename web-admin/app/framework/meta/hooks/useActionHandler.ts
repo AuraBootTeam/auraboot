@@ -621,7 +621,10 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
         switch (actionDef.type) {
           case 'command': {
-            if (confirmKey) {
+            const offboardingAction = toNonBlankString(
+              (actionDef as any).offboardingAction ?? (normalizedButton as any).offboardingAction,
+            );
+            if (confirmKey && !offboardingAction) {
               const confirmed = await showConfirmDialog(confirmKey);
               if (!confirmed) return;
             }
@@ -647,18 +650,61 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 actionRuntimeContext,
               ),
             };
-            const inputFields = Array.isArray((actionDef as any).inputFields)
+            let inputFields = Array.isArray((actionDef as any).inputFields)
               ? (actionDef as any).inputFields
               : Array.isArray((normalizedButton as any).inputFields)
                 ? (normalizedButton as any).inputFields
                 : [];
+            let inputFieldsTitle =
+              (actionDef as any).inputFieldsTitle ?? (normalizedButton as any).inputFieldsTitle;
+            let transferRequired = false;
+            if (offboardingAction && targetRecordPid) {
+              const impactResult = await fetchResult(
+                `/api/tenant/members/${encodeURIComponent(targetRecordPid)}/offboarding-impact`,
+                { method: 'get', params: { action: offboardingAction }, token },
+              );
+              if (!ResultHelper.isSuccess(impactResult)) {
+                throw new Error(resolveCommandErrorMessage(impactResult, offboardingAction));
+              }
+              const impact = impactResult.data as Record<string, any>;
+              transferRequired = impact?.transferRequired === true;
+              if (transferRequired) {
+                const ownedCount = Number(impact.ownedResourceCount || 0);
+                const isChinese = locale.toLowerCase().startsWith('zh');
+                inputFieldsTitle = isChinese
+                  ? `资源交接：该成员名下有 ${ownedCount} 项资源`
+                  : `Resource transfer: this member owns ${ownedCount} item${ownedCount === 1 ? '' : 's'}`;
+                inputFields = [
+                  {
+                    field: 'targetMemberPid',
+                    label: isChinese ? '资源接收人' : 'Resource recipient',
+                    type: 'select',
+                    required: true,
+                    dataSource: {
+                      type: 'api',
+                      endpoint: '/api/tenant/members/${record.pid}/offboarding-candidates',
+                      valueField: 'memberPid',
+                      labelField: 'displayName',
+                      descriptionField: 'email',
+                    },
+                  },
+                  ...inputFields,
+                ];
+              }
+            }
+            if (offboardingAction && inputFields.length === 0 && !transferRequired && confirmKey) {
+              const confirmed = await showConfirmDialog(confirmKey);
+              if (!confirmed) return;
+            }
             if (inputFields.length > 0) {
               let collectedInputs: Record<string, any>;
               try {
                 collectedInputs = await promptInputForm(
                   inputFields,
-                  (actionDef as any).inputFieldsTitle ?? (normalizedButton as any).inputFieldsTitle,
+                  inputFieldsTitle,
                   fetchResult,
+                  undefined,
+                  actionRuntimeContext,
                 );
               } catch {
                 return;

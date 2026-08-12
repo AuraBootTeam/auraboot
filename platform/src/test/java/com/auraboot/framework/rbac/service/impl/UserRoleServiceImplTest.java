@@ -10,6 +10,7 @@ import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
+import com.auraboot.framework.tenant.offboarding.TenantAdminContinuityGuard;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -45,6 +46,7 @@ class UserRoleServiceImplTest {
     @Mock private RoleMapper roleMapper;
     @Mock private TenantMemberMapper tenantMemberMapper;
     @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    @Mock private TenantAdminContinuityGuard tenantAdminContinuityGuard;
 
     private UserRoleServiceImpl service;
     private UserRoleServiceImpl spyService;
@@ -57,6 +59,7 @@ class UserRoleServiceImplTest {
         injectField(service, "roleMapper", roleMapper);
         injectField(service, "tenantMemberMapper", tenantMemberMapper);
         injectField(service, "eventPublisher", eventPublisher);
+        injectField(service, "tenantAdminContinuityGuard", tenantAdminContinuityGuard);
         spyService = spy(service);
     }
 
@@ -322,6 +325,7 @@ class UserRoleServiceImplTest {
         doReturn(List.of(ur(1L, 1L, 100L, 10L))).when(spyService).listByIds(anyList());
         doReturn(true).when(spyService).removeByIds(anyList());
         assertEquals(1, spyService.batchRemoveRoles(List.of(1L)));
+        verify(tenantAdminContinuityGuard).assertRolesCanBeRemoved(1L, 10L, List.of(100L));
     }
 
     @Test
@@ -461,16 +465,22 @@ class UserRoleServiceImplTest {
     @DisplayName("activateUserRole/deactivateUserRole update status")
     void activateDeactivate() {
         doReturn(true).when(spyService).update(any(UpdateWrapper.class));
+        doReturn(ur(1L, 1L, 100L, 10L)).when(spyService).getById(1L);
         assertTrue(spyService.activateUserRole(1L));
         assertTrue(spyService.deactivateUserRole(1L));
+        verify(tenantAdminContinuityGuard).assertRolesCanBeRemoved(1L, 10L, List.of(100L));
     }
 
     @Test
     @DisplayName("batchActivate/batchDeactivate return list size on success")
     void batchActivateDeactivate() {
         doReturn(true).when(spyService).update(any(UpdateWrapper.class));
+        doReturn(List.of(ur(1L, 1L, 100L, 10L), ur(2L, 2L, 101L, 10L)))
+                .when(spyService).listByIds(List.of(1L, 2L));
         assertEquals(2, spyService.batchActivateUserRoles(List.of(1L, 2L)));
         assertEquals(2, spyService.batchDeactivateUserRoles(List.of(1L, 2L)));
+        verify(tenantAdminContinuityGuard).assertRolesCanBeRemoved(1L, 10L, List.of(100L));
+        verify(tenantAdminContinuityGuard).assertRolesCanBeRemoved(2L, 10L, List.of(101L));
     }
 
     @Test

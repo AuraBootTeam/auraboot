@@ -6,6 +6,7 @@ import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
+import com.auraboot.framework.tenant.offboarding.TenantAdminContinuityGuard;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,6 +52,7 @@ class UserRoleServiceImplEvictEventTest {
     @Mock private UserRoleMapper userRoleMapper;
     @Mock private RoleMapper roleMapper;
     @Mock private TenantMemberMapper tenantMemberMapper;
+    @Mock private TenantAdminContinuityGuard tenantAdminContinuityGuard;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     private UserRoleServiceImpl spyService;
@@ -62,6 +64,7 @@ class UserRoleServiceImplEvictEventTest {
         injectField(service, "userRoleMapper", userRoleMapper);
         injectField(service, "roleMapper", roleMapper);
         injectField(service, "tenantMemberMapper", tenantMemberMapper);
+        injectField(service, "tenantAdminContinuityGuard", tenantAdminContinuityGuard);
         injectField(service, "eventPublisher", eventPublisher);
         spyService = spy(service);
     }
@@ -164,6 +167,7 @@ class UserRoleServiceImplEvictEventTest {
         UserRole row = new UserRole();
         row.setMemberId(MEMBER_ID);
         row.setRoleId(ROLE_ID);
+        row.setTenantId(TENANT_ID);
         doReturn(true).when(spyService).update(any());
         doReturn(List.of(row)).when(spyService).listByIds(anyList());
         when(tenantMemberMapper.selectById(MEMBER_ID)).thenReturn(memberWithUser());
@@ -181,6 +185,7 @@ class UserRoleServiceImplEvictEventTest {
         UserRole row = new UserRole();
         row.setMemberId(MEMBER_ID);
         row.setRoleId(ROLE_ID);
+        row.setTenantId(TENANT_ID);
         doReturn(true).when(spyService).saveBatch(anyList());
         when(tenantMemberMapper.selectById(MEMBER_ID)).thenReturn(memberWithUser());
 
@@ -252,7 +257,9 @@ class UserRoleServiceImplEvictEventTest {
         UserRole row = new UserRole();
         row.setMemberId(MEMBER_ID);
         row.setRoleId(ROLE_ID);
+        row.setTenantId(TENANT_ID);
         doReturn(true).when(spyService).update(any());
+        doReturn(row).when(spyService).getById(5L);
         doReturn(List.of(row)).when(spyService).listByIds(List.of(5L));
         when(tenantMemberMapper.selectById(MEMBER_ID)).thenReturn(memberWithUser());
 

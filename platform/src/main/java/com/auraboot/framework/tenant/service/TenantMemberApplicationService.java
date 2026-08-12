@@ -7,6 +7,8 @@ import com.auraboot.framework.tenant.dto.TenantMemberCreateRequest;
 import com.auraboot.framework.tenant.dto.TenantMemberCreateResult;
 import com.auraboot.framework.tenant.dto.TenantMemberImportResult;
 import com.auraboot.framework.tenant.dto.TenantMemberImportRow;
+import com.auraboot.framework.tenant.dto.TenantMemberOffboardingImpactResponse;
+import com.auraboot.framework.tenant.dto.TenantMemberOffboardingCandidate;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -52,6 +54,9 @@ public interface TenantMemberApplicationService {
      * @return 是否成功
      */
     boolean updateMemberStatus(String memberPid, String status, String reason, Long userId);
+
+    boolean updateMemberStatus(String memberPid, String status, String reason,
+                               String targetMemberPid, Long userId);
     
     /**
      * 移除成员
@@ -60,6 +65,13 @@ public interface TenantMemberApplicationService {
      * @return 是否成功
      */
     boolean removeMember(String memberPid, Long userId);
+
+    boolean removeMember(String memberPid, String targetMemberPid, Long userId);
+
+    TenantMemberOffboardingImpactResponse inspectOffboardingImpact(
+            String memberPid, String targetMemberPid, String action, Long userId);
+
+    List<TenantMemberOffboardingCandidate> listOffboardingCandidates(String memberPid, Long userId);
     
     /**
      * 批量移除成员

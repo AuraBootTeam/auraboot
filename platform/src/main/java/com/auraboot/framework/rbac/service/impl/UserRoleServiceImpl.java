@@ -12,6 +12,7 @@ import com.auraboot.framework.permission.event.UserRoleChangedEvent;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
+import com.auraboot.framework.tenant.offboarding.TenantAdminContinuityGuard;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -46,6 +47,9 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
 
     @Resource
     private ApplicationEventPublisher eventPublisher;
+
+    @Resource
+    private TenantAdminContinuityGuard tenantAdminContinuityGuard;
 
     @Override
     @Transactional
@@ -147,6 +151,7 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             return true;
         }
 
+        tenantAdminContinuityGuard.assertRolesCanBeRemoved(memberId, tenantId, roleIds);
         QueryWrapper<UserRole> wrapper = new QueryWrapper<>();
         wrapper.eq("member_id", memberId)
                 .in("role_id", roleIds);
@@ -175,6 +180,8 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
     @Override
     @Transactional
     public boolean removeAllRolesFromMemberInTenant(Long memberId, Long tenantId) {
+        tenantAdminContinuityGuard.assertRolesCanBeRemoved(
+                memberId, tenantId, getRoleIdsByMemberIdAndTenantId(memberId, tenantId));
         boolean removed = userRoleMapper.deleteByMemberIdAndTenantId(memberId, tenantId) >= 0;
         publishMemberRoleChange(memberId, null, "DELETE");
         return removed;
@@ -298,6 +305,15 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             }
         }
 
+        records.stream()
+                .collect(Collectors.groupingBy(UserRole::getTenantId))
+                .forEach((recordTenantId, tenantRecords) -> tenantRecords.stream()
+                        .collect(Collectors.groupingBy(UserRole::getMemberId))
+                        .forEach((memberId, memberRecords) -> tenantAdminContinuityGuard.assertRolesCanBeRemoved(
+                                memberId,
+                                recordTenantId,
+                                memberRecords.stream().map(UserRole::getRoleId).toList())));
+
         if (!removeByIds(userRoleIds)) {
             return 0;
         }
@@ -328,6 +344,13 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         if (CollectionUtils.isEmpty(records)) {
             return 0;
         }
+
+        records.stream()
+                .collect(Collectors.groupingBy(UserRole::getMemberId))
+                .forEach((memberId, memberRecords) -> tenantAdminContinuityGuard.assertRolesCanBeRemoved(
+                        memberId,
+                        tenantId,
+                        memberRecords.stream().map(UserRole::getRoleId).toList()));
 
         List<Long> ids = records.stream()
                 .map(UserRole::getId)
@@ -550,6 +573,11 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
     @Override
     @Transactional
     public boolean deactivateUserRole(Long userRoleId) {
+        UserRole record = getById(userRoleId);
+        if (record != null) {
+            tenantAdminContinuityGuard.assertRolesCanBeRemoved(
+                    record.getMemberId(), record.getTenantId(), List.of(record.getRoleId()));
+        }
         UpdateWrapper<UserRole> wrapper = new UpdateWrapper<>();
         wrapper.eq("id", userRoleId)
                 .set("status", StatusConstants.INACTIVE)
@@ -587,6 +615,16 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             return 0;
         }
 
+        List<UserRole> records = listByIds(userRoleIds);
+        records.stream()
+                .collect(Collectors.groupingBy(UserRole::getTenantId))
+                .forEach((recordTenantId, tenantRecords) -> tenantRecords.stream()
+                        .collect(Collectors.groupingBy(UserRole::getMemberId))
+                        .forEach((memberId, memberRecords) -> tenantAdminContinuityGuard.assertRolesCanBeRemoved(
+                                memberId,
+                                recordTenantId,
+                                memberRecords.stream().map(UserRole::getRoleId).toList())));
+
         UpdateWrapper<UserRole> wrapper = new UpdateWrapper<>();
         wrapper.in("id", userRoleIds)
                 .set("status", StatusConstants.INACTIVE)
@@ -601,6 +639,7 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
 
     @Override
     public boolean removeMemberRole(Long memberId, Long roleId, Long tenantId) {
+        tenantAdminContinuityGuard.assertRolesCanBeRemoved(memberId, tenantId, List.of(roleId));
         QueryWrapper<UserRole> wrapper = new QueryWrapper<>();
         wrapper.eq("member_id", memberId)
                 .eq("role_id", roleId)
