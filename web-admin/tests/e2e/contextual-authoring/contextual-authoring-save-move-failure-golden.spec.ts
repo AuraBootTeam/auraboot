@@ -1,9 +1,13 @@
-import { test, expect, type Page } from '@playwright/test';
-import { resolve } from 'node:path';
+import { test, expect, type BrowserContext, type BrowserType, type Page } from '@playwright/test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { loginViaUI } from '../../helpers/wd-fixtures';
 
-const RUNTIME_ROUTE = '/production-exception-list-v4';
+// Save/recovery goldens use the canonical E2E DSL page so every case is independently runnable.
+// Menu-to-special-fixture navigation remains covered by contextual-authoring-pc-golden.spec.ts.
+const RUNTIME_ROUTE = '/p/e2et_record';
 const SCREENSHOT_DIR = resolve(
   process.env.CONTEXTUAL_AUTHORING_SCREENSHOT_DIR ?? 'test-results/contextual-authoring',
 );
@@ -326,7 +330,9 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
       await expect(page.getByTestId('authoring-local-recovery')).toBeVisible();
       await expect(page.getByTestId('authoring-local-recovery-resume')).toBeEnabled();
     }
-    await expect(page.getByText(/本地恢复数据仍保留/)).toBeVisible();
+    await expect(page.getByTestId('authoring-local-recovery-error')).toContainText(
+      '本地恢复数据仍保留',
+    );
     await page.screenshot({
       path: resolve(SCREENSHOT_DIR, 'pc-auth-024-inline-restart-recovery-pending.png'),
       fullPage: true,
@@ -975,7 +981,290 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
       fullPage: true,
     });
   });
+
+  test('PC-AUTH-031 @critical — a complete browser-process exit restores only the same-device Mine after controlled long offline age', async ({
+    browser,
+    page,
+  }) => {
+    const profileRoot = await mkdtemp(join(tmpdir(), 'auraboot-authoring-recovery-'));
+    const sameDeviceProfile = join(profileRoot, 'same-device');
+    const otherDeviceProfile = join(profileRoot, 'other-device');
+    let firstProcess: BrowserContext | null = null;
+    let reopenedProcess: BrowserContext | null = null;
+    let otherDeviceProcess: BrowserContext | null = null;
+    try {
+      const authoritativeTenantCookies = await page.context().cookies();
+      firstProcess = await openPersistentContext(browser.browserType(), sameDeviceProfile);
+      const firstPage = firstProcess.pages()[0] ?? (await firstProcess.newPage());
+      await firstProcess.addCookies(authoritativeTenantCookies);
+      await openPersistentProfileRuntime(firstPage);
+      const session = await enterAuthoringFromCurrentRuntime(firstPage);
+      const itemsBefore = await loadChangeItems(firstPage, session.sessionPid);
+      const { value } = await stageDensityEdit(firstPage, session);
+      await expect(firstPage.getByText('1 项未保存')).toBeVisible();
+      expect(await recoveryKeys(firstPage)).toHaveLength(1);
+
+      // Deterministic TTL-boundary evidence: preserve a still-valid 23-hour offline age without
+      // pretending the gate spent 23 wall-clock hours asleep.
+      await firstPage.evaluate(() => {
+        for (let index = 0; index < localStorage.length; index += 1) {
+          const key = localStorage.key(index);
+          if (!key?.startsWith('auraboot:authoring-recovery:v2:')) continue;
+          const record = JSON.parse(localStorage.getItem(key) ?? '{}') as { savedAt?: number };
+          record.savedAt = Date.now() - 23 * 60 * 60 * 1000;
+          localStorage.setItem(key, JSON.stringify(record));
+        }
+      });
+      await firstPage.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-031-before-complete-process-exit.png'),
+        fullPage: true,
+      });
+      await firstProcess.close();
+      firstProcess = null;
+
+      otherDeviceProcess = await openPersistentContext(browser.browserType(), otherDeviceProfile);
+      const otherPage = otherDeviceProcess.pages()[0] ?? (await otherDeviceProcess.newPage());
+      await otherDeviceProcess.addCookies(authoritativeTenantCookies);
+      await openPersistentProfileRuntime(otherPage);
+      await expect(otherPage.getByTestId('authoring-local-recovery')).toHaveCount(0);
+      await expect(otherPage.getByTestId('contextual-authoring-enter')).toBeVisible();
+      expect(await recoveryKeys(otherPage)).toEqual([]);
+      await otherPage.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-031-other-device-no-mine.png'),
+        fullPage: true,
+      });
+      await otherDeviceProcess.close();
+      otherDeviceProcess = null;
+
+      reopenedProcess = await openPersistentContext(browser.browserType(), sameDeviceProfile);
+      const reopenedPage = reopenedProcess.pages()[0] ?? (await reopenedProcess.newPage());
+      await reopenedProcess.addCookies(authoritativeTenantCookies);
+      await openPersistentProfileRuntime(reopenedPage, 'recovery');
+      await expect(reopenedPage.getByTestId('authoring-local-recovery')).toContainText(
+        '发现页面中断前保留的本地变更',
+      );
+      await reopenedPage.getByTestId('authoring-local-recovery-resume').click();
+      await expect(reopenedPage.getByTestId('contextual-authoring-surface')).toBeVisible();
+      await expect(reopenedPage.getByText('1 项未保存')).toBeVisible();
+      await expect(
+        reopenedPage.getByTestId('authoring-property-/props/density').locator('input'),
+      ).toHaveValue(value);
+      await expect(
+        reopenedPage.getByTestId('authoring-save-reconciliation-feedback'),
+      ).toContainText('确认尚未写入权威草稿');
+      expect(await loadChangeItems(reopenedPage, session.sessionPid)).toEqual(itemsBefore);
+      await reopenedPage.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-031-reopened-profile-recovered.png'),
+        fullPage: true,
+      });
+
+      await reopenedPage.getByRole('button', { name: '保存', exact: true }).click();
+      await expect(reopenedPage.getByText('0 项未保存')).toBeVisible();
+      expect(await loadChangeItems(reopenedPage, session.sessionPid)).toHaveLength(
+        itemsBefore.length + 1,
+      );
+    } finally {
+      await Promise.allSettled([
+        firstProcess?.close(),
+        reopenedProcess?.close(),
+        otherDeviceProcess?.close(),
+      ]);
+      await rm(profileRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('PC-AUTH-032 @critical — persistent-storage quota refusal is visible and accidental exit remains blocked', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function quotaGuard(key: string, value: string) {
+        if (String(key).startsWith('auraboot:authoring-recovery:v2:')) {
+          throw new DOMException('Quota exceeded by PC-AUTH-032', 'QuotaExceededError');
+        }
+        return original.call(this, key, value);
+      };
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('nav')).toBeVisible();
+    await openPersistentProfileRuntime(page);
+    const session = await enterAuthoringFromCurrentRuntime(page);
+    await stageDensityEdit(page, session);
+
+    await expect(page.getByTestId('authoring-local-recovery-storage-failed')).toContainText(
+      '浏览器无法建立本地恢复副本',
+    );
+    expect(await recoveryKeys(page)).toEqual([]);
+    page.once('dialog', async (dialog) => {
+      expect(dialog.message()).toContain('退出会丢失当前未保存变更');
+      await dialog.dismiss();
+    });
+    await page.getByRole('button', { name: '退出' }).click();
+    await expect(page.getByTestId('contextual-authoring-surface')).toBeVisible();
+    await expect(page.getByText('1 项未保存')).toBeVisible();
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-032-quota-refusal-exit-blocked.png'),
+      fullPage: true,
+    });
+  });
+
+  test('PC-AUTH-033 @critical — tenant recovery policy can prohibit all browser persistence', async ({
+    page,
+  }) => {
+    const preferencePath = '/api/tenant-preferences/authoring.recovery.policy';
+    const original = await expectApiData<{ value: unknown }>(
+      await page.request.get(preferencePath),
+      'read original recovery policy',
+    );
+    try {
+      await expectApiData<unknown>(
+        await page.request.put(preferencePath, { data: { value: 'DISABLED' } }),
+        'disable tenant browser recovery',
+      );
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(page.locator('nav')).toBeVisible();
+      await openPersistentProfileRuntime(page);
+      const session = await enterAuthoringFromCurrentRuntime(page);
+      await stageDensityEdit(page, session);
+
+      await expect(page.getByTestId('authoring-local-recovery-storage-failed')).toContainText(
+        '企业安全策略已禁止浏览器保存恢复副本',
+      );
+      expect(await recoveryKeys(page)).toEqual([]);
+      page.once('dialog', async (dialog) => {
+        expect(dialog.message()).toContain('退出会丢失当前未保存变更');
+        await dialog.dismiss();
+      });
+      await page.getByRole('button', { name: '退出' }).click();
+      await expect(page.getByTestId('contextual-authoring-surface')).toBeVisible();
+      await page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-033-tenant-policy-disabled.png'),
+        fullPage: true,
+      });
+    } finally {
+      await expectApiData<unknown>(
+        await page.request.put(preferencePath, { data: { value: original.value ?? null } }),
+        'restore original recovery policy',
+      );
+    }
+  });
+
+  test('PC-AUTH-034 @critical — discarding inline recovery deletes only the local session candidate and never writes it', async ({
+    page,
+  }) => {
+    const session = await enterAuthoringFromRuntime(page);
+    const itemsBefore = await loadChangeItems(page, session.sessionPid);
+    await stageDensityEdit(page, session);
+    await expect(page.getByText('1 项未保存')).toBeVisible();
+    expect(await recoveryKeys(page)).toHaveLength(1);
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('authoring-local-recovery')).toBeVisible();
+    page.once('dialog', async (dialog) => {
+      expect(dialog.message()).toContain('放弃此页面中断前保留的本地未保存变更');
+      await dialog.accept();
+    });
+    await page.getByTestId('authoring-local-recovery-discard').click();
+
+    await expect(page.getByTestId('authoring-local-recovery')).toHaveCount(0);
+    await expect(page.getByTestId('contextual-authoring-enter')).toBeVisible();
+    expect(await recoveryKeys(page)).toEqual([]);
+    expect(await loadChangeItems(page, session.sessionPid)).toEqual(itemsBefore);
+  });
+
+  test('PC-AUTH-035 @critical — discarding Studio recovery removes the complete local Mine and never replays a batch', async ({
+    page,
+  }) => {
+    const session = await enterAuthoringFromRuntime(page);
+    const itemsBefore = await loadChangeItems(page, session.sessionPid);
+    await continueToStudio(page);
+    const table = findBlock(session.snapshot, (candidate) => blockType(candidate) === 'table');
+    expect(table?.id, 'table block for Studio discard').toBeTruthy();
+    await page.getByTestId(`outline-item-${String(table!.id)}`).click();
+    const title = page.getByTestId('inspector-field-title');
+    await expect(title).toBeVisible();
+    await title.fill(`Discarded Studio Mine ${Date.now()}`);
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');
+    await expect.poll(async () => (await recoveryKeys(page)).length).toBe(1);
+
+    const sessionPath = `/api/authoring/sessions/${session.sessionPid}`;
+    await page.route(`**${sessionPath}`, async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.abort('failed');
+        return;
+      }
+      await route.continue();
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByText('权威草稿暂不可读，本地 Studio 文档仍保留')).toBeVisible();
+    page.once('dialog', async (dialog) => {
+      expect(dialog.message()).toContain('放弃页面中断前保留的本地 Studio 文档');
+      await dialog.accept();
+    });
+    await page.getByTestId('studio-local-recovery-discard').click();
+
+    await expect(page.getByTestId('studio-local-recovery-discard')).toHaveCount(0);
+    expect(await recoveryKeys(page)).toEqual([]);
+    expect(await loadChangeItems(page, session.sessionPid)).toEqual(itemsBefore);
+
+    await page.unroute(`**${sessionPath}`);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('已保存');
+    expect(await loadChangeItems(page, session.sessionPid)).toEqual(itemsBefore);
+  });
 });
+
+async function openPersistentContext(
+  browserType: BrowserType,
+  userDataDir: string,
+): Promise<BrowserContext> {
+  return browserType.launchPersistentContext(userDataDir, {
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5173',
+    headless: true,
+    viewport: { width: 1440, height: 900 },
+    args: ['--no-proxy-server'],
+  });
+}
+
+async function openPersistentProfileRuntime(
+  page: Page,
+  expected: 'clean' | 'recovery' = 'clean',
+): Promise<void> {
+  // Persistent profiles intentionally begin without the normal test runner's in-memory menu
+  // cache. The deep link still traverses the real authenticated router, page permission and DSL
+  // runtime; menu navigation is already covered by the surrounding golden suite.
+  await page.goto(RUNTIME_ROUTE, { waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(new RegExp(`${RUNTIME_ROUTE}$`));
+  await expect(
+    page.getByTestId(
+      expected === 'recovery' ? 'authoring-local-recovery' : 'contextual-authoring-enter',
+    ),
+  ).toBeVisible({ timeout: 15_000 });
+}
+
+async function enterAuthoringFromCurrentRuntime(page: Page): Promise<AuthoringSession> {
+  const sessionResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      apiPath(response.url()) === '/api/authoring/sessions',
+  );
+  await page.getByRole('main').first().getByRole('button', { name: '配置此页' }).click();
+  const session = await expectApiData<AuthoringSession>(
+    await sessionResponse,
+    'enter persistent-profile contextual authoring',
+  );
+  await expect(page.getByTestId('contextual-authoring-surface')).toBeVisible();
+  return session;
+}
+
+async function recoveryKeys(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).filter(
+      (key): key is string => Boolean(key?.startsWith('auraboot:authoring-recovery:v2:')),
+    ),
+  );
+}
 
 async function enterAuthoringFromRuntime(page: Page): Promise<AuthoringSession> {
   const link = page.locator('nav').locator(`a[href="${RUNTIME_ROUTE}"]`).first();
@@ -988,9 +1277,7 @@ async function enterAuthoringFromRuntime(page: Page): Promise<AuthoringSession> 
     await page.goto(RUNTIME_ROUTE, { waitUntil: 'domcontentloaded' });
   }
   await expect(page).toHaveURL(new RegExp(`${RUNTIME_ROUTE}$`));
-  await expect(page.getByRole('main').first().getByText('EXC-V4-REAL-001')).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(page.getByTestId('contextual-authoring-enter')).toBeVisible({ timeout: 15_000 });
 
   const sessionResponse = page.waitForResponse(
     (response) =>

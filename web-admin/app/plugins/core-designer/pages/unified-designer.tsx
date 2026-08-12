@@ -58,11 +58,17 @@ import { AuthoringReleaseHistoryPanel } from '~/framework/meta/authoring/Authori
 import { AuthoringOwnershipNotice } from '~/framework/meta/authoring/AuthoringOwnershipNotice';
 import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
 import {
+  clearAuthoringRecoveriesForActor,
   clearInlineAuthoringRecovery,
   clearStudioAuthoringRecovery,
   readStudioAuthoringRecovery,
   storeStudioAuthoringRecovery,
+  type AuthoringRecoveryPolicy,
 } from '~/framework/meta/authoring/authoringLocalRecovery';
+import {
+  describeAuthoringRecoveryFailure,
+  loadAuthoringRecoveryPolicy,
+} from '~/framework/meta/authoring/authoringRecoveryPolicy';
 import { AuthoringConflictResolutionPanel } from '../components/unified-designer/AuthoringConflictResolutionPanel';
 import type {
   AuthoringSession,
@@ -142,6 +148,8 @@ export default function UnifiedDesignerPage() {
   const [studioRecoveredBaseDocument, setStudioRecoveredBaseDocument] =
     useState<PageSchemaV3 | null>(null);
   const [studioLocalRecoveryAvailable, setStudioLocalRecoveryAvailable] = useState(false);
+  const [studioRecoveryPolicy, setStudioRecoveryPolicy] =
+    useState<AuthoringRecoveryPolicy | null>(null);
   const [contextReloadGeneration, setContextReloadGeneration] = useState(0);
   const [studioConflict, setStudioConflict] = useState<StudioConflictState | null>(null);
   const [conflictPending, setConflictPending] = useState(false);
@@ -239,6 +247,7 @@ export default function UnifiedDesignerPage() {
       setStudioPermissionRevoked(false);
       setStudioRecoveredBaseDocument(null);
       setStudioLocalRecoveryAvailable(false);
+      setStudioRecoveryPolicy(null);
       setStudioConflict(null);
       setConflictError(null);
       setSubmissionError(null);
@@ -259,13 +268,7 @@ export default function UnifiedDesignerPage() {
     setLeaseTakeoverFeedback(null);
     setStudioSaveReconciliationFeedback(null);
     setStudioRecoveredBaseDocument(null);
-    setStudioLocalRecoveryAvailable(
-      Boolean(
-        recoveryActorId &&
-          resumeSessionPid &&
-          readStudioAuthoringRecovery(recoveryActorId, resumeSessionPid),
-      ),
-    );
+    setStudioLocalRecoveryAvailable(false);
     setStudioConflict(null);
     setConflictError(null);
     setSubmissionError(null);
@@ -328,9 +331,18 @@ export default function UnifiedDesignerPage() {
                 reviewWorkspace: false,
               }));
 
-    void resolveContext
-      .then(({ handoff: resolvedHandoff, session, capabilities, reviewWorkspace }) => {
+    const recoveryPolicyRequest = loadAuthoringRecoveryPolicy();
+    void Promise.all([resolveContext, recoveryPolicyRequest])
+      .then(
+        ([
+          { handoff: resolvedHandoff, session, capabilities, reviewWorkspace },
+          resolvedRecoveryPolicy,
+        ]) => {
         if (!cancelled) {
+          setStudioRecoveryPolicy(resolvedRecoveryPolicy);
+          if (resolvedRecoveryPolicy === 'DISABLED' && recoveryActorId) {
+            clearAuthoringRecoveriesForActor(recoveryActorId);
+          }
           let isolatedDocument = authoringSnapshotToPageSchemaV3(session.snapshot);
           let recoveredSavedDocument: PageSchemaV3 | null = null;
           if (conflictContextId) {
@@ -361,15 +373,18 @@ export default function UnifiedDesignerPage() {
               merge,
             });
             if (recoveryActorId) {
-              const migrated = storeStudioAuthoringRecovery({
-                actorId: recoveryActorId,
-                sessionPid: session.sessionPid,
-                pagePid: session.pagePid,
-                baseRevision: transfer.baseRevision,
-                state: 'DIRTY',
-                baseSnapshot: transfer.baseSnapshot,
-                mineDocument,
-              });
+              const migrated = storeStudioAuthoringRecovery(
+                {
+                  actorId: recoveryActorId,
+                  sessionPid: session.sessionPid,
+                  pagePid: session.pagePid,
+                  baseRevision: transfer.baseRevision,
+                  state: 'DIRTY',
+                  baseSnapshot: transfer.baseSnapshot,
+                  mineDocument,
+                },
+                resolvedRecoveryPolicy,
+              );
               setStudioLocalRecoveryAvailable(migrated);
               if (migrated) {
                 clearInlineAuthoringRecovery(
@@ -380,14 +395,17 @@ export default function UnifiedDesignerPage() {
               } else {
                 setStudioSaveReconciliationFeedback({
                   tone: 'warning',
-                  message:
-                    '浏览器无法把冲突草稿迁入 Studio 恢复副本；请勿刷新页面，并尽快完成裁决。',
+                  message: describeAuthoringRecoveryFailure(resolvedRecoveryPolicy),
                 });
               }
             }
             replaceAuthoringContextUrl('conflictContext', session.sessionPid);
           } else if (!reviewWorkspace && recoveryActorId) {
-            const recovery = readStudioAuthoringRecovery(recoveryActorId, session.sessionPid);
+            const recovery = readStudioAuthoringRecovery(
+              recoveryActorId,
+              session.sessionPid,
+              resolvedRecoveryPolicy,
+            );
             if (recovery) {
               if (recovery.pagePid !== session.pagePid) {
                 clearStudioAuthoringRecovery(recoveryActorId, session.sessionPid);
@@ -455,16 +473,23 @@ export default function UnifiedDesignerPage() {
           setPublished(false);
           setStudioPermissionRevoked(false);
         }
-      })
-      .catch((consumeError) => {
+      },
+      )
+      .catch(async (consumeError) => {
         if (!cancelled) {
-          setStudioLocalRecoveryAvailable(
-            Boolean(
-              recoveryActorId &&
-                resumeSessionPid &&
-                readStudioAuthoringRecovery(recoveryActorId, resumeSessionPid),
-            ),
-          );
+          const recoverable = await recoveryPolicyRequest
+            .then((policy) => {
+              setStudioRecoveryPolicy(policy);
+              return Boolean(
+                policy !== 'DISABLED' &&
+                  recoveryActorId &&
+                  resumeSessionPid &&
+                  readStudioAuthoringRecovery(recoveryActorId, resumeSessionPid, policy),
+              );
+            })
+            .catch(() => false);
+          if (cancelled) return;
+          setStudioLocalRecoveryAvailable(recoverable);
           setHandoffError(
             consumeError instanceof Error
               ? consumeError.message
@@ -678,21 +703,24 @@ export default function UnifiedDesignerPage() {
     baseSession: AuthoringSession,
     state: 'DIRTY' | 'UNKNOWN_OUTCOME',
   ) => {
-    if (!recoveryActorId) return;
-    const stored = storeStudioAuthoringRecovery({
-      actorId: recoveryActorId,
-      sessionPid: baseSession.sessionPid,
-      pagePid: baseSession.pagePid,
-      baseRevision: baseSession.revision,
-      state,
-      baseSnapshot: baseSession.snapshot,
-      mineDocument: nextDocument,
-    });
+    if (!recoveryActorId || !studioRecoveryPolicy) return;
+    const stored = storeStudioAuthoringRecovery(
+      {
+        actorId: recoveryActorId,
+        sessionPid: baseSession.sessionPid,
+        pagePid: baseSession.pagePid,
+        baseRevision: baseSession.revision,
+        state,
+        baseSnapshot: baseSession.snapshot,
+        mineDocument: nextDocument,
+      },
+      studioRecoveryPolicy,
+    );
     setStudioLocalRecoveryAvailable(stored);
     if (!stored) {
       setStudioSaveReconciliationFeedback({
         tone: 'warning',
-        message: '浏览器无法建立本地恢复副本；请勿刷新页面，并尽快重试保存。',
+        message: describeAuthoringRecoveryFailure(studioRecoveryPolicy),
       });
     }
   };

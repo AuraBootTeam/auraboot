@@ -54,10 +54,18 @@ import { AuthoringValidationNotice } from './AuthoringValidationNotice';
 import { AuthoringWriterLeaseNotice } from './AuthoringWriterLeaseNotice';
 import { storeAuthoringConflictTransfer } from './authoringConflictTransfer';
 import {
+  clearAuthoringRecoveriesForActor,
   clearInlineAuthoringRecovery,
+  listInlineAuthoringRecoveries,
   readInlineAuthoringRecovery,
   storeInlineAuthoringRecovery,
+  type AuthoringRecoveryPolicy,
+  type InlineAuthoringRecovery,
 } from './authoringLocalRecovery';
+import {
+  describeAuthoringRecoveryFailure,
+  loadAuthoringRecoveryPolicy,
+} from './authoringRecoveryPolicy';
 import type {
   AuthoringMode,
   AuthoringNode,
@@ -135,8 +143,13 @@ export function ContextualAuthoringSurface({
   } | null>(null);
   const [savePermissionRevoked, setSavePermissionRevoked] = useState(false);
   const [localRecoveryAvailable, setLocalRecoveryAvailable] = useState(false);
+  const [localRecoveryCandidate, setLocalRecoveryCandidate] =
+    useState<InlineAuthoringRecovery | null>(null);
+  const [localRecoveryCandidateCount, setLocalRecoveryCandidateCount] = useState(0);
   const [localRecoveryPending, setLocalRecoveryPending] = useState(false);
   const [localRecoveryStorageFailed, setLocalRecoveryStorageFailed] = useState(false);
+  const [recoveryPolicy, setRecoveryPolicy] = useState<AuthoringRecoveryPolicy | null>(null);
+  const [recoveryPolicyError, setRecoveryPolicyError] = useState<string | null>(null);
   const [governancePending, setGovernancePending] = useState<AuthoringGovernanceAction | null>(
     null,
   );
@@ -173,37 +186,90 @@ export function ContextualAuthoringSurface({
   const activeWriterLeaseStatus = session?.writerLease?.status;
   const activeWriterLeaseUntil = session?.writerLease?.leasedUntil;
 
+  const applyRecoveryPolicy = useCallback(
+    (policy: AuthoringRecoveryPolicy) => {
+      setRecoveryPolicy(policy);
+      setRecoveryPolicyError(null);
+      if (policy === 'DISABLED' && recoveryActorId) {
+        clearAuthoringRecoveriesForActor(recoveryActorId);
+        setLocalRecoveryAvailable(false);
+        setLocalRecoveryCandidate(null);
+        setLocalRecoveryCandidateCount(0);
+      }
+      return policy;
+    },
+    [recoveryActorId],
+  );
+
+  const ensureRecoveryPolicy = useCallback(async () => {
+    if (recoveryPolicy) return recoveryPolicy;
+    try {
+      return applyRecoveryPolicy(await loadAuthoringRecoveryPolicy());
+    } catch (policyError) {
+      const message = policyError instanceof Error ? policyError.message : '无法读取企业恢复策略';
+      setRecoveryPolicyError(message);
+      throw new Error(message);
+    }
+  }, [applyRecoveryPolicy, recoveryPolicy]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadAuthoringRecoveryPolicy()
+      .then((policy) => {
+        if (!cancelled) applyRecoveryPolicy(policy);
+      })
+      .catch((policyError) => {
+        if (!cancelled) {
+          setRecoveryPolicy(null);
+          setRecoveryPolicyError(
+            policyError instanceof Error ? policyError.message : '无法读取企业恢复策略',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [applyRecoveryPolicy]);
+
   const persistInlineRecovery = useCallback(
     (
       recoverySession: AuthoringSession,
       edits: Map<string, PendingAuthoringEdit>,
       state: 'DIRTY' | 'UNKNOWN_OUTCOME',
     ) => {
-      if (!recoveryActorId) return;
+      if (!recoveryActorId || !recoveryPolicy) return;
       if (edits.size === 0) {
         clearInlineAuthoringRecovery(recoveryActorId, schema.id, recoverySession.sessionPid);
         setLocalRecoveryAvailable(false);
+        setLocalRecoveryCandidate(null);
+        setLocalRecoveryCandidateCount(0);
         setLocalRecoveryStorageFailed(false);
         return;
       }
-      const stored = storeInlineAuthoringRecovery({
-        actorId: recoveryActorId,
-        sessionPid: recoverySession.sessionPid,
-        pagePid: schema.id,
-        baseRevision: Math.min(...[...edits.values()].map((edit) => edit.baseRevision)),
-        state,
-        edits: [...edits.values()],
-      });
+      const stored = storeInlineAuthoringRecovery(
+        {
+          actorId: recoveryActorId,
+          sessionPid: recoverySession.sessionPid,
+          pagePid: schema.id,
+          baseRevision: Math.min(...[...edits.values()].map((edit) => edit.baseRevision)),
+          state,
+          edits: [...edits.values()],
+        },
+        recoveryPolicy,
+      );
       setLocalRecoveryAvailable(stored);
       setLocalRecoveryStorageFailed(!stored);
     },
-    [recoveryActorId, schema.id],
+    [recoveryActorId, recoveryPolicy, schema.id],
   );
 
   useEffect(() => {
-    if (!recoveryActorId || session) return;
-    setLocalRecoveryAvailable(Boolean(readInlineAuthoringRecovery(recoveryActorId, schema.id)));
-  }, [recoveryActorId, schema.id, session]);
+    if (!recoveryActorId || !recoveryPolicy || session) return;
+    const candidates = listInlineAuthoringRecoveries(recoveryActorId, schema.id, recoveryPolicy);
+    setLocalRecoveryCandidate(candidates[0] ?? null);
+    setLocalRecoveryCandidateCount(candidates.length);
+    setLocalRecoveryAvailable(candidates.length > 0);
+  }, [recoveryActorId, recoveryPolicy, schema.id, session]);
 
   useEffect(() => {
     if (!canConfigure) {
@@ -307,10 +373,14 @@ export function ContextualAuthoringSurface({
   }, [canConfigure, schema]);
 
   const restoreLocalRecovery = useCallback(async () => {
-    if (!canConfigure || !recoveryActorId || localRecoveryPending) return;
-    const recovery = readInlineAuthoringRecovery(recoveryActorId, schema.id);
+    if (!canConfigure || !recoveryActorId || !recoveryPolicy || localRecoveryPending) return;
+    const recovery =
+      localRecoveryCandidate ??
+      readInlineAuthoringRecovery(recoveryActorId, schema.id, undefined, recoveryPolicy);
     if (!recovery) {
       setLocalRecoveryAvailable(false);
+      setLocalRecoveryCandidate(null);
+      setLocalRecoveryCandidateCount(0);
       return;
     }
     setLocalRecoveryPending(true);
@@ -395,18 +465,29 @@ export function ContextualAuthoringSurface({
       setLocalRecoveryPending(false);
       setOpening(false);
     }
-  }, [canConfigure, localRecoveryPending, persistInlineRecovery, recoveryActorId, schema]);
+  }, [
+    canConfigure,
+    localRecoveryCandidate,
+    localRecoveryPending,
+    persistInlineRecovery,
+    recoveryActorId,
+    recoveryPolicy,
+    schema,
+  ]);
 
   const discardLocalRecovery = useCallback(() => {
-    if (!recoveryActorId) return;
+    if (!recoveryActorId || !recoveryPolicy) return;
     if (!window.confirm('确定放弃此页面中断前保留的本地未保存变更吗？此操作无法撤销。')) {
       return;
     }
-    clearInlineAuthoringRecovery(recoveryActorId, schema.id);
-    setLocalRecoveryAvailable(false);
+    clearInlineAuthoringRecovery(recoveryActorId, schema.id, localRecoveryCandidate?.sessionPid);
+    const remaining = listInlineAuthoringRecoveries(recoveryActorId, schema.id, recoveryPolicy);
+    setLocalRecoveryAvailable(remaining.length > 0);
+    setLocalRecoveryCandidate(remaining[0] ?? null);
+    setLocalRecoveryCandidateCount(remaining.length);
     setLocalRecoveryStorageFailed(false);
     setError(null);
-  }, [recoveryActorId, schema.id]);
+  }, [localRecoveryCandidate?.sessionPid, recoveryActorId, recoveryPolicy, schema.id]);
 
   const enter = useCallback(async () => {
     if (!canConfigure || opening) return;
@@ -416,6 +497,7 @@ export function ContextualAuthoringSurface({
     setSaveReconciliationFeedback(null);
     entryScrollRef.current = { x: window.scrollX, y: window.scrollY };
     try {
+      await ensureRecoveryPolicy();
       const interactionContext = captureInteractionContext(recordPid, schema.id);
       const [opened, registry] = await Promise.all([
         openAuthoringSession(schema.id, interactionContext),
@@ -435,7 +517,7 @@ export function ContextualAuthoringSurface({
     } finally {
       setOpening(false);
     }
-  }, [canConfigure, opening, recordPid, schema]);
+  }, [canConfigure, ensureRecoveryPolicy, opening, recordPid, schema]);
 
   const exit = useCallback(() => {
     if (
@@ -1152,7 +1234,13 @@ export function ContextualAuthoringSurface({
             data-testid="contextual-authoring-enter"
           >
             <Settings2 className="h-4 w-4" />
-            {opening ? '正在进入配置模式…' : '配置此页'}
+            {opening
+              ? '正在进入配置模式…'
+              : recoveryPolicyError
+                ? '重试安全策略并配置'
+                : recoveryPolicy
+                  ? '配置此页'
+                  : '正在读取恢复策略…'}
           </button>
         ) : null}
         {localRecoveryAvailable ? (
@@ -1168,6 +1256,12 @@ export function ContextualAuthoringSurface({
                 <p className="mt-1 leading-5">
                   先读取权威草稿并对账，再决定继续保存；恢复过程不会自动重放写请求。
                 </p>
+                {localRecoveryCandidateCount > 1 ? (
+                  <p className="mt-1 leading-5">
+                    本设备发现 {localRecoveryCandidateCount}{' '}
+                    个独立会话候选；当前只处理最新一项，绝不自动合并或覆盖其他会话。
+                  </p>
+                ) : null}
                 {error ? (
                   <p
                     className="mt-2 font-medium text-red-700"
@@ -1206,6 +1300,14 @@ export function ContextualAuthoringSurface({
             className="border-status-red bg-status-red-bg fixed right-6 bottom-20 z-30 max-w-sm rounded-lg border px-4 py-3 text-sm text-red-800 shadow-lg"
           >
             {error}
+          </div>
+        ) : null}
+        {recoveryPolicyError && !error && !localRecoveryAvailable ? (
+          <div
+            role="alert"
+            className="border-status-red bg-status-red-bg fixed right-6 bottom-20 z-30 max-w-sm rounded-lg border px-4 py-3 text-sm text-red-800 shadow-lg"
+          >
+            {recoveryPolicyError}；在策略可确认前不会保存任何恢复副本，也不会进入配置模式。
           </div>
         ) : null}
       </div>
@@ -1254,7 +1356,7 @@ export function ContextualAuthoringSurface({
           className="border-status-red bg-status-red-bg mx-3 mt-3 rounded-md border px-3 py-2 text-sm text-red-800"
           data-testid="authoring-local-recovery-storage-failed"
         >
-          浏览器无法建立本地恢复副本；请勿刷新或关闭页面，并尽快重试保存。
+          {describeAuthoringRecoveryFailure(recoveryPolicy ?? 'DISABLED')}
         </div>
       ) : null}
       {!authoringWriteAllowed && !permissionSaveReconciliationActive ? (

@@ -111,11 +111,19 @@ vi.mock('~/framework/meta/authoring/authoringConflictTransfer', () => ({
   consumeAuthoringConflictTransfer: vi.fn(),
 }));
 
+vi.mock('~/framework/meta/authoring/authoringRecoveryPolicy', async () => {
+  const actual = await vi.importActual<
+    typeof import('~/framework/meta/authoring/authoringRecoveryPolicy')
+  >('~/framework/meta/authoring/authoringRecoveryPolicy');
+  return { ...actual, loadAuthoringRecoveryPolicy: vi.fn().mockResolvedValue('PERSISTENT') };
+});
+
 describe('UnifiedDesignerPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(document, 'hasFocus').mockReturnValue(true);
     window.sessionStorage.clear();
+    window.localStorage.clear();
     vi.mocked(loadModelFieldsByModelCodes).mockResolvedValue({});
     vi.mocked(savePageSchemaV3).mockResolvedValue({
       ok: true,

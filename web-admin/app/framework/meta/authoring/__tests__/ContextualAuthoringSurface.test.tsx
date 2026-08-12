@@ -20,7 +20,11 @@ import {
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 import type { AuthoringSession } from '../types';
 import { storeAuthoringConflictTransfer } from '../authoringConflictTransfer';
-import { readInlineAuthoringRecovery } from '../authoringLocalRecovery';
+import {
+  readInlineAuthoringRecovery,
+  storeInlineAuthoringRecovery,
+} from '../authoringLocalRecovery';
+import { loadAuthoringRecoveryPolicy } from '../authoringRecoveryPolicy';
 
 const permissionMock = vi.hoisted(() => ({
   canRead: true,
@@ -61,6 +65,13 @@ vi.mock('../authoringConflictTransfer', () => ({
   storeAuthoringConflictTransfer: vi.fn(() => 'a'.repeat(32)),
 }));
 
+vi.mock('../authoringRecoveryPolicy', async () => {
+  const actual = await vi.importActual<typeof import('../authoringRecoveryPolicy')>(
+    '../authoringRecoveryPolicy',
+  );
+  return { ...actual, loadAuthoringRecoveryPolicy: vi.fn().mockResolvedValue('PERSISTENT') };
+});
+
 const schema: UnifiedSchema = {
   kind: 'list',
   version: '1.0.0',
@@ -83,8 +94,10 @@ describe('ContextualAuthoringSurface', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
+    vi.mocked(loadAuthoringRecoveryPolicy).mockResolvedValue('PERSISTENT');
     vi.spyOn(document, 'hasFocus').mockReturnValue(true);
     window.sessionStorage.clear();
+    window.localStorage.clear();
     permissionMock.canRead = true;
     permissionMock.canManage = true;
     permissionMock.canAdmin = true;
@@ -540,8 +553,25 @@ describe('ContextualAuthoringSurface', () => {
     expect(readInlineAuthoringRecovery('1', 'page-1')).toBeNull();
   });
 
+  it('discards only the selected recovery session and exposes the next independent candidate', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    storeRecoveryCandidate('older-session', '旧会话标题');
+    now.mockReturnValue(2_000);
+    storeRecoveryCandidate('newer-session', '新会话标题');
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderSurface(vi.fn(), vi.fn());
+
+    expect(await screen.findByText(/本设备发现 2 个独立会话候选/)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('authoring-local-recovery-discard'));
+
+    expect(screen.getByTestId('authoring-local-recovery')).toBeInTheDocument();
+    expect(screen.queryByText(/个独立会话候选/)).not.toBeInTheDocument();
+    expect(readInlineAuthoringRecovery('1', 'page-1')?.sessionPid).toBe('older-session');
+  });
+
   it('warns and blocks accidental exit when browser recovery storage is unavailable', async () => {
-    vi.spyOn(window.sessionStorage, 'setItem').mockImplementation(() => {
+    vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
       throw new DOMException('Quota exceeded', 'QuotaExceededError');
     });
     const confirmExit = vi.spyOn(window, 'confirm').mockReturnValue(false);
@@ -561,6 +591,40 @@ describe('ContextualAuthoringSurface', () => {
     );
     expect(screen.getByTestId('contextual-authoring-surface')).toBeInTheDocument();
     expect(screen.getByText('1 项未保存')).toBeInTheDocument();
+  });
+
+  it('honors a disabled tenant recovery policy and warns before losing unsaved changes', async () => {
+    vi.mocked(loadAuthoringRecoveryPolicy).mockResolvedValue('DISABLED');
+    const confirmExit = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(await screen.findByTestId('contextual-authoring-enter'));
+    await screen.findByTestId('contextual-authoring-surface');
+    fireEvent.click(screen.getByTestId('runtime-write'));
+    fireEvent.change(screen.getByLabelText(/标题/), { target: { value: '企业禁存的订单' } });
+
+    expect(screen.getByTestId('authoring-local-recovery-storage-failed')).toHaveTextContent(
+      '企业安全策略已禁止浏览器保存恢复副本',
+    );
+    expect(window.localStorage.length).toBe(0);
+
+    fireEvent.click(screen.getByRole('button', { name: '退出' }));
+    expect(confirmExit).toHaveBeenCalled();
+    expect(screen.getByTestId('contextual-authoring-surface')).toBeInTheDocument();
+  });
+
+  it('fails closed before entry when the tenant recovery policy is unreadable', async () => {
+    vi.mocked(loadAuthoringRecoveryPolicy).mockRejectedValue(new Error('无法读取企业恢复策略'));
+
+    renderSurface(vi.fn(), vi.fn());
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '在策略可确认前不会保存任何恢复副本，也不会进入配置模式',
+    );
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+
+    await waitFor(() => expect(loadAuthoringRecoveryPolicy).toHaveBeenCalledTimes(2));
+    expect(openAuthoringSession).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('contextual-authoring-surface')).not.toBeInTheDocument();
   });
 
   it('fails closed with the exact dirty edit when permission changes during save reconciliation', async () => {
@@ -1260,4 +1324,36 @@ function createAuthoringSession(overrides: Partial<AuthoringSession> = {}): Auth
     expiresAt: '2026-08-09T12:00:00Z',
     ...overrides,
   };
+}
+
+function storeRecoveryCandidate(sessionPid: string, title: string): void {
+  storeInlineAuthoringRecovery({
+    actorId: '1',
+    sessionPid,
+    pagePid: 'page-1',
+    baseRevision: 1,
+    state: 'DIRTY',
+    edits: [
+      {
+        key: 'table-1:/title',
+        baseRevision: 1,
+        blockId: 'table-1',
+        blockLabel: '订单表格',
+        manifestChecksum: 'registry-1',
+        property: {
+          propertyPath: '/title',
+          allowedOperations: ['REPLACE'],
+          route: 'INLINE',
+          risk: 'L1',
+          effectTags: ['PRESENTATION'],
+          reversibility: 'REVERSIBLE',
+          protectedSemantic: false,
+          rolePreviewRequired: false,
+        },
+        operation: 'REPLACE',
+        previousValue: '订单表格',
+        value: title,
+      },
+    ],
+  });
 }
