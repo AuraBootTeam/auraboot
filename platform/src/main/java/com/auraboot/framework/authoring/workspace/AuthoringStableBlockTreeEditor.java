@@ -1,5 +1,6 @@
 package com.auraboot.framework.authoring.workspace;
 
+import com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -177,6 +178,58 @@ public class AuthoringStableBlockTreeEditor {
                 blockId, blockType, targetParentBlockId, targetParentType,
                 beforeBlockId, descendantCount(moved));
         return new StructureResult(snapshot, blockType, previous, saved);
+    }
+
+    /**
+     * Switches the server-owned concrete page kind and its single stable root atomically.
+     * Descendants keep their ids; an incompatible descendant fails closed instead of being
+     * silently deleted or coerced.
+     */
+    public StructureResult switchPageKind(JsonNode sourceSnapshot, String targetKind) {
+        ObjectNode snapshot = validSnapshot(sourceSnapshot);
+        requireIdentifier(targetKind, "authoring.page-kind.target-required");
+        if (!structurePolicy.allowsPageKind(targetKind)) {
+            throw invalid("authoring.page-kind.target-invalid");
+        }
+        String previousKind = snapshot.path("kind").asText("");
+        if (!structurePolicy.allowsPageKind(previousKind)) {
+            throw invalid("authoring.page-kind.source-invalid");
+        }
+        if (previousKind.equals(targetKind)) {
+            throw new ResponseStatusException(CONFLICT, "authoring.page-kind.no-op");
+        }
+        ArrayNode roots = ensureBlocks(snapshot);
+        if (roots.size() != 1 || !(roots.get(0) instanceof ObjectNode root)
+                || !previousKind.equals(root.path("blockType").asText())) {
+            throw invalid("authoring.page-kind.root-invalid");
+        }
+        requireKindCompatible(root.path("blocks"), targetKind);
+        snapshot.put("kind", targetKind);
+        root.put("blockType", targetKind);
+        return new StructureResult(
+                snapshot,
+                CoreAuthoringCapabilityRegistry.PAGE_MANIFEST_BLOCK_TYPE,
+                JsonNodeFactory.instance.textNode(previousKind),
+                JsonNodeFactory.instance.textNode(targetKind));
+    }
+
+    private void requireKindCompatible(JsonNode children, String targetKind) {
+        if (children == null || children.isNull() || children.isMissingNode()) {
+            return;
+        }
+        if (!children.isArray()) {
+            throw invalid("authoring.page-kind.children-invalid");
+        }
+        for (JsonNode child : children) {
+            if (!(child instanceof ObjectNode block)) {
+                throw invalid("authoring.page-kind.child-invalid");
+            }
+            String blockType = block.path("blockType").asText("");
+            if (!structurePolicy.allowsKindDescendant(targetKind, blockType)) {
+                throw invalid("authoring.page-kind.incompatible-block");
+            }
+            requireKindCompatible(block.path("blocks"), targetKind);
+        }
     }
 
     private ObjectNode validSnapshot(JsonNode sourceSnapshot) {

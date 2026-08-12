@@ -23,6 +23,8 @@ import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityReg
 import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.CREATE_BLOCK_PATH;
 import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.RELOCATE_BLOCK_PATH;
 import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.REMOVE_BLOCK_PATH;
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.PAGE_KIND_PATH;
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.PAGE_MANIFEST_BLOCK_TYPE;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY;
 
@@ -172,6 +174,23 @@ public class AuthoringPatchEngine {
                         target.snapshot(), blockId, targetParentBlockId, beforeBlockId),
                 capability,
                 decision);
+    }
+
+    public PreparedPatch prepareStudioPageKindSwitch(
+            JsonNode sourceSnapshot,
+            String targetKind,
+            String manifestChecksum,
+            ResourceScope resourceScope) {
+        CapabilityManifest manifest = registry.find(PAGE_MANIFEST_BLOCK_TYPE).orElse(null);
+        PropertyCapability capability = manifest == null
+                ? null
+                : manifest.properties().get(PAGE_KIND_PATH);
+        BoundaryDecision decision = structureDecision(
+                PAGE_MANIFEST_BLOCK_TYPE, PAGE_KIND_PATH, PatchOperation.REPLACE,
+                capability, manifestChecksum, resourceScope);
+        requireAllowedDecision(decision, true);
+        return preparedStructure(
+                blockTreeEditor.switchPageKind(sourceSnapshot, targetKind), capability, decision);
     }
 
     private BoundaryDecision structureDecision(

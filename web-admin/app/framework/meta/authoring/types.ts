@@ -386,6 +386,10 @@ export interface PatchResult {
 }
 
 export interface AuthoringStudioBatchPlan {
+  kindSwitch: {
+    targetKind: 'list' | 'detail' | 'form' | 'dashboard';
+    manifestChecksum: string;
+  } | null;
   creates: Array<{
     blockId: string;
     blockType: string;

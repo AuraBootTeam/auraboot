@@ -39,7 +39,12 @@ import {
   getDeviceFrameStyle,
   getDevicePreviewPreset,
 } from '../preview/devicePreviewPresets';
-import { getPageTemplate, getPageTemplates } from '../templates/pageTemplateRegistry';
+import {
+  getPageTemplate,
+  getPageTemplates,
+  instantiatePageTemplate,
+} from '../templates/pageTemplateRegistry';
+import { CORE_PAGE_TEMPLATES } from '../templates/corePageTemplates';
 import {
   canSwitchToKind,
   getKindPolicy,
@@ -50,7 +55,7 @@ import {
   createModelFieldBlock,
   type ModelFieldTargetBlockType,
 } from '../registry/createBlockTemplate';
-import { collectBlockIds } from '../utils/blockIds';
+import { collectBlockIds, createUniqueBlockId, toStableBlockId } from '../utils/blockIds';
 import { buildDesignerCollisionCandidates, type DragData } from '../dnd/dndShared';
 import {
   canMoveExistingBlockBeforeTarget,
@@ -109,6 +114,7 @@ const designerCollisionDetection: CollisionDetection = (args) => {
 };
 
 const SYNTHETIC_PREVIEW_OPTION = '__synthetic_fixture__';
+const AUTHORING_COPY_LINEAGE_PATH = '/extension/authoringCopyLineage';
 
 export interface UnifiedDesignerWorkbenchProps {
   initialDocument: PageSchemaV3;
@@ -160,6 +166,7 @@ export interface UnifiedDesignerWorkbenchProps {
   contextualCreatableBlockTypes?: string[];
   contextualRemovableBlockTypes?: string[];
   contextualRelocatableBlockTypes?: string[];
+  contextualPageKindSwitchEnabled?: boolean;
   /** Active governed authoring session; enables target-role structure preview in Preview mode. */
   roleStructurePreviewSessionPid?: string;
   /** Security-admin capability for starting a short-lived, audited, read-only role simulation. */
@@ -189,6 +196,7 @@ export function UnifiedDesignerWorkbench({
   contextualCreatableBlockTypes,
   contextualRemovableBlockTypes,
   contextualRelocatableBlockTypes,
+  contextualPageKindSwitchEnabled = false,
   roleStructurePreviewSessionPid,
   identitySimulationAllowed = false,
   embedded = false,
@@ -479,6 +487,24 @@ export function UnifiedDesignerWorkbench({
     onChange: syncSaveStateForSnapshot,
   });
   const document = documentKernel.document;
+  const availablePageTemplates = useMemo(
+    () =>
+      [...CORE_PAGE_TEMPLATES, ...getPageTemplates()]
+        .filter((template) => {
+          if (template.kinds) return template.kinds.includes(document.kind);
+          const roots = template.build();
+          return roots.length === 1 && roots[0].blockType === document.kind;
+        })
+        .filter((template) => {
+          if (!contextualRestricted) return true;
+          const roots = template.build();
+          return (
+            roots.length === 1 &&
+            templateDescendantsAreGoverned(roots[0].blocks, contextualCreatableTypes)
+          );
+        }),
+    [contextualCreatableTypes, contextualRestricted, document.kind],
+  );
   const updateDocument = documentKernel.update;
   const handleUndo = documentKernel.undo;
   const handleRedo = documentKernel.redo;
@@ -514,7 +540,7 @@ export function UnifiedDesignerWorkbench({
   // to the target kind's root (e.g. detail → form), keeping all children. The
   // whole switch is one undoable step.
   const handleSwitchKind = (targetKind: PageSchemaV3['kind']) => {
-    if (contextualReadOnly || contextualRestricted) return;
+    if (contextualReadOnly || (contextualRestricted && !contextualPageKindSwitchEnabled)) return;
     if (targetKind === document.kind) return;
     if (!canSwitchToKind(document.blocks, targetKind)) return;
     const rootBlockType = getKindPolicy(targetKind).rootBlockType;
@@ -532,15 +558,22 @@ export function UnifiedDesignerWorkbench({
   // D6 — apply a scenario template: replace the page's blocks (and title) with a
   // fresh tree built by the registered template, then clear the selection.
   const applyTemplate = (templateId: string) => {
-    if (contextualReadOnly || contextualRestricted) return;
-    const template = getPageTemplate(templateId);
+    if (contextualReadOnly) return;
+    const template = availablePageTemplates.find((candidate) => candidate.id === templateId)
+      ?? getPageTemplate(templateId);
     if (!template) return;
+    const built = instantiatePageTemplate(template, document.blocks);
+    const governedBlocks = contextualRestricted
+      ? projectTemplateIntoGovernedRoot(document, built, prepareCreatedBlock)
+      : built;
+    if (!governedBlocks) return;
     updateDocument((current) => ({
       ...current,
-      title: template.title ?? current.title,
-      blocks: template.build(),
+      title: contextualRestricted ? current.title : (template.title ?? current.title),
+      blocks: governedBlocks,
     }));
     setSelectedBlockId(null);
+    setMultiSelectedIds(new Set());
   };
 
   const updateSelectedBlock = (path: string, value: unknown) => {
@@ -631,6 +664,38 @@ export function UnifiedDesignerWorkbench({
       next.delete(blockId);
       return next;
     });
+  };
+
+  const canDuplicateBlock = (blockId: string | null) => {
+    if (contextualReadOnly || !blockId) return false;
+    const result = findBlockById(document.blocks, blockId);
+    if (!result || result.path.length <= 1) return false;
+    if (!contextualRestricted) return true;
+    return duplicateSubtreeIsGoverned(
+      result.block,
+      contextualCreatableTypes,
+      contextualEditablePropertyPaths ?? {},
+    );
+  };
+
+  const handleDuplicateBlock = () => {
+    if (!canDuplicateBlock(selectedBlockId) || !selectedBlockId) return;
+    let copiedRootId: string | null = null;
+    updateDocument((current) => {
+      const source = findBlockById(current.blocks, selectedBlockId);
+      if (!source || source.path.length <= 1) return current;
+      const usedIds = collectBlockIds(current.blocks);
+      const copied = prepareCreatedBlock(duplicateBlockSubtree(source.block, usedIds));
+      copiedRootId = copied.id;
+      return {
+        ...current,
+        blocks: insertBlockAfterTarget(current.blocks, source.block.id, copied),
+      };
+    });
+    if (copiedRootId) {
+      setSelectedBlockId(copiedRootId);
+      setMultiSelectedIds(new Set());
+    }
   };
 
 
@@ -1098,7 +1163,7 @@ export function UnifiedDesignerWorkbench({
       onDocumentChange?.(canonicalDocument, false);
     } catch (error) {
       setSaveStatus('error');
-      setSaveError(resolveSaveErrorMessage(error));
+      setSaveError(resolveSaveErrorMessage(error, locale));
     }
   };
 
@@ -1179,21 +1244,39 @@ export function UnifiedDesignerWorkbench({
   // any parse/shape failure the document is left untouched and an inline error
   // is shown via the existing save-error channel.
   const handleImportFile = (file: File) => {
-    if (contextualReadOnly || contextualRestricted) return;
+    if (contextualReadOnly) return;
     setSaveError(null);
     const reader = new FileReader();
     reader.onload = () => {
       const imported = parseImportedDocument(reader.result);
       if (!imported) {
-        setSaveStatus('error');
+        setSaveStatus('import-error');
         setSaveError(resolveDesignerText(DESIGNER_I18N.unified.importInvalid, locale));
         return;
       }
-      updateDocument(() => imported);
+      const nextDocument = contextualRestricted
+        ? normalizeGovernedImport(
+            document,
+            imported,
+            prepareCreatedBlock,
+            contextualCreatableTypes,
+            contextualRemovableTypes,
+            contextualReorderableTypes,
+            contextualRelocatableTypes,
+            contextualPageKindSwitchEnabled,
+          )
+        : imported;
+      if (!nextDocument) {
+        setSaveStatus('import-error');
+        setSaveError(resolveDesignerText(DESIGNER_I18N.unified.importInvalid, locale));
+        return;
+      }
+      updateDocument(() => nextDocument);
       setSelectedBlockId(null);
+      setMultiSelectedIds(new Set());
     };
     reader.onerror = () => {
-      setSaveStatus('error');
+      setSaveStatus('import-error');
       setSaveError(resolveDesignerText(DESIGNER_I18N.unified.importInvalid, locale));
     };
     reader.readAsText(file);
@@ -1307,14 +1390,22 @@ export function UnifiedDesignerWorkbench({
         publishStatus={publishStatus}
         publishError={publishError}
         onModeChange={setMode}
-        onSwitchKind={contextualRestricted ? undefined : handleSwitchKind}
+        onSwitchKind={
+          contextualRestricted && !contextualPageKindSwitchEnabled ? undefined : handleSwitchKind
+        }
         onUndo={handleUndo}
         onRedo={handleRedo}
         onSave={handleSave}
         onPublish={onPublish ? handlePublish : undefined}
         onUnpublish={onUnpublish ? handleUnpublish : undefined}
-        onExport={contextualRestricted ? undefined : handleExport}
-        onImportFile={contextualRestricted ? undefined : handleImportFile}
+        onExport={
+          !contextualReadOnly &&
+          !identitySimulationActive &&
+          effectiveRoleStructurePreview?.exportAllowed !== false
+            ? handleExport
+            : undefined
+        }
+        onImportFile={contextualReadOnly ? undefined : handleImportFile}
         onOpenAiCopilot={() => setAiDialogOpen(true)}
         onOpenVersions={
           pageId && !contextualRestricted ? () => setVersionPanelOpen(true) : undefined
@@ -1834,7 +1925,7 @@ export function UnifiedDesignerWorkbench({
           onDragEnd={handleDragEnd}
           onDragCancel={clearActiveDrag}
         >
-          {!contextualReadOnly && !contextualRestricted && getPageTemplates().length > 0 ? (
+          {!contextualReadOnly && availablePageTemplates.length > 0 ? (
             <div
               className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2"
               data-testid="designer-template-bar"
@@ -1849,7 +1940,7 @@ export function UnifiedDesignerWorkbench({
                 className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-blue-500"
               >
                 <option value="">应用模板…</option>
-                {getPageTemplates().map((template) => (
+                {availablePageTemplates.map((template) => (
                   <option key={template.id} value={template.id}>
                     {template.label}
                   </option>
@@ -1857,7 +1948,7 @@ export function UnifiedDesignerWorkbench({
               </select>
             </div>
           ) : null}
-          {!contextualReadOnly && !contextualRestricted && multiSelectedIds.size >= 2 ? (
+          {!contextualReadOnly && multiSelectedIds.size >= 2 ? (
             <div
               className="flex items-center gap-3 border-b border-blue-200 bg-blue-50 px-4 py-2"
               data-testid="multi-select-bar"
@@ -1896,6 +1987,7 @@ export function UnifiedDesignerWorkbench({
               blockDefinitions={blockDefinitions}
               selectedModelCode={selectedModelCode}
               modelFields={selectedModelFields}
+              canAddCustomField={!contextualRestricted && canAddBlock('field')}
               canAddBlock={canAddBlock}
               canAddModelField={canAddModelField}
               isModelFieldUsed={isSelectedModelFieldUsed}
@@ -1943,6 +2035,8 @@ export function UnifiedDesignerWorkbench({
                   ? (contextualEditablePropertyPaths?.[selectedBlock?.blockType ?? ''] ?? [])
                   : undefined
               }
+              canDuplicateBlock={canDuplicateBlock(selectedBlockId)}
+              onDuplicateBlock={handleDuplicateBlock}
               onChange={updateSelectedBlock}
             />
           </div>
@@ -1989,7 +2083,17 @@ function formatValidationSaveError(errorCount: number): string {
   return `Fix ${errorCount} validation issue${errorCount === 1 ? '' : 's'} before saving.`;
 }
 
-function resolveSaveErrorMessage(error: unknown): string {
+function resolveSaveErrorMessage(error: unknown, locale: string): string {
+  const context = (error as { context?: unknown } | null)?.context;
+  const policyToken =
+    typeof context === 'string'
+      ? context
+      : context && typeof context === 'object' && 'reason' in context
+        ? String((context as { reason?: unknown }).reason ?? '')
+        : '';
+  if (policyToken === 'authoring.policy.protected_semantic_invalid') {
+    return resolveDesignerText(DESIGNER_I18N.unified.protectedSemanticInvalid, locale);
+  }
   if (error instanceof Error && error.message.trim()) return error.message;
   if (typeof error === 'string' && error.trim()) return error;
   return 'Failed to save page schema.';
@@ -2033,6 +2137,179 @@ function parseImportedDocument(raw: FileReader['result']): PageSchemaV3 | null {
     return null;
   }
   return parsed as PageSchemaV3;
+}
+
+function projectTemplateIntoGovernedRoot(
+  current: PageSchemaV3,
+  templateBlocks: DslBlockV3[],
+  project: (block: DslBlockV3) => DslBlockV3,
+): DslBlockV3[] | null {
+  if (
+    current.blocks.length !== 1 ||
+    templateBlocks.length !== 1 ||
+    current.blocks[0].blockType !== current.kind ||
+    templateBlocks[0].blockType !== current.kind
+  ) {
+    return null;
+  }
+  const projected = project(templateBlocks[0]);
+  const { authoringTemplateLineage: _rootLineage, ...projectedRootExtension } =
+    projected.extension ?? {};
+  const governedRootExtension = {
+    ...(current.blocks[0].extension ?? {}),
+    ...projectedRootExtension,
+  };
+  const governedRoot: DslBlockV3 = {
+    ...current.blocks[0],
+    ...projected,
+    id: current.blocks[0].id,
+    blockType: current.kind,
+    extension: Object.keys(governedRootExtension).length ? governedRootExtension : undefined,
+    blocks: projected.blocks ?? [],
+  };
+  if (!governedRoot.extension) delete governedRoot.extension;
+  return [governedRoot];
+}
+
+/** Governed imports may replace design content, but never page identity, binding or ownership. */
+function normalizeGovernedImport(
+  current: PageSchemaV3,
+  imported: PageSchemaV3,
+  project: (block: DslBlockV3) => DslBlockV3,
+  creatableTypes: Set<string>,
+  removableTypes: Set<string>,
+  reorderableTypes: Set<string>,
+  relocatableTypes: Set<string>,
+  pageKindSwitchEnabled: boolean,
+): PageSchemaV3 | null {
+  if (
+    imported.kind === 'composite' ||
+    (imported.kind !== current.kind && !pageKindSwitchEnabled) ||
+    current.blocks.length !== 1 ||
+    imported.blocks.length !== 1 ||
+    current.blocks[0].blockType !== current.kind ||
+    imported.blocks[0].blockType !== imported.kind ||
+    !validatePageSchemaV3(imported).valid
+  ) {
+    return null;
+  }
+
+  const stableRootId = current.blocks[0].id;
+  const importedRoot: DslBlockV3 = {
+    ...imported.blocks[0],
+    id: stableRootId,
+    blockType: imported.kind,
+  };
+  const currentBlocks = indexImportBlocks(current.blocks);
+  const importedBlocks = indexImportBlocks([importedRoot]);
+  for (const [id, entry] of importedBlocks) {
+    const existing = currentBlocks.get(id);
+    if (
+      existing &&
+      existing.block.blockType !== entry.block.blockType &&
+      id !== stableRootId
+    ) {
+      return null;
+    }
+    if (!existing && !creatableTypes.has(entry.block.blockType)) return null;
+    if (
+      existing &&
+      existing.parentId !== entry.parentId &&
+      id !== current.blocks[0].id &&
+      !relocatableTypes.has(entry.block.blockType)
+    ) {
+      return null;
+    }
+  }
+  for (const [id, entry] of currentBlocks) {
+    if (!importedBlocks.has(id) && !removableTypes.has(entry.block.blockType)) return null;
+  }
+  if (hasUnauthorizedExistingSiblingReorder(currentBlocks, importedBlocks, reorderableTypes)) {
+    return null;
+  }
+
+  const projectImportedBlock = (block: DslBlockV3): DslBlockV3 => {
+    const projected = project({ ...block, blocks: undefined });
+    const existing = currentBlocks.get(block.id)?.block;
+    const projectedExtension = { ...(projected.extension ?? {}) };
+    if (existing) {
+      delete projectedExtension.authoringTemplateLineage;
+      delete projectedExtension.authoringCopyLineage;
+    }
+    if (existing?.extension?.authoringTemplateLineage) {
+      projectedExtension.authoringTemplateLineage =
+        existing.extension.authoringTemplateLineage;
+    }
+    if (existing?.extension?.authoringCopyLineage) {
+      projectedExtension.authoringCopyLineage =
+        existing.extension.authoringCopyLineage;
+    }
+    const governedExtension = {
+      ...(existing?.extension ?? {}),
+      ...projectedExtension,
+    };
+    const normalizedBlock: DslBlockV3 = {
+      ...(existing ?? {}),
+      ...projected,
+      id: block.id,
+      blockType: block.blockType,
+      extension: Object.keys(governedExtension).length ? governedExtension : undefined,
+      blocks: block.blocks?.map(projectImportedBlock),
+    };
+    if (!normalizedBlock.extension) delete normalizedBlock.extension;
+    return normalizedBlock;
+  };
+  const projectedRoot = projectImportedBlock(importedRoot);
+  const normalized: PageSchemaV3 = {
+    ...imported,
+    id: current.id,
+    pageKey: current.pageKey,
+    modelCode: current.modelCode,
+    title: current.title,
+    layout: current.layout,
+    extension: current.extension,
+    blocks: [{ ...projectedRoot, id: current.blocks[0].id, blockType: imported.kind }],
+  };
+  return validatePageSchemaV3(normalized).valid ? normalized : null;
+}
+
+type ImportBlockEntry = { block: DslBlockV3; parentId: string | null; siblingIndex: number };
+
+function indexImportBlocks(blocks: DslBlockV3[] | undefined): Map<string, ImportBlockEntry> {
+  const indexed = new Map<string, ImportBlockEntry>();
+  const visit = (items: DslBlockV3[] | undefined, parentId: string | null) => {
+    for (const [siblingIndex, block] of (items ?? []).entries()) {
+      indexed.set(block.id, { block, parentId, siblingIndex });
+      visit(block.blocks, block.id);
+    }
+  };
+  visit(blocks, null);
+  return indexed;
+}
+
+function hasUnauthorizedExistingSiblingReorder(
+  current: Map<string, ImportBlockEntry>,
+  imported: Map<string, ImportBlockEntry>,
+  reorderableTypes: Set<string>,
+): boolean {
+  const parentIds = new Set([...current.values()].map((entry) => entry.parentId));
+  for (const parentId of parentIds) {
+    const currentOrder = [...current.entries()]
+      .filter(([id, entry]) => entry.parentId === parentId && imported.get(id)?.parentId === parentId)
+      .sort((left, right) => left[1].siblingIndex - right[1].siblingIndex)
+      .map(([id]) => id);
+    const importedOrder = [...imported.entries()]
+      .filter(([id, entry]) => entry.parentId === parentId && current.get(id)?.parentId === parentId)
+      .sort((left, right) => left[1].siblingIndex - right[1].siblingIndex)
+      .map(([id]) => id);
+    if (
+      currentOrder.join('\0') !== importedOrder.join('\0') &&
+      importedOrder.some((id) => !reorderableTypes.has(imported.get(id)!.block.blockType))
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function findModelCodeForSelection(path: PageSchemaV3['blocks']): string | null {
@@ -2092,6 +2369,56 @@ function insertBlockBeforeTarget(
   }));
 }
 
+function insertBlockAfterTarget(
+  blocks: DslBlockV3[],
+  targetBlockId: string,
+  nextBlock: DslBlockV3,
+): DslBlockV3[] {
+  const directIndex = blocks.findIndex((block) => block.id === targetBlockId);
+  if (directIndex >= 0) {
+    const next = [...blocks];
+    next.splice(directIndex + 1, 0, nextBlock);
+    return next;
+  }
+  let changed = false;
+  const next = blocks.map((block) => {
+    if (!block.blocks?.length) return block;
+    const children = insertBlockAfterTarget(block.blocks, targetBlockId, nextBlock);
+    if (children === block.blocks) return block;
+    changed = true;
+    return { ...block, blocks: children };
+  });
+  return changed ? next : blocks;
+}
+
+function duplicateBlockSubtree(source: DslBlockV3, usedIds: Set<string>): DslBlockV3 {
+  const id = createUniqueBlockId(toStableBlockId(source.id, 'copy') || 'block_copy', usedIds);
+  usedIds.add(id);
+  return {
+    ...source,
+    id,
+    extension: {
+      ...(source.extension ?? {}),
+      authoringCopyLineage: { sourceBlockId: source.id },
+    },
+    blocks: source.blocks?.map((child) => duplicateBlockSubtree(child, usedIds)),
+  };
+}
+
+function duplicateSubtreeIsGoverned(
+  block: DslBlockV3,
+  creatableTypes: Set<string>,
+  editablePropertyPaths: Record<string, string[]>,
+): boolean {
+  return (
+    creatableTypes.has(block.blockType)
+    && (editablePropertyPaths[block.blockType] ?? []).includes(AUTHORING_COPY_LINEAGE_PATH)
+    && (block.blocks ?? []).every((child) =>
+      duplicateSubtreeIsGoverned(child, creatableTypes, editablePropertyPaths),
+    )
+  );
+}
+
 function applyParentPlacementDefaults(block: DslBlockV3, parentBlock: DslBlockV3): DslBlockV3 {
   if (
     block.blockType === 'action' &&
@@ -2140,6 +2467,17 @@ function compactObject<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(
     Object.entries(value).filter(([, item]) => item !== undefined),
   ) as T;
+}
+
+function templateDescendantsAreGoverned(
+  blocks: DslBlockV3[] | undefined,
+  creatableTypes: Set<string>,
+): boolean {
+  return (blocks ?? []).every(
+    (block) =>
+      creatableTypes.has(block.blockType) &&
+      templateDescendantsAreGoverned(block.blocks, creatableTypes),
+  );
 }
 
 function isDotPathAllowed(dotPath: string, capabilityPointers: string[]): boolean {

@@ -45,6 +45,10 @@ export interface StudioAuthoringRelocation {
 }
 
 export interface StudioAuthoringPatchPlan {
+  kindSwitch: {
+    targetKind: Exclude<PageSchemaV3Kind, 'composite'>;
+    manifestChecksum: string;
+  } | null;
   patches: StudioAuthoringPatch[];
   moves: StudioAuthoringMove[];
   creates: StudioAuthoringCreate[];
@@ -77,6 +81,8 @@ export const STUDIO_REORDER_WITHIN_PARENT_PATH = '/$structure/order';
 export const STUDIO_CREATE_BLOCK_PATH = '/$structure/create';
 export const STUDIO_REMOVE_BLOCK_PATH = '/$structure/remove';
 export const STUDIO_RELOCATE_BLOCK_PATH = '/$structure/parent';
+export const STUDIO_PAGE_MANIFEST_BLOCK_TYPE = '$page';
+export const STUDIO_PAGE_KIND_PATH = '/$page/kind';
 
 interface IndexedBlock {
   block: DslBlockV3;
@@ -100,6 +106,7 @@ export function authoringSnapshotToPageSchemaV3(
       title: localizedValue(snapshot.title),
       layout: objectValue(snapshot.layout),
       blocks: blocks as DslBlockV3[],
+      extension: objectValue(snapshot.extension),
     };
   }
 
@@ -135,12 +142,15 @@ export function planStudioAuthoringPatches(
   if (
     baseline.id !== candidate.id ||
     baseline.pageKey !== candidate.pageKey ||
-    baseline.kind !== candidate.kind ||
     baseline.modelCode !== candidate.modelCode
   ) {
-    unsupported.push('页面标识、路由、类型或模型变更必须使用专用结构变更流程');
+    unsupported.push('页面标识、路由或模型变更必须使用专用资源变更流程');
   }
-  if (!deepEqual(baseline.title, candidate.title) || !deepEqual(baseline.layout, candidate.layout)) {
+  if (
+    !deepEqual(baseline.title, candidate.title) ||
+    !deepEqual(baseline.layout, candidate.layout) ||
+    !deepEqual(baseline.extension, candidate.extension)
+  ) {
     unsupported.push('页面级标题或布局尚未声明为 Studio typed patch');
   }
 
@@ -153,6 +163,18 @@ export function planStudioAuthoringPatches(
   const creates: StudioAuthoringCreate[] = [];
   const removes: StudioAuthoringRemove[] = [];
   const relocations: StudioAuthoringRelocation[] = [];
+  let kindSwitch: StudioAuthoringPatchPlan['kindSwitch'] = null;
+  if (baseline.kind !== candidate.kind) {
+    const pageManifest = manifests.get(STUDIO_PAGE_MANIFEST_BLOCK_TYPE);
+    if (candidate.kind === 'composite' || !pageManifest?.properties[STUDIO_PAGE_KIND_PATH]) {
+      unsupported.push('页面类型切换能力未由服务端声明');
+    } else {
+      kindSwitch = {
+        targetKind: candidate.kind,
+        manifestChecksum: pageManifest.checksum,
+      };
+    }
+  }
 
   baselineIndex.forEach((entry, blockId) => {
     if (candidateIndex.has(blockId)) return;
@@ -255,10 +277,23 @@ export function planStudioAuthoringPatches(
   baselineIndex.forEach((baseEntry, blockId) => {
     const nextEntry = candidateIndex.get(blockId);
     if (!nextEntry) return;
-    if (baseEntry.block.blockType !== nextEntry.block.blockType) {
+    const isGovernedRootKindSwitch =
+      kindSwitch !== null &&
+      baseEntry.parentId === null &&
+      nextEntry.parentId === null &&
+      baseEntry.block.blockType === baseline.kind &&
+      nextEntry.block.blockType === candidate.kind;
+    if (baseEntry.block.blockType !== nextEntry.block.blockType && !isGovernedRootKindSwitch) {
       unsupported.push(`区块 ${blockId} 的类型变更尚未声明为 typed patch`);
     }
-    const manifest = manifests.get(baseEntry.block.blockType);
+    if (isGovernedRootKindSwitch) {
+      const normalizedRoot = cloneJson(withoutChildren(baseEntry.block));
+      normalizedRoot.blockType = candidate.kind;
+      if (deepEqual(normalizedRoot, withoutChildren(nextEntry.block))) return;
+    }
+    const manifest = manifests.get(
+      isGovernedRootKindSwitch ? nextEntry.block.blockType : baseEntry.block.blockType,
+    );
     if (!manifest) {
       if (!deepEqual(withoutChildren(baseEntry.block), withoutChildren(nextEntry.block))) {
         unsupported.push(`区块 ${blockId} 没有可信能力清单`);
@@ -267,6 +302,9 @@ export function planStudioAuthoringPatches(
     }
 
     const reconstructed = cloneJson(withoutChildren(baseEntry.block));
+    if (isGovernedRootKindSwitch) {
+      reconstructed.blockType = candidate.kind;
+    }
     Object.values(manifest.properties)
       .filter((property) => !isStructuralCapabilityPath(property.propertyPath))
       .sort((left, right) => left.propertyPath.localeCompare(right.propertyPath))
@@ -282,6 +320,12 @@ export function planStudioAuthoringPatches(
         if (deepEqual(previous, value)) return;
         const operation: PatchOperation =
           value === undefined ? 'REMOVE' : previous === undefined ? 'ADD' : 'REPLACE';
+        if (!property.allowedOperations.includes(operation)) {
+          unsupported.push(
+            `区块 ${blockId} 的 ${property.propertyPath} 不允许 ${operation} 操作`,
+          );
+          return;
+        }
         patches.push({
           blockId,
           propertyPath: property.propertyPath,
@@ -298,6 +342,7 @@ export function planStudioAuthoringPatches(
   });
 
   return {
+    kindSwitch,
     patches,
     moves,
     creates,
@@ -305,6 +350,14 @@ export function planStudioAuthoringPatches(
     relocations,
     unsupported: [...new Set(unsupported)],
   };
+}
+
+export function studioPageKindSwitchEnabled(capabilities: CapabilityRegistry): boolean {
+  return Boolean(
+    capabilities.manifests.find(
+      (manifest) => manifest.blockType === STUDIO_PAGE_MANIFEST_BLOCK_TYPE,
+    )?.properties[STUDIO_PAGE_KIND_PATH],
+  );
 }
 
 /**
@@ -458,7 +511,10 @@ export function studioEditablePropertyPaths(
       manifest.blockType,
       Object.values(manifest.properties)
         .map((property) => property.propertyPath)
-        .filter((propertyPath) => !isStructuralCapabilityPath(propertyPath)),
+        .filter(
+          (propertyPath) =>
+            !isStructuralCapabilityPath(propertyPath) && !propertyPath.startsWith('/$page/'),
+        ),
     ]),
   );
 }

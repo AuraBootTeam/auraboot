@@ -19,6 +19,9 @@ import static org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY;
 @Component
 public class AuthoringContentSanitizer {
 
+    private static final String TEMPLATE_LINEAGE_PATH = "/extension/authoringTemplateLineage";
+    private static final String COPY_LINEAGE_PATH = "/extension/authoringCopyLineage";
+
     private static final Safelist RICH_TEXT = Safelist.relaxed()
             .removeTags("style")
             .addProtocols("a", "href", "http", "https")
@@ -45,8 +48,42 @@ public class AuthoringContentSanitizer {
                 throw invalid("authoring.navigation.unsafe-target");
             }
         }
+        if (TEMPLATE_LINEAGE_PATH.equals(propertyPath)) {
+            return sanitizeTemplateLineage(value);
+        }
+        if (COPY_LINEAGE_PATH.equals(propertyPath)) {
+            return sanitizeCopyLineage(value);
+        }
         rejectControlCharacters(value);
         return value.deepCopy();
+    }
+
+    private JsonNode sanitizeTemplateLineage(JsonNode value) {
+        if (!(value instanceof ObjectNode object)
+                || object.size() != 3
+                || !validLineagePart(object.get("templateId"), 120)
+                || !validLineagePart(object.get("templateVersion"), 80)
+                || !validLineagePart(object.get("sourceBlockId"), 120)) {
+            throw invalid("authoring.template-lineage.invalid");
+        }
+        rejectControlCharacters(object);
+        return object.deepCopy();
+    }
+
+    private JsonNode sanitizeCopyLineage(JsonNode value) {
+        if (!(value instanceof ObjectNode object)
+                || object.size() != 1
+                || !validLineagePart(object.get("sourceBlockId"), 120)) {
+            throw invalid("authoring.copy-lineage.invalid");
+        }
+        rejectControlCharacters(object);
+        return object.deepCopy();
+    }
+
+    private boolean validLineagePart(JsonNode value, int maxLength) {
+        return value != null && value.isTextual() && !value.asText().isBlank()
+                && value.asText().length() <= maxLength
+                && value.asText().matches("[A-Za-z0-9][A-Za-z0-9._:-]*");
     }
 
     private JsonNode sanitizePlainText(JsonNode value) {

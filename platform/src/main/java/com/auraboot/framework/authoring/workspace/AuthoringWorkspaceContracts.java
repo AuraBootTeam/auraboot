@@ -185,11 +185,17 @@ public final class AuthoringWorkspaceContracts {
     /** One atomic Studio save. Operation groups execute in document-reconstruction order. */
     public record StudioBatchRequest(
             @Positive long expectedRevision,
+            @Valid StudioPageKindSwitch kindSwitch,
             @NotNull @Size(max = 50) List<@Valid StudioCreateBlock> creates,
             @NotNull @Size(max = 50) List<@Valid StudioRelocateBlock> relocations,
             @NotNull @Size(max = 50) List<@Valid StudioRemoveBlock> removes,
             @NotNull @Size(max = 50) List<@Valid StudioMoveBlock> moves,
             @NotNull @Size(max = 100) List<@Valid StudioPropertyPatch> patches) {
+    }
+
+    public record StudioPageKindSwitch(
+            @NotBlank @Size(max = 32) String targetKind,
+            @NotBlank String manifestChecksum) {
     }
 
     public record StudioCreateBlock(

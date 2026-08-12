@@ -1,5 +1,5 @@
-import { test, expect, type Browser, type Page } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
+import { test, expect, type Browser, type Locator, type Page } from '@playwright/test';
+import { mkdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Client as PgClient } from 'pg';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
@@ -51,6 +51,7 @@ type AuthoringSession = {
   approvalState?: string;
   publishState: string;
   snapshot: Record<string, unknown>;
+  interactionContext?: Record<string, unknown>;
 };
 
 type PatchResult = {
@@ -94,6 +95,7 @@ type ChangeItem = {
   blockId: string;
   propertyPath: string;
   riskLevel: string;
+  operation?: string;
 };
 type SplitResult = {
   sourceSession: AuthoringSession;
@@ -691,6 +693,886 @@ test.describe('Contextual authoring release PC golden', () => {
     }
   });
 
+  test('PC-AUTH-040 @critical — governed Builder completes kind, template, batch, export/import, sanitization and protected semantics', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const source = await enterAuthoringFromMenu(page);
+    await page.getByRole('button', { name: '新页面 / 菜单' }).click();
+    const explain = page.getByRole('dialog', { name: '在应用设计中心创建页面' });
+    await explain.getByRole('button', { name: '继续到应用设计中心' }).click();
+
+    const wizard = page.getByTestId('new-page-workspace-wizard');
+    await expect(wizard).toBeVisible();
+    const suffix = `${Date.now().toString(36)}_${process.pid}`;
+    const pageKey = `authoring_builder_gate_${suffix}`;
+    const title = `Authoring Builder Gate ${suffix}`;
+    await wizard.getByLabel('页面标题').fill(title);
+    await wizard.getByLabel('页面标识').fill(pageKey);
+    await wizard
+      .locator('label')
+      .filter({ hasText: '页面类型' })
+      .getByRole('combobox')
+      .selectOption('list');
+    await wizard.getByLabel('业务模型').selectOption('e2et_record');
+    const parentSelect = wizard.getByLabel('父菜单');
+    await expect.poll(() => parentSelect.locator('option').count()).toBeGreaterThan(1);
+    await parentSelect.selectOption(
+      (await parentSelect.locator('option').nth(1).getAttribute('value'))!,
+    );
+    await wizard.getByLabel('访问权限').selectOption('page.page.read');
+
+    const createdResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${source.sessionPid}/new-page-workspaces`,
+    );
+    await wizard.getByRole('button', { name: '创建并进入页面设计' }).click();
+    const created = await expectApiData<AuthoringSession>(
+      await createdResponse,
+      'create governed Builder workspace',
+    );
+    try {
+      await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+      await expect(page.getByTestId('designer-contextual-restricted')).toContainText(
+        '同一 ChangeSet',
+      );
+      await expect(page.getByTestId('designer-kind-switch')).toHaveValue('list');
+      await expect(page.getByTestId('designer-template-select')).toBeVisible();
+      await expect(page.getByTestId('designer-export')).toBeEnabled();
+      await expect(page.getByTestId('designer-import')).toBeEnabled();
+      const stableRootId = String(
+        (created.snapshot.blocks as Array<Record<string, unknown>>)[0].id,
+      );
+
+      const unauthorizedImport = {
+        schemaVersion: 3,
+        id: 'forged-page',
+        pageKey: 'forged-page-key',
+        kind: 'list',
+        blocks: [
+          {
+            id: 'forged-root',
+            blockType: 'list',
+            blocks: [{ id: 'forged-divider', blockType: 'divider' }],
+          },
+        ],
+      };
+      await page.getByTestId('designer-import-input').setInputFiles({
+        name: 'unauthorized.page.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from(JSON.stringify(unauthorizedImport)),
+      });
+      await expect(page.getByTestId('designer-dirty-state')).toContainText('导入失败');
+      await expect(page.getByTestId(`canvas-block-${stableRootId}`)).toBeVisible();
+      await expect(page.getByTestId('canvas-block-forged-divider')).toHaveCount(0);
+
+      await page.getByTestId('designer-kind-switch').selectOption('detail');
+      await expect(page.getByTestId(`canvas-block-${stableRootId}`)).toContainText('detail');
+      await page.getByTestId('designer-template-select').selectOption('core_detail_summary');
+      const summary = page.locator('[data-testid^="canvas-block-core_detail_summary_summary"]');
+      const description = page.locator(
+        '[data-testid^="canvas-block-core_detail_summary_description"]',
+      );
+      await expect(summary).toBeVisible();
+      await expect(description).toBeVisible();
+      const summaryId = (await summary.getAttribute('data-testid'))!.replace('canvas-block-', '');
+      const descriptionId = (await description.getAttribute('data-testid'))!.replace(
+        'canvas-block-',
+        '',
+      );
+
+      await summary.click();
+      await description.click({ modifiers: ['Shift'] });
+      await expect(page.getByTestId('multi-select-count')).toContainText('2');
+      await page.getByTestId('multi-select-delete').click();
+      await expect(summary).toHaveCount(0);
+      await expect(description).toHaveCount(0);
+      await page.getByTestId('designer-undo').click();
+      await expect(page.getByTestId(`canvas-block-${summaryId}`)).toBeVisible();
+      await expect(page.getByTestId(`canvas-block-${descriptionId}`)).toBeVisible();
+      await page.getByTestId('designer-redo').click();
+      await expect(page.getByTestId(`canvas-block-${summaryId}`)).toHaveCount(0);
+      await page.getByTestId('designer-undo').click();
+
+      const firstSaveResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${created.sessionPid}/studio-batches`,
+      );
+      await page.getByTestId('designer-save').click();
+      const firstSaved = await expectApiData<PatchResult>(
+        await firstSaveResponse,
+        'save kind switch and approved template atomically',
+      );
+      expect(firstSaved.session.snapshot.kind).toBe('detail');
+      const firstRoot = (firstSaved.session.snapshot.blocks as Array<Record<string, unknown>>)[0];
+      expect(firstRoot.id).toBe(stableRootId);
+      expect(firstRoot.blockType).toBe('detail');
+      expect(
+        (firstRoot.extension as Record<string, unknown> | undefined)?.authoringTemplateLineage,
+      ).toBeUndefined();
+      const firstChildren = firstRoot.blocks as Array<Record<string, unknown>>;
+      expect(firstChildren.map((block) => block.id)).toEqual([summaryId, descriptionId]);
+      expect(
+        (firstChildren[0].extension as Record<string, unknown>).authoringTemplateLineage,
+      ).toEqual({
+        templateId: 'core_detail_summary',
+        templateVersion: '1',
+        sourceBlockId: 'summary',
+      });
+
+      const downloadPromise = page.waitForEvent('download');
+      await page.getByTestId('designer-export').click();
+      const download = await downloadPromise;
+      expect(download.suggestedFilename()).toBe(`${pageKey}.page.json`);
+      const downloadPath = await download.path();
+      expect(downloadPath).toBeTruthy();
+      const exported = JSON.parse(await readFile(downloadPath!, 'utf8')) as Record<string, unknown>;
+      expect(exported.id).toBe(pageKey);
+      expect(exported.pageKey).toBe(pageKey);
+      expect(exported.kind).toBe('detail');
+
+      const imported = structuredClone(exported) as Record<string, unknown>;
+      imported.id = 'forged-page-id';
+      imported.pageKey = 'forged-page-key';
+      imported.modelCode = 'forged-model';
+      imported.title = 'Forged title';
+      const importedRoot = (imported.blocks as Array<Record<string, unknown>>)[0];
+      importedRoot.id = 'forged-root-id';
+      const importedChildren = importedRoot.blocks as Array<Record<string, unknown>>;
+      const protectedActionBarId = `protected-action-bar-${suffix}`;
+      const protectedActionId = `protected-action-${suffix}`;
+      const importedDescription = importedChildren.find((block) => block.id === descriptionId)!;
+      importedDescription.props = {
+        content:
+          '<b>Builder safe</b><script>window.__builder_xss=1</script><a href="javascript:alert(1)">bad</a>',
+      };
+      importedDescription.extension = {
+        authoringTemplateLineage: {
+          templateId: 'forged-template',
+          templateVersion: '999',
+          sourceBlockId: 'forged-source',
+        },
+      };
+      importedChildren.push({
+        id: protectedActionBarId,
+        blockType: 'action-bar',
+        layout: { span: 12 },
+        blocks: [
+          {
+            id: protectedActionId,
+            blockType: 'action',
+            actionType: 'command',
+            props: {
+              command: 'e2et:delete_order',
+              label: 'Delete order',
+              variant: 'danger',
+            },
+          },
+        ],
+      });
+      await page.getByTestId('designer-import-input').setInputFiles({
+        name: 'roundtrip.page.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from(JSON.stringify(imported)),
+      });
+      await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');
+
+      const secondSaveResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${created.sessionPid}/studio-batches`,
+      );
+      await page.getByTestId('designer-save').click();
+      const secondSaved = await expectApiData<PatchResult>(
+        await secondSaveResponse,
+        'save governed import through the same ChangeSet',
+      );
+      expect(secondSaved.session.snapshot.pid).toBe(created.snapshot.pid);
+      expect(secondSaved.session.snapshot.pageKey).toBe(pageKey);
+      expect(secondSaved.session.snapshot.modelCode).toBe('e2et_record');
+      expect(secondSaved.session.snapshot.title).toEqual(created.snapshot.title);
+      const savedRoot = (secondSaved.session.snapshot.blocks as Array<Record<string, unknown>>)[0];
+      expect(savedRoot.id).toBe(stableRootId);
+      const savedDescription = (savedRoot.blocks as Array<Record<string, unknown>>).find(
+        (block) => block.id === descriptionId,
+      )!;
+      const savedContent = String((savedDescription.props as Record<string, unknown>).content);
+      expect(savedContent).toContain('<b>Builder safe</b>');
+      expect(savedContent).not.toMatch(/script|javascript:/i);
+      expect(
+        (savedDescription.extension as Record<string, unknown>).authoringTemplateLineage,
+      ).toEqual({
+        templateId: 'core_detail_summary',
+        templateVersion: '1',
+        sourceBlockId: 'description',
+      });
+      const savedActionBar = (savedRoot.blocks as Array<Record<string, unknown>>).find(
+        (block) => block.id === protectedActionBarId,
+      )!;
+      const savedAction = (savedActionBar.blocks as Array<Record<string, unknown>>).find(
+        (block) => block.id === protectedActionId,
+      )!;
+      expect(savedAction).toMatchObject({
+        blockType: 'action',
+        actionType: 'command',
+        props: {
+          command: 'e2et:delete_order',
+          label: 'Delete order',
+          variant: 'danger',
+        },
+      });
+
+      const canonicalDownloadPromise = page.waitForEvent('download');
+      await page.getByTestId('designer-export').click();
+      const canonicalDownloadPath = await (await canonicalDownloadPromise).path();
+      expect(canonicalDownloadPath).toBeTruthy();
+      const canonicalImport = JSON.parse(await readFile(canonicalDownloadPath!, 'utf8')) as Record<
+        string,
+        unknown
+      >;
+
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+      await expect(page.getByTestId('designer-kind-switch')).toHaveValue('detail');
+      await expect(page.getByTestId(`canvas-block-${stableRootId}`)).toBeVisible();
+      const reloaded = await loadSession(page, created.sessionPid, 'reload Builder session');
+      expect(reloaded.revision).toBe(secondSaved.session.revision);
+      expect(reloaded.snapshot).toEqual(secondSaved.session.snapshot);
+
+      await mkdir(SCREENSHOT_DIR, { recursive: true });
+      await page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-040-governed-builder.png'),
+        fullPage: true,
+      });
+
+      const disguisedActionImport = structuredClone(canonicalImport);
+      const disguisedRoot = (disguisedActionImport.blocks as Array<Record<string, unknown>>)[0];
+      const disguisedActionBar = (disguisedRoot.blocks as Array<Record<string, unknown>>).find(
+        (block) => block.id === protectedActionBarId,
+      )!;
+      const disguisedAction = (disguisedActionBar.blocks as Array<Record<string, unknown>>).find(
+        (block) => block.id === protectedActionId,
+      )!;
+      disguisedAction.props = {
+        ...(disguisedAction.props as Record<string, unknown>),
+        label: 'Continue',
+        variant: 'primary',
+      };
+      await page.getByTestId('designer-import-input').setInputFiles({
+        name: 'disguised-destructive-action.page.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from(JSON.stringify(disguisedActionImport)),
+      });
+      await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');
+      const protectedSemanticResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${created.sessionPid}/studio-batches`,
+      );
+      await page.getByTestId('designer-save').click();
+      expect(
+        (await protectedSemanticResponse).status(),
+        'a destructive command cannot be relabeled or restyled as a benign action',
+      ).toBe(422);
+      const protectedSemanticError = page.getByTestId('designer-save-error');
+      await expect(protectedSemanticError).toContainText('保存被拒绝');
+      await expect(protectedSemanticError).toContainText('保留动作真实意图与危险提示');
+      await expect(protectedSemanticError).not.toContainText('Business error');
+      const rejected = await loadSession(
+        page,
+        created.sessionPid,
+        'reload protected-semantic rejection',
+      );
+      expect(rejected.revision).toBe(secondSaved.session.revision);
+      expect(rejected.snapshot).toEqual(secondSaved.session.snapshot);
+      await page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-040-protected-semantic-rejected.png'),
+        fullPage: true,
+      });
+
+      const sessionPath = `/api/authoring/sessions/${created.sessionPid}`;
+      await page.route(`**${sessionPath}`, async (route) => {
+        if (route.request().method() === 'GET') {
+          await route.abort('failed');
+          return;
+        }
+        await route.continue();
+      });
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(page.getByText('权威草稿暂不可读，本地 Studio 文档仍保留')).toBeVisible();
+      page.once('dialog', async (dialog) => {
+        expect(dialog.message()).toContain('放弃页面中断前保留的本地 Studio 文档');
+        await dialog.accept();
+      });
+      await page.getByTestId('studio-local-recovery-discard').click();
+      await page.unroute(`**${sessionPath}`);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+      await expect(page.getByTestId('designer-dirty-state')).toContainText('已保存');
+      await page.getByTestId('studio-return-source').click();
+      await expect(page).toHaveURL(new RegExp(`${gatePage.route}$`));
+      await expect(page.getByText(gatePage.recordMarker)).toBeVisible();
+    } finally {
+      await cleanupMaterializedNewPage(pageKey);
+    }
+  });
+
+  test('PC-AUTH-041 @critical — governed Builder supports real pointer palettes, reorder, inspector and modes', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const source = await enterAuthoringFromMenu(page);
+    await page.getByRole('button', { name: '新页面 / 菜单' }).click();
+    await page
+      .getByRole('dialog', { name: '在应用设计中心创建页面' })
+      .getByRole('button', { name: '继续到应用设计中心' })
+      .click();
+
+    const wizard = page.getByTestId('new-page-workspace-wizard');
+    await expect(wizard).toBeVisible();
+    const suffix = `${Date.now().toString(36)}_${process.pid}`;
+    const pageKey = `authoring_pointer_gate_${suffix}`;
+    await wizard.getByLabel('页面标题').fill(`Authoring Pointer Gate ${suffix}`);
+    await wizard.getByLabel('页面标识').fill(pageKey);
+    await wizard
+      .locator('label')
+      .filter({ hasText: '页面类型' })
+      .getByRole('combobox')
+      .selectOption('detail');
+    await wizard.getByLabel('业务模型').selectOption('e2et_record');
+    const parentSelect = wizard.getByLabel('父菜单');
+    await expect.poll(() => parentSelect.locator('option').count()).toBeGreaterThan(1);
+    await parentSelect.selectOption(
+      (await parentSelect.locator('option').nth(1).getAttribute('value'))!,
+    );
+    await wizard.getByLabel('访问权限').selectOption('page.page.read');
+
+    const createdResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${source.sessionPid}/new-page-workspaces`,
+    );
+    await wizard.getByRole('button', { name: '创建并进入页面设计' }).click();
+    const created = await expectApiData<AuthoringSession>(
+      await createdResponse,
+      'create governed pointer Builder workspace',
+    );
+
+    try {
+      const workbench = page.getByTestId('unified-designer-workbench');
+      await expect(workbench).toBeVisible();
+      await expect(workbench).toHaveAttribute('data-mode', 'edit');
+      await page.getByTestId('designer-template-select').selectOption('core_detail_summary');
+
+      const rootId = String((created.snapshot.blocks as Array<Record<string, unknown>>)[0].id);
+      const summary = page.locator('[data-testid^="canvas-block-core_detail_summary_summary"]');
+      const description = page.locator(
+        '[data-testid^="canvas-block-core_detail_summary_description"]',
+      );
+      await expect(summary).toBeVisible();
+      await expect(description).toBeVisible();
+      const summaryId = (await summary.getAttribute('data-testid'))!.replace('canvas-block-', '');
+      const descriptionId = (await description.getAttribute('data-testid'))!.replace(
+        'canvas-block-',
+        '',
+      );
+
+      await page.getByTestId(`outline-item-${rootId}`).click();
+      await switchAuthoringResourceTab(page, 'blocks');
+      await expect(page.getByTestId('palette-add-detail-section')).toBeEnabled();
+      await expect(page.getByTestId('palette-add-form-section')).toHaveCount(0);
+      const rootDropPosition = await authoringContainerDropPosition(
+        page.getByTestId(`canvas-block-${rootId}`),
+      );
+      await authoringPointerDragTo(
+        page,
+        page.getByTestId('palette-add-detail-section'),
+        page.getByTestId(`canvas-block-${rootId}`),
+        { targetPosition: rootDropPosition },
+      );
+      const addedSectionId = 'detail_section_new_detail_section';
+      await expect(page.getByTestId(`canvas-block-${addedSectionId}`)).toBeVisible();
+
+      await switchAuthoringResourceTab(page, 'outline');
+      await page.getByTestId(`outline-item-${summaryId}`).click();
+      await switchAuthoringResourceTab(page, 'fields');
+      const fieldSearch = page.getByTestId('field-palette-search');
+      await expect(page.getByTestId('field-palette-add-field')).toBeDisabled();
+      await fieldSearch.fill('e2et_name');
+      const modelField = page.getByTestId('model-field-e2et_name');
+      await expect(modelField).toBeEnabled();
+      const summaryDropPosition = await authoringContainerDropPosition(
+        page.getByTestId(`canvas-block-${summaryId}`),
+      );
+      await authoringPointerDragTo(
+        page,
+        modelField,
+        page.getByTestId(`canvas-block-${summaryId}`),
+        { targetPosition: summaryDropPosition },
+      );
+      const fieldBlockId = 'field_e2et_name';
+      await expect(page.getByTestId(`canvas-block-${fieldBlockId}`)).toBeVisible();
+      await expect(page.getByTestId('inspector-selected-id')).toContainText(fieldBlockId);
+      await expect(page.getByTestId('inspector-field-props.label')).toBeVisible();
+      await expect(modelField).toBeDisabled();
+      await expect(modelField).toHaveAttribute('data-used', 'true');
+      await fieldSearch.fill('no_such_builder_field');
+      await expect(page.getByTestId('model-field-e2et_name')).toHaveCount(0);
+      await fieldSearch.fill('e2et_name');
+
+      await page.getByTestId(`canvas-block-${summaryId}`).click();
+      await page.getByTestId(`canvas-block-${descriptionId}`).click({ modifiers: ['Shift'] });
+      await expect(page.getByTestId('multi-select-count')).toContainText('2');
+      await page.getByTestId('multi-select-clear').click();
+      await expect(page.getByTestId('multi-select-bar')).toHaveCount(0);
+
+      await expect(page.getByTestId('designer-duplicate-block')).toBeEnabled();
+      await page.getByTestId('designer-duplicate-block').click();
+      const copiedDescriptionId = `${descriptionId}_copy`;
+      await expect(page.getByTestId(`canvas-block-${copiedDescriptionId}`)).toBeVisible();
+      await expect(page.getByTestId('inspector-selected-id')).toContainText(copiedDescriptionId);
+      await page.getByTestId('designer-undo').click();
+      await expect(page.getByTestId(`canvas-block-${copiedDescriptionId}`)).toHaveCount(0);
+      await page.getByTestId('designer-redo').click();
+      await expect(page.getByTestId(`canvas-block-${copiedDescriptionId}`)).toBeVisible();
+
+      await page.getByTestId('designer-mode-layout').click();
+      await expect(workbench).toHaveAttribute('data-mode', 'layout');
+      await expect(page.getByTestId(`block-drag-handle-${addedSectionId}`)).toBeVisible();
+      await page.getByTestId('designer-mode-preview').click();
+      await expect(workbench).toHaveAttribute('data-mode', 'preview');
+      await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
+      await page.getByTestId('preview-device-select').selectOption('mobile');
+      await expect(page.getByTestId('preview-device-select')).toHaveValue('mobile');
+      await page.getByTestId('designer-mode-edit').click();
+      await expect(workbench).toHaveAttribute('data-mode', 'edit');
+      await expect(page.getByTestId('inspector-selected-id')).toContainText(copiedDescriptionId);
+
+      const firstSaveResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${created.sessionPid}/studio-batches`,
+      );
+      await page.getByTestId('designer-save').click();
+      const firstSaved = await expectApiData<PatchResult>(
+        await firstSaveResponse,
+        'save pointer-created block and model field',
+      );
+      const firstItems = await loadAuthoringChangeItems(page, created.sessionPid);
+      const firstRoot = (firstSaved.session.snapshot.blocks as Array<Record<string, unknown>>)[0];
+      expect((firstRoot.blocks as Array<Record<string, unknown>>).map((block) => block.id)).toEqual(
+        [summaryId, descriptionId, copiedDescriptionId, addedSectionId],
+      );
+      const copiedDescription = (firstRoot.blocks as Array<Record<string, unknown>>).find(
+        (block) => block.id === copiedDescriptionId,
+      )!;
+      expect(copiedDescription.extension).toMatchObject({
+        authoringCopyLineage: { sourceBlockId: descriptionId },
+      });
+      const firstSummary = (firstRoot.blocks as Array<Record<string, unknown>>).find(
+        (block) => block.id === summaryId,
+      )!;
+      expect(
+        (firstSummary.blocks as Array<Record<string, unknown>>).map((block) => block.id),
+      ).toEqual([fieldBlockId]);
+
+      await authoringDragCanvasBlockBefore(page, addedSectionId, summaryId);
+      await expectAuthoringBlockBefore(page, addedSectionId, summaryId);
+      const secondSaveResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${created.sessionPid}/studio-batches`,
+      );
+      await page.getByTestId('designer-save').click();
+      const secondSaved = await expectApiData<PatchResult>(
+        await secondSaveResponse,
+        'save pointer reorder as semantic MOVE',
+      );
+      const secondRoot = (secondSaved.session.snapshot.blocks as Array<Record<string, unknown>>)[0];
+      expect(
+        (secondRoot.blocks as Array<Record<string, unknown>>).map((block) => block.id),
+      ).toEqual([addedSectionId, summaryId, descriptionId, copiedDescriptionId]);
+      const secondItems = await loadAuthoringChangeItems(page, created.sessionPid);
+      expect(secondItems).toHaveLength(firstItems.length + 1);
+      expect(secondItems.at(-1)).toMatchObject({
+        blockId: addedSectionId,
+        operation: 'MOVE',
+      });
+      await page.getByTestId('studio-governance-open').click();
+      await page.getByTestId('authoring-split-panel').locator('summary').click();
+      const moveItem = page
+        .getByTestId(`authoring-split-item-${String(secondItems.at(-1)!.changeItemPid)}`)
+        .locator('..');
+      await moveItem.scrollIntoViewIfNeeded();
+      await expect(moveItem).toBeVisible();
+      await expect(moveItem).toContainText('MOVE');
+      await expect(moveItem).not.toContainText('REMOVE');
+      await expect(moveItem).not.toContainText('ADD');
+
+      await mkdir(SCREENSHOT_DIR, { recursive: true });
+      await page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-041-governed-builder-palettes.png'),
+        fullPage: true,
+      });
+      await page.getByTestId('studio-governance-close').click();
+      await page.getByTestId('studio-return-source').click();
+      await expect(page).toHaveURL(new RegExp(`${gatePage.route}$`));
+      await expect(page.getByText(gatePage.recordMarker)).toBeVisible();
+    } finally {
+      await cleanupMaterializedNewPage(pageKey);
+    }
+  });
+
+  test('PC-AUTH-043 @critical — publish and runtime re-sanitize a mutated governed snapshot', async ({
+    page,
+    browser,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await ensureReviewer(page);
+    const source = await enterAuthoringFromMenu(page);
+    await page.getByRole('button', { name: '新页面 / 菜单' }).click();
+    await page
+      .getByRole('dialog', { name: '在应用设计中心创建页面' })
+      .getByRole('button', { name: '继续到应用设计中心' })
+      .click();
+
+    const wizard = page.getByTestId('new-page-workspace-wizard');
+    await expect(wizard).toBeVisible();
+    const suffix = `${Date.now().toString(36)}_${process.pid}`;
+    const pageKey = `authoring_runtime_sanitize_${suffix}`;
+    const route = `/${pageKey.replaceAll('_', '-')}`;
+    const title = `Runtime sanitize gate ${suffix}`;
+    await wizard.getByLabel('页面标题').fill(title);
+    await wizard.getByLabel('页面标识').fill(pageKey);
+    await wizard
+      .locator('label')
+      .filter({ hasText: '页面类型' })
+      .getByRole('combobox')
+      .selectOption('detail');
+    await wizard.getByLabel('业务模型').selectOption('e2et_record');
+    const parentSelect = wizard.getByLabel('父菜单');
+    await expect.poll(() => parentSelect.locator('option').count()).toBeGreaterThan(1);
+    await parentSelect.selectOption(
+      (await parentSelect.locator('option').nth(1).getAttribute('value'))!,
+    );
+    await wizard.getByLabel('访问权限').selectOption('page.page.read');
+
+    const createdResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${source.sessionPid}/new-page-workspaces`,
+    );
+    await wizard.getByRole('button', { name: '创建并进入页面设计' }).click();
+    const created = await expectApiData<AuthoringSession>(
+      await createdResponse,
+      'create runtime-sanitization workspace',
+    );
+
+    try {
+      await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+      await page.getByTestId('designer-template-select').selectOption('core_detail_summary');
+      const description = page.locator(
+        '[data-testid^="canvas-block-core_detail_summary_description"]',
+      );
+      await expect(description).toBeVisible();
+      const descriptionId = (await description.getAttribute('data-testid'))!.replace(
+        'canvas-block-',
+        '',
+      );
+      const saveResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          apiPath(response.url()) ===
+            `/api/authoring/sessions/${created.sessionPid}/studio-batches`,
+      );
+      await page.getByTestId('designer-save').click();
+      const saved = await expectApiData<PatchResult>(
+        await saveResponse,
+        'save legitimate runtime-sanitization baseline',
+      );
+      const maliciousHtml =
+        '<b>Runtime boundary safe</b><script>window.__authoring_runtime_xss=1</script><a href="javascript:alert(1)" onclick="window.__authoring_runtime_click=1">unsafe</a>';
+      await mutateAuthoringDraftContent(created.changeSetPid, descriptionId, maliciousHtml);
+
+      const prepared = await prepareAndSubmitInStudio(page, created.sessionPid);
+      expect(prepared.revision).toBe(saved.session.revision);
+      const reviewer = await openReviewer(browser);
+      try {
+        await openReviewWorkspace(reviewer, created.changeSetPid, prepared.revision);
+        await reviewer
+          .getByTestId('authoring-governance-reason')
+          .fill('PC 门禁：验证发布和运行读取边界二次净化');
+        const approvalResponse = reviewer.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            apiPath(response.url()) ===
+              `/api/authoring/change-sets/${created.changeSetPid}/approve`,
+        );
+        await reviewer.getByTestId('authoring-governance-approve').click();
+        await expectApiData(await approvalResponse, 'approve runtime-sanitization revision');
+      } finally {
+        await reviewer.context().close();
+      }
+
+      const published = await expectApiData<Release>(
+        await page.request.post(`/api/authoring/change-sets/${created.changeSetPid}/publish`, {
+          data: { expectedRevision: prepared.revision },
+        }),
+        'publish runtime-sanitization revision',
+      );
+      expect(published.status).toBe('ACTIVE');
+      const runtimeProbe = await browser.newContext({
+        storageState: { cookies: [], origins: [] },
+      });
+      const probePage = await runtimeProbe.newPage();
+      try {
+        await login(probePage);
+        const deployed = await expectApiData<Record<string, unknown>>(
+          await probePage.request.get(`/api/pages/key/${pageKey}`),
+          'read runtime-sanitized active release',
+        );
+        const deployedJson = JSON.stringify(deployed);
+        expect(deployedJson).toContain('<b>Runtime boundary safe</b>');
+        expect(deployedJson).not.toMatch(/<script|javascript:|onclick/i);
+        expect((deployed.runtime as Record<string, unknown>).source).toBe('AUTHORING_RELEASE');
+        expect((deployed.runtime as Record<string, unknown>).releasePid).toBe(published.releasePid);
+
+        await probePage.goto('/', { waitUntil: 'domcontentloaded' });
+        const newMenu = probePage.locator('nav').locator(`a[href="${route}"]`).first();
+        await expect(newMenu).toBeVisible({ timeout: 15_000 });
+        await newMenu.click();
+        await expect(probePage).toHaveURL(new RegExp(`${route}$`));
+        const runtime = probePage.getByRole('main').first();
+        await expect(runtime.getByText('Runtime boundary safe')).toBeVisible();
+        expect(
+          await probePage.evaluate(() => ({
+            script: (window as Window & { __authoring_runtime_xss?: number })
+              .__authoring_runtime_xss,
+            click: (window as Window & { __authoring_runtime_click?: number })
+              .__authoring_runtime_click,
+          })),
+        ).toEqual({ script: undefined, click: undefined });
+        await expect(runtime.locator('script')).toHaveCount(0);
+        await expect(runtime.locator('a[href^="javascript:"]')).toHaveCount(0);
+        await mkdir(SCREENSHOT_DIR, { recursive: true });
+        await probePage.screenshot({
+          path: resolve(SCREENSHOT_DIR, 'pc-auth-043-runtime-resanitized.png'),
+          fullPage: true,
+        });
+      } finally {
+        await runtimeProbe.close();
+      }
+    } finally {
+      await cleanupMaterializedNewPage(pageKey);
+    }
+  });
+
+  test('PC-AUTH-042 @critical — Studio return restores the real record, query, scroll and selected block', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 520 });
+    const menuLink = page.locator('nav').locator(`a[href="${gatePage.route}"]`).first();
+    await expect(menuLink).toBeVisible();
+    await menuLink.click();
+    await expect(page.getByText(gatePage.recordMarker)).toBeVisible();
+
+    const sourceParams = new URLSearchParams({
+      tab: 'record-overview',
+      'filter.status': 'active',
+      sort: 'e2et_name:asc',
+      pageNum: '1',
+    });
+    await page.goto(`${gatePage.route}?${sourceParams.toString()}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    const sourceRow = page.locator('tr').filter({ hasText: gatePage.recordMarker }).first();
+    await expect(sourceRow).toBeVisible();
+    // This gate copies the currently published runtime schema. Some supported
+    // list profiles expose detail navigation on the row itself and intentionally
+    // omit a row-action column, so drive the real, profile-independent entry.
+    await sourceRow.click();
+    await expect(page).toHaveURL(/\/p\/e2et_record\/view\/[^/?#]+/);
+    await expect(page.getByTestId('detail-page-skeleton')).toHaveCount(0);
+    await expect(page.getByTestId('ab:detail:e2et_record:container')).toBeVisible();
+    await expect(page.getByText(gatePage.recordMarker)).toBeVisible();
+
+    const sourceUrl = new URL(page.url());
+    const sourceRoute = `${sourceUrl.pathname}${sourceUrl.search}${sourceUrl.hash}`;
+    const recordPid = sourceUrl.pathname.split('/').at(-1)!;
+    expect(sourceUrl.searchParams.get('tab')).toBe('record-overview');
+    expect(sourceUrl.searchParams.get('filter.status')).toBe('active');
+    expect(sourceUrl.searchParams.get('sort')).toBe('e2et_name:asc');
+    expect(sourceUrl.searchParams.get('pageNum')).toBe('1');
+
+    const pageScroll = page.locator('[data-aura-scroll-container="page-content"]');
+    await expect(pageScroll).toBeVisible();
+    const sourceScrollY = await pageScroll.evaluate((container) => {
+      const target = Math.min(160, container.scrollHeight - container.clientHeight);
+      container.scrollTo(0, Math.max(0, target));
+      return container.scrollTop;
+    });
+    expect(
+      sourceScrollY,
+      'detail route must exercise a non-window scroll container',
+    ).toBeGreaterThan(0);
+
+    const sessionResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) === '/api/authoring/sessions',
+    );
+    await page.getByTestId('contextual-authoring-enter').click();
+    const opened = await expectApiData<AuthoringSession>(
+      await sessionResponse,
+      'open detail authoring with interaction context',
+    );
+    const interaction = opened.interactionContext ?? {};
+    expect(interaction.route).toBe(sourceRoute);
+    expect(interaction.recordPid).toBe(recordPid);
+    expect(interaction.tabId).toBe('record-overview');
+    expect(interaction.filters).toEqual({ 'filter.status': ['active'] });
+    expect(interaction.sort).toEqual({ sort: ['e2et_name:asc'] });
+    expect(interaction.scroll).toEqual({
+      container: 'page-content',
+      x: 0,
+      y: sourceScrollY,
+    });
+
+    const selectedBlock = findFirstSelectableBlock(opened.snapshot);
+    expect(selectedBlock?.id, 'detail authoring snapshot selectable block').toBeTruthy();
+    const selectedBlockId = String(selectedBlock!.id);
+    await page.getByTestId('authoring-outline-open').click();
+    const contextualOutline = page.getByTestId(`authoring-outline-${selectedBlockId}`);
+    await expect(contextualOutline).toBeVisible();
+    await contextualOutline.click();
+    await expect(contextualOutline).toHaveClass(/bg-blue-50/);
+    await page
+      .getByTestId('authoring-inspector')
+      .getByRole('button', { name: '高级设置', exact: true })
+      .click();
+    const explain = page.getByRole('dialog', { name: '进入应用设计中心' });
+    await explain.getByRole('button', { name: '继续到应用设计中心' }).click();
+    await expect(page).toHaveURL(/\/unified-designer\?authoringSession=/);
+    await expect(page.getByTestId(`canvas-block-${selectedBlockId}`)).toHaveAttribute(
+      'data-selected',
+      'true',
+    );
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+    await expect(page.getByTestId(`canvas-block-${selectedBlockId}`)).toHaveAttribute(
+      'data-selected',
+      'true',
+    );
+    const returnSessionResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'GET' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}`,
+    );
+    const returnCapabilitiesResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'GET' &&
+        apiPath(response.url()) === '/api/authoring/capabilities',
+    );
+    await page.getByTestId('designer-return-link').click();
+
+    await expect(page).toHaveURL(sourceRoute);
+    expect((await returnSessionResponse).status(), 'return session reload').toBe(200);
+    expect((await returnCapabilitiesResponse).status(), 'return capability reload').toBe(200);
+    await expect(page.getByTestId('contextual-authoring-surface')).toBeVisible({ timeout: 10_000 });
+    const restoredOutline = page.getByTestId(`authoring-outline-${selectedBlockId}`);
+    await expect(restoredOutline).toBeVisible();
+    await expect(restoredOutline).toHaveClass(/bg-blue-50/);
+    await expect(page.getByTestId('authoring-inspector')).toBeVisible();
+    await expect
+      .poll(async () =>
+        Math.abs(
+          (await pageScroll.evaluate((container) => container.scrollTop)) - sourceScrollY,
+        ),
+      )
+      .toBeLessThanOrEqual(4);
+    const restored = await loadSession(page, opened.sessionPid, 'reload returned detail session');
+    expect(restored.interactionContext).toMatchObject({
+      route: sourceRoute,
+      recordPid,
+      tabId: 'record-overview',
+      filters: { 'filter.status': ['active'] },
+      sort: { sort: ['e2et_name:asc'] },
+      scroll: { container: 'page-content', x: 0, y: sourceScrollY },
+      selection: selectedBlockId,
+    });
+    expect((restored.interactionContext?.outlinePath as string[]).at(-1)).toBe(selectedBlockId);
+
+    await mkdir(SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-042-context-return.png'),
+      fullPage: true,
+    });
+  });
+
+  test('PC-AUTH-044 @critical — new-page workspace fails closed when no published model is available', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const source = await enterAuthoringFromMenu(page);
+    let createRequests = 0;
+    page.on('request', (request) => {
+      if (
+        request.method() === 'POST' &&
+        apiPath(request.url()) ===
+          `/api/authoring/sessions/${source.sessionPid}/new-page-workspaces`
+      ) {
+        createRequests += 1;
+      }
+    });
+    await page.route('**/api/authoring/new-page-workspace-options', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: '0',
+          data: { models: [], parentMenus: [], permissions: [] },
+        }),
+      });
+    });
+
+    await page.getByRole('button', { name: '新页面 / 菜单' }).click();
+    await page
+      .getByRole('dialog', { name: '在应用设计中心创建页面' })
+      .getByRole('button', { name: '继续到应用设计中心' })
+      .click();
+
+    const wizard = page.getByTestId('new-page-workspace-wizard');
+    await expect(wizard).toBeVisible();
+    await expect(wizard.getByLabel('业务模型')).toBeDisabled();
+    await expect(wizard.getByLabel('业务模型')).toContainText('暂无已发布模型');
+    await expect(wizard.getByRole('link', { name: '模型设计器' })).toHaveAttribute(
+      'href',
+      '/meta/models/new',
+    );
+    await expect(wizard.getByRole('button', { name: '创建并进入页面设计' })).toBeDisabled();
+    expect(createRequests).toBe(0);
+
+    await mkdir(SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-044-no-published-model.png'),
+      fullPage: true,
+    });
+    await wizard.getByRole('link', { name: '返回现场' }).click();
+    await expect(page).toHaveURL(new RegExp(`${gatePage.route}$`));
+    expect(createRequests).toBe(0);
+  });
+
   test('PC-AUTH-028 @critical — governed new page stays private until independent review and atomic publish', async ({
     page,
     browser,
@@ -1276,6 +2158,68 @@ async function cleanupMaterializedNewPage(pageKey: string): Promise<void> {
   }
 }
 
+async function mutateAuthoringDraftContent(
+  changeSetPid: string,
+  blockId: string,
+  content: string,
+): Promise<void> {
+  const client = new PgClient(PG_CONN);
+  await client.connect();
+  try {
+    const draft = await client.query<{ id: string; snapshot: Record<string, unknown> }>(
+      `SELECT draft.id::text, draft.snapshot
+         FROM ab_authoring_resource_draft draft
+         JOIN ab_authoring_change_set change_set ON change_set.id = draft.change_set_id
+        WHERE change_set.pid = $1 AND change_set.deleted_flag = FALSE`,
+      [changeSetPid],
+    );
+    expect(draft.rows).toHaveLength(1);
+    const snapshot = draft.rows[0].snapshot;
+    const mutate = (blocks: unknown[]): boolean => {
+      for (const item of blocks) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+        const block = item as Record<string, unknown>;
+        if (block.id === blockId) {
+          block.props = {
+            ...((block.props as Record<string, unknown> | undefined) ?? {}),
+            content,
+          };
+          return true;
+        }
+        if (Array.isArray(block.blocks) && mutate(block.blocks)) return true;
+      }
+      return false;
+    };
+    expect(mutate(snapshot.blocks as unknown[]), `draft block ${blockId} must exist`).toBe(true);
+    await client.query(
+      `UPDATE ab_authoring_resource_draft
+          SET snapshot = $2::jsonb,
+              validation_state = 'UNVALIDATED', impact_state = 'UNKNOWN',
+              stale_reason = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1::bigint`,
+      [draft.rows[0].id, JSON.stringify(snapshot)],
+    );
+    const stored = await client.query<{ content: string }>(
+      `WITH RECURSIVE block_tree AS (
+         SELECT block
+           FROM ab_authoring_resource_draft draft,
+                LATERAL jsonb_array_elements(draft.snapshot -> 'blocks') block
+          WHERE draft.id = $1::bigint
+         UNION ALL
+         SELECT child
+           FROM block_tree,
+                LATERAL jsonb_array_elements(COALESCE(block_tree.block -> 'blocks', '[]'::jsonb)) child
+       )
+       SELECT block #>> '{props,content}' AS content
+         FROM block_tree WHERE block ->> 'id' = $2`,
+      [draft.rows[0].id, blockId],
+    );
+    expect(stored.rows[0]?.content).toBe(content);
+  } finally {
+    await client.end();
+  }
+}
+
 async function publishDensityRevisionViaUi(
   page: Page,
   exerciseFailure: boolean,
@@ -1399,6 +2343,153 @@ async function enterAuthoringFromMenu(page: Page): Promise<AuthoringSession> {
   return session;
 }
 
+async function settleAuthoringDrag(page: Page): Promise<void> {
+  await page
+    .locator('[data-testid="drag-overlay-ghost"]')
+    .waitFor({ state: 'detached', timeout: 5000 })
+    .catch(() => {});
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolveFrame) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolveFrame())),
+      ),
+  );
+}
+
+async function authoringPointerDragTo(
+  page: Page,
+  source: Locator,
+  target: Locator,
+  options?: { targetPosition?: { x: number; y: number } },
+): Promise<void> {
+  const canvasBlocks = page.locator('[data-testid^="canvas-block-"]');
+  const beforeCount = await canvasBlocks.count();
+  await expect(async () => {
+    await target.scrollIntoViewIfNeeded();
+    await source.scrollIntoViewIfNeeded();
+    const sourceBox = await source.boundingBox();
+    const targetBox = await target.boundingBox();
+    expect(sourceBox, 'pointer drag source bounding box').not.toBeNull();
+    expect(targetBox, 'pointer drag target bounding box').not.toBeNull();
+    const startX = sourceBox!.x + sourceBox!.width / 2;
+    const startY = sourceBox!.y + sourceBox!.height / 2;
+    const endX = targetBox!.x + (options?.targetPosition?.x ?? targetBox!.width / 2);
+    const endY = targetBox!.y + (options?.targetPosition?.y ?? targetBox!.height / 2);
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 12, startY + 12, { steps: 6 });
+    await expect(
+      page.getByTestId('drag-overlay-ghost'),
+      'a real pointer drag must expose the visible drag object before drop',
+    ).toBeVisible();
+    await page.mouse.move(endX, endY, { steps: 18 });
+    await page.mouse.move(endX + 2, endY + 2, { steps: 4 });
+    await page.mouse.up();
+    await settleAuthoringDrag(page);
+    expect(await canvasBlocks.count()).toBeGreaterThan(beforeCount);
+  }).toPass({ timeout: 20_000 });
+}
+
+async function authoringContainerDropPosition(target: Locator): Promise<{ x: number; y: number }> {
+  const box = await target.boundingBox();
+  expect(box, 'authoring container bounding box').not.toBeNull();
+  return { x: 6, y: Math.min(200, Math.max(24, box!.height / 2)) };
+}
+
+async function switchAuthoringResourceTab(
+  page: Page,
+  tab: 'outline' | 'blocks' | 'fields',
+): Promise<void> {
+  const button = page.getByTestId(`resource-tab-${tab}`);
+  await expect(async () => {
+    await button.click();
+    await expect(button).toHaveAttribute('data-active', 'true', { timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+}
+
+async function authoringDragCanvasBlockBefore(
+  page: Page,
+  movingBlockId: string,
+  targetBlockId: string,
+): Promise<void> {
+  const handle = page.getByTestId(`block-drag-handle-${movingBlockId}`);
+  const target = page.getByTestId(`canvas-block-${targetBlockId}`);
+  await expect(handle).toBeVisible();
+  await expect(target).toBeVisible();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await target.scrollIntoViewIfNeeded();
+    await handle.scrollIntoViewIfNeeded();
+    const handleBox = await handle.boundingBox();
+    expect(handleBox, 'reorder drag handle bounding box').not.toBeNull();
+    const startX = handleBox!.x + handleBox!.width / 2;
+    const startY = handleBox!.y + handleBox!.height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    let beforeIntentVisible = false;
+    try {
+      await page.mouse.move(startX + 10, startY + 10, { steps: 6 });
+      await expect(
+        page.getByTestId('drag-overlay-ghost'),
+        'a reorder gesture must activate the visible drag object',
+      ).toBeVisible({ timeout: 2_000 });
+      // dnd-kit auto-scrolls the canvas while a lower block moves upward. Re-read
+      // the live target box after each move instead of dropping at stale coordinates.
+      for (let targetAttempt = 0; targetAttempt < 6; targetAttempt += 1) {
+        const liveTargetBox = await target.boundingBox();
+        expect(liveTargetBox, 'live reorder target bounding box').not.toBeNull();
+        await page.mouse.move(
+          liveTargetBox!.x + Math.min(24, liveTargetBox!.width / 4),
+          liveTargetBox!.y + Math.min(10, liveTargetBox!.height / 6),
+          { steps: targetAttempt === 0 ? 20 : 6 },
+        );
+        beforeIntentVisible = await page
+          .getByTestId(`drop-indicator-before-${targetBlockId}`)
+          .isVisible()
+          .catch(() => false);
+        if (beforeIntentVisible) break;
+      }
+    } finally {
+      await page.mouse.up();
+    }
+    await settleAuthoringDrag(page);
+    if (!beforeIntentVisible) continue;
+    const ordered = await page
+      .locator('[data-testid^="canvas-block-"]')
+      .evaluateAll((nodes, [firstId, secondId]) => {
+        const ids = nodes.map(
+          (node) => node.getAttribute('data-testid')?.replace('canvas-block-', '') ?? '',
+        );
+        return ids.indexOf(firstId) < ids.indexOf(secondId);
+      }, [movingBlockId, targetBlockId] as const);
+    if (ordered) return;
+  }
+  throw new Error(`real pointer reorder did not place ${movingBlockId} before ${targetBlockId}`);
+}
+
+async function expectAuthoringBlockBefore(
+  page: Page,
+  firstBlockId: string,
+  secondBlockId: string,
+): Promise<void> {
+  await expect
+    .poll(async () => {
+      const ids = await page
+        .locator('[data-testid^="canvas-block-"]')
+        .evaluateAll((nodes) =>
+          nodes.map((node) => node.getAttribute('data-testid')?.replace('canvas-block-', '') ?? ''),
+        );
+      return ids.indexOf(firstBlockId) < ids.indexOf(secondBlockId);
+    })
+    .toBe(true);
+}
+
+async function loadAuthoringChangeItems(page: Page, sessionPid: string): Promise<ChangeItem[]> {
+  return expectApiData<ChangeItem[]>(
+    await page.request.get(`/api/authoring/sessions/${sessionPid}/change-items`),
+    'load governed Builder ChangeItems',
+  );
+}
+
 async function seedReleaseGateRecord(): Promise<string> {
   const marker = `AUTHORING-RELEASE-REAL-${Date.now().toString(36)}`;
   const client = new PgClient(PG_CONN);
@@ -1481,6 +2572,26 @@ function findTableBlock(value: unknown): Record<string, unknown> | null {
     if (found) return found;
   }
   return null;
+}
+
+function findFirstSelectableBlock(value: unknown): Record<string, unknown> | null {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findFirstSelectableBlock(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id === 'string' &&
+    record.id &&
+    (typeof record.blockType === 'string' || typeof record.type === 'string')
+  ) {
+    return record;
+  }
+  return findFirstSelectableBlock(record.blocks);
 }
 
 function readObjectPath(root: Record<string, unknown>, path: string): unknown {

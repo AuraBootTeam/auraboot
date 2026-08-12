@@ -23,6 +23,7 @@ import static org.springframework.http.HttpStatus.CONFLICT;
 public class AuthoringChangeSetSplitter {
 
     private static final String MOVE_PATH = "/blocks/@order";
+    private static final String PAGE_KIND_PATH = "/$page/kind";
 
     private final AuthoringSnapshotTargetResolver targetResolver;
     private final AuthoringJsonObjectPatchApplier patchApplier;
@@ -98,6 +99,12 @@ public class AuthoringChangeSetSplitter {
     }
 
     private JsonNode applyForward(JsonNode snapshot, ChangeItem item) {
+        if (PAGE_KIND_PATH.equals(item.propertyPath())) {
+            AuthoringStableBlockTreeEditor.StructureResult result = blockTreeEditor.switchPageKind(
+                    snapshot, item.newValue().asText());
+            requireSame(result.previousValue(), item.oldValue());
+            return result.snapshot();
+        }
         if ("MOVE".equals(item.operation())) {
             AuthoringStableBlockTreeEditor.MoveResult result = blockTreeEditor.moveBefore(
                     snapshot, item.blockId(), beforeBlockId(item.newValue()));
@@ -114,6 +121,12 @@ public class AuthoringChangeSetSplitter {
     }
 
     private JsonNode applyInverse(JsonNode snapshot, ChangeItem item) {
+        if (PAGE_KIND_PATH.equals(item.propertyPath())) {
+            AuthoringStableBlockTreeEditor.StructureResult result = blockTreeEditor.switchPageKind(
+                    snapshot, item.oldValue().asText());
+            requireSame(result.previousValue(), item.newValue());
+            return result.snapshot();
+        }
         if ("MOVE".equals(item.operation())) {
             AuthoringStableBlockTreeEditor.MoveResult result = blockTreeEditor.moveBefore(
                     snapshot, item.blockId(), beforeBlockId(item.oldValue()));

@@ -36,18 +36,27 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
     public static final String CREATE_BLOCK_PATH = "/$structure/create";
     public static final String REMOVE_BLOCK_PATH = "/$structure/remove";
     public static final String RELOCATE_BLOCK_PATH = "/$structure/parent";
+    public static final String PAGE_MANIFEST_BLOCK_TYPE = "$page";
+    public static final String PAGE_KIND_PATH = "/$page/kind";
+    public static final String TEMPLATE_LINEAGE_PATH = "/extension/authoringTemplateLineage";
+    public static final String COPY_LINEAGE_PATH = "/extension/authoringCopyLineage";
     private static final Set<PatchOperation> VALUE_OPERATIONS =
             Set.copyOf(EnumSet.of(PatchOperation.ADD, PatchOperation.REPLACE, PatchOperation.REMOVE));
     private static final Set<String> SAFE_CREATABLE_BLOCK_TYPES = Set.of(
             "form", "list", "detail", "dashboard", "form-section", "detail-section",
             "tabs", "tab", "filter-bar", "action-bar", "table", "widget", "stat-card",
-            "description", "rich-text", "chart", "field", "column", "filter-field");
+            "description", "rich-text", "chart", "field", "column", "filter-field", "action");
 
     private final Map<String, CapabilityManifest> manifests;
     private final String registryChecksum;
 
     public CoreAuthoringCapabilityRegistry() {
         Map<String, Map<String, PropertyCapability>> definitions = new LinkedHashMap<>();
+
+        definitions.put(PAGE_MANIFEST_BLOCK_TYPE, Map.of(
+                PAGE_KIND_PATH,
+                property(PAGE_KIND_PATH, Route.HANDOFF_STUDIO, RiskLevel.L3,
+                        effects(EffectTag.PRESENTATION), Reversibility.REVERSIBLE, false, true)));
 
         definitions.put("field", properties(
                 commonTitle(), commonSpan(), reorderWithinParent(), fieldBinding(),
@@ -64,6 +73,8 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
 
         definitions.put("action", properties(
                 commonTitle(), commonSpan(), reorderWithinParent(),
+                property("/actionType", Route.HANDOFF_STUDIO, RiskLevel.L3,
+                        effects(EffectTag.BUSINESS_ACTION), Reversibility.REVERSIBLE, false, true),
                 property("/props/label", Route.GUIDED_INLINE, RiskLevel.L2,
                         effects(EffectTag.PRESENTATION),
                         Reversibility.REVERSIBLE, true, true),
@@ -77,8 +88,10 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
                         Reversibility.REVERSIBLE, false, true),
                 property("/props/targetPage", Route.GUIDED_INLINE, RiskLevel.L2,
                         effects(EffectTag.NAVIGATION), Reversibility.REVERSIBLE, false, true),
+                property("/props/command", Route.HANDOFF_STUDIO, RiskLevel.L3,
+                        effects(EffectTag.BUSINESS_ACTION), Reversibility.REVERSIBLE, true, true),
                 property("/props/commandCode", Route.HANDOFF_STUDIO, RiskLevel.L3,
-                        effects(EffectTag.BUSINESS_ACTION), Reversibility.REVERSIBLE, false, true)));
+                        effects(EffectTag.BUSINESS_ACTION), Reversibility.REVERSIBLE, true, true)));
 
         definitions.put("chart", properties(
                 commonTitle(), commonSpan(), reorderWithinParent(),
@@ -112,6 +125,8 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
             }
             Map<String, PropertyCapability> withCreate = new LinkedHashMap<>(propertyMap);
             withCreate.put(CREATE_BLOCK_PATH, createBlock());
+            withCreate.put(TEMPLATE_LINEAGE_PATH, templateLineage());
+            withCreate.put(COPY_LINEAGE_PATH, copyLineage());
             return Map.copyOf(withCreate);
         });
 
@@ -203,6 +218,30 @@ public class CoreAuthoringCapabilityRegistry implements AuthoringCapabilityRegis
 
     private PropertyCapability relocateBlock() {
         return structureCapability(RELOCATE_BLOCK_PATH, PatchOperation.MOVE);
+    }
+
+    private PropertyCapability templateLineage() {
+        return new PropertyCapability(
+                TEMPLATE_LINEAGE_PATH,
+                Set.of(PatchOperation.ADD),
+                Route.HANDOFF_STUDIO,
+                RiskLevel.L3,
+                effects(EffectTag.PRESENTATION),
+                Reversibility.REVERSIBLE,
+                false,
+                false);
+    }
+
+    private PropertyCapability copyLineage() {
+        return new PropertyCapability(
+                COPY_LINEAGE_PATH,
+                Set.of(PatchOperation.ADD),
+                Route.HANDOFF_STUDIO,
+                RiskLevel.L3,
+                effects(EffectTag.PRESENTATION),
+                Reversibility.REVERSIBLE,
+                true,
+                false);
     }
 
     private PropertyCapability structureCapability(String path, PatchOperation operation) {

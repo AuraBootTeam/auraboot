@@ -50,6 +50,9 @@ public class AuthoringPageSnapshotFactory {
         snapshot.set("title", parseOrDefault(page.getTitle(), objectMapper.createObjectNode()));
         snapshot.set("layout", parseOrDefault(page.getLayout(), objectMapper.createObjectNode()));
         snapshot.set("blocks", parseOrDefault(page.getBlocks(), objectMapper.createArrayNode()));
+        if (page.getExtension() != null) {
+            snapshot.set("extension", objectMapper.valueToTree(page.getExtension()));
+        }
         return normalizeForAuthoring(snapshot);
     }
 

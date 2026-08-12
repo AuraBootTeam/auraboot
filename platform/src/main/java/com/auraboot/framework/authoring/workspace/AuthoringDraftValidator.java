@@ -15,6 +15,7 @@ import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityReg
 import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.RELOCATE_BLOCK_PATH;
 import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.REMOVE_BLOCK_PATH;
 import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.REORDER_WITHIN_PARENT_PATH;
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.PAGE_KIND_PATH;
 
 /** Validates the current server-owned draft without executing page business behavior. */
 @Component
@@ -101,6 +102,10 @@ public class AuthoringDraftValidator {
             validateResourceChange(item, issues);
             return;
         }
+        if (PAGE_KIND_PATH.equals(item.propertyPath())) {
+            validatePageKindChange(item, issues);
+            return;
+        }
         if (item.propertyPath().startsWith("/$structure/")) {
             validateStructureChange(item, blocksById, issues);
             return;
@@ -156,6 +161,16 @@ public class AuthoringDraftValidator {
         if (!"ADD".equals(item.operation()) || item.newValue() == null || !item.newValue().isObject()) {
             issues.add(issue("RESOURCE_ADD_INVALID", item.pid(), item.blockId(),
                     item.propertyPath(), "authoring.validation.resource-add-invalid"));
+        }
+    }
+
+    private void validatePageKindChange(ChangeItem item, List<ValidationIssue> issues) {
+        if (!"REPLACE".equals(item.operation()) || item.newValue() == null
+                || !item.newValue().isTextual()
+                || !Set.of("form", "list", "detail", "dashboard")
+                        .contains(item.newValue().asText())) {
+            issues.add(issue("PAGE_KIND_CHANGE_INVALID", item.pid(), item.blockId(),
+                    item.propertyPath(), "authoring.validation.page-kind-change-invalid"));
         }
     }
 

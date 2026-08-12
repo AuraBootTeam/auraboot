@@ -100,6 +100,8 @@ interface ContextualConflictState {
   pendingCount: number;
 }
 
+const AUTHORING_RETURN_REQUEST_STORAGE_KEY = 'auraboot.authoring.return-request';
+
 export function ContextualAuthoringSurface({
   schema,
   recordPid,
@@ -158,8 +160,13 @@ export function ContextualAuthoringSurface({
     null,
   );
   const runtimeRootRef = useRef<HTMLDivElement | null>(null);
-  const entryScrollRef = useRef({ x: 0, y: 0 });
-  const returnResumeAttemptedRef = useRef(false);
+  const latestSchemaRef = useRef(schema);
+  latestSchemaRef.current = schema;
+  const entryScrollRef = useRef<AuthoringScrollContext>({ x: 0, y: 0 });
+  const pendingEntryInteractionRef = useRef<ReturnType<typeof captureInteractionContext> | null>(
+    null,
+  );
+  const returnResumeAttemptedRef = useRef<string | null>(null);
   const permissionLossObservedRef = useRef(false);
   const recoveryActorId = user?.id == null ? null : String(user.id);
 
@@ -308,16 +315,22 @@ export function ContextualAuthoringSurface({
   }, [savePermissionRevoked]);
 
   useEffect(() => {
-    if (returnResumeAttemptedRef.current) return;
     const resume = readAuthoringReturnRequest();
     if (!resume) return;
-    returnResumeAttemptedRef.current = true;
+    const resumeKey = `${schema.id}:${resume.sessionPid}`;
+    if (returnResumeAttemptedRef.current === resumeKey) return;
+    returnResumeAttemptedRef.current = resumeKey;
+    // The handoff parameters are one-shot transport metadata. Consume them
+    // synchronously so slow session recovery never leaves the opaque token in
+    // the address bar, browser history or a copied business URL.
+    clearAuthoringReturnParams();
     if (!canConfigure) {
       setError('当前账号无权恢复配置会话');
       return;
     }
 
     let cancelled = false;
+    let settled = false;
     setOpening(true);
     setError(null);
     setLeaseTakeoverFeedback(null);
@@ -328,7 +341,8 @@ export function ContextualAuthoringSurface({
           throw new Error('返回的配置会话与当前页面不一致');
         }
         if (cancelled) return;
-        const restoredSchema = schemaFromSnapshot(schema, restored.snapshot);
+        const sourceSchema = latestSchemaRef.current;
+        const restoredSchema = schemaFromSnapshot(sourceSchema, restored.snapshot);
         const restoredTree = buildAuthoringTree(restoredSchema);
         const restoredIndex = indexTree(restoredTree);
         const contextSelection = contextSelectionId(restored.interactionContext);
@@ -348,14 +362,14 @@ export function ContextualAuthoringSurface({
         setSelectedId(selected ?? schema.id);
         setOutlineOpen(true);
         setInspectorOpen(true);
-        clearAuthoringReturnParams();
+        clearCachedAuthoringReturnRequest();
         requestAnimationFrame(() => {
-          window.scrollTo(scroll.x, scroll.y);
           if (selected && selected !== schema.id) {
             runtimeRootRef.current
               ?.querySelector<HTMLElement>(`[data-aura-block-id="${cssEscape(selected)}"]`)
               ?.scrollIntoView({ block: 'center' });
           }
+          restoreInteractionScroll(scroll);
         });
       })
       .catch((resumeError) => {
@@ -364,13 +378,20 @@ export function ContextualAuthoringSurface({
         }
       })
       .finally(() => {
+        settled = true;
         if (!cancelled) setOpening(false);
       });
 
     return () => {
       cancelled = true;
+      // Permission/schema readiness can legitimately change while the two
+      // recovery requests are in flight. Let the next effect lifecycle resume
+      // the same per-tab request instead of leaving the UI permanently opening.
+      if (!settled && returnResumeAttemptedRef.current === resumeKey) {
+        returnResumeAttemptedRef.current = null;
+      }
     };
-  }, [canConfigure, schema]);
+  }, [canConfigure, schema.id]);
 
   const restoreLocalRecovery = useCallback(async () => {
     if (!canConfigure || !recoveryActorId || !recoveryPolicy || localRecoveryPending) return;
@@ -491,14 +512,19 @@ export function ContextualAuthoringSurface({
 
   const enter = useCallback(async () => {
     if (!canConfigure || opening) return;
+    // Pointer activation can move focus and reflow the runtime before `click`
+    // runs. Reuse the pre-activation snapshot when present so the source
+    // position is the place the user acted from, not the partially changed UI.
+    const interactionContext =
+      pendingEntryInteractionRef.current ?? captureInteractionContext(recordPid, schema.id);
+    pendingEntryInteractionRef.current = null;
+    entryScrollRef.current = contextScroll(interactionContext);
     setOpening(true);
     setError(null);
     setLeaseTakeoverFeedback(null);
     setSaveReconciliationFeedback(null);
-    entryScrollRef.current = { x: window.scrollX, y: window.scrollY };
     try {
       await ensureRecoveryPolicy();
-      const interactionContext = captureInteractionContext(recordPid, schema.id);
       const [opened, registry] = await Promise.all([
         openAuthoringSession(schema.id, interactionContext),
         loadAuthoringCapabilities(),
@@ -518,6 +544,10 @@ export function ContextualAuthoringSurface({
       setOpening(false);
     }
   }, [canConfigure, ensureRecoveryPolicy, opening, recordPid, schema]);
+
+  const captureEntryInteraction = useCallback(() => {
+    pendingEntryInteractionRef.current = captureInteractionContext(recordPid, schema.id);
+  }, [recordPid, schema.id]);
 
   const exit = useCallback(() => {
     if (
@@ -543,9 +573,7 @@ export function ContextualAuthoringSurface({
     setWriteBlocked(false);
     setOutlineOpen(false);
     setInspectorOpen(false);
-    requestAnimationFrame(() =>
-      window.scrollTo(entryScrollRef.current.x, entryScrollRef.current.y),
-    );
+    requestAnimationFrame(() => restoreInteractionScroll(entryScrollRef.current));
   }, [localRecoveryStorageFailed, pendingEdits.size, schema]);
 
   useEffect(() => {
@@ -1229,6 +1257,10 @@ export function ContextualAuthoringSurface({
           <button
             type="button"
             onClick={enter}
+            onPointerDown={captureEntryInteraction}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') captureEntryInteraction();
+            }}
             disabled={opening}
             className="border-border-strong bg-panel text-text hover:bg-hover fixed right-6 bottom-6 z-30 inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-lg disabled:cursor-wait disabled:opacity-70"
             data-testid="contextual-authoring-enter"
@@ -2349,7 +2381,7 @@ function captureInteractionContext(recordPid?: string, selection?: string) {
     ...(search.get('tab') ? { tabId: search.get('tab')! } : {}),
     ...(Object.keys(filters).length > 0 ? { filters } : {}),
     ...(Object.keys(sort).length > 0 ? { sort } : {}),
-    scroll: { x: window.scrollX, y: window.scrollY },
+    scroll: captureInteractionScroll(),
     viewport: {
       width: window.innerWidth,
       height: window.innerHeight,
@@ -2375,18 +2407,60 @@ function readAuthoringReturnRequest(): { sessionPid: string; focusBlockId: strin
   if (typeof window === 'undefined') return null;
   const search = new URLSearchParams(window.location.search);
   const sessionPid = search.get('authoringReturn');
-  if (!sessionPid) return null;
-  return {
-    sessionPid,
-    focusBlockId: search.get('authoringFocus'),
-  };
+  if (sessionPid) {
+    const request = {
+      sessionPid,
+      focusBlockId: search.get('authoringFocus'),
+      returnRoute: authoringReturnBusinessRoute(),
+    };
+    try {
+      window.sessionStorage.setItem(AUTHORING_RETURN_REQUEST_STORAGE_KEY, JSON.stringify(request));
+    } catch {
+      // URL transport remains sufficient when per-tab storage is unavailable.
+    }
+    return request;
+  }
+  try {
+    const raw = window.sessionStorage.getItem(AUTHORING_RETURN_REQUEST_STORAGE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as Record<string, unknown>;
+    if (
+      typeof cached.sessionPid !== 'string' ||
+      typeof cached.returnRoute !== 'string' ||
+      cached.returnRoute !== authoringReturnBusinessRoute()
+    ) {
+      return null;
+    }
+    return {
+      sessionPid: cached.sessionPid,
+      focusBlockId: typeof cached.focusBlockId === 'string' ? cached.focusBlockId : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function clearAuthoringReturnParams(): void {
   const url = new URL(window.location.href);
   url.searchParams.delete('authoringReturn');
   url.searchParams.delete('authoringFocus');
-  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  const cleanRoute = `${url.pathname}${url.search}${url.hash}`;
+  window.history.replaceState(window.history.state, '', cleanRoute);
+}
+
+function authoringReturnBusinessRoute(): string {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('authoringReturn');
+  url.searchParams.delete('authoringFocus');
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+function clearCachedAuthoringReturnRequest(): void {
+  try {
+    window.sessionStorage.removeItem(AUTHORING_RETURN_REQUEST_STORAGE_KEY);
+  } catch {
+    // Best effort only; route matching prevents a stale request leaking to a different page.
+  }
 }
 
 function contextSelectionId(context: Record<string, unknown>): string | null {
@@ -2398,13 +2472,42 @@ function contextSelectionId(context: Record<string, unknown>): string | null {
   return last || null;
 }
 
-function contextScroll(context: Record<string, unknown>): { x: number; y: number } {
+type AuthoringScrollContext = { x: number; y: number; container?: string };
+
+function captureInteractionScroll(): AuthoringScrollContext {
+  const container = document.querySelector<HTMLElement>('[data-aura-scroll-container]');
+  if (!container) return { x: window.scrollX, y: window.scrollY };
+  const containerId = container.dataset.auraScrollContainer;
+  return {
+    x: container.scrollLeft,
+    y: container.scrollTop,
+    ...(containerId ? { container: containerId } : {}),
+  };
+}
+
+function restoreInteractionScroll(scroll: AuthoringScrollContext): void {
+  if (scroll.container) {
+    const container = document.querySelector<HTMLElement>(
+      `[data-aura-scroll-container="${cssEscape(scroll.container)}"]`,
+    );
+    if (container) {
+      container.scrollTo(scroll.x, scroll.y);
+      return;
+    }
+  }
+  window.scrollTo(scroll.x, scroll.y);
+}
+
+function contextScroll(context: Record<string, unknown>): AuthoringScrollContext {
   const scroll = context.scroll;
   if (!scroll || typeof scroll !== 'object' || Array.isArray(scroll)) return { x: 0, y: 0 };
   const value = scroll as Record<string, unknown>;
   return {
     x: finiteNumber(value.x),
     y: finiteNumber(value.y),
+    ...(typeof value.container === 'string' && value.container
+      ? { container: value.container }
+      : {}),
   };
 }
 
@@ -2888,6 +2991,9 @@ function cssEscape(value: string): string {
 
 export const contextualAuthoringTestUtils = {
   buildAuthoringTree,
+  captureInteractionScroll,
+  contextScroll,
   indexTree,
   isSafePreviewInteraction,
+  restoreInteractionScroll,
 };

@@ -46,9 +46,9 @@ export interface AuthoringPermissionSnapshot {
 
 export class AuthoringServiceError extends Error {
   readonly code: string;
-  readonly context: Record<string, unknown> | null;
+  readonly context: unknown;
 
-  constructor(message: string, code: string | number, context?: Record<string, unknown> | null) {
+  constructor(message: string, code: string | number, context?: unknown) {
     super(message);
     this.name = 'AuthoringServiceError';
     this.code = String(code);
@@ -407,6 +407,7 @@ export async function applyAuthoringStudioBatch(
       method: 'post',
       params: {
         expectedRevision: revision,
+        kindSwitch: plan.kindSwitch,
         creates: plan.creates,
         relocations: plan.relocations,
         removes: plan.removes,
@@ -627,7 +628,7 @@ function requireData<T>(
     data: T | null;
     message?: string;
     desc?: string;
-    context?: Record<string, unknown> | null;
+    context?: unknown;
   },
   fallback: string,
 ): T {

@@ -1041,8 +1041,8 @@ describe('UnifiedDesignerPage', () => {
     );
     expect(loadPageSchemaV3).not.toHaveBeenCalled();
     expect(screen.queryByTestId('designer-kind-switch')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('designer-export')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('designer-import')).not.toBeInTheDocument();
+    expect(screen.getByTestId('designer-export')).toBeInTheDocument();
+    expect(screen.getByTestId('designer-import')).toBeInTheDocument();
     expect(screen.queryByTestId('designer-versions')).not.toBeInTheDocument();
     expect(screen.queryByTestId('designer-publish')).not.toBeInTheDocument();
     await waitFor(() =>
@@ -1063,6 +1063,7 @@ describe('UnifiedDesignerPage', () => {
         'session_1',
         3,
         {
+          kindSwitch: null,
           creates: [],
           relocations: [],
           removes: [],

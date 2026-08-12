@@ -21,16 +21,23 @@ public class AuthoringHandoffContextMapper {
     }
 
     public JsonNode createPayload(WorkspaceRow workspace, CreateHandoffRequest request) {
+        return createPayload(workspace, request, workspace.interactionContext());
+    }
+
+    public JsonNode createPayload(
+            WorkspaceRow workspace,
+            CreateHandoffRequest request,
+            JsonNode interactionContext) {
         return objectMapper.valueToTree(Map.of(
                 "pagePid", workspace.pagePid(),
                 "changeSetPid", workspace.changeSetPid(),
                 "sessionPid", workspace.sessionPid(),
                 "revision", workspace.changeSetRevision(),
                 "intent", request.intent().name(),
-                "returnTo", returnTo(workspace.interactionContext()),
+                "returnTo", returnTo(interactionContext),
                 "blockId", safeNullable(request.blockId()),
                 "propertyPath", safeNullable(request.propertyPath()),
-                "interactionContext", workspace.interactionContext()));
+                "interactionContext", interactionContext));
     }
 
     public HandoffContextView toView(HandoffRow handoff) {

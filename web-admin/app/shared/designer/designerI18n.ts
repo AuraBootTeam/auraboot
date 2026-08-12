@@ -292,6 +292,11 @@ export const DESIGNER_I18N = {
     mode: { 'zh-CN': '模式', 'en-US': 'Mode' } as L,
     untitledPage: { 'zh-CN': '未命名页面', 'en-US': 'Untitled page' } as L,
     deleteBlock: { 'zh-CN': '删除', 'en-US': 'Delete' } as L,
+    duplicateBlock: { 'zh-CN': '复制区块', 'en-US': 'Duplicate block' } as L,
+    duplicateBlockHint: {
+      'zh-CN': '生成新 ID，并保留来源关系',
+      'en-US': 'Creates new IDs and preserves source lineage',
+    } as L,
     aiLockBadge: { 'zh-CN': 'AI 锁定', 'en-US': 'AI locked' } as L,
 
     // Multi-select batch bar (shift / cmd / ctrl + click on the canvas)
@@ -596,6 +601,13 @@ export const DESIGNER_I18N = {
     statusUnsaved: { 'zh-CN': '未保存', 'en-US': 'Unsaved' } as L,
     statusInvalid: { 'zh-CN': '校验失败 {count}', 'en-US': 'Invalid {count}' } as L,
     statusError: { 'zh-CN': '保存失败', 'en-US': 'Save failed' } as L,
+    protectedSemanticInvalid: {
+      'zh-CN':
+        '保存被拒绝：危险业务动作不能改成误导性文案或非危险样式。请保留动作真实意图与危险提示。',
+      'en-US':
+        'Save rejected: a dangerous business action cannot use a misleading label or non-danger styling. Preserve its true intent and warning treatment.',
+    } as L,
+    statusImportError: { 'zh-CN': '导入失败', 'en-US': 'Import failed' } as L,
     unsavedChanges: { 'zh-CN': '有未保存的更改', 'en-US': 'Unsaved changes' } as L,
     stay: { 'zh-CN': '留下', 'en-US': 'Stay' } as L,
     leave: { 'zh-CN': '离开', 'en-US': 'Leave' } as L,

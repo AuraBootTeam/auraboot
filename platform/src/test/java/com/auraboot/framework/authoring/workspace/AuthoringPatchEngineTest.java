@@ -9,6 +9,7 @@ import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
@@ -194,6 +195,34 @@ class AuthoringPatchEngineTest {
     }
 
     @Test
+    void studioPageKindSwitchKeepsStableRootAndRejectsIncompatibleDescendants() throws Exception {
+        ObjectNode source = (ObjectNode) objectMapper.readTree("""
+                {"kind":"list","blocks":[{"id":"stable-root","blockType":"list","blocks":[]}]}
+                """);
+
+        AuthoringPatchEngine.PreparedPatch switched = engine.prepareStudioPageKindSwitch(
+                source, "detail", checksum("$page"), ResourceScope.CURRENT_PAGE);
+
+        assertThat(switched.decision().route()).isEqualTo(Route.HANDOFF_STUDIO);
+        assertThat(switched.previousValue().asText()).isEqualTo("list");
+        assertThat(switched.savedValue().asText()).isEqualTo("detail");
+        assertThat(switched.snapshot().path("kind").asText()).isEqualTo("detail");
+        assertThat(switched.snapshot().at("/blocks/0/id").asText()).isEqualTo("stable-root");
+        assertThat(switched.snapshot().at("/blocks/0/blockType").asText()).isEqualTo("detail");
+        assertThat(source.path("kind").asText()).isEqualTo("list");
+
+        ObjectNode incompatible = (ObjectNode) objectMapper.readTree("""
+                {"kind":"list","blocks":[{"id":"stable-root","blockType":"list","blocks":[
+                  {"id":"table-1","blockType":"table"}
+                ]}]}
+                """);
+        assertThatThrownBy(() -> engine.prepareStudioPageKindSwitch(
+                incompatible, "detail", checksum("$page"), ResourceScope.CURRENT_PAGE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("incompatible-block");
+    }
+
+    @Test
     void studioCanCreateAColumnOnlyWhenItsFieldBelongsToThePageModel() throws Exception {
         when(metaModelService.getModelFields("production_exception"))
                 .thenReturn(List.of(FieldDefinition.builder().code("exception_no").build()));
@@ -344,6 +373,96 @@ class AuthoringPatchEngineTest {
     }
 
     @Test
+    void templateLineageCanOnlyBeAddedOnce() throws Exception {
+        ObjectNode source = snapshot("""
+                {"id":"desc-1","blockType":"description","props":{"content":"old"}}
+                """);
+        JsonNode lineage = objectMapper.readTree("""
+                {"templateId":"core_detail_summary","templateVersion":"1","sourceBlockId":"description"}
+                """);
+
+        AuthoringPatchEngine.PreparedPatch added = engine.prepareStudio(
+                source,
+                "desc-1",
+                "/extension/authoringTemplateLineage",
+                PatchOperation.ADD,
+                lineage,
+                checksum("description"), ResourceScope.CURRENT_PAGE);
+        assertThat(added.snapshot().at(
+                "/blocks/0/extension/authoringTemplateLineage/templateId").asText())
+                .isEqualTo("core_detail_summary");
+
+        assertThatThrownBy(() -> engine.prepareStudio(
+                added.snapshot(),
+                "desc-1",
+                "/extension/authoringTemplateLineage",
+                PatchOperation.REPLACE,
+                objectMapper.readTree("""
+                        {"templateId":"forged","templateVersion":"9","sourceBlockId":"other"}
+                        """),
+                checksum("description"), ResourceScope.CURRENT_PAGE))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void copyLineageRequiresOneTrustedSourceBlockIdAndCanOnlyBeAdded() throws Exception {
+        ObjectNode source = (ObjectNode) objectMapper.readTree("""
+                {"blocks":[
+                  {"id":"desc-source","blockType":"description","props":{"content":"old"}},
+                  {"id":"desc-copy","blockType":"description","props":{"content":"old"}}
+                ]}
+                """);
+
+        AuthoringPatchEngine.PreparedPatch added = engine.prepareStudio(
+                source,
+                "desc-copy",
+                "/extension/authoringCopyLineage",
+                PatchOperation.ADD,
+                objectMapper.readTree("""
+                        {"sourceBlockId":"desc-source"}
+                        """),
+                checksum("description"), ResourceScope.CURRENT_PAGE);
+        assertThat(added.snapshot().at(
+                "/blocks/1/extension/authoringCopyLineage/sourceBlockId").asText())
+                .isEqualTo("desc-source");
+
+        assertThatThrownBy(() -> engine.prepareStudio(
+                source,
+                "desc-copy",
+                "/extension/authoringCopyLineage",
+                PatchOperation.ADD,
+                objectMapper.readTree("""
+                        {"sourceBlockId":"desc-source","forged":"unsafe"}
+                        """),
+                checksum("description"), ResourceScope.CURRENT_PAGE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("protected_semantic_invalid");
+
+        assertThatThrownBy(() -> engine.prepareStudio(
+                source,
+                "desc-copy",
+                "/extension/authoringCopyLineage",
+                PatchOperation.ADD,
+                objectMapper.readTree("""
+                        {"sourceBlockId":"missing-source"}
+                        """),
+                checksum("description"), ResourceScope.CURRENT_PAGE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("protected_semantic_invalid");
+
+        assertThatThrownBy(() -> engine.prepareStudio(
+                added.snapshot(),
+                "desc-copy",
+                "/extension/authoringCopyLineage",
+                PatchOperation.REPLACE,
+                objectMapper.readTree("""
+                        {"sourceBlockId":"other"}
+                        """),
+                checksum("description"), ResourceScope.CURRENT_PAGE))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
     void unsafeNavigationTargetIsRejected() throws Exception {
         ObjectNode source = snapshot("""
                 {"id":"action-1","blockType":"action","props":{"targetPage":"/orders"}}
@@ -368,7 +487,7 @@ class AuthoringPatchEngineTest {
         when(commandDefinitionMapper.findCurrentByCode("order.delete")).thenReturn(deleteCommand);
         ObjectNode source = snapshot("""
                 {"id":"action-1","blockType":"action","props":{
-                  "commandCode":"order.delete","label":"Delete order","variant":"danger"
+                  "command":"order.delete","label":"Delete order","variant":"danger"
                 }}
                 """);
 
@@ -387,6 +506,15 @@ class AuthoringPatchEngineTest {
                 "/props/variant",
                 PatchOperation.REPLACE,
                 objectMapper.getNodeFactory().textNode("primary"),
+                checksum("action"), ResourceScope.CURRENT_PAGE))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("protected_semantic_invalid");
+        assertThatThrownBy(() -> engine.prepareStudio(
+                source,
+                "action-1",
+                "/props/command",
+                PatchOperation.REPLACE,
+                objectMapper.getNodeFactory().textNode("forged.missing"),
                 checksum("action"), ResourceScope.CURRENT_PAGE))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("protected_semantic_invalid");

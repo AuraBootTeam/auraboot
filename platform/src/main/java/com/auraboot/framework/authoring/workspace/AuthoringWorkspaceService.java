@@ -60,6 +60,8 @@ import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityReg
 import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.CREATE_BLOCK_PATH;
 import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.RELOCATE_BLOCK_PATH;
 import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.REMOVE_BLOCK_PATH;
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.PAGE_KIND_PATH;
+import static com.auraboot.framework.authoring.policy.CoreAuthoringCapabilityRegistry.PAGE_MANIFEST_BLOCK_TYPE;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -635,6 +637,24 @@ public class AuthoringWorkspaceService {
                 "STRUCTURE_RELOCATE_SAVED", metadata);
     }
 
+    private PatchResult switchStudioPageKind(
+            String sessionPid,
+            long expectedRevision,
+            String targetKind,
+            String manifestChecksum) {
+        Identity identity = identity();
+        WorkspaceRow workspace = requireWorkspace(identity, sessionPid, true);
+        validateWritable(workspace, identity, expectedRevision);
+        PreparedPatch prepared = patchEngine.prepareStudioPageKindSwitch(
+                workspace.snapshot(), targetKind, manifestChecksum,
+                snapshotFactory.resourceScope(workspace.snapshot()));
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("targetKind", targetKind);
+        return persistStructure(
+                workspace, identity, prepared, PAGE_MANIFEST_BLOCK_TYPE, PAGE_KIND_PATH,
+                "REPLACE", "PAGE_KIND_SWITCH_SAVED", metadata);
+    }
+
     /**
      * Persists one Studio document save as a single database transaction. Public single-operation
      * endpoints remain available for focused actions, while the workbench uses this batch boundary
@@ -648,7 +668,8 @@ public class AuthoringWorkspaceService {
                 + request.relocations().size()
                 + request.removes().size()
                 + request.moves().size()
-                + request.patches().size();
+                + request.patches().size()
+                + (request.kindSwitch() == null ? 0 : 1);
         if (total == 0 || total > 200) {
             throw new ResponseStatusException(
                     UNPROCESSABLE_ENTITY, "authoring.studio-batch.size-invalid");
@@ -656,6 +677,13 @@ public class AuthoringWorkspaceService {
 
         long revision = request.expectedRevision();
         List<String> changeItemPids = new ArrayList<>(total);
+        if (request.kindSwitch() != null) {
+            PatchResult result = switchStudioPageKind(
+                    sessionPid, revision, request.kindSwitch().targetKind(),
+                    request.kindSwitch().manifestChecksum());
+            revision = result.session().revision();
+            changeItemPids.add(result.changeItemPid());
+        }
         for (var create : request.creates()) {
             PatchResult result = createStudioBlock(sessionPid, new CreateBlockRequest(
                     revision, create.blockId(), create.blockType(), create.parentBlockId(),

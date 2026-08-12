@@ -83,6 +83,7 @@ import {
   authoringSnapshotToPageSchemaV3,
   buildStudioThreeWayMerge,
   planStudioAuthoringPatches,
+  studioPageKindSwitchEnabled,
   resolveStudioThreeWayMerge,
   studioCreatableBlockTypes,
   studioEditablePropertyPaths,
@@ -1399,6 +1400,13 @@ export default function UnifiedDesignerPage() {
     handoff && !reviewWorkspaceMode && canWriteContextualStudio && authoringCapabilities
       ? studioRelocatableBlockTypes(authoringCapabilities)
       : undefined;
+  const contextualPageKindSwitchEnabled = Boolean(
+    handoff &&
+      !reviewWorkspaceMode &&
+      canWriteContextualStudio &&
+      authoringCapabilities &&
+      studioPageKindSwitchEnabled(authoringCapabilities),
+  );
   const contextualReadOnly = Boolean(
     handoff &&
       (reviewWorkspaceMode ||
@@ -1444,6 +1452,7 @@ export default function UnifiedDesignerPage() {
       contextualCreatableBlockTypes={contextualCreatableBlockTypes}
       contextualRemovableBlockTypes={contextualRemovableBlockTypes}
       contextualRelocatableBlockTypes={contextualRelocatableBlockTypes}
+      contextualPageKindSwitchEnabled={contextualPageKindSwitchEnabled}
       governedAiCopilot={
         handoff &&
         !contextualReadOnly &&

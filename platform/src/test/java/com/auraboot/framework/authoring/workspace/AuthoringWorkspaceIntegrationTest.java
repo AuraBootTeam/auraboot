@@ -673,6 +673,7 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.targetRoute").value("/unified-designer"))
                 .andReturn().getResponse().getContentAsString();
         String contextId = objectMapper.readTree(createBody).at("/data/contextId").asText();
+        String rootBlockId = opened.snapshot().path("blocks").path(0).path("id").asText();
 
         String storedHash = jdbcTemplate.queryForObject(
                 "SELECT nonce_hash FROM ab_authoring_handoff_context WHERE change_set_id = "
@@ -690,7 +691,17 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.returnTo").value("/orders"))
                 .andExpect(jsonPath("$.data.blockId").value("table-1"))
                 .andExpect(jsonPath("$.data.propertyPath").value("/props/dataSource"))
-                .andExpect(jsonPath("$.data.interactionContext.recordPid").value("record-1"));
+                .andExpect(jsonPath("$.data.interactionContext.recordPid").value("record-1"))
+                .andExpect(jsonPath("$.data.interactionContext.selection").value("table-1"))
+                .andExpect(jsonPath("$.data.interactionContext.outlinePath[0]").value(page.getPid()))
+                .andExpect(jsonPath("$.data.interactionContext.outlinePath[1]").value(rootBlockId))
+                .andExpect(jsonPath("$.data.interactionContext.outlinePath[2]").value("table-1"));
+
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT interaction_context ->> 'selection'
+                  FROM ab_authoring_config_session
+                 WHERE pid = ?
+                """, String.class, opened.sessionPid())).isEqualTo("table-1");
 
         mockMvc.perform(post("/api/authoring/handoffs/{contextId}/consume", contextId))
                 .andExpect(status().isConflict());
@@ -967,6 +978,109 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
                         .value("middle"))
                 .andExpect(jsonPath("$.data.session.snapshot.blocks[0].blocks[2].blocks[0].id")
                         .value("field-a"));
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void studioBatchPersistsCopyLineageOnlyWhenItsSourceExistsAndMatchesType() throws Exception {
+        grantDesignerAdmin();
+        PageSchema page = insertStructurePage();
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        String sectionChecksum = capabilityRegistry.find("form-section").orElseThrow().checksum();
+
+        mockMvc.perform(post("/api/authoring/sessions/{sessionPid}/studio-batches",
+                        opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedRevision":1,
+                                  "creates":[{"blockId":"left-copy","blockType":"form-section",
+                                    "parentBlockId":"form-root","beforeBlockId":null,
+                                    "manifestChecksum":"%s"}],
+                                  "relocations":[],"removes":[],"moves":[],
+                                  "patches":[{"blockId":"left-copy",
+                                    "propertyPath":"/extension/authoringCopyLineage",
+                                    "operation":"ADD","value":{"sourceBlockId":"left"},
+                                    "manifestChecksum":"%s"}]
+                                }
+                                """.formatted(sectionChecksum, sectionChecksum)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.revision").value(3))
+                .andExpect(jsonPath("$.data.session.snapshot.blocks[0].blocks[2].id")
+                        .value("left-copy"))
+                .andExpect(jsonPath("$.data.session.snapshot.blocks[0].blocks[2]"
+                        + ".extension.authoringCopyLineage.sourceBlockId").value("left"));
+
+        applyTestMetaContext();
+        PageSchema invalidPage = insertStructurePage();
+        SessionView invalid = workspaceService.open(
+                new OpenSessionRequest(invalidPage.getPid(), null));
+        mockMvc.perform(post("/api/authoring/sessions/{sessionPid}/studio-batches",
+                        invalid.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedRevision":1,
+                                  "creates":[{"blockId":"forged-copy","blockType":"form-section",
+                                    "parentBlockId":"form-root","beforeBlockId":null,
+                                    "manifestChecksum":"%s"}],
+                                  "relocations":[],"removes":[],"moves":[],
+                                  "patches":[{"blockId":"forged-copy",
+                                    "propertyPath":"/extension/authoringCopyLineage",
+                                    "operation":"ADD","value":{"sourceBlockId":"missing-source"},
+                                    "manifestChecksum":"%s"}]
+                                }
+                                """.formatted(sectionChecksum, sectionChecksum)))
+                .andExpect(status().isUnprocessableEntity());
+
+        applyTestMetaContext();
+        SessionView unchanged = workspaceService.get(invalid.sessionPid());
+        assertThat(unchanged.revision()).isEqualTo(1);
+        assertThat(unchanged.snapshot().toString()).doesNotContain("forged-copy");
+    }
+
+    @Test
+    void studioBatchSwitchesPageKindAsOneGovernedStableRootChange() throws Exception {
+        grantDesignerAdmin();
+        PageSchema page = insertStructurePage();
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        String pageChecksum = capabilityRegistry.find("$page").orElseThrow().checksum();
+
+        mockMvc.perform(post("/api/authoring/sessions/{sessionPid}/studio-batches",
+                        opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedRevision":1,
+                                  "kindSwitch":{"targetKind":"detail","manifestChecksum":"%s"},
+                                  "creates":[],"relocations":[],"removes":[],"moves":[],"patches":[]
+                                }
+                                """.formatted(pageChecksum)))
+                .andExpect(status().isUnprocessableEntity());
+
+        applyTestMetaContext();
+        SessionView unchanged = workspaceService.get(opened.sessionPid());
+        assertThat(unchanged.revision()).isEqualTo(1);
+        assertThat(unchanged.snapshot().path("kind").asText()).isEqualTo("form");
+
+        PageSchema empty = insertPage("normal");
+        empty.setBlocks("[]");
+        pageSchemaMapper.updateById(empty);
+        SessionView compatible = workspaceService.open(new OpenSessionRequest(empty.getPid(), null));
+        mockMvc.perform(post("/api/authoring/sessions/{sessionPid}/studio-batches",
+                        compatible.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedRevision":1,
+                                  "kindSwitch":{"targetKind":"detail","manifestChecksum":"%s"},
+                                  "creates":[],"relocations":[],"removes":[],"moves":[],"patches":[]
+                                }
+                                """.formatted(pageChecksum)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.session.revision").value(2))
+                .andExpect(jsonPath("$.data.session.snapshot.kind").value("detail"))
+                .andExpect(jsonPath("$.data.session.snapshot.blocks[0].blockType").value("detail"));
     }
 
     @Test

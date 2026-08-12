@@ -382,6 +382,19 @@ public class AuthoringWorkspaceRepository {
                 json(command.contextPayload()), Timestamp.from(command.expiresAt()));
     }
 
+    public void updateInteractionContext(WorkspaceRow workspace, JsonNode interactionContext) {
+        int updated = jdbcTemplate.update("""
+                UPDATE ab_authoring_config_session
+                   SET interaction_context = ?::jsonb
+                 WHERE id = ? AND tenant_id = ? AND env_id = ? AND actor_user_id = ?
+                """,
+                json(interactionContext), workspace.sessionId(), workspace.tenantId(),
+                workspace.envId(), workspace.actorUserId());
+        if (updated != 1) {
+            throw new IllegalStateException("authoring.interaction-context.update-failed");
+        }
+    }
+
     public HandoffRow findHandoff(
             long tenantId,
             long envId,

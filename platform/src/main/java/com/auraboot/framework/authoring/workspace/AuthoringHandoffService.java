@@ -11,6 +11,8 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.W
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -58,7 +60,9 @@ public class AuthoringHandoffService {
 
         String contextId = tokenCodec.create();
         Instant expiresAt = databaseClock.now().plus(HANDOFF_TTL);
-        JsonNode payload = contextMapper.createPayload(workspace, request);
+        JsonNode interactionContext = interactionContextForHandoff(workspace, request.blockId());
+        repository.updateInteractionContext(workspace, interactionContext);
+        JsonNode payload = contextMapper.createPayload(workspace, request, interactionContext);
         repository.createHandoff(new CreateHandoff(
                 UniqueIdGenerator.generate(), identity.tenantId(), identity.envId(), identity.userId(),
                 workspace.changeSetId(), tokenCodec.hash(contextId), PAGE_DESIGNER_ROUTE,
@@ -69,6 +73,47 @@ public class AuthoringHandoffService {
                         "targetRoute", PAGE_DESIGNER_ROUTE,
                         "expiresAt", expiresAt.toString()))));
         return new HandoffCreatedView(contextId, PAGE_DESIGNER_ROUTE, expiresAt);
+    }
+
+    private JsonNode interactionContextForHandoff(WorkspaceRow workspace, String blockId) {
+        ObjectNode context = workspace.interactionContext() != null
+                && workspace.interactionContext().isObject()
+                ? (ObjectNode) workspace.interactionContext().deepCopy()
+                : objectMapper.createObjectNode();
+        if (blockId == null || blockId.isBlank()) {
+            return context;
+        }
+        ArrayNode path = objectMapper.createArrayNode();
+        String pageId = workspace.snapshot().path("id").asText(workspace.pagePid());
+        path.add(pageId);
+        if (!appendBlockPath(workspace.snapshot().path("blocks"), blockId, path)) {
+            throw new ResponseStatusException(NOT_FOUND, "authoring.handoff.block-not-found");
+        }
+        context.put("selection", blockId);
+        context.set("outlinePath", path);
+        return context;
+    }
+
+    private boolean appendBlockPath(JsonNode blocks, String blockId, ArrayNode path) {
+        if (!blocks.isArray()) {
+            return false;
+        }
+        for (JsonNode block : blocks) {
+            if (!block.isObject()) {
+                continue;
+            }
+            String candidate = block.path("id").asText("");
+            if (!candidate.isBlank()) {
+                path.add(candidate);
+            }
+            if (blockId.equals(candidate) || appendBlockPath(block.path("blocks"), blockId, path)) {
+                return true;
+            }
+            if (!candidate.isBlank()) {
+                path.remove(path.size() - 1);
+            }
+        }
+        return false;
     }
 
     @Transactional

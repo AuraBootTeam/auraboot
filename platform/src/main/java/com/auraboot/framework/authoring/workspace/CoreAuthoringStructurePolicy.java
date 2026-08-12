@@ -11,6 +11,13 @@ import java.util.Set;
 public class CoreAuthoringStructurePolicy {
 
     private static final Set<String> PAGE_ROOTS = Set.of("form", "list", "detail", "dashboard");
+    private static final Map<String, Set<String>> PAGE_KIND_BLOCKS = Map.of(
+            "form", Set.of("form-section", "field", "tabs", "tab", "action-bar", "action"),
+            "list", Set.of("tabs", "tab", "filter-bar", "filter-field", "action-bar", "action",
+                    "table", "column", "widget"),
+            "detail", Set.of("tabs", "tab", "detail-section", "field", "action-bar", "action",
+                    "widget", "stat-card", "description", "chart", "rich-text"),
+            "dashboard", Set.of("widget", "stat-card", "description", "chart", "rich-text"));
     private static final Map<String, Set<String>> ALLOWED_CHILDREN = Map.ofEntries(
             Map.entry("form", Set.of("form-section", "tabs", "action-bar")),
             Map.entry("list", Set.of("tabs", "filter-bar", "action-bar", "table", "widget")),
@@ -39,5 +46,13 @@ public class CoreAuthoringStructurePolicy {
 
     public boolean isContainer(String blockType) {
         return ALLOWED_CHILDREN.containsKey(blockType);
+    }
+
+    public boolean allowsPageKind(String kind) {
+        return PAGE_ROOTS.contains(kind);
+    }
+
+    public boolean allowsKindDescendant(String kind, String blockType) {
+        return PAGE_KIND_BLOCKS.getOrDefault(kind, Set.of()).contains(blockType);
     }
 }

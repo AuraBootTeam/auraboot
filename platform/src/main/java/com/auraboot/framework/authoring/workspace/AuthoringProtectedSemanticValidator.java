@@ -34,7 +34,19 @@ public class AuthoringProtectedSemanticValidator {
         if ("/field".equals(propertyPath)) {
             return validModelField(snapshot, proposedValue);
         }
-        String commandCode = block.path("props").path("commandCode").asText("");
+        if ("/extension/authoringCopyLineage".equals(propertyPath)) {
+            return validCopyLineage(snapshot, block, proposedValue);
+        }
+        if ("/props/command".equals(propertyPath) || "/props/commandCode".equals(propertyPath)) {
+            return proposedValue.isTextual()
+                    && !proposedValue.asText().isBlank()
+                    && commandDefinitionMapper.findCurrentByCode(proposedValue.asText()) != null;
+        }
+        JsonNode props = block.path("props");
+        String commandCode = props.path("command").asText("");
+        if (commandCode.isBlank()) {
+            commandCode = props.path("commandCode").asText("");
+        }
         CommandDefinition command = commandCode.isBlank()
                 ? null
                 : commandDefinitionMapper.findCurrentByCode(commandCode);
@@ -47,6 +59,33 @@ public class AuthoringProtectedSemanticValidator {
             return validLabel(commandCode, proposedValue);
         }
         return true;
+    }
+
+    private boolean validCopyLineage(JsonNode snapshot, ObjectNode copiedBlock, JsonNode value) {
+        if (!value.isObject() || value.size() != 1) {
+            return false;
+        }
+        String sourceBlockId = value.path("sourceBlockId").asText("");
+        if (sourceBlockId.isBlank() || sourceBlockId.equals(copiedBlock.path("id").asText(""))) {
+            return false;
+        }
+        JsonNode sourceBlock = findBlock(snapshot.path("blocks"), sourceBlockId);
+        return sourceBlock != null
+                && sourceBlock.path("blockType").asText("")
+                    .equals(copiedBlock.path("blockType").asText(""));
+    }
+
+    private JsonNode findBlock(JsonNode node, String blockId) {
+        if (node.isObject() && blockId.equals(node.path("id").asText(null))) {
+            return node;
+        }
+        if (node.isContainerNode()) {
+            for (JsonNode child : node) {
+                JsonNode found = findBlock(child, blockId);
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 
     private boolean validModelField(JsonNode snapshot, JsonNode proposedValue) {

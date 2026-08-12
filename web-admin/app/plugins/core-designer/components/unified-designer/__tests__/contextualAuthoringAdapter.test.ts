@@ -12,6 +12,16 @@ const capabilities: CapabilityRegistry = {
   checksum: 'registry-1',
   manifests: [
     {
+      blockType: '$page',
+      pluginCode: 'core.designer',
+      pluginVersion: '1',
+      manifestVersion: '1',
+      checksum: 'page-1',
+      properties: {
+        '/$page/kind': property('/$page/kind', 'HANDOFF_STUDIO'),
+      },
+    },
+    {
       blockType: 'table',
       pluginCode: 'core.designer',
       pluginVersion: '1',
@@ -112,6 +122,28 @@ describe('contextualAuthoringAdapter', () => {
     ]);
   });
 
+  it('plans a compatible root kind switch as one server-owned page operation', () => {
+    const baseline: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'list',
+      id: 'orders',
+      blocks: [{ id: 'stable-root', blockType: 'list', blocks: [] }],
+    };
+    const candidate: PageSchemaV3 = {
+      ...baseline,
+      kind: 'detail',
+      blocks: [{ ...baseline.blocks[0], blockType: 'detail' }],
+    };
+
+    const plan = planStudioAuthoringPatches(baseline, candidate, capabilities);
+
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.kindSwitch).toEqual({ targetKind: 'detail', manifestChecksum: 'page-1' });
+    expect(plan.creates).toEqual([]);
+    expect(plan.removes).toEqual([]);
+    expect(plan.patches).toEqual([]);
+  });
+
   it('plans stable same-parent reorder operations without treating them as property patches', () => {
     const baseline: PageSchemaV3 = {
       schemaVersion: 3,
@@ -201,6 +233,62 @@ describe('contextualAuthoringAdapter', () => {
         manifestChecksum: 'table-1',
       },
     ]);
+  });
+
+  it('plans a copied block as a fresh create plus server-declared source lineage', () => {
+    const copyCapabilities: CapabilityRegistry = {
+      checksum: 'registry-copy',
+      manifests: [{
+        blockType: 'description',
+        pluginCode: 'core.designer',
+        pluginVersion: '1',
+        manifestVersion: '1',
+        checksum: 'description-copy',
+        properties: {
+          '/props/content': property('/props/content', 'INLINE'),
+          '/extension/authoringCopyLineage': property(
+            '/extension/authoringCopyLineage',
+            'HANDOFF_STUDIO',
+            ['ADD'],
+          ),
+          '/$structure/create': property('/$structure/create', 'HANDOFF_STUDIO', ['ADD']),
+        },
+      }],
+    };
+    const baseline: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'composite',
+      id: 'copy-page',
+      blocks: [],
+    };
+    const candidate: PageSchemaV3 = {
+      ...baseline,
+      blocks: [{
+        id: 'description-source-copy',
+        blockType: 'description',
+        props: { content: 'Copied content' },
+        extension: { authoringCopyLineage: { sourceBlockId: 'description-source' } },
+      }],
+    };
+
+    const plan = planStudioAuthoringPatches(baseline, candidate, copyCapabilities);
+
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.creates).toEqual([{
+      blockId: 'description-source-copy',
+      blockType: 'description',
+      parentBlockId: null,
+      beforeBlockId: null,
+      manifestChecksum: 'description-copy',
+    }]);
+    expect(plan.patches).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        blockId: 'description-source-copy',
+        propertyPath: '/extension/authoringCopyLineage',
+        operation: 'ADD',
+        value: { sourceBlockId: 'description-source' },
+      }),
+    ]));
   });
 
   it('plans a nested table and model-backed column as governed structure plus typed patches', () => {

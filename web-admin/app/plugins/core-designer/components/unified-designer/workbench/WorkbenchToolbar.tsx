@@ -8,7 +8,13 @@ import {
 } from '../registry/kindPolicy';
 import type { PageSchemaV3, WorkbenchMode } from '../types';
 
-export type DesignerSaveStatus = 'saved' | 'dirty' | 'saving' | 'invalid' | 'error';
+export type DesignerSaveStatus =
+  | 'saved'
+  | 'dirty'
+  | 'saving'
+  | 'invalid'
+  | 'error'
+  | 'import-error';
 
 /** Lifecycle state of the publish/unpublish action point. */
 export type DesignerPublishStatus = 'draft' | 'publishing' | 'published' | 'unpublishing' | 'error';
@@ -470,6 +476,9 @@ function getStatusLabel(
       count: validationErrorCount,
     });
   }
+  if (status === 'import-error') {
+    return resolveDesignerText(DESIGNER_I18N.unified.statusImportError, locale);
+  }
   if (status === 'error') return resolveDesignerText(DESIGNER_I18N.unified.statusError, locale);
   return resolveDesignerText(DESIGNER_I18N.unified.statusSaved, locale);
 }
@@ -477,6 +486,8 @@ function getStatusLabel(
 function getStatusClassName(status: DesignerSaveStatus): string {
   if (status === 'dirty') return 'bg-amber-50 text-amber-700';
   if (status === 'saving') return 'bg-blue-50 text-blue-700';
-  if (status === 'invalid' || status === 'error') return 'bg-red-50 text-red-700';
+  if (status === 'invalid' || status === 'error' || status === 'import-error') {
+    return 'bg-red-50 text-red-700';
+  }
   return 'bg-emerald-50 text-emerald-700';
 }

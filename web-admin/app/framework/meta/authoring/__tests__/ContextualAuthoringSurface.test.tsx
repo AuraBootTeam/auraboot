@@ -2,7 +2,10 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ContextualAuthoringSurface } from '../ContextualAuthoringSurface';
+import {
+  ContextualAuthoringSurface,
+  contextualAuthoringTestUtils,
+} from '../ContextualAuthoringSurface';
 import {
   applyAuthoringPatch,
   createAuthoringHandoff,
@@ -1277,6 +1280,36 @@ describe('ContextualAuthoringSurface', () => {
       }),
     ]);
     expect(screen.getByTestId('authoring-outline-list-orders-list')).toBeInTheDocument();
+  });
+});
+
+describe('contextual authoring interaction scroll', () => {
+  it('captures and restores the stable application scroll container', () => {
+    const container = document.createElement('main');
+    container.dataset.auraScrollContainer = 'page-content';
+    Object.defineProperty(container, 'scrollLeft', { value: 24, writable: true });
+    Object.defineProperty(container, 'scrollTop', { value: 480, writable: true });
+    container.scrollTo = vi.fn();
+    document.body.appendChild(container);
+
+    expect(contextualAuthoringTestUtils.captureInteractionScroll()).toEqual({
+      container: 'page-content',
+      x: 24,
+      y: 480,
+    });
+    expect(
+      contextualAuthoringTestUtils.contextScroll({
+        scroll: { container: 'page-content', x: 12, y: 360 },
+      }),
+    ).toEqual({ container: 'page-content', x: 12, y: 360 });
+
+    contextualAuthoringTestUtils.restoreInteractionScroll({
+      container: 'page-content',
+      x: 12,
+      y: 360,
+    });
+    expect(container.scrollTo).toHaveBeenCalledWith(12, 360);
+    container.remove();
   });
 });
 

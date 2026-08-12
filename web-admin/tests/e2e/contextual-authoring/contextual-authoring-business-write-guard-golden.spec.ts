@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { Client } from 'pg';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { PG_CONN } from '../../helpers/environments';
@@ -71,8 +71,15 @@ test.describe('Contextual authoring PC business-write guard golden', () => {
     await expect(page.getByTestId('contextual-authoring-surface')).toBeVisible();
     await page.getByRole('button', { name: '交互预览' }).click();
 
+    let listReadRequests = 0;
     let publishCommandRequests = 0;
     page.on('request', (request) => {
+      if (
+        request.method() === 'GET' &&
+        new URL(request.url()).pathname === '/api/dynamic/ab_announcement/list'
+      ) {
+        listReadRequests += 1;
+      }
       if (
         request.method() === 'POST' &&
         new URL(request.url()).pathname === '/api/meta/commands/execute/announcement:publish'
@@ -81,14 +88,44 @@ test.describe('Contextual authoring PC business-write guard golden', () => {
       }
     });
 
+    const listReadResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'GET' &&
+        new URL(response.url()).pathname === '/api/dynamic/ab_announcement/list' &&
+        new URL(response.url()).searchParams.get('keyword') === title,
+    );
+    await page.getByTestId('list-search-input').fill(title);
+    await page.getByTestId('list-search-input').press('Enter');
+    expect((await listReadResponse).ok(), 'read-only list search must remain available').toBe(true);
+    await expect.poll(() => new URL(page.url()).searchParams.get('keyword')).toBe(title);
+    expect(listReadRequests).toBeGreaterThan(0);
+
+    await page.evaluate(() => {
+      const state = window as Window & { __authoringPublishActivationCount?: number };
+      state.__authoringPublishActivationCount = 0;
+      window.addEventListener(
+        'click',
+        (event) => {
+          if ((event.target as HTMLElement | null)?.closest('[data-testid="row-action-publish"]')) {
+            state.__authoringPublishActivationCount =
+              (state.__authoringPublishActivationCount ?? 0) + 1;
+          }
+        },
+        true,
+      );
+    });
     const authoringRow = await findRowByContent(page, title);
-    await authoringRow.getByTestId('row-action-more').click();
-    await page.getByTestId('row-action-publish').click();
-    const confirmDialog = page.getByTestId('confirm-dialog');
-    if (await confirmDialog.isVisible().catch(() => false)) {
-      await page.getByTestId('confirm-ok').click();
-    }
+    await doubleActivatePublishFromRow(page, authoringRow);
     await expect(page.getByTestId('authoring-write-blocked')).toContainText('已拦截真实业务写入');
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as Window & { __authoringPublishActivationCount?: number })
+              .__authoringPublishActivationCount ?? 0,
+        ),
+      )
+      .toBeGreaterThanOrEqual(2);
     expect(publishCommandRequests).toBe(0);
     expect(await readBusinessWriteSnapshot(recordPid)).toEqual(before);
 
@@ -113,6 +150,15 @@ test.describe('Contextual authoring PC business-write guard golden', () => {
     expect.soft(after).toEqual(before);
   });
 });
+
+async function doubleActivatePublishFromRow(page: Page, row: Locator): Promise<void> {
+  await row.getByTestId('row-action-more').click();
+  await page.getByTestId('row-action-publish').dblclick();
+  const confirmDialog = page.getByTestId('confirm-dialog');
+  if (await confirmDialog.isVisible().catch(() => false)) {
+    await page.getByTestId('confirm-ok').click();
+  }
+}
 
 async function navigateToAnnouncementList(page: Page): Promise<void> {
   await page.goto('/home', { waitUntil: 'domcontentloaded' });

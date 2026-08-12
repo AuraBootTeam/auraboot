@@ -2,7 +2,10 @@ import { Outlet } from 'react-router';
 
 export default function PageContent() {
   return (
-    <main className="flex flex-1 flex-col overflow-y-auto bg-gray-50 dark:bg-gray-900">
+    <main
+      className="flex flex-1 flex-col overflow-y-auto bg-gray-50 dark:bg-gray-900"
+      data-aura-scroll-container="page-content"
+    >
       <div className="flex min-h-0 flex-1 flex-col">
         <Outlet />
       </div>
