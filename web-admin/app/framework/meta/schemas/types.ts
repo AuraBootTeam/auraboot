@@ -298,12 +298,28 @@ export interface ColumnConfig {
   tagConfig?: Record<string, unknown>;
 }
 
+export interface CommandInputFieldConfig {
+  field: string;
+  label?: string | LocalizedText;
+  helpText?: string | LocalizedText;
+  placeholder?: string | LocalizedText;
+  type?: string;
+  required?: boolean;
+  [key: string]: unknown;
+}
+
+export interface CommandInputFormConfig {
+  inputFields?: CommandInputFieldConfig[];
+  inputFieldsTitle?: string | LocalizedText;
+  inputFieldsSubmitLabel?: string | LocalizedText;
+}
+
 // Action definition — unified button behavior
 export type ActionDef =
-  | { type: 'command'; command: string }
-  | { type: 'state_transition'; command: string }
-  | { type: 'bulk_command'; command: string }
-  | { type: 'bulk_state_transition'; command: string }
+  | ({ type: 'command'; command: string } & CommandInputFormConfig)
+  | ({ type: 'state_transition'; command: string } & CommandInputFormConfig)
+  | ({ type: 'bulk_command'; command: string } & CommandInputFormConfig)
+  | ({ type: 'bulk_state_transition'; command: string } & CommandInputFormConfig)
   | { type: 'navigate'; to: string; command?: string; hardReload?: boolean }
   | { type: 'builtin'; name: string }
   | { type: 'flow'; steps: FlowStep[] }
@@ -464,6 +480,8 @@ export interface SubTableConfig {
   editableWhen?: string;
   columns: ColumnConfig[];
   actions?: ButtonConfig[];
+  /** @deprecated Use actions. Kept for imported DSL compatibility. */
+  rowActions?: ButtonConfig[];
   summary?: SummaryConfig;
   resolveVia?: ResolveViaConfig;
   /**

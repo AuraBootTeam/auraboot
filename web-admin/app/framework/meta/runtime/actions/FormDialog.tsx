@@ -34,6 +34,7 @@ interface FormOptionConfig {
 interface FormFieldConfig {
   field: string;
   label?: string | Record<string, string>;
+  helpText?: string | Record<string, string>;
   type?: 'text' | 'select' | 'number' | 'textarea' | 'multiselect' | 'segmented' | 'checkbox' | 'file';
   required?: boolean;
   mustBeTrue?: boolean;

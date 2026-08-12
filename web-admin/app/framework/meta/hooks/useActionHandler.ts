@@ -281,7 +281,7 @@ function notifyActionToast(
  */
 export function resolveCommandErrorMessage(result: unknown, commandCode: string): string {
   const body = (result || {}) as Record<string, any>;
-  return (
+  const resolved =
     firstNonBlankString(
       body.context?.detail,
       body.context?.error,
@@ -293,8 +293,17 @@ export function resolveCommandErrorMessage(result: unknown, commandCode: string)
       body.data?.message,
       body.message,
       body.desc,
-    ) || `Command ${commandCode} failed`
-  );
+    ) || `Command ${commandCode} failed`;
+
+  // PF4J/platform wrappers are implementation details, not business feedback. Keep
+  // the handler's actionable reason while removing the transport prefix from every
+  // DSL command surface (detail, form, workbench and list actions).
+  return resolved
+    .replace(
+      /^(?:plugin (?:extension )?handler execution failed|command handler execution failed)\s*:\s*/i,
+      '',
+    )
+    .trim();
 }
 
 export interface UseActionHandlerOptions {

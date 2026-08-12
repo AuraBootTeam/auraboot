@@ -14,6 +14,8 @@ import {
   resolveDetailFieldComponent,
   resolveDetailRecordEndpoint,
   resolveHiddenSystemTabKeys,
+  resolveSettingsCardDisplayValue,
+  resolveSettingsCardField,
   resolveSubTableDataSourceConfig,
   resolveVisibleDetailTabs,
   resolveVisibleDetailTabsFromBlocks,
@@ -294,6 +296,32 @@ describe('enrichDetailField', () => {
         dictCode: 'sc_cascade_category_dict',
       },
     });
+  });
+});
+
+describe('settings-card field presentation', () => {
+  it('enriches fallback field codes with business display names', () => {
+    const field = resolveSettingsCardField(
+      { field: 'inv_in_source_type' } as any,
+      (fieldCode) => fieldCode,
+      (candidate) => enrichDetailField(candidate, { displayName: '来源类型' }),
+    );
+
+    expect(field.label).toBe('来源类型');
+  });
+
+  it('prefers reference display values and resolves dictionary labels', () => {
+    expect(
+      resolveSettingsCardDisplayValue('warehouse-pid', '生产仓', { field: 'warehouse' } as any),
+    ).toBe('生产仓');
+    expect(
+      resolveSettingsCardDisplayValue(
+        'draft',
+        'draft',
+        { field: 'status', dictCode: 'receipt_status' } as any,
+        () => [{ value: 'draft', label: '草稿' }],
+      ),
+    ).toBe('草稿');
   });
 });
 
