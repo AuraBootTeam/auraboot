@@ -2604,6 +2604,20 @@
     "refType": "ui"
   },
   {
+    "key": "crm.saved_view.department_opportunities",
+    "zh-CN": "部门商机",
+    "en-US": "Department Opportunities",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.department_opportunities_description",
+    "zh-CN": "当前部门及其下级部门成员负责的商机",
+    "en-US": "Opportunities owned by members of the current department and its descendants",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
     "key": "crm.saved_view.won_opportunities",
     "zh-CN": "赢单商机",
     "en-US": "Won Opportunities",

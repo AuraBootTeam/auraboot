@@ -163,6 +163,20 @@ public class DataScopeEvaluator {
                     "Scope: dept — no department PIDs resolved");
         }
 
+        if (condition.deptOwnerField() != null && !condition.deptOwnerField().isBlank()) {
+            Object ownerValue = record.get(condition.deptOwnerField());
+            if (ownerValue == null) {
+                return new EvaluationStep(NAME, EvaluationVerdict.DENY,
+                        "Record has no " + condition.deptOwnerField() + " department-owner field");
+            }
+            if (dataScopeService.isOwnerInDepartments(String.valueOf(ownerValue), condition.deptPids())) {
+                return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,
+                        "Scope: " + condition.scopeType() + " — owner belongs to accessible department");
+            }
+            return new EvaluationStep(NAME, EvaluationVerdict.DENY,
+                    "Scope: " + condition.scopeType() + " — owner outside accessible department");
+        }
+
         Object deptValue = record.get(condition.deptField());
         if (deptValue == null) {
             // If record has no dept field, fall back to owner check

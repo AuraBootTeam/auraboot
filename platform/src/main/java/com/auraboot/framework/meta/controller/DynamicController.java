@@ -11,6 +11,7 @@ import com.auraboot.framework.meta.service.PageSchemaService;
 import com.auraboot.framework.meta.service.RecordCapabilityService;
 import com.auraboot.framework.meta.util.PageKeyConverter;
 import com.auraboot.framework.meta.util.PublicRecordSanitizer;
+import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -54,6 +55,7 @@ public class DynamicController {
 
     static final int MAX_BATCH_SIZE = 500;
     static final String RECORD_INTERNAL_ID_RESOLVER = "$recordInternalId";
+    static final String CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER = "$currentDepartmentOwnerPids";
 
     private static String logSafe(Object value) {
         return LogSanitizer.safe(value);
@@ -76,6 +78,9 @@ public class DynamicController {
 
     @Autowired
     private RecordCapabilityService recordCapabilityService;
+
+    @Autowired
+    private OrganizationService organizationService;
 
     @Autowired
     private com.auraboot.framework.meta.service.ModelFieldBindingService modelFieldBindingService;
@@ -257,7 +262,14 @@ public class DynamicController {
             if (condition.getValues() != null && !condition.getValues().isEmpty()) {
                 List<Object> resolvedValues = new ArrayList<>(condition.getValues().size());
                 for (Object value : condition.getValues()) {
-                    resolvedValues.add(resolveRuntimeFilterValue(value));
+                    Object resolved = resolveRuntimeFilterValue(value);
+                    if ((condition.getOperator() == QueryCondition.Operator.IN
+                            || condition.getOperator() == QueryCondition.Operator.NOT_IN)
+                            && resolved instanceof List<?> list) {
+                        resolvedValues.addAll(list);
+                    } else {
+                        resolvedValues.add(resolved);
+                    }
                 }
                 condition.setValues(resolvedValues);
             }
@@ -271,6 +283,9 @@ public class DynamicController {
         if (value instanceof Map<?, ?> map && map.containsKey(RECORD_INTERNAL_ID_RESOLVER)) {
             return resolveRecordInternalId(map.get(RECORD_INTERNAL_ID_RESOLVER));
         }
+        if (value instanceof Map<?, ?> map && map.containsKey(CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER)) {
+            return resolveCurrentDepartmentOwnerPids(map.get(CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER));
+        }
         if (value instanceof List<?> list) {
             List<Object> resolved = new ArrayList<>(list.size());
             for (Object item : list) {
@@ -279,6 +294,15 @@ public class DynamicController {
             return resolved;
         }
         return value;
+    }
+
+    private List<String> resolveCurrentDepartmentOwnerPids(Object resolverSpec) {
+        boolean includeSubDepartments = true;
+        if (resolverSpec instanceof Map<?, ?> spec
+                && spec.get("includeSubDepartments") instanceof Boolean includeSub) {
+            includeSubDepartments = includeSub;
+        }
+        return organizationService.getCurrentDepartmentUserPids(includeSubDepartments);
     }
 
     private Object resolveRecordInternalId(Object resolverSpec) {
@@ -679,7 +703,7 @@ public class DynamicController {
                     if (item instanceof Map<?, ?> condMap) {
                         String field = condMap.get("field") != null ? condMap.get("field").toString() : null;
                         String op = condMap.get("operator") != null ? condMap.get("operator").toString() : null;
-                        Object val = condMap.get("value");
+                        Object val = resolveRuntimeFilterValue(condMap.get("value"));
                         if (field != null && op != null) {
                             try {
                                 QueryCondition.Operator operator = QueryCondition.Operator.fromCode(op);
@@ -694,7 +718,7 @@ public class DynamicController {
                                         || operator == QueryCondition.Operator.NOT_IN
                                         || operator == QueryCondition.Operator.BETWEEN)
                                         && val instanceof List<?> values) {
-                                    conditionBuilder.values(new java.util.ArrayList<>(values));
+                                    conditionBuilder.values(flattenResolvedValues(values));
                                 }
                                 conditions.add(conditionBuilder.build());
                             } catch (IllegalArgumentException e) {
@@ -745,6 +769,18 @@ public class DynamicController {
             case "xlsx", "excel" -> DataExportRequest.ExportFormat.EXCEL;
             default -> DataExportRequest.ExportFormat.EXCEL;
         };
+    }
+
+    private static List<Object> flattenResolvedValues(List<?> values) {
+        List<Object> flattened = new ArrayList<>();
+        for (Object value : values) {
+            if (value instanceof List<?> nested) {
+                flattened.addAll(flattenResolvedValues(nested));
+            } else {
+                flattened.add(value);
+            }
+        }
+        return flattened;
     }
 
     /**

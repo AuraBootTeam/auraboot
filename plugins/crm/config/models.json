@@ -115,7 +115,8 @@
       "subtitleField": "crm_opp_code",
       "dataScope": {
         "ownerField": "crm_opp_owner",
-        "departmentField": null
+        "departmentField": null,
+        "departmentOwnerField": "crm_opp_owner"
       }
     },
     "semantic_description": "A sales deal opportunity representing a qualified prospect progressing through the sales pipeline. Tracked from discovery through proposal, negotiation, and close (won or lost). LLM need to understand: probability %, expected amount, close date, pipeline stage signals.",

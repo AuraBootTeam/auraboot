@@ -10,6 +10,7 @@ common:
   creator: 创建人
   modifier: 修改人
   current_user: 当前用户
+  current_department: 当前部门
   loading: 加载中...
   actionFailed: 操作失败
   close: 关闭

@@ -239,6 +239,10 @@ export interface SavedViewFilterExpressionContext {
   currentUserPid?: string;
 }
 
+const CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER = {
+  $currentDepartmentOwnerPids: { includeSubDepartments: true },
+} as const;
+
 /**
  * Resolve the deliberately small, documented set of SavedView filter expressions.
  *
@@ -257,6 +261,9 @@ export function resolveSavedViewFilterExpressions(
     const resolvedValue =
       expression === '#currentUser' || expression === '${system.currentUser}'
         ? context.currentUserPid?.trim() || undefined
+        : expression === '#currentDepartmentOwners' ||
+            expression === '${system.currentDepartmentOwners}'
+          ? CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER
         : undefined;
 
     return { ...filter, value: resolvedValue };
@@ -5125,6 +5132,12 @@ function ListPageContentInner(props: PageContentProps) {
                         translateCommon('common.current_user', '当前用户')
                       );
                     }
+                    if (
+                      filter.expression === '#currentDepartmentOwners' ||
+                      filter.expression === '${system.currentDepartmentOwners}'
+                    ) {
+                      return translateCommon('common.current_department', '当前部门');
+                    }
                     return filter.expression;
                   }
                   const dc = filterFieldMetadata.find(
@@ -5173,7 +5186,7 @@ function ListPageContentInner(props: PageContentProps) {
                 open={analysisOpen}
                 onClose={() => setAnalysisOpen(false)}
                 modelCode={schema?.modelCode || tableName}
-                viewName={currentView?.name}
+                viewName={getLocalizedText(currentView?.name, locale, t)}
                 keyword={keyword}
                 filters={activeRuntimeViewFilters}
                 fields={filterFieldMetadata}

@@ -48,6 +48,36 @@
     }
   },
   {
+    "name": "$i18n:crm.saved_view.department_opportunities",
+    "description": "$i18n:crm.saved_view.department_opportunities_description",
+    "modelCode": "crm_opportunity_common",
+    "pageKey": "crm_opportunity_common_list",
+    "viewKey": "crm_opportunity_department_table",
+    "scope": "global",
+    "viewType": "table",
+    "isDefault": false,
+    "sortOrder": 3,
+    "pinAsQuickFilter": true,
+    "quickFilterIcon": "🏢",
+    "quickFilterOrder": 2,
+    "viewConfig": {
+      "filters": [
+        {
+          "fieldCode": "crm_opp_owner",
+          "operator": "in",
+          "value": null,
+          "isExpression": true,
+          "expression": "#currentDepartmentOwners"
+        }
+      ],
+      "sorts": [
+        { "fieldCode": "crm_opp_expected_close_date", "direction": "asc", "priority": 1 },
+        { "fieldCode": "crm_opp_expected_amount", "direction": "desc", "priority": 2 }
+      ],
+      "pagination": { "pageSize": 20 }
+    }
+  },
+  {
     "name": "$i18n:crm.saved_view.won_opportunities",
     "description": "$i18n:crm.saved_view.won_opportunities_description",
     "modelCode": "crm_opportunity_common",
@@ -56,7 +86,7 @@
     "scope": "global",
     "viewType": "table",
     "isDefault": false,
-    "sortOrder": 3,
+    "sortOrder": 4,
     "viewConfig": {
       "filters": [
         { "fieldCode": "crm_opp_stage", "operator": "eq", "value": "closed_won" }
@@ -76,7 +106,7 @@
     "scope": "global",
     "viewType": "kanban",
     "isDefault": false,
-    "sortOrder": 4,
+    "sortOrder": 5,
     "viewConfig": {
       "groupByField": "crm_opp_stage",
       "groupByDictCode": "crm_opp_stage",

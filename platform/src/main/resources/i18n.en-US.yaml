@@ -988,6 +988,7 @@ common:
   creator: Created By
   modifier: Updated By
   current_user: Current user
+  current_department: Current department
   create: Create
   new: New
   edit: Edit

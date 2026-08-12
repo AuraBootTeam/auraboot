@@ -45,6 +45,7 @@ import com.auraboot.framework.permission.dto.PermissionCreateRequest;
 import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.PermissionService;
+import com.auraboot.framework.permission.service.DataScopeService;
 import com.auraboot.framework.permission.service.RolePermissionService;
 import com.auraboot.framework.dashboard.dto.DashboardCreateRequest;
 import com.auraboot.framework.dashboard.dto.DashboardDTO;
@@ -69,6 +70,7 @@ import com.auraboot.framework.plugin.dto.imports.ProcessDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ResourceAction;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.RoleDataScopeDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.RolePermissionPolicyDefinitionDTO;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 import com.auraboot.framework.plugin.entity.PluginResource;
@@ -87,6 +89,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.common.util.LogSanitizer;
+import com.auraboot.framework.common.constant.StatusConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
@@ -100,11 +103,9 @@ import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import com.auraboot.framework.common.constant.StatusConstants;
 
 /**
  * Implementation of resource importer using service layer.
@@ -127,6 +128,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final DictService dictService;
     private final CommandService commandService;
     private final PermissionService permissionService;
+    private final DataScopeService dataScopeService;
     private final RolePermissionService rolePermissionService;
     private final RoleService roleService;
     private final UserRoleService userRoleService;
@@ -1211,6 +1213,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             // Reconcile role-permission bindings and data-scope defaults.
             Long roleId = roleMapper.findIdByCode(tenantId, dto.getCode());
             updateRolePermissions(roleId, dto, tenantId, pluginPid);
+            applyRoleDataScopes(roleId, dto, tenantId);
             assignSeedMembers(roleId, dto, tenantId);
 
             String existingPid = roleMapper.findPidByCode(tenantId, dto.getCode());
@@ -1244,6 +1247,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
             // Create role-permission bindings
             updateRolePermissions(created.getId(), dto, tenantId, pluginPid);
+            applyRoleDataScopes(created.getId(), dto, tenantId);
             assignSeedMembers(created.getId(), dto, tenantId);
 
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.ROLE,
@@ -1305,6 +1309,48 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 // of the role's permission set. Failure surfaced via warn log only.
                 log.warn("Failed to bind permission {} to role: {}", logSafe(permCode), logSafe(e.getMessage()), e);
             }
+        }
+    }
+
+    /**
+     * Materialize security-sensitive per-permission scope declarations after role bindings exist.
+     * Missing permissions or incomplete permission metadata fail the import instead of silently
+     * widening the role to its default scope.
+     */
+    private void applyRoleDataScopes(Long roleId, RoleDefinitionDTO dto, Long tenantId) {
+        List<RoleDataScopeDefinitionDTO> definitions = dto.getDataScopes();
+        if (definitions == null || definitions.isEmpty()) {
+            return;
+        }
+        if (roleId == null) {
+            throw new PluginException("Cannot apply data scopes for unresolved role " + dto.getCode());
+        }
+        for (RoleDataScopeDefinitionDTO definition : definitions) {
+            if (definition == null || !definition.isValid()) {
+                throw new PluginException("Invalid data scope declaration for role " + dto.getCode());
+            }
+            PermissionDTO permission = permissionService.findByCode(definition.getPermissionCode());
+            if (permission == null || permission.getId() == null
+                    || permission.getResourceCode() == null || permission.getAction() == null) {
+                throw new PluginException("Role " + dto.getCode()
+                        + " declares data scope for an unresolved permission: "
+                        + definition.getPermissionCode());
+            }
+            if (dto.getPermissions() == null
+                    || !dto.getPermissions().contains(definition.getPermissionCode())
+                    || rolePermissionMapper.countByRoleAndPermission(
+                            roleId, permission.getId(), tenantId) <= 0) {
+                throw new PluginException("Role " + dto.getCode()
+                        + " declares data scope for a permission that is not bound to the role: "
+                        + definition.getPermissionCode());
+            }
+            dataScopeService.setScope(
+                    tenantId,
+                    roleId,
+                    permission.getResourceCode(),
+                    permission.getAction(),
+                    definition.getScopeType(),
+                    definition.effectiveMergeStrategy());
         }
     }
 

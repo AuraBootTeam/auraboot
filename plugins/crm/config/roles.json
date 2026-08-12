@@ -150,6 +150,13 @@
     "name:en": "Sales Manager",
     "description": "Sales manager: manages team accounts, opportunities, quotes and orders; basis for commission attribution and approvals (extended in ICM milestones)",
     "defaultDataScopeType": "all",
+    "dataScopes": [
+      {
+        "permissionCode": "model.crm_opportunity_common.read",
+        "scopeType": "dept_and_sub",
+        "mergeStrategy": "MAX"
+      }
+    ],
     "permissions": [
       "meta.command.execute",
       "data.datasource.read",

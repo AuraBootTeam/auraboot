@@ -718,6 +718,30 @@ describe('resolveSavedViewFilterExpressions', () => {
     expect(resolved[1].value).toBeUndefined();
     expect(viewFilterToQueryCondition(resolved[1])).toBeNull();
   });
+
+  it('resolves the department-owner expression to an authenticated backend resolver', () => {
+    const resolved = resolveSavedViewFilterExpressions(
+      [
+        {
+          fieldCode: 'owner',
+          operator: 'in',
+          value: null,
+          isExpression: true,
+          expression: '#currentDepartmentOwners',
+        },
+      ],
+      { currentUserPid: '01K2USERPID' },
+    );
+
+    expect(resolved[0].value).toEqual({
+      $currentDepartmentOwnerPids: { includeSubDepartments: true },
+    });
+    expect(viewFilterToQueryCondition(resolved[0])).toEqual({
+      fieldName: 'owner',
+      operator: 'IN',
+      values: [{ $currentDepartmentOwnerPids: { includeSubDepartments: true } }],
+    });
+  });
 });
 
 describe('resolveUrlFilterSyncAction', () => {

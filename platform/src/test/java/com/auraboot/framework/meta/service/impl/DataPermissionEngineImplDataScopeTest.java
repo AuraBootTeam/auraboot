@@ -183,6 +183,30 @@ class DataPermissionEngineImplDataScopeTest {
                 .isEqualTo("org_emp_dept_id IN ('p1','p2')");
     }
 
+    @Test
+    @DisplayName("owner-derived department SQL follows user PID to current employee department")
+    void dataScopeSql_buildsOwnerDerivedDepartmentSubquery() {
+        DataScopeCondition condition = new DataScopeCondition(
+                "dept_and_sub", "crm_opp_owner", "user-pid", null, "crm_opp_owner",
+                List.of("dept-1", "dept'2"), List.of(), List.of());
+
+        assertThat((String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", condition))
+                .isEqualTo("crm_opp_owner IN (SELECT org_emp_user_id FROM mt_org_employee"
+                        + " WHERE tenant_id = 10 AND deleted_flag = FALSE"
+                        + " AND org_emp_dept_id IN ('dept-1','dept''2'))");
+    }
+
+    @Test
+    @DisplayName("owner-derived department SQL rejects an injected owner field")
+    void dataScopeSql_rejectsInjectedDepartmentOwnerField() {
+        DataScopeCondition malicious = new DataScopeCondition(
+                "dept", "owner", "user-pid", null, "owner) OR 1=1 --",
+                List.of("dept-1"), List.of(), List.of());
+
+        assertThat((String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", malicious))
+                .isEqualTo("1 = 0");
+    }
+
     // ---- SELF owner value typing (2026-06-28 Quote/BOM varchar/ULID owner incident) ----
     // A string owner value (userPid against a varchar/ULID owner column) must be quoted;
     // unquoted it is either broken SQL or an injection surface.
