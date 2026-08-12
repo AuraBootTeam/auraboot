@@ -1,6 +1,7 @@
 package com.auraboot.framework.infrastructure.storage.minio;
 
 import com.auraboot.framework.file.constant.StorageType;
+import com.auraboot.framework.infrastructure.storage.StorageProperties;
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;
 import io.minio.http.Method;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -47,6 +49,14 @@ class MinioStorageProviderTest {
     @DisplayName("type() returns MINIO")
     void typeReturnsMinio() {
         assertEquals(StorageType.MINIO, provider.type());
+    }
+
+    @Test
+    @DisplayName("Spring selects the production constructor")
+    void productionConstructorIsAutowired() throws NoSuchMethodException {
+        assertTrue(MinioStorageProvider.class
+                .getConstructor(StorageProperties.class)
+                .isAnnotationPresent(Autowired.class));
     }
 
     @Test

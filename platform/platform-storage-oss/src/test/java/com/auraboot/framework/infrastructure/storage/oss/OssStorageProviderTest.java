@@ -5,6 +5,8 @@ import com.aliyun.oss.model.OSSObject;
 import com.aliyun.oss.model.ObjectMetadata;
 import com.aliyun.oss.model.PutObjectResult;
 import com.auraboot.framework.file.constant.StorageType;
+import com.auraboot.framework.infrastructure.storage.StorageProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +43,13 @@ class OssStorageProviderTest {
     @Test
     void type_returnsOss() {
         assertEquals(StorageType.OSS, provider.type());
+    }
+
+    @Test
+    void productionConstructorIsAutowired() throws NoSuchMethodException {
+        assertTrue(OssStorageProvider.class
+                .getConstructor(StorageProperties.class)
+                .isAnnotationPresent(Autowired.class));
     }
 
     @Test
