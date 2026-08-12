@@ -1041,7 +1041,7 @@ describe('UnifiedDesignerPage', () => {
     expect(await screen.findByTestId('studio-handoff-editable-reason')).toHaveTextContent(
       '写回同一隔离草稿',
     );
-    expect(screen.getByTestId('designer-contextual-restricted')).toHaveTextContent(
+    expect(await screen.findByTestId('designer-contextual-restricted')).toHaveTextContent(
       '同一 ChangeSet',
     );
     expect(loadPageSchemaV3).not.toHaveBeenCalled();
@@ -1569,8 +1569,13 @@ describe('UnifiedDesignerPage', () => {
     render(<UnifiedDesignerPage />);
 
     await screen.findByTestId('studio-handoff-context');
+    await waitFor(() =>
+      expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent(
+        'field_customer_name',
+      ),
+    );
     fireEvent.click(screen.getByTestId('designer-mode-layout'));
-    fireEvent.click(screen.getByTestId('block-move-down-field_customer_name'));
+    fireEvent.click(await screen.findByTestId('block-move-down-field_customer_name'));
     fireEvent.click(screen.getByTestId('designer-save'));
 
     await waitFor(() =>

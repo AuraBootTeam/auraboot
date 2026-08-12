@@ -1,10 +1,17 @@
 import { test, expect, type APIResponse, type Browser, type Page } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { Client as PgClient } from 'pg';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { PG_CONN } from '../../helpers/environments';
 import { loginViaUI } from '../../helpers/wd-fixtures';
 
-const RUNTIME_ROUTE = '/production-exception-list-v4';
+const SOURCE_PAGE_KEY = 'e2et_record_list';
 const RUNTIME_ONLY_ROLE = 'e2e_contextual_authoring_runtime_only';
 const RUNTIME_ONLY_EMAIL = 'e2e-contextual-authoring-runtime-only@test.com';
+const SCREENSHOT_DIR = resolve(
+  process.env.CONTEXTUAL_AUTHORING_SCREENSHOT_DIR ?? 'test-results/contextual-authoring',
+);
 
 type ApiEnvelope<T> = {
   code?: number | string;
@@ -22,13 +29,30 @@ type RoleRecord = {
   code: string;
 };
 
+type GatePage = {
+  pid: string;
+  pageKey: string;
+  route: string;
+  title: string;
+  recordMarker: string;
+  recordPids: string[];
+  menuId: string | number;
+};
+
+let gatePage: GatePage;
+
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Contextual authoring PC Web golden', () => {
   test.describe.configure({ mode: 'serial', timeout: 60_000 });
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ browser, page }) => {
+    gatePage = await createPcGatePage(browser);
     await login(page);
+  });
+
+  test.afterEach(async ({ browser }) => {
+    if (gatePage) await cleanupPcGatePage(browser, gatePage);
   });
 
   test('PC-AUTH-001 @critical @smoke — menu to runtime to contextual authoring', async ({
@@ -38,10 +62,8 @@ test.describe('Contextual authoring PC Web golden', () => {
     await openRuntimeFromMenu(page);
 
     const runtimeMain = page.getByRole('main').first();
-    await expect(
-      runtimeMain.getByRole('heading', { name: 'Production Exception List V4' }),
-    ).toBeVisible();
-    await expect(runtimeMain.getByText('EXC-V4-REAL-001')).toBeVisible();
+    await expect(runtimeMain.getByRole('heading', { name: gatePage.title })).toBeVisible();
+    await expect(runtimeMain.getByText(gatePage.recordMarker)).toBeVisible();
     await runtimeMain.getByRole('button', { name: '配置此页' }).click();
 
     const surface = page.getByTestId('contextual-authoring-surface');
@@ -59,7 +81,7 @@ test.describe('Contextual authoring PC Web golden', () => {
     await page.keyboard.press('Enter');
     const inspector = page.getByTestId('authoring-inspector');
     await expect(inspector).toBeVisible();
-    await expect(inspector).toContainText('Production Exception List V4');
+    await expect(inspector).toContainText(gatePage.title);
     await expect(inspector).toContainText('页面');
     await testInfo.attach('contextual-authoring-1280', {
       body: await page.screenshot(),
@@ -145,14 +167,14 @@ test.describe('Contextual authoring PC Web golden', () => {
       await openRuntimeFromMenu(actor.page);
 
       const runtimeMain = actor.page.getByRole('main').first();
-      await expect(runtimeMain.getByText('EXC-V4-REAL-001')).toBeVisible();
+      await expect(runtimeMain.getByText(gatePage.recordMarker)).toBeVisible();
       await expect(runtimeMain.getByRole('button', { name: '配置此页' })).toHaveCount(0);
       await expect(actor.page.getByTestId('contextual-authoring-enter')).toHaveCount(0);
 
       const denied = await actor.page.request.post('/api/authoring/sessions', {
         data: {
-          pagePid: 'production-exception-list-v4',
-          interactionContext: { route: RUNTIME_ROUTE },
+          pagePid: gatePage.pid,
+          interactionContext: { route: gatePage.route },
         },
       });
       expect(denied.status(), '后端必须独立拒绝无设计权限账号创建配置会话').toBe(403);
@@ -161,16 +183,312 @@ test.describe('Contextual authoring PC Web golden', () => {
       expect(JSON.stringify(deniedBody)).not.toContain('changeSetPid');
 
       await actor.page.goto('/unified-designer', { waitUntil: 'domcontentloaded' });
-      await expect(
-        actor.page.getByRole('heading', { name: '应用设计中心不可用' }),
-      ).toBeVisible();
+      await expect(actor.page.getByRole('heading', { name: '应用设计中心不可用' })).toBeVisible();
       await expect(actor.page.getByText(/meta\.designer\.read/)).toBeVisible();
       await expect(actor.page.getByTestId('unified-designer-workbench')).toHaveCount(0);
     } finally {
       await actor.close();
     }
   });
+
+  test('PC-AUTH-049 @critical — 200% effective zoom keeps authoring keyboard and screen-reader semantics intact', async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openRuntimeFromMenu(page);
+    await emulateDesktopAtTwoHundredPercent(page);
+
+    const effectiveViewport = await page.evaluate(() => ({
+      devicePixelRatio: window.devicePixelRatio,
+      height: window.innerHeight,
+      width: window.innerWidth,
+    }));
+    expect(effectiveViewport).toEqual({ devicePixelRatio: 2, height: 450, width: 720 });
+
+    const runtimeMain = page.getByRole('main').first();
+    await runtimeMain.getByRole('button', { name: '配置此页' }).focus();
+    await page.keyboard.press('Enter');
+
+    const surface = page.getByTestId('contextual-authoring-surface');
+    await expect(surface).toBeVisible();
+    await expect(page.getByRole('note', { name: 'ChangeSet 风险与发布策略' })).toContainText('L0');
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      ),
+      '200% 等效缩放下页面不应产生全局水平滚动',
+    ).toBe(true);
+
+    const inspectorTrigger = page.getByTestId('authoring-inspector-open');
+    await inspectorTrigger.focus();
+    await page.keyboard.press('Enter');
+
+    const inspector = page.getByRole('dialog', { name: '属性检查器' });
+    await expect(inspector).toBeVisible();
+    await expect(inspector).toHaveAttribute('aria-modal', 'true');
+    const inspectorAria = await inspector.ariaSnapshot();
+    expect(inspectorAria).toContain('dialog "属性检查器"');
+    expect(inspectorAria).toContain('button "高级设置"');
+    await testInfo.attach('contextual-authoring-accessibility-tree', {
+      body: inspectorAria,
+      contentType: 'text/plain',
+    });
+    const inspectorBox = await inspector.boundingBox();
+    expect(inspectorBox?.x ?? -1, '窄视口属性检查器应从 viewport 左缘开始').toBeLessThanOrEqual(1);
+    expect(inspectorBox?.width ?? 0, '窄视口属性检查器应占满 viewport').toBeGreaterThanOrEqual(
+      effectiveViewport.width - 2,
+    );
+
+    const inspectorClose = inspector.getByRole('button', { name: '关闭属性检查器' });
+    await expect(inspectorClose).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(inspector.getByRole('button', { name: '高级设置' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(inspectorClose).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(inspector).toBeHidden();
+    await expect(inspectorTrigger).toBeFocused();
+
+    await page.keyboard.press('Enter');
+    const advancedSettings = inspector.getByRole('button', { name: '高级设置' });
+    await advancedSettings.focus();
+    await page.keyboard.press('Enter');
+    const explain = page.getByRole('dialog', { name: '进入应用设计中心' });
+    await expect(explain).toBeVisible();
+    await expect(explain).toHaveAttribute('aria-modal', 'true');
+    await expect(explain.getByRole('button', { name: '取消' })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(explain.getByRole('button', { name: '继续到应用设计中心' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(explain).toBeHidden();
+    await expect(advancedSettings).toBeFocused();
+
+    await page.emulateMedia({ forcedColors: 'active' });
+    await expect(inspector).toBeVisible();
+    await expect(inspector.getByText('可配置属性')).toBeVisible();
+    await mkdir(SCREENSHOT_DIR, { recursive: true });
+    await useEquivalentLayoutViewport(page);
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-049-contextual-200-percent-forced-colors-final.png'),
+      fullPage: true,
+    });
+    await testInfo.attach('contextual-authoring-200-percent-forced-colors', {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await page.emulateMedia({ forcedColors: 'none' });
+    await emulateDesktopAtTwoHundredPercent(page);
+
+    await expect(advancedSettings).toBeFocused();
+    await page.keyboard.press('Enter');
+    await explain.getByRole('button', { name: '继续到应用设计中心' }).click();
+    await expect(page).toHaveURL(/\/unified-designer\?authoringSession=/);
+    await emulateDesktopAtTwoHundredPercent(page);
+    expect(await page.evaluate(() => window.innerWidth)).toBe(720);
+
+    const governanceTrigger = page.getByTestId('studio-governance-open');
+    await governanceTrigger.focus();
+    await page.keyboard.press('Enter');
+    const governance = page.getByRole('dialog', { name: '治理与发布' });
+    await expect(governance).toBeVisible();
+    await expect(governance).toHaveAttribute('aria-modal', 'true');
+    const governanceAria = await governance.ariaSnapshot();
+    expect(governanceAria).toContain('dialog "治理与发布"');
+    expect(governanceAria).toContain('button "关闭治理与发布"');
+    await testInfo.attach('studio-governance-accessibility-tree', {
+      body: governanceAria,
+      contentType: 'text/plain',
+    });
+    const governanceBox = await governance.boundingBox();
+    expect(governanceBox?.x ?? -1, '200% 下治理抽屉应从 viewport 左缘开始').toBeLessThanOrEqual(1);
+    expect(governanceBox?.width ?? 0, '200% 下治理抽屉应占满 viewport').toBeGreaterThanOrEqual(718);
+    await expect(governance.getByRole('button', { name: '关闭治理与发布' })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    expect(
+      await governance.evaluate((element) => element.contains(document.activeElement)),
+      '治理抽屉的反向 Tab 必须留在模态范围内',
+    ).toBe(true);
+    await useEquivalentLayoutViewport(page);
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-049-studio-200-percent-final.png'),
+      fullPage: true,
+    });
+    await page.keyboard.press('Escape');
+    await expect(governance).toBeHidden();
+    await expect(governanceTrigger).toBeFocused();
+
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      ),
+      'Studio 在 200% 等效缩放下不应产生全局水平滚动',
+    ).toBe(true);
+    await testInfo.attach('studio-governance-200-percent', {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+  });
 });
+
+async function emulateDesktopAtTwoHundredPercent(page: Page): Promise<void> {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setDeviceMetricsOverride', {
+    mobile: false,
+    width: 720,
+    height: 450,
+    deviceScaleFactor: 2,
+    screenWidth: 1440,
+    screenHeight: 900,
+    screenOrientation: { angle: 0, type: 'landscapePrimary' },
+  });
+}
+
+async function useEquivalentLayoutViewport(page: Page): Promise<void> {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.clearDeviceMetricsOverride');
+  await page.setViewportSize({ width: 720, height: 900 });
+}
+
+async function createPcGatePage(browser: Browser): Promise<GatePage> {
+  const suffix = `${Date.now().toString(36)}_${process.pid}`;
+  const recordMarker = `PC-AUTH-A11Y-${suffix}`;
+  const recordPids = await seedPcGateRecords(recordMarker, suffix);
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  try {
+    await login(page);
+    const source = await expectApiData<Record<string, unknown>>(
+      await page.request.get(`/api/pages/key/${SOURCE_PAGE_KEY}`),
+      'load PC gate source page',
+    );
+    const menuId = Date.now();
+    const pageKey = `contextual_authoring_pc_gate_${suffix}`;
+    const route = `/contextual-authoring-pc-gate-${suffix.replaceAll('_', '-')}`;
+    const title = `Contextual Authoring PC Gate ${suffix}`;
+    const created = await expectApiData<{ pid: string }>(
+      await page.request.post('/api/pages', {
+        data: {
+          pageKey,
+          modelCode: source.modelCode,
+          name: title,
+          title,
+          description: 'Self-contained PC accessibility and authoring golden fixture',
+          kind: source.kind,
+          profile: source.profile,
+          layout: source.layout ?? {},
+          blocks: source.blocks,
+          schemaVersion: source.schemaVersion,
+          isTemplate: false,
+          sortWeight: 9999,
+          semver: '1.0.0',
+        },
+      }),
+      'create PC gate page',
+    );
+    await expectApiData(
+      await page.request.post(`/api/pages/${created.pid}/publish`),
+      'publish PC gate page',
+    );
+    const menu = await expectApiData<{ id: string | number }>(
+      await page.request.post('/api/menu/create', {
+        data: {
+          id: menuId,
+          pid: `menu_${suffix}`,
+          code: pageKey,
+          name: title,
+          path: route,
+          component: 'dynamic-page',
+          type: 1,
+          permissionCode: 'page.page.read',
+          visible: true,
+          orderNo: 9999,
+          pageKey,
+          pagePid: created.pid,
+          status: 'active',
+          deletedFlag: false,
+        },
+      }),
+      'mount PC gate page in menu',
+    );
+    return {
+      pid: created.pid,
+      pageKey,
+      route,
+      title,
+      recordMarker,
+      recordPids,
+      menuId: menu.id,
+    };
+  } catch (error) {
+    await deletePcGateRecords(recordPids);
+    throw error;
+  } finally {
+    await context.close();
+  }
+}
+
+async function cleanupPcGatePage(browser: Browser, target: GatePage): Promise<void> {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  try {
+    await login(page);
+    await expectApiData(
+      await page.request.delete(`/api/menu/${encodeURIComponent(String(target.menuId))}`),
+      'delete PC gate menu',
+    );
+    await expectApiData(
+      await page.request.post(`/api/pages/${encodeURIComponent(target.pid)}/unpublish`),
+      'unpublish PC gate page',
+    );
+    await expectApiData(
+      await page.request.delete(`/api/pages/${encodeURIComponent(target.pid)}`),
+      'delete PC gate page',
+    );
+  } finally {
+    await context.close();
+    await deletePcGateRecords(target.recordPids);
+  }
+}
+
+async function seedPcGateRecords(marker: string, suffix: string): Promise<string[]> {
+  const client = new PgClient(PG_CONN);
+  await client.connect();
+  try {
+    const tenants = await client.query<{ tenant_id: string }>(
+      `SELECT DISTINCT tenant_id
+         FROM ab_meta_model
+        WHERE code = 'e2et_record'
+          AND is_current = TRUE
+          AND deleted_flag = FALSE`,
+    );
+    expect(tenants.rows.length, `${SOURCE_PAGE_KEY} model tenant`).toBeGreaterThan(0);
+    const pids = tenants.rows.map(
+      ({ tenant_id: tenantId }, index) => `pcgold_${suffix}_${index}_${tenantId.slice(-6)}`,
+    );
+    for (let index = 0; index < tenants.rows.length; index += 1) {
+      await client.query(
+        `INSERT INTO mt_e2et_record
+           (pid, tenant_id, e2et_name, e2et_status, e2et_count, created_at, updated_at)
+         VALUES ($1, $2, $3, 'active', 1, NOW(), NOW())`,
+        [pids[index], tenants.rows[index].tenant_id, marker],
+      );
+    }
+    return pids;
+  } finally {
+    await client.end();
+  }
+}
+
+async function deletePcGateRecords(recordPids: string[]): Promise<void> {
+  const client = new PgClient(PG_CONN);
+  await client.connect();
+  try {
+    await client.query('DELETE FROM mt_e2et_record WHERE pid = ANY($1::text[])', [recordPids]);
+  } finally {
+    await client.end();
+  }
+}
 
 async function login(page: Page): Promise<void> {
   await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
@@ -180,11 +498,11 @@ async function login(page: Page): Promise<void> {
 async function openRuntimeFromMenu(page: Page): Promise<void> {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   const nav = page.locator('nav');
-  const link = nav.locator(`a[href="${RUNTIME_ROUTE}"]`).first();
+  const link = nav.locator(`a[href="${gatePage.route}"]`).first();
   await expect(link).toBeVisible({ timeout: 10_000 });
   await link.click();
-  await expect(page).toHaveURL(new RegExp(`${RUNTIME_ROUTE}$`));
-  await expect(page.getByRole('main').first().getByText('EXC-V4-REAL-001')).toBeVisible({
+  await expect(page).toHaveURL(new RegExp(`${gatePage.route}$`));
+  await expect(page.getByRole('main').first().getByText(gatePage.recordMarker)).toBeVisible({
     timeout: 15_000,
   });
 }
@@ -224,7 +542,7 @@ async function ensureRuntimeOnlyPersona(adminPage: Page): Promise<void> {
   }
 
   const permissionPids = await resolvePermissionPids(adminPage, [
-    'model.production_exception.read',
+    'model.e2et_record.read',
     'page.page.read',
   ]);
   await expectApiData<boolean>(

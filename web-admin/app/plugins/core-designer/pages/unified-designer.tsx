@@ -56,6 +56,7 @@ import { AuthoringImpactNotice } from '~/framework/meta/authoring/AuthoringImpac
 import { AuthoringChangeSetSplitPanel } from '~/framework/meta/authoring/AuthoringChangeSetSplitPanel';
 import { AuthoringReleaseHistoryPanel } from '~/framework/meta/authoring/AuthoringReleaseHistoryPanel';
 import { AuthoringOwnershipNotice } from '~/framework/meta/authoring/AuthoringOwnershipNotice';
+import { useModalFocusTrap } from '~/framework/meta/authoring/useModalFocusTrap';
 import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
 import {
   clearAuthoringRecoveriesForActor,
@@ -166,8 +167,10 @@ export default function UnifiedDesignerPage() {
   const [newPageError, setNewPageError] = useState<string | null>(null);
   const [reviewWorkspaceMode, setReviewWorkspaceMode] = useState(false);
   const [governanceOpen, setGovernanceOpen] = useState(false);
+  const governanceDrawerRef = useRef<HTMLElement>(null);
   const [workbenchGeneration, setWorkbenchGeneration] = useState(0);
   const [document, setDocument] = useState<PageSchemaV3 | null>(null);
+  useModalFocusTrap(governanceOpen, governanceDrawerRef, () => setGovernanceOpen(false));
   const [source, setSource] = useState<PageSchemaV3Source>({ type: 'local' });
   const [published, setPublished] = useState(false);
   const [modelFieldsByModel, setModelFieldsByModel] = useState<ModelFieldsByModel>({});
@@ -1652,9 +1655,12 @@ export default function UnifiedDesignerPage() {
         />
       ) : null}
       <aside
+        ref={governanceDrawerRef}
         aria-label="治理与发布"
+        aria-modal={governanceOpen || undefined}
+        role={governanceOpen ? 'dialog' : undefined}
         hidden={!governanceOpen}
-        className={`absolute inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-200 ${
+        className={`fixed inset-y-0 right-0 z-50 flex w-screen max-w-none flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-200 md:absolute md:w-full md:max-w-xl ${
           governanceOpen ? 'translate-x-0' : 'invisible translate-x-full'
         }`}
         data-testid="studio-governance-drawer"

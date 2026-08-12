@@ -82,6 +82,7 @@ import {
   canonicalizePageSchemaDto,
   type PageSchemaDTO,
 } from '~/framework/meta/utils/canonicalizePageDsl';
+import { useModalFocusTrap } from './useModalFocusTrap';
 
 type HandoffIntent = 'PAGE_STRUCTURE' | 'NEW_PAGE' | 'MENU_STRUCTURE';
 
@@ -682,10 +683,8 @@ export function ContextualAuthoringSurface({
         if (parentId) setSelectedId(parentId);
       }
       if (event.key === 'Escape') {
-        if (explain) setExplain(null);
-        else if (inspectorOpen) setInspectorOpen(false);
-        else if (outlineOpen) setOutlineOpen(false);
-        else if (selectedId !== schema.id) setSelectedId(schema.id);
+        if (explain || inspectorOpen || outlineOpen) return;
+        if (selectedId !== schema.id) setSelectedId(schema.id);
         else exit();
       }
     };
@@ -1736,12 +1735,17 @@ function OutlinePanel({
   onClose: () => void;
   onSelect: (id: string) => void;
 }) {
+  const panelRef = useRef<HTMLElement>(null);
+  useModalFocusTrap(open, panelRef, onClose);
   return (
     <aside
-      className={`border-border bg-panel z-40 w-64 shrink-0 overflow-auto border-r 2xl:relative 2xl:block ${
+      ref={panelRef}
+      className={`border-border bg-panel z-40 w-64 shrink-0 overflow-auto border-r max-md:fixed max-md:inset-0 max-md:w-screen 2xl:relative 2xl:block ${
         open ? 'absolute inset-y-0 left-0 block shadow-2xl' : 'hidden'
       }`}
       aria-label="页面大纲"
+      aria-modal={open || undefined}
+      role={open ? 'dialog' : undefined}
       data-testid="authoring-outline"
     >
       <PanelHeader title="页面大纲" onClose={onClose} />
@@ -1813,15 +1817,20 @@ function InspectorPanel({
     remove?: boolean,
   ) => void;
 }) {
+  const panelRef = useRef<HTMLElement>(null);
+  useModalFocusTrap(open, panelRef, onClose);
   const properties = Object.values(manifest?.properties ?? {}).sort((left, right) =>
     left.propertyPath.localeCompare(right.propertyPath),
   );
   return (
     <aside
-      className={`border-border bg-panel z-40 w-80 max-w-[calc(100vw-2rem)] shrink-0 overflow-auto border-l 2xl:relative 2xl:block ${
+      ref={panelRef}
+      className={`border-border bg-panel z-40 w-80 max-w-[calc(100vw-2rem)] shrink-0 overflow-auto border-l max-md:fixed max-md:inset-0 max-md:w-screen max-md:max-w-none 2xl:relative 2xl:block ${
         open ? 'absolute inset-y-0 right-0 block shadow-2xl' : 'hidden'
       }`}
       aria-label="属性检查器"
+      aria-modal={open || undefined}
+      role={open ? 'dialog' : undefined}
       data-testid="authoring-inspector"
     >
       <PanelHeader title="属性检查器" onClose={onClose} />
@@ -2155,8 +2164,11 @@ function DockButton({
 }
 
 function DiffDialog({ edits, onClose }: { edits: PendingAuthoringEdit[]; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(true, dialogRef, onClose);
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4"
       role="dialog"
       aria-modal="true"
@@ -2247,8 +2259,11 @@ function ExplainDialog({
   onCancel: () => void;
   onContinue: () => void;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(true, dialogRef, onCancel);
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/40 p-4"
       role="dialog"
       aria-modal="true"

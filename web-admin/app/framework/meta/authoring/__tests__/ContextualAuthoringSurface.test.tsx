@@ -329,8 +329,10 @@ describe('ContextualAuthoringSurface', () => {
     fireEvent.click(screen.getByTestId('runtime-write'));
 
     fireEvent.click(await screen.findByText('高级设置 ↗'));
-    expect(screen.getByRole('dialog')).toHaveTextContent('DATA_BINDING');
-    expect(screen.getByRole('dialog')).toHaveTextContent('10 分钟');
+    expect(screen.getByRole('dialog', { name: '进入应用设计中心' })).toHaveTextContent(
+      'DATA_BINDING',
+    );
+    expect(screen.getByRole('dialog', { name: '进入应用设计中心' })).toHaveTextContent('10 分钟');
     fireEvent.click(screen.getByText('继续到应用设计中心'));
 
     await waitFor(() =>
@@ -353,8 +355,8 @@ describe('ContextualAuthoringSurface', () => {
     fireEvent.change(screen.getByLabelText(/标题/), { target: { value: '生产订单' } });
     expect(screen.getByText('1 项未保存')).toBeInTheDocument();
     fireEvent.click(screen.getByText('差异'));
-    expect(screen.getByRole('dialog')).toHaveTextContent('订单表格');
-    expect(screen.getByRole('dialog')).toHaveTextContent('生产订单');
+    expect(screen.getByRole('dialog', { name: '待保存差异' })).toHaveTextContent('订单表格');
+    expect(screen.getByRole('dialog', { name: '待保存差异' })).toHaveTextContent('生产订单');
     fireEvent.click(screen.getByLabelText('关闭差异'));
 
     fireEvent.click(screen.getByText('保存'));
