@@ -38,6 +38,13 @@ type ChangeItem = {
   operation: string;
 };
 
+type CapabilityRegistry = {
+  manifests: Array<{
+    blockType: string;
+    checksum: string;
+  }>;
+};
+
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Contextual authoring PC save, move and failure golden', () => {
@@ -806,6 +813,168 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
       fullPage: true,
     });
   });
+
+  test('PC-AUTH-026 @critical — an inline recovery third value survives the Studio handoff and explicit resolution', async ({
+    page,
+  }) => {
+    const session = await enterAuthoringFromRuntime(page);
+    const itemsBefore = await loadChangeItems(page, session.sessionPid);
+    const table = findBlock(session.snapshot, (candidate) => blockType(candidate) === 'table');
+    expect(table?.id, 'table block for inline recovery third value').toBeTruthy();
+    const baseTitleValue = readObjectPath(table!, '/title');
+    const baseTitle = typeof baseTitleValue === 'string' ? baseTitleValue : undefined;
+    const { editor, value: mineTitle } = await stageTitleEdit(page, session);
+    const latestTitle = distinctText(baseTitle, mineTitle, '生产异常（恢复 Latest）');
+    const latestPatch = await buildTablePatch(page, session, '/title', latestTitle);
+    const latestSaved = await expectApiData<PatchResult>(
+      await page.request.patch(`/api/authoring/sessions/${session.sessionPid}/patches`, {
+        data: { expectedRevision: session.revision, ...latestPatch },
+      }),
+      'write authoritative third value before inline recovery',
+    );
+    expect(latestSaved.session.revision).toBe(session.revision + 1);
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('authoring-local-recovery')).toBeVisible();
+    await page.getByTestId('authoring-local-recovery-resume').click();
+
+    await expect(page.getByTestId('contextual-authoring-conflict')).toContainText(
+      'Base / Mine / Latest',
+    );
+    await expect(page.getByTestId('contextual-authoring-conflict')).toContainText(
+      `Base r${session.revision} / Latest r${latestSaved.session.revision}`,
+    );
+    await expect(editor).toHaveValue(mineTitle);
+    await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-026-inline-restart-third-value.png'),
+      fullPage: true,
+    });
+
+    await page.getByTestId('contextual-authoring-conflict-studio').click();
+    await expect(page.getByTestId('authoring-conflict-panel')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('authoring-conflict-panel')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');
+    const titleConflict = conflictCard(page, '标题');
+    await expect(titleConflict.getByTestId('authoring-conflict-value-base')).toContainText(
+      baseTitle ?? '未设置',
+    );
+    await expect(titleConflict.getByTestId('authoring-conflict-value-mine')).toContainText(
+      mineTitle,
+    );
+    await expect(titleConflict.getByTestId('authoring-conflict-value-latest')).toContainText(
+      latestTitle,
+    );
+
+    await titleConflict.getByLabel('保留 Mine').click();
+    const resolutionResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${session.sessionPid}/studio-batches`,
+    );
+    await page.getByTestId('authoring-conflict-apply').click();
+    const resolved = await expectApiData<PatchResult>(
+      await resolutionResponse,
+      'resolve inline restart third value in Studio',
+    );
+    expect(resolved.session.revision).toBe(latestSaved.session.revision + 1);
+    expect(
+      readObjectPath(
+        findBlock(resolved.session.snapshot, (candidate) => candidate.id === table!.id)!,
+        '/title',
+      ),
+    ).toBe(mineTitle);
+    expect(await loadChangeItems(page, session.sessionPid)).toHaveLength(itemsBefore.length + 2);
+    await expect(page.getByTestId('authoring-conflict-panel')).toHaveCount(0);
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('已保存');
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('authoring-conflict-panel')).toHaveCount(0);
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('已保存');
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-026-inline-restart-third-value-resolved.png'),
+      fullPage: true,
+    });
+  });
+
+  test('PC-AUTH-027 @critical — a native Studio recovery third value reloads into Base Mine Latest and resolves once', async ({
+    page,
+  }) => {
+    const session = await enterAuthoringFromRuntime(page);
+    const itemsBefore = await loadChangeItems(page, session.sessionPid);
+    await continueToStudio(page);
+
+    const table = findBlock(session.snapshot, (candidate) => blockType(candidate) === 'table');
+    expect(table?.id, 'table block for native Studio recovery third value').toBeTruthy();
+    const tableId = String(table!.id);
+    const baseTitleValue = readObjectPath(table!, '/title');
+    const baseTitle = typeof baseTitleValue === 'string' ? baseTitleValue : undefined;
+    const mineTitle = distinctText(baseTitle, undefined, '生产异常（Studio Mine）');
+    const latestTitle = distinctText(baseTitle, mineTitle, '生产异常（Studio Latest）');
+    await page.getByTestId(`outline-item-${tableId}`).click();
+    await page.getByTestId('inspector-field-title').fill(mineTitle);
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');
+
+    const latestPatch = await buildTablePatch(page, session, '/title', latestTitle);
+    const latestSaved = await expectApiData<PatchResult>(
+      await page.request.patch(`/api/authoring/sessions/${session.sessionPid}/patches`, {
+        data: { expectedRevision: session.revision, ...latestPatch },
+      }),
+      'write authoritative third value before native Studio reload',
+    );
+    expect(latestSaved.session.revision).toBe(session.revision + 1);
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('authoring-conflict-panel')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');
+    const titleConflict = conflictCard(page, '标题');
+    await expect(titleConflict.getByTestId('authoring-conflict-value-base')).toContainText(
+      baseTitle ?? '未设置',
+    );
+    await expect(titleConflict.getByTestId('authoring-conflict-value-mine')).toContainText(
+      mineTitle,
+    );
+    await expect(titleConflict.getByTestId('authoring-conflict-value-latest')).toContainText(
+      latestTitle,
+    );
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-027-studio-restart-third-value.png'),
+      fullPage: true,
+    });
+
+    await titleConflict.getByLabel('保留 Mine').click();
+    const resolutionResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) === `/api/authoring/sessions/${session.sessionPid}/studio-batches`,
+    );
+    await page.getByTestId('authoring-conflict-apply').click();
+    const resolved = await expectApiData<PatchResult>(
+      await resolutionResponse,
+      'resolve native Studio restart third value',
+    );
+    expect(resolved.session.revision).toBe(latestSaved.session.revision + 1);
+    expect(
+      readObjectPath(
+        findBlock(resolved.session.snapshot, (candidate) => candidate.id === tableId)!,
+        '/title',
+      ),
+    ).toBe(mineTitle);
+    expect(await loadChangeItems(page, session.sessionPid)).toHaveLength(itemsBefore.length + 2);
+    await expect(page.getByTestId('authoring-conflict-panel')).toHaveCount(0);
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('已保存');
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('authoring-conflict-panel')).toHaveCount(0);
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('已保存');
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-027-studio-restart-third-value-resolved.png'),
+      fullPage: true,
+    });
+  });
 });
 
 async function enterAuthoringFromRuntime(page: Page): Promise<AuthoringSession> {
@@ -835,6 +1004,39 @@ async function enterAuthoringFromRuntime(page: Page): Promise<AuthoringSession> 
   );
   await expect(page.getByTestId('contextual-authoring-surface')).toBeVisible();
   return session;
+}
+
+async function continueToStudio(page: Page): Promise<void> {
+  await page.getByTestId('authoring-inspector-open').click();
+  await page.getByRole('button', { name: '高级设置' }).click();
+  await page
+    .getByRole('dialog', { name: '进入应用设计中心' })
+    .getByRole('button', { name: '继续到应用设计中心' })
+    .click();
+  await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+}
+
+async function buildTablePatch(
+  page: Page,
+  session: AuthoringSession,
+  propertyPath: '/title',
+  value: unknown,
+) {
+  const table = findBlock(session.snapshot, (candidate) => blockType(candidate) === 'table');
+  expect(table?.id, 'table block for direct authoritative patch').toBeTruthy();
+  const capabilities = await expectApiData<CapabilityRegistry>(
+    await page.request.get('/api/authoring/capabilities'),
+    'load authoring capabilities for direct patch',
+  );
+  const tableManifest = capabilities.manifests.find((manifest) => manifest.blockType === 'table');
+  expect(tableManifest?.checksum, 'table manifest checksum for direct patch').toBeTruthy();
+  return {
+    blockId: String(table!.id),
+    propertyPath,
+    operation: readObjectPath(table!, propertyPath) === undefined ? 'ADD' : 'REPLACE',
+    value,
+    manifestChecksum: tableManifest!.checksum,
+  };
 }
 
 async function stageDensityEdit(page: Page, session: AuthoringSession) {
@@ -867,6 +1069,17 @@ async function openTableInspector(page: Page, tableId: string): Promise<void> {
   await page.getByTestId(`authoring-outline-${tableId}`).click();
   await page.getByRole('button', { name: '关闭页面大纲' }).click();
   await page.getByTestId('authoring-inspector-open').click();
+}
+
+function conflictCard(page: Page, label: string) {
+  return page.locator('article[data-testid^="authoring-conflict-"]').filter({ hasText: label });
+}
+
+function distinctText(base: string | undefined, excluded: string | undefined, preferred: string) {
+  if (preferred !== base && preferred !== excluded) return preferred;
+  const alternate = `${preferred} 2`;
+  if (alternate !== base && alternate !== excluded) return alternate;
+  return `${preferred} 3`;
 }
 
 async function loadChangeItems(page: Page, sessionPid: string): Promise<ChangeItem[]> {

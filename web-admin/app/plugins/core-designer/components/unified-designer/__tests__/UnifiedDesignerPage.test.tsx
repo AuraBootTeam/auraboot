@@ -43,7 +43,11 @@ import type {
   HandoffContext,
 } from '~/framework/meta/authoring/types';
 import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
-import { readStudioAuthoringRecovery } from '~/framework/meta/authoring/authoringLocalRecovery';
+import {
+  readInlineAuthoringRecovery,
+  readStudioAuthoringRecovery,
+  storeInlineAuthoringRecovery,
+} from '~/framework/meta/authoring/authoringLocalRecovery';
 
 const permissionMock = vi.hoisted(() => ({
   canAdministerDesigner: vi.fn((_permission: string) => true),
@@ -918,6 +922,7 @@ describe('UnifiedDesignerPage', () => {
     refreshedLatestList.dataSource = { model: 'invoice' };
     vi.mocked(loadAuthoringSession)
       .mockResolvedValueOnce(latestSession)
+      .mockResolvedValueOnce(latestSession)
       .mockResolvedValueOnce(createAuthoringSession(refreshedLatest, 5));
     vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
     vi.mocked(consumeAuthoringConflictTransfer).mockReturnValue({
@@ -930,8 +935,39 @@ describe('UnifiedDesignerPage', () => {
       baseSnapshot: baseline as unknown as Record<string, unknown>,
       mineSnapshot: mine as unknown as Record<string, unknown>,
     });
+    expect(
+      storeInlineAuthoringRecovery({
+        actorId: '1',
+        sessionPid: 'session_1',
+        pagePid: 'page_1',
+        baseRevision: 3,
+        state: 'DIRTY',
+        edits: [
+          {
+            key: 'list_customer:/dataSource',
+            baseRevision: 3,
+            blockId: 'list_customer',
+            blockLabel: '客户列表',
+            manifestChecksum: 'list-checksum',
+            property: {
+              propertyPath: '/dataSource',
+              allowedOperations: ['REPLACE'],
+              route: 'HANDOFF_STUDIO',
+              risk: 'L3',
+              effectTags: [],
+              reversibility: 'REVERSIBLE',
+              protectedSemantic: false,
+              rolePreviewRequired: false,
+            },
+            operation: 'REPLACE',
+            previousValue: { model: 'customer' },
+            value: { model: 'payment' },
+          },
+        ],
+      }),
+    ).toBe(true);
 
-    render(<UnifiedDesignerPage />);
+    const firstRender = render(<UnifiedDesignerPage />);
 
     expect(await screen.findByTestId('authoring-conflict-panel')).toHaveTextContent(
       'Base / Mine / Latest',
@@ -946,14 +982,26 @@ describe('UnifiedDesignerPage', () => {
       'authoringSession=session_1',
     );
     expect(String(replaceState.mock.calls.at(-1)?.[2])).not.toContain('conflictContext');
+    expect(readInlineAuthoringRecovery('1', 'page_1')).toBeNull();
+    expect(readStudioAuthoringRecovery('1', 'session_1')?.mineDocument).toEqual(mine);
+
+    firstRender.unmount();
+    setSearch('?authoringSession=session_1');
+    render(<UnifiedDesignerPage />);
+
+    expect(await screen.findByTestId('authoring-conflict-panel')).toHaveTextContent(
+      'Base / Mine / Latest',
+    );
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
 
     fireEvent.click(screen.getByTestId('authoring-conflict-use-latest'));
 
     await waitFor(() =>
       expect(screen.queryByTestId('authoring-conflict-panel')).not.toBeInTheDocument(),
     );
-    expect(loadAuthoringSession).toHaveBeenCalledTimes(2);
+    expect(loadAuthoringSession).toHaveBeenCalledTimes(3);
     expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r5');
+    expect(readStudioAuthoringRecovery('1', 'session_1')).toBeNull();
     replaceState.mockRestore();
   });
 

@@ -58,6 +58,7 @@ import { AuthoringReleaseHistoryPanel } from '~/framework/meta/authoring/Authori
 import { AuthoringOwnershipNotice } from '~/framework/meta/authoring/AuthoringOwnershipNotice';
 import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
 import {
+  clearInlineAuthoringRecovery,
   clearStudioAuthoringRecovery,
   readStudioAuthoringRecovery,
   storeStudioAuthoringRecovery,
@@ -341,6 +342,7 @@ export default function UnifiedDesignerPage() {
             if (transfer.baseRevision >= session.revision) {
               throw new Error('三方冲突上下文的 Base 修订不早于 Latest');
             }
+            const latestDocument = isolatedDocument;
             const baseDocument = authoringSnapshotToPageSchemaV3(transfer.baseSnapshot);
             const mineDocument = authoringSnapshotToPageSchemaV3(transfer.mineSnapshot);
             const merge = buildStudioThreeWayMerge(
@@ -350,6 +352,7 @@ export default function UnifiedDesignerPage() {
               capabilities,
             );
             isolatedDocument = mineDocument;
+            recoveredSavedDocument = latestDocument;
             setStudioConflict({
               baseRevision: transfer.baseRevision,
               baseDocument,
@@ -357,6 +360,31 @@ export default function UnifiedDesignerPage() {
               latestSession: session,
               merge,
             });
+            if (recoveryActorId) {
+              const migrated = storeStudioAuthoringRecovery({
+                actorId: recoveryActorId,
+                sessionPid: session.sessionPid,
+                pagePid: session.pagePid,
+                baseRevision: transfer.baseRevision,
+                state: 'DIRTY',
+                baseSnapshot: transfer.baseSnapshot,
+                mineDocument,
+              });
+              setStudioLocalRecoveryAvailable(migrated);
+              if (migrated) {
+                clearInlineAuthoringRecovery(
+                  recoveryActorId,
+                  session.pagePid,
+                  session.sessionPid,
+                );
+              } else {
+                setStudioSaveReconciliationFeedback({
+                  tone: 'warning',
+                  message:
+                    '浏览器无法把冲突草稿迁入 Studio 恢复副本；请勿刷新页面，并尽快完成裁决。',
+                });
+              }
+            }
             replaceAuthoringContextUrl('conflictContext', session.sessionPid);
           } else if (!reviewWorkspace && recoveryActorId) {
             const recovery = readStudioAuthoringRecovery(recoveryActorId, session.sessionPid);
@@ -908,6 +936,11 @@ export default function UnifiedDesignerPage() {
       setAuthoringSession(latestSession);
       setDocument(latestDocument);
       setStudioConflict(null);
+      if (recoveryActorId) {
+        clearStudioAuthoringRecovery(recoveryActorId, latestSession.sessionPid);
+      }
+      setStudioLocalRecoveryAvailable(false);
+      setStudioRecoveredBaseDocument(null);
       setWorkbenchGeneration((current) => current + 1);
     } catch (latestError) {
       setConflictError(
