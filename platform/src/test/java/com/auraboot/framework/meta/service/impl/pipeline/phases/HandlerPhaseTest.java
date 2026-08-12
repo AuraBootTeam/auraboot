@@ -32,6 +32,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.context.ApplicationContext;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -238,6 +239,25 @@ class HandlerPhaseTest {
         assertThatThrownBy(() -> phase.execute(ctx))
                 .isInstanceOf(com.auraboot.framework.exception.ConflictException.class)
                 .hasMessageContaining("iot.error.version_conflict");
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test
+    void execute_preservesPluginAccessDeniedSemantic() {
+        CommandHandlerExtension denied = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) {
+                throw new AccessDeniedException("record ownership required");
+            }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(denied));
+
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessage("record ownership required");
         assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
     }
 
