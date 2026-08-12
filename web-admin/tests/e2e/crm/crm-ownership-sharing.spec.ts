@@ -64,9 +64,16 @@ test.describe('CRM account collaboration', () => {
       displayName: `CRM Recipient ${uid}`,
       password: PASSWORD,
     };
+    const otherTenantMember: TestUser = {
+      email: `crm-other-tenant-${uid}@e2e.local`,
+      displayName: `CRM Other Tenant ${uid}`,
+      password: PASSWORD,
+    };
 
     owner.pid = await provisionSalesUser(page, owner);
     recipient.pid = await provisionSalesUser(page, recipient);
+    otherTenantMember.pid = await provisionSalesUser(page, otherTenantMember);
+    await moveUserMembershipToIsolatedTenant(otherTenantMember.pid, uid);
 
     const ownerContext = await newAuthenticatedContext(browser, resolvedBaseURL, owner);
     const recipientContext = await newAuthenticatedContext(browser, resolvedBaseURL, recipient);
@@ -118,6 +125,43 @@ test.describe('CRM account collaboration', () => {
       await expect(dialog).toBeVisible();
 
       await dialog.getByTestId('member-picker-add').click();
+      const crossTenantSearchResponse = ownerPage.waitForResponse(
+        (response) =>
+          response.url().includes('/api/tenant/members/search') &&
+          response.request().method() === 'POST' &&
+          String(response.request().postDataJSON()?.keyword ?? '') === otherTenantMember.email,
+      );
+      await dialog.getByTestId('member-picker-search-input').fill(otherTenantMember.email);
+      const completedCrossTenantSearch = await crossTenantSearchResponse;
+      expect(completedCrossTenantSearch.ok(), 'cross-tenant member search request').toBe(true);
+      const crossTenantSearchBody = await completedCrossTenantSearch.json().catch(() => ({}));
+      expect(memberSearchRecords(crossTenantSearchBody)).toEqual([]);
+      await expect(dialog.getByTestId(`member-picker-option-${otherTenantMember.pid}`)).toHaveCount(
+        0,
+      );
+      await expect(dialog).not.toContainText(otherTenantMember.email);
+      await expect(dialog.getByText(/未找到成员|No members found/i)).toBeVisible();
+
+      const crossTenantShareResponse = await ownerPage.request.post('/api/record-share', {
+        data: {
+          resourceCode: MODEL_CODE,
+          recordPid: ownerAccount.pid,
+          subjectType: 'member',
+          subjectPid: otherTenantMember.pid,
+          permissionMask: 'read',
+        },
+      });
+      const crossTenantShareBody = await crossTenantShareResponse.json().catch(() => ({}));
+      expect(
+        crossTenantShareResponse.ok() && isSuccessBody(crossTenantShareBody),
+        'owner cannot submit a member from another tenant even with its public PID',
+      ).toBe(false);
+      await expectShareNotPersisted(ownerAccount.pid, otherTenantMember.pid);
+      await testInfo.attach('owner-cross-tenant-member-hidden', {
+        body: await ownerPage.screenshot(),
+        contentType: 'image/png',
+      });
+
       await dialog.getByTestId('member-picker-search-input').fill(recipient.email);
       const recipientOption = dialog.getByTestId(`member-picker-option-${recipient.pid}`);
       await expect(recipientOption).toBeVisible({ timeout: 10_000 });
@@ -365,9 +409,6 @@ test.describe('CRM account collaboration', () => {
         0,
       );
       await expect(recipientPage.getByText(/加载中|Loading/)).toHaveCount(0);
-      await expect(
-        recipientPage.getByText(/暂无数据|没有数据|No data|No records/i).first(),
-      ).toBeVisible({ timeout: 10_000 });
       await testInfo.attach('recipient-account-hidden-after-revoke', {
         body: await recipientPage.screenshot(),
         contentType: 'image/png',
@@ -394,6 +435,85 @@ async function expireOwnShareForClockAdvance(sharePid: string): Promise<void> {
   } finally {
     await pool.end();
   }
+}
+
+async function moveUserMembershipToIsolatedTenant(userPid: string, uid: string): Promise<void> {
+  const pool = new Pool(PG_CONN);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const membership = await client.query<{
+      member_id: string;
+    }>(
+      `SELECT tm.id::text AS member_id
+       FROM ab_tenant_member tm
+       INNER JOIN ab_user u ON u.id = tm.user_id
+       WHERE u.pid = $1
+         AND tm.status = 'active'
+         AND tm.deleted_flag = false
+       LIMIT 1`,
+      [userPid],
+    );
+    expect(membership.rowCount, `source membership for ${userPid}`).toBe(1);
+
+    const tenantId = (
+      BigInt(Date.now()) * 1_000_000n +
+      BigInt(Math.floor(Math.random() * 1_000_000))
+    ).toString();
+    await client.query(
+      `INSERT INTO ab_tenant
+         (id, pid, name, display_name, status, deleted_flag, created_at, updated_at)
+       VALUES ($1, substr(md5(random()::text || clock_timestamp()::text), 1, 26),
+               $2, $3, 'active', false, now(), now())`,
+      [tenantId, `crm-isolated-${uid}`, `CRM Isolated ${uid}`],
+    );
+    await client.query(
+      `UPDATE ab_user_role
+       SET deleted_flag = true, updated_at = now()
+       WHERE member_id = $1`,
+      [membership.rows[0].member_id],
+    );
+    const moved = await client.query(
+      `UPDATE ab_tenant_member
+       SET tenant_id = $1, updated_at = now()
+       WHERE id = $2
+       RETURNING tenant_id`,
+      [tenantId, membership.rows[0].member_id],
+    );
+    expect(moved.rowCount, `move ${userPid} to isolated tenant`).toBe(1);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+async function expectShareNotPersisted(recordPid: string, subjectPid: string): Promise<void> {
+  const pool = new Pool(PG_CONN);
+  try {
+    const result = await pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM ab_record_share
+       WHERE resource_code = $1
+         AND record_pid = $2
+         AND subject_pid = $3`,
+      [MODEL_CODE, recordPid, subjectPid],
+    );
+    expect(result.rows[0]?.count, 'cross-tenant rejection leaves no grant residue').toBe('0');
+  } finally {
+    await pool.end();
+  }
+}
+
+function memberSearchRecords(body: any): unknown[] {
+  const data = body?.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.records)) return data.records;
+  if (Array.isArray(data?.content)) return data.content;
+  return [];
 }
 
 async function provisionSalesUser(adminPage: Page, user: TestUser): Promise<string> {

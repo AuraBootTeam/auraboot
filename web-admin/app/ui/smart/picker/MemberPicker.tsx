@@ -81,7 +81,8 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
   className,
 }) => {
   const { t } = useI18n();
-  const effectivePlaceholder = placeholder || t('member_picker.select', undefined, 'Select member…');
+  const effectivePlaceholder =
+    placeholder || t('member_picker.select', undefined, 'Select member…');
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [options, setOptions] = useState<MemberOption[]>([]);
@@ -89,6 +90,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const searchRequestIdRef = useRef(0);
 
   // Selected IDs
   const selectedIds = useMemo(() => (Array.isArray(value) ? value : value ? [value] : []), [value]);
@@ -114,6 +116,8 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
 
   // Search users
   const searchUsers = useCallback(async (keyword: string) => {
+    const requestId = ++searchRequestIdRef.current;
+    let nextOptions: MemberOption[] = [];
     setLoading(true);
     try {
       // Record collaborators are ordinary tenant members, not tenant administrators.
@@ -134,7 +138,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
           const records: TenantMemberSearchRecord[] = Array.isArray(result.data)
             ? result.data
             : result.data.records || result.data.content || [];
-          const users = records.flatMap((record): MemberOption[] => {
+          nextOptions = records.flatMap((record): MemberOption[] => {
             const userPid = record.user?.pid;
             if (!userPid) return [];
             return [
@@ -152,13 +156,17 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
               },
             ];
           });
-          setOptions(users);
         }
       }
     } catch {
       // CATCH: non-transactional HTTP call, safe to handle
     } finally {
-      setLoading(false);
+      if (requestId === searchRequestIdRef.current) {
+        // Fail closed: an error or unsuccessful response must not leave stale
+        // member candidates visible for a different keyword.
+        setOptions(nextOptions);
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -166,6 +174,11 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
   useEffect(() => {
     if (open) {
       searchUsers(search);
+    } else {
+      // Invalidate in-flight requests so a closed/reopened picker cannot be
+      // overwritten by an older response.
+      searchRequestIdRef.current += 1;
+      setLoading(false);
     }
   }, [open, search, searchUsers]);
 

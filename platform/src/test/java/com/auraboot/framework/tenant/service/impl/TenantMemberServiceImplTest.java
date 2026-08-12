@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -149,22 +150,28 @@ class TenantMemberServiceImplTest {
     }
 
     @Test
-    @DisplayName("findMembers paginates with status filter")
-    void findMembersWithStatus() {
+    @DisplayName("findMembers trims tenant-scoped user keyword and normalizes filters")
+    void findMembersWithKeywordAndStatus() {
         Page<TenantMember> page = new Page<>(1, 10);
-        doReturn(page).when(spyService).page(any(Page.class), any(QueryWrapper.class));
+        when(tenantMemberMapper.searchMembersPage(
+                any(Page.class), eq(10L), eq("owner@example.com"), eq("human"), eq("active")))
+                .thenReturn(page);
 
-        Page<TenantMember> result = spyService.findMembers(1, 10, 10L, "kw", "human", "active");
-        assertNotNull(result);
+        assertEquals(
+                page,
+                service.findMembers(
+                        1, 10, 10L, "  owner@example.com  ", "HUMAN", "ACTIVE"));
     }
 
     @Test
     @DisplayName("findMembers paginates without status filter")
     void findMembersNoStatus() {
         Page<TenantMember> page = new Page<>(1, 10);
-        doReturn(page).when(spyService).page(any(Page.class), any(QueryWrapper.class));
+        when(tenantMemberMapper.searchMembersPage(
+                any(Page.class), eq(10L), eq(null), eq(null), eq(null)))
+                .thenReturn(page);
 
-        assertNotNull(spyService.findMembers(1, 10, 10L, null, null, null));
+        assertEquals(page, service.findMembers(1, 10, 10L, null, null, null));
     }
 
     @Test
