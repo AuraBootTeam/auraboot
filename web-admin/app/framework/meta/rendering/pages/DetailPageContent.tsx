@@ -73,6 +73,13 @@ import { getPublicRecordPid } from '~/framework/meta/utils/publicRecordId';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
 import { useRuntimeStateSubscription } from '~/framework/meta/rendering/blocks/workbenchBlockUtils';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import {
+  formatInTimezone,
+  resolveTemporalFormat,
+  resolveTemporalType,
+  type DateTimeFormatPreferences,
+} from '~/shared/services/dateTimeFormatService';
 
 interface RecordData {
   [key: string]: any;
@@ -430,6 +437,8 @@ export function resolveSettingsCardDisplayValue(
   getDictItems?: (
     code: string,
   ) => Array<{ value: string; label: string; extension?: Record<string, any> }>,
+  timeZone?: string,
+  formats?: Partial<DateTimeFormatPreferences>,
 ): string {
   if (rawValue === null || rawValue === undefined || rawValue === '') return '—';
   // List APIs may emit a `<field>_display` value that is identical to the raw enum
@@ -440,6 +449,18 @@ export function resolveSettingsCardDisplayValue(
       (candidate) => String(candidate.value) === String(rawValue),
     );
     if (item?.label) return item.label;
+  }
+  const temporalType = resolveTemporalType(
+    field.field,
+    (field as FieldConfig & { dataType?: string }).dataType,
+    rawValue,
+  );
+  if (temporalType) {
+    return formatInTimezone(
+      rawValue as string | number | Date,
+      resolveTemporalFormat(temporalType, formats, (field as any).format),
+      timeZone,
+    );
   }
   if (displayValue !== null && displayValue !== undefined && displayValue !== '') {
     return String(displayValue);
@@ -1748,6 +1769,7 @@ function DetailBlockRenderer({
   schemaDataSources?: Record<string, DataSourceConfig>;
   dataSourceManager?: { getConfig: (id: string) => DataSourceConfig | undefined };
 }) {
+  const { timezone, formats } = useTimezone();
   const resolveModelFieldLabel = useCallback(
     (fieldCode: string): string => {
       if (modelCode) {
@@ -1819,6 +1841,8 @@ function DetailBlockRenderer({
                   fieldDisplayValue,
                   resolvedField,
                   getDictItems,
+                  timezone,
+                  formats,
                 );
                 const isLongText = valueText.includes('\n') || valueText.length > 56;
                 return (

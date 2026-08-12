@@ -323,6 +323,19 @@ describe('settings-card field presentation', () => {
       ),
     ).toBe('草稿');
   });
+
+  it('formats settings-card datetimes in the effective business timezone', () => {
+    expect(
+      resolveSettingsCardDisplayValue(
+        '2026-08-12T19:58:15.058+00:00',
+        undefined,
+        { field: 'started_at', dataType: 'datetime' } as any,
+        undefined,
+        'Asia/Shanghai',
+        { datetime: 'YYYY-MM-DD HH:mm:ss' },
+      ),
+    ).toBe('2026-08-13 03:58:15');
+  });
 });
 
 describe('collectDetailDictCodes', () => {
