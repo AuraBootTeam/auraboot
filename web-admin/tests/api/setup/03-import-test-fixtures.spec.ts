@@ -199,8 +199,14 @@ test('import test-fixtures plugin (gated)', async ({ request }) => {
       commands.some((command) => command?.code === 'e2et:create_order') &&
       roleCodes.has('e2et_viewer')
     ) {
-      await ensureFixtureUserRoles(request, token);
-      return;
+      const modelRes = await request.get(`${BACKEND_URL}/api/meta/models/code/e2et_order`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const modelBody = modelRes.ok() ? await modelRes.json() : {};
+      if (modelBody?.data?.extension?.importPolicy?.enabled === true) {
+        await ensureFixtureUserRoles(request, token);
+        return;
+      }
     }
   }
 

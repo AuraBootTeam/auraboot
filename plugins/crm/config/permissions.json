@@ -665,5 +665,41 @@
     "module": "crm",
     "resourceCode": "crm_customer_confirmation_common",
     "action": "read"
+  },
+  {
+    "code": "model.crm_account_common.import",
+    "name:zh-CN": "导入客户",
+    "name:en": "Import Accounts",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_account_common",
+    "action": "import"
+  },
+  {
+    "code": "model.crm_contact_common.import",
+    "name:zh-CN": "导入联系人",
+    "name:en": "Import Contacts",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_contact_common",
+    "action": "import"
+  },
+  {
+    "code": "model.crm_lead_common.import",
+    "name:zh-CN": "导入线索",
+    "name:en": "Import Leads",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_lead_common",
+    "action": "import"
+  },
+  {
+    "code": "model.crm_opportunity_common.import",
+    "name:zh-CN": "导入商机",
+    "name:en": "Import Opportunities",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_opportunity_common",
+    "action": "import"
   }
 ]

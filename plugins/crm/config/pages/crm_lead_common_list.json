@@ -5,6 +5,14 @@
   "modelCode": "crm_lead_common",
   "kind": "list",
   "schemaVersion": 4,
+  "extension": {
+    "import": {
+      "enabled": true,
+      "permissionCode": "model.crm_lead_common.import",
+      "modes": ["insert", "update"],
+      "updateKeys": ["crm_lead_code"]
+    }
+  },
   "layout": {
     "type": "grid",
     "cols": 12

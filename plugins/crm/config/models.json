@@ -12,6 +12,11 @@
       "activityTimelineEnabled": true,
       "titleField": "crm_acc_name",
       "subtitleField": "crm_acc_code",
+      "importPolicy": {
+        "enabled": true,
+        "modes": ["insert", "update"],
+        "updateKeys": ["crm_acc_code"]
+      },
       "dataScope": {
         "ownerField": "crm_acc_owner",
         "departmentField": null
@@ -34,7 +39,11 @@
       "category": "crm",
       "activityTimelineEnabled": true,
       "titleField": "crm_ct_name",
-      "subtitleField": "crm_ct_email"
+      "subtitleField": "crm_ct_email",
+      "importPolicy": {
+        "enabled": true,
+        "modes": ["insert"]
+      }
     },
     "semantic_description": "An individual person at a customer organization. Contacts are reference entities linked to an account and may participate in multiple opportunities and activities. LLM need to understand: primary contact flag, contact title, communication channels.",
     "domain_category": "crm",
@@ -54,6 +63,11 @@
       "activityTimelineEnabled": true,
       "titleField": "crm_lead_company",
       "subtitleField": "crm_lead_code",
+      "importPolicy": {
+        "enabled": true,
+        "modes": ["insert", "update"],
+        "updateKeys": ["crm_lead_code"]
+      },
       "dataScope": {
         "ownerField": "crm_lead_assigned_to",
         "departmentField": null
@@ -113,6 +127,11 @@
       "activityTimelineEnabled": true,
       "titleField": "crm_opp_name",
       "subtitleField": "crm_opp_code",
+      "importPolicy": {
+        "enabled": true,
+        "modes": ["insert", "update"],
+        "updateKeys": ["crm_opp_code"]
+      },
       "dataScope": {
         "ownerField": "crm_opp_owner",
         "departmentField": null,

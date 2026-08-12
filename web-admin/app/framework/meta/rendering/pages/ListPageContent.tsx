@@ -137,6 +137,7 @@ import {
   mergeViewConfigPatch,
   summarizeViewConfigPatch,
 } from '~/framework/smart/utils/savedViewPersistence';
+import { canUseImport } from '~/framework/smart/components/data-tools/importCapability';
 
 // Dict data item type
 interface DictItem {
@@ -1370,6 +1371,10 @@ function ListPageContentInner(props: PageContentProps) {
 
   // SavedView integration
   const modelCode = schema?.modelCode || tableName;
+  const importConfig = schemaExtension.import as
+    | import('~/framework/smart/components/data-tools/ImportModal').ImportConfiguration
+    | undefined;
+  const canImport = canUseImport(importConfig, hasPermission);
   const pageKey = resolveListSavedViewPageKey(schema, tableName);
   const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant_member';
   const hideSavedViews =
@@ -4665,11 +4670,7 @@ function ListPageContentInner(props: PageContentProps) {
             }}
             hideSavedViews={hideSavedViews}
             hideBuiltInImport={
-              skipListData
-                ? true
-                : (listExtensions?.hideBuiltInImport ??
-                  (schema as any)?.extension?.hideBuiltInImport ??
-                  (schema as any)?.extension?.hideToolbarMore)
+              skipListData ? true : (listExtensions?.hideBuiltInImport ?? !canImport)
             }
             hideBuiltInExport={
               skipListData
@@ -5465,6 +5466,7 @@ function ListPageContentInner(props: PageContentProps) {
             onBulkFieldCommandSubmit={handleBulkFieldCommandSubmit}
             // ImportModal
             importOpen={importOpen}
+            importConfig={importConfig}
             onImportClose={() => setImportOpen(false)}
             onImportComplete={handleImportComplete}
             // ViewManagePanel

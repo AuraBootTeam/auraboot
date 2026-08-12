@@ -9,7 +9,10 @@
 
 import type { ColumnConfig, FieldConfig } from '~/framework/meta/schemas/types';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
-import { ImportModal } from '~/framework/smart/components/data-tools/ImportModal';
+import {
+  ImportModal,
+  type ImportConfiguration,
+} from '~/framework/smart/components/data-tools/ImportModal';
 import FormDialog from '~/framework/meta/runtime/actions/FormDialog';
 import { ViewManagePanel } from '~/framework/smart/components/view/ViewManagePanel';
 import {
@@ -55,6 +58,7 @@ export interface ListModalsProps {
 
   // ImportModal
   importOpen: boolean;
+  importConfig?: ImportConfiguration;
   onImportClose: () => void;
   onImportComplete: () => void;
 
@@ -149,6 +153,7 @@ export function ListModals({
 
   // ImportModal
   importOpen,
+  importConfig,
   onImportClose,
   onImportComplete,
 
@@ -257,6 +262,7 @@ export function ListModals({
         open={importOpen}
         onClose={onImportClose}
         modelCode={modelCode}
+        config={importConfig}
         onImportComplete={onImportComplete}
       />
 

@@ -31,13 +31,13 @@
       "page-fields": 1325,
       "ui-actions": 468,
       "commands": 193,
-      "permissions": 87,
+      "permissions": 91,
       "queries": 45,
       "dashboards": 37
     },
     "productVerdicts": {
       "pass": 329,
-      "untested": 2320
+      "untested": 2324
     },
     "fullProductNonGoals": [
       "data migration"
@@ -35749,6 +35749,58 @@
         {
           "id": "permission:model.crm_customer_confirmation_common.read",
           "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_customer_confirmation_common.read",
+          "evidence": [],
+          "assertion": "Positive and negative persona evidence is not registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/permissions.json"
+        },
+        {
+          "id": "permission:model.crm_account_common.import",
+          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_account_common.import",
+          "evidence": [],
+          "assertion": "Positive and negative persona evidence is not registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/permissions.json"
+        },
+        {
+          "id": "permission:model.crm_contact_common.import",
+          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_contact_common.import",
+          "evidence": [],
+          "assertion": "Positive and negative persona evidence is not registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/permissions.json"
+        },
+        {
+          "id": "permission:model.crm_lead_common.import",
+          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_lead_common.import",
+          "evidence": [],
+          "assertion": "Positive and negative persona evidence is not registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/permissions.json"
+        },
+        {
+          "id": "permission:model.crm_opportunity_common.import",
+          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_opportunity_common.import",
           "evidence": [],
           "assertion": "Positive and negative persona evidence is not registered.",
           "verdict": "untested",

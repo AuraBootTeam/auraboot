@@ -310,6 +310,12 @@
     }
   ],
   "extension": {
-    "enableMultiView": true
+    "enableMultiView": true,
+    "import": {
+      "enabled": true,
+      "permissionCode": "model.crm_opportunity_common.import",
+      "modes": ["insert", "update"],
+      "updateKeys": ["crm_opp_code"]
+    }
   }
 }

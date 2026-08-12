@@ -19,6 +19,8 @@ import { BulkEditModal } from '~/framework/smart/components/bulk/BulkEditModal';
 import type { BulkEditField } from '~/framework/smart/components/bulk/BulkEditModal';
 import { ExportButton } from '~/framework/smart/components/data-tools/ExportButton';
 import { ImportModal } from '~/framework/smart/components/data-tools/ImportModal';
+import { canUseImport } from '~/framework/smart/components/data-tools/importCapability';
+import { useAuth } from '~/contexts/AuthContext';
 import type { SavedView, ViewType } from '~/framework/smart/types/savedView';
 import type { KanbanCard, KanbanCardMoveEvent } from '~/framework/smart/types/kanban';
 import type { FilterConfig } from '~/framework/smart/types/chart';
@@ -119,9 +121,14 @@ export const SmartViewRenderer: React.FC<SmartViewRendererProps> = ({
   onDataRefresh,
 }) => {
   const { locale, t } = useI18n();
+  const { hasPermission } = useAuth();
   const viewType: ViewType = (view.viewType as ViewType) || 'table';
   const [importOpen, setImportOpen] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const importConfig = ((view as any).import ?? (view as any).extension?.import) as
+    | import('~/framework/smart/components/data-tools/ImportModal').ImportConfiguration
+    | undefined;
+  const canImport = canUseImport(importConfig, hasPermission);
 
   const handleImportComplete = useCallback(() => {
     setImportOpen(false);
@@ -253,7 +260,7 @@ export const SmartViewRenderer: React.FC<SmartViewRendererProps> = ({
   return (
     <>
       {/* Data Tools Toolbar */}
-      {showDataTools && (
+      {showDataTools && canImport && (
         <div className="mb-3 flex items-center justify-end gap-2">
           <button
             type="button"
@@ -316,11 +323,12 @@ export const SmartViewRenderer: React.FC<SmartViewRendererProps> = ({
       )}
 
       {/* Import Modal */}
-      {showDataTools && (
+      {showDataTools && canImport && (
         <ImportModal
           open={importOpen}
           onClose={() => setImportOpen(false)}
           modelCode={view.modelCode}
+          config={importConfig}
           onImportComplete={handleImportComplete}
         />
       )}
