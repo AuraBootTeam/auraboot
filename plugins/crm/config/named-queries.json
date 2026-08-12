@@ -1625,6 +1625,47 @@
     ]
   },
   {
+    "code": "crm_forecast_variance_summary",
+    "name:zh-CN": "预测偏差对照",
+    "name:en": "Forecast Variance Summary",
+    "description": "Compares one selected forecast submission with the current open-pipeline facts for the same owner. Returns one row per forecast measure so the review surface stays compact and explainable.",
+    "resourceCode": "crm_forecast_submission",
+    "actionCode": "read",
+    "fromSql": "SELECT f.pid AS submission_pid, f.crm_fcst_period AS forecast_period, COALESCE(u.nick_name, u.user_name, '未分配') AS owner_name, v.measure, CASE v.measure WHEN 'commit' THEN COALESCE(f.crm_fcst_commit_amount, 0) WHEN 'best_case' THEN COALESCE(f.crm_fcst_best_case_amount, 0) ELSE COALESCE(f.crm_fcst_pipeline_amount, 0) END AS submitted_amount, CASE v.measure WHEN 'commit' THEN COALESCE(SUM(o.crm_opp_expected_amount) FILTER (WHERE o.crm_opp_stage NOT IN ('closed_won','closed_lost') AND o.crm_opp_forecast_category = 'commit'), 0) WHEN 'best_case' THEN COALESCE(SUM(o.crm_opp_expected_amount) FILTER (WHERE o.crm_opp_stage NOT IN ('closed_won','closed_lost') AND o.crm_opp_forecast_category IN ('commit','best_case')), 0) ELSE COALESCE(SUM(o.crm_opp_expected_amount) FILTER (WHERE o.crm_opp_stage NOT IN ('closed_won','closed_lost')), 0) END AS current_amount, CASE v.measure WHEN 'commit' THEN COALESCE(SUM(o.crm_opp_expected_amount) FILTER (WHERE o.crm_opp_stage NOT IN ('closed_won','closed_lost') AND o.crm_opp_forecast_category = 'commit'), 0) - COALESCE(f.crm_fcst_commit_amount, 0) WHEN 'best_case' THEN COALESCE(SUM(o.crm_opp_expected_amount) FILTER (WHERE o.crm_opp_stage NOT IN ('closed_won','closed_lost') AND o.crm_opp_forecast_category IN ('commit','best_case')), 0) - COALESCE(f.crm_fcst_best_case_amount, 0) ELSE COALESCE(SUM(o.crm_opp_expected_amount) FILTER (WHERE o.crm_opp_stage NOT IN ('closed_won','closed_lost')), 0) - COALESCE(f.crm_fcst_pipeline_amount, 0) END AS variance_amount FROM mt_crm_forecast_submission f LEFT JOIN ab_user u ON u.pid = f.crm_fcst_owner LEFT JOIN mt_crm_opportunity_common o ON o.tenant_id = #{params.tenantId} AND o.crm_opp_owner IS NOT DISTINCT FROM f.crm_fcst_owner CROSS JOIN (VALUES ('commit'), ('best_case'), ('pipeline')) AS v(measure) WHERE f.tenant_id = #{params.tenantId} AND f.pid = CAST(#{params.submissionPid} AS text) GROUP BY f.pid, f.crm_fcst_period, f.crm_fcst_commit_amount, f.crm_fcst_best_case_amount, f.crm_fcst_pipeline_amount, u.nick_name, u.user_name, v.measure ORDER BY CASE v.measure WHEN 'commit' THEN 1 WHEN 'best_case' THEN 2 ELSE 3 END",
+    "outputFields": [
+      { "code": "submission_pid", "columnExpr": "submission_pid", "dataType": "string" },
+      { "code": "forecast_period", "columnExpr": "forecast_period", "dataType": "string" },
+      { "code": "owner_name", "columnExpr": "owner_name", "dataType": "string" },
+      { "code": "measure", "columnExpr": "measure", "dataType": "string" },
+      { "code": "submitted_amount", "columnExpr": "submitted_amount", "dataType": "number" },
+      { "code": "current_amount", "columnExpr": "current_amount", "dataType": "number" },
+      { "code": "variance_amount", "columnExpr": "variance_amount", "dataType": "number" }
+    ]
+  },
+  {
+    "code": "crm_forecast_variance_drivers",
+    "name:zh-CN": "预测偏差商机驱动",
+    "name:en": "Forecast Variance Opportunity Drivers",
+    "description": "Returns the exact open opportunities behind a selected forecast owner's current rollup, ordered by overdue, risk, staleness and quote readiness so a manager can explain the variance and drill into the record.",
+    "resourceCode": "crm_opportunity_common",
+    "actionCode": "read",
+    "fromSql": "SELECT o.pid, o.crm_opp_code, o.crm_opp_name, COALESCE(a.crm_acc_name, '') AS account_name, o.crm_opp_stage, COALESCE(o.crm_opp_forecast_category, 'pipeline') AS forecast_category, o.crm_opp_expected_amount, o.crm_opp_probability, o.crm_opp_expected_close_date, act.last_activity_at, COALESCE(r.open_risks, 0) AS open_risks, CASE WHEN o.crm_opp_expected_close_date < CURRENT_DATE THEN 'close_date_overdue' WHEN COALESCE(r.open_risks, 0) > 0 THEN 'mitigate_risk' WHEN act.last_activity_at IS NULL OR act.last_activity_at < now() - interval '14 days' THEN 'follow_up' WHEN o.crm_opp_stage IN ('proposal', 'negotiation') AND COALESCE(q.quote_count, 0) = 0 THEN 'prepare_quote' ELSE 'advance_stage' END AS variance_driver FROM mt_crm_forecast_submission f JOIN mt_crm_opportunity_common o ON o.tenant_id = #{params.tenantId} AND o.crm_opp_owner IS NOT DISTINCT FROM f.crm_fcst_owner LEFT JOIN mt_crm_account_common a ON a.pid = o.crm_opp_account_id AND a.tenant_id = o.tenant_id LEFT JOIN (SELECT ar.crm_ar_object_id AS opportunity_id, MAX(ac.crm_act_date) AS last_activity_at FROM mt_crm_activity_relation_common ar JOIN mt_crm_activity_common ac ON ac.pid = ar.crm_ar_activity_id AND ac.tenant_id = #{params.tenantId} WHERE ar.tenant_id = #{params.tenantId} AND ar.crm_ar_object_type = 'opportunity' GROUP BY ar.crm_ar_object_id) act ON act.opportunity_id = o.pid LEFT JOIN (SELECT crm_rk_source_id AS opportunity_id, COUNT(*) FILTER (WHERE crm_rk_status IN ('open', 'mitigating')) AS open_risks FROM mt_crm_risk_common WHERE tenant_id = #{params.tenantId} AND crm_rk_source_model = 'crm_opportunity_common' GROUP BY crm_rk_source_id) r ON r.opportunity_id = o.pid LEFT JOIN (SELECT crm_qs_opportunity_id AS opportunity_id, COUNT(*) AS quote_count FROM mt_crm_quote_summary_common WHERE tenant_id = #{params.tenantId} GROUP BY crm_qs_opportunity_id) q ON q.opportunity_id = o.pid WHERE f.tenant_id = #{params.tenantId} AND f.pid = CAST(#{params.submissionPid} AS text) AND o.crm_opp_stage NOT IN ('closed_won', 'closed_lost') ORDER BY CASE WHEN o.crm_opp_expected_close_date < CURRENT_DATE THEN 1 WHEN COALESCE(r.open_risks, 0) > 0 THEN 2 WHEN act.last_activity_at IS NULL OR act.last_activity_at < now() - interval '14 days' THEN 3 WHEN o.crm_opp_stage IN ('proposal', 'negotiation') AND COALESCE(q.quote_count, 0) = 0 THEN 4 ELSE 5 END, o.crm_opp_expected_amount DESC, o.crm_opp_expected_close_date ASC NULLS LAST",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "crm_opp_code", "columnExpr": "crm_opp_code", "dataType": "string", "searchable": true },
+      { "code": "crm_opp_name", "columnExpr": "crm_opp_name", "dataType": "string", "searchable": true },
+      { "code": "account_name", "columnExpr": "account_name", "dataType": "string", "searchable": true },
+      { "code": "crm_opp_stage", "columnExpr": "crm_opp_stage", "dataType": "string" },
+      { "code": "forecast_category", "columnExpr": "forecast_category", "dataType": "string" },
+      { "code": "crm_opp_expected_amount", "columnExpr": "crm_opp_expected_amount", "dataType": "number" },
+      { "code": "crm_opp_probability", "columnExpr": "crm_opp_probability", "dataType": "number" },
+      { "code": "crm_opp_expected_close_date", "columnExpr": "crm_opp_expected_close_date", "dataType": "date" },
+      { "code": "last_activity_at", "columnExpr": "last_activity_at", "dataType": "date" },
+      { "code": "open_risks", "columnExpr": "open_risks", "dataType": "number" },
+      { "code": "variance_driver", "columnExpr": "variance_driver", "dataType": "string" }
+    ]
+  },
+  {
     "code": "crm_activity_service_stats",
     "name:zh-CN": "活动与服务工作台统计",
     "name:en": "Activity and Service Desk Stats",

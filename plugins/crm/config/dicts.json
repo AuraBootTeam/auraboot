@@ -4072,6 +4072,17 @@
     ]
   },
   {
+    "code": "crm_forecast_measure",
+    "name": "Forecast Measure",
+    "name:zh-CN": "预测口径",
+    "dictType": "static",
+    "items": [
+      { "value": "commit", "label": "Commit", "label:zh-CN": "承诺", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "best_case", "label": "Best Case", "label:zh-CN": "最佳预期", "sortNo": 20, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "pipeline", "label": "Pipeline", "label:zh-CN": "总管道", "sortNo": 30, "status": "enabled", "extension": { "color": "blue" } }
+    ]
+  },
+  {
     "code": "crm_work_item_kind",
     "name": "Work Item Kind",
     "name:zh-CN": "工作项类型",

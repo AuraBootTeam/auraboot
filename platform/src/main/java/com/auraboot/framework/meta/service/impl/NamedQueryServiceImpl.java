@@ -19,6 +19,7 @@ import com.auraboot.framework.meta.mapper.NamedQueryVersionMapper;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.base.BaseMetaService;
+import com.auraboot.framework.permission.engine.PermissionEvaluator;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -27,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +61,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     private final ApiConnectorService apiConnectorService;
     private final DecisionUsageIndexService usageIndexService;
     private final DataPermissionEngine dataPermissionEngine;
+    private final PermissionEvaluator permissionEvaluator;
 
     // DANGEROUS_SQL_PATTERN removed — replaced by SqlSafetyUtils.validateSelectOnlySql()
 
@@ -630,6 +633,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         }
 
         Long tenantId = getCurrentTenantId();
+        authorizeDeclaredResource(query);
         NamedQueryPolicy policy = query.getPolicy() != null ? query.getPolicy() : new NamedQueryPolicy();
 
         // 2. Rate limit check
@@ -738,6 +742,26 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         List<Map<String, Object>> records = dynamicDataMapper.selectByQueryWithoutTenant(sql.toString(), params);
 
         return PaginationResult.of(records, total, pageNum, pageSize);
+    }
+
+    /**
+     * A declared resource/action is an authorization boundary, not only a row-scope hint.
+     * Applying DataScope without first checking RBAC turns "no matching scope" into an
+     * unrestricted query for roles that were never granted the resource permission.
+     */
+    private void authorizeDeclaredResource(NamedQuery query) {
+        String resourceCode = trimToNull(query.getResourceCode());
+        String actionCode = trimToNull(query.getActionCode());
+        if (resourceCode == null || actionCode == null) {
+            return;
+        }
+        Long memberId = MetaContext.getCurrentMemberId();
+        if (memberId == null) {
+            memberId = getCurrentUserId();
+        }
+        if (!permissionEvaluator.canAction(memberId, resourceCode, actionCode)) {
+            throw new AccessDeniedException("Access denied for named query resource: " + resourceCode);
+        }
     }
 
     // ==================== Export ====================

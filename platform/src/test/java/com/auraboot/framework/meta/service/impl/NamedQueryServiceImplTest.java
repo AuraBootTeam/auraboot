@@ -15,9 +15,11 @@ import com.auraboot.framework.meta.mapper.NamedQueryFieldMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryVersionMapper;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
+import com.auraboot.framework.permission.engine.PermissionEvaluator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
 import java.util.Map;
@@ -42,6 +44,7 @@ class NamedQueryServiceImplTest {
     private final ApiConnectorService apiConnectorService = mock(ApiConnectorService.class);
     private final DecisionUsageIndexService usageIndexService = mock(DecisionUsageIndexService.class);
     private final DataPermissionEngine dataPermissionEngine = mock(DataPermissionEngine.class);
+    private final PermissionEvaluator permissionEvaluator = mock(PermissionEvaluator.class);
 
     private final NamedQueryServiceImpl service = new NamedQueryServiceImpl(
             namedQueryMapper,
@@ -51,7 +54,8 @@ class NamedQueryServiceImplTest {
             rateLimiter,
             apiConnectorService,
             usageIndexService,
-            dataPermissionEngine);
+            dataPermissionEngine,
+            permissionEvaluator);
 
     @AfterEach
     void clearContext() {
@@ -107,6 +111,7 @@ class NamedQueryServiceImplTest {
         query.setResourceCode("e2et_order");
         query.setActionCode("read");
         when(namedQueryMapper.findByCode("order_summary")).thenReturn(query);
+        when(permissionEvaluator.canAction(20L, "e2et_order", "read")).thenReturn(true);
         when(namedQueryFieldMapper.findByQueryCode(10L, "order_summary")).thenReturn(List.of());
         when(rateLimiter.tryAcquire(10L, "order_summary", 60)).thenReturn(true);
         when(dataPermissionEngine.buildRowFilter(10L, "e2et_order", "read", 20L))
@@ -121,6 +126,28 @@ class NamedQueryServiceImplTest {
         verify(dynamicDataMapper).selectByQueryWithoutTenant(sqlCaptor.capture(), anyMap());
         assertThat(sqlCaptor.getValue()).contains("created_by = 20");
         verify(dataPermissionEngine).buildRowFilter(10L, "e2et_order", "read", 20L);
+    }
+
+    @Test
+    void executeQueryRejectsDeclaredResourceWhenRbacDenies() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        MetaContext.setMemberId(30L);
+        NamedQuery query = sqlQuery();
+        query.setResourceCode("e2et_order");
+        query.setActionCode("read");
+        when(namedQueryMapper.findByCode("order_summary")).thenReturn(query);
+        when(permissionEvaluator.canAction(30L, "e2et_order", "read")).thenReturn(false);
+
+        assertThatThrownBy(
+                        () -> service.executeQuery(
+                                "order_summary",
+                                new com.auraboot.framework.meta.dto.NamedQueryTestRequest()))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("Access denied")
+                .hasMessageContaining("e2et_order");
+
+        verify(namedQueryFieldMapper, never()).findByQueryCode(any(), anyString());
+        verify(dynamicDataMapper, never()).selectByQueryWithoutTenant(anyString(), anyMap());
     }
 
     @Test

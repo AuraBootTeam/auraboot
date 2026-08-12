@@ -23,6 +23,26 @@
       "adaptor": "table",
       "format": "records"
     },
+    "forecastVarianceSummary": {
+      "type": "namedQuery",
+      "queryCode": "crm_forecast_variance_summary",
+      "params": {
+        "submissionPid": "${state.selectedForecast.pid}"
+      },
+      "adaptor": "table",
+      "format": "records",
+      "dependOn": ["state.selectedForecast.pid"]
+    },
+    "forecastVarianceDrivers": {
+      "type": "namedQuery",
+      "queryCode": "crm_forecast_variance_drivers",
+      "params": {
+        "submissionPid": "${state.selectedForecast.pid}"
+      },
+      "adaptor": "table",
+      "format": "records",
+      "dependOn": ["state.selectedForecast.pid"]
+    },
     "forecastSubmissions": {
       "type": "api",
       "method": "get",
@@ -219,6 +239,66 @@
                 { "field": "opportunity_count", "width": 120, "align": "right", "label": { "zh-CN": "商机数", "en": "Deals" } },
                 { "field": "total_amount", "width": 150, "align": "right", "valueType": "currency", "label": { "zh-CN": "管道金额", "en": "Pipeline" } },
                 { "field": "weighted_forecast", "width": 150, "align": "right", "valueType": "currency", "label": { "zh-CN": "加权预测", "en": "Weighted" } }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "variance",
+          "label": { "zh-CN": "偏差解释", "en": "Variance Explanation" },
+          "blocks": [
+            {
+              "id": "crm_forecast_variance_summary_intro",
+              "blockType": "description",
+              "content": {
+                "zh-CN": "<h3>提交预测与实时事实</h3><p>正数表示实时管道高于提交值，负数表示实时管道低于提交值。</p>",
+                "en": "<h3>Submitted Forecast vs Live Facts</h3><p>Positive values mean the live rollup is above the submission; negative values mean it is below.</p>"
+              }
+            },
+            {
+              "id": "crm_forecast_variance_summary",
+              "blockType": "table",
+              "dataSource": "forecastVarianceSummary",
+              "density": "compact",
+              "maxHeight": 260,
+              "columns": [
+                { "field": "measure", "width": 130, "dictCode": "crm_forecast_measure", "label": { "zh-CN": "预测口径", "en": "Measure" } },
+                { "field": "submitted_amount", "width": 160, "align": "right", "valueType": "currency", "label": { "zh-CN": "已提交", "en": "Submitted" } },
+                { "field": "current_amount", "width": 160, "align": "right", "valueType": "currency", "label": { "zh-CN": "实时事实", "en": "Live Facts" } },
+                { "field": "variance_amount", "width": 160, "align": "right", "valueType": "currency", "label": { "zh-CN": "偏差", "en": "Variance" } }
+              ]
+            },
+            {
+              "id": "crm_forecast_variance_drivers_intro",
+              "blockType": "description",
+              "content": {
+                "zh-CN": "<h3>偏差商机驱动</h3><p>按逾期、风险、长期未跟进和缺报价排序，直接定位需要经理介入的商机。</p>",
+                "en": "<h3>Opportunity Variance Drivers</h3><p>Ordered by overdue close, open risk, stale activity and quote readiness to identify deals requiring manager action.</p>"
+              }
+            },
+            {
+              "id": "crm_forecast_variance_drivers",
+              "blockType": "table",
+              "dataSource": "forecastVarianceDrivers",
+              "density": "compact",
+              "maxHeight": 440,
+              "columns": [
+                { "field": "crm_opp_name", "width": 220, "label": { "zh-CN": "商机", "en": "Opportunity" } },
+                { "field": "account_name", "width": 180, "label": { "zh-CN": "客户", "en": "Account" } },
+                { "field": "crm_opp_stage", "width": 120, "dictCode": "crm_opp_stage", "label": { "zh-CN": "阶段", "en": "Stage" } },
+                { "field": "forecast_category", "width": 120, "dictCode": "crm_forecast_category", "label": { "zh-CN": "预测类别", "en": "Forecast Category" } },
+                { "field": "crm_opp_expected_amount", "width": 150, "align": "right", "valueType": "currency", "label": { "zh-CN": "预计金额", "en": "Amount" } },
+                { "field": "crm_opp_probability", "width": 105, "align": "right", "render": "${record.crm_opp_probability}%", "label": { "zh-CN": "概率", "en": "Probability" } },
+                { "field": "crm_opp_expected_close_date", "width": 130, "valueType": "date", "label": { "zh-CN": "预计关闭", "en": "Close Date" } },
+                { "field": "variance_driver", "width": 145, "dictCode": "crm_opportunity_next_action", "label": { "zh-CN": "经理动作", "en": "Manager Action" } }
+              ],
+              "rowActions": [
+                {
+                  "code": "open_variance_opportunity",
+                  "label": { "zh-CN": "打开商机", "en": "Open Opportunity" },
+                  "permissionCode": "crm.opportunity.read",
+                  "action": { "type": "navigate", "to": "crm_opportunity_common_detail" }
+                }
               ]
             }
           ]
