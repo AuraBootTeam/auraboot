@@ -43,6 +43,7 @@ import {
   buildCommandTargetParams,
   getLegacyCompatibleRecordPid,
 } from '~/framework/meta/utils/publicRecordId';
+import { promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
 
 export interface SubTableViewerProps {
   config: SubTableConfig;
@@ -905,11 +906,32 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
       setRowActionLoadingKey(loadingKey);
       setEditErrors({});
       try {
+        let payload = row;
+        const inputFields = Array.isArray((actionDef as any)?.inputFields)
+          ? (actionDef as any).inputFields
+          : Array.isArray((button as any).inputFields)
+            ? (button as any).inputFields
+            : [];
+        if (inputFields.length > 0) {
+          let collectedInputs: Record<string, any>;
+          try {
+            collectedInputs = await promptInputForm(
+              inputFields,
+              (actionDef as any)?.inputFieldsTitle ?? (button as any).inputFieldsTitle,
+              fetchResult,
+              (actionDef as any)?.inputFieldsSubmitLabel ??
+                (button as any).inputFieldsSubmitLabel,
+            );
+          } catch {
+            return;
+          }
+          payload = { ...row, ...collectedInputs };
+        }
         const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
           method: 'post',
           params: {
             ...buildCommandTargetParams(rowPid),
-            payload: row,
+            payload,
             operationType: actionType === 'state_transition' ? 'UPDATE' : 'update',
           },
           token,
@@ -1091,7 +1113,8 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     [handleSaveEdit, handleCancelEdit, editableFields],
   );
 
-  const hasConfiguredRowActions = Boolean(config.actions && config.actions.length > 0);
+  const configuredRowActions = config.actions ?? config.rowActions ?? [];
+  const hasConfiguredRowActions = configuredRowActions.length > 0;
   const hasActions =
     hasConfiguredRowActions ||
     (isEditable && (config.commands?.create || config.commands?.delete || canInlineEdit));
@@ -1373,8 +1396,8 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                           </>
                         ) : (
                           <div className="flex items-center justify-center gap-2">
-                            {config.actions
-                              ?.filter((button): button is ButtonConfig => {
+                            {configuredRowActions
+                              .filter((button): button is ButtonConfig => {
                                 if (!button) return false;
                                 return isRowActionVisible(button, row);
                               })

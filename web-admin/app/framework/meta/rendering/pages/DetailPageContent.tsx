@@ -73,6 +73,13 @@ import { getPublicRecordPid } from '~/framework/meta/utils/publicRecordId';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
 import { useRuntimeStateSubscription } from '~/framework/meta/rendering/blocks/workbenchBlockUtils';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import {
+  formatInTimezone,
+  resolveTemporalFormat,
+  resolveTemporalType,
+  type DateTimeFormatPreferences,
+} from '~/shared/services/dateTimeFormatService';
 
 interface RecordData {
   [key: string]: any;
@@ -412,6 +419,55 @@ export function enrichDetailField(field: FieldConfig, meta?: Record<string, any>
   return enriched as FieldConfig;
 }
 
+export function resolveSettingsCardField(
+  field: FieldConfig,
+  resolveLabel: (fieldCode: string) => string,
+  enrichField?: (field: FieldConfig) => FieldConfig,
+): FieldConfig {
+  const fieldWithFallbackLabel = field.label
+    ? field
+    : { ...field, label: resolveLabel(field.field) };
+  return enrichField ? enrichField(fieldWithFallbackLabel) : fieldWithFallbackLabel;
+}
+
+export function resolveSettingsCardDisplayValue(
+  rawValue: unknown,
+  displayValue: unknown,
+  field: FieldConfig,
+  getDictItems?: (
+    code: string,
+  ) => Array<{ value: string; label: string; extension?: Record<string, any> }>,
+  timeZone?: string,
+  formats?: Partial<DateTimeFormatPreferences>,
+): string {
+  if (rawValue === null || rawValue === undefined || rawValue === '') return '—';
+  // List APIs may emit a `<field>_display` value that is identical to the raw enum
+  // token. Resolve the dictionary first so settings cards never leak values such as
+  // `draft`, `production_pick` or `reversal` when a business label is available.
+  if (field.dictCode && getDictItems) {
+    const item = (getDictItems(field.dictCode) || []).find(
+      (candidate) => String(candidate.value) === String(rawValue),
+    );
+    if (item?.label) return item.label;
+  }
+  const temporalType = resolveTemporalType(
+    field.field,
+    (field as FieldConfig & { dataType?: string }).dataType,
+    rawValue,
+  );
+  if (temporalType) {
+    return formatInTimezone(
+      rawValue as string | number | Date,
+      resolveTemporalFormat(temporalType, formats, (field as any).format),
+      timeZone,
+    );
+  }
+  if (displayValue !== null && displayValue !== undefined && displayValue !== '') {
+    return String(displayValue);
+  }
+  return String(rawValue);
+}
+
 export function collectDetailDictCodes(
   schema: { blocks?: BlockConfig[] } | undefined | null,
   modelFieldMap: Map<string, any>,
@@ -430,7 +486,10 @@ export function collectDetailDictCodes(
   };
   const walkBlocks = (blocks: BlockConfig[]) => {
     for (const block of blocks) {
-      if (block.blockType === 'form-section' && block.fields) {
+      if (
+        (block.blockType === 'form-section' || block.blockType === 'detail-section') &&
+        block.fields
+      ) {
         collectFromFields(block.fields);
       }
       if ((block as any).tabs) {
@@ -1710,6 +1769,7 @@ function DetailBlockRenderer({
   schemaDataSources?: Record<string, DataSourceConfig>;
   dataSourceManager?: { getConfig: (id: string) => DataSourceConfig | undefined };
 }) {
+  const { timezone, formats } = useTimezone();
   const resolveModelFieldLabel = useCallback(
     (fieldCode: string): string => {
       if (modelCode) {
@@ -1762,9 +1822,11 @@ function DetailBlockRenderer({
               {block.fields.map((field: FieldConfig) => {
                 const colSpan = field.layout?.colSpan || (field.span === 2 ? 12 : 6);
                 const isFullWidth = colSpan >= 12 || field.span === 2;
-                const resolvedField: FieldConfig = field.label
-                  ? field
-                  : { ...field, label: resolveModelFieldLabel(field.field) };
+                const resolvedField = resolveSettingsCardField(
+                  field,
+                  resolveModelFieldLabel,
+                  enrichField,
+                );
                 const label = resolvedField.label
                   ? getLocalizedText(resolvedField.label as any, locale, t)
                   : field.field;
@@ -1774,11 +1836,14 @@ function DetailBlockRenderer({
                 const fieldDisplayValue = sectionRecord
                   ? readDetailRecordField(sectionRecord, `${field.field}_display`)
                   : undefined;
-                const displayValue = fieldDisplayValue !== undefined ? fieldDisplayValue : rawValue;
-                const valueText =
-                  displayValue === null || displayValue === undefined || displayValue === ''
-                    ? '—'
-                    : String(displayValue);
+                const valueText = resolveSettingsCardDisplayValue(
+                  rawValue,
+                  fieldDisplayValue,
+                  resolvedField,
+                  getDictItems,
+                  timezone,
+                  formats,
+                );
                 const isLongText = valueText.includes('\n') || valueText.length > 56;
                 return (
                   <div

@@ -14,6 +14,8 @@ import {
   resolveDetailFieldComponent,
   resolveDetailRecordEndpoint,
   resolveHiddenSystemTabKeys,
+  resolveSettingsCardDisplayValue,
+  resolveSettingsCardField,
   resolveSubTableDataSourceConfig,
   resolveVisibleDetailTabs,
   resolveVisibleDetailTabsFromBlocks,
@@ -297,7 +299,67 @@ describe('enrichDetailField', () => {
   });
 });
 
+describe('settings-card field presentation', () => {
+  it('enriches fallback field codes with business display names', () => {
+    const field = resolveSettingsCardField(
+      { field: 'inv_in_source_type' } as any,
+      (fieldCode) => fieldCode,
+      (candidate) => enrichDetailField(candidate, { displayName: '来源类型' }),
+    );
+
+    expect(field.label).toBe('来源类型');
+  });
+
+  it('prefers reference display values and resolves dictionary labels', () => {
+    expect(
+      resolveSettingsCardDisplayValue('warehouse-pid', '生产仓', { field: 'warehouse' } as any),
+    ).toBe('生产仓');
+    expect(
+      resolveSettingsCardDisplayValue(
+        'draft',
+        'draft',
+        { field: 'status', dictCode: 'receipt_status' } as any,
+        () => [{ value: 'draft', label: '草稿' }],
+      ),
+    ).toBe('草稿');
+  });
+
+  it('formats settings-card datetimes in the effective business timezone', () => {
+    expect(
+      resolveSettingsCardDisplayValue(
+        '2026-08-12T19:58:15.058+00:00',
+        undefined,
+        { field: 'started_at', dataType: 'datetime' } as any,
+        undefined,
+        'Asia/Shanghai',
+        { datetime: 'YYYY-MM-DD HH:mm:ss' },
+      ),
+    ).toBe('2026-08-13 03:58:15');
+  });
+});
+
 describe('collectDetailDictCodes', () => {
+  it('collects dict codes declared by settings-card detail sections', () => {
+    expect(
+      collectDetailDictCodes(
+        {
+          blocks: [
+            {
+              id: 'receipt-summary',
+              blockType: 'detail-section',
+              extension: { displayVariant: 'settings-card' },
+              fields: [
+                { field: 'receipt_type', dictCode: 'receipt_type' },
+                { field: 'status', dictCode: 'receipt_status' },
+              ],
+            },
+          ],
+        },
+        new Map(),
+      ),
+    ).toEqual(['receipt_type', 'receipt_status']);
+  });
+
   it('collects dict codes declared inside field-meta extension props', () => {
     const modelFieldMap = new Map<string, any>([
       [

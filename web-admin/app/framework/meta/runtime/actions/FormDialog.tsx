@@ -34,6 +34,7 @@ interface FormOptionConfig {
 interface FormFieldConfig {
   field: string;
   label?: string | Record<string, string>;
+  helpText?: string | Record<string, string>;
   type?: 'text' | 'select' | 'number' | 'textarea' | 'multiselect' | 'segmented' | 'checkbox' | 'file';
   required?: boolean;
   mustBeTrue?: boolean;
@@ -275,6 +276,9 @@ export default function FormDialog() {
             const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
             const placeholder = field.placeholder
               ? getLocalizedText(field.placeholder, locale, t)
+              : '';
+            const helpText = field.helpText
+              ? getLocalizedText(field.helpText, locale, t)
               : '';
             const fieldType = field.type || 'text';
             const options = visibleOptions(field, state.fieldOptions, formData);
@@ -527,6 +531,14 @@ export default function FormDialog() {
                 )}
 
                 {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+                {helpText && (
+                  <p
+                    className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400"
+                    data-testid={`form-dialog-help-${field.field}`}
+                  >
+                    {helpText}
+                  </p>
+                )}
               </div>
             );
           })}
