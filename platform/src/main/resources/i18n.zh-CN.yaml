@@ -12,42 +12,6 @@ common:
   current_user: 当前用户
   current_department: 当前部门
   collaborative_records: 协作记录
-
-record_share:
-  title: 记录协作
-  subtitle: 邀请租户成员共同查看或维护这条记录
-  close: 关闭协作窗口
-  add_member: 添加协作成员
-  member_label: 租户成员
-  member_placeholder: 选择成员
-  permission: 协作权限
-  permission_read_title: 仅查看
-  permission_read_description: 可以查看该记录，但不能修改
-  permission_collaborate_title: 可协作
-  permission_collaborate_description: 可以共同查看和编辑该记录
-  save: 保存协作成员
-  saving: 保存中…
-  saved: 协作成员已保存
-  save_failed: 保存协作成员失败
-  load_failed: 加载协作成员失败
-  current_members: 当前协作成员
-  empty_title: 暂无协作成员
-  empty_description: 选择成员和权限即可开始协作
-  unavailable_member: 成员已不可用
-  remove: 移除协作成员
-  removed: 协作成员已移除
-  remove_failed: 移除协作成员失败
-  notification_title: 客户协作权限已更新
-  notification_content: 你已获得一条共享记录的{0}权限，请从对应的协作视图查看。
-  notification_permission_read: 仅查看
-  notification_permission_collaborate: 可协作
-
-member_picker:
-  select: 选择成员…
-  add: 添加
-  search_placeholder: 搜索成员…
-  searching: 搜索中…
-  empty: 未找到成员
   loading: 加载中...
   actionFailed: 操作失败
   close: 关闭
@@ -468,6 +432,42 @@ member_picker:
 #  validation_code_length: 模型编码长度为2-50个字符
 #  validation_display_name_length: 显示名称长度为2-100个字符
 #  validation_description_length: 描述长度不能超过500个字符
+
+record_share:
+  title: 记录协作
+  subtitle: 邀请租户成员共同查看或维护这条记录
+  close: 关闭协作窗口
+  add_member: 添加协作成员
+  member_label: 租户成员
+  member_placeholder: 选择成员
+  permission: 协作权限
+  permission_read_title: 仅查看
+  permission_read_description: 可以查看该记录，但不能修改
+  permission_collaborate_title: 可协作
+  permission_collaborate_description: 可以共同查看和编辑该记录
+  save: 保存协作成员
+  saving: 保存中…
+  saved: 协作成员已保存
+  save_failed: 保存协作成员失败
+  load_failed: 加载协作成员失败
+  current_members: 当前协作成员
+  empty_title: 暂无协作成员
+  empty_description: 选择成员和权限即可开始协作
+  unavailable_member: 成员已不可用
+  remove: 移除协作成员
+  removed: 协作成员已移除
+  remove_failed: 移除协作成员失败
+  notification_title: 客户协作权限已更新
+  notification_content: 你已获得一条共享记录的{0}权限，请从对应的协作视图查看。
+  notification_permission_read: 仅查看
+  notification_permission_collaborate: 可协作
+
+member_picker:
+  select: 选择成员…
+  add: 添加
+  search_placeholder: 搜索成员…
+  searching: 搜索中…
+  empty: 未找到成员
 
 # Notification System
 notification:
