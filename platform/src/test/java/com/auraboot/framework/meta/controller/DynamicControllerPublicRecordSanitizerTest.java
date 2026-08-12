@@ -11,6 +11,9 @@ import com.auraboot.framework.meta.dto.ExportResult;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.organization.service.OrganizationService;
+import com.auraboot.framework.permission.service.RecordShareService;
+import com.auraboot.framework.application.tenant.MetaContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -45,6 +48,14 @@ class DynamicControllerPublicRecordSanitizerTest {
 
     @Mock
     private OrganizationService organizationService;
+
+    @Mock
+    private RecordShareService recordShareService;
+
+    @AfterEach
+    void clearContext() {
+        MetaContext.clear();
+    }
 
     @Test
     void publicRecordRoutesUseRecordPidTemplates() throws NoSuchMethodException {
@@ -176,6 +187,65 @@ class DynamicControllerPublicRecordSanitizerTest {
     }
 
     @Test
+    void listResolvesCurrentSharedRecordPidsForTheCurrentModelAndMember() {
+        MetaContext.setContext(7L, 9L, "member-pid", "member");
+        DynamicController controller = controller();
+        when(metaModelService.getModelDefinition("crm_account_common"))
+                .thenReturn(Optional.of(model("crm_account_common")));
+        when(recordShareService.getSharedRecordPids(
+                7L, "crm_account_common", 9L, "member-pid", "read"))
+                .thenReturn(List.of("account-a", "account-b"));
+        when(dynamicDataService.list(eq("crm_account_common"), any()))
+                .thenReturn(PaginationResult.of(List.of(row(11L, "account-a")), 1L, 1, 20));
+
+        String filters = """
+                [{
+                  "fieldName": "pid",
+                  "operator": "IN",
+                  "values": [{
+                    "$currentSharedRecordPids": {"action": "read"}
+                  }]
+                }]
+                """;
+
+        controller.list("crm_account_common", 1, 20, null, filters,
+                null, null, null, null, null);
+
+        ArgumentCaptor<DynamicQueryRequest> requestCaptor = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService).list(eq("crm_account_common"), requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getConditions().getFirst().getValues())
+                .containsExactly("account-a", "account-b");
+    }
+
+    @Test
+    void listKeepsEmptyCurrentSharedRecordSetSoTheQueryFailsClosed() {
+        MetaContext.setContext(7L, 9L, "member-pid", "member");
+        DynamicController controller = controller();
+        when(metaModelService.getModelDefinition("crm_account_common"))
+                .thenReturn(Optional.of(model("crm_account_common")));
+        when(recordShareService.getSharedRecordPids(
+                7L, "crm_account_common", 9L, "member-pid", "read"))
+                .thenReturn(List.of());
+        when(dynamicDataService.list(eq("crm_account_common"), any()))
+                .thenReturn(PaginationResult.of(List.of(), 0L, 1, 20));
+
+        String filters = """
+                [{
+                  "fieldName": "pid",
+                  "operator": "IN",
+                  "values": [{"$currentSharedRecordPids": {"action": "read"}}]
+                }]
+                """;
+
+        controller.list("crm_account_common", 1, 20, null, filters,
+                null, null, null, null, null);
+
+        ArgumentCaptor<DynamicQueryRequest> requestCaptor = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService).list(eq("crm_account_common"), requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getConditions().getFirst().getValues()).isEmpty();
+    }
+
+    @Test
     void exportResolvesCurrentDepartmentOwnerPidsBeforeQueryingData() {
         DynamicController controller = controller();
         when(metaModelService.getModelDefinition("crm_opportunity_common"))
@@ -256,6 +326,7 @@ class DynamicControllerPublicRecordSanitizerTest {
         ReflectionTestUtils.setField(controller, "dynamicDataService", dynamicDataService);
         ReflectionTestUtils.setField(controller, "metaModelService", metaModelService);
         ReflectionTestUtils.setField(controller, "organizationService", organizationService);
+        ReflectionTestUtils.setField(controller, "recordShareService", recordShareService);
         return controller;
     }
 

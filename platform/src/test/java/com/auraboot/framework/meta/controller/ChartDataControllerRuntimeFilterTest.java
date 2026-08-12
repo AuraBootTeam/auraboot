@@ -4,6 +4,9 @@ import com.auraboot.framework.meta.dto.AggregateQueryRequest;
 import com.auraboot.framework.meta.dto.AggregateQueryResponse;
 import com.auraboot.framework.meta.service.AggregateQueryService;
 import com.auraboot.framework.organization.service.OrganizationService;
+import com.auraboot.framework.permission.service.RecordShareService;
+import com.auraboot.framework.application.tenant.MetaContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -26,9 +29,18 @@ class ChartDataControllerRuntimeFilterTest {
     @Mock
     private OrganizationService organizationService;
 
+    @Mock
+    private RecordShareService recordShareService;
+
+    @AfterEach
+    void clearContext() {
+        MetaContext.clear();
+    }
+
     @Test
     void resolvesDepartmentOwnerPidsForAggregateAndNestedDrillFilters() {
-        ChartDataController controller = new ChartDataController(aggregateQueryService, organizationService);
+        ChartDataController controller = new ChartDataController(
+                aggregateQueryService, organizationService, recordShareService);
         when(organizationService.getCurrentDepartmentUserPids(true))
                 .thenReturn(List.of("owner-a", "owner-b"));
 
@@ -51,6 +63,30 @@ class ChartDataControllerRuntimeFilterTest {
         assertThat(requestCaptor.getValue().getDrillFilters().getFirst()
                 .getChildren().getFirst().getValue())
                 .isEqualTo(List.of("owner-a", "owner-b"));
+    }
+
+    @Test
+    void resolvesCurrentSharedRecordPidsForTheRequestedModel() {
+        MetaContext.setContext(7L, 9L, "member-pid", "member");
+        ChartDataController controller = new ChartDataController(
+                aggregateQueryService, organizationService, recordShareService);
+        when(recordShareService.getSharedRecordPids(
+                7L, "crm_account_common", 9L, "member-pid", "read"))
+                .thenReturn(List.of("account-a", "account-b"));
+
+        AggregateQueryRequest.FilterConfig filter = new AggregateQueryRequest.FilterConfig();
+        filter.setField("pid");
+        filter.setOperator("in");
+        filter.setValue(Map.of("$currentSharedRecordPids", Map.of("action", "read")));
+        AggregateQueryRequest request = new AggregateQueryRequest();
+        request.setModelCode("crm_account_common");
+        request.setFilters(List.of(filter));
+        when(aggregateQueryService.execute(request)).thenReturn(new AggregateQueryResponse());
+
+        controller.getChartData(request);
+
+        assertThat(request.getFilters().getFirst().getValue())
+                .isEqualTo(List.of("account-a", "account-b"));
     }
 
     private static AggregateQueryRequest.FilterConfig departmentOwnerFilter() {

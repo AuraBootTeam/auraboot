@@ -10,6 +10,7 @@ import { Search, X, Plus, Loader2, Users } from 'lucide-react';
 import { cn } from '~/utils/cn';
 import { ResultHelper } from '~/utils/type';
 import { getAvatarColor, getInitials } from './avatar-utils';
+import { useI18n } from '~/contexts/I18nContext';
 
 export interface MemberOption {
   id: string;
@@ -74,11 +75,13 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
   value,
   onChange,
   multiple = false,
-  placeholder = 'Select member...',
+  placeholder,
   readOnly = false,
   disabled = false,
   className,
 }) => {
+  const { t } = useI18n();
+  const effectivePlaceholder = placeholder || t('member_picker.select', undefined, 'Select member…');
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [options, setOptions] = useState<MemberOption[]>([]);
@@ -346,7 +349,11 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
                 )}
               >
                 <Plus className="h-3 w-3" />
-                <span>{selectedMembers.length === 0 ? placeholder : 'Add'}</span>
+                <span>
+                  {selectedMembers.length === 0
+                    ? effectivePlaceholder
+                    : t('member_picker.add', undefined, 'Add')}
+                </span>
               </button>
             )}
           </div>
@@ -368,7 +375,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
                   data-testid="member-picker-search-input"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search members..."
+                  placeholder={t('member_picker.search_placeholder', undefined, 'Search members…')}
                   className="rounded-control border-border bg-subtle focus:bg-panel w-full border py-2 pr-3 pl-9 text-sm transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-100 focus:outline-none"
                 />
               </div>
@@ -379,12 +386,16 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
               {loading ? (
                 <div className="text-text-3 flex flex-col items-center justify-center py-8">
                   <Loader2 className="text-accent h-5 w-5 animate-spin" />
-                  <span className="mt-2 text-xs">Searching...</span>
+                  <span className="mt-2 text-xs">
+                    {t('member_picker.searching', undefined, 'Searching…')}
+                  </span>
                 </div>
               ) : options.length === 0 ? (
                 <div className="text-text-3 flex flex-col items-center justify-center py-8">
                   <Users className="text-text-3 h-7 w-7" />
-                  <span className="mt-2 text-xs">No members found</span>
+                  <span className="mt-2 text-xs">
+                    {t('member_picker.empty', undefined, 'No members found')}
+                  </span>
                 </div>
               ) : (
                 options.map((opt) => {

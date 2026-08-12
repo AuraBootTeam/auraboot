@@ -3,6 +3,8 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
+import com.auraboot.framework.permission.service.RecordShareService;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.PhaseDecision;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade;
@@ -139,6 +141,32 @@ class PermitPlanAssemblyPhaseTest {
         phase.execute(ctx);
 
         assertThat(ctx.getPermitPlan().scope()).isEqualTo(ScopeGrade.SELF);
+    }
+
+    @Test
+    @DisplayName("an explicit update share resolves to TARGET instead of widening to ALL")
+    void resolvesTargetScopeForSharedRecordUpdate() {
+        DataPermissionEngine engine = Mockito.mock(DataPermissionEngine.class);
+        RecordShareService shares = Mockito.mock(RecordShareService.class);
+        when(engine.buildRowFilter(anyLong(), anyString(), anyLong()))
+                .thenReturn("AND crm_acc_owner = 'other-user'");
+        when(shares.isSharedByPid(99L, "crm_account_common", "account-1", 42L,
+                "member-pid", "update")).thenReturn(true);
+        ReflectionTestUtils.setField(phase, "dataPermissionEngine", engine);
+        ReflectionTestUtils.setField(phase, "recordShareService", shares);
+        CommandPipelineContext ctx = ctxWithModel("account-1", "crm_account_common");
+        ctx.getRequest().setOperationType("update");
+        ctx.recordPhaseDecision(PhaseDecision.permit("authorization"));
+
+        MetaContext.setContext(99L, 100L, "member-pid", "member");
+        MetaContext.setMemberId(42L);
+        try {
+            phase.execute(ctx);
+        } finally {
+            MetaContext.clear();
+        }
+
+        assertThat(ctx.getPermitPlan().scope()).isEqualTo(ScopeGrade.TARGET);
     }
 
     @Test

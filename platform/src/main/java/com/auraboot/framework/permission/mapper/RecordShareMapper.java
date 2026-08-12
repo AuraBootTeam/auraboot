@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Select;
 
 import java.time.Instant;
@@ -18,6 +19,48 @@ import java.util.List;
 @Mapper
 @InterceptorIgnore(tenantLine = "true")
 public interface RecordShareMapper extends BaseMapper<RecordShare> {
+
+    /**
+     * Create or update a public-PID share. The matching partial unique index makes
+     * changing a collaborator from read-only to read/write an atomic update instead
+     * of accumulating contradictory grants.
+     */
+    @Insert("""
+        INSERT INTO ab_record_share (
+          pid, tenant_id, resource_code, record_pid, subject_type, subject_id,
+          subject_pid, permission_mask, expires_at, created_at, created_by
+        ) VALUES (
+          #{share.pid}, #{share.tenantId}, #{share.resourceCode}, #{share.recordPid},
+          #{share.subjectType}, #{share.subjectId}, #{share.subjectPid},
+          #{share.permissionMask}, #{share.expiresAt}, #{share.createdAt}, #{share.createdBy}
+        )
+        ON CONFLICT (tenant_id, resource_code, record_pid, subject_type, subject_pid)
+          WHERE record_pid IS NOT NULL AND subject_pid IS NOT NULL
+        DO UPDATE SET
+          permission_mask = EXCLUDED.permission_mask,
+          expires_at = EXCLUDED.expires_at,
+          created_at = EXCLUDED.created_at,
+          created_by = EXCLUDED.created_by
+        """)
+    int upsertByPublicPids(@Param("share") RecordShare share);
+
+    @Select("""
+        SELECT * FROM ab_record_share
+        WHERE tenant_id = #{tenantId}
+          AND pid = #{sharePid}
+        """)
+    RecordShare findByPidInTenant(
+            @Param("tenantId") Long tenantId,
+            @Param("sharePid") String sharePid);
+
+    @Delete("""
+        DELETE FROM ab_record_share
+        WHERE tenant_id = #{tenantId}
+          AND pid = #{sharePid}
+        """)
+    int deleteByPidInTenant(
+            @Param("tenantId") Long tenantId,
+            @Param("sharePid") String sharePid);
 
     /**
      * Find shares for a specific record.

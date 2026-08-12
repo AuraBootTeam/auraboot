@@ -83,6 +83,7 @@ test('opportunity daily-efficiency surface shares one saved-view fact across lis
     [
       'crm_opportunity_all_table',
       'crm_opportunity_my_table',
+      'crm_opportunity_department_table',
       'crm_opportunity_won_table',
       'crm_opportunity_pipeline_board',
     ],
@@ -103,6 +104,20 @@ test('opportunity daily-efficiency surface shares one saved-view fact across lis
     },
   ]);
   assert.equal(myOpportunities.pinAsQuickFilter, true);
+
+  const departmentOpportunities = opportunityViews.find(
+    (view) => view.viewKey === 'crm_opportunity_department_table',
+  );
+  assert.deepEqual(departmentOpportunities.viewConfig.filters, [
+    {
+      fieldCode: 'crm_opp_owner',
+      operator: 'in',
+      value: null,
+      isExpression: true,
+      expression: '#currentDepartmentOwners',
+    },
+  ]);
+  assert.equal(departmentOpportunities.pinAsQuickFilter, true);
 
   const wonOpportunities = opportunityViews.find(
     (view) => view.viewKey === 'crm_opportunity_won_table',

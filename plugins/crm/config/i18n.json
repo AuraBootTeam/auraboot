@@ -2576,6 +2576,34 @@
     "refType": "ui"
   },
   {
+    "key": "crm.saved_view.all_accounts",
+    "zh-CN": "全部客户",
+    "en-US": "All Accounts",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.all_accounts_description",
+    "zh-CN": "按最近更新时间查看可访问的全部客户",
+    "en-US": "All accessible accounts ordered by latest update",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.collaborative_accounts",
+    "zh-CN": "协作客户",
+    "en-US": "Collaborative Accounts",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.collaborative_accounts_description",
+    "zh-CN": "其他负责人邀请我查看或共同维护的客户",
+    "en-US": "Accounts another owner invited me to view or maintain",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
     "key": "crm.saved_view.all_opportunities",
     "zh-CN": "全部商机",
     "en-US": "All Opportunities",

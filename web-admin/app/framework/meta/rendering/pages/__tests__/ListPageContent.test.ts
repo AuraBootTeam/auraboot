@@ -742,6 +742,30 @@ describe('resolveSavedViewFilterExpressions', () => {
       values: [{ $currentDepartmentOwnerPids: { includeSubDepartments: true } }],
     });
   });
+
+  it('resolves collaborative records through the authenticated backend without exposing PIDs', () => {
+    const resolved = resolveSavedViewFilterExpressions(
+      [
+        {
+          fieldCode: 'pid',
+          operator: 'in',
+          value: null,
+          isExpression: true,
+          expression: '#currentSharedRecords',
+        },
+      ],
+      { currentUserPid: '01K2USERPID' },
+    );
+
+    expect(resolved[0].value).toEqual({
+      $currentSharedRecordPids: { action: 'read' },
+    });
+    expect(viewFilterToQueryCondition(resolved[0])).toEqual({
+      fieldName: 'pid',
+      operator: 'IN',
+      values: [{ $currentSharedRecordPids: { action: 'read' } }],
+    });
+  });
 });
 
 describe('resolveUrlFilterSyncAction', () => {

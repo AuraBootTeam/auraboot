@@ -82,7 +82,7 @@ class RecordShareServiceImplTest {
         service.shareRecordByPid(100L, "model.user", "rec_10", "member", "mem_5", "read", expires);
 
         ArgumentCaptor<RecordShare> captor = ArgumentCaptor.forClass(RecordShare.class);
-        verify(recordShareMapper).insert(captor.capture());
+        verify(recordShareMapper).upsertByPublicPids(captor.capture());
 
         RecordShare share = captor.getValue();
         assertThat(share.getTenantId()).isEqualTo(100L);
@@ -227,40 +227,35 @@ class RecordShareServiceImplTest {
     }
 
     @Test
-    void removeByIdThrowsWhenNotFound() {
-        when(recordShareMapper.selectById(99L)).thenReturn(null);
+    void removeByPidThrowsWhenNotFound() {
+        when(recordShareMapper.findByPidInTenant(100L, "share-99")).thenReturn(null);
 
-        assertThatThrownBy(() -> service.removeById(100L, 99L))
+        assertThatThrownBy(() -> service.removeByPid(100L, "share-99"))
                 .isInstanceOf(RootUnCheckedException.class)
-                .hasMessageContaining("99");
+                .hasMessageContaining("not found");
     }
 
     @Test
-    void removeByIdThrowsWhenCrossTenant() {
-        RecordShare share = new RecordShare();
-        share.setId(99L);
-        share.setTenantId(999L); // different tenant
-        share.setResourceCode("model.user");
-        share.setRecordId(10L);
-        when(recordShareMapper.selectById(99L)).thenReturn(share);
+    void removeByPidDoesNotResolveCrossTenantShare() {
+        when(recordShareMapper.findByPidInTenant(100L, "share-99")).thenReturn(null);
 
-        assertThatThrownBy(() -> service.removeById(100L, 99L))
+        assertThatThrownBy(() -> service.removeByPid(100L, "share-99"))
                 .isInstanceOf(RootUnCheckedException.class);
 
-        verify(recordShareMapper, never()).deleteById(anyLong());
+        verify(recordShareMapper, never()).deleteByPidInTenant(anyLong(), anyString());
     }
 
     @Test
-    void removeByIdDeletesWhenTenantMatches() {
+    void removeByPidDeletesWhenTenantMatches() {
         RecordShare share = new RecordShare();
-        share.setId(99L);
+        share.setPid("share-99");
         share.setTenantId(100L);
         share.setResourceCode("model.user");
-        share.setRecordId(10L);
-        when(recordShareMapper.selectById(99L)).thenReturn(share);
+        share.setRecordPid("rec-10");
+        when(recordShareMapper.findByPidInTenant(100L, "share-99")).thenReturn(share);
 
-        service.removeById(100L, 99L);
+        service.removeByPid(100L, "share-99");
 
-        verify(recordShareMapper).deleteById(99L);
+        verify(recordShareMapper).deleteByPidInTenant(100L, "share-99");
     }
 }

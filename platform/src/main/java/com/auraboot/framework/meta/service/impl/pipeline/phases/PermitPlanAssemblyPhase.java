@@ -1,8 +1,10 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
+import com.auraboot.framework.permission.service.RecordShareService;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
@@ -54,6 +56,10 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
      */
     @Autowired(required = false)
     private DataPermissionEngine dataPermissionEngine;
+
+    /** Optional only for minimal unit contexts; production uses it for exact shared-target writes. */
+    @Autowired(required = false)
+    private RecordShareService recordShareService;
 
     /** Optional so a minimal context still assembles; when present, records the shadow divergence. */
     @Autowired(required = false)
@@ -122,6 +128,9 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
      * authority.</p>
      */
     private ScopeGrade resolveScope(CommandPipelineContext ctx) {
+        if (hasSharedTargetWrite(ctx)) {
+            return ScopeGrade.TARGET;
+        }
         if (dataPermissionEngine == null) {
             return null;
         }
@@ -142,5 +151,37 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
                     ctx.getCommandCode(), modelCode, e);
             return null;
         }
+    }
+
+    /**
+     * A collaboration grant is record-specific, so it must never be flattened into ALL. Carry a
+     * TARGET grade only when the current member has an explicit update share for the public PID.
+     */
+    private boolean hasSharedTargetWrite(CommandPipelineContext ctx) {
+        if (recordShareService == null || ctx == null || ctx.getCommand() == null
+                || ctx.getRequest() == null || !StringUtils.hasText(ctx.getRequest().getTargetRecordId())) {
+            return false;
+        }
+        String operation = ctx.getRequest().getOperationType();
+        if (!StringUtils.hasText(operation) && ctx.getExecConfig() != null) {
+            Object configured = ctx.getExecConfig().get("type");
+            operation = configured != null ? String.valueOf(configured) : null;
+        }
+        if (!"update".equalsIgnoreCase(operation)) {
+            return false;
+        }
+        Long tenantId = ctx.getTenantId();
+        Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
+        String memberPid = MetaContext.exists() ? MetaContext.getCurrentUserPid() : null;
+        if (tenantId == null || (!StringUtils.hasText(memberPid) && memberId == null)) {
+            return false;
+        }
+        return recordShareService.isSharedByPid(
+                tenantId,
+                ctx.getCommand().getModelCode(),
+                ctx.getRequest().getTargetRecordId(),
+                memberId,
+                memberPid,
+                "update");
     }
 }

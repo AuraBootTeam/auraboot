@@ -3,20 +3,27 @@ package com.auraboot.framework.permission.controller;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.i18n.service.I18nService;
+import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.notification.service.NotificationService;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.entity.RecordShare;
 import com.auraboot.framework.permission.service.RecordShareService;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.user.dto.UserSearchDTO;
+import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 
@@ -37,7 +45,7 @@ import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
  * <ul>
  *   <li>GET  /api/record-share  - List shares for a record</li>
  *   <li>POST /api/record-share  - Share a record with a subject</li>
- *   <li>DELETE /api/record-share/{shareId} - Remove a share by ID</li>
+ *   <li>DELETE /api/record-share/{sharePid} - Remove a share by public PID</li>
  * </ul>
  */
 @Slf4j
@@ -51,6 +59,12 @@ public class RecordShareController {
     private final RecordShareService recordShareService;
     private final DynamicDataService dynamicDataService;
     private final UserPermissionService userPermissionService;
+    private final MetaModelService metaModelService;
+    private final UserService userService;
+    private final NotificationService notificationService;
+    private final I18nService i18nService;
+
+    private static final Set<String> PUBLIC_PERMISSION_MASKS = Set.of("read", "read,update");
 
     /**
      * List all active shares for a record.
@@ -61,20 +75,35 @@ public class RecordShareController {
      */
     @GetMapping
     @Operation(summary = "List shares for a record")
-    public ApiResponse<List<RecordShare>> listShares(
+    public ApiResponse<List<RecordShareResponse>> listShares(
             @RequestParam @NotBlank String resourceCode,
             @RequestParam @NotBlank String recordPid) {
 
         Long tenantId = MetaContext.getCurrentTenantId();
+        assertCanManageRecordShares(resourceCode, recordPid);
         log.debug("Listing shares: resourceCode={}, recordPid={}, tenantId={}",
                 resourceCode, recordPid, tenantId);
 
-        List<RecordShare> shares = recordShareService.listByRecordPid(tenantId, resourceCode, recordPid);
+        List<RecordShareResponse> shares = recordShareService
+                .listByRecordPid(tenantId, resourceCode, recordPid)
+                .stream()
+                .map(share -> toResponse(tenantId, share))
+                .toList();
         return ApiResponse.success(shares);
     }
 
+    /** Return whether the authenticated caller may manage this record's collaborators. */
+    @GetMapping("/manage-capability")
+    @Operation(summary = "Get record-share management capability")
+    public ApiResponse<RecordShareCapabilityResponse> getManageCapability(
+            @RequestParam @NotBlank String resourceCode,
+            @RequestParam @NotBlank String recordPid) {
+        return ApiResponse.success(new RecordShareCapabilityResponse(
+                canManageRecordShares(resourceCode, recordPid)));
+    }
+
     /**
-     * Share a record with a subject (member, role, or dept).
+     * Share a record with another active member of the current tenant.
      *
      * @param request share request body
      * @return success
@@ -85,46 +114,63 @@ public class RecordShareController {
         Long tenantId = MetaContext.getCurrentTenantId();
         log.info("Sharing record: resourceCode={}, recordPid={}, subjectType={}, subjectId={}, subjectPid={}, tenantId={}",
                 request.getResourceCode(), request.getRecordPid(),
-                request.getSubjectType(), request.getSubjectId(), request.getSubjectPid(), tenantId);
+                request.getSubjectType(), null, request.getSubjectPid(), tenantId);
 
         if (!StringUtils.hasText(request.getRecordPid())) {
             throw new RootUnCheckedException(BadParam, "recordPid is required");
         }
-        if (request.getSubjectId() == null && !StringUtils.hasText(request.getSubjectPid())) {
-            throw new RootUnCheckedException(BadParam, "subjectId or subjectPid is required");
+        if (!"member".equalsIgnoreCase(request.getSubjectType())) {
+            throw new RootUnCheckedException(BadParam, "Public record sharing currently supports tenant members only");
+        }
+        if (!StringUtils.hasText(request.getSubjectPid())) {
+            throw new RootUnCheckedException(BadParam, "subjectPid is required");
+        }
+        String permissionMask = normalizePermissionMask(request.getPermissionMask());
+        if (!PUBLIC_PERMISSION_MASKS.contains(permissionMask)) {
+            throw new RootUnCheckedException(BadParam, "permissionMask must be read or read,update");
         }
         assertCanManageRecordShares(request.getResourceCode(), request.getRecordPid());
+        UserSearchDTO subject = userService.findInTenantByPid(tenantId, request.getSubjectPid().trim());
+        if (subject == null) {
+            throw new RootUnCheckedException(BadParam, "Share subject is not an active member of this tenant");
+        }
+        User recipient = userService.findByPid(subject.getPid());
+        if (recipient == null || recipient.getId() == null
+                || !(recipient.getUserType() == null || "human".equalsIgnoreCase(recipient.getUserType()))
+                || !recipient.isEnabled()) {
+            throw new RootUnCheckedException(BadParam, "Share subject must be an enabled human member");
+        }
         recordShareService.shareRecordByPid(
                 tenantId,
                 request.getResourceCode(),
                 request.getRecordPid(),
-                request.getSubjectType(),
-                request.getSubjectId(),
-                request.getSubjectPid(),
-                request.getPermissionMask(),
+                "member",
+                subject.getPid(),
+                permissionMask,
                 request.getExpiresAt());
+        notifyShareRecipient(recipient, request.getResourceCode(), request.getRecordPid(), permissionMask);
 
         return ApiResponse.success();
     }
 
     /**
-     * Remove a share by its ID.
+     * Remove a share by its stable public PID.
      *
-     * @param shareId the ID of the share entry to remove
+     * @param sharePid stable public PID of the share entry
      * @return success
      */
-    @DeleteMapping("/{shareId}")
-    @Operation(summary = "Remove a share by ID")
-    public ApiResponse<Void> removeShare(@PathVariable @NotNull Long shareId) {
+    @DeleteMapping("/{sharePid}")
+    @Operation(summary = "Remove a share by public PID")
+    public ApiResponse<Void> removeShare(@PathVariable @NotBlank String sharePid) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        log.info("Removing share: shareId={}, tenantId={}", shareId, tenantId);
+        log.info("Removing share: sharePid={}, tenantId={}", sharePid, tenantId);
 
-        RecordShare share = recordShareService.getByIdInTenant(tenantId, shareId);
+        RecordShare share = recordShareService.getByPidInTenant(tenantId, sharePid);
         if (share == null) {
             throw new AccessDeniedException("Record share not found or not accessible");
         }
         authorizeShareRemoval(share);
-        recordShareService.removeById(tenantId, shareId);
+        recordShareService.removeByPid(tenantId, sharePid);
         return ApiResponse.success();
     }
 
@@ -140,15 +186,12 @@ public class RecordShareController {
      * themselves access to records they cannot see.
      */
     private void assertCanManageRecordShares(String resourceCode, String recordPid) {
+        if (canManageRecordShares(resourceCode, recordPid)) {
+            return;
+        }
         Long callerId = MetaContext.getCurrentUserId();
         if (callerId == null) {
             throw new AccessDeniedException("Authenticated user required to manage record shares");
-        }
-        if (userPermissionService.hasPermission(callerId, MetaPermission.RECORD_SHARE_MANAGE)) {
-            return; // administrative escape hatch
-        }
-        if (isRecordOwner(resourceCode, recordPid, callerId)) {
-            return; // a record owner may share their own record
         }
         log.warn("Denied record-share mutation: caller={} is neither owner nor admin for {}/{}",
                 callerId, resourceCode, recordPid);
@@ -156,9 +199,22 @@ public class RecordShareController {
                 "Only the record owner or an authorized administrator can manage shares for this record");
     }
 
+    private boolean canManageRecordShares(String resourceCode, String recordPid) {
+        Long callerId = MetaContext.getCurrentUserId();
+        if (callerId == null || !StringUtils.hasText(resourceCode) || !StringUtils.hasText(recordPid)) {
+            return false;
+        }
+        Map<String, Object> record = dynamicDataService.getById(resourceCode, recordPid);
+        if (record == null || record.isEmpty()) {
+            return false;
+        }
+        return userPermissionService.hasPermission(callerId, MetaPermission.RECORD_SHARE_MANAGE)
+                || isRecordOwner(resourceCode, record, callerId, MetaContext.getCurrentUserPid());
+    }
+
     /**
      * Authorize removal of an existing share. Allowed for the administrator, the original
-     * creator of the share, or the owner of the underlying record.
+     * owner of the underlying record.
      */
     private void authorizeShareRemoval(RecordShare share) {
         Long callerId = MetaContext.getCurrentUserId();
@@ -168,48 +224,111 @@ public class RecordShareController {
         if (userPermissionService.hasPermission(callerId, MetaPermission.RECORD_SHARE_MANAGE)) {
             return;
         }
-        if (callerId.equals(share.getCreatedBy())) {
-            return; // the member who created the share may revoke it
-        }
-        if (isRecordOwner(share.getResourceCode(), share.getRecordPid(), callerId)) {
+        Map<String, Object> record = dynamicDataService.getById(
+                share.getResourceCode(), share.getRecordPid());
+        if (record != null && !record.isEmpty() && isRecordOwner(
+                share.getResourceCode(), record, callerId, MetaContext.getCurrentUserPid())) {
             return;
         }
-        log.warn("Denied record-share removal: caller={} for shareId={} ({}/{})",
-                callerId, share.getId(), share.getResourceCode(), share.getRecordPid());
+        log.warn("Denied record-share removal: caller={} for sharePid={} ({}/{})",
+                callerId, share.getPid(), share.getResourceCode(), share.getRecordPid());
         throw new AccessDeniedException(
-                "Only the record owner, the share creator, or an authorized administrator can remove this share");
+                "Only the record owner or an authorized administrator can remove this share");
     }
 
     /**
-     * Returns true if {@code callerId} created the target record (its {@code created_by}).
+     * Returns true if the caller matches the model's configured business owner field.
+     * Models without a data-scope owner field fall back to {@code created_by}.
      * If the record cannot be resolved (missing / not accessible) this returns false so
      * that sharing fails closed.
      */
-    private boolean isRecordOwner(String resourceCode, String recordPid, Long callerId) {
-        if (!StringUtils.hasText(resourceCode) || !StringUtils.hasText(recordPid)) {
+    private boolean isRecordOwner(
+            String resourceCode, Map<String, Object> record, Long callerId, String callerPid) {
+        if (!StringUtils.hasText(resourceCode) || record == null || record.isEmpty()) {
             return false;
         }
-        Map<String, Object> record = dynamicDataService.getById(resourceCode, recordPid);
-        if (record == null || record.isEmpty()) {
+        String ownerField;
+        try {
+            ownerField = resolveOwnerField(resourceCode);
+        } catch (RuntimeException ex) {
+            log.warn("Denied record-share management because owner metadata for {} is unavailable: {}",
+                    resourceCode, ex.getMessage());
             return false;
         }
-        Long ownerId = toLong(record.get("created_by"));
-        return ownerId != null && ownerId.equals(callerId);
+        if (!StringUtils.hasText(ownerField)) {
+            return false;
+        }
+        Object owner = record.get(ownerField);
+        if (owner == null) {
+            return false;
+        }
+        String ownerValue = String.valueOf(owner).trim();
+        return (StringUtils.hasText(callerPid) && callerPid.trim().equals(ownerValue))
+                || String.valueOf(callerId).equals(ownerValue);
     }
 
-    private static Long toLong(Object value) {
-        if (value == null) {
+    private String resolveOwnerField(String resourceCode) {
+        MetaModelDTO model = metaModelService.findByCode(resourceCode);
+        if (model == null) {
             return null;
         }
-        if (value instanceof Number number) {
-            return number.longValue();
+        if (model.getExtension() != null
+                && model.getExtension().get("dataScope") instanceof Map<?, ?> dataScope) {
+            Object configured = dataScope.get("ownerField");
+            if (configured != null && StringUtils.hasText(String.valueOf(configured))) {
+                return String.valueOf(configured).trim();
+            }
         }
+        return "created_by";
+    }
+
+    private RecordShareResponse toResponse(Long tenantId, RecordShare share) {
+        String subjectName = null;
+        if ("member".equalsIgnoreCase(share.getSubjectType()) && StringUtils.hasText(share.getSubjectPid())) {
+            UserSearchDTO member = userService.findInTenantByPid(tenantId, share.getSubjectPid());
+            subjectName = member != null ? member.getDisplayName() : null;
+        }
+        return new RecordShareResponse(
+                share.getPid(),
+                share.getSubjectType(),
+                subjectName,
+                share.getPermissionMask(),
+                share.getExpiresAt(),
+                share.getCreatedAt());
+    }
+
+    /**
+     * Notify the collaborator after access has been granted or updated. Notification delivery is
+     * deliberately best-effort: a transient notification failure must not roll back valid access.
+     */
+    private void notifyShareRecipient(
+            User recipient, String resourceCode, String recordPid, String permissionMask) {
         try {
-            return Long.parseLong(value.toString().trim());
-        } catch (NumberFormatException ex) {
-            // Non-numeric created_by → treat as no resolvable owner (fail closed).
-            return null;
+            String locale = LocaleContextHolder.getLocale().toLanguageTag();
+            String permissionLabel = i18nService.getValue(
+                    locale,
+                    "record_share.notification_permission_"
+                            + ("read,update".equals(permissionMask) ? "collaborate" : "read"),
+                    "read,update".equals(permissionMask) ? "collaboration" : "view-only");
+            String title = i18nService.getValue(
+                    locale, "record_share.notification_title", "Record collaboration updated");
+            String content = i18nService.getMessage(
+                    locale, "record_share.notification_content", permissionLabel);
+            if (!StringUtils.hasText(content)) {
+                content = "You now have " + permissionLabel + " access to a shared record.";
+            }
+            notificationService.sendInApp(
+                    recipient.getId(), title, content, "business", resourceCode, recordPid);
+        } catch (RuntimeException ex) {
+            log.warn("Record share saved but collaborator notification failed for {}/{}: {}",
+                    resourceCode, recordPid, ex.getMessage());
         }
+    }
+
+    private static String normalizePermissionMask(String permissionMask) {
+        return StringUtils.hasText(permissionMask)
+                ? permissionMask.trim().toLowerCase().replace(" ", "")
+                : "read";
     }
 
     // -----------------------------------------------------------------------
@@ -226,12 +345,9 @@ public class RecordShareController {
         /** Stable public record PID */
         private String recordPid;
 
-        /** Subject type: "member", "role", or "dept" */
+        /** Public subject type. Only "member" is accepted by this endpoint. */
         @NotBlank
         private String subjectType;
-
-        /** Legacy subject ID (member ID, role ID, or dept ID) */
-        private Long subjectId;
 
         /** Stable public subject PID */
         private String subjectPid;
@@ -241,5 +357,17 @@ public class RecordShareController {
 
         /** Optional expiration time (ISO-8601). Null means no expiry. */
         private Instant expiresAt;
+    }
+
+    public record RecordShareResponse(
+            String pid,
+            String subjectType,
+            String subjectName,
+            String permissionMask,
+            Instant expiresAt,
+            Instant createdAt) {
+    }
+
+    public record RecordShareCapabilityResponse(boolean canManage) {
     }
 }

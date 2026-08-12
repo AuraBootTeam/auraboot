@@ -1,5 +1,52 @@
 [
   {
+    "name": "$i18n:crm.saved_view.all_accounts",
+    "description": "$i18n:crm.saved_view.all_accounts_description",
+    "modelCode": "crm_account_common",
+    "pageKey": "crm_account_common_list",
+    "viewKey": "crm_account_all_table",
+    "scope": "global",
+    "viewType": "table",
+    "isDefault": true,
+    "sortOrder": 1,
+    "viewConfig": {
+      "filters": [],
+      "sorts": [
+        { "fieldCode": "updated_at", "direction": "desc", "priority": 1 }
+      ],
+      "pagination": { "pageSize": 20 }
+    }
+  },
+  {
+    "name": "$i18n:crm.saved_view.collaborative_accounts",
+    "description": "$i18n:crm.saved_view.collaborative_accounts_description",
+    "modelCode": "crm_account_common",
+    "pageKey": "crm_account_common_list",
+    "viewKey": "crm_account_collaborative_table",
+    "scope": "global",
+    "viewType": "table",
+    "isDefault": false,
+    "sortOrder": 2,
+    "pinAsQuickFilter": true,
+    "quickFilterIcon": "🤝",
+    "quickFilterOrder": 1,
+    "viewConfig": {
+      "filters": [
+        {
+          "fieldCode": "pid",
+          "operator": "in",
+          "value": null,
+          "isExpression": true,
+          "expression": "#currentSharedRecords"
+        }
+      ],
+      "sorts": [
+        { "fieldCode": "updated_at", "direction": "desc", "priority": 1 }
+      ],
+      "pagination": { "pageSize": 20 }
+    }
+  },
+  {
     "name": "$i18n:crm.saved_view.all_opportunities",
     "description": "$i18n:crm.saved_view.all_opportunities_description",
     "modelCode": "crm_opportunity_common",

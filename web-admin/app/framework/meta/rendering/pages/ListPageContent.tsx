@@ -243,6 +243,10 @@ const CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER = {
   $currentDepartmentOwnerPids: { includeSubDepartments: true },
 } as const;
 
+const CURRENT_SHARED_RECORD_PIDS_RESOLVER = {
+  $currentSharedRecordPids: { action: 'read' },
+} as const;
+
 /**
  * Resolve the deliberately small, documented set of SavedView filter expressions.
  *
@@ -264,7 +268,10 @@ export function resolveSavedViewFilterExpressions(
         : expression === '#currentDepartmentOwners' ||
             expression === '${system.currentDepartmentOwners}'
           ? CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER
-        : undefined;
+          : expression === '#currentSharedRecords' ||
+              expression === '${system.currentSharedRecords}'
+            ? CURRENT_SHARED_RECORD_PIDS_RESOLVER
+            : undefined;
 
     return { ...filter, value: resolvedValue };
   });
@@ -5137,6 +5144,12 @@ function ListPageContentInner(props: PageContentProps) {
                       filter.expression === '${system.currentDepartmentOwners}'
                     ) {
                       return translateCommon('common.current_department', '当前部门');
+                    }
+                    if (
+                      filter.expression === '#currentSharedRecords' ||
+                      filter.expression === '${system.currentSharedRecords}'
+                    ) {
+                      return translateCommon('common.collaborative_records', '协作记录');
                     }
                     return filter.expression;
                   }

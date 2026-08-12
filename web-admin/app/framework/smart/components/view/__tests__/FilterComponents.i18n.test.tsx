@@ -12,6 +12,7 @@ const ZH = {
     apply: '应用',
     cancel: '取消',
     clear_all: '清除全部',
+    collaborative_records: '协作记录',
     no: '否',
     select_placeholder: '请选择',
     yes: '是',
@@ -112,5 +113,32 @@ describe('FilterChipBar i18n', () => {
     expect(screen.getByRole('button', { name: '清除全部' })).toBeInTheDocument();
     expect(screen.queryByText('contains')).not.toBeInTheDocument();
     expect(screen.queryByText('Clear All')).not.toBeInTheDocument();
+  });
+
+  it('renders the collaborative-record expression as a product label instead of PID', () => {
+    renderZh(
+      <FilterChipBar
+        filters={[
+          {
+            fieldCode: 'pid',
+            operator: 'in',
+            value: { $currentSharedRecordPids: { action: 'read' } },
+            isExpression: true,
+            expression: '#currentSharedRecords',
+          },
+        ]}
+        sorts={[]}
+        fieldMetadata={[]}
+        onFiltersChange={vi.fn()}
+        onSortsChange={vi.fn()}
+        onAddFilter={vi.fn()}
+        onClearAll={vi.fn()}
+        resolveValueLabel={() => '协作记录'}
+      />,
+    );
+
+    expect(screen.getAllByText('协作记录')).toHaveLength(2);
+    expect(screen.queryByText('pid')).not.toBeInTheDocument();
+    expect(screen.queryByText('#currentSharedRecords')).not.toBeInTheDocument();
   });
 });

@@ -42,10 +42,10 @@ type TenantSpace = {
   spaceType?: string;
 };
 
-test.describe('CRM ownership isolation and explicit record sharing', () => {
+test.describe('CRM account collaboration', () => {
   test.setTimeout(120_000);
 
-  test('sales members see self records; owner share/revoke changes recipient list and detail @smoke', async ({
+  test('owner grants read-only, upgrades collaboration, and revokes from the collaborative-account journey @smoke @golden', async ({
     page,
     browser,
     baseURL,
@@ -129,11 +129,34 @@ test.describe('CRM ownership isolation and explicit record sharing', () => {
       expect((await shareResponse).ok(), 'owner share request').toBe(true);
       const shareRow = dialog
         .locator('[data-testid^="record-share-row-"]')
-        .filter({ hasText: recipient.pid! });
+        .filter({ hasText: recipient.displayName });
       await expect(shareRow).toBeVisible({ timeout: 10_000 });
+      await expect(shareRow).toContainText(/仅查看|View only/);
+      await expect(dialog).not.toContainText(recipient.pid!);
       await testInfo.attach('owner-share-dialog', {
         body: await ownerPage.screenshot(),
         contentType: 'image/png',
+      });
+
+      await expect.poll(
+        async () => {
+          const response = await recipientPage.request.get(
+            '/api/notifications?pageNum=1&pageSize=50',
+          );
+          if (!response.ok()) return null;
+          const body = await response.json().catch(() => ({}));
+          const rows = (body?.data?.records ?? []) as Array<Record<string, unknown>>;
+          return rows.find(
+            (row) =>
+              String(row.sourceType ?? '') === MODEL_CODE &&
+              String(row.sourceId ?? '') === ownerAccount.pid,
+          ) ?? null;
+        },
+        { message: 'recipient receives a record-collaboration notification' },
+      ).toMatchObject({
+        category: 'business',
+        sourceType: MODEL_CODE,
+        sourceId: ownerAccount.pid,
       });
 
       await expectAccountVisibility(
@@ -160,27 +183,95 @@ test.describe('CRM ownership isolation and explicit record sharing', () => {
       ).toBe(false);
 
       await openAccountListFromMenu(recipientPage);
-      await searchAccountList(recipientPage, ownerAccount.name);
+      const collaborativeView = recipientPage
+        .getByTestId('quick-filters')
+        .getByRole('button', { name: /协作客户|Collaborative Accounts/ });
+      await expect(collaborativeView).toBeVisible({ timeout: 10_000 });
+      const collaborativeListResponse = recipientPage.waitForResponse(
+        (response) => {
+          if (!response.url().includes(`/api/dynamic/${MODEL_CODE}/list`)) return false;
+          const filters = new URL(response.url()).searchParams.get('filters') ?? '';
+          return filters.includes('$currentSharedRecordPids') && response.status() === 200;
+        },
+      );
+      await collaborativeView.click();
+      await collaborativeListResponse;
       await expect(
         recipientPage.locator('tbody tr', { hasText: ownerAccount.name }).first(),
       ).toBeVisible();
+      await expect(
+        recipientPage.locator('tbody tr', { hasText: recipientAccount.name }),
+      ).toHaveCount(0);
+      await clickRowActionByLocator(
+        recipientPage,
+        recipientPage.locator('tbody tr', { hasText: ownerAccount.name }).first(),
+        'view',
+        'detail',
+      );
+      await expect(recipientPage.locator('[data-testid$="share-btn"]')).toHaveCount(0);
       await testInfo.attach('recipient-shared-account-visible', {
         body: await recipientPage.screenshot(),
         contentType: 'image/png',
       });
 
-      const shareId = Number(
-        (await shareRow.getAttribute('data-testid'))?.replace('record-share-row-', ''),
+      const existingOwnerToasts = ownerPage.getByRole('button', {
+        name: 'Close notification',
+      });
+      for (let index = await existingOwnerToasts.count(); index > 0; index -= 1) {
+        await existingOwnerToasts.nth(index - 1).click();
+      }
+      await expect(ownerPage.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0);
+
+      await dialog.getByTestId('member-picker-add').click();
+      await dialog.getByTestId('member-picker-search-input').fill(recipient.email);
+      await expect(recipientOption).toBeVisible({ timeout: 10_000 });
+      await recipientOption.click();
+      await dialog.getByTestId('record-share-permission-read-update').click();
+      const upgradeResponse = ownerPage.waitForResponse(
+        (response) =>
+          response.url().endsWith('/api/record-share') && response.request().method() === 'POST',
       );
-      expect(Number.isFinite(shareId), 'share row exposes a stable share id').toBe(true);
+      await dialog.getByTestId('record-share-add-btn').click();
+      expect((await upgradeResponse).ok(), 'owner collaboration upgrade request').toBe(true);
+      await expect(shareRow).toContainText(/可协作|Collaborate/);
+      await expect(dialog.locator('[data-testid^="record-share-row-"]')).toHaveCount(1);
+      await testInfo.attach('owner-collaboration-upgraded', {
+        body: await ownerPage.screenshot(),
+        contentType: 'image/png',
+      });
+
+      const collaborativeName = `Collaborated Account ${uid}`;
+      const allowedUpdate = await recipientPage.request.post(
+        '/api/meta/commands/execute/crm:update_account',
+        {
+          data: {
+            operationType: 'update',
+            targetRecordPid: ownerAccount.pid,
+            payload: { crm_acc_name: collaborativeName },
+          },
+        },
+      );
+      const allowedUpdateBody = await allowedUpdate.json().catch(() => ({}));
+      expect(
+        allowedUpdate.ok() && isSuccessBody(allowedUpdateBody),
+        'a collaboration share must authorize update',
+      ).toBe(true);
+      ownerAccount.name = collaborativeName;
+
+      const sharePid = (await shareRow.getAttribute('data-testid'))?.replace(
+        'record-share-row-',
+        '',
+      );
+      expect(sharePid, 'share row exposes a stable public share PID').toMatch(/\S+/);
+      expect(sharePid, 'share row must not expose an internal numeric ID').not.toMatch(/^\d+$/);
       const revokeResponse = ownerPage.waitForResponse(
         (response) =>
-          response.url().endsWith(`/api/record-share/${shareId}`) &&
+          response.url().endsWith(`/api/record-share/${sharePid}`) &&
           response.request().method() === 'DELETE',
       );
-      await dialog.getByTestId(`record-share-remove-${shareId}`).click();
+      await dialog.getByTestId(`record-share-remove-${sharePid}`).click();
       expect((await revokeResponse).ok(), 'owner revoke request').toBe(true);
-      await expect(dialog.getByTestId(`record-share-row-${shareId}`)).toHaveCount(0);
+      await expect(dialog.getByTestId(`record-share-row-${sharePid}`)).toHaveCount(0);
 
       await expectAccountVisibility(
         recipientPage,
@@ -193,6 +284,10 @@ test.describe('CRM ownership isolation and explicit record sharing', () => {
       await expect(recipientPage.locator('tbody tr', { hasText: ownerAccount.name })).toHaveCount(
         0,
       );
+      await expect(recipientPage.getByText(/加载中|Loading/)).toHaveCount(0);
+      await expect(
+        recipientPage.getByText(/暂无数据|没有数据|No data|No records/i).first(),
+      ).toBeVisible({ timeout: 10_000 });
       await testInfo.attach('recipient-account-hidden-after-revoke', {
         body: await recipientPage.screenshot(),
         contentType: 'image/png',

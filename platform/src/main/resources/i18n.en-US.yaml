@@ -972,6 +972,43 @@ search:
   open: Open
   close: Close
 common:
+  collaborative_records: Collaborative records
+
+record_share:
+  title: Record collaboration
+  subtitle: Invite tenant members to view or maintain this record with you
+  close: Close collaboration dialog
+  add_member: Add collaborator
+  member_label: Tenant member
+  member_placeholder: Choose a member
+  permission: Collaboration permission
+  permission_read_title: View only
+  permission_read_description: Can view this record, but cannot change it
+  permission_collaborate_title: Collaborate
+  permission_collaborate_description: Can view and update this record together
+  save: Save collaborator
+  saving: Saving…
+  saved: Collaborator saved
+  save_failed: Failed to save collaborator
+  load_failed: Failed to load collaborators
+  current_members: Current collaborators
+  empty_title: No collaborators yet
+  empty_description: Choose a member and permission to start collaborating
+  unavailable_member: Unavailable member
+  remove: Remove collaborator
+  removed: Collaborator removed
+  remove_failed: Failed to remove collaborator
+  notification_title: Record collaboration updated
+  notification_content: You now have {0} access to a shared record. Open its collaborative view to continue.
+  notification_permission_read: view-only
+  notification_permission_collaborate: collaboration
+
+member_picker:
+  select: Select member…
+  add: Add
+  search_placeholder: Search members…
+  searching: Searching…
+  empty: No members found
   field:
     status: Status
   status:

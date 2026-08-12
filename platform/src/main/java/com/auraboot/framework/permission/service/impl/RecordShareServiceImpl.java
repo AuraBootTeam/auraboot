@@ -77,7 +77,7 @@ public class RecordShareServiceImpl implements RecordShareService {
         share.setCreatedAt(Instant.now());
         share.setCreatedBy(MetaContext.getCurrentUserId());
 
-        recordShareMapper.insert(share);
+        recordShareMapper.upsertByPublicPids(share);
         log.info("Shared record {}/{} with {}:{} (mask={}, expires={})",
                 resourceCode, recordPid, subjectType,
                 StringUtils.hasText(subjectPid) ? subjectPid : subjectId,
@@ -203,28 +203,22 @@ public class RecordShareServiceImpl implements RecordShareService {
     }
 
     @Override
-    public void removeById(Long tenantId, Long shareId) {
-        RecordShare share = recordShareMapper.selectById(shareId);
+    public void removeByPid(Long tenantId, String sharePid) {
+        RecordShare share = getByPidInTenant(tenantId, sharePid);
         if (share == null) {
-            throw new RootUnCheckedException(BadParam, "Share not found: " + shareId);
+            throw new RootUnCheckedException(BadParam, "Share not found");
         }
-        if (!tenantId.equals(share.getTenantId())) {
-            throw new RootUnCheckedException(BadParam, "Share not found: " + shareId);
-        }
-        recordShareMapper.deleteById(shareId);
-        log.info("Removed share id={} for resource={} record={}", shareId, share.getResourceCode(), share.getRecordId());
+        recordShareMapper.deleteByPidInTenant(tenantId, sharePid.trim());
+        log.info("Removed share pid={} for resource={} record={}",
+                sharePid, share.getResourceCode(), share.getRecordPid());
     }
 
     @Override
-    public RecordShare getByIdInTenant(Long tenantId, Long shareId) {
-        if (tenantId == null || shareId == null) {
+    public RecordShare getByPidInTenant(Long tenantId, String sharePid) {
+        if (tenantId == null || !StringUtils.hasText(sharePid)) {
             return null;
         }
-        RecordShare share = recordShareMapper.selectById(shareId);
-        if (share == null || !tenantId.equals(share.getTenantId())) {
-            return null;
-        }
-        return share;
+        return recordShareMapper.findByPidInTenant(tenantId, sharePid.trim());
     }
 
     private String normalizePid(String pid) {

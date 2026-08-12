@@ -26595,6 +26595,13 @@ CREATE UNIQUE INDEX uq_ab_permission_tenant_code ON public.ab_permission USING b
 
 
 --
+-- Name: uq_ab_record_share_public_subject; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_ab_record_share_public_subject ON public.ab_record_share USING btree (tenant_id, resource_code, record_pid, subject_type, subject_pid) WHERE ((record_pid IS NOT NULL) AND (subject_pid IS NOT NULL));
+
+
+--
 -- Name: uq_ab_team_member_team_user; Type: INDEX; Schema: public; Owner: -
 --
 
