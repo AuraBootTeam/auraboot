@@ -2524,14 +2524,14 @@ function ListPageContentInner(props: PageContentProps) {
               successCount += 1;
             } else {
               failures.push({
-                recordId: id,
+                recordPid: id,
                 recordLabel: recordLabel(id),
                 reason: (result as any).desc || (result as any).message || 'Command failed',
               });
             }
           } catch (error) {
             failures.push({
-              recordId: id,
+              recordPid: id,
               recordLabel: recordLabel(id),
               reason: error instanceof Error ? error.message : String(error),
             });
@@ -2553,7 +2553,7 @@ function ListPageContentInner(props: PageContentProps) {
           successCount = ids.length;
         } else {
           failures.push({
-            recordId: command,
+            recordPid: command,
             recordLabel: command,
             reason: (result as any).desc || (result as any).message || 'Command failed',
           });

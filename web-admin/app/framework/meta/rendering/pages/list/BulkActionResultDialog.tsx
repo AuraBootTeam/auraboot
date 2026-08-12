@@ -1,7 +1,7 @@
 import React from 'react';
 
 export interface BulkActionFailure {
-  recordId: string;
+  recordPid: string;
   recordLabel: string;
   reason: string;
 }
@@ -99,7 +99,7 @@ export function BulkActionResultDialog({
                   </thead>
                   <tbody className="divide-border divide-y">
                     {result.failures.map((failure) => (
-                      <tr key={`${failure.recordId}:${failure.reason}`}>
+                      <tr key={`${failure.recordPid}:${failure.reason}`}>
                         <td className="text-text truncate px-3 py-2" title={failure.recordLabel}>
                           {failure.recordLabel}
                         </td>

@@ -13,7 +13,7 @@ describe('BulkActionResultDialog', () => {
           successCount: 1,
           failures: [
             {
-              recordId: 'opp-2',
+              recordPid: 'opp-2',
               recordLabel: '华东存量商机',
               reason: '当前阶段不允许资格确认',
             },
@@ -43,7 +43,7 @@ describe('BulkActionResultDialog', () => {
           successCount: 1,
           failures: [
             {
-              recordId: 'opp-2',
+              recordPid: 'opp-2',
               recordLabel: '华东存量商机',
               reason: 'Bad parameter',
             },
