@@ -904,7 +904,13 @@ export function UnifiedDesignerWorkbench({
 
   const isSelectedModelFieldUsed = (field: ModelFieldDefinition) => {
     if (!selectedBlockId) return false;
-    return isModelFieldUsedInParent(selectedBlockId, field);
+    if (isModelFieldUsedInParent(selectedBlockId, field)) return true;
+    const selected = findBlockById(document.blocks, selectedBlockId);
+    if (!selected) return false;
+    return selected.path
+      .slice(0, -1)
+      .reverse()
+      .some(({ block }) => isModelFieldUsedInParent(block.id, field));
   };
 
   const handleAddModelField = (field: ModelFieldDefinition) => {

@@ -62,6 +62,7 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         history.setOp(operation);
         history.setOpBy(operatorPid);
         history.setOpAt(Instant.now());
+        history.setDescription(description);
         history.setCreatedAt(Instant.now());
         
         // 创建快照数据
@@ -560,7 +561,7 @@ public class PageSchemaVersionServiceImpl implements PageSchemaVersionService {
         dto.setOperatorPid(history.getOpBy());
         dto.setOperationTime(DateUtil.toUtcLocalDateTime(history.getOpAt()));
         dto.setSnapshot(history.getSnapshot());
-        dto.setDescription(description);
+        dto.setDescription(description != null ? description : history.getDescription());
         
         // 从快照中提取版本信息
         Map<String, Object> snapshot = history.getSnapshot();

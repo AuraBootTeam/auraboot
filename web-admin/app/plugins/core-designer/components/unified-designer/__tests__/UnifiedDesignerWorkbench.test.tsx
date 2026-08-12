@@ -1155,6 +1155,24 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('model-field-status')).toHaveTextContent('Status');
   });
 
+  it('keeps the newly added field marked as used after selecting its generated block', () => {
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={samplePageSchemaV3}
+        modelFieldsByModel={testModelFields}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('outline-item-section_basic'));
+    fireEvent.click(screen.getByTestId('resource-tab-fields'));
+    fireEvent.click(screen.getByTestId('model-field-email'));
+
+    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_email');
+    expect(screen.getByTestId('model-field-email')).toBeDisabled();
+    expect(screen.getByTestId('model-field-email')).toHaveAttribute('data-used', 'true');
+    expect(screen.getByTestId('model-field-email')).toHaveTextContent('已添加');
+  });
+
   it('shows model field type badges and filters field palette by type', () => {
     render(
       <UnifiedDesignerWorkbench

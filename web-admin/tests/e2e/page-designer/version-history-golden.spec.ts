@@ -31,11 +31,9 @@
 
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { loginViaUI } from '../../helpers/wd-fixtures';
 import { uniqueId } from '../helpers';
-
-const ADMIN_STORAGE_STATE =
-  process.env.PW_ADMIN_STORAGE_STATE ||
-  (process.env.PW_STORAGE_DIR ? `${process.env.PW_STORAGE_DIR}/admin.json` : './tests/storage/admin.json');
 
 // ab_announcement is a published platform meta-model present in every OSS stack;
 // it satisfies the detail-page contract for the root detail block.
@@ -126,12 +124,7 @@ function detailDoc(pageKey: string, sectionId: string, sectionTitle: string) {
   };
 }
 
-async function seedDraftPage(
-  browser: import('@playwright/test').Browser,
-  uid: string,
-): Promise<{ pid: string; pageKey: string }> {
-  const ctx = await browser.newContext({ storageState: ADMIN_STORAGE_STATE });
-  const page = await ctx.newPage();
+async function seedDraftPage(page: Page, uid: string): Promise<{ pid: string; pageKey: string }> {
   const pageKey = `pd_ver_${uid}`.replace(/-/g, '_');
   const resp = await page.request.post('/api/pages', {
     data: {
@@ -152,19 +145,23 @@ async function seedDraftPage(
   expect(body.code, 'seed page API code').toBe('0');
   const pid = String(body.data?.pid ?? '');
   expect(pid, 'seeded pid').toBeTruthy();
-  await ctx.close();
   return { pid, pageKey };
 }
+
+test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe.serial('Unified Designer version-history golden', () => {
   // Real save/reopen round-trips plus snapshot/rollback; the 15s default is tight.
   test.describe.configure({ timeout: 120_000 });
 
+  test.beforeEach(async ({ page }) => {
+    await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  });
+
   test('C3: create snapshot grows the list; rollback restores the canvas + backend blocks', async ({
     page,
-    browser,
   }, testInfo) => {
-    const { pid, pageKey } = await seedDraftPage(browser, uniqueId('pdver'));
+    const { pid, pageKey } = await seedDraftPage(page, uniqueId('pdver'));
 
     await openDesigner(page, pid);
 
@@ -173,16 +170,38 @@ test.describe.serial('Unified Designer version-history golden', () => {
     await expect(versionsBtn).toBeVisible();
     await expect(versionsBtn).toBeEnabled();
 
+    // Delay the first real GET until the loading state is visible; then let the
+    // request continue to the backend and resolve the fresh-page empty state.
+    let releaseVersionLoad!: () => void;
+    const versionLoadGate = new Promise<void>((resolve) => {
+      releaseVersionLoad = resolve;
+    });
+    const versionsPath = `/api/pages/${pid}/versions`;
+    await page.route(
+      `**${versionsPath}*`,
+      async (route) => {
+        await versionLoadGate;
+        await route.continue();
+      },
+      { times: 1 },
+    );
+
     // Open the version panel — a fresh page has no versions yet.
     await versionsBtn.click();
     await expect(page.getByTestId('version-history-panel')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('version-history-backdrop')).toBeVisible();
+    await expect(page.getByTestId('version-loading')).toBeVisible();
+    releaseVersionLoad();
     await expect(page.getByTestId('version-empty')).toBeVisible({ timeout: 10_000 });
+    await page.unroute(`**${versionsPath}*`);
     await testInfo.attach('c3-panel-empty', {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
 
-    // --- Snapshot #1 (captures the original section) ---
+    // --- Snapshot #1 (captures the original section and audited reason) ---
+    const snapshotReason = 'PC 门禁：初始页面快照';
+    await page.getByTestId('version-snapshot-reason').fill(snapshotReason);
     await expect(async () => {
       const createResp = page.waitForResponse(
         (r) => r.url().includes(`/api/pages/${pid}/versions`) && r.request().method() === 'POST',
@@ -201,9 +220,12 @@ test.describe.serial('Unified Designer version-history golden', () => {
       expect(versions.length, 'versions after snapshot #1').toBe(1);
     }).toPass({ timeout: 15_000 });
     const afterFirst = await readVersions(page, pid);
+    expect(afterFirst[0]?.description, 'snapshot reason round-trip').toBe(snapshotReason);
     const earliestHistoryId = afterFirst[afterFirst.length - 1].id;
     // The UI row for that history entry is rendered.
-    await expect(page.getByTestId(`version-row-${earliestHistoryId}`)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId(`version-row-${earliestHistoryId}`)).toBeVisible({
+      timeout: 10_000,
+    });
     await testInfo.attach('c3-after-snapshot-1', {
       body: await page.screenshot(),
       contentType: 'image/png',
@@ -224,16 +246,16 @@ test.describe.serial('Unified Designer version-history golden', () => {
       ),
     });
     // The changed section is on the canvas; the original is gone; doc is dirty.
-    await expect(page.getByTestId(`outline-item-${CHANGED_SECTION}`)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId(`outline-item-${CHANGED_SECTION}`)).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.getByTestId(`outline-item-${SECTION_BLOCK}`)).toHaveCount(0);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     // Save the changed document to the backend.
     await expect(async () => {
       const saveResp = page.waitForResponse(
-        (r) =>
-          r.url().includes(`/api/pages/${pid}`) &&
-          r.request().method() === 'PUT',
+        (r) => r.url().includes(`/api/pages/${pid}`) && r.request().method() === 'PUT',
         { timeout: 5_000 },
       );
       await page.getByTestId('designer-save').click();
@@ -246,7 +268,10 @@ test.describe.serial('Unified Designer version-history golden', () => {
 
     // BACKEND sanity: the saved page now holds the changed section.
     const changedDto = await readPage(page, pid);
-    expect(findBlockById(changedDto.blocks, CHANGED_SECTION), 'changed section persisted').toBeTruthy();
+    expect(
+      findBlockById(changedDto.blocks, CHANGED_SECTION),
+      'changed section persisted',
+    ).toBeTruthy();
     expect(findBlockById(changedDto.blocks, SECTION_BLOCK), 'original section replaced').toBeNull();
     const versionAfterChange = changedDto.version ?? 0;
 
@@ -287,8 +312,7 @@ test.describe.serial('Unified Designer version-history golden', () => {
 
     await expect(async () => {
       const rollbackResp = page.waitForResponse(
-        (r) =>
-          r.url().includes(`/api/pages/${pid}/rollback/`) && r.request().method() === 'POST',
+        (r) => r.url().includes(`/api/pages/${pid}/rollback/`) && r.request().method() === 'POST',
         { timeout: 5_000 },
       );
       await page.getByTestId(`version-rollback-confirm-yes-${earliestHistoryId}`).click();
@@ -300,7 +324,9 @@ test.describe.serial('Unified Designer version-history golden', () => {
 
     // The panel closes and the canvas reloads with the restored original section.
     await expect(page.getByTestId('version-history-panel')).toHaveCount(0, { timeout: 10_000 });
-    await expect(page.getByTestId(`outline-item-${SECTION_BLOCK}`)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId(`outline-item-${SECTION_BLOCK}`)).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.getByTestId(`outline-item-${CHANGED_SECTION}`)).toHaveCount(0);
     await testInfo.attach('c3-after-rollback', {
       body: await page.screenshot(),
@@ -310,7 +336,10 @@ test.describe.serial('Unified Designer version-history golden', () => {
     // BACKEND verification: the live page blocks are restored to the original
     // section and the version number advanced (rollback bumps + records history).
     const rolledBackDto = await readPage(page, pid);
-    expect(findBlockById(rolledBackDto.blocks, SECTION_BLOCK), 'original section restored').toBeTruthy();
+    expect(
+      findBlockById(rolledBackDto.blocks, SECTION_BLOCK),
+      'original section restored',
+    ).toBeTruthy();
     expect(findBlockById(rolledBackDto.blocks, CHANGED_SECTION), 'changed section gone').toBeNull();
     expect(rolledBackDto.version ?? 0, 'version advanced after rollback').toBeGreaterThan(
       versionAfterChange,
@@ -322,28 +351,44 @@ test.describe.serial('Unified Designer version-history golden', () => {
     expect(finalVersions.length, 'versions after rollback').toBeGreaterThanOrEqual(2);
   });
 
-  test('C3 (sad path): a new/local page (no pid) keeps the versions button disabled', async ({
-    page,
-  }) => {
+  test('C3 (sad path): a new/local page (no pid) hides version history', async ({ page }) => {
     // No pageId / pageKey → the designer loads the local sample document; it is
     // not page-bound, so there is no server-side version history.
     await page.goto('/unified-designer', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 30_000 });
 
-    const versionsBtn = page.getByTestId('designer-versions');
-    await expect(versionsBtn).toBeVisible();
-    await expect(versionsBtn).toBeDisabled();
-    // Clicking a disabled button is a no-op — no panel appears.
+    await expect(page.getByTestId('designer-versions')).toHaveCount(0);
+    // No persisted page exists, so the history panel cannot be opened.
     await expect(page.getByTestId('version-history-panel')).toHaveCount(0);
   });
 
   test('C3 (sad path): cancelling the rollback confirm does NOT roll back', async ({
     page,
-    browser,
   }, testInfo) => {
-    const { pid, pageKey } = await seedDraftPage(browser, uniqueId('pdvercancel'));
+    const { pid, pageKey } = await seedDraftPage(page, uniqueId('pdvercancel'));
 
     await openDesigner(page, pid);
+
+    // Force the first load through an invalid real backend history resource. The panel
+    // must expose an error and recover after close/reopen without stale state.
+    const versionsPath = `/api/pages/${pid}/versions`;
+    await page.route(
+      `**${versionsPath}*`,
+      async (route) => {
+        await route.continue({
+          url: route.request().url().replace(versionsPath, `${versionsPath}/not-a-history-id`),
+        });
+      },
+      { times: 1 },
+    );
+    const failedLoadResponse = page.waitForResponse((response) =>
+      response.url().includes(`${versionsPath}/not-a-history-id`),
+    );
+    await page.getByTestId('designer-versions').click();
+    expect((await failedLoadResponse).status()).toBeGreaterThanOrEqual(400);
+    await expect(page.getByTestId('version-panel-error')).toBeVisible();
+    await page.getByTestId('version-panel-close').click();
+    await page.unroute(`**${versionsPath}*`);
 
     // Create one snapshot so there is a row to (not) roll back to.
     await page.getByTestId('designer-versions').click();
@@ -405,7 +450,10 @@ test.describe.serial('Unified Designer version-history golden', () => {
     // changed section and the version did not advance from the cancel (it equals
     // exactly the post-save snapshot taken above).
     const afterCancel = await readPage(page, pid);
-    expect(findBlockById(afterCancel.blocks, CHANGED), 'changed section intact (no rollback)').toBeTruthy();
+    expect(
+      findBlockById(afterCancel.blocks, CHANGED),
+      'changed section intact (no rollback)',
+    ).toBeTruthy();
     expect(findBlockById(afterCancel.blocks, SECTION_BLOCK), 'original NOT restored').toBeNull();
     expect(afterCancel.version ?? 0, 'version unchanged by cancel').toBe(versionBeforeCancel);
   });
