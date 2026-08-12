@@ -406,6 +406,56 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void persistHandlerResults_neverCopiesReturnedIdentityOntoTargetRecord() throws Exception {
+        CommandHandlerExtension handler = new CommandHandlerExtension() {
+            @Override
+            public String getCommandType() {
+                return BUSINESS_COMMAND_CODE;
+            }
+
+            @Override
+            public Object execute(CommandContext context) {
+                return Map.of(
+                        "id", 99L,
+                        "pid", "successor-pid",
+                        "cr_cj_status", "PAUSED");
+            }
+        };
+        when(extensionRegistry.getCommandHandler(BUSINESS_COMMAND_CODE)).thenReturn(Optional.of(handler));
+
+        String modelCode = "cr_crawl_job";
+        String tableName = "mt_cr_crawl_job";
+        com.auraboot.framework.meta.dto.ModelDefinition model =
+                com.auraboot.framework.meta.dto.ModelDefinition.builder()
+                        .code(modelCode)
+                        .tableName(tableName)
+                        .fields(java.util.List.of(
+                                com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                                        .code("id").columnName("id").dataType("long").build(),
+                                com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                                        .code("pid").columnName("pid").dataType("string").build(),
+                                com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                                        .code("cr_cj_status").columnName("cr_cj_status")
+                                        .dataType("string").build()))
+                        .build();
+
+        when(metaModelService.getModelDefinition(modelCode)).thenReturn(Optional.of(model));
+        when(metaModelService.getTableName(modelCode)).thenReturn(tableName);
+        when(dynamicDataMapper.findJsonbColumns(tableName)).thenReturn(java.util.Set.of());
+        when(dynamicDataMapper.selectByQuery(any(), any()))
+                .thenReturn(java.util.List.of(Map.of("id", 42L)));
+
+        phase.execute(buildContext(BUSINESS_COMMAND_CODE, modelCode, Map.of("type", "custom")));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> dataCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).update(eq(tableName), dataCaptor.capture(), any());
+        assertThat(dataCaptor.getValue())
+                .containsEntry("cr_cj_status", "PAUSED")
+                .doesNotContainKeys("id", "pid");
+    }
+
+    @Test
     void persistHandlerResults_usesScopedSqlGuardsWhenUserContextExists() throws Exception {
         MetaContext.setContext(1L, 2L, "user-pid", "tester");
         RecordingFullRowHandler handler = new RecordingFullRowHandler(BUSINESS_COMMAND_CODE);

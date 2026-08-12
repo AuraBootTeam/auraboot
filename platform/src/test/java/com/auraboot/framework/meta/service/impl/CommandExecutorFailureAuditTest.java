@@ -35,6 +35,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -50,6 +52,26 @@ import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class CommandExecutorFailureAuditTest {
+
+    @Test
+    void commandAuditWriterUsesIndependentTransactionSoFailureEvidenceSurvivesRollback() throws Exception {
+        var method = CommandEffectExecutor.class.getDeclaredMethod(
+                "saveAuditLog",
+                Long.class,
+                String.class,
+                String.class,
+                Long.class,
+                Map.class,
+                Map.class,
+                boolean.class,
+                String.class,
+                long.class,
+                String.class,
+                Map.class);
+        Transactional transactional = method.getAnnotation(Transactional.class);
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+    }
 
     @Mock
     private CommandDefinitionMapper commandDefinitionMapper;
