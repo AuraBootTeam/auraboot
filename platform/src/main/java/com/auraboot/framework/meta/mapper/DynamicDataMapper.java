@@ -268,5 +268,6 @@ public interface DynamicDataMapper {
      * @return 执行结果
      */
     @UpdateProvider(type = DynamicSqlProvider.class, method = "alterTable")
+    @InterceptorIgnore(tenantLine = "true")
     int alterTable(@Param("alterTableSql") String alterTableSql);
 }

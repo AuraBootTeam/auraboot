@@ -201,10 +201,19 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
             params.put("value", value);
             params.put("tenantId", tenantId);
 
-            // For UPDATE context, exclude the current record
-            if (context == ValidationContext.UPDATE && data.containsKey("id")) {
-                sql += " AND id != #{params.excludeId}";
-                params.put("excludeId", data.get("id"));
+            // For UPDATE context, exclude the current record. Dynamic public APIs and plugin
+            // handlers identify rows by pid, while older internal paths may still carry id.
+            // Requiring only id makes an unchanged unique value fail every ordinary update.
+            if (context == ValidationContext.UPDATE) {
+                Object excludeId = data.get("id");
+                Object excludePid = data.get("pid");
+                if (excludeId != null) {
+                    sql += " AND id != #{params.excludeId}";
+                    params.put("excludeId", excludeId);
+                } else if (excludePid != null) {
+                    sql += " AND pid != #{params.excludePid}";
+                    params.put("excludePid", excludePid);
+                }
             }
 
             try {

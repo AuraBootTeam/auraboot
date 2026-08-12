@@ -212,7 +212,12 @@ public class HandlerPhase implements CommandPhase {
         Map<String, Object> persistable = new HashMap<>();
         for (Map.Entry<String, Object> entry : handlerResults.entrySet()) {
             String key = entry.getKey();
-            if (!StringUtils.hasText(key) || !modelFieldCodes.contains(key)) {
+            // A handler result's pid/id identify the record the handler created or returned to
+            // the caller. They are response metadata, never fields to copy onto the command's
+            // target record. Persisting a successor fact's pid onto its predecessor corrupts the
+            // aggregate identity and normally trips the table's unique pid constraint.
+            if (!StringUtils.hasText(key) || Set.of("id", "pid").contains(key)
+                    || !modelFieldCodes.contains(key)) {
                 continue;
             }
             Object value = entry.getValue();

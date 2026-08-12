@@ -31,4 +31,5 @@ class PostgresDdlDialectTest {
 
         assertEquals("DECIMAL(19,2)", dialect.mapDataType(field));
     }
+
 }

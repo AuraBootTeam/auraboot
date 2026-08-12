@@ -97,7 +97,9 @@ class SchemaManagementServiceMethodsTest {
         when(ddlDialectProvider.getDialect()).thenReturn(ddlDialect);
         when(ddlDialect.mapDataType(any())).thenReturn("VARCHAR(255)");
         when(ddlDialect.formatDefaultValue(any(), any())).thenReturn("'default'");
+        when(ddlDialect.getName()).thenReturn("MySQL");
         when(tableMetadataService.columnExists("tb_test", "row_version")).thenReturn(true);
+        when(tableMetadataService.isColumnNullable("tb_test", "row_version")).thenReturn(false);
     }
 
     @Test
@@ -154,6 +156,36 @@ class SchemaManagementServiceMethodsTest {
     }
 
     @Test
+    @DisplayName("createTableByModel - explicit DSL row_version cannot weaken the platform invariant")
+    void testCreateTableByModel_ExplicitRowVersionUsesSystemDefinition() {
+        FieldDefinition explicitRowVersion = FieldDefinition.builder()
+                .code("row_version")
+                .columnName("row_version")
+                .dataType("integer")
+                .required(false)
+                .defaultValue("0")
+                .build();
+        testModel.setFields(List.of(testField, explicitRowVersion));
+        when(metaModelService.getModelDefinitionFromDb("test_model"))
+                .thenReturn(Optional.of(testModel));
+        when(tableMetadataService.tableExists("tb_test")).thenReturn(false);
+        when(ddlDialect.getTimestampType()).thenReturn("TIMESTAMP");
+        when(ddlDialect.getVarcharType(anyInt())).thenReturn("VARCHAR(255)");
+        when(ddlDialect.getTableSuffix()).thenReturn("");
+
+        SchemaOperationResult result = schemaManagementService.createTableByModel("test_model");
+
+        assertTrue(result.getSuccess());
+        ArgumentCaptor<String> ddlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(dynamicDataMapper).createTable(ddlCaptor.capture());
+        String ddl = ddlCaptor.getValue();
+        assertEquals(1, ddl.split("row_version", -1).length - 1, ddl);
+        assertTrue(ddl.contains("row_version INTEGER NOT NULL DEFAULT 1"), ddl);
+        assertFalse(ddl.contains("row_version VARCHAR"), ddl);
+        assertFalse(ddl.contains("row_version INTEGER DEFAULT 0"), ddl);
+    }
+
+    @Test
     @DisplayName("syncModelToTable - existing dynamic tables receive row_version")
     void testSyncModelToTable_AddsMissingRowVersion() {
         when(metaModelService.getModelDefinitionFromDb("test_model"))
@@ -171,6 +203,35 @@ class SchemaManagementServiceMethodsTest {
         assertNotNull(result.getExecutedDDL());
         assertTrue(result.getExecutedDDL().contains(
                 "ALTER TABLE tb_test ADD COLUMN IF NOT EXISTS row_version INTEGER NOT NULL DEFAULT 1"));
+    }
+
+    @Test
+    @DisplayName("syncModelToTable - repairs nullable row_version and its default before CAS traffic")
+    void testSyncModelToTable_RepairsExistingRowVersionInvariant() {
+        when(metaModelService.getModelDefinitionFromDb("test_model"))
+                .thenReturn(Optional.of(testModel));
+        when(tableMetadataService.tableExists("tb_test")).thenReturn(true);
+        when(tableMetadataService.columnExists("tb_test", "row_version")).thenReturn(true);
+        when(tableMetadataService.isColumnNullable("tb_test", "row_version")).thenReturn(true);
+        when(tableMetadataService.columnExists("tb_test", "test_column")).thenReturn(true);
+        when(tableMetadataService.getColumnTypeDefinition("tb_test", "test_column"))
+                .thenReturn("VARCHAR(255)");
+        when(tableMetadataService.isColumnNullable("tb_test", "test_column")).thenReturn(true);
+        when(ddlDialect.getName()).thenReturn("PostgreSQL");
+
+        SchemaSyncOptions dryRun = SchemaSyncOptions.builder()
+                .syncMode(SchemaSyncOptions.SyncMode.DRY_RUN)
+                .build();
+        SchemaOperationResult result = schemaManagementService.syncModelToTable("test_model", dryRun);
+
+        assertTrue(result.getSuccess());
+        assertNotNull(result.getExecutedDDL());
+        assertTrue(result.getExecutedDDL().contains(
+                "UPDATE tb_test SET row_version = 1 WHERE row_version IS NULL"));
+        assertTrue(result.getExecutedDDL().contains(
+                "ALTER TABLE tb_test ALTER COLUMN row_version SET NOT NULL"));
+        assertTrue(result.getExecutedDDL().contains(
+                "ALTER TABLE tb_test ALTER COLUMN row_version SET DEFAULT 1"));
     }
 
     // ==================== addFieldToModel 测试 ====================

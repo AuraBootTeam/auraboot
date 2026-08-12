@@ -1684,7 +1684,19 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             payloadTemporalNormalizer.normalize(data, model);
             // 使用验证服务的严格模式进行验证
             // 验证失败会抛出异常并触发事务回滚
-            validationService.validateAndThrow(model, data, ValidationContext.UPDATE);
+            // Uniqueness validation needs the current public identity so the existing row does
+            // not conflict with itself when a handler resubmits an unchanged unique field.
+            Map<String, Object> validationData = new LinkedHashMap<>(data);
+            Object existingInternalId = existingRecord.get("id");
+            Object existingPid = existingRecord.get("pid");
+            if (existingInternalId != null) {
+                validationData.put("id", existingInternalId);
+            } else if (existingPid != null) {
+                validationData.put("pid", existingPid);
+            } else {
+                validationData.put("pid", recordId);
+            }
+            validationService.validateAndThrow(model, validationData, ValidationContext.UPDATE);
             // Field-level domain invariants (immutable / immutableWhen). These are decided
             // against the row as it currently stands, which is why they need existingRecord
             // and cannot live in the payload-only validation above. They are invariants, not

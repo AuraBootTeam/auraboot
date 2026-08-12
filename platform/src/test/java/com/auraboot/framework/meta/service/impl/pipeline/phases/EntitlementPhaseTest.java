@@ -6,6 +6,8 @@ import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import com.auraboot.framework.plugin.entity.PluginRecord;
+import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,11 +30,12 @@ import static org.mockito.Mockito.when;
 class EntitlementPhaseTest {
 
     @Mock private EntitlementChecker entitlementChecker;
+    @Mock private PluginRecordMapper pluginRecordMapper;
 
     @Test
     @DisplayName("an inactive plugin records a DENY before throwing")
     void recordsADenyWhenThePluginIsNotActive() {
-        EntitlementPhase phase = new EntitlementPhase(entitlementChecker);
+        EntitlementPhase phase = new EntitlementPhase(entitlementChecker, pluginRecordMapper);
         when(entitlementChecker.isPluginActive("qo")).thenReturn(false);
         CommandPipelineContext ctx = context("qo_quote_common", null);
 
@@ -50,7 +53,7 @@ class EntitlementPhaseTest {
     @Test
     @DisplayName("a missing required feature records a DENY before throwing")
     void recordsADenyWhenTheRequiredFeatureIsMissing() {
-        EntitlementPhase phase = new EntitlementPhase(entitlementChecker);
+        EntitlementPhase phase = new EntitlementPhase(entitlementChecker, pluginRecordMapper);
         when(entitlementChecker.isPluginActive("qo")).thenReturn(true);
         when(entitlementChecker.hasFeature("qo", "advanced")).thenReturn(false);
         CommandPipelineContext ctx = context("qo_quote_common", "advanced");
@@ -72,7 +75,7 @@ class EntitlementPhaseTest {
     @Test
     @DisplayName("satisfied entitlement abstains rather than permits")
     void abstainsRatherThanPermitsWhenEntitlementIsSatisfied() {
-        EntitlementPhase phase = new EntitlementPhase(entitlementChecker);
+        EntitlementPhase phase = new EntitlementPhase(entitlementChecker, pluginRecordMapper);
         when(entitlementChecker.isPluginActive("qo")).thenReturn(true);
         CommandPipelineContext ctx = context("qo_quote_common", null);
 
@@ -86,8 +89,29 @@ class EntitlementPhaseTest {
     @Test
     @DisplayName("a command with no model abstains")
     void abstainsWhenTheCommandHasNoModel() {
-        EntitlementPhase phase = new EntitlementPhase(entitlementChecker);
+        EntitlementPhase phase = new EntitlementPhase(entitlementChecker, pluginRecordMapper);
         CommandPipelineContext ctx = context(null, null);
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getPhaseDecisions()).singleElement()
+                .extracting(CommandPermitPlan.PhaseDecision::decision)
+                .isEqualTo(CommandPermitPlan.Decision.ABSTAIN);
+    }
+
+    @Test
+    @DisplayName("an imported command checks its owning plugin id rather than its model prefix")
+    void resolvesEntitlementFromCommandPluginOwner() {
+        EntitlementPhase phase = new EntitlementPhase(entitlementChecker, pluginRecordMapper);
+        CommandPipelineContext ctx = context("inv_kitting_result", null);
+        ctx.getCommand().setPluginPid("inventory-plugin-pid");
+        PluginRecord inventory = PluginRecord.builder()
+                .pid("inventory-plugin-pid")
+                .pluginId("com.auraboot.inventory")
+                .namespace("inv")
+                .build();
+        when(pluginRecordMapper.findByPid("inventory-plugin-pid")).thenReturn(inventory);
+        when(entitlementChecker.isPluginActive("com.auraboot.inventory")).thenReturn(true);
 
         phase.execute(ctx);
 

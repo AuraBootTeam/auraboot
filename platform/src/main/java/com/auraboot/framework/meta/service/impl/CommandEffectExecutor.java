@@ -20,6 +20,8 @@ import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
@@ -75,6 +77,7 @@ public class CommandEffectExecutor {
         }
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveAuditLog(Long tenantId, String commandCode, String commandPid,
                       Long userId, Map<String, Object> requestPayload,
                       Map<String, Object> executionResult,
@@ -102,8 +105,8 @@ public class CommandEffectExecutor {
 
             commandAuditLogMapper.insertLog(auditLog);
         } catch (Exception e) {
-            // CATCH: safe — called from after-commit (no transaction) or
-            // from execute() failure path (transaction already rolling back).
+            // CATCH: safe — the audit insert owns a REQUIRES_NEW transaction, so a failed
+            // business command cannot roll the evidence back with its domain transaction.
             // Audit log failure must not mask the original command error.
             log.warn("Failed to save audit log for command {}: {}", commandCode, e.getMessage());
         }
