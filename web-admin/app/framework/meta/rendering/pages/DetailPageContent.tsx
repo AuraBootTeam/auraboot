@@ -465,7 +465,10 @@ export function collectDetailDictCodes(
   };
   const walkBlocks = (blocks: BlockConfig[]) => {
     for (const block of blocks) {
-      if (block.blockType === 'form-section' && block.fields) {
+      if (
+        (block.blockType === 'form-section' || block.blockType === 'detail-section') &&
+        block.fields
+      ) {
         collectFromFields(block.fields);
       }
       if ((block as any).tabs) {

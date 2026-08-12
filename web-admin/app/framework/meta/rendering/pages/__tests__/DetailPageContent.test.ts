@@ -326,6 +326,27 @@ describe('settings-card field presentation', () => {
 });
 
 describe('collectDetailDictCodes', () => {
+  it('collects dict codes declared by settings-card detail sections', () => {
+    expect(
+      collectDetailDictCodes(
+        {
+          blocks: [
+            {
+              id: 'receipt-summary',
+              blockType: 'detail-section',
+              extension: { displayVariant: 'settings-card' },
+              fields: [
+                { field: 'receipt_type', dictCode: 'receipt_type' },
+                { field: 'status', dictCode: 'receipt_status' },
+              ],
+            },
+          ],
+        },
+        new Map(),
+      ),
+    ).toEqual(['receipt_type', 'receipt_status']);
+  });
+
   it('collects dict codes declared inside field-meta extension props', () => {
     const modelFieldMap = new Map<string, any>([
       [
