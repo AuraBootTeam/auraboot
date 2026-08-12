@@ -80,7 +80,9 @@ import com.auraboot.framework.plugin.source.PluginSource;
 import com.auraboot.framework.semantic.exception.SemanticYamlInvalidException;
 import com.auraboot.framework.semantic.service.SemanticPublishService;
 import com.auraboot.framework.plugin.validation.PluginQualityScorer;
+import com.auraboot.framework.plugin.validation.PluginValidationContext;
 import com.auraboot.framework.plugin.validation.PluginValidationPipeline;
+import com.auraboot.framework.plugin.validation.PluginValidationResult;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
@@ -197,6 +199,23 @@ class PluginImportServiceImplCoreTest {
         m.setNamespace("demo");
         m.setVersion("1.0.0");
         return m;
+    }
+
+    private PluginValidationResult invokeValidationPipeline(PluginManifestExtended manifest) {
+        try {
+            Method method = PluginImportServiceImpl.class.getDeclaredMethod(
+                    "runValidationPipeline", PluginManifestExtended.class, boolean.class, boolean.class);
+            method.setAccessible(true);
+            return (PluginValidationResult) method.invoke(service, manifest, true, false);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new RuntimeException(cause);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private String invokeCreateOrUpdatePlugin(PluginManifestExtended manifest, Long tenantId) {
@@ -896,6 +915,32 @@ class PluginImportServiceImplCoreTest {
 
         assertThat(errors).anyMatch(e -> e.contains("missing parent menu: menu.parent.missing"));
         assertThat(errors).anyMatch(e -> e.contains("missing permission: perm.missing"));
+    }
+
+    @Test
+    @DisplayName("validation pipeline exposes installed menu permissions to cross-reference validators")
+    void validationPipeline_loadsInstalledMenuPermissionCodes() {
+        PluginManifestExtended manifest = baseManifest();
+        MenuDefinitionDTO installed = new MenuDefinitionDTO();
+        installed.setCode("audit_log_view");
+        installed.setPermissionCode("meta.changelog.read");
+        MenuDefinitionDTO missing = new MenuDefinitionDTO();
+        missing.setCode("unresolved_view");
+        missing.setPermissionCode("permission.still.missing");
+        manifest.setMenus(List.of(installed, missing));
+
+        when(pluginRecordMapper.selectList(any())).thenReturn(List.of());
+        when(resourceImporter.checkPermissionExists(1L, "meta.changelog.read")).thenReturn(true);
+        when(resourceImporter.checkPermissionExists(1L, "permission.still.missing")).thenReturn(false);
+        when(validationPipeline.validate(any())).thenReturn(PluginValidationResult.empty());
+
+        invokeValidationPipeline(manifest);
+
+        ArgumentCaptor<PluginValidationContext> context =
+                ArgumentCaptor.forClass(PluginValidationContext.class);
+        verify(validationPipeline).validate(context.capture());
+        assertThat(context.getValue().getInstalledPermissionCodes())
+                .containsExactly("meta.changelog.read");
     }
 
     // ---------- two-phase cross-plugin reference validation ----------
