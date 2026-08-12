@@ -253,7 +253,7 @@ function MemberRecordShareDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]"
       data-testid="record-share-dialog"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
