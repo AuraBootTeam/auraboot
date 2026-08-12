@@ -3076,6 +3076,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             List<QueryCondition> conditions = exportRequest.getConditions() != null
                     ? exportRequest.getConditions() : Collections.emptyList();
             QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(model, conditions);
+            if (exportRequest.getKeyword() != null && !exportRequest.getKeyword().isBlank()) {
+                queryBuilder = queryBuilderService.buildKeywordSearch(
+                        queryBuilder,
+                        exportRequest.getKeyword().trim(),
+                        model);
+            }
             queryBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
 
             // Apply row-level permission filter

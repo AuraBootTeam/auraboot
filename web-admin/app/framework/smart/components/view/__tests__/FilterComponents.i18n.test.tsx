@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '~/contexts/I18nContext';
 import { FilterChipBar } from '../FilterChipBar';
+import { FilterFieldPicker } from '../FilterFieldPicker';
 import { FilterValuePopover } from '../FilterValuePopover';
 
 const ZH = {
@@ -65,6 +66,30 @@ describe('FilterValuePopover i18n', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '应用' }));
     expect(onApply).not.toHaveBeenCalled();
+  });
+});
+
+describe('FilterFieldPicker i18n', () => {
+  it('renders Chinese section and field-type labels', () => {
+    renderZh(
+      <FilterFieldPicker
+        open
+        anchorEl={{ x: 0, y: 0 }}
+        fields={[
+          { fieldCode: 'amount', label: '预期金额', fieldType: 'MONEY' },
+          { fieldCode: 'owner', label: '负责人', fieldType: 'REFERENCE' },
+        ]}
+        activeFieldCodes={[]}
+        onSelect={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('常用字段')).toBeInTheDocument();
+    expect(screen.getByText('金额')).toBeInTheDocument();
+    expect(screen.getByText('关联')).toBeInTheDocument();
+    expect(screen.queryByText('Common Fields')).not.toBeInTheDocument();
+    expect(screen.queryByText('Money')).not.toBeInTheDocument();
   });
 });
 

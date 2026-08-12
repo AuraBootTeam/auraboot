@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildListReferenceDisplayCacheKey,
   buildViewManageFieldOptions,
+  buildListFilterFieldMetadata,
   collectListReferenceDisplayConfigs,
   findPersonalPresetSavedView,
   getListFieldValueWithAlias,
@@ -17,9 +18,12 @@ import {
   resolveListSavedViewPageKey,
   resolveListMiscBlocksPosition,
   resolveTableBlockRowActions,
+  queryConditionToExportCondition,
+  resolveUrlFilterSyncAction,
   shouldSkipListData,
   shouldSkipModelFieldMeta,
   useRestoreSavedViewFromUrl,
+  viewFilterToQueryCondition,
 } from '../ListPageContent';
 
 describe('renderComponentToValueType', () => {
@@ -190,12 +194,7 @@ describe('findPersonalPresetSavedView', () => {
 
 describe('pruneNoopViewConfigPatch', () => {
   it('removes empty sort patches that match the saved view state', () => {
-    expect(
-      pruneNoopViewConfigPatch(
-        { rowHeight: 'medium', sorts: [] },
-        { sorts: [] },
-      ),
-    ).toBeNull();
+    expect(pruneNoopViewConfigPatch({ rowHeight: 'medium', sorts: [] }, { sorts: [] })).toBeNull();
   });
 
   it('keeps empty sort patches when they clear a saved sort', () => {
@@ -480,6 +479,111 @@ describe('resolveColumnCapabilityDataType', () => {
     expect(resolveColumnCapabilityDataType({ field: 'name', sorter: true }, new Map())).toBe(
       'text',
     );
+  });
+});
+
+describe('buildListFilterFieldMetadata', () => {
+  it('uses model metadata for numeric, enum and reference filter controls', () => {
+    const fields = buildListFilterFieldMetadata(
+      [
+        { field: 'amount', label: 'Amount' },
+        { field: 'stage', label: 'Stage', renderType: 'tag' },
+        { field: 'owner', label: 'Owner' },
+      ],
+      new Map([
+        ['amount', { code: 'amount', dataType: 'money' }],
+        ['stage', { code: 'stage', dataType: 'enum', dictCode: 'opp_stage' }],
+        [
+          'owner',
+          {
+            code: 'owner',
+            dataType: 'reference',
+            refTarget: {
+              targetEntity: 'sys_user',
+              valueField: 'pid',
+              displayField: 'displayName',
+            },
+          },
+        ],
+      ]),
+      (column) => String(column.label),
+    );
+
+    expect(fields).toContainEqual({
+      fieldCode: 'amount',
+      label: 'Amount',
+      fieldType: 'money',
+      dictCode: undefined,
+      referenceModelCode: undefined,
+      referenceValueField: 'pid',
+      referenceDisplayField: undefined,
+    });
+    expect(fields).toContainEqual(
+      expect.objectContaining({
+        fieldCode: 'stage',
+        fieldType: 'enum',
+        dictCode: 'opp_stage',
+      }),
+    );
+    expect(fields).toContainEqual(
+      expect.objectContaining({
+        fieldCode: 'owner',
+        fieldType: 'reference',
+        referenceModelCode: 'sys_user',
+        referenceValueField: 'pid',
+        referenceDisplayField: 'displayName',
+      }),
+    );
+  });
+});
+
+describe('viewFilterToQueryCondition', () => {
+  it('keeps IN and BETWEEN values as arrays for list and export requests', () => {
+    const inCondition = viewFilterToQueryCondition({
+      fieldCode: 'forecast_category',
+      operator: 'in',
+      value: ['commit', 'best_case'],
+    });
+    const betweenCondition = viewFilterToQueryCondition({
+      fieldCode: 'close_date',
+      operator: 'between',
+      value: ['2026-08-01', '2026-08-31'],
+    });
+
+    expect(inCondition).toEqual({
+      fieldName: 'forecast_category',
+      operator: 'IN',
+      values: ['commit', 'best_case'],
+    });
+    expect(betweenCondition).toEqual({
+      fieldName: 'close_date',
+      operator: 'BETWEEN',
+      values: ['2026-08-01', '2026-08-31'],
+    });
+    expect(queryConditionToExportCondition(inCondition!)).toEqual({
+      field: 'forecast_category',
+      operator: 'IN',
+      value: ['commit', 'best_case'],
+    });
+  });
+
+  it('keeps numbers typed and wraps LIKE values only once', () => {
+    expect(
+      viewFilterToQueryCondition({ fieldCode: 'amount', operator: 'gte', value: 100000 }),
+    ).toEqual({ fieldName: 'amount', operator: 'GTE', value: 100000 });
+    expect(
+      viewFilterToQueryCondition({ fieldCode: 'name', operator: 'like', value: '华东' }),
+    ).toEqual({ fieldName: 'name', operator: 'LIKE', value: '%华东%' });
+  });
+});
+
+describe('resolveUrlFilterSyncAction', () => {
+  it('does not let a stale URL write clobber a newer local filter edit', () => {
+    expect(resolveUrlFilterSyncAction('new-filter-state', 'older-filter-state')).toBe(
+      'wait-for-local',
+    );
+    expect(resolveUrlFilterSyncAction('new-filter-state', 'new-filter-state')).toBe('ack-local');
+    expect(resolveUrlFilterSyncAction(undefined, 'browser-history-state')).toBe('apply-url');
   });
 });
 

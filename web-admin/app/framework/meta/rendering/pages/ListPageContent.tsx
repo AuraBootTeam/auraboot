@@ -71,6 +71,11 @@ import { ListModals } from './list/ListModals';
 import { ListToolbar } from './list/ListToolbar';
 import { ListTable } from './list/ListTable';
 import {
+  BulkActionResultDialog,
+  type BulkActionFailure,
+  type BulkActionResult,
+} from './list/BulkActionResultDialog';
+import {
   areFiltersEqual,
   areSortsEqual,
   decodeFilters,
@@ -101,6 +106,7 @@ import {
   selectedCount as selectionSelectedCount,
   isPageFullySelected as selectionIsPageFullySelected,
   getExplicitIds as selectionGetExplicitIds,
+  getExcludedIds as selectionGetExcludedIds,
   isAllMatching as selectionIsAllMatching,
 } from './list/selectionModel';
 import {
@@ -471,6 +477,109 @@ export function resolveColumnCapabilityDataType(
   );
 }
 
+export interface ListFilterFieldMetadata {
+  fieldCode: string;
+  label: string;
+  fieldType: string;
+  dictCode?: string;
+  referenceModelCode?: string;
+  referenceValueField?: string;
+  referenceDisplayField?: string;
+}
+
+/**
+ * Build the typed metadata shared by the filter picker, filter chips and value editor.
+ *
+ * A table column is primarily a presentation contract, so many DSL pages omit its
+ * data type. The model field metadata remains the source of truth for filter
+ * operators and editors (money must expose numeric comparisons, enums their dict,
+ * and references their target model).
+ */
+export function buildListFilterFieldMetadata(
+  tableColumns: ColumnConfig[],
+  modelFieldMap: Map<string, any> | undefined,
+  resolveLabel: (column: ColumnConfig) => string,
+): ListFilterFieldMetadata[] {
+  return tableColumns
+    .filter((column) => !column.isActionColumn && Boolean(column.field))
+    .map((column) => {
+      const meta = modelFieldMap?.get(column.field);
+      const refTarget = readRefTargetConfig(column, meta);
+      const referenceModelCode = String(
+        refTarget.modelCode ||
+          refTarget.targetModel ||
+          refTarget.targetEntity ||
+          meta?.referenceModelCode ||
+          meta?.extension?.referenceModelCode ||
+          '',
+      ).trim();
+      return {
+        fieldCode: column.field,
+        label: resolveLabel(column),
+        fieldType: resolveColumnCapabilityDataType(column, modelFieldMap),
+        dictCode: column.dictCode || meta?.dictCode || meta?.extension?.dictCode || undefined,
+        referenceModelCode: referenceModelCode || undefined,
+        referenceValueField: String(
+          refTarget.valueField || refTarget.targetValueField || refTarget.idField || 'pid',
+        ),
+        referenceDisplayField:
+          String(
+            refTarget.displayField || refTarget.labelField || refTarget.targetField || '',
+          ).trim() || undefined,
+      };
+    });
+}
+
+export interface ListQueryFilterCondition {
+  fieldName: string;
+  operator: string;
+  value?: unknown;
+  values?: unknown[];
+}
+
+/** Preserve array-valued IN/BETWEEN filters for the dynamic query contract. */
+export function viewFilterToQueryCondition(
+  filter: ViewFilterConfig,
+): ListQueryFilterCondition | null {
+  if (!filter.fieldCode) return null;
+  const operator = (filter.operator || 'eq').toUpperCase();
+  if (operator === 'ISNULL' || operator === 'ISNOTNULL') {
+    return { fieldName: filter.fieldCode, operator, value: null };
+  }
+  if (filter.value == null || filter.value === '') return null;
+  if (operator === 'IN' || operator === 'BETWEEN') {
+    const values = Array.isArray(filter.value) ? filter.value : [filter.value];
+    if (values.length === 0) return null;
+    return { fieldName: filter.fieldCode, operator, values };
+  }
+  return {
+    fieldName: filter.fieldCode,
+    operator,
+    value: operator === 'LIKE' ? `%${String(filter.value)}%` : filter.value,
+  };
+}
+
+/** Convert the dynamic-list condition shape to the export endpoint shape. */
+export function queryConditionToExportCondition(condition: ListQueryFilterCondition): {
+  field: string;
+  operator: string;
+  value: unknown;
+} {
+  return {
+    field: condition.fieldName,
+    operator: condition.operator,
+    value: condition.values ?? condition.value ?? null,
+  };
+}
+
+export function resolveUrlFilterSyncAction(
+  pendingLocalEncoding: string | null | undefined,
+  currentUrlEncoding: string | null,
+): 'apply-url' | 'ack-local' | 'wait-for-local' {
+  if (pendingLocalEncoding === undefined) return 'apply-url';
+  return pendingLocalEncoding === currentUrlEncoding ? 'ack-local' : 'wait-for-local';
+}
+
 export interface ViewManageFieldOption {
   code: string;
   name: string;
@@ -801,6 +910,17 @@ function ListPageContentInner(props: PageContentProps) {
   const [activeSorts, setActiveSorts] = useState<SortConfig[]>(() => urlSorts);
   // Active filter chips — user-added filters via chip bar (separate from filters)
   const [chipFilters, setChipFilters] = useState<ViewFilterConfig[]>(() => urlChipFilters);
+  const pendingChipFilterUrlSyncRef = useRef<string | null | undefined>(undefined);
+  const setLocalChipFilters = useCallback(
+    (update: ViewFilterConfig[] | ((previous: ViewFilterConfig[]) => ViewFilterConfig[])) => {
+      setChipFilters((previous) => {
+        const next = typeof update === 'function' ? update(previous) : update;
+        pendingChipFilterUrlSyncRef.current = encodeFilters(next);
+        return next;
+      });
+    },
+    [],
+  );
   // FilterFieldPicker state
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
   const [fieldPickerAnchor, setFieldPickerAnchor] = useState<
@@ -811,6 +931,11 @@ function ListPageContentInner(props: PageContentProps) {
   const [valuePopoverAnchor, setValuePopoverAnchor] = useState<
     { x: number; y: number } | undefined
   >();
+  const chipFiltersRef = useRef<ViewFilterConfig[]>(chipFilters);
+
+  useEffect(() => {
+    chipFiltersRef.current = chipFilters;
+  }, [chipFilters]);
 
   // Client-side grouping state
   const [groupByField, setGroupByField] = useState<string | null>(null);
@@ -908,7 +1033,11 @@ function ListPageContentInner(props: PageContentProps) {
   // explicit mode this is the full cross-page pick; in all-matching mode we
   // fall back to the currently-selected rows on this page (a finite, safe set)
   // — export is the cross-page path and uses the filter directly.
-  const selectedIdList = allMatchingSelected ? Array.from(selectedIds) : explicitSelectedIds;
+  const selectedIdList = allMatchingSelected ? [] : explicitSelectedIds;
+  const allMatchingExcludedIds = useMemo(
+    () => selectionGetExcludedIds(selectionState),
+    [selectionState],
+  );
   // Whether row selection (checkbox column + bulk bar + select-all banner) is
   // active for this page — DSL opt-in via the table block, minus any host-level
   // override.
@@ -972,8 +1101,18 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Sync URL chip filters -> local state (supports refresh and browser back/forward).
   useEffect(() => {
+    const currentUrlEncoding = searchParams.get('filters');
+    const syncAction = resolveUrlFilterSyncAction(
+      pendingChipFilterUrlSyncRef.current,
+      currentUrlEncoding,
+    );
+    if (syncAction === 'wait-for-local') return;
+    if (syncAction === 'ack-local') {
+      pendingChipFilterUrlSyncRef.current = undefined;
+      return;
+    }
     setChipFilters((prev) => (areFiltersEqual(prev, urlChipFilters) ? prev : urlChipFilters));
-  }, [urlChipFilters]);
+  }, [searchParams, urlChipFilters]);
 
   // Sync URL sorts -> local state (supports refresh and browser back/forward).
   useEffect(() => {
@@ -1065,6 +1204,7 @@ function ListPageContentInner(props: PageContentProps) {
   const [memberImportResult, setMemberImportResult] = useState<TenantMemberImportResult | null>(
     null,
   );
+  const [bulkActionResult, setBulkActionResult] = useState<BulkActionResult | null>(null);
   const { formats: dateTimeFormats, timezone: effectiveTimezone } = useTimezone();
   const pendingSavedViewFiltersRef = useRef<Record<string, any> | null>(null);
   // When restoring a preset view from ?preset= on mount, skip the first run of
@@ -1356,10 +1496,15 @@ function ListPageContentInner(props: PageContentProps) {
   const applyViewConfigToListState = useCallback(
     (viewConfig: ViewConfig | undefined): Record<string, any> => {
       const vc = viewConfig ?? {};
-      const restoredFilters = viewConfigFiltersToRuntimeFilters(vc.filters);
+      const restoredViewFilters = vc.filters ?? [];
+      const restoredFilters: Record<string, any> = {};
 
       pendingSavedViewFiltersRef.current = restoredFilters;
       setFilters(restoredFilters);
+      chipFiltersRef.current = restoredViewFilters;
+      setChipFilters((prev) =>
+        areFiltersEqual(prev, restoredViewFilters) ? prev : restoredViewFilters,
+      );
 
       const restoredSorts = vc.sorts ?? [];
       setActiveSorts((prev) => (areSortsEqual(prev, restoredSorts) ? prev : restoredSorts));
@@ -1510,7 +1655,7 @@ function ListPageContentInner(props: PageContentProps) {
       userFilters?: Record<string, any>,
       chipFiltersList?: ViewFilterConfig[],
     ) => {
-      const conditions: Array<{ fieldName: string; operator: string; value: string }> = [];
+      const conditions: ListQueryFilterCondition[] = [];
       if (tabCondition) {
         conditions.push(tabCondition);
       }
@@ -1550,23 +1695,8 @@ function ListPageContentInner(props: PageContentProps) {
       if (chipFiltersList) {
         for (const cf of chipFiltersList) {
           if (!cf.fieldCode) continue;
-          // Skip unary operators (isNull/isNotNull) that don't need a value
-          if (cf.operator === 'isNull' || cf.operator === 'isNotNull') {
-            conditions.push({
-              fieldName: cf.fieldCode,
-              operator: cf.operator.toUpperCase(),
-              value: '',
-            });
-            continue;
-          }
-          if (cf.value == null || cf.value === '') continue;
-          const op = cf.operator?.toUpperCase() || 'EQ';
-          const val = String(cf.value);
-          conditions.push({
-            fieldName: cf.fieldCode,
-            operator: op,
-            value: op === 'LIKE' ? `%${val}%` : val,
-          });
+          const condition = viewFilterToQueryCondition(cf);
+          if (condition) conditions.push(condition);
         }
       }
       return conditions.length > 0 ? JSON.stringify(conditions) : undefined;
@@ -1662,7 +1792,11 @@ function ListPageContentInner(props: PageContentProps) {
         } else {
           // For standard dynamic tables, use JSON filters array
           const tabCondition = getTabFilter();
-          const filtersParam = buildFiltersParam(tabCondition, params?.filters, chipFilters);
+          const filtersParam = buildFiltersParam(
+            tabCondition,
+            params?.filters,
+            chipFiltersRef.current,
+          );
           if (filtersParam) {
             queryParams.filters = filtersParam;
           }
@@ -1752,7 +1886,6 @@ function ListPageContentInner(props: PageContentProps) {
       namedQueryCode,
       tableBlock,
       activeSorts,
-      chipFilters,
       skipListData,
     ],
   );
@@ -2268,6 +2401,7 @@ function ListPageContentInner(props: PageContentProps) {
     const encoded = encodeFilters(chipFilters);
     const currentEncoded = searchParams.get('filters');
     if ((encoded ?? null) === (currentEncoded ?? null)) return;
+    pendingChipFilterUrlSyncRef.current = encoded;
     shouldPersistPaginationToUrlRef.current = true;
     setSearchParams(
       (prev) => {
@@ -2356,8 +2490,23 @@ function ListPageContentInner(props: PageContentProps) {
       }
 
       const label = resolveButtonLabel(button);
+      const isZhLocale = locale.toLowerCase().startsWith('zh');
       let successCount = 0;
-      const failures: string[] = [];
+      const failures: BulkActionFailure[] = [];
+      const recordLabelById = new Map(
+        data.map((record) => {
+          const id = getPublicRecordKey(record) || '';
+          const label =
+            record.name ||
+            record.title ||
+            record.crm_opp_name ||
+            record.code ||
+            record.crm_opp_code ||
+            id;
+          return [id, String(label)] as const;
+        }),
+      );
+      const recordLabel = (id: string) => recordLabelById.get(id) || id;
 
       if (actionType === 'bulk_state_transition') {
         for (const id of ids) {
@@ -2374,10 +2523,18 @@ function ListPageContentInner(props: PageContentProps) {
             if (ResultHelper.isSuccess(result)) {
               successCount += 1;
             } else {
-              failures.push((result as any).desc || (result as any).message || id);
+              failures.push({
+                recordId: id,
+                recordLabel: recordLabel(id),
+                reason: (result as any).desc || (result as any).message || 'Command failed',
+              });
             }
           } catch (error) {
-            failures.push(error instanceof Error ? error.message : String(error));
+            failures.push({
+              recordId: id,
+              recordLabel: recordLabel(id),
+              reason: error instanceof Error ? error.message : String(error),
+            });
           }
         }
       } else if (actionType === 'bulk_command') {
@@ -2395,7 +2552,11 @@ function ListPageContentInner(props: PageContentProps) {
         if (ResultHelper.isSuccess(result)) {
           successCount = ids.length;
         } else {
-          failures.push((result as any).desc || (result as any).message || command);
+          failures.push({
+            recordId: command,
+            recordLabel: command,
+            reason: (result as any).desc || (result as any).message || 'Command failed',
+          });
         }
       } else {
         showToast(
@@ -2419,7 +2580,9 @@ function ListPageContentInner(props: PageContentProps) {
           translateOrFallback(
             t,
             'list.bulkAction.success',
-            `${label} completed for ${successCount} records`,
+            isZhLocale
+              ? `${label}已完成，成功 ${successCount} 条`
+              : `${label} completed for ${successCount} records`,
           ),
           'success',
         );
@@ -2428,18 +2591,24 @@ function ListPageContentInner(props: PageContentProps) {
           translateOrFallback(
             t,
             'list.bulkAction.partial',
-            `${label} completed for ${successCount} records; ${failures.length} failed`,
+            isZhLocale
+              ? `${label}部分完成：成功 ${successCount} 条，失败 ${failures.length} 条`
+              : `${label} completed for ${successCount} records; ${failures.length} failed`,
           ),
           'warning',
         );
+        setBulkActionResult({ actionLabel: label, successCount, failures });
       } else {
-        showToast(failures[0] || `${label} failed`, 'error');
+        showToast(failures[0]?.reason || `${label} failed`, 'error');
+        setBulkActionResult({ actionLabel: label, successCount, failures });
       }
     },
     [
       canUseButton,
+      data,
       filters,
       loadData,
+      locale,
       modelCode,
       pagination.pageSize,
       resolveButtonLabel,
@@ -3184,6 +3353,11 @@ function ListPageContentInner(props: PageContentProps) {
     return Array.from(fieldMap.values());
   }, [tableColumns, modelFieldMap, resolveColumnLabel]);
 
+  const filterFieldMetadata = useMemo(
+    () => buildListFilterFieldMetadata(tableColumns, modelFieldMap, resolveColumnLabel),
+    [tableColumns, modelFieldMap, resolveColumnLabel],
+  );
+
   // Personal-only baseline: changes to an explicit personal view are staged as
   // a visible local draft. The user chooses save-current, save-as-new, or discard.
   const [viewSavedHintOn, flashViewSavedHint] = useTransientFlag(2200);
@@ -3561,8 +3735,12 @@ function ListPageContentInner(props: PageContentProps) {
         }
       }
     }
+    for (const filter of chipFilters) {
+      const condition = viewFilterToQueryCondition(filter);
+      if (condition) conditions.push(queryConditionToExportCondition(condition));
+    }
     return conditions.length > 0 ? conditions : undefined;
-  }, [filters, getTabFilter]);
+  }, [chipFilters, filters, getTabFilter]);
 
   // Shared export request — posts the given conditions to the export endpoint
   // and triggers a browser download of the returned file.
@@ -3578,6 +3756,7 @@ function ListPageContentInner(props: PageContentProps) {
           body: JSON.stringify({
             format: format === 'xlsx' ? 'excel' : 'csv',
             conditions,
+            keyword: keywordRef.current.trim() || undefined,
           }),
         });
         if (!res.ok) throw new Error('Export request failed');
@@ -3615,7 +3794,13 @@ function ListPageContentInner(props: PageContentProps) {
   const handleExportSelected = useCallback(
     async (format: 'xlsx' | 'csv' = 'xlsx') => {
       if (allMatchingSelected) {
-        await runExport(format, exportFilterConditions);
+        const conditions = [
+          ...(exportFilterConditions ?? []),
+          ...(allMatchingExcludedIds.length > 0
+            ? [{ field: 'pid', operator: 'NOT_IN', value: allMatchingExcludedIds }]
+            : []),
+        ];
+        await runExport(format, conditions.length > 0 ? conditions : undefined);
         return;
       }
       if (explicitSelectedIds.length === 0) return;
@@ -3625,7 +3810,13 @@ function ListPageContentInner(props: PageContentProps) {
       ];
       await runExport(format, conditions);
     },
-    [allMatchingSelected, runExport, exportFilterConditions, explicitSelectedIds],
+    [
+      allMatchingExcludedIds,
+      allMatchingSelected,
+      runExport,
+      exportFilterConditions,
+      explicitSelectedIds,
+    ],
   );
 
   // Row height from current view config (with fallback)
@@ -3833,15 +4024,15 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Save current filters to SavedView
   const handleSaveFilters = useCallback(async () => {
-    const viewFilters = Object.entries(filters)
+    const formFilters = Object.entries(filters)
       .filter(([, v]) => v != null && v !== '')
       .map(([field, value]) => ({
         fieldCode: field,
         operator: 'eq' as const,
         value: String(value),
       }));
-    await ensureViewAndUpdateConfig({ filters: viewFilters });
-  }, [filters, ensureViewAndUpdateConfig]);
+    await ensureViewAndUpdateConfig({ filters: [...formFilters, ...chipFilters] });
+  }, [filters, chipFilters, ensureViewAndUpdateConfig]);
 
   const loadCurrentInviteCode = useCallback(async () => {
     if (!isTenantMemberPage) return;
@@ -4745,23 +4936,21 @@ function ListPageContentInner(props: PageContentProps) {
                 onRowHeightChange={handleRowHeightChange}
                 onColumnSettingsOpen={() => setColumnSettingsOpen(true)}
                 chipFilters={chipFilters}
-                onChipFiltersChange={setChipFilters}
-                fieldMetadata={tableColumns
-                  .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
-                  .map((c: ColumnConfig) => ({
-                    fieldCode: c.field,
-                    label: resolveColumnLabel(c),
-                    fieldType: c.valueType || c.sorter || 'text',
-                    dictCode: c.dictCode,
-                  }))}
+                onChipFiltersChange={setLocalChipFilters}
+                fieldMetadata={filterFieldMetadata}
                 resolveChipValueLabel={(filter) => {
-                  const col = tableColumns.find((c: ColumnConfig) => c.field === filter.fieldCode);
-                  const dc = (col as any)?.dictCode as string | undefined;
+                  const dc = filterFieldMetadata.find(
+                    (field) => field.fieldCode === filter.fieldCode,
+                  )?.dictCode;
                   if (!dc) return undefined;
-                  const item = dictDataCache.current
-                    .get(dc)
-                    ?.find((i) => String(i.value) === String(filter.value));
-                  return item?.label;
+                  const values = Array.isArray(filter.value) ? filter.value : [filter.value];
+                  const items = dictDataCache.current.get(dc);
+                  const labels = values.map(
+                    (value) =>
+                      items?.find((item) => String(item.value) === String(value))?.label ??
+                      String(value),
+                  );
+                  return labels.join('、');
                 }}
                 onAddFilter={(e?: React.MouseEvent) => {
                   const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect?.();
@@ -4776,7 +4965,7 @@ function ListPageContentInner(props: PageContentProps) {
                   setEditingChipIdx(idx);
                 }}
                 onClearAll={() => {
-                  setChipFilters([]);
+                  setLocalChipFilters([]);
                   setActiveSorts([]);
                 }}
                 hideQuickFilters={hideQuickFilters}
@@ -4804,6 +4993,7 @@ function ListPageContentInner(props: PageContentProps) {
                 onSelectAllMatching={handleSelectAllMatching}
                 onClearSelection={clearAllSelection}
                 t={t}
+                locale={locale}
               />
 
               {/* Table area — extracted to ListTable with DnD column reorder */}
@@ -4876,12 +5066,20 @@ function ListPageContentInner(props: PageContentProps) {
                 selectedCount={effectiveSelectedCount}
                 selectedIds={selectedIdList}
                 modelCode={modelCode}
-                onBulkEdit={builtInBulkCapabilities.edit ? () => setBulkEditOpen(true) : undefined}
-                onBulkDelete={builtInBulkCapabilities.delete ? handleBulkDelete : undefined}
+                onBulkEdit={
+                  builtInBulkCapabilities.edit && !allMatchingSelected
+                    ? () => setBulkEditOpen(true)
+                    : undefined
+                }
+                onBulkDelete={
+                  builtInBulkCapabilities.delete && !allMatchingSelected
+                    ? handleBulkDelete
+                    : undefined
+                }
                 onBulkExport={
                   builtInBulkCapabilities.export ? () => handleExportSelected('xlsx') : undefined
                 }
-                bulkActions={visibleBulkActions}
+                bulkActions={allMatchingSelected ? [] : visibleBulkActions}
                 onBulkAction={handleBulkAction}
                 resolveBulkActionLabel={resolveButtonLabel}
                 onClearSelection={clearAllSelection}
@@ -5019,14 +5217,7 @@ function ListPageContentInner(props: PageContentProps) {
             // FilterFieldPicker
             fieldPickerOpen={fieldPickerOpen}
             fieldPickerAnchor={fieldPickerAnchor}
-            fieldPickerFields={tableColumns
-              .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
-              .map((c: ColumnConfig) => ({
-                fieldCode: c.field,
-                label: resolveColumnLabel(c),
-                fieldType: c.valueType || c.sorter || 'text',
-                dictCode: c.dictCode,
-              }))}
+            filterFieldMetadata={filterFieldMetadata}
             chipFilterFieldCodes={chipFilters.map((f) => f.fieldCode)}
             onFieldPickerSelect={(fieldCode) => {
               // Add a new empty filter chip and immediately open the value popover
@@ -5035,7 +5226,7 @@ function ListPageContentInner(props: PageContentProps) {
                 operator: 'eq',
                 value: '',
               };
-              setChipFilters((prev) => {
+              setLocalChipFilters((prev) => {
                 const next = [...prev, newFilter];
                 // Open value popover for the newly added chip
                 setTimeout(() => {
@@ -5056,7 +5247,7 @@ function ListPageContentInner(props: PageContentProps) {
             schema={schema}
             tableName={tableName}
             onFilterApply={(operator, value) => {
-              setChipFilters((prev) =>
+              setLocalChipFilters((prev) =>
                 prev.map((f, i) =>
                   i === editingChipIdx ? { ...f, operator: operator as any, value } : f,
                 ),
@@ -5117,6 +5308,12 @@ function ListPageContentInner(props: PageContentProps) {
         </div>
       </div>
       <AsyncTaskModalHost />
+      <BulkActionResultDialog
+        result={bulkActionResult}
+        onClose={() => setBulkActionResult(null)}
+        locale={locale}
+        t={t}
+      />
     </DataSourceProvider>
   );
 }

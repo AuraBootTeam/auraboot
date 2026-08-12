@@ -17,6 +17,7 @@ import { FilterValuePopover } from '~/framework/smart/components/view/FilterValu
 import { BulkEditModal } from '~/framework/smart/components/bulk/BulkEditModal';
 import { RecordPreviewDrawer } from '~/framework/smart/components/preview/RecordPreviewDrawer';
 import { ColumnContextMenu } from './ColumnContextMenu';
+import type { ListFilterFieldMetadata } from '../ListPageContent';
 import type {
   SavedViewCreateRequest,
   ColumnConfig as ViewColumnConfig,
@@ -80,12 +81,7 @@ export interface ListModalsProps {
   // FilterFieldPicker
   fieldPickerOpen: boolean;
   fieldPickerAnchor?: { x: number; y: number };
-  fieldPickerFields: Array<{
-    fieldCode: string;
-    label: string;
-    fieldType: string;
-    dictCode?: string;
-  }>;
+  filterFieldMetadata: ListFilterFieldMetadata[];
   chipFilterFieldCodes: string[];
   onFieldPickerSelect: (fieldCode: string) => void;
   onFieldPickerClose: () => void;
@@ -97,7 +93,7 @@ export interface ListModalsProps {
   tableColumns: ColumnConfig[];
   schema: any;
   tableName: string;
-  onFilterApply: (operator: string, value: string) => void;
+  onFilterApply: (operator: string, value: unknown) => void;
   onFilterCancel: () => void;
 
   // ColumnContextMenu
@@ -172,7 +168,7 @@ export function ListModals({
   // FilterFieldPicker
   fieldPickerOpen,
   fieldPickerAnchor,
-  fieldPickerFields,
+  filterFieldMetadata,
   chipFilterFieldCodes,
   onFieldPickerSelect,
   onFieldPickerClose,
@@ -277,7 +273,7 @@ export function ListModals({
       <FilterFieldPicker
         open={fieldPickerOpen}
         anchorEl={fieldPickerAnchor}
-        fields={fieldPickerFields}
+        fields={filterFieldMetadata}
         activeFieldCodes={chipFilterFieldCodes}
         onSelect={onFieldPickerSelect}
         onClose={onFieldPickerClose}
@@ -288,7 +284,8 @@ export function ListModals({
         chipFilters[editingChipIdx] &&
         (() => {
           const cf = chipFilters[editingChipIdx];
-          const fieldMeta = tableColumns.find((c: ColumnConfig) => c.field === cf.fieldCode) as any;
+          const column = tableColumns.find((c: ColumnConfig) => c.field === cf.fieldCode) as any;
+          const fieldMeta = filterFieldMetadata.find((field) => field.fieldCode === cf.fieldCode);
           return (
             <FilterValuePopover
               open
@@ -296,21 +293,26 @@ export function ListModals({
               fieldCode={cf.fieldCode}
               fieldLabel={
                 fieldMeta?.label
-                  ? typeof fieldMeta.label === 'string'
-                    ? fieldMeta.label
-                    : fieldMeta.label?.['zh-CN'] || cf.fieldCode
-                  : (() => {
-                      const mc = schema?.modelCode || tableName;
-                      const key = `model.${mc}.${cf.fieldCode}.label`;
-                      const resolved = t(key);
-                      return resolved !== key ? resolved : cf.fieldCode;
-                    })()
+                  ? fieldMeta.label
+                  : column?.label
+                    ? typeof column.label === 'string'
+                      ? column.label
+                      : column.label?.['zh-CN'] || cf.fieldCode
+                    : (() => {
+                        const mc = schema?.modelCode || tableName;
+                        const key = `model.${mc}.${cf.fieldCode}.label`;
+                        const resolved = t(key);
+                        return resolved !== key ? resolved : cf.fieldCode;
+                      })()
               }
-              fieldType={fieldMeta?.valueType || fieldMeta?.sorter || 'text'}
+              fieldType={fieldMeta?.fieldType || 'text'}
               dictCode={fieldMeta?.dictCode}
+              referenceModelCode={fieldMeta?.referenceModelCode}
+              referenceValueField={fieldMeta?.referenceValueField}
+              referenceDisplayField={fieldMeta?.referenceDisplayField}
               operator={cf.operator}
               value={cf.value}
-              onApply={(operator, value) => onFilterApply(String(operator), String(value))}
+              onApply={(operator, value) => onFilterApply(String(operator), value)}
               onCancel={onFilterCancel}
             />
           );

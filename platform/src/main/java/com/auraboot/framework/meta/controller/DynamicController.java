@@ -662,6 +662,7 @@ public class DynamicController {
         String modelCode = resolveModelCode(pageKey);
         DataExportRequest.ExportFormat format = DataExportRequest.ExportFormat.EXCEL;
         List<QueryCondition> conditions = null;
+        String keyword = null;
 
         if (exportParams != null) {
             // Parse format
@@ -685,11 +686,17 @@ public class DynamicController {
                                 if (operator == null) {
                                     throw new IllegalArgumentException("Unsupported operator: " + op);
                                 }
-                                conditions.add(QueryCondition.builder()
+                                QueryCondition.QueryConditionBuilder conditionBuilder = QueryCondition.builder()
                                         .fieldName(field)
                                         .operator(operator)
-                                        .value(val)
-                                        .build());
+                                        .value(val);
+                                if ((operator == QueryCondition.Operator.IN
+                                        || operator == QueryCondition.Operator.NOT_IN
+                                        || operator == QueryCondition.Operator.BETWEEN)
+                                        && val instanceof List<?> values) {
+                                    conditionBuilder.values(new java.util.ArrayList<>(values));
+                                }
+                                conditions.add(conditionBuilder.build());
                             } catch (IllegalArgumentException e) {
                                 log.warn("Invalid operator in export condition: {}", logSafe(op));
                             }
@@ -698,11 +705,16 @@ public class DynamicController {
                 }
                 if (conditions.isEmpty()) conditions = null;
             }
+            Object keywordObj = exportParams.get("keyword");
+            if (keywordObj != null && !keywordObj.toString().isBlank()) {
+                keyword = keywordObj.toString().trim();
+            }
         }
 
         DataExportRequest request = DataExportRequest.builder()
                 .format(format)
                 .conditions(conditions)
+                .keyword(keyword)
                 .includeHeader(true)
                 .build();
 

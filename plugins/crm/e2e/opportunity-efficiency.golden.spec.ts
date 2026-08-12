@@ -1,5 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5191';
@@ -40,6 +40,7 @@ const ids = {
 const expectedScenarios = [
   'shared-list-kanban-fact',
   'personal-view-persistence',
+  'advanced-filter-saved-view-export',
   'opportunity-plan-quote-context',
   'forecast-first-screen-hierarchy',
   'merged-customer-activity-timeline',
@@ -77,6 +78,9 @@ const expectedCoverage = {
     'crm_opportunity_common_detail:crm_opportunity_tabs:activities',
     'crm_opportunity_common_detail:crm_opportunity_tabs:plan_and_quotes',
     'crm_opportunity_common_list:crm_opp_table:bulk_qualify',
+    'crm_opportunity_common_list:platform:add_advanced_filter',
+    'crm_opportunity_common_list:platform:export_filtered_csv',
+    'crm_opportunity_common_list:platform:save_advanced_filters',
     'crm_opportunity_common_list:crm_opp_tabs:proposal',
   ],
   blocks: [
@@ -534,6 +538,120 @@ test('a personal saved view persists while list and board presentation changes',
   completedScenarios.add('personal-view-persistence');
 });
 
+test('advanced filters persist and drive the exact exported opportunity fact', async ({ page }, testInfo) => {
+  await uiLogin(page);
+  await gotoOpportunityList(page, ids.personalView);
+  const tableMode = page.getByTestId('list-view-mode-table');
+  if ((await tableMode.getAttribute('aria-checked')) !== 'true') await tableMode.click();
+  await page.getByRole('button', { name: '全部', exact: true }).click();
+  const keywordResponsePromise = page.waitForResponse((response) =>
+    response.request().method() === 'GET'
+      && response.url().includes('/api/dynamic/crm_opportunity_common/list')
+      && new URL(response.url()).searchParams.get('keyword') === RUN,
+  { timeout: 20_000 });
+  const keywordInput = page.getByPlaceholder(/查询|Search/);
+  await keywordInput.fill(RUN);
+  await keywordInput.press('Enter');
+  expect((await keywordResponsePromise).ok()).toBeTruthy();
+
+  await page.getByTestId('add-filter-btn').click();
+  await page.getByTestId('filter-field-crm_opp_expected_amount').click();
+  const amountPopover = page.getByTestId('filter-value-popover');
+  await amountPopover.getByTestId('filter-operator-select').selectOption('gte');
+  await amountPopover.getByTestId('filter-value-input').fill('300000');
+  await amountPopover.getByTestId('filter-apply').click();
+
+  await page.getByTestId('add-filter-btn').click();
+  await page.getByTestId('filter-field-crm_opp_forecast_category').click();
+  const categoryPopover = page.getByTestId('filter-value-popover');
+  await categoryPopover.getByTestId('filter-operator-select').selectOption('in');
+  await expect(categoryPopover.getByText('管道', { exact: true })).toBeVisible({ timeout: 10_000 });
+  await categoryPopover.getByText('管道', { exact: true }).click();
+  await categoryPopover.getByText('最佳预期', { exact: true }).click();
+
+  const filteredResponsePromise = page.waitForResponse((response) =>
+    response.request().method() === 'GET'
+      && response.url().includes('/api/dynamic/crm_opportunity_common/list')
+      && response.url().includes('crm_opp_forecast_category'),
+  { timeout: 20_000 });
+  await categoryPopover.getByTestId('filter-apply').click();
+  const filteredResponse = await filteredResponsePromise;
+  expect(filteredResponse.ok()).toBeTruthy();
+  const requestFilters = JSON.parse(new URL(filteredResponse.url()).searchParams.get('filters') || '[]');
+  expect(requestFilters).toEqual(expect.arrayContaining([
+    { fieldName: 'crm_opp_expected_amount', operator: 'GTE', value: 300000 },
+    {
+      fieldName: 'crm_opp_forecast_category',
+      operator: 'IN',
+      values: ['pipeline', 'best_case'],
+    },
+  ]));
+
+  await expect(page.locator('tr').filter({ hasText: names.discovery })).toBeVisible();
+  await expect(page.locator('tr').filter({ hasText: names.proposal })).toBeVisible();
+  await expect(page.locator('tr').filter({ hasText: names.bulkDiscovery })).toHaveCount(0);
+  await expect(page.locator('tr').filter({ hasText: names.negotiation })).toHaveCount(0);
+  await expect(page.getByTestId('filter-chip-bar')).toContainText('管道、最佳预期');
+  await expect(page.getByTestId('filter-chip-bar')).not.toContainText('pipeline');
+  await expect(page.getByTestId('filter-chip-bar')).not.toContainText('best_case');
+  await shot(page, testInfo, 'release-b-opportunity-advanced-filter-desktop.png');
+  await compactShot(page, testInfo, 'release-b-opportunity-advanced-filter-compact.png');
+
+  const filterToggle = page.getByTestId('filters-toggle');
+  if (await filterToggle.isVisible()) await filterToggle.click();
+  await expect(page.getByTestId('filter-save')).toBeVisible();
+  await page.getByTestId('filter-save').click();
+  await expect(page.getByTestId('personal-view-draft-banner')).toBeVisible();
+  await page.getByTestId('personal-view-save-current').click();
+  await expect(page.getByTestId('personal-view-draft-banner')).toHaveCount(0);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('filter-chip-bar')).toContainText('预期金额');
+  await expect(page.getByTestId('filter-chip-bar')).toContainText('300000');
+  await expect(page.getByTestId('filter-chip-bar')).toContainText('预测类别');
+  await expect(page.getByTestId('filter-chip-bar')).toContainText('管道、最佳预期');
+  await expect(page.locator('tr').filter({ hasText: names.discovery })).toBeVisible();
+  await expect(page.locator('tr').filter({ hasText: names.proposal })).toBeVisible();
+
+  const exportResponsePromise = page.waitForResponse((response) =>
+    response.request().method() === 'POST'
+      && response.url().includes('/api/dynamic/crm_opportunity_common/export'),
+  { timeout: 20_000 });
+  const downloadPromise = page.waitForEvent('download', { timeout: 20_000 });
+  await page.getByTestId('toolbar-more-menu').click();
+  await page.getByTestId('more-menu-export-csv').click();
+  const [exportResponse, download] = await Promise.all([exportResponsePromise, downloadPromise]);
+  expect(exportResponse.ok()).toBeTruthy();
+  const exportPayload = exportResponse.request().postDataJSON();
+  expect(exportPayload.keyword).toBe(RUN);
+  expect(exportPayload.conditions).toEqual(expect.arrayContaining([
+    { field: 'crm_opp_expected_amount', operator: 'GTE', value: 300000 },
+    {
+      field: 'crm_opp_forecast_category',
+      operator: 'IN',
+      value: ['pipeline', 'best_case'],
+    },
+  ]));
+  expect((await exportResponse.json()).data.recordCount).toBe(2);
+
+  const csvPath = path.join(EVIDENCE_DIR, 'release-b-opportunity-advanced-filter.csv');
+  await download.saveAs(csvPath);
+  const csv = readFileSync(csvPath, 'utf8');
+  expect(csv.trim().split(/\r?\n/)).toHaveLength(3);
+  expect(csv).toContain(names.discovery);
+  expect(csv).toContain(names.proposal);
+  expect(csv).not.toContain(names.bulkDiscovery);
+  expect(csv).not.toContain(names.negotiation);
+
+  cover(
+    'uiActions',
+    'crm_opportunity_common_list:platform:add_advanced_filter',
+    'crm_opportunity_common_list:platform:save_advanced_filters',
+    'crm_opportunity_common_list:platform:export_filtered_csv',
+  );
+  completedScenarios.add('advanced-filter-saved-view-export');
+});
+
 test('opportunity keeps the next task and quote in one navigable context', async ({ page }, testInfo) => {
   const relations = await listRecords('crm_activity_relation_common', [
     { fieldName: 'crm_ar_activity_id', operator: 'EQ', value: ids.task },
@@ -678,6 +796,7 @@ test('account dashboard keeps the account fact when drilling into contacts', asy
 });
 
 test('bulk opportunity actions protect lifecycle fields and execute state commands', async ({ page }, testInfo) => {
+  await executeTransition('crm:qualify_opportunity', ids.discovery);
   await uiLogin(page);
   await page.goto(`${BASE}/p/crm_opportunity_common?keyword=${encodeURIComponent(RUN)}`, {
     waitUntil: 'domcontentloaded',
@@ -687,6 +806,14 @@ test('bulk opportunity actions protect lifecycle fields and execute state comman
   if ((await tableMode.getAttribute('aria-checked')) !== 'true') {
     await tableMode.click();
   }
+  // Saved views are a server-side user concern, so a fresh browser context can
+  // still inherit the advanced filters persisted by the preceding journey.
+  // Reset presentation state explicitly before proving the bulk-action journey.
+  const clearAllViewState = page
+    .getByTestId('filter-chip-bar')
+    .getByRole('button', { name: /清除全部|Clear All/ });
+  if (await clearAllViewState.isVisible()) await clearAllViewState.click();
+  await page.getByRole('button', { name: '全部', exact: true }).click();
 
   const discoveryRow = page.locator('tr').filter({ hasText: names.discovery });
   const bulkDiscoveryRow = page.locator('tr').filter({ hasText: names.bulkDiscovery });
@@ -717,7 +844,12 @@ test('bulk opportunity actions protect lifecycle fields and execute state comman
   await bulkDialog.getByRole('button', { name: /取消|Cancel/ }).click();
 
   await page.getByTestId('bulk-action-bulk_qualify').click();
-  await expect(page.getByTestId('bulk-clear-selection-btn')).toHaveCount(0, { timeout: 20_000 });
+  const resultDialog = page.getByTestId('bulk-action-result-dialog');
+  await expect(resultDialog).toBeVisible({ timeout: 20_000 });
+  await expect(resultDialog).toContainText('成功 1 条');
+  await expect(resultDialog).toContainText('失败 1 条');
+  await expect(resultDialog).toContainText(names.discovery);
+  await expect(resultDialog).toContainText('当前记录状态不满足操作条件');
   await expect
     .poll(
       async () => {
@@ -731,6 +863,7 @@ test('bulk opportunity actions protect lifecycle fields and execute state comman
     )
     .toEqual(['qualification', 'qualification']);
   await shot(page, testInfo, 'release-b-opportunity-bulk-qualified.png');
+  await compactShot(page, testInfo, 'release-b-opportunity-bulk-mixed-result-compact.png');
   cover('uiActions', 'crm_opportunity_common_list:crm_opp_table:bulk_qualify');
   completedScenarios.add('safe-bulk-opportunity-lifecycle');
 });

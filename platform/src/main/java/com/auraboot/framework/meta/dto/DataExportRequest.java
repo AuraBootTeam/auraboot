@@ -34,6 +34,9 @@ public class DataExportRequest {
      * 查询条件
      */
     private List<QueryCondition> conditions;
+
+    /** Optional keyword search using the same searchable-field contract as list. */
+    private String keyword;
     
     /**
      * 排序字段
