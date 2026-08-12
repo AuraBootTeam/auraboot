@@ -7,6 +7,7 @@ import com.auraboot.framework.file.constant.StorageType;
 import com.auraboot.framework.infrastructure.storage.StorageProperties;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -29,6 +30,7 @@ public class OssStorageProvider implements StorageProvider, DisposableBean {
     private final OSS ossClient;
     private final String bucket;
 
+    @Autowired
     public OssStorageProvider(StorageProperties properties) {
         StorageProperties.Oss ossConfig = properties.getOss();
         String endpoint = ossConfig.getEndpoint();

@@ -1,6 +1,7 @@
 package com.auraboot.framework.infrastructure.storage.s3;
 
 import com.auraboot.framework.file.constant.StorageType;
+import com.auraboot.framework.infrastructure.storage.StorageProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -48,6 +50,14 @@ class S3StorageProviderTest {
     @DisplayName("type() returns S3")
     void type_returnsS3() {
         assertEquals(StorageType.S3, provider.type());
+    }
+
+    @Test
+    @DisplayName("Spring selects the production constructor")
+    void productionConstructorIsAutowired() throws NoSuchMethodException {
+        assertTrue(S3StorageProvider.class
+                .getConstructor(StorageProperties.class)
+                .isAnnotationPresent(Autowired.class));
     }
 
     @Test

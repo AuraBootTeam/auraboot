@@ -4,6 +4,7 @@ import com.auraboot.framework.file.constant.StorageType;
 import com.auraboot.framework.infrastructure.storage.StorageProperties;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -32,6 +33,7 @@ public class S3StorageProvider implements StorageProvider, DisposableBean {
     private final S3Presigner s3Presigner;
     private final String bucket;
 
+    @Autowired
     public S3StorageProvider(StorageProperties properties) {
         StorageProperties.S3 s3Config = properties.getS3();
         this.bucket = s3Config.getBucket();
