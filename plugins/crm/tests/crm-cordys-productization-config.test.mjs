@@ -75,6 +75,42 @@ test('opportunity detail is a stage-led workspace with one primary transition an
 
 test('opportunity daily-efficiency surface shares one saved-view fact across list and kanban', () => {
   assert.equal(opportunityList.extension?.enableMultiView, true);
+  const opportunityViews = savedViews
+    .filter((view) => view.modelCode === 'crm_opportunity_common')
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+  assert.deepEqual(
+    opportunityViews.map((view) => view.viewKey),
+    [
+      'crm_opportunity_all_table',
+      'crm_opportunity_my_table',
+      'crm_opportunity_won_table',
+      'crm_opportunity_pipeline_board',
+    ],
+  );
+  assert.equal(opportunityViews.filter((view) => view.isDefault).length, 1);
+  assert.equal(opportunityViews[0].isDefault, true);
+
+  const myOpportunities = opportunityViews.find(
+    (view) => view.viewKey === 'crm_opportunity_my_table',
+  );
+  assert.deepEqual(myOpportunities.viewConfig.filters, [
+    {
+      fieldCode: 'crm_opp_owner',
+      operator: 'eq',
+      value: null,
+      isExpression: true,
+      expression: '#currentUser',
+    },
+  ]);
+  assert.equal(myOpportunities.pinAsQuickFilter, true);
+
+  const wonOpportunities = opportunityViews.find(
+    (view) => view.viewKey === 'crm_opportunity_won_table',
+  );
+  assert.deepEqual(wonOpportunities.viewConfig.filters, [
+    { fieldCode: 'crm_opp_stage', operator: 'eq', value: 'closed_won' },
+  ]);
+
   const pipelineBoard = savedViews.find(
     (view) => view.modelCode === 'crm_opportunity_common' && view.viewType === 'kanban',
   );

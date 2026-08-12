@@ -1,5 +1,73 @@
 [
   {
+    "name": "$i18n:crm.saved_view.all_opportunities",
+    "description": "$i18n:crm.saved_view.all_opportunities_description",
+    "modelCode": "crm_opportunity_common",
+    "pageKey": "crm_opportunity_common_list",
+    "viewKey": "crm_opportunity_all_table",
+    "scope": "global",
+    "viewType": "table",
+    "isDefault": true,
+    "sortOrder": 1,
+    "viewConfig": {
+      "filters": [],
+      "sorts": [
+        { "fieldCode": "updated_at", "direction": "desc", "priority": 1 }
+      ],
+      "pagination": { "pageSize": 20 }
+    }
+  },
+  {
+    "name": "$i18n:crm.saved_view.my_opportunities",
+    "description": "$i18n:crm.saved_view.my_opportunities_description",
+    "modelCode": "crm_opportunity_common",
+    "pageKey": "crm_opportunity_common_list",
+    "viewKey": "crm_opportunity_my_table",
+    "scope": "global",
+    "viewType": "table",
+    "isDefault": false,
+    "sortOrder": 2,
+    "pinAsQuickFilter": true,
+    "quickFilterIcon": "👤",
+    "quickFilterOrder": 1,
+    "viewConfig": {
+      "filters": [
+        {
+          "fieldCode": "crm_opp_owner",
+          "operator": "eq",
+          "value": null,
+          "isExpression": true,
+          "expression": "#currentUser"
+        }
+      ],
+      "sorts": [
+        { "fieldCode": "crm_opp_expected_close_date", "direction": "asc", "priority": 1 },
+        { "fieldCode": "crm_opp_expected_amount", "direction": "desc", "priority": 2 }
+      ],
+      "pagination": { "pageSize": 20 }
+    }
+  },
+  {
+    "name": "$i18n:crm.saved_view.won_opportunities",
+    "description": "$i18n:crm.saved_view.won_opportunities_description",
+    "modelCode": "crm_opportunity_common",
+    "pageKey": "crm_opportunity_common_list",
+    "viewKey": "crm_opportunity_won_table",
+    "scope": "global",
+    "viewType": "table",
+    "isDefault": false,
+    "sortOrder": 3,
+    "viewConfig": {
+      "filters": [
+        { "fieldCode": "crm_opp_stage", "operator": "eq", "value": "closed_won" }
+      ],
+      "sorts": [
+        { "fieldCode": "updated_at", "direction": "desc", "priority": 1 }
+      ],
+      "pagination": { "pageSize": 20 }
+    }
+  },
+  {
     "name": "$i18n:crm.saved_view.pipeline_board",
     "description": "$i18n:crm.saved_view.pipeline_board_description",
     "modelCode": "crm_opportunity_common",
@@ -7,8 +75,8 @@
     "viewKey": "crm_opportunity_pipeline_board",
     "scope": "global",
     "viewType": "kanban",
-    "isDefault": true,
-    "sortOrder": 1,
+    "isDefault": false,
+    "sortOrder": 4,
     "viewConfig": {
       "groupByField": "crm_opp_stage",
       "groupByDictCode": "crm_opp_stage",

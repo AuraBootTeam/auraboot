@@ -10,6 +10,7 @@ const EVIDENCE_DIR =
   path.join('/tmp', `crm-opportunity-efficiency-${RUN}`);
 const ADMIN_EMAIL = 'admin@auraboot.com';
 const PASSWORD = 'Test2026x';
+const OTHER_OWNER_EMAIL = `${RUN.slice(-18)}-owner@crm.example`;
 const TODAY = new Date().toISOString().slice(0, 10);
 const NEXT_MONTH = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -17,6 +18,8 @@ const names = {
   discovery: `${RUN} 华东智造云发现阶段`,
   proposal: `${RUN} 华东智造云方案提报`,
   negotiation: `${RUN} 华东智造云商务谈判`,
+  otherOwned: `${RUN} 非本人负责商机`,
+  won: `${RUN} 华东智造云已赢单`,
   task: `${RUN} 完成技术方案复核`,
   contact: `${RUN} 王敏`,
   bulkDiscovery: `${RUN} 华东智造云批量资格确认`,
@@ -29,15 +32,23 @@ const ids = {
   bulkDiscovery: '',
   proposal: '',
   negotiation: '',
+  otherOwned: '',
+  won: '',
   task: '',
   quote: '',
   forecast: '',
   personalView: '',
   pipelineBoard: '',
+  allOpportunitiesView: '',
+  myOpportunitiesView: '',
+  wonOpportunitiesView: '',
+  adminUser: '',
+  otherOwner: '',
   contact: '',
 };
 
 const expectedScenarios = [
+  'cordys-preset-view-operating-matrix',
   'shared-list-kanban-fact',
   'personal-view-persistence',
   'personal-view-column-configuration',
@@ -67,6 +78,7 @@ const expectedCoverage = {
     'crm:create_opportunity',
     'crm:create_quote_summary',
     'crm:qualify_opportunity',
+    'crm:win_opportunity',
   ],
   queries: ['crm_account_stats', 'crm_account_timeline'],
   dashboardTargets: [
@@ -84,6 +96,7 @@ const expectedCoverage = {
     'crm_opportunity_common_list:platform:configure_view_columns',
     'crm_opportunity_common_list:platform:export_filtered_csv',
     'crm_opportunity_common_list:platform:analyze_current_view',
+    'crm_opportunity_common_list:platform:select_preset_view',
     'crm_opportunity_common_list:platform:drill_chart_to_list',
     'crm_opportunity_common_list:platform:save_advanced_filters',
     'crm_opportunity_common_list:crm_opp_tabs:proposal',
@@ -184,6 +197,22 @@ async function executeCreate(code: string, payload: Record<string, unknown>): Pr
   return String(pid);
 }
 
+async function provisionUser(email: string, roleCode: string, displayName: string): Promise<string> {
+  const body = assertOk(await api('/api/admin/users', {
+    method: 'POST',
+    body: JSON.stringify({
+      email,
+      displayName,
+      initialPassword: PASSWORD,
+      roleCodes: [roleCode],
+      sendInviteEmail: false,
+    }),
+  }), `provision ${roleCode}`);
+  const pid = findValue(body?.data, ['pid', 'userPid']);
+  expect(pid, `${roleCode} user must return a public pid`).toBeTruthy();
+  return String(pid);
+}
+
 async function executeTransition(code: string, targetRecordPid: string): Promise<void> {
   assertOk(await api(`/api/meta/commands/execute/${code}`, {
     method: 'POST',
@@ -237,6 +266,7 @@ async function seedJourney(): Promise<void> {
     crm_opp_expected_amount: 480000,
     crm_opp_expected_close_date: NEXT_MONTH,
     crm_opp_probability: 25,
+    crm_opp_owner: ids.adminUser,
     crm_opp_forecast_category: 'pipeline',
   });
   ids.bulkDiscovery = await executeCreate('crm:create_opportunity', {
@@ -246,6 +276,7 @@ async function seedJourney(): Promise<void> {
     crm_opp_expected_amount: 260000,
     crm_opp_expected_close_date: NEXT_MONTH,
     crm_opp_probability: 20,
+    crm_opp_owner: ids.adminUser,
     crm_opp_forecast_category: 'pipeline',
   });
   ids.proposal = await executeCreate('crm:create_opportunity', {
@@ -255,6 +286,7 @@ async function seedJourney(): Promise<void> {
     crm_opp_expected_amount: 320000,
     crm_opp_expected_close_date: NEXT_MONTH,
     crm_opp_probability: 60,
+    crm_opp_owner: ids.adminUser,
     crm_opp_forecast_category: 'best_case',
     crm_opp_competitor: 'CordysCRM',
   });
@@ -265,6 +297,7 @@ async function seedJourney(): Promise<void> {
     crm_opp_expected_amount: 180000,
     crm_opp_expected_close_date: NEXT_MONTH,
     crm_opp_probability: 85,
+    crm_opp_owner: ids.adminUser,
     crm_opp_forecast_category: 'commit',
   });
   await executeTransition('crm:qualify_opportunity', ids.proposal);
@@ -272,6 +305,31 @@ async function seedJourney(): Promise<void> {
   await executeTransition('crm:qualify_opportunity', ids.negotiation);
   await executeTransition('crm:advance_opp_to_proposal', ids.negotiation);
   await executeTransition('crm:advance_opp_to_negotiation', ids.negotiation);
+
+  ids.otherOwned = await executeCreate('crm:create_opportunity', {
+    crm_opp_name: names.otherOwned,
+    crm_opp_account_id: ids.account,
+    crm_opp_currency_code: 'CNY',
+    crm_opp_expected_amount: 210000,
+    crm_opp_expected_close_date: NEXT_MONTH,
+    crm_opp_probability: 30,
+    crm_opp_owner: ids.otherOwner,
+    crm_opp_forecast_category: 'pipeline',
+  });
+  ids.won = await executeCreate('crm:create_opportunity', {
+    crm_opp_name: names.won,
+    crm_opp_account_id: ids.account,
+    crm_opp_currency_code: 'CNY',
+    crm_opp_expected_amount: 680000,
+    crm_opp_expected_close_date: NEXT_MONTH,
+    crm_opp_probability: 100,
+    crm_opp_owner: ids.adminUser,
+    crm_opp_forecast_category: 'commit',
+  });
+  await executeTransition('crm:qualify_opportunity', ids.won);
+  await executeTransition('crm:advance_opp_to_proposal', ids.won);
+  await executeTransition('crm:advance_opp_to_negotiation', ids.won);
+  await executeTransition('crm:win_opportunity', ids.won);
 
   ids.task = await executeCreate('crm:create_opp_task', {
     sourceRecordPid: ids.proposal,
@@ -337,6 +395,7 @@ async function gotoOpportunityList(page: Page, viewPid?: string): Promise<void> 
 async function assertNoRawCodes(page: Page): Promise<void> {
   const text = await page.locator('main, [role="main"]').first().innerText();
   expect(text).not.toMatch(/\bcrm_(?:opp|act|qs|fcst)_[a-z_]+\b/);
+  expect(text).not.toMatch(/\b(?:created_at|updated_at|created_by|updated_by)\b/);
   expect(text).not.toMatch(/\b[0-9A-HJKMNP-TV-Z]{26}\b/);
   expect(text).not.toMatch(/加载失败|Page not found/i);
 }
@@ -396,6 +455,10 @@ test.beforeAll(async () => {
   }, ''), 'API login');
   adminJwt = String(findValue(login?.data, ['jwt']) || '');
   expect(adminJwt).toBeTruthy();
+  const currentUser = assertOk(await api('/api/auth/me'), 'read current admin identity')?.data?.user;
+  ids.adminUser = String(currentUser?.pid || '');
+  expect(ids.adminUser, 'current admin must expose a public pid').toBeTruthy();
+  ids.otherOwner = await provisionUser(OTHER_OWNER_EMAIL, 'crm_sales', `${RUN} 异地销售`);
   const priorPersonalViews = assertOk(await api(
     '/api/views/personal?modelCode=crm_opportunity_common&pageKey=crm_opportunity_common_list',
   ), 'prior personal opportunity views').data ?? [];
@@ -408,6 +471,13 @@ test.beforeAll(async () => {
   const accessibleViews = assertOk(await api(
     '/api/views/accessible?modelCode=crm_opportunity_common&pageKey=crm_opportunity_common_list',
   ), 'accessible opportunity views').data ?? [];
+  const resolveViewPid = (viewKey: string): string => String(
+    accessibleViews.find((view: any) =>
+      (view.viewKey || view.viewConfig?.meta?.viewKey) === viewKey)?.pid || '',
+  );
+  ids.allOpportunitiesView = resolveViewPid('crm_opportunity_all_table');
+  ids.myOpportunitiesView = resolveViewPid('crm_opportunity_my_table');
+  ids.wonOpportunitiesView = resolveViewPid('crm_opportunity_won_table');
   ids.pipelineBoard = String(
     accessibleViews.find((view: any) =>
       view.viewKey === 'crm_opportunity_pipeline_board'
@@ -415,6 +485,9 @@ test.beforeAll(async () => {
         || view.name === 'Pipeline Board')?.pid || '',
   );
   expect(ids.pipelineBoard).toBeTruthy();
+  expect(ids.allOpportunitiesView).toBeTruthy();
+  expect(ids.myOpportunitiesView).toBeTruthy();
+  expect(ids.wonOpportunitiesView).toBeTruthy();
   await seedJourney();
 });
 
@@ -450,6 +523,111 @@ test.afterAll(() => {
     path.join(EVIDENCE_DIR, `crm-opportunity-efficiency-${RUN}.json`),
     `${JSON.stringify(evidence, null, 2)}\n`,
   );
+});
+
+test('Cordys-aligned preset views expose real all, self and won opportunity facts', async ({ page }, testInfo) => {
+  const accessibleViews = assertOk(await api(
+    '/api/views/accessible?modelCode=crm_opportunity_common&pageKey=crm_opportunity_common_list',
+  ), 're-read accessible opportunity views').data ?? [];
+  const byKey = new Map(accessibleViews.map((view: any) => [
+    view.viewKey || view.viewConfig?.meta?.viewKey,
+    view,
+  ]));
+  expect(byKey.get('crm_opportunity_my_table')?.viewConfig?.filters).toEqual([
+    expect.objectContaining({
+      fieldCode: 'crm_opp_owner',
+      operator: 'eq',
+      isExpression: true,
+      expression: '#currentUser',
+    }),
+  ]);
+  expect(byKey.get('crm_opportunity_won_table')?.viewConfig?.filters).toEqual([
+    expect.objectContaining({ fieldCode: 'crm_opp_stage', operator: 'eq', value: 'closed_won' }),
+  ]);
+
+  await uiLogin(page);
+  await gotoOpportunityList(page, ids.allOpportunitiesView);
+  await expect(page.getByTestId('view-selector-trigger')).toContainText('全部商机');
+  await expect(page.locator('tr').filter({ hasText: names.discovery })).toBeVisible();
+  await expect(page.locator('tr').filter({ hasText: names.otherOwned })).toBeVisible();
+
+  await page.getByTestId('view-selector-trigger').click();
+  const selector = page.getByRole('listbox');
+  for (const label of ['全部商机', '我的商机', '赢单商机', '销售管道看板']) {
+    await expect(selector.getByRole('option').filter({ hasText: label })).toBeVisible();
+  }
+  await shot(page, testInfo, 'release-d-opportunity-preset-matrix-desktop.png');
+
+  const selfResponse = page.waitForResponse((response) => {
+    if (response.request().method() !== 'GET'
+      || !response.url().includes('/api/dynamic/crm_opportunity_common/list')) return false;
+    const raw = new URL(response.url()).searchParams.get('filters');
+    if (!raw) return false;
+    const conditions = JSON.parse(raw);
+    return conditions.some((condition: any) =>
+      condition.fieldName === 'crm_opp_owner' && condition.value === ids.adminUser);
+  }, { timeout: 20_000 });
+  await selector.getByRole('option').filter({ hasText: '我的商机' }).click();
+  const resolvedSelfResponse = await selfResponse;
+  expect(resolvedSelfResponse.ok()).toBeTruthy();
+  const selfPayload = await resolvedSelfResponse.json();
+  const selfRecords = selfPayload?.data?.records ?? selfPayload?.data?.content ?? [];
+  expect(selfRecords.length).toBeGreaterThan(0);
+  expect(selfRecords.every((record: any) => record.crm_opp_owner === ids.adminUser)).toBeTruthy();
+  await expect(page.getByTestId('view-selector-trigger')).toContainText('我的商机');
+
+  // Repeated true-stack runs deliberately leave business records behind. The
+  // preset sorts by expected close date ascending, so the current run may be on
+  // the last page even though the owner filter is correct. Traverse through the
+  // visible pagination contract instead of assuming a pristine database.
+  const discoveryRow = page.locator('tr').filter({ hasText: names.discovery });
+  if (!(await discoveryRow.isVisible())) {
+    const lastPage = page.getByTestId('pagination-last');
+    await expect(lastPage).toBeVisible();
+    const lastPageResponse = page.waitForResponse((response) => {
+      if (response.request().method() !== 'GET'
+        || !response.url().includes('/api/dynamic/crm_opportunity_common/list')) return false;
+      const raw = new URL(response.url()).searchParams.get('filters');
+      if (!raw) return false;
+      const conditions = JSON.parse(raw);
+      return conditions.some((condition: any) =>
+        condition.fieldName === 'crm_opp_owner' && condition.value === ids.adminUser);
+    }, { timeout: 20_000 });
+    await lastPage.click();
+    expect((await lastPageResponse).ok()).toBeTruthy();
+  }
+  await expect(discoveryRow).toBeVisible();
+  await expect(page.locator('tr').filter({ hasText: names.otherOwned })).toHaveCount(0);
+  await expect(page.getByText('Admin User', { exact: true }).first()).toBeVisible();
+  await expect(page.getByTestId(`quick-filter-view-${ids.myOpportunitiesView}`)).toContainText(
+    '我的商机',
+  );
+  await expect(page.getByTestId(`quick-filter-view-${ids.myOpportunitiesView}`)).not.toContainText(
+    '$i18n:',
+  );
+  await assertNoRawCodes(page);
+  await shot(page, testInfo, 'release-d-my-opportunities-desktop.png');
+
+  await page.getByTestId('view-selector-trigger').click();
+  await page.getByRole('listbox').getByRole('option').filter({ hasText: '赢单商机' }).click();
+  await expect(page.getByTestId('view-selector-trigger')).toContainText('赢单商机');
+  await expect(page.locator('tr').filter({ hasText: names.won })).toBeVisible();
+  await expect(page.locator('tr').filter({ hasText: names.discovery })).toHaveCount(0);
+  await assertNoRawCodes(page);
+  await compactShot(page, testInfo, 'release-d-won-opportunities-compact.png');
+
+  cover('pages', 'crm_opportunity_common_list');
+  cover('blocks', 'crm_opportunity_common_list:crm_opp_table');
+  cover(
+    'fields',
+    'crm_opportunity_common_list:crm_opp_table:crm_opp_name',
+    'crm_opportunity_common_list:crm_opp_table:crm_opp_stage',
+    'crm_opportunity_common_list:crm_opp_table:crm_opp_expected_amount',
+    'crm_opportunity_common_list:crm_opp_table:crm_opp_expected_close_date',
+  );
+  cover('commands', 'crm:win_opportunity');
+  cover('uiActions', 'crm_opportunity_common_list:platform:select_preset_view');
+  completedScenarios.add('cordys-preset-view-operating-matrix');
 });
 
 test('list and kanban share the same stage-filtered opportunity fact', async ({ page }, testInfo) => {

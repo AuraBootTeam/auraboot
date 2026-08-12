@@ -75,6 +75,7 @@ const RELEASE_B_COVERAGE = {
     'crm:create_opportunity',
     'crm:create_quote_summary',
     'crm:qualify_opportunity',
+    'crm:win_opportunity',
   ],
   queries: ['crm_account_stats', 'crm_account_timeline'],
   dashboardTargets: [
@@ -92,6 +93,7 @@ const RELEASE_B_COVERAGE = {
     'crm_opportunity_common_list:platform:configure_view_columns',
     'crm_opportunity_common_list:platform:export_filtered_csv',
     'crm_opportunity_common_list:platform:analyze_current_view',
+    'crm_opportunity_common_list:platform:select_preset_view',
     'crm_opportunity_common_list:platform:drill_chart_to_list',
     'crm_opportunity_common_list:platform:save_advanced_filters',
     'crm_opportunity_common_list:crm_opp_tabs:proposal',
@@ -1224,8 +1226,8 @@ export function buildReleaseManifest() {
       {
         id: 'RELEASE-B-OPPORTUNITY',
         filePrefix: 'crm-opportunity-efficiency-',
-        expectedScenarios: 10,
-        minimumScreenshots: 21,
+        expectedScenarios: 11,
+        minimumScreenshots: 24,
         expectedCoverage: RELEASE_B_COVERAGE,
       },
       {

@@ -987,6 +987,7 @@ common:
   updated_at: Updated At
   creator: Created By
   modifier: Updated By
+  current_user: Current user
   create: Create
   new: New
   edit: Edit

@@ -2576,6 +2576,48 @@
     "refType": "ui"
   },
   {
+    "key": "crm.saved_view.all_opportunities",
+    "zh-CN": "全部商机",
+    "en-US": "All Opportunities",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.all_opportunities_description",
+    "zh-CN": "按最近更新时间查看全部商机",
+    "en-US": "All opportunities ordered by latest update",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.my_opportunities",
+    "zh-CN": "我的商机",
+    "en-US": "My Opportunities",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.my_opportunities_description",
+    "zh-CN": "仅显示当前用户负责的商机",
+    "en-US": "Opportunities owned by the current user",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.won_opportunities",
+    "zh-CN": "赢单商机",
+    "en-US": "Won Opportunities",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.won_opportunities_description",
+    "zh-CN": "已完成赢单的商机",
+    "en-US": "Opportunities completed as won",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
     "key": "crm.saved_view.pipeline_board",
     "zh-CN": "销售管道看板",
     "en-US": "Pipeline Board",

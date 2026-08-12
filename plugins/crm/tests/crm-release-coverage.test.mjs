@@ -73,8 +73,14 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   const releaseBContract = committed.runtimeEvidenceContracts.find(
     (contract) => contract.id === 'RELEASE-B-OPPORTUNITY',
   );
-  assert.equal(releaseBContract.expectedScenarios, 7);
-  assert.equal(releaseBContract.minimumScreenshots, 12);
+  assert.equal(releaseBContract.expectedScenarios, 11);
+  assert.equal(releaseBContract.minimumScreenshots, 24);
+  assert.ok(releaseBContract.expectedCoverage.commands.includes('crm:win_opportunity'));
+  assert.ok(
+    releaseBContract.expectedCoverage.uiActions.includes(
+      'crm_opportunity_common_list:platform:select_preset_view',
+    ),
+  );
   assert.deepEqual(Object.keys(releaseBContract.expectedCoverage).sort(), [
     'blocks',
     'commands',

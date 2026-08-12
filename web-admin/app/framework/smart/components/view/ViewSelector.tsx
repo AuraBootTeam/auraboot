@@ -2,11 +2,21 @@
  * ViewSelector Component
  *
  * A dropdown component for selecting saved views.
- * This release exposes personal saved views only; team/global scopes remain roadmap.
+ * Lists every server-authorized SavedView, grouped by personal, team and global scope.
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { AlertTriangle, Check, ChevronDown, Lock, Plus, Settings, User } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  Globe2,
+  Lock,
+  Plus,
+  Settings,
+  User,
+  Users,
+} from 'lucide-react';
 import { type SavedView, type ViewScope, type ViewType } from '~/framework/smart/types/savedView';
 import type { ViewRecommendation } from '~/framework/smart/hooks/useViewRecommendations';
 import {
@@ -60,7 +70,8 @@ interface ScopeConfig {
 /**
  * Ordered scope configurations for grouping views.
  *
- * Personal-only release rule: do not render team/global groups from this selector.
+ * The backend accessible-views endpoint remains authoritative for which entries
+ * may be shown; grouping here never widens access.
  */
 const SCOPE_CONFIGS: ScopeConfig[] = [
   {
@@ -70,6 +81,22 @@ const SCOPE_CONFIGS: ScopeConfig[] = [
     shortLabelKey: 'common.saved_view_scope_personal',
     shortFallback: '我的',
     Icon: User,
+  },
+  {
+    scope: 'team',
+    labelKey: 'common.saved_view_team_group',
+    fallback: '团队共享',
+    shortLabelKey: 'common.saved_view_scope_team',
+    shortFallback: '团队',
+    Icon: Users,
+  },
+  {
+    scope: 'global',
+    labelKey: 'common.saved_view_global_group',
+    fallback: '全员视图',
+    shortLabelKey: 'common.saved_view_scope_global',
+    shortFallback: '全员',
+    Icon: Globe2,
   },
 ];
 
@@ -327,17 +354,14 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
     setIsOpen(false);
   }, [onManageViews]);
 
-  /**
-   * Group personal views only. Team/global views may exist in API responses for
-   * historical data, but they are not part of the current user-facing release.
-   */
+  /** Group every view already authorized by the accessible-views endpoint. */
   const groupedViews = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
     return SCOPE_CONFIGS.map((config) => ({
       ...config,
       label: t(config.labelKey, undefined, config.fallback),
       views: views
-        .filter((v) => v.scope === 'personal' && !isImplicitSavedView(v))
+        .filter((v) => v.scope === config.scope && !isImplicitSavedView(v))
         .filter((v) => {
           if (!normalizedSearch) return true;
           const haystack =

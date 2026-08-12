@@ -116,6 +116,7 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const dragField = useRef<string | null>(null);
   const initialSnapshot = useRef('');
+  const wasOpen = useRef(false);
 
   const l = useCallback(
     (key: string, fallback: string) => {
@@ -139,7 +140,17 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
   }, [allColumns, rowHeight, viewColumns]);
 
   useEffect(() => {
-    if (open) resetState();
+    if (!open) {
+      wasOpen.current = false;
+      return;
+    }
+    // Parent list state can re-render with referentially new column/view props
+    // while this drawer is open (URL sort sync is one example). Reset only on
+    // the closed -> open transition so those renders cannot erase unsaved edits.
+    if (!wasOpen.current) {
+      wasOpen.current = true;
+      resetState();
+    }
   }, [open, resetState]);
 
   const visibleCount = columns.filter((column) => column.visible !== false).length;

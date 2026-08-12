@@ -204,6 +204,7 @@ const REQUIRED_COMMON_KEYS = [
   'updated_at',
   'creator',
   'modifier',
+  'current_user',
   // Row-action / form button bare-string labels (#4)
   'create',
   'edit',

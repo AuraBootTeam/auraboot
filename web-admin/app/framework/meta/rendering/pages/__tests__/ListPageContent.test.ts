@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildListReferenceDisplayCacheKey,
@@ -24,8 +24,41 @@ import {
   shouldSkipListData,
   shouldSkipModelFieldMeta,
   useRestoreSavedViewFromUrl,
+  useSerializedSearchParamsUpdater,
   viewFilterToQueryCondition,
+  resolveSavedViewFilterExpressions,
 } from '../ListPageContent';
+
+describe('useSerializedSearchParamsUpdater', () => {
+  it('merges same-turn functional URL updates instead of restoring a stale query string', () => {
+    const committed: string[] = [];
+    const routerSetter = vi.fn((nextInit: any) => {
+      const next = typeof nextInit === 'function' ? nextInit(new URLSearchParams()) : nextInit;
+      committed.push(new URLSearchParams(next).toString());
+    });
+    const { result } = renderHook(() =>
+      useSerializedSearchParamsUpdater(
+        new URLSearchParams('sort=updated_at%3Adesc'),
+        routerSetter as any,
+      ),
+    );
+
+    act(() => {
+      result.current((prev: URLSearchParams) => {
+        const next = new URLSearchParams(prev);
+        next.set('view', 'personal-view');
+        return next;
+      }, { replace: true });
+      result.current((prev: URLSearchParams) => {
+        const next = new URLSearchParams(prev);
+        next.set('pageNum', '1');
+        return next;
+      }, { replace: true });
+    });
+
+    expect(committed.at(-1)).toBe('sort=updated_at%3Adesc&view=personal-view&pageNum=1');
+  });
+});
 
 describe('renderComponentToValueType', () => {
   it('maps renderComponent (and DSL renderType) to a list cell valueType', () => {
@@ -579,6 +612,24 @@ describe('buildListFilterFieldMetadata', () => {
       }),
     );
   });
+
+  it('can supply localized system metadata for sort chips outside the visible table', () => {
+    expect(
+      buildListFilterFieldMetadata(
+        [{ field: 'updated_at', label: '更新时间', valueType: 'datetime' }],
+        new Map(),
+        (column) => String(column.label),
+      ),
+    ).toContainEqual({
+      fieldCode: 'updated_at',
+      label: '更新时间',
+      fieldType: 'datetime',
+      referenceDisplayField: undefined,
+      referenceModelCode: undefined,
+      referenceValueField: 'pid',
+      dictCode: undefined,
+    });
+  });
 });
 
 describe('viewFilterToQueryCondition', () => {
@@ -618,6 +669,54 @@ describe('viewFilterToQueryCondition', () => {
     expect(
       viewFilterToQueryCondition({ fieldCode: 'name', operator: 'like', value: '华东' }),
     ).toEqual({ fieldName: 'name', operator: 'LIKE', value: '%华东%' });
+  });
+});
+
+describe('resolveSavedViewFilterExpressions', () => {
+  it('resolves both supported current-user syntaxes to a public user PID', () => {
+    const resolved = resolveSavedViewFilterExpressions(
+      [
+        {
+          fieldCode: 'owner',
+          operator: 'eq',
+          value: null,
+          isExpression: true,
+          expression: '#currentUser',
+        },
+        {
+          fieldCode: 'reviewer',
+          operator: 'eq',
+          value: null,
+          isExpression: true,
+          expression: '${system.currentUser}',
+        },
+      ],
+      { currentUserPid: ' 01K2USERPID ' },
+    );
+
+    expect(resolved.map((filter) => filter.value)).toEqual(['01K2USERPID', '01K2USERPID']);
+    expect(resolved.every((filter) => filter.isExpression)).toBe(true);
+  });
+
+  it('drops stale values for unsupported expressions and preserves static filters', () => {
+    const staticFilter = { fieldCode: 'stage', operator: 'eq' as const, value: 'closed_won' };
+    const resolved = resolveSavedViewFilterExpressions(
+      [
+        staticFilter,
+        {
+          fieldCode: 'owner',
+          operator: 'eq',
+          value: 'stale-user',
+          isExpression: true,
+          expression: '#unsupported',
+        },
+      ],
+      { currentUserPid: '01K2USERPID' },
+    );
+
+    expect(resolved[0]).toBe(staticFilter);
+    expect(resolved[1].value).toBeUndefined();
+    expect(viewFilterToQueryCondition(resolved[1])).toBeNull();
   });
 });
 

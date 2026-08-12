@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams } from 'react-router';
+import { createSearchParams, useSearchParams } from 'react-router';
 import { BlockRenderer, type PageContentProps } from '@auraboot/runtime-kernel';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -234,6 +234,35 @@ export function viewConfigFiltersToRuntimeFilters(
   return restoredFilters;
 }
 
+export interface SavedViewFilterExpressionContext {
+  /** Public user PID used by reference fields such as an opportunity owner. */
+  currentUserPid?: string;
+}
+
+/**
+ * Resolve the deliberately small, documented set of SavedView filter expressions.
+ *
+ * SavedView expressions are convenience filters, not an authorization boundary;
+ * backend data-scope policies remain authoritative. Unknown expressions are left
+ * inactive instead of accidentally reusing a stale static value.
+ */
+export function resolveSavedViewFilterExpressions(
+  filters: ViewFilterConfig[] | undefined,
+  context: SavedViewFilterExpressionContext,
+): ViewFilterConfig[] {
+  return (filters ?? []).map((filter) => {
+    if (!filter.isExpression) return filter;
+
+    const expression = String(filter.expression ?? '').trim();
+    const resolvedValue =
+      expression === '#currentUser' || expression === '${system.currentUser}'
+        ? context.currentUserPid?.trim() || undefined
+        : undefined;
+
+    return { ...filter, value: resolvedValue };
+  });
+}
+
 function clearTransientViewSearchParams(params: URLSearchParams): void {
   for (const key of Array.from(params.keys())) {
     if (
@@ -357,6 +386,40 @@ export function useRestoreSavedViewFromUrl({
       setActiveViewType(match.viewType as ViewType);
     }
   }, [urlViewPid, savedViews, viewsLoading, selectView, setActiveViewType]);
+}
+
+type SearchParamsSetter = ReturnType<typeof useSearchParams>[1];
+
+/**
+ * Serialize URL search-param writes made during the same React turn.
+ *
+ * React Router's functional `setSearchParams` form does not queue updates like
+ * React state does. List state can change sorts, filters, pagination and the
+ * selected SavedView together, so independently queued writers could otherwise
+ * restore an older query string and drop a newly selected `view` parameter.
+ */
+export function useSerializedSearchParamsUpdater(
+  searchParams: URLSearchParams,
+  setSearchParams: SearchParamsSetter,
+): SearchParamsSetter {
+  const latestSearchParamsRef = useRef(new URLSearchParams(searchParams));
+
+  useEffect(() => {
+    latestSearchParamsRef.current = new URLSearchParams(searchParams);
+  }, [searchParams]);
+
+  return useCallback<SearchParamsSetter>(
+    (nextInit, options) => {
+      const resolvedInit =
+        typeof nextInit === 'function'
+          ? nextInit(new URLSearchParams(latestSearchParamsRef.current))
+          : nextInit;
+      const next = createSearchParams(resolvedInit);
+      latestSearchParamsRef.current = new URLSearchParams(next);
+      setSearchParams(next, options);
+    },
+    [setSearchParams],
+  );
 }
 
 export function resolveTableBlockRowActions(tableBlock: any): ButtonConfig[] {
@@ -857,7 +920,8 @@ function ListPageContentInner(props: PageContentProps) {
   );
 
   // Parse filter_* params from URL for drill-down navigation
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, routerSetSearchParams] = useSearchParams();
+  const setSearchParams = useSerializedSearchParamsUpdater(searchParams, routerSetSearchParams);
   const urlFilters = useMemo(() => {
     const filters: Record<string, any> = {};
     searchParams.forEach((value, key) => {
@@ -1304,7 +1368,7 @@ function ListPageContentInner(props: PageContentProps) {
   } = useSavedViews({
     modelCode,
     pageKey,
-    scopeFilter: 'personal',
+    scopeFilter: 'all',
     autoLoad: !!schema && !hideSavedViews && !skipListData,
   });
 
@@ -1334,10 +1398,9 @@ function ListPageContentInner(props: PageContentProps) {
     void loadChipPins();
   }, [loadChipPins]);
 
-  // Team-scoped views the user may pin for their team. The saved-view list above
-  // is personal-only (scopeFilter='personal'), so team views are fetched
-  // separately and only when the user can author team pins (team-manage or the
-  // broader view-manage, mirroring the backend gate).
+  // Team-scoped views the user may pin for their team. They are already visible
+  // in the all-scope selector; this separate fetch is only for team pin authoring
+  // and remains permission-gated.
   const canManageTeamPins =
     hasPermission('dashboard.saved_view.team.update') ||
     hasPermission('dashboard.saved_view.update');
@@ -1421,9 +1484,16 @@ function ListPageContentInner(props: PageContentProps) {
       value: tab.filter.value,
     };
   }, [activeTab, schema?.blocks]);
+  const resolvedEffectiveViewFilters = useMemo(
+    () =>
+      resolveSavedViewFilterExpressions(effectiveViewConfig?.filters, {
+        currentUserPid: user?.pid,
+      }),
+    [effectiveViewConfig?.filters, user?.pid],
+  );
   const activeRuntimeViewFilters = useMemo<ViewFilterConfig[]>(() => {
     const merged = [
-      ...(effectiveViewConfig?.filters ?? []),
+      ...resolvedEffectiveViewFilters,
       ...Object.entries(filters)
         .filter(([, value]) => value != null && value !== '')
         .map(([fieldCode, value]) => ({
@@ -1439,7 +1509,7 @@ function ListPageContentInner(props: PageContentProps) {
       unique.set(`${filter.fieldCode}:${filter.operator}:${JSON.stringify(filter.value)}`, filter);
     }
     return Array.from(unique.values());
-  }, [activeTabViewFilter, chipFilters, effectiveViewConfig?.filters, filters]);
+  }, [activeTabViewFilter, chipFilters, filters, resolvedEffectiveViewFilters]);
   const effectiveNonNullViewConfig = useMemo<Partial<ViewConfig>>(
     () =>
       Object.fromEntries(
@@ -1557,7 +1627,9 @@ function ListPageContentInner(props: PageContentProps) {
   const applyViewConfigToListState = useCallback(
     (viewConfig: ViewConfig | undefined): Record<string, any> => {
       const vc = viewConfig ?? {};
-      const restoredViewFilters = vc.filters ?? [];
+      const restoredViewFilters = resolveSavedViewFilterExpressions(vc.filters, {
+        currentUserPid: user?.pid,
+      });
       const restoredFilters: Record<string, any> = {};
 
       pendingSavedViewFiltersRef.current = restoredFilters;
@@ -1579,7 +1651,7 @@ function ListPageContentInner(props: PageContentProps) {
 
       return restoredFilters;
     },
-    [setFilters, setPagination],
+    [setFilters, setPagination, user?.pid],
   );
 
   // Apply SavedView viewConfig (pagination + filters + sorts) when view changes.
@@ -3416,10 +3488,20 @@ function ListPageContentInner(props: PageContentProps) {
     return Array.from(fieldMap.values());
   }, [tableColumns, modelFieldMap, resolveColumnLabel]);
 
-  const filterFieldMetadata = useMemo(
-    () => buildListFilterFieldMetadata(tableColumns, modelFieldMap, resolveColumnLabel),
-    [tableColumns, modelFieldMap, resolveColumnLabel],
-  );
+  const filterFieldMetadata = useMemo(() => {
+    const businessFields = buildListFilterFieldMetadata(
+      tableColumns,
+      modelFieldMap,
+      resolveColumnLabel,
+    );
+    const known = new Set(businessFields.map((field) => field.fieldCode));
+    const systemFields = buildListFilterFieldMetadata(
+      SYSTEM_FIELD_DEFS.filter((column) => !known.has(column.field)),
+      modelFieldMap,
+      resolveColumnLabel,
+    );
+    return [...businessFields, ...systemFields];
+  }, [tableColumns, modelFieldMap, resolveColumnLabel, SYSTEM_FIELD_DEFS]);
 
   const handleAnalysisDrillDown = useCallback(
     (drillFilters: import('~/framework/smart/types/chart').FilterConfig[]) => {
@@ -5031,6 +5113,20 @@ function ListPageContentInner(props: PageContentProps) {
                 onChipFiltersChange={setLocalChipFilters}
                 fieldMetadata={filterFieldMetadata}
                 resolveChipValueLabel={(filter) => {
+                  if (filter.isExpression && filter.expression) {
+                    if (
+                      filter.expression === '#currentUser' ||
+                      filter.expression === '${system.currentUser}'
+                    ) {
+                      return (
+                        user?.name ||
+                        user?.nickname ||
+                        user?.username ||
+                        translateCommon('common.current_user', '当前用户')
+                      );
+                    }
+                    return filter.expression;
+                  }
                   const dc = filterFieldMetadata.find(
                     (field) => field.fieldCode === filter.fieldCode,
                   )?.dictCode;

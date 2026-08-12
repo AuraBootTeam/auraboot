@@ -53,7 +53,7 @@ describe('ColumnSettingsPanel', () => {
 
   it('keeps one visible field and saves visibility, pinning and density together', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
-    render(
+    const { rerender } = render(
       <ColumnSettingsPanel
         open
         allColumns={columns}
@@ -69,6 +69,20 @@ describe('ColumnSettingsPanel', () => {
     fireEvent.click(screen.getByTestId('column-settings-visible-name'));
     fireEvent.click(screen.getByTestId('column-settings-pin-left-amount'));
     fireEvent.click(screen.getByTestId('column-settings-density-short'));
+
+    // URL/view synchronization in the parent can recreate these arrays while
+    // the drawer is open. Local edits must remain the source of truth.
+    rerender(
+      <ColumnSettingsPanel
+        open
+        allColumns={[...columns]}
+        viewColumns={[]}
+        onClose={vi.fn()}
+        onSave={onSave}
+        rowHeight="medium"
+      />,
+    );
+    expect(screen.getByTestId('column-settings-density-short')).toHaveClass('bg-accent');
     fireEvent.click(screen.getByTestId('column-settings-save'));
 
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));

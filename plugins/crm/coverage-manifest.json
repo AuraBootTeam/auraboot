@@ -798,13 +798,15 @@
       {
         "id": "crm:win_opportunity",
         "goals": [
-          "RG-1"
+          "RG-1",
+          "RELEASE-B"
         ],
         "permissionCodes": [
           "crm.opportunity.manage"
         ],
         "evidence": [
-          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
         ],
         "permissionsVerified": true,
         "verdict": "pass"
@@ -1593,8 +1595,8 @@
     {
       "id": "RELEASE-B-OPPORTUNITY",
       "filePrefix": "crm-opportunity-efficiency-",
-      "expectedScenarios": 10,
-      "minimumScreenshots": 21,
+      "expectedScenarios": 11,
+      "minimumScreenshots": 24,
       "expectedCoverage": {
         "pages": [
           "crm_contact_common_list",
@@ -1611,7 +1613,8 @@
           "crm:create_opp_task",
           "crm:create_opportunity",
           "crm:create_quote_summary",
-          "crm:qualify_opportunity"
+          "crm:qualify_opportunity",
+          "crm:win_opportunity"
         ],
         "queries": [
           "crm_account_stats",
@@ -1632,6 +1635,7 @@
           "crm_opportunity_common_list:platform:configure_view_columns",
           "crm_opportunity_common_list:platform:export_filtered_csv",
           "crm_opportunity_common_list:platform:analyze_current_view",
+          "crm_opportunity_common_list:platform:select_preset_view",
           "crm_opportunity_common_list:platform:drill_chart_to_list",
           "crm_opportunity_common_list:platform:save_advanced_filters",
           "crm_opportunity_common_list:crm_opp_tabs:proposal"
@@ -33829,7 +33833,8 @@
           "id": "command:crm:win_opportunity",
           "action": "Execute crm:win_opportunity (state_transition) through its supported user or runtime path",
           "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
           ],
           "assertion": "The command has registered release evidence.",
           "verdict": "pass",

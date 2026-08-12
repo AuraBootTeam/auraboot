@@ -9,6 +9,7 @@ common:
   updated_at: 更新时间
   creator: 创建人
   modifier: 修改人
+  current_user: 当前用户
   loading: 加载中...
   actionFailed: 操作失败
   close: 关闭
