@@ -38,6 +38,54 @@ export interface InteractionContext {
   outlinePath?: string[];
 }
 
+export interface AuthoringPermissionSnapshot {
+  canReadDesigner: boolean;
+  canManageDesigner: boolean;
+  canAdministerDesigner: boolean;
+}
+
+export class AuthoringServiceError extends Error {
+  readonly code: string;
+  readonly context: Record<string, unknown> | null;
+
+  constructor(message: string, code: string | number, context?: Record<string, unknown> | null) {
+    super(message);
+    this.name = 'AuthoringServiceError';
+    this.code = String(code);
+    this.context = context ?? null;
+  }
+}
+
+export function isAuthoringPermissionDeniedError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const code = error instanceof AuthoringServiceError ? error.code.toUpperCase() : '';
+  if (['403', 'FORBIDDEN', 'PERMISSION_DENIED', 'ACCESS_DENIED'].includes(code)) return true;
+  return /(?:\b403\b|forbidden|access denied|permission denied|无权|权限(?:不足|已收回))/i.test(
+    error.message,
+  );
+}
+
+export async function loadAuthoringPermissionSnapshot(): Promise<AuthoringPermissionSnapshot> {
+  const result = await fetchResult<{
+    permissions?: {
+      permissionCodes?: string[];
+      permissions?: Array<{ code?: string }>;
+    };
+  }>('/api/auth/me');
+  const auth = requireData(result, '无法确认当前配置权限');
+  const codes = new Set([
+    ...(auth.permissions?.permissionCodes ?? []),
+    ...(auth.permissions?.permissions ?? [])
+      .map((permission) => permission.code)
+      .filter((code): code is string => Boolean(code)),
+  ]);
+  return {
+    canReadDesigner: codes.has('meta.designer.read'),
+    canManageDesigner: codes.has('meta.designer.update'),
+    canAdministerDesigner: codes.has('meta.designer.admin'),
+  };
+}
+
 export async function openAuthoringSession(
   pagePid: string,
   interactionContext: InteractionContext,
@@ -574,11 +622,21 @@ export function resetAuthoringHandoffConsumptionForTests(): void {
 }
 
 function requireData<T>(
-  result: { code: string | number; data: T | null; message?: string; desc?: string },
+  result: {
+    code: string | number;
+    data: T | null;
+    message?: string;
+    desc?: string;
+    context?: Record<string, unknown> | null;
+  },
   fallback: string,
 ): T {
   if (!ResultHelper.isSuccess(result) || !result.data) {
-    throw new Error(result.message || result.desc || fallback);
+    throw new AuthoringServiceError(
+      result.message || result.desc || fallback,
+      result.code,
+      result.context,
+    );
   }
   return result.data;
 }

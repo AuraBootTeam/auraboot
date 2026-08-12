@@ -12,7 +12,9 @@ import {
   consumeAuthoringHandoff,
   createAuthoringNewPageWorkspace,
   createAuthoringAiPatchProposal,
+  isAuthoringPermissionDeniedError,
   loadAuthoringCapabilities,
+  loadAuthoringPermissionSnapshot,
   loadAuthoringNewPageWorkspaceOptions,
   loadAuthoringChangeItems,
   loadAuthoringReleaseHistory,
@@ -75,6 +77,7 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   createAuthoringNewPageWorkspace: vi.fn(),
   createAuthoringAiPatchProposal: vi.fn(),
   loadAuthoringCapabilities: vi.fn(),
+  loadAuthoringPermissionSnapshot: vi.fn(),
   loadAuthoringNewPageWorkspaceOptions: vi.fn(),
   loadAuthoringIdentitySimulation: vi.fn(),
   loadAuthoringChangeItems: vi.fn(),
@@ -84,6 +87,7 @@ vi.mock('~/framework/meta/authoring/authoringService', () => ({
   loadAuthoringSyntheticPreview: vi.fn(),
   loadAuthoringReviewWorkspace: vi.fn(),
   loadAuthoringSession: vi.fn(),
+  isAuthoringPermissionDeniedError: vi.fn(),
   observeAuthoringChangeSet: vi.fn(),
   prepareAuthoringSession: vi.fn(),
   publishAuthoringChangeSet: vi.fn(),
@@ -113,6 +117,16 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(consumeAuthoringHandoff).mockReset();
     vi.mocked(loadAuthoringSession).mockReset();
     vi.mocked(loadAuthoringCapabilities).mockReset();
+    vi.mocked(loadAuthoringPermissionSnapshot).mockReset();
+    vi.mocked(loadAuthoringPermissionSnapshot).mockResolvedValue({
+      canReadDesigner: true,
+      canManageDesigner: true,
+      canAdministerDesigner: true,
+    });
+    vi.mocked(isAuthoringPermissionDeniedError).mockReset();
+    vi.mocked(isAuthoringPermissionDeniedError).mockImplementation(
+      (error) => error instanceof Error && /(?:403|forbidden|permission denied)/i.test(error.message),
+    );
     vi.mocked(loadAuthoringNewPageWorkspaceOptions).mockReset();
     vi.mocked(createAuthoringNewPageWorkspace).mockReset();
     vi.mocked(loadAuthoringChangeItems).mockReset();
@@ -1231,6 +1245,105 @@ describe('UnifiedDesignerPage', () => {
     expect(screen.getByTestId('studio-handoff-read-only-reason')).toBeInTheDocument();
     expect(screen.queryByTestId('designer-save-error')).not.toBeInTheDocument();
     expect(applyAuthoringStudioBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('confirms the atomic Studio save and turns read-only when permission changes during reconciliation', async () => {
+    setSearch('?contextId=ctx_secure_once');
+    const handoff = createHandoff('list_customer', '/dataSource');
+    const baseline = createDocument('document_one', 'Isolated Draft');
+    const committed = createDocument('document_one', 'Isolated Draft');
+    const committedList = findBlock(committed.blocks, 'list_customer');
+    if (!committedList) throw new Error('list_customer fixture missing');
+    committedList.dataSource = { model: 'payment' };
+
+    vi.mocked(consumeAuthoringHandoff).mockResolvedValue(handoff);
+    vi.mocked(loadAuthoringSession)
+      .mockResolvedValueOnce(createAuthoringSession(baseline, 3))
+      .mockResolvedValueOnce(createAuthoringSession(committed, 4, 'L3', 'HANDOFF_STUDIO'));
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(loadAuthoringPermissionSnapshot).mockResolvedValueOnce({
+      canReadDesigner: true,
+      canManageDesigner: true,
+      canAdministerDesigner: false,
+    });
+    vi.mocked(applyAuthoringStudioBatch).mockRejectedValueOnce(new Error('Failed to fetch'));
+
+    render(<UnifiedDesignerPage />);
+
+    await screen.findByTestId('studio-handoff-context');
+    await waitFor(() =>
+      expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('list_customer'),
+    );
+    fireEvent.change(screen.getByTestId('inspector-field-dataSource.model-manual'), {
+      target: { value: 'payment' },
+    });
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    await waitFor(() => expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('已保存'));
+    expect(screen.getByTestId('studio-save-reconciliation-feedback')).toHaveAttribute(
+      'data-tone',
+      'warning',
+    );
+    expect(screen.getByTestId('studio-save-reconciliation-feedback')).toHaveTextContent(
+      '保存已在服务端完成；应用设计中心高级配置权限已收回',
+    );
+    expect(screen.getByTestId('studio-handoff-read-only-reason')).toHaveTextContent(
+      '缺少高级设计权限',
+    );
+    expect(screen.queryByTestId('designer-save-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('designer-save')).toBeDisabled();
+    expect(applyAuthoringStudioBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the Studio document dirty when permission is revoked before the save commits', async () => {
+    setSearch('?contextId=ctx_secure_once');
+    const handoff = createHandoff('list_customer', '/dataSource');
+    const baseline = createDocument('document_one', 'Isolated Draft');
+    const session = createAuthoringSession(baseline, 3);
+
+    vi.mocked(consumeAuthoringHandoff).mockResolvedValue(handoff);
+    vi.mocked(loadAuthoringSession).mockResolvedValue(session);
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(loadAuthoringPermissionSnapshot).mockResolvedValueOnce({
+      canReadDesigner: true,
+      canManageDesigner: true,
+      canAdministerDesigner: false,
+    });
+    vi.mocked(applyAuthoringStudioBatch).mockRejectedValueOnce(new Error('403 Forbidden'));
+
+    render(<UnifiedDesignerPage />);
+
+    await screen.findByTestId('studio-handoff-context');
+    await waitFor(() =>
+      expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('list_customer'),
+    );
+    fireEvent.change(screen.getByTestId('inspector-field-dataSource.model-manual'), {
+      target: { value: 'payment' },
+    });
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    expect(await screen.findByTestId('designer-save-error')).toHaveTextContent(
+      '保存未完成；应用设计中心高级配置权限已收回，本地未保存变更已保留且未重放',
+    );
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('保存失败');
+    expect(screen.getByTestId('studio-handoff-read-only-reason')).toHaveTextContent(
+      '缺少高级设计权限',
+    );
+    expect(screen.getByTestId('designer-save')).toBeDisabled();
+    expect(applyAuthoringStudioBatch).toHaveBeenCalledTimes(1);
+
+    vi.mocked(loadAuthoringPermissionSnapshot).mockResolvedValue({
+      canReadDesigner: true,
+      canManageDesigner: true,
+      canAdministerDesigner: true,
+    });
+    fireEvent(window, new Event('focus'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('studio-handoff-editable-reason')).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('保存失败');
+    expect(screen.getByTestId('designer-save')).toBeEnabled();
   });
 
   it('keeps the Studio document dirty when the authoritative reload also fails', async () => {

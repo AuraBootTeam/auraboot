@@ -26,8 +26,10 @@ import {
 import {
   applyAuthoringPatch,
   createAuthoringHandoff,
+  isAuthoringPermissionDeniedError,
   loadAuthoringSession,
   loadAuthoringCapabilities,
+  loadAuthoringPermissionSnapshot,
   openAuthoringSession,
   prepareAuthoringSession,
   renewAuthoringWriterLease,
@@ -126,6 +128,7 @@ export function ContextualAuthoringSurface({
     tone: 'warning' | 'success';
     message: string;
   } | null>(null);
+  const [savePermissionRevoked, setSavePermissionRevoked] = useState(false);
   const [governancePending, setGovernancePending] = useState<AuthoringGovernanceAction | null>(
     null,
   );
@@ -136,6 +139,7 @@ export function ContextualAuthoringSurface({
   const runtimeRootRef = useRef<HTMLDivElement | null>(null);
   const entryScrollRef = useRef({ x: 0, y: 0 });
   const returnResumeAttemptedRef = useRef(false);
+  const permissionLossObservedRef = useRef(false);
 
   const rootNode = useMemo(() => buildAuthoringTree(workingSchema), [workingSchema]);
   const runtimeSchema = useMemo(() => schemaForRuntimePreview(workingSchema), [workingSchema]);
@@ -150,12 +154,51 @@ export function ContextualAuthoringSurface({
     () => new Map(capabilities?.manifests.map((manifest) => [manifest.blockType, manifest]) ?? []),
     [capabilities],
   );
+  const authoringWriteAllowed = canConfigure && !savePermissionRevoked;
   const authoringReadOnly =
-    Boolean(contextualConflict) || !isAuthoringSessionWritable(session, canConfigure);
+    Boolean(contextualConflict) || !isAuthoringSessionWritable(session, authoringWriteAllowed);
+  const permissionSaveReconciliationActive =
+    savePermissionRevoked && saveReconciliationFeedback?.tone === 'warning';
   const activeSessionPid = session?.sessionPid;
   const activeSessionRevision = session?.revision;
   const activeWriterLeaseStatus = session?.writerLease?.status;
   const activeWriterLeaseUntil = session?.writerLease?.leasedUntil;
+
+  useEffect(() => {
+    if (!canConfigure) {
+      permissionLossObservedRef.current = true;
+      return;
+    }
+    if (permissionLossObservedRef.current) {
+      permissionLossObservedRef.current = false;
+      setSavePermissionRevoked(false);
+      setSaveReconciliationFeedback(null);
+    }
+  }, [canConfigure]);
+
+  useEffect(() => {
+    if (!savePermissionRevoked) return;
+    let cancelled = false;
+    const recheck = () => {
+      void loadAuthoringPermissionSnapshot()
+        .then((permission) => {
+          if (!cancelled && permission.canReadDesigner && permission.canManageDesigner) {
+            setSavePermissionRevoked(false);
+            setSaveReconciliationFeedback(null);
+          }
+        })
+        .catch(() => {
+          // Keep the authoritative local write lock until permission can be proven restored.
+        });
+    };
+    const interval = window.setInterval(recheck, 15_000);
+    window.addEventListener('focus', recheck);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', recheck);
+    };
+  }, [savePermissionRevoked]);
 
   useEffect(() => {
     if (returnResumeAttemptedRef.current) return;
@@ -193,6 +236,7 @@ export function ContextualAuthoringSurface({
         setStale(false);
         setContextualConflict(null);
         setGovernanceError(null);
+        setSavePermissionRevoked(false);
         setCapabilities(registry);
         setSelectedId(selected ?? schema.id);
         setOutlineOpen(true);
@@ -240,6 +284,7 @@ export function ContextualAuthoringSurface({
       setStale(false);
       setContextualConflict(null);
       setGovernanceError(null);
+      setSavePermissionRevoked(false);
       setCapabilities(registry);
       setSelectedId(schema.id);
     } catch (enterError) {
@@ -261,6 +306,7 @@ export function ContextualAuthoringSurface({
     setError(null);
     setLeaseTakeoverFeedback(null);
     setSaveReconciliationFeedback(null);
+    setSavePermissionRevoked(false);
     setWriteBlocked(false);
     setOutlineOpen(false);
     setInspectorOpen(false);
@@ -467,7 +513,7 @@ export function ContextualAuthoringSurface({
   const createHandoff = async () => {
     if (
       contextualConflict ||
-      !isAuthoringSessionWritable(session, canConfigure) ||
+      !isAuthoringSessionWritable(session, authoringWriteAllowed) ||
       !explain ||
       handoffPending
     )
@@ -493,7 +539,7 @@ export function ContextualAuthoringSurface({
 
   const stageEdit = useCallback(
     (node: AuthoringNode, property: PropertyCapability, value: unknown, remove = false) => {
-      if (contextualConflict || !isAuthoringSessionWritable(session, canConfigure)) return;
+      if (contextualConflict || !isAuthoringSessionWritable(session, authoringWriteAllowed)) return;
       const manifestChecksum = manifestByType.get(node.blockType)?.checksum;
       if (!manifestChecksum) {
         setError(`未找到 ${node.blockType} 的能力清单，无法保存该变更`);
@@ -533,12 +579,12 @@ export function ContextualAuthoringSurface({
       setSaveReconciliationFeedback(null);
       setStale(false);
     },
-    [canConfigure, contextualConflict, manifestByType, schema, session],
+    [authoringWriteAllowed, contextualConflict, manifestByType, schema, session],
   );
 
   const saveChanges = useCallback(async () => {
     if (
-      !isAuthoringSessionWritable(session, canConfigure) ||
+      !isAuthoringSessionWritable(session, authoringWriteAllowed) ||
       contextualConflict ||
       saving ||
       pendingEdits.size === 0 ||
@@ -594,18 +640,43 @@ export function ContextualAuthoringSurface({
           setSession(currentSession);
           setPendingEdits(new Map(remaining));
         } catch (saveFailure) {
-          let latestSession: AuthoringSession | null = null;
-          try {
-            latestSession = await loadAuthoringSession(currentSession.sessionPid);
-          } catch {
+          const [sessionProbe, permissionProbe] = await Promise.allSettled([
+            loadAuthoringSession(currentSession.sessionPid),
+            loadAuthoringPermissionSnapshot(),
+          ]);
+          const permissionSnapshot =
+            permissionProbe.status === 'fulfilled' ? permissionProbe.value : null;
+          const permissionRevoked =
+            isAuthoringPermissionDeniedError(saveFailure) ||
+            Boolean(
+              permissionSnapshot &&
+              (!permissionSnapshot.canReadDesigner || !permissionSnapshot.canManageDesigner),
+            );
+          if (permissionRevoked) setSavePermissionRevoked(true);
+          if (sessionProbe.status === 'rejected') {
+            if (permissionRevoked) {
+              setPendingEdits(new Map(remaining));
+              setWorkingSchema(
+                materializePendingSchema(schema, currentSession.snapshot, remaining),
+              );
+              setSaveReconciliationFeedback({
+                tone: 'warning',
+                message: savePermissionChangedMessage(
+                  pendingCountAtSaveStart - remaining.size,
+                  remaining.size,
+                ),
+              });
+              setStale(true);
+              setError(null);
+              return;
+            }
             throw new Error('保存结果暂时无法确认；无法读取权威草稿，请联网后重试');
           }
-          if (!latestSession) {
-            throw new Error('保存结果暂时无法确认；无法读取权威草稿，请联网后重试');
-          }
+          const latestSession = sessionProbe.value;
           const latestSessionWritable =
             latestSession.state === 'ACTIVE' &&
-            (!latestSession.writerLease || latestSession.writerLease.status === 'OWNED');
+            (!latestSession.writerLease || latestSession.writerLease.status === 'OWNED') &&
+            !permissionRevoked;
           if (latestSession.revision <= currentSession.revision) {
             if (!latestSessionWritable) {
               currentSession = latestSession;
@@ -616,7 +687,12 @@ export function ContextualAuthoringSurface({
               );
               setSaveReconciliationFeedback({
                 tone: 'warning',
-                message: saveAuthorityChangedMessage(latestSession, 0, remaining.size),
+                message: permissionRevoked
+                  ? savePermissionChangedMessage(
+                      pendingCountAtSaveStart - remaining.size,
+                      remaining.size,
+                    )
+                  : saveAuthorityChangedMessage(latestSession, 0, remaining.size),
               });
               setStale(true);
               setError(null);
@@ -656,7 +732,12 @@ export function ContextualAuthoringSurface({
           if (!latestSessionWritable) {
             setSaveReconciliationFeedback({
               tone: 'warning',
-              message: saveAuthorityChangedMessage(latestSession, committedCount, remaining.size),
+              message: permissionRevoked
+                ? savePermissionChangedMessage(
+                    pendingCountAtSaveStart - remaining.size,
+                    remaining.size,
+                  )
+                : saveAuthorityChangedMessage(latestSession, committedCount, remaining.size),
             });
             setStale(true);
             setError(null);
@@ -722,7 +803,7 @@ export function ContextualAuthoringSurface({
     } finally {
       setSaving(false);
     }
-  }, [canConfigure, contextualConflict, pendingEdits, saving, schema, session]);
+  }, [authoringWriteAllowed, contextualConflict, pendingEdits, saving, schema, session]);
 
   const continueConflictInStudio = useCallback(() => {
     if (!contextualConflict) return;
@@ -740,7 +821,7 @@ export function ContextualAuthoringSurface({
   }, [contextualConflict, navigate]);
 
   const refreshDraft = useCallback(async () => {
-    if (!canConfigure || !session || contextualConflict) return;
+    if (!authoringWriteAllowed || !session || contextualConflict) return;
     setError(null);
     try {
       const latest = await loadAuthoringSession(session.sessionPid);
@@ -750,11 +831,11 @@ export function ContextualAuthoringSurface({
     } catch (refreshFailure) {
       setError(refreshFailure instanceof Error ? refreshFailure.message : '无法刷新配置草稿');
     }
-  }, [canConfigure, contextualConflict, pendingEdits, schema, session]);
+  }, [authoringWriteAllowed, contextualConflict, pendingEdits, schema, session]);
 
   const submitForReview = useCallback(async () => {
     if (
-      !isAuthoringSessionWritable(session, canConfigure) ||
+      !isAuthoringSessionWritable(session, authoringWriteAllowed) ||
       contextualConflict ||
       pendingEdits.size > 0 ||
       submitting ||
@@ -785,7 +866,7 @@ export function ContextualAuthoringSurface({
     } finally {
       setSubmitting(false);
     }
-  }, [canConfigure, contextualConflict, pendingEdits.size, schema, session, submitting]);
+  }, [authoringWriteAllowed, contextualConflict, pendingEdits.size, schema, session, submitting]);
 
   const handleGovernanceAction = useCallback(
     async (action: AuthoringGovernanceAction, reason: string) => {
@@ -943,7 +1024,7 @@ export function ContextualAuthoringSurface({
           已拦截真实业务写入；交互预览只保留本地状态。
         </div>
       ) : null}
-      {!canConfigure ? (
+      {!authoringWriteAllowed && !permissionSaveReconciliationActive ? (
         <div
           role="alert"
           className="border-status-amber bg-status-amber-bg text-status-amber mx-3 mt-3 flex items-start gap-2 rounded-md border px-3 py-2 text-sm"
@@ -973,7 +1054,7 @@ export function ContextualAuthoringSurface({
           <AuthoringGovernanceNotice
             session={session}
             currentUserId={user?.id}
-            canManage={canConfigure}
+            canManage={authoringWriteAllowed}
             canReview={false}
             canPublish={false}
             pendingAction={governancePending}
@@ -982,7 +1063,7 @@ export function ContextualAuthoringSurface({
           />
         </div>
       ) : null}
-      {canConfigure ? (
+      {authoringWriteAllowed ? (
         <div className="mx-3 mt-3">
           <AuthoringWriterLeaseNotice
             lease={session.writerLease}
@@ -1136,7 +1217,11 @@ export function ContextualAuthoringSurface({
         submitting={submitting}
         stale={stale}
         readOnly={authoringReadOnly}
-        readOnlyLabel={authoringReadOnlyLabel(session, canConfigure, Boolean(contextualConflict))}
+        readOnlyLabel={authoringReadOnlyLabel(
+          session,
+          authoringWriteAllowed,
+          Boolean(contextualConflict),
+        )}
         onDiff={() => setDiffOpen(true)}
         onSave={saveChanges}
         onRefresh={refreshDraft}
@@ -2395,6 +2480,15 @@ function saveAuthorityChangedMessage(
       : `保存已在服务端完成；${authority}，当前页面已按权威草稿恢复为只读。`;
   }
   return `保存未完成；${authority}，本地未保存变更已保留且未重放。`;
+}
+
+function savePermissionChangedMessage(savedCount: number, remainingCount: number): string {
+  if (savedCount > 0) {
+    return remainingCount > 0
+      ? `配置权限已收回；已确认 ${savedCount} 项保存成功，剩余 ${remainingCount} 项保留在本地且未重放。`
+      : `保存已在服务端完成；配置权限已收回，当前页面已按权威草稿恢复为只读。`;
+  }
+  return '保存未完成；配置权限已收回，本地未保存变更已保留且未重放。权限恢复后可继续对账，或先退出配置模式。';
 }
 
 function propertyEditorKind(

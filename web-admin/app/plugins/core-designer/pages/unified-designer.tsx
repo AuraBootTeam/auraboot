@@ -23,7 +23,9 @@ import {
   applyAuthoringStudioBatch,
   consumeAuthoringHandoff,
   createAuthoringNewPageWorkspace,
+  isAuthoringPermissionDeniedError,
   loadAuthoringCapabilities,
+  loadAuthoringPermissionSnapshot,
   loadAuthoringNewPageWorkspaceOptions,
   loadAuthoringReviewWorkspace,
   loadAuthoringSession,
@@ -130,6 +132,7 @@ export default function UnifiedDesignerPage() {
     tone: 'warning' | 'success';
     message: string;
   } | null>(null);
+  const [studioPermissionRevoked, setStudioPermissionRevoked] = useState(false);
   const [studioConflict, setStudioConflict] = useState<StudioConflictState | null>(null);
   const [conflictPending, setConflictPending] = useState(false);
   const [conflictError, setConflictError] = useState<string | null>(null);
@@ -152,6 +155,7 @@ export default function UnifiedDesignerPage() {
   const [error, setError] = useState<string | null>(null);
   const documentBaselineRef = useRef<AuthoringSession | null>(null);
   const studioSaveFeedbackTimerRef = useRef<number | null>(null);
+  const studioPermissionLossObservedRef = useRef(false);
   const modelCodeKey = document ? collectModelCodesFromDocument(document).join('|') : '';
   const documentId = document?.id ?? null;
   const resolvingHandoff = Boolean(
@@ -163,6 +167,41 @@ export default function UnifiedDesignerPage() {
   const activeAuthoringRevision = authoringSession?.revision;
   const activeWriterLeaseStatus = authoringSession?.writerLease?.status;
   const activeWriterLeaseUntil = authoringSession?.writerLease?.leasedUntil;
+  const canWriteContextualStudio = canAdministerDesigner && !studioPermissionRevoked;
+
+  useEffect(() => {
+    if (!canAdministerDesigner) {
+      studioPermissionLossObservedRef.current = true;
+      return;
+    }
+    if (studioPermissionLossObservedRef.current) {
+      studioPermissionLossObservedRef.current = false;
+      setStudioPermissionRevoked(false);
+    }
+  }, [canAdministerDesigner]);
+
+  useEffect(() => {
+    if (!studioPermissionRevoked) return;
+    let cancelled = false;
+    const recheck = () => {
+      void loadAuthoringPermissionSnapshot()
+        .then((permission) => {
+          if (!cancelled && permission.canAdministerDesigner) {
+            setStudioPermissionRevoked(false);
+          }
+        })
+        .catch(() => {
+          // Preserve the local write lock until the authoritative permission check succeeds.
+        });
+    };
+    const interval = window.setInterval(recheck, 15_000);
+    window.addEventListener('focus', recheck);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', recheck);
+    };
+  }, [studioPermissionRevoked]);
 
   useEffect(() => {
     if (reviewWorkspaceMode) setGovernanceOpen(true);
@@ -186,6 +225,7 @@ export default function UnifiedDesignerPage() {
       setLeaseTakeoverError(null);
       setLeaseTakeoverFeedback(null);
       setStudioSaveReconciliationFeedback(null);
+      setStudioPermissionRevoked(false);
       setStudioConflict(null);
       setConflictError(null);
       setSubmissionError(null);
@@ -309,6 +349,7 @@ export default function UnifiedDesignerPage() {
             pageKey: isolatedDocument.pageKey,
           });
           setPublished(false);
+          setStudioPermissionRevoked(false);
         }
       })
       .catch((consumeError) => {
@@ -562,7 +603,7 @@ export default function UnifiedDesignerPage() {
     if (!handoff || !authoringSession || !authoringCapabilities) {
       throw new Error('现场配置会话尚未就绪');
     }
-    if (!canAdministerDesigner) {
+    if (!canWriteContextualStudio) {
       throw new Error('缺少应用设计中心高级配置权限');
     }
     if (authoringSession.state !== 'ACTIVE') {
@@ -592,17 +633,29 @@ export default function UnifiedDesignerPage() {
       setStudioConflict(null);
       return canonicalDocument;
     } catch (saveError) {
-      let latestSession: AuthoringSession | null = null;
-      try {
-        latestSession = await loadAuthoringSession(baseSession.sessionPid);
-      } catch {
+      const [sessionProbe, permissionProbe] = await Promise.allSettled([
+        loadAuthoringSession(baseSession.sessionPid),
+        loadAuthoringPermissionSnapshot(),
+      ]);
+      const permissionSnapshot =
+        permissionProbe.status === 'fulfilled' ? permissionProbe.value : null;
+      const permissionRevoked =
+        isAuthoringPermissionDeniedError(saveError) ||
+        Boolean(permissionSnapshot && !permissionSnapshot.canAdministerDesigner);
+      if (permissionRevoked) setStudioPermissionRevoked(true);
+      if (sessionProbe.status === 'rejected') {
+        if (permissionRevoked) {
+          throw new Error(
+            '保存未完成；应用设计中心高级配置权限已收回，本地未保存变更已保留且未重放',
+          );
+        }
         throw new Error('保存结果暂时无法确认；无法读取权威草稿，请联网后重试');
       }
-      if (!latestSession) {
-        throw new Error('保存结果暂时无法确认；无法读取权威草稿，请联网后重试');
-      }
+      const latestSession = sessionProbe.value;
       const latestSessionWritable =
-        latestSession.state === 'ACTIVE' && hasOwnedWriterLease(latestSession);
+        latestSession.state === 'ACTIVE' &&
+        hasOwnedWriterLease(latestSession) &&
+        !permissionRevoked;
       if (latestSession.revision > baseSession.revision) {
         const baseDocument = authoringSnapshotToPageSchemaV3(baseSession.snapshot);
         const latestDocument = authoringSnapshotToPageSchemaV3(latestSession.snapshot);
@@ -618,7 +671,9 @@ export default function UnifiedDesignerPage() {
             tone: latestSessionWritable ? 'success' : 'warning',
             message: latestSessionWritable
               ? '保存已在服务端完成；响应虽中断，应用设计中心已按权威草稿恢复，未重复写入。'
-              : `保存已在服务端完成；${studioSaveAuthorityLabel(latestSession)}，应用设计中心已按权威草稿恢复为只读。`,
+              : permissionRevoked
+                ? '保存已在服务端完成；应用设计中心高级配置权限已收回，应用设计中心已按权威草稿恢复为只读。'
+                : `保存已在服务端完成；${studioSaveAuthorityLabel(latestSession)}，应用设计中心已按权威草稿恢复为只读。`,
           });
           studioSaveFeedbackTimerRef.current = window.setTimeout(() => {
             setStudioSaveReconciliationFeedback(null);
@@ -630,7 +685,9 @@ export default function UnifiedDesignerPage() {
           setAuthoringSession(latestSession);
           setStudioConflict(null);
           throw new Error(
-            `保存未完成；${studioSaveAuthorityLabel(latestSession)}，本地未保存变更已保留且未重放`,
+            permissionRevoked
+              ? '保存未完成；应用设计中心高级配置权限已收回，本地未保存变更已保留且未重放'
+              : `保存未完成；${studioSaveAuthorityLabel(latestSession)}，本地未保存变更已保留且未重放`,
           );
         }
         openStudioConflict(baseSession, nextDocument, latestSession);
@@ -640,7 +697,9 @@ export default function UnifiedDesignerPage() {
         setAuthoringSession(latestSession);
         setStudioConflict(null);
         throw new Error(
-          `保存未完成；${studioSaveAuthorityLabel(latestSession)}，本地未保存变更已保留且未重放`,
+          permissionRevoked
+            ? '保存未完成；应用设计中心高级配置权限已收回，本地未保存变更已保留且未重放'
+            : `保存未完成；${studioSaveAuthorityLabel(latestSession)}，本地未保存变更已保留且未重放`,
         );
       }
       throw saveError;
@@ -1034,7 +1093,7 @@ export default function UnifiedDesignerPage() {
         options={newPageOptions}
         pending={newPagePending}
         error={newPageError}
-        canCreate={canAdministerDesigner && hasOwnedWriterLease(authoringSession)}
+        canCreate={canWriteContextualStudio && hasOwnedWriterLease(authoringSession)}
         returnHref={authoringReturnHref(handoff.returnTo, handoff.sessionPid, handoff.blockId)}
         onCreate={handleCreateNewPageWorkspace}
       />
@@ -1046,30 +1105,30 @@ export default function UnifiedDesignerPage() {
     : getWorkbenchKey(document, source);
   const contextualEditablePropertyPaths =
     handoff
-      ? !reviewWorkspaceMode && canAdministerDesigner && authoringCapabilities
+      ? !reviewWorkspaceMode && canWriteContextualStudio && authoringCapabilities
         ? studioEditablePropertyPaths(authoringCapabilities)
         : {}
       : undefined;
   const contextualReorderableBlockTypes =
-    handoff && !reviewWorkspaceMode && canAdministerDesigner && authoringCapabilities
+    handoff && !reviewWorkspaceMode && canWriteContextualStudio && authoringCapabilities
       ? studioReorderableBlockTypes(authoringCapabilities)
       : undefined;
   const contextualCreatableBlockTypes =
-    handoff && !reviewWorkspaceMode && canAdministerDesigner && authoringCapabilities
+    handoff && !reviewWorkspaceMode && canWriteContextualStudio && authoringCapabilities
       ? studioCreatableBlockTypes(authoringCapabilities)
       : undefined;
   const contextualRemovableBlockTypes =
-    handoff && !reviewWorkspaceMode && canAdministerDesigner && authoringCapabilities
+    handoff && !reviewWorkspaceMode && canWriteContextualStudio && authoringCapabilities
       ? studioRemovableBlockTypes(authoringCapabilities)
       : undefined;
   const contextualRelocatableBlockTypes =
-    handoff && !reviewWorkspaceMode && canAdministerDesigner && authoringCapabilities
+    handoff && !reviewWorkspaceMode && canWriteContextualStudio && authoringCapabilities
       ? studioRelocatableBlockTypes(authoringCapabilities)
       : undefined;
   const contextualReadOnly = Boolean(
     handoff &&
       (reviewWorkspaceMode ||
-        !canAdministerDesigner ||
+        !canWriteContextualStudio ||
         authoringSession?.state !== 'ACTIVE' ||
         !hasOwnedWriterLease(authoringSession) ||
         Boolean(studioConflict)),
@@ -1112,7 +1171,7 @@ export default function UnifiedDesignerPage() {
       governedAiCopilot={
         handoff &&
         !contextualReadOnly &&
-        canAdministerDesigner &&
+        canWriteContextualStudio &&
         authoringSession &&
         authoringCapabilities
           ? {
@@ -1164,7 +1223,7 @@ export default function UnifiedDesignerPage() {
             >
               {studioReadOnlyReason(
                 authoringSession,
-                canAdministerDesigner,
+                canWriteContextualStudio,
                 Boolean(studioConflict),
                 reviewWorkspaceMode,
               )}，当前仅可查看隔离草稿。
@@ -1242,7 +1301,7 @@ export default function UnifiedDesignerPage() {
         <div className="px-3 pt-2">
           <AuthoringWriterLeaseNotice
             lease={authoringSession.writerLease}
-            canTakeover={canAdministerDesigner}
+            canTakeover={canWriteContextualStudio}
             pending={leaseTakeoverPending}
             onTakeover={handleWriterLeaseTakeover}
           />
@@ -1356,7 +1415,7 @@ export default function UnifiedDesignerPage() {
             session={authoringSession!}
             enabled={Boolean(
               !reviewWorkspaceMode &&
-                canAdministerDesigner &&
+                canWriteContextualStudio &&
                 user?.id != null &&
                 String(user.id) === String(authoringSession?.ownerUserId) &&
                 authoringSession?.state === 'ACTIVE' &&

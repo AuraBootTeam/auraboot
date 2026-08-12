@@ -6,7 +6,9 @@ import { ContextualAuthoringSurface } from '../ContextualAuthoringSurface';
 import {
   applyAuthoringPatch,
   createAuthoringHandoff,
+  isAuthoringPermissionDeniedError,
   loadAuthoringCapabilities,
+  loadAuthoringPermissionSnapshot,
   loadAuthoringSession,
   openAuthoringSession,
   prepareAuthoringSession,
@@ -42,7 +44,9 @@ vi.mock('~/contexts/AuthContext', () => ({
 vi.mock('../authoringService', () => ({
   openAuthoringSession: vi.fn(),
   loadAuthoringCapabilities: vi.fn(),
+  loadAuthoringPermissionSnapshot: vi.fn(),
   loadAuthoringSession: vi.fn(),
+  isAuthoringPermissionDeniedError: vi.fn(),
   applyAuthoringPatch: vi.fn(),
   prepareAuthoringSession: vi.fn(),
   renewAuthoringWriterLease: vi.fn(),
@@ -128,6 +132,15 @@ describe('ContextualAuthoringSurface', () => {
       targetRoute: '/unified-designer',
       expiresAt: '2026-08-09T12:00:00Z',
     });
+    vi.mocked(loadAuthoringPermissionSnapshot).mockResolvedValue({
+      canReadDesigner: true,
+      canManageDesigner: true,
+      canAdministerDesigner: true,
+    });
+    vi.mocked(isAuthoringPermissionDeniedError).mockImplementation(
+      (error) =>
+        error instanceof Error && /(?:403|forbidden|permission denied)/i.test(error.message),
+    );
     vi.mocked(applyAuthoringPatch).mockResolvedValue({
       session: {
         sessionPid: 'session-1',
@@ -485,6 +498,60 @@ describe('ContextualAuthoringSurface', () => {
     expect(screen.getByLabelText(/标题/)).toHaveValue('生产订单');
     expect(screen.getByText('1 项未保存')).toBeInTheDocument();
     expect(applyAuthoringPatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed with the exact dirty edit when permission changes during save reconciliation', async () => {
+    vi.mocked(applyAuthoringPatch).mockRejectedValueOnce(new Error('Failed to fetch'));
+    vi.mocked(loadAuthoringSession).mockRejectedValueOnce(new Error('403 Forbidden'));
+    vi.mocked(loadAuthoringPermissionSnapshot).mockResolvedValueOnce({
+      canReadDesigner: true,
+      canManageDesigner: false,
+      canAdministerDesigner: false,
+    });
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+    await screen.findByTestId('contextual-authoring-surface');
+    fireEvent.click(screen.getByTestId('runtime-write'));
+    fireEvent.change(screen.getByLabelText(/标题/), {
+      target: { value: '权限切换期间的订单标题' },
+    });
+
+    fireEvent.click(screen.getByText('保存'));
+
+    expect(await screen.findByTestId('authoring-save-reconciliation-feedback')).toHaveAttribute(
+      'data-tone',
+      'warning',
+    );
+    expect(screen.getByTestId('authoring-save-reconciliation-feedback')).toHaveTextContent(
+      '保存未完成；配置权限已收回，本地未保存变更已保留且未重放',
+    );
+    expect(screen.queryByTestId('authoring-permission-revoked')).not.toBeInTheDocument();
+    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+      'data-read-only',
+      'true',
+    );
+    expect(screen.getByLabelText(/标题/)).toHaveValue('权限切换期间的订单标题');
+    expect(screen.getByText('1 项未保存')).toBeInTheDocument();
+    expect(screen.getByText('保存')).toBeDisabled();
+    expect(applyAuthoringPatch).toHaveBeenCalledTimes(1);
+
+    vi.mocked(loadAuthoringPermissionSnapshot).mockResolvedValue({
+      canReadDesigner: true,
+      canManageDesigner: true,
+      canAdministerDesigner: false,
+    });
+    fireEvent(window, new Event('focus'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+        'data-read-only',
+        'false',
+      ),
+    );
+    expect(screen.getByLabelText(/标题/)).toBeEnabled();
+    expect(screen.getByLabelText(/标题/)).toHaveValue('权限切换期间的订单标题');
+    expect(screen.getByText('1 项未保存')).toBeInTheDocument();
+    expect(screen.getByText('保存')).toBeEnabled();
   });
 
   it('stops stale inline writes and transfers only an opaque conflict context to Studio', async () => {

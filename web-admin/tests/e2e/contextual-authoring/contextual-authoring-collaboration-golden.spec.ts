@@ -992,6 +992,226 @@ test.describe('Contextual authoring PC collaboration golden', () => {
       await author.close();
     }
   });
+
+  test('PC-AUTH-022 @critical — revoking Studio permission during response loss confirms the commit once and turns read-only', async ({
+    page,
+    browser,
+  }) => {
+    const role = await ensurePersona(page, PERSONAS.secondAdmin);
+    const designer = await openAsPersona(browser, PERSONAS.secondAdmin);
+    let permissionsRestored = false;
+    const retainedPermissions = PERSONAS.secondAdmin.permissions.filter(
+      (permission) => permission !== 'meta.designer.admin',
+    );
+    try {
+      await designer.page.setViewportSize({ width: 1440, height: 900 });
+      const session = await enterAuthoringFromRuntime(designer.page);
+      const table = findTableBlock(session.snapshot);
+      expect(table?.id, 'table block for permission reconciliation').toBeTruthy();
+      const tableId = String(table!.id);
+      const previousTitle = readObjectPath(table!, '/title');
+      const nextTitle =
+        previousTitle === '生产异常（权限对账）'
+          ? '生产异常（权限对账 2）'
+          : '生产异常（权限对账）';
+      const itemsBefore = await loadChangeItems(designer.page, session.sessionPid);
+
+      await designer.page.getByTestId('authoring-inspector-open').click();
+      await designer.page.getByRole('button', { name: '高级设置' }).click();
+      await designer.page
+        .getByRole('dialog', { name: '进入应用设计中心' })
+        .getByRole('button', { name: '继续到应用设计中心' })
+        .click();
+      await expect(designer.page.getByTestId('unified-designer-workbench')).toBeVisible();
+      await designer.page.getByTestId(`outline-item-${tableId}`).click();
+      await expect(designer.page.getByTestId('inspector-selected-id')).toContainText(tableId);
+      await designer.page.getByTestId('inspector-field-title').fill(nextTitle);
+      await expect(designer.page.getByTestId('designer-dirty-state')).toContainText('未保存');
+
+      const batchPath = `/api/authoring/sessions/${session.sessionPid}/studio-batches`;
+      let batchRequests = 0;
+      let batchPayload: unknown;
+      await designer.page.route(`**${batchPath}`, async (route) => {
+        batchRequests += 1;
+        batchPayload = route.request().postDataJSON();
+        const committedResponse = await route.fetch();
+        expect(committedResponse.ok(), 'Studio batch commits before permission revocation').toBe(
+          true,
+        );
+        await assignPermissions(page, role.pid, retainedPermissions);
+        await route.abort('failed');
+      });
+
+      await designer.page.getByTestId('designer-save').click();
+
+      await expect(designer.page.getByTestId('designer-dirty-state')).toContainText('已保存');
+      await expect(
+        designer.page.getByTestId('studio-save-reconciliation-feedback'),
+      ).toHaveAttribute('data-tone', 'warning');
+      await expect(designer.page.getByTestId('studio-save-reconciliation-feedback')).toContainText(
+        '保存已在服务端完成；应用设计中心高级配置权限已收回',
+      );
+      await expect(designer.page.getByTestId('studio-handoff-read-only-reason')).toContainText(
+        '缺少高级设计权限',
+      );
+      await expect(designer.page.getByTestId('designer-save')).toBeDisabled();
+      await expect(designer.page.getByTestId('designer-save-error')).toHaveCount(0);
+      expect(batchRequests).toBe(1);
+
+      const authoritative = await expectApiData<AuthoringSession>(
+        await designer.page.request.get(`/api/authoring/sessions/${session.sessionPid}`),
+        'reload committed Studio document after admin permission revocation',
+      );
+      expect(authoritative.revision).toBe(session.revision + 1);
+      expect(readObjectPath(findTableBlock(authoritative.snapshot)!, '/title')).toBe(nextTitle);
+
+      const forbiddenReplay = await designer.page.request.post(batchPath, {
+        data: batchPayload,
+      });
+      expect(forbiddenReplay.status(), 'backend must reject a replay after admin revocation').toBe(
+        403,
+      );
+      expect(await forbiddenReplay.text()).not.toContain('snapshot');
+      await mkdir(SCREENSHOT_DIR, { recursive: true });
+      await designer.page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-022-studio-permission-reconciled.png'),
+        fullPage: true,
+      });
+
+      await designer.page.unroute(`**${batchPath}`);
+      await assignPermissions(page, role.pid, [...PERSONAS.secondAdmin.permissions]);
+      permissionsRestored = true;
+      const itemsAfter = await loadChangeItems(designer.page, session.sessionPid);
+      expect(itemsAfter).toHaveLength(itemsBefore.length + 1);
+      expect(itemsAfter.at(-1)).toMatchObject({
+        blockId: tableId,
+        propertyPath: '/title',
+        operation: expect.stringMatching(/ADD|REPLACE/),
+      });
+    } finally {
+      if (!permissionsRestored) {
+        await designer.page.unroute('**/api/authoring/sessions/*/studio-batches').catch(() => {});
+        await assignPermissions(page, role.pid, [...PERSONAS.secondAdmin.permissions]).catch(
+          () => {},
+        );
+      }
+      await designer.close();
+    }
+  });
+
+  test('PC-AUTH-023 @critical — revoking inline permission during response loss preserves unknown dirty and later reconciles without replay', async ({
+    page,
+    browser,
+  }) => {
+    const role = await ensurePersona(page, PERSONAS.secondAdmin);
+    const author = await openAsPersona(browser, PERSONAS.secondAdmin);
+    let permissionsRestored = false;
+    const retainedPermissions = PERSONAS.secondAdmin.permissions.filter(
+      (permission) => permission !== 'meta.designer.update',
+    );
+    try {
+      await author.page.setViewportSize({ width: 1440, height: 900 });
+      const session = await enterAuthoringFromRuntime(author.page);
+      const itemsBefore = await loadChangeItems(author.page, session.sessionPid);
+      const { editor, value } = await stageLocalDensityEdit(author.page, session);
+      const patchPath = `/api/authoring/sessions/${session.sessionPid}/patches`;
+      let patchRequests = 0;
+      let patchPayload: unknown;
+      await author.page.route(`**${patchPath}`, async (route) => {
+        patchRequests += 1;
+        patchPayload = route.request().postDataJSON();
+        const committedResponse = await route.fetch();
+        expect(committedResponse.ok(), 'inline patch commits before permission revocation').toBe(
+          true,
+        );
+        await assignPermissions(page, role.pid, retainedPermissions);
+        await route.abort('failed');
+      });
+
+      await author.page.getByRole('button', { name: '保存', exact: true }).click();
+
+      await expect(
+        author.page.getByTestId('authoring-save-reconciliation-feedback'),
+      ).toHaveAttribute('data-tone', 'warning');
+      await expect(author.page.getByTestId('authoring-save-reconciliation-feedback')).toContainText(
+        '保存未完成；配置权限已收回，本地未保存变更已保留且未重放',
+      );
+      await expect(author.page.getByTestId('authoring-permission-revoked')).toHaveCount(0);
+      await expect(author.page.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+        'data-read-only',
+        'true',
+      );
+      await expect(author.page.getByText('1 项未保存')).toBeVisible();
+      await expect(editor).toHaveValue(value);
+      await expect(author.page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
+      expect(patchRequests).toBe(1);
+
+      const forbiddenReplay = await author.page.request.patch(patchPath, { data: patchPayload });
+      expect(
+        forbiddenReplay.status(),
+        'backend must reject inline replay after update revocation',
+      ).toBe(403);
+      expect(await forbiddenReplay.text()).not.toContain('snapshot');
+      await mkdir(SCREENSHOT_DIR, { recursive: true });
+      await author.page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-023-inline-permission-unknown.png'),
+        fullPage: true,
+      });
+
+      await author.page.unroute(`**${patchPath}`);
+      await assignPermissions(page, role.pid, [...PERSONAS.secondAdmin.permissions]);
+      permissionsRestored = true;
+      await author.page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await expect(author.page.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+        'data-read-only',
+        'false',
+        {
+          timeout: 20_000,
+        },
+      );
+      await expect(author.page.getByRole('button', { name: '保存', exact: true })).toBeEnabled();
+      const committedUnknown = await expectApiData<AuthoringSession>(
+        await author.page.request.get(`/api/authoring/sessions/${session.sessionPid}`),
+        'actor confirms the hidden inline commit after update permission restoration',
+      );
+      expect(committedUnknown.revision).toBe(session.revision + 1);
+      expect(await loadChangeItems(author.page, session.sessionPid)).toHaveLength(
+        itemsBefore.length + 1,
+      );
+
+      const staleRetry = author.page.waitForResponse(
+        (response) =>
+          response.request().method().toUpperCase() === 'PATCH' &&
+          apiPath(response.url()) === patchPath,
+      );
+      await author.page.getByRole('button', { name: '保存', exact: true }).click();
+      expect((await staleRetry).status()).toBe(409);
+      await expect(author.page.getByText('0 项未保存')).toBeVisible();
+      await expect(author.page.getByTestId('authoring-save-reconciliation-feedback')).toContainText(
+        '未重复写入',
+      );
+      const reconciled = await expectApiData<AuthoringSession>(
+        await author.page.request.get(`/api/authoring/sessions/${session.sessionPid}`),
+        'author reloads reconciled inline session after permission restoration',
+      );
+      expect(reconciled.revision).toBe(session.revision + 1);
+      expect(await loadChangeItems(author.page, session.sessionPid)).toHaveLength(
+        itemsBefore.length + 1,
+      );
+      await author.page.screenshot({
+        path: resolve(SCREENSHOT_DIR, 'pc-auth-023-inline-permission-reconciled.png'),
+        fullPage: true,
+      });
+    } finally {
+      if (!permissionsRestored) {
+        await author.page.unroute('**/api/authoring/sessions/*/patches').catch(() => {});
+        await assignPermissions(page, role.pid, [...PERSONAS.secondAdmin.permissions]).catch(
+          () => {},
+        );
+      }
+      await author.close();
+    }
+  });
 });
 
 async function login(page: Page, email: string): Promise<void> {
