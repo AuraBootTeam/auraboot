@@ -53,6 +53,11 @@ import { AuthoringRiskSummary } from './AuthoringRiskSummary';
 import { AuthoringValidationNotice } from './AuthoringValidationNotice';
 import { AuthoringWriterLeaseNotice } from './AuthoringWriterLeaseNotice';
 import { storeAuthoringConflictTransfer } from './authoringConflictTransfer';
+import {
+  clearInlineAuthoringRecovery,
+  readInlineAuthoringRecovery,
+  storeInlineAuthoringRecovery,
+} from './authoringLocalRecovery';
 import type {
   AuthoringMode,
   AuthoringNode,
@@ -129,6 +134,9 @@ export function ContextualAuthoringSurface({
     message: string;
   } | null>(null);
   const [savePermissionRevoked, setSavePermissionRevoked] = useState(false);
+  const [localRecoveryAvailable, setLocalRecoveryAvailable] = useState(false);
+  const [localRecoveryPending, setLocalRecoveryPending] = useState(false);
+  const [localRecoveryStorageFailed, setLocalRecoveryStorageFailed] = useState(false);
   const [governancePending, setGovernancePending] = useState<AuthoringGovernanceAction | null>(
     null,
   );
@@ -140,6 +148,7 @@ export function ContextualAuthoringSurface({
   const entryScrollRef = useRef({ x: 0, y: 0 });
   const returnResumeAttemptedRef = useRef(false);
   const permissionLossObservedRef = useRef(false);
+  const recoveryActorId = user?.id == null ? null : String(user.id);
 
   const rootNode = useMemo(() => buildAuthoringTree(workingSchema), [workingSchema]);
   const runtimeSchema = useMemo(() => schemaForRuntimePreview(workingSchema), [workingSchema]);
@@ -163,6 +172,38 @@ export function ContextualAuthoringSurface({
   const activeSessionRevision = session?.revision;
   const activeWriterLeaseStatus = session?.writerLease?.status;
   const activeWriterLeaseUntil = session?.writerLease?.leasedUntil;
+
+  const persistInlineRecovery = useCallback(
+    (
+      recoverySession: AuthoringSession,
+      edits: Map<string, PendingAuthoringEdit>,
+      state: 'DIRTY' | 'UNKNOWN_OUTCOME',
+    ) => {
+      if (!recoveryActorId) return;
+      if (edits.size === 0) {
+        clearInlineAuthoringRecovery(recoveryActorId, schema.id, recoverySession.sessionPid);
+        setLocalRecoveryAvailable(false);
+        setLocalRecoveryStorageFailed(false);
+        return;
+      }
+      const stored = storeInlineAuthoringRecovery({
+        actorId: recoveryActorId,
+        sessionPid: recoverySession.sessionPid,
+        pagePid: schema.id,
+        baseRevision: Math.min(...[...edits.values()].map((edit) => edit.baseRevision)),
+        state,
+        edits: [...edits.values()],
+      });
+      setLocalRecoveryAvailable(stored);
+      setLocalRecoveryStorageFailed(!stored);
+    },
+    [recoveryActorId, schema.id],
+  );
+
+  useEffect(() => {
+    if (!recoveryActorId || session) return;
+    setLocalRecoveryAvailable(Boolean(readInlineAuthoringRecovery(recoveryActorId, schema.id)));
+  }, [recoveryActorId, schema.id, session]);
 
   useEffect(() => {
     if (!canConfigure) {
@@ -265,6 +306,108 @@ export function ContextualAuthoringSurface({
     };
   }, [canConfigure, schema]);
 
+  const restoreLocalRecovery = useCallback(async () => {
+    if (!canConfigure || !recoveryActorId || localRecoveryPending) return;
+    const recovery = readInlineAuthoringRecovery(recoveryActorId, schema.id);
+    if (!recovery) {
+      setLocalRecoveryAvailable(false);
+      return;
+    }
+    setLocalRecoveryPending(true);
+    setOpening(true);
+    setError(null);
+    setSaveReconciliationFeedback(null);
+    try {
+      const [restored, registry] = await Promise.all([
+        loadAuthoringSession(recovery.sessionPid),
+        loadAuthoringCapabilities(),
+      ]);
+      if (restored.pagePid !== schema.id) {
+        throw new Error('本地恢复记录与当前页面不一致');
+      }
+      const remaining = new Map<string, PendingAuthoringEdit>();
+      let committedCount = 0;
+      let conflictCount = 0;
+      recovery.edits.forEach((edit) => {
+        const latestValue = readSnapshotProperty(
+          restored.snapshot,
+          edit.blockId,
+          edit.property.propertyPath,
+        );
+        const mineValue = edit.operation === 'REMOVE' ? undefined : edit.value;
+        const reconciliation = reconcileAuthoringSaveProperty(
+          edit.previousValue,
+          mineValue,
+          latestValue,
+        );
+        if (reconciliation === 'COMMITTED') {
+          committedCount += 1;
+          return;
+        }
+        if (reconciliation === 'CONFLICT') conflictCount += 1;
+        remaining.set(
+          edit.key,
+          reconciliation === 'UNCHANGED'
+            ? { ...edit, baseRevision: restored.revision, previousValue: latestValue }
+            : edit,
+        );
+      });
+
+      const restoredSchema = schemaFromSnapshot(schema, restored.snapshot);
+      setSession(restored);
+      setCapabilities(registry);
+      setPendingEdits(remaining);
+      setWorkingSchema(materializePendingSchema(schema, restored.snapshot, remaining));
+      setSelectedId(recovery.edits.at(-1)?.blockId ?? schema.id);
+      setOutlineOpen(true);
+      setInspectorOpen(true);
+      setSavePermissionRevoked(false);
+      setStale(conflictCount > 0);
+      if (conflictCount > 0) {
+        setContextualConflict(
+          createContextualConflictState(restored, remaining, recovery.baseRevision),
+        );
+        setSaveReconciliationFeedback({
+          tone: 'warning',
+          message: `已恢复页面中断前的 ${remaining.size} 项本地变更；其中 ${conflictCount} 项与权威草稿冲突，需先完成 Base / Mine / Latest 裁决。`,
+        });
+      } else if (remaining.size > 0) {
+        setContextualConflict(null);
+        setSaveReconciliationFeedback({
+          tone: 'warning',
+          message:
+            committedCount > 0
+              ? `页面中断后已由权威草稿确认 ${committedCount} 项保存成功，并恢复 ${remaining.size} 项未落服变更；请复核后重试。`
+              : `已恢复页面中断前的 ${remaining.size} 项本地变更，并确认尚未写入权威草稿；请复核后重试。`,
+        });
+      } else {
+        setContextualConflict(null);
+        setWorkingSchema(restoredSchema);
+        setSaveReconciliationFeedback({
+          tone: 'success',
+          message: `页面中断前的 ${committedCount} 项变更已由权威草稿确认保存成功，未重复写入。`,
+        });
+      }
+      persistInlineRecovery(restored, remaining, 'DIRTY');
+    } catch {
+      setError('权威草稿暂不可读；本地恢复数据仍保留，请联网后重新对账');
+    } finally {
+      setLocalRecoveryPending(false);
+      setOpening(false);
+    }
+  }, [canConfigure, localRecoveryPending, persistInlineRecovery, recoveryActorId, schema]);
+
+  const discardLocalRecovery = useCallback(() => {
+    if (!recoveryActorId) return;
+    if (!window.confirm('确定放弃此页面中断前保留的本地未保存变更吗？此操作无法撤销。')) {
+      return;
+    }
+    clearInlineAuthoringRecovery(recoveryActorId, schema.id);
+    setLocalRecoveryAvailable(false);
+    setLocalRecoveryStorageFailed(false);
+    setError(null);
+  }, [recoveryActorId, schema.id]);
+
   const enter = useCallback(async () => {
     if (!canConfigure || opening) return;
     setOpening(true);
@@ -295,6 +438,13 @@ export function ContextualAuthoringSurface({
   }, [canConfigure, opening, recordPid, schema]);
 
   const exit = useCallback(() => {
+    if (
+      pendingEdits.size > 0 &&
+      localRecoveryStorageFailed &&
+      !window.confirm('浏览器无法保留恢复副本，退出会丢失当前未保存变更。仍要退出吗？')
+    ) {
+      return;
+    }
     setSession(null);
     setWorkingSchema(schema);
     setPendingEdits(new Map());
@@ -307,13 +457,14 @@ export function ContextualAuthoringSurface({
     setLeaseTakeoverFeedback(null);
     setSaveReconciliationFeedback(null);
     setSavePermissionRevoked(false);
+    setLocalRecoveryStorageFailed(false);
     setWriteBlocked(false);
     setOutlineOpen(false);
     setInspectorOpen(false);
     requestAnimationFrame(() =>
       window.scrollTo(entryScrollRef.current.x, entryScrollRef.current.y),
     );
-  }, [schema]);
+  }, [localRecoveryStorageFailed, pendingEdits.size, schema]);
 
   useEffect(() => {
     if (!session) return;
@@ -573,13 +724,21 @@ export function ContextualAuthoringSurface({
           });
         }
         setWorkingSchema(materializePendingSchema(schema, session.snapshot, next));
+        persistInlineRecovery(session, next, 'DIRTY');
         return next;
       });
       setError(null);
       setSaveReconciliationFeedback(null);
       setStale(false);
     },
-    [authoringWriteAllowed, contextualConflict, manifestByType, schema, session],
+    [
+      authoringWriteAllowed,
+      contextualConflict,
+      manifestByType,
+      persistInlineRecovery,
+      schema,
+      session,
+    ],
   );
 
   const saveChanges = useCallback(async () => {
@@ -623,9 +782,11 @@ export function ContextualAuthoringSurface({
         if (valuesEqual(latestValue, mineValue)) {
           remaining.delete(edit.key);
           setPendingEdits(new Map(remaining));
+          persistInlineRecovery(currentSession, remaining, 'DIRTY');
           continue;
         }
         try {
+          persistInlineRecovery(currentSession, remaining, 'UNKNOWN_OUTCOME');
           const result = await applyAuthoringPatch(
             currentSession.sessionPid,
             currentSession.revision,
@@ -639,6 +800,7 @@ export function ContextualAuthoringSurface({
           remaining.delete(edit.key);
           setSession(currentSession);
           setPendingEdits(new Map(remaining));
+          persistInlineRecovery(currentSession, remaining, 'DIRTY');
         } catch (saveFailure) {
           const [sessionProbe, permissionProbe] = await Promise.allSettled([
             loadAuthoringSession(currentSession.sessionPid),
@@ -659,6 +821,7 @@ export function ContextualAuthoringSurface({
               setWorkingSchema(
                 materializePendingSchema(schema, currentSession.snapshot, remaining),
               );
+              persistInlineRecovery(currentSession, remaining, 'UNKNOWN_OUTCOME');
               setSaveReconciliationFeedback({
                 tone: 'warning',
                 message: savePermissionChangedMessage(
@@ -670,6 +833,7 @@ export function ContextualAuthoringSurface({
               setError(null);
               return;
             }
+            persistInlineRecovery(currentSession, remaining, 'UNKNOWN_OUTCOME');
             throw new Error('保存结果暂时无法确认；无法读取权威草稿，请联网后重试');
           }
           const latestSession = sessionProbe.value;
@@ -685,6 +849,7 @@ export function ContextualAuthoringSurface({
               setWorkingSchema(
                 materializePendingSchema(schema, currentSession.snapshot, remaining),
               );
+              persistInlineRecovery(currentSession, remaining, 'DIRTY');
               setSaveReconciliationFeedback({
                 tone: 'warning',
                 message: permissionRevoked
@@ -729,6 +894,7 @@ export function ContextualAuthoringSurface({
           setSession(currentSession);
           setPendingEdits(new Map(remaining));
           setWorkingSchema(materializePendingSchema(schema, currentSession.snapshot, remaining));
+          persistInlineRecovery(currentSession, remaining, 'DIRTY');
           if (!latestSessionWritable) {
             setSaveReconciliationFeedback({
               tone: 'warning',
@@ -778,6 +944,7 @@ export function ContextualAuthoringSurface({
         }
       }
       setWorkingSchema(schemaFromSnapshot(schema, currentSession.snapshot));
+      persistInlineRecovery(currentSession, remaining, 'DIRTY');
       setStale(false);
       if (reconciledCommittedCount > 0) {
         setSaveReconciliationFeedback({
@@ -795,6 +962,7 @@ export function ContextualAuthoringSurface({
       setWorkingSchema(materializePendingSchema(schema, currentSession.snapshot, remaining));
       setStale(true);
       setSession(currentSession);
+      persistInlineRecovery(currentSession, remaining, 'UNKNOWN_OUTCOME');
       setError(
         saveFailure instanceof Error
           ? `${saveFailure.message}；本地未保存变更已保留`
@@ -803,7 +971,15 @@ export function ContextualAuthoringSurface({
     } finally {
       setSaving(false);
     }
-  }, [authoringWriteAllowed, contextualConflict, pendingEdits, saving, schema, session]);
+  }, [
+    authoringWriteAllowed,
+    contextualConflict,
+    pendingEdits,
+    persistInlineRecovery,
+    saving,
+    schema,
+    session,
+  ]);
 
   const continueConflictInStudio = useCallback(() => {
     if (!contextualConflict) return;
@@ -964,7 +1140,7 @@ export function ContextualAuthoringSurface({
     return (
       <div className="relative" data-testid="contextual-authoring-runtime">
         {children}
-        {canConfigure ? (
+        {canConfigure && !localRecoveryAvailable ? (
           <button
             type="button"
             onClick={enter}
@@ -976,7 +1152,52 @@ export function ContextualAuthoringSurface({
             {opening ? '正在进入配置模式…' : '配置此页'}
           </button>
         ) : null}
-        {error ? (
+        {localRecoveryAvailable ? (
+          <div
+            role="alert"
+            className="border-status-amber bg-status-amber-bg text-status-amber fixed right-6 bottom-20 z-30 max-w-md rounded-lg border px-4 py-3 text-sm shadow-lg"
+            data-testid="authoring-local-recovery"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <div className="font-semibold">发现页面中断前保留的本地变更</div>
+                <p className="mt-1 leading-5">
+                  先读取权威草稿并对账，再决定继续保存；恢复过程不会自动重放写请求。
+                </p>
+                {error ? (
+                  <p
+                    className="mt-2 font-medium text-red-700"
+                    data-testid="authoring-local-recovery-error"
+                  >
+                    {error}
+                  </p>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void restoreLocalRecovery()}
+                    disabled={!canConfigure || localRecoveryPending}
+                    className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                    data-testid="authoring-local-recovery-resume"
+                  >
+                    {localRecoveryPending ? '正在读取权威草稿…' : '恢复并对账'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={discardLocalRecovery}
+                    disabled={localRecoveryPending}
+                    className="border-border-strong bg-panel text-text rounded-md border px-3 py-1.5 font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                    data-testid="authoring-local-recovery-discard"
+                  >
+                    放弃本地恢复
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {error && !localRecoveryAvailable ? (
           <div
             role="alert"
             className="border-status-red bg-status-red-bg fixed right-6 bottom-20 z-30 max-w-sm rounded-lg border px-4 py-3 text-sm text-red-800 shadow-lg"
@@ -1022,6 +1243,15 @@ export function ContextualAuthoringSurface({
         >
           <LockKeyhole className="h-4 w-4" />
           已拦截真实业务写入；交互预览只保留本地状态。
+        </div>
+      ) : null}
+      {localRecoveryStorageFailed ? (
+        <div
+          role="alert"
+          className="border-status-red bg-status-red-bg mx-3 mt-3 rounded-md border px-3 py-2 text-sm text-red-800"
+          data-testid="authoring-local-recovery-storage-failed"
+        >
+          浏览器无法建立本地恢复副本；请勿刷新或关闭页面，并尽快重试保存。
         </div>
       ) : null}
       {!authoringWriteAllowed && !permissionSaveReconciliationActive ? (

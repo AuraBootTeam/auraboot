@@ -43,6 +43,7 @@ import type {
   HandoffContext,
 } from '~/framework/meta/authoring/types';
 import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
+import { readStudioAuthoringRecovery } from '~/framework/meta/authoring/authoringLocalRecovery';
 
 const permissionMock = vi.hoisted(() => ({
   canAdministerDesigner: vi.fn((_permission: string) => true),
@@ -109,6 +110,7 @@ vi.mock('~/framework/meta/authoring/authoringConflictTransfer', () => ({
 describe('UnifiedDesignerPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     vi.mocked(loadModelFieldsByModelCodes).mockResolvedValue({});
     vi.mocked(savePageSchemaV3).mockResolvedValue({
       ok: true,
@@ -1376,6 +1378,69 @@ describe('UnifiedDesignerPage', () => {
     expect(screen.getByTestId('inspector-field-dataSource.model-manual')).toHaveValue('payment');
     expect(screen.getByTestId('designer-save')).toBeEnabled();
     expect(applyAuthoringStudioBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores a Studio Mine after repeated authoritative GET failures and a page-process restart', async () => {
+    setSearch('?contextId=ctx_secure_once');
+    const handoff = createHandoff('list_customer', '/dataSource');
+    const baseline = createDocument('document_one', 'Isolated Draft');
+    const baselineSession = createAuthoringSession(baseline, 3);
+
+    vi.mocked(consumeAuthoringHandoff).mockResolvedValue(handoff);
+    vi.mocked(loadAuthoringSession)
+      .mockResolvedValueOnce(baselineSession)
+      .mockRejectedValueOnce(new Error('Network error'));
+    vi.mocked(loadAuthoringCapabilities).mockResolvedValue(createCapabilities());
+    vi.mocked(applyAuthoringStudioBatch).mockRejectedValueOnce(new Error('Failed to fetch'));
+
+    const firstPage = render(<UnifiedDesignerPage />);
+    await screen.findByTestId('studio-handoff-context');
+    await waitFor(() =>
+      expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('list_customer'),
+    );
+    fireEvent.change(screen.getByTestId('inspector-field-dataSource.model-manual'), {
+      target: { value: 'payment' },
+    });
+    fireEvent.click(screen.getByTestId('designer-save'));
+    await screen.findByText(/保存结果暂时无法确认/);
+    expect(applyAuthoringStudioBatch).toHaveBeenCalledTimes(1);
+
+    firstPage.unmount();
+    setSearch('?authoringSession=session_1');
+    vi.mocked(loadAuthoringSession).mockReset();
+    vi.mocked(loadAuthoringSession)
+      .mockRejectedValueOnce(new Error('Network still unavailable'))
+      .mockResolvedValueOnce(baselineSession);
+    render(<UnifiedDesignerPage />);
+
+    expect(await screen.findByText('权威草稿暂不可读，本地 Studio 文档仍保留')).toBeInTheDocument();
+    expect(screen.getByText('恢复只会重新读取并对账，不会自动重放保存请求。')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('studio-local-recovery-retry'));
+
+    await screen.findByTestId('studio-handoff-context');
+    expect(await screen.findByTestId('studio-save-reconciliation-feedback')).toHaveTextContent(
+      '已恢复页面进程中断前的完整 Studio 文档，并确认尚未写入权威草稿',
+    );
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
+    fireEvent.click(screen.getByTestId('outline-item-list_customer'));
+    expect(screen.getByTestId('inspector-field-dataSource.model-manual')).toHaveValue('payment');
+    expect(applyAuthoringStudioBatch).toHaveBeenCalledTimes(1);
+
+    const committed = createDocument('document_one', 'Isolated Draft');
+    const committedList = findBlock(committed.blocks, 'list_customer');
+    if (!committedList) throw new Error('list_customer fixture missing');
+    committedList.dataSource = { model: 'payment' };
+    vi.mocked(applyAuthoringStudioBatch).mockResolvedValueOnce({
+      session: createAuthoringSession(committed, 4, 'L3', 'HANDOFF_STUDIO'),
+      changeItemPids: ['item_1'],
+    });
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('已保存'),
+    );
+    expect(applyAuthoringStudioBatch).toHaveBeenCalledTimes(2);
+    expect(readStudioAuthoringRecovery('1', 'session_1')).toBeNull();
   });
 
   it('preserves an unsaved Studio edit but blocks writes when admin permission is revoked', async () => {

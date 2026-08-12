@@ -57,6 +57,11 @@ import { AuthoringChangeSetSplitPanel } from '~/framework/meta/authoring/Authori
 import { AuthoringReleaseHistoryPanel } from '~/framework/meta/authoring/AuthoringReleaseHistoryPanel';
 import { AuthoringOwnershipNotice } from '~/framework/meta/authoring/AuthoringOwnershipNotice';
 import { consumeAuthoringConflictTransfer } from '~/framework/meta/authoring/authoringConflictTransfer';
+import {
+  clearStudioAuthoringRecovery,
+  readStudioAuthoringRecovery,
+  storeStudioAuthoringRecovery,
+} from '~/framework/meta/authoring/authoringLocalRecovery';
 import { AuthoringConflictResolutionPanel } from '../components/unified-designer/AuthoringConflictResolutionPanel';
 import type {
   AuthoringSession,
@@ -133,6 +138,10 @@ export default function UnifiedDesignerPage() {
     message: string;
   } | null>(null);
   const [studioPermissionRevoked, setStudioPermissionRevoked] = useState(false);
+  const [studioRecoveredBaseDocument, setStudioRecoveredBaseDocument] =
+    useState<PageSchemaV3 | null>(null);
+  const [studioLocalRecoveryAvailable, setStudioLocalRecoveryAvailable] = useState(false);
+  const [contextReloadGeneration, setContextReloadGeneration] = useState(0);
   const [studioConflict, setStudioConflict] = useState<StudioConflictState | null>(null);
   const [conflictPending, setConflictPending] = useState(false);
   const [conflictError, setConflictError] = useState<string | null>(null);
@@ -156,6 +165,7 @@ export default function UnifiedDesignerPage() {
   const documentBaselineRef = useRef<AuthoringSession | null>(null);
   const studioSaveFeedbackTimerRef = useRef<number | null>(null);
   const studioPermissionLossObservedRef = useRef(false);
+  const recoveryActorId = user?.id == null ? null : String(user.id);
   const modelCodeKey = document ? collectModelCodesFromDocument(document).join('|') : '';
   const documentId = document?.id ?? null;
   const resolvingHandoff = Boolean(
@@ -226,6 +236,8 @@ export default function UnifiedDesignerPage() {
       setLeaseTakeoverFeedback(null);
       setStudioSaveReconciliationFeedback(null);
       setStudioPermissionRevoked(false);
+      setStudioRecoveredBaseDocument(null);
+      setStudioLocalRecoveryAvailable(false);
       setStudioConflict(null);
       setConflictError(null);
       setSubmissionError(null);
@@ -244,6 +256,15 @@ export default function UnifiedDesignerPage() {
     setHandoffError(null);
     setLeaseTakeoverError(null);
     setLeaseTakeoverFeedback(null);
+    setStudioSaveReconciliationFeedback(null);
+    setStudioRecoveredBaseDocument(null);
+    setStudioLocalRecoveryAvailable(
+      Boolean(
+        recoveryActorId &&
+          resumeSessionPid &&
+          readStudioAuthoringRecovery(recoveryActorId, resumeSessionPid),
+      ),
+    );
     setStudioConflict(null);
     setConflictError(null);
     setSubmissionError(null);
@@ -310,6 +331,7 @@ export default function UnifiedDesignerPage() {
       .then(({ handoff: resolvedHandoff, session, capabilities, reviewWorkspace }) => {
         if (!cancelled) {
           let isolatedDocument = authoringSnapshotToPageSchemaV3(session.snapshot);
+          let recoveredSavedDocument: PageSchemaV3 | null = null;
           if (conflictContextId) {
             const transfer = consumeAuthoringConflictTransfer(conflictContextId, {
               sessionPid: session.sessionPid,
@@ -336,12 +358,66 @@ export default function UnifiedDesignerPage() {
               merge,
             });
             replaceAuthoringContextUrl('conflictContext', session.sessionPid);
+          } else if (!reviewWorkspace && recoveryActorId) {
+            const recovery = readStudioAuthoringRecovery(recoveryActorId, session.sessionPid);
+            if (recovery) {
+              if (recovery.pagePid !== session.pagePid) {
+                clearStudioAuthoringRecovery(recoveryActorId, session.sessionPid);
+              } else {
+                const baseDocument = authoringSnapshotToPageSchemaV3(recovery.baseSnapshot);
+                const mineDocument = recovery.mineDocument;
+                const reconciliation = reconcileAuthoringStudioDocument(
+                  baseDocument,
+                  mineDocument,
+                  isolatedDocument,
+                );
+                if (reconciliation === 'COMMITTED') {
+                  clearStudioAuthoringRecovery(recoveryActorId, session.sessionPid);
+                  setStudioLocalRecoveryAvailable(false);
+                  setStudioSaveReconciliationFeedback({
+                    tone: 'success',
+                    message:
+                      '页面进程中断前的 Studio 保存已由权威草稿确认完成，已恢复最新文档且未重复写入。',
+                  });
+                } else {
+                  recoveredSavedDocument = isolatedDocument;
+                  isolatedDocument = mineDocument;
+                  setStudioLocalRecoveryAvailable(true);
+                  if (reconciliation === 'CONFLICT') {
+                    setStudioConflict({
+                      baseRevision: recovery.baseRevision,
+                      baseDocument,
+                      mineDocument,
+                      latestSession: session,
+                      merge: buildStudioThreeWayMerge(
+                        baseDocument,
+                        mineDocument,
+                        recoveredSavedDocument,
+                        capabilities,
+                      ),
+                    });
+                    setStudioSaveReconciliationFeedback({
+                      tone: 'warning',
+                      message:
+                        '已恢复页面进程中断前的完整 Studio 文档；权威草稿已有第三值，需先完成 Base / Mine / Latest 裁决。',
+                    });
+                  } else {
+                    setStudioSaveReconciliationFeedback({
+                      tone: 'warning',
+                      message:
+                        '已恢复页面进程中断前的完整 Studio 文档，并确认尚未写入权威草稿；请复核后重试保存。',
+                    });
+                  }
+                }
+              }
+            }
           }
           setHandoff(resolvedHandoff);
           setAuthoringSession(session);
           setAuthoringCapabilities(capabilities);
           setReviewWorkspaceMode(reviewWorkspace || session.workspaceMode === 'REVIEW');
           documentBaselineRef.current = session;
+          setStudioRecoveredBaseDocument(recoveredSavedDocument);
           setDocument(isolatedDocument);
           setSource({
             type: 'page',
@@ -354,6 +430,13 @@ export default function UnifiedDesignerPage() {
       })
       .catch((consumeError) => {
         if (!cancelled) {
+          setStudioLocalRecoveryAvailable(
+            Boolean(
+              recoveryActorId &&
+                resumeSessionPid &&
+                readStudioAuthoringRecovery(recoveryActorId, resumeSessionPid),
+            ),
+          );
           setHandoffError(
             consumeError instanceof Error
               ? consumeError.message
@@ -373,6 +456,8 @@ export default function UnifiedDesignerPage() {
     resumeReviewSessionPid,
     resumeSessionPid,
     resumeStudioIntent,
+    recoveryActorId,
+    contextReloadGeneration,
   ]);
 
   useEffect(() => {
@@ -557,6 +642,48 @@ export default function UnifiedDesignerPage() {
     setDocument(nextDocument);
   };
 
+  const storeStudioRecoveryForDocument = (
+    nextDocument: PageSchemaV3,
+    baseSession: AuthoringSession,
+    state: 'DIRTY' | 'UNKNOWN_OUTCOME',
+  ) => {
+    if (!recoveryActorId) return;
+    const stored = storeStudioAuthoringRecovery({
+      actorId: recoveryActorId,
+      sessionPid: baseSession.sessionPid,
+      pagePid: baseSession.pagePid,
+      baseRevision: baseSession.revision,
+      state,
+      baseSnapshot: baseSession.snapshot,
+      mineDocument: nextDocument,
+    });
+    setStudioLocalRecoveryAvailable(stored);
+    if (!stored) {
+      setStudioSaveReconciliationFeedback({
+        tone: 'warning',
+        message: '浏览器无法建立本地恢复副本；请勿刷新页面，并尽快重试保存。',
+      });
+    }
+  };
+
+  const handleContextualStudioDocumentChange = (
+    nextDocument: PageSchemaV3,
+    dirty: boolean,
+  ) => {
+    if (!handoff || !authoringSession || !recoveryActorId) return;
+    if (!dirty) {
+      clearStudioAuthoringRecovery(recoveryActorId, authoringSession.sessionPid);
+      setStudioLocalRecoveryAvailable(false);
+      setStudioRecoveredBaseDocument(null);
+      return;
+    }
+    storeStudioRecoveryForDocument(
+      nextDocument,
+      documentBaselineRef.current ?? authoringSession,
+      'DIRTY',
+    );
+  };
+
   const persistContextualStudioDocument = async (
     nextDocument: PageSchemaV3,
     startingSession: AuthoringSession,
@@ -624,6 +751,7 @@ export default function UnifiedDesignerPage() {
       throw new Error('服务器已有更新，已进入 Base / Mine / Latest 三方冲突裁决');
     }
 
+    storeStudioRecoveryForDocument(nextDocument, baseSession, 'UNKNOWN_OUTCOME');
     try {
       const savedSession = await persistContextualStudioDocument(nextDocument, baseSession);
       const canonicalDocument = authoringSnapshotToPageSchemaV3(savedSession.snapshot);
@@ -631,6 +759,12 @@ export default function UnifiedDesignerPage() {
       setAuthoringSession(savedSession);
       setDocument(canonicalDocument);
       setStudioConflict(null);
+      if (recoveryActorId) {
+        clearStudioAuthoringRecovery(recoveryActorId, savedSession.sessionPid);
+      }
+      setStudioLocalRecoveryAvailable(false);
+      setStudioRecoveredBaseDocument(null);
+      setStudioSaveReconciliationFeedback(null);
       return canonicalDocument;
     } catch (saveError) {
       const [sessionProbe, permissionProbe] = await Promise.allSettled([
@@ -667,6 +801,11 @@ export default function UnifiedDesignerPage() {
           setAuthoringSession(latestSession);
           setDocument(latestDocument);
           setStudioConflict(null);
+          if (recoveryActorId) {
+            clearStudioAuthoringRecovery(recoveryActorId, latestSession.sessionPid);
+          }
+          setStudioLocalRecoveryAvailable(false);
+          setStudioRecoveredBaseDocument(null);
           setStudioSaveReconciliationFeedback({
             tone: latestSessionWritable ? 'success' : 'warning',
             message: latestSessionWritable
@@ -681,6 +820,7 @@ export default function UnifiedDesignerPage() {
           }, 10_000);
           return latestDocument;
         }
+        storeStudioRecoveryForDocument(nextDocument, baseSession, 'DIRTY');
         if (!latestSessionWritable) {
           setAuthoringSession(latestSession);
           setStudioConflict(null);
@@ -694,6 +834,7 @@ export default function UnifiedDesignerPage() {
         throw new Error('旧修订未写入；已进入 Base / Mine / Latest 三方冲突裁决');
       }
       if (!latestSessionWritable) {
+        storeStudioRecoveryForDocument(nextDocument, baseSession, 'DIRTY');
         setAuthoringSession(latestSession);
         setStudioConflict(null);
         throw new Error(
@@ -702,6 +843,7 @@ export default function UnifiedDesignerPage() {
             : `保存未完成；${studioSaveAuthorityLabel(latestSession)}，本地未保存变更已保留且未重放`,
         );
       }
+      storeStudioRecoveryForDocument(nextDocument, baseSession, 'DIRTY');
       throw saveError;
     }
   };
@@ -721,6 +863,12 @@ export default function UnifiedDesignerPage() {
       setAuthoringSession(savedSession);
       setDocument(canonicalDocument);
       setStudioConflict(null);
+      if (recoveryActorId) {
+        clearStudioAuthoringRecovery(recoveryActorId, savedSession.sessionPid);
+      }
+      setStudioLocalRecoveryAvailable(false);
+      setStudioRecoveredBaseDocument(null);
+      setStudioSaveReconciliationFeedback(null);
       setWorkbenchGeneration((current) => current + 1);
     } catch (resolutionError) {
       try {
@@ -1071,9 +1219,61 @@ export default function UnifiedDesignerPage() {
     return (
       <div className="grid min-h-[420px] place-items-center bg-slate-100 p-6 text-sm text-red-700">
         <div className="max-w-lg rounded-lg border border-red-200 bg-white p-5 shadow-sm">
-          <div className="font-semibold">无法恢复现场配置上下文</div>
-          <div className="mt-2">{handoffError || error}</div>
-          <a href="/" className="mt-4 inline-flex text-blue-700 hover:underline">返回首页</a>
+          <div className="font-semibold">
+            {studioLocalRecoveryAvailable
+              ? '权威草稿暂不可读，本地 Studio 文档仍保留'
+              : '无法恢复现场配置上下文'}
+          </div>
+          <div className="mt-2">
+            {studioLocalRecoveryAvailable
+              ? '连续读取权威草稿失败；请检查网络后重新对账。'
+              : handoffError || error}
+          </div>
+          {studioLocalRecoveryAvailable ? (
+            <p className="mt-2 text-slate-600">
+              恢复只会重新读取并对账，不会自动重放保存请求。
+            </p>
+          ) : null}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            {studioLocalRecoveryAvailable ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHandoffError(null);
+                    setContextReloadGeneration((current) => current + 1);
+                  }}
+                  className="rounded-md bg-blue-700 px-3 py-1.5 font-medium text-white hover:bg-blue-800"
+                  data-testid="studio-local-recovery-retry"
+                >
+                  重新读取并对账
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (
+                      !recoveryActorId ||
+                      !resumeSessionPid ||
+                      !window.confirm(
+                        '确定放弃页面中断前保留的本地 Studio 文档吗？此操作无法撤销。',
+                      )
+                    ) {
+                      return;
+                    }
+                    clearStudioAuthoringRecovery(recoveryActorId, resumeSessionPid);
+                    setStudioLocalRecoveryAvailable(false);
+                  }}
+                  className="rounded-md border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
+                  data-testid="studio-local-recovery-discard"
+                >
+                  放弃本地恢复
+                </button>
+              </>
+            ) : null}
+            <a href="/" className="inline-flex text-blue-700 hover:underline">
+              返回首页
+            </a>
+          </div>
         </div>
       </div>
     );
@@ -1139,6 +1339,7 @@ export default function UnifiedDesignerPage() {
     <UnifiedDesignerWorkbench
       key={workbenchKey}
       initialDocument={document}
+      initialSavedDocument={studioRecoveredBaseDocument ?? undefined}
       modelFieldsByModel={modelFieldsByModel}
       returnHref={
         handoff
@@ -1150,6 +1351,7 @@ export default function UnifiedDesignerPage() {
             : undefined
       }
       onSave={handoff ? handleContextualStudioSave : handleSave}
+      onDocumentChange={handoff ? handleContextualStudioDocumentChange : undefined}
       pageId={!handoff && source.type === 'page' ? source.pid : undefined}
       initialPublished={source.type === 'page' ? published : false}
       onPublish={source.type === 'page' && !handoff ? handlePublish : undefined}

@@ -277,6 +277,78 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
     });
   });
 
+  test('PC-AUTH-024 @critical — repeated authoritative GET failures survive an inline page-process restart and reconcile without replay', async ({
+    page,
+  }) => {
+    const session = await enterAuthoringFromRuntime(page);
+    const itemsBefore = await loadChangeItems(page, session.sessionPid);
+    const { value } = await stageDensityEdit(page, session);
+    const patchPath = `/api/authoring/sessions/${session.sessionPid}/patches`;
+    const sessionPath = `/api/authoring/sessions/${session.sessionPid}`;
+    let patchRequests = 0;
+    let failedAuthoritativeReads = 0;
+    await page.route(`**${patchPath}`, async (route) => {
+      patchRequests += 1;
+      const committedResponse = await route.fetch();
+      expect(committedResponse.ok(), 'inline patch committed before process restart').toBe(true);
+      await route.abort('failed');
+    });
+    await page.route(`**${sessionPath}`, async (route) => {
+      if (route.request().method() === 'GET') {
+        failedAuthoritativeReads += 1;
+        await route.abort('failed');
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('保存结果暂时无法确认');
+    await expect(page.getByText('1 项未保存')).toBeVisible();
+    expect(patchRequests).toBe(1);
+    expect(failedAuthoritativeReads).toBe(1);
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('authoring-local-recovery')).toContainText(
+      '发现页面中断前保留的本地变更',
+    );
+    await expect(page.getByTestId('contextual-authoring-enter')).toHaveCount(0);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await page.getByTestId('authoring-local-recovery-resume').click();
+      await expect.poll(() => failedAuthoritativeReads).toBe(attempt + 2);
+      await expect(page.getByTestId('authoring-local-recovery')).toBeVisible();
+      await expect(page.getByTestId('authoring-local-recovery-resume')).toBeEnabled();
+    }
+    await expect(page.getByText(/本地恢复数据仍保留/)).toBeVisible();
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-024-inline-restart-recovery-pending.png'),
+      fullPage: true,
+    });
+
+    await page.unroute(`**${sessionPath}`);
+    await page.getByTestId('authoring-local-recovery-resume').click();
+
+    await expect(page.getByTestId('contextual-authoring-surface')).toBeVisible();
+    await expect(page.getByText('0 项未保存')).toBeVisible();
+    await expect(page.getByTestId('authoring-save-reconciliation-feedback')).toContainText(
+      '已由权威草稿确认保存成功，未重复写入',
+    );
+    expect(patchRequests).toBe(1);
+    const authoritative = await reloadSession(page, session.sessionPid);
+    expect(authoritative.revision).toBe(session.revision + 1);
+    const table = findBlock(
+      authoritative.snapshot,
+      (candidate) => readObjectPath(candidate, '/props/density') === value,
+    );
+    expect(table, 'recovered inline Mine in authoritative draft').not.toBeNull();
+    expect(await loadChangeItems(page, session.sessionPid)).toHaveLength(itemsBefore.length + 1);
+    await page.unroute(`**${patchPath}`);
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-024-inline-restart-reconciled.png'),
+      fullPage: true,
+    });
+  });
+
   test('PC-AUTH-020 @critical — authority transfer during an interrupted save confirms no write and turns the dirty owner read-only', async ({
     page,
   }) => {
@@ -624,13 +696,128 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
       fullPage: true,
     });
   });
+
+  test('PC-AUTH-025 @critical — Studio Mine survives repeated authoritative GET failures and a page-process restart', async ({
+    page,
+  }) => {
+    const session = await enterAuthoringFromRuntime(page);
+    await page.getByTestId('authoring-inspector-open').click();
+    await page.getByRole('button', { name: '高级设置' }).click();
+    await page
+      .getByRole('dialog', { name: '进入应用设计中心' })
+      .getByRole('button', { name: '继续到应用设计中心' })
+      .click();
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+
+    const list = findBlock(session.snapshot, (candidate) => blockType(candidate) === 'list');
+    expect(list?.id, 'list root id for Studio restart recovery').toBeTruthy();
+    await page.getByTestId(`outline-item-${String(list!.id)}`).click();
+    await page.getByTestId('resource-tab-blocks').click();
+    const availableBlock = page
+      .locator(
+        'button[data-testid="palette-add-filter-bar"]:not([disabled]), button[data-testid="palette-add-action-bar"]:not([disabled])',
+      )
+      .first();
+    await expect(availableBlock).toBeVisible();
+    await availableBlock.click();
+    const batchPath = `/api/authoring/sessions/${session.sessionPid}/studio-batches`;
+    const sessionPath = `/api/authoring/sessions/${session.sessionPid}`;
+    const createResponse = page.waitForResponse(
+      (response) => response.request().method() === 'POST' && apiPath(response.url()) === batchPath,
+    );
+    await page.getByTestId('designer-save').click();
+    const created = await expectApiData<PatchResult>(
+      await createResponse,
+      'create Studio restart-recovery fixture',
+    );
+    const itemsAfterCreate = await loadChangeItems(page, session.sessionPid);
+
+    await page.getByTestId('designer-mode-layout').click();
+    const moveButton = page.locator('[data-testid^="block-move-up-"]:not([disabled])').first();
+    await expect(moveButton).toBeVisible();
+    const testId = await moveButton.getAttribute('data-testid');
+    const blockId = testId!.slice('block-move-up-'.length);
+    const beforeOrder = siblingOrder(created.session.snapshot, blockId);
+    await moveButton.click();
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');
+
+    let committedBatches = 0;
+    let failedAuthoritativeReads = 0;
+    await page.route(`**${batchPath}`, async (route) => {
+      const committedResponse = await route.fetch();
+      expect(committedResponse.ok(), 'Studio batch committed before process restart').toBe(true);
+      committedBatches += 1;
+      await route.abort('failed');
+    });
+    await page.route(`**${sessionPath}`, async (route) => {
+      if (route.request().method() === 'GET') {
+        failedAuthoritativeReads += 1;
+        await route.abort('failed');
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.getByTestId('designer-save').click();
+    await expect(page.getByTestId('designer-save-error')).toContainText('保存结果暂时无法确认');
+    expect(committedBatches).toBe(1);
+    expect(failedAuthoritativeReads).toBe(1);
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByText('权威草稿暂不可读，本地 Studio 文档仍保留')).toBeVisible();
+    const failedReadsAfterRestart = failedAuthoritativeReads;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const readsBeforeRetry = failedAuthoritativeReads;
+      await page.getByTestId('studio-local-recovery-retry').click();
+      await expect.poll(() => failedAuthoritativeReads).toBeGreaterThan(readsBeforeRetry);
+      await expect(page.getByTestId('studio-local-recovery-retry')).toBeVisible();
+    }
+    expect(failedAuthoritativeReads).toBeGreaterThanOrEqual(failedReadsAfterRestart + 2);
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-025-studio-restart-recovery-pending.png'),
+      fullPage: true,
+    });
+
+    await page.unroute(`**${sessionPath}`);
+    await page.getByTestId('studio-local-recovery-retry').click();
+
+    await expect(page.getByTestId('unified-designer-workbench')).toBeVisible();
+    await expect(page.getByTestId('designer-dirty-state')).toContainText('已保存');
+    await expect(page.getByTestId('studio-save-reconciliation-feedback')).toContainText(
+      '已由权威草稿确认完成',
+    );
+    expect(committedBatches).toBe(1);
+    const authoritative = await reloadSession(page, session.sessionPid);
+    expect(authoritative.revision).toBe(created.session.revision + 1);
+    const afterOrder = siblingOrder(authoritative.snapshot, blockId);
+    expect(afterOrder.ids).toEqual([
+      ...beforeOrder.ids.slice(0, beforeOrder.index - 1),
+      blockId,
+      beforeOrder.ids[beforeOrder.index - 1],
+      ...beforeOrder.ids.slice(beforeOrder.index + 1),
+    ]);
+    expect(countStableId(authoritative.snapshot, blockId)).toBe(1);
+    expect(await loadChangeItems(page, session.sessionPid)).toHaveLength(
+      itemsAfterCreate.length + 1,
+    );
+    await page.unroute(`**${batchPath}`);
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-025-studio-restart-reconciled.png'),
+      fullPage: true,
+    });
+  });
 });
 
 async function enterAuthoringFromRuntime(page: Page): Promise<AuthoringSession> {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
   const link = page.locator('nav').locator(`a[href="${RUNTIME_ROUTE}"]`).first();
   await expect(link).toBeVisible({ timeout: 10_000 });
   await link.click();
+  try {
+    await page.waitForURL(new RegExp(`${RUNTIME_ROUTE}$`), { timeout: 3_000 });
+  } catch {
+    // Login may finish a delayed redirect after the first SPA click; navigate once after it settles.
+    await page.goto(RUNTIME_ROUTE, { waitUntil: 'domcontentloaded' });
+  }
   await expect(page).toHaveURL(new RegExp(`${RUNTIME_ROUTE}$`));
   await expect(page.getByRole('main').first().getByText('EXC-V4-REAL-001')).toBeVisible({
     timeout: 15_000,

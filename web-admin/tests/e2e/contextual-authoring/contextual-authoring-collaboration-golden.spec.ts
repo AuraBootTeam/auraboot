@@ -1224,6 +1224,12 @@ async function openRuntimeFromMenu(page: Page): Promise<void> {
   const link = page.locator('nav').locator(`a[href="${RUNTIME_ROUTE}"]`).first();
   await expect(link).toBeVisible({ timeout: 10_000 });
   await link.click();
+  try {
+    await page.waitForURL(new RegExp(`${RUNTIME_ROUTE}$`), { timeout: 3_000 });
+  } catch {
+    // Login may finish a delayed redirect after the first SPA click; navigate once after it settles.
+    await page.goto(RUNTIME_ROUTE, { waitUntil: 'domcontentloaded' });
+  }
   await expect(page).toHaveURL(new RegExp(`${RUNTIME_ROUTE}$`));
   await expect(page.getByRole('main').first().getByText('EXC-V4-REAL-001')).toBeVisible({
     timeout: 15_000,

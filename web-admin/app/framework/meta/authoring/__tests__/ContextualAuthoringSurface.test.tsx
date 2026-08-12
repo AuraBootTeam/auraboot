@@ -20,6 +20,7 @@ import {
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
 import type { AuthoringSession } from '../types';
 import { storeAuthoringConflictTransfer } from '../authoringConflictTransfer';
+import { readInlineAuthoringRecovery } from '../authoringLocalRecovery';
 
 const permissionMock = vi.hoisted(() => ({
   canRead: true,
@@ -80,7 +81,9 @@ const schema: UnifiedSchema = {
 
 describe('ContextualAuthoringSurface', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     permissionMock.canRead = true;
     permissionMock.canManage = true;
     permissionMock.canAdmin = true;
@@ -498,6 +501,65 @@ describe('ContextualAuthoringSurface', () => {
     expect(screen.getByLabelText(/标题/)).toHaveValue('生产订单');
     expect(screen.getByText('1 项未保存')).toBeInTheDocument();
     expect(applyAuthoringPatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores an unknown inline save after a page-process restart and reconciles before replay', async () => {
+    vi.mocked(applyAuthoringPatch).mockRejectedValueOnce(new Error('Failed to fetch'));
+    vi.mocked(loadAuthoringSession).mockRejectedValueOnce(new Error('Network error'));
+    const firstPage = renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+    await screen.findByTestId('contextual-authoring-surface');
+    fireEvent.click(screen.getByTestId('runtime-write'));
+    fireEvent.change(screen.getByLabelText(/标题/), { target: { value: '进程重启后的订单' } });
+    fireEvent.click(screen.getByText('保存'));
+    await screen.findByText(/保存结果暂时无法确认/);
+    expect(applyAuthoringPatch).toHaveBeenCalledTimes(1);
+
+    firstPage.unmount();
+    vi.mocked(loadAuthoringSession).mockResolvedValue(createAuthoringSession());
+    renderSurface(vi.fn(), vi.fn());
+
+    expect(await screen.findByTestId('authoring-local-recovery')).toHaveTextContent(
+      '发现页面中断前保留的本地变更',
+    );
+    expect(screen.queryByTestId('contextual-authoring-enter')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('authoring-local-recovery-resume'));
+
+    expect(await screen.findByTestId('contextual-authoring-surface')).toBeInTheDocument();
+    expect(screen.getByLabelText(/标题/)).toHaveValue('进程重启后的订单');
+    expect(screen.getByTestId('authoring-save-reconciliation-feedback')).toHaveTextContent(
+      '已恢复页面中断前的 1 项本地变更，并确认尚未写入权威草稿',
+    );
+    expect(screen.getByText('1 项未保存')).toBeInTheDocument();
+    expect(applyAuthoringPatch).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByText('保存'));
+    await waitFor(() => expect(screen.getByText('0 项未保存')).toBeInTheDocument());
+    expect(applyAuthoringPatch).toHaveBeenCalledTimes(2);
+    expect(readInlineAuthoringRecovery('1', 'page-1')).toBeNull();
+  });
+
+  it('warns and blocks accidental exit when browser recovery storage is unavailable', async () => {
+    vi.spyOn(window.sessionStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError');
+    });
+    const confirmExit = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+    await screen.findByTestId('contextual-authoring-surface');
+    fireEvent.click(screen.getByTestId('runtime-write'));
+    fireEvent.change(screen.getByLabelText(/标题/), { target: { value: '无法落盘的订单' } });
+
+    expect(screen.getByTestId('authoring-local-recovery-storage-failed')).toHaveTextContent(
+      '请勿刷新或关闭页面',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '退出' }));
+
+    expect(confirmExit).toHaveBeenCalledWith(
+      '浏览器无法保留恢复副本，退出会丢失当前未保存变更。仍要退出吗？',
+    );
+    expect(screen.getByTestId('contextual-authoring-surface')).toBeInTheDocument();
+    expect(screen.getByText('1 项未保存')).toBeInTheDocument();
   });
 
   it('fails closed with the exact dirty edit when permission changes during save reconciliation', async () => {

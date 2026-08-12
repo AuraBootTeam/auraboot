@@ -24,7 +24,11 @@ import {
 } from '../utils/recursiveBlockWalker';
 import { getByPath, setByPath } from '../utils/dotPath';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
-import { useDesignerDocument, serializeDocument } from '../document/useDesignerDocument';
+import {
+  parseDocumentSnapshot,
+  serializeDocument,
+  useDesignerDocument,
+} from '../document/useDesignerDocument';
 import { useDesignerSelection } from '../selection/useDesignerSelection';
 import { useDesignerDnd } from '../dnd/useDesignerDnd';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
@@ -108,9 +112,13 @@ const SYNTHETIC_PREVIEW_OPTION = '__synthetic_fixture__';
 
 export interface UnifiedDesignerWorkbenchProps {
   initialDocument: PageSchemaV3;
+  /** Optional authoritative baseline when initialDocument is a recovered local Mine. */
+  initialSavedDocument?: PageSchemaV3;
   modelFieldsByModel?: ModelFieldsByModel;
   returnHref?: string;
   onSave?: (document: PageSchemaV3) => Promise<PageSchemaV3 | void> | PageSchemaV3 | void;
+  /** Receives every local document transition so a host can persist crash recovery state. */
+  onDocumentChange?: (document: PageSchemaV3, dirty: boolean) => void;
   /**
    * The persisted page id (pid) when the document is page-bound. Required to
    * enable the publish / unpublish action points (a local/new document has none).
@@ -162,9 +170,11 @@ export interface UnifiedDesignerWorkbenchProps {
 
 export function UnifiedDesignerWorkbench({
   initialDocument,
+  initialSavedDocument,
   modelFieldsByModel = {},
   returnHref,
   onSave,
+  onDocumentChange,
   pageId,
   initialPublished = false,
   onPublish,
@@ -185,9 +195,12 @@ export function UnifiedDesignerWorkbench({
 }: UnifiedDesignerWorkbenchProps) {
   const { locale } = useI18n();
   const initialSnapshot = serializeDocument(initialDocument);
-  const [savedSnapshot, setSavedSnapshot] = useState(initialSnapshot);
-  const savedSnapshotRef = useRef(initialSnapshot);
-  const [saveStatus, setSaveStatus] = useState<DesignerSaveStatus>('saved');
+  const initialSavedSnapshot = serializeDocument(initialSavedDocument ?? initialDocument);
+  const [savedSnapshot, setSavedSnapshot] = useState(initialSavedSnapshot);
+  const savedSnapshotRef = useRef(initialSavedSnapshot);
+  const [saveStatus, setSaveStatus] = useState<DesignerSaveStatus>(
+    initialSnapshot === initialSavedSnapshot ? 'saved' : 'dirty',
+  );
   const [saveError, setSaveError] = useState<string | null>(null);
   const [validationErrorCount, setValidationErrorCount] = useState(0);
   const [publishStatus, setPublishStatus] = useState<DesignerPublishStatus>(
@@ -452,9 +465,11 @@ export function UnifiedDesignerWorkbench({
   // Toolbar save indicator follows the live document snapshot; wired into the
   // document kernel's onChange so every edit / undo / redo refreshes it.
   const syncSaveStateForSnapshot = (snapshot: string) => {
-    setSaveStatus(snapshot === savedSnapshotRef.current ? 'saved' : 'dirty');
+    const dirty = snapshot !== savedSnapshotRef.current;
+    setSaveStatus(dirty ? 'dirty' : 'saved');
     setSaveError(null);
     setValidationErrorCount(0);
+    onDocumentChange?.(parseDocumentSnapshot(snapshot), dirty);
   };
 
   // Shared block-tree document + history kernel. Selection, drag-and-drop, the
@@ -1074,6 +1089,7 @@ export function UnifiedDesignerWorkbench({
       savedSnapshotRef.current = snapshot;
       setSavedSnapshot(snapshot);
       setSaveStatus('saved');
+      onDocumentChange?.(canonicalDocument, false);
     } catch (error) {
       setSaveStatus('error');
       setSaveError(resolveSaveErrorMessage(error));
