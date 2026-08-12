@@ -21,6 +21,7 @@ const ZH_TRANSLATIONS = {
     filter: '筛选',
     search: '搜索',
     add_filter: '添加筛选',
+    view_analysis: '视图分析',
     my_records: '我的记录',
     created_today: '今日新建',
     modified_this_week: '本周修改',
@@ -59,6 +60,7 @@ function renderToolbar(extraProps: Partial<React.ComponentProps<typeof ListToolb
         sortableColumns={[]}
         onRowHeightChange={noop}
         onColumnSettingsOpen={noop}
+        onAnalysisOpen={noop}
         chipFilters={[]}
         onChipFiltersChange={noop}
         fieldMetadata={[]}
@@ -197,6 +199,15 @@ describe('ListToolbar i18n', () => {
     const button = screen.getByTestId('add-filter-btn');
     expect(button).toHaveTextContent('添加筛选');
     expect(button).not.toHaveTextContent('Add Filter');
+  });
+
+  it('renders and invokes the current-view analysis entry', () => {
+    const onAnalysisOpen = vi.fn();
+    renderToolbar({ onAnalysisOpen });
+    const button = screen.getByTestId('view-analysis-open');
+    expect(button).toHaveTextContent('视图分析');
+    fireEvent.click(button);
+    expect(onAnalysisOpen).toHaveBeenCalledTimes(1);
   });
 
   it('hides the Add Filter button when filter chips are suppressed', () => {

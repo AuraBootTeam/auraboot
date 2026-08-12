@@ -41,6 +41,7 @@ const expectedScenarios = [
   'shared-list-kanban-fact',
   'personal-view-persistence',
   'advanced-filter-saved-view-export',
+  'current-view-self-service-analysis',
   'opportunity-plan-quote-context',
   'forecast-first-screen-hierarchy',
   'merged-customer-activity-timeline',
@@ -80,6 +81,8 @@ const expectedCoverage = {
     'crm_opportunity_common_list:crm_opp_table:bulk_qualify',
     'crm_opportunity_common_list:platform:add_advanced_filter',
     'crm_opportunity_common_list:platform:export_filtered_csv',
+    'crm_opportunity_common_list:platform:analyze_current_view',
+    'crm_opportunity_common_list:platform:drill_chart_to_list',
     'crm_opportunity_common_list:platform:save_advanced_filters',
     'crm_opportunity_common_list:crm_opp_tabs:proposal',
   ],
@@ -650,6 +653,109 @@ test('advanced filters persist and drive the exact exported opportunity fact', a
     'crm_opportunity_common_list:platform:export_filtered_csv',
   );
   completedScenarios.add('advanced-filter-saved-view-export');
+});
+
+test('current view analysis aggregates every matching opportunity and drills back to the exact list', async ({ page }, testInfo) => {
+  await uiLogin(page);
+  await gotoOpportunityList(page, ids.personalView);
+  const tableMode = page.getByTestId('list-view-mode-table');
+  if ((await tableMode.getAttribute('aria-checked')) !== 'true') await tableMode.click();
+  await page.getByRole('button', { name: '全部', exact: true }).click();
+
+  const keywordResponse = page.waitForResponse((response) =>
+    response.request().method() === 'GET'
+      && response.url().includes('/api/dynamic/crm_opportunity_common/list')
+      && new URL(response.url()).searchParams.get('keyword') === RUN,
+  { timeout: 20_000 });
+  const keywordInput = page.getByTestId('list-search-input');
+  await keywordInput.fill(RUN);
+  await keywordInput.press('Enter');
+  expect((await keywordResponse).ok()).toBeTruthy();
+
+  const aggregateResponse = page.waitForResponse((response) =>
+    response.request().method() === 'POST'
+      && response.url().includes('/api/meta/chart-data')
+      && response.request().postData()?.includes('analysis_value') === true,
+  { timeout: 20_000 });
+  await page.getByTestId('view-analysis-open').click();
+  const drawer = page.getByTestId('view-analysis-drawer');
+  await expect(drawer).toBeVisible();
+  const firstAggregate = await aggregateResponse;
+  expect(firstAggregate.ok()).toBeTruthy();
+  const countRequest = firstAggregate.request().postDataJSON();
+  expect(countRequest.keyword).toBe(RUN);
+  expect(countRequest.metrics).toEqual([
+    { field: 'pid', aggregation: 'count', alias: 'analysis_value' },
+  ]);
+  expect(countRequest.filters).toEqual(expect.arrayContaining([
+    { field: 'crm_opp_expected_amount', operator: 'gte', value: 300000 },
+    { field: 'crm_opp_forecast_category', operator: 'in', value: ['pipeline', 'best_case'] },
+  ]));
+  await expect(drawer).toContainText('当前视图');
+  await expect(drawer).toContainText(`查询: ${RUN}`);
+  await expect(drawer.getByTestId('view-analysis-chart-bar')).toHaveAttribute('aria-pressed', 'true');
+
+  const categoryResponsePromise = page.waitForResponse((response) =>
+    response.request().method() === 'POST'
+      && response.url().includes('/api/meta/chart-data')
+      && response.request().postData()?.includes('crm_opp_forecast_category') === true,
+  { timeout: 20_000 });
+  await drawer.getByTestId('view-analysis-group-field').selectOption('crm_opp_forecast_category');
+  expect((await categoryResponsePromise).ok()).toBeTruthy();
+
+  const sumResponsePromise = page.waitForResponse((response) =>
+    response.request().method() === 'POST'
+      && response.url().includes('/api/meta/chart-data')
+      && response.request().postData()?.includes('"aggregation":"sum"') === true,
+  { timeout: 20_000 });
+  await drawer.getByTestId('view-analysis-aggregation').selectOption('sum');
+  await drawer.getByTestId('view-analysis-metric-field').selectOption('crm_opp_expected_amount');
+  const sumResponse = await sumResponsePromise;
+  expect(sumResponse.ok()).toBeTruthy();
+  const sumBody = await sumResponse.json();
+  const rows = sumBody?.data?.rows ?? [];
+  expect(rows).toEqual(expect.arrayContaining([
+    expect.objectContaining({ crm_opp_forecast_category: 'pipeline', analysis_value: 480000 }),
+    expect.objectContaining({ crm_opp_forecast_category: 'best_case', analysis_value: 320000 }),
+  ]));
+  await expect(drawer.getByText('480,000', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('320,000', { exact: true })).toBeVisible();
+  await shot(page, testInfo, 'release-c-current-view-analysis-desktop.png');
+
+  for (const chartType of ['line', 'pie', 'donut', 'funnel'] as const) {
+    await drawer.getByTestId(`view-analysis-chart-${chartType}`).click();
+    await expect(drawer.getByTestId(`view-analysis-chart-${chartType}`)).toHaveAttribute('aria-pressed', 'true');
+  }
+  await drawer.getByTestId('view-analysis-chart-bar').click();
+  await page.setViewportSize({ width: 960, height: 900 });
+  await assertNoPageOverflow(page);
+  await shot(page, testInfo, 'release-c-current-view-analysis-compact.png');
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  const chartCanvas = drawer.locator('canvas').first();
+  await expect(chartCanvas).toBeVisible();
+  // Animation is disabled for this self-service chart. Wait for the responsive
+  // desktop resize to settle, then hit the geometric centre of the first bar.
+  await page.waitForTimeout(350);
+  const chartBox = await chartCanvas.boundingBox();
+  expect(chartBox).not.toBeNull();
+  await chartCanvas.click({
+    position: { x: chartBox!.width * 0.33, y: chartBox!.height * 0.72 },
+  });
+  await expect(drawer).toHaveCount(0);
+  await expect(page.getByTestId('filter-chip-bar')).toContainText(/管道|最佳预期/);
+  const drilledRows = page.locator('tbody tr');
+  await expect(drilledRows).toHaveCount(1, { timeout: 20_000 });
+  await expect(page.getByTestId('table-cell-0-crm_opp_forecast_category')).toContainText('管道');
+  await expect(page.getByTestId('table-cell-0-crm_opp_expected_amount')).toContainText('480');
+  await shot(page, testInfo, 'release-c-current-view-analysis-drilldown.png');
+
+  cover(
+    'uiActions',
+    'crm_opportunity_common_list:platform:analyze_current_view',
+    'crm_opportunity_common_list:platform:drill_chart_to_list',
+  );
+  completedScenarios.add('current-view-self-service-analysis');
 });
 
 test('opportunity keeps the next task and quote in one navigable context', async ({ page }, testInfo) => {

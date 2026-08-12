@@ -144,7 +144,8 @@ export const SmartPieChart: React.FC<SmartPieChartProps> = ({
       if (!data?.meta?.dimensions?.length) return;
 
       const dimension = data.meta.dimensions[0];
-      const clickedValue = params.name || params.data?.name;
+      const clickedRow = params.dataIndex == null ? undefined : data.rows[params.dataIndex];
+      const clickedValue = clickedRow?.[dimension] ?? params.name ?? params.data?.name;
 
       if (!clickedValue) return;
 
@@ -157,9 +158,7 @@ export const SmartPieChart: React.FC<SmartPieChartProps> = ({
       // Handle drill-down
       if (drillDown?.enabled && onDrillDown) {
         const row =
-          params.dataIndex == null
-            ? data.rows.find((candidate) => candidate[dimension] === clickedValue)
-            : data.rows[params.dataIndex];
+          clickedRow ?? data.rows.find((candidate) => candidate[dimension] === clickedValue);
         onDrillDown(enrichDrillDownFilters(filter, row, drillDown));
       }
 

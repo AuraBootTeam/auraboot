@@ -3,7 +3,9 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.AggregateQueryRequest;
 import com.auraboot.framework.meta.dto.AggregateQueryResponse;
+import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.MetricConfig;
+import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.entity.NamedQueryField;
 import com.auraboot.framework.meta.exception.MetaServiceException;
@@ -110,6 +112,11 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     private static final Set<String> PUBLIC_FORBIDDEN_OUTPUT_ALIASES = Set.of(
             "id", "record_id", "tenant_id", "created_by", "updated_by"
     );
+
+    private static final Set<String> KEYWORD_TEXT_TYPES = Set.of("string", "text", "enum", "dict");
+    private static final Set<String> KEYWORD_EXPLICIT_TYPES = Set.of(
+            "string", "text", "enum", "dict", "integer", "int", "long", "bigint", "smallint",
+            "decimal", "number", "double", "float");
 
     @Override
     @Transactional(readOnly = true)
@@ -438,6 +445,44 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         }
 
         return sql.toString();
+    }
+
+    /** Mirror DynamicDataService keyword semantics for aggregate/list parity. */
+    private void appendKeywordClause(AggregateQueryRequest request, List<String> whereClauses,
+                                     Map<String, Object> params) {
+        String keyword = trimToNull(request.getKeyword());
+        if (keyword == null) return;
+        ModelDefinition model = metaModelService.getModelDefinition(request.getModelCode())
+                .orElseThrow(() -> new MetaServiceException(
+                        "Model not found for aggregate keyword search: " + request.getModelCode()));
+        List<FieldDefinition> fields = model.getFields() == null ? List.of() : model.getFields();
+        List<FieldDefinition> searchable = fields.stream()
+                .filter(FieldDefinition::isSearchable)
+                .filter(field -> KEYWORD_EXPLICIT_TYPES.contains(normalizedDataType(field)))
+                .toList();
+        if (searchable.isEmpty()) {
+            searchable = fields.stream()
+                    .filter(field -> KEYWORD_TEXT_TYPES.contains(normalizedDataType(field)))
+                    .filter(field -> !"pid".equals(field.getCode()))
+                    .limit(5)
+                    .toList();
+        }
+        List<String> clauses = new ArrayList<>();
+        for (FieldDefinition field : searchable) {
+            String column = trimToNull(field.getColumnName());
+            if (column == null) column = trimToNull(field.getCode());
+            if (column == null || !IDENTIFIER_PATTERN.matcher(column).matches()) continue;
+            clauses.add("CAST(" + column + " AS TEXT) ILIKE #{params.keyword} ESCAPE '\\'");
+        }
+        if (!clauses.isEmpty()) {
+            whereClauses.add("(" + String.join(" OR ", clauses) + ")");
+            params.put("keyword", "%" + keyword.replace("\\", "\\\\")
+                    .replace("%", "\\%").replace("_", "\\_") + "%");
+        }
+    }
+
+    private String normalizedDataType(FieldDefinition field) {
+        return field.getDataType() == null ? "" : field.getDataType().toLowerCase(Locale.ROOT);
     }
 
     private void validatePublicOutputAliases(List<NamedQueryField> fields) {
@@ -1012,6 +1057,8 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
                 }
             }
         }
+
+        appendKeywordClause(request, whereClauses, params);
 
         if (request.getDrillFilters() != null) {
             for (AggregateQueryRequest.FilterConfig filter : request.getDrillFilters()) {

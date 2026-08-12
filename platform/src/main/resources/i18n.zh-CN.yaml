@@ -38,6 +38,29 @@ common:
   filter: 筛选
   search: 搜索
   add_filter: 添加筛选
+  view_analysis: 视图分析
+  view_analysis_scope: 当前视图
+  view_analysis_help: 分析当前视图的全部匹配记录，点击图表即可返回精确列表
+  view_analysis_filters: 筛选条件
+  view_analysis_chart_type: 图表类型
+  view_analysis_chart_bar: 柱状图
+  view_analysis_chart_line: 折线图
+  view_analysis_chart_pie: 饼图
+  view_analysis_chart_donut: 环形图
+  view_analysis_chart_funnel: 漏斗图
+  view_analysis_group: 分组字段
+  view_analysis_metric: 统计指标
+  view_analysis_count: 记录数
+  view_analysis_sum: 求和
+  view_analysis_avg: 平均值
+  view_analysis_numeric_field: 数值字段
+  view_analysis_drill_hint: 点击任意数据点，将列表筛选到对应记录
+  view_analysis_refresh: 刷新
+  view_analysis_failed: 分析加载失败
+  view_analysis_empty: 当前条件下暂无数据
+  view_analysis_empty_help: 请调整列表筛选后重试
+  view_analysis_breakdown: 数据明细
+  view_analysis_open_records: 查看对应记录
   clear_all: 清除全部
   search_fields: 搜索字段...
   no_fields_found: 未找到字段

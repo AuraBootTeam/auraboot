@@ -1628,6 +1628,8 @@
           "crm_opportunity_common_detail:crm_opportunity_tabs:activities",
           "crm_opportunity_common_detail:crm_opportunity_tabs:plan_and_quotes",
           "crm_opportunity_common_list:crm_opp_table:bulk_qualify",
+          "crm_opportunity_common_list:platform:analyze_current_view",
+          "crm_opportunity_common_list:platform:drill_chart_to_list",
           "crm_opportunity_common_list:crm_opp_tabs:proposal"
         ],
         "blocks": [

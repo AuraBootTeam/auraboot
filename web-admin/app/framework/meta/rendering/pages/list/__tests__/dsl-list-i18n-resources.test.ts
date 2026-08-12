@@ -29,6 +29,29 @@ const REQUIRED_COMMON_KEYS = [
   'filter',
   'search',
   'add_filter',
+  'view_analysis',
+  'view_analysis_scope',
+  'view_analysis_help',
+  'view_analysis_filters',
+  'view_analysis_chart_type',
+  'view_analysis_chart_bar',
+  'view_analysis_chart_line',
+  'view_analysis_chart_pie',
+  'view_analysis_chart_donut',
+  'view_analysis_chart_funnel',
+  'view_analysis_group',
+  'view_analysis_metric',
+  'view_analysis_count',
+  'view_analysis_sum',
+  'view_analysis_avg',
+  'view_analysis_numeric_field',
+  'view_analysis_drill_hint',
+  'view_analysis_refresh',
+  'view_analysis_failed',
+  'view_analysis_empty',
+  'view_analysis_empty_help',
+  'view_analysis_breakdown',
+  'view_analysis_open_records',
   'clear_all',
   'search_fields',
   'no_fields_found',
@@ -247,7 +270,9 @@ describe('DSL list page i18n zh-CN yaml resource', () => {
   });
 
   it.each(REQUIRED_JSON_EDITOR_KEYS)('%s exists in seed/i18n-base.json', (key) => {
-    const entries = JSON.parse(fs.readFileSync(SEED_JSON, 'utf-8')) as Array<Record<string, string>>;
+    const entries = JSON.parse(fs.readFileSync(SEED_JSON, 'utf-8')) as Array<
+      Record<string, string>
+    >;
     const entry = entries.find((item) => item.key === key);
     expect(entry, `${key} must be seeded for DB-backed /api/i18n`).toBeDefined();
     expect(entry?.['zh-CN']).toBeTruthy();

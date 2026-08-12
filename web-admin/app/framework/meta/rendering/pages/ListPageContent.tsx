@@ -69,6 +69,7 @@ import { ListTabs } from './list/ListTabs';
 import { ListPagination } from './list/ListPagination';
 import { ListModals } from './list/ListModals';
 import { ListToolbar } from './list/ListToolbar';
+import { ViewAnalysisDrawer } from './list/ViewAnalysisDrawer';
 import { ListTable } from './list/ListTable';
 import {
   BulkActionResultDialog,
@@ -835,6 +836,7 @@ function ListPageContentInner(props: PageContentProps) {
     createSelectionModel(),
   );
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
   const [pageState, setPageState] = useState(() => ({
     filters: { ...urlFilters } as Record<string, any>,
     pagination: {
@@ -847,6 +849,9 @@ function ListPageContentInner(props: PageContentProps) {
   // P2-1 fix: destructure state for convenience
   const { filters, pagination } = pageState;
   const schemaExtension = (schema as any)?.extension ?? {};
+  const isApiDatasourcePage = Boolean(
+    schema?.dataSource?.type === 'api' && schema.dataSource.endpoint,
+  );
   const skipListData = shouldSkipListData(schema);
   const skipModelFieldMeta = shouldSkipModelFieldMeta(schema, skipListData);
   const miscBlocksPosition = resolveListMiscBlocksPosition(schema);
@@ -3358,6 +3363,22 @@ function ListPageContentInner(props: PageContentProps) {
     [tableColumns, modelFieldMap, resolveColumnLabel],
   );
 
+  const handleAnalysisDrillDown = useCallback(
+    (drillFilters: import('~/framework/smart/types/chart').FilterConfig[]) => {
+      const next = drillFilters.map<ViewFilterConfig>((filter) => ({
+        fieldCode: filter.field,
+        operator: 'eq',
+        value: filter.value,
+      }));
+      setLocalChipFilters((previous) => {
+        const fields = new Set(next.map((filter) => filter.fieldCode));
+        return [...previous.filter((filter) => !fields.has(filter.fieldCode)), ...next];
+      });
+      setAnalysisOpen(false);
+    },
+    [setLocalChipFilters],
+  );
+
   // Personal-only baseline: changes to an explicit personal view are staged as
   // a visible local draft. The user chooses save-current, save-as-new, or discard.
   const [viewSavedHintOn, flashViewSavedHint] = useTransientFlag(2200);
@@ -4935,6 +4956,9 @@ function ListPageContentInner(props: PageContentProps) {
                 rowHeight={effectiveViewConfig?.rowHeight}
                 onRowHeightChange={handleRowHeightChange}
                 onColumnSettingsOpen={() => setColumnSettingsOpen(true)}
+                onAnalysisOpen={
+                  namedQueryCode || isApiDatasourcePage ? undefined : () => setAnalysisOpen(true)
+                }
                 chipFilters={chipFilters}
                 onChipFiltersChange={setLocalChipFilters}
                 fieldMetadata={filterFieldMetadata}
@@ -4979,6 +5003,17 @@ function ListPageContentInner(props: PageContentProps) {
                 hideFilterChips={
                   listExtensions?.hideFilterChips ?? Boolean(schemaExtension.hideFilterChips)
                 }
+              />
+
+              <ViewAnalysisDrawer
+                open={analysisOpen}
+                onClose={() => setAnalysisOpen(false)}
+                modelCode={schema?.modelCode || tableName}
+                viewName={currentView?.name}
+                keyword={keyword}
+                filters={activeRuntimeViewFilters}
+                fields={filterFieldMetadata}
+                onDrillDown={handleAnalysisDrillDown}
               />
 
               {/* T9 — cross-page select-all banner. Shown once the whole page

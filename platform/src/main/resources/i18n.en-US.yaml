@@ -999,6 +999,29 @@ common:
   filter: Filter
   search: Search
   add_filter: Add Filter
+  view_analysis: View analysis
+  view_analysis_scope: Current view
+  view_analysis_help: Analyze every matching record and click a chart point to return to the exact list
+  view_analysis_filters: Filters
+  view_analysis_chart_type: Chart type
+  view_analysis_chart_bar: Bar
+  view_analysis_chart_line: Line
+  view_analysis_chart_pie: Pie
+  view_analysis_chart_donut: Donut
+  view_analysis_chart_funnel: Funnel
+  view_analysis_group: Group by
+  view_analysis_metric: Measure
+  view_analysis_count: Record count
+  view_analysis_sum: Sum
+  view_analysis_avg: Average
+  view_analysis_numeric_field: Numeric field
+  view_analysis_drill_hint: Click any data point to filter the list
+  view_analysis_refresh: Refresh
+  view_analysis_failed: Analysis failed
+  view_analysis_empty: No matching data
+  view_analysis_empty_help: Adjust the list filters and try again
+  view_analysis_breakdown: Breakdown
+  view_analysis_open_records: Open matching records
   clear_all: Clear All
   search_fields: Search fields...
   no_fields_found: No fields found
