@@ -7,7 +7,8 @@
  * Behavior-preserving extraction — no functional changes.
  */
 
-import type { ColumnConfig } from '~/framework/meta/schemas/types';
+import type { ColumnConfig, FieldConfig } from '~/framework/meta/schemas/types';
+import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { ImportModal } from '~/framework/smart/components/data-tools/ImportModal';
 import FormDialog from '~/framework/meta/runtime/actions/FormDialog';
 import { ViewManagePanel } from '~/framework/smart/components/view/ViewManagePanel';
@@ -19,6 +20,7 @@ import {
 import { FilterFieldPicker } from '~/framework/smart/components/view/FilterFieldPicker';
 import { FilterValuePopover } from '~/framework/smart/components/view/FilterValuePopover';
 import { BulkEditModal } from '~/framework/smart/components/bulk/BulkEditModal';
+import { BulkFieldCommandModal } from '~/framework/smart/components/bulk/BulkFieldCommandModal';
 import { RecordPreviewDrawer } from '~/framework/smart/components/preview/RecordPreviewDrawer';
 import { ColumnContextMenu } from './ColumnContextMenu';
 import type { ListFilterFieldMetadata } from '../ListPageContent';
@@ -40,6 +42,16 @@ export interface ListModalsProps {
   bulkEditFields: Array<{ code: string; name: string; dataType: string }>;
   onBulkEditComplete: () => void;
   locale: string;
+
+  // BulkFieldCommandModal
+  bulkFieldCommand: {
+    actionLabel: string;
+    selectedCount: number;
+    field: FieldConfig;
+  } | null;
+  bulkFieldCommandContext: ExpressionContext;
+  onBulkFieldCommandClose: () => void;
+  onBulkFieldCommandSubmit: (value: unknown) => Promise<void>;
 
   // ImportModal
   importOpen: boolean;
@@ -128,6 +140,12 @@ export function ListModals({
   bulkEditFields,
   onBulkEditComplete,
   locale,
+
+  // BulkFieldCommandModal
+  bulkFieldCommand,
+  bulkFieldCommandContext,
+  onBulkFieldCommandClose,
+  onBulkFieldCommandSubmit,
 
   // ImportModal
   importOpen,
@@ -218,6 +236,20 @@ export function ListModals({
           locale={locale}
           t={t}
           onUpdateComplete={onBulkEditComplete}
+        />
+      )}
+
+      {bulkFieldCommand && (
+        <BulkFieldCommandModal
+          open
+          actionLabel={bulkFieldCommand.actionLabel}
+          selectedCount={bulkFieldCommand.selectedCount}
+          field={bulkFieldCommand.field}
+          context={bulkFieldCommandContext}
+          locale={locale}
+          t={t}
+          onClose={onBulkFieldCommandClose}
+          onSubmit={onBulkFieldCommandSubmit}
         />
       )}
 

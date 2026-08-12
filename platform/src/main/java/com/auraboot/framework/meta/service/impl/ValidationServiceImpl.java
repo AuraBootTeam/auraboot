@@ -8,6 +8,7 @@ import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.exception.MetaServiceException;
+import com.auraboot.framework.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.expression.EvaluationContext;
@@ -35,6 +36,7 @@ import java.util.regex.Pattern;
 public class ValidationServiceImpl extends BaseMetaService implements ValidationService {
 
     private final DynamicDataMapper dynamicDataMapper;
+    private final UserService userService;
     private final SpelExpressionParser spelParser = new SpelExpressionParser();
 
     @Override
@@ -110,6 +112,12 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         // 数据类型验证
         validateDataType(fieldDefinition, value, errors);
 
+        // A sys_user PID is global, while business ownership is tenant-scoped.
+        // Shape validation alone would allow a caller to persist a user from a
+        // different tenant and corrupt owner-based authorization. Resolve it
+        // through the active tenant-member projection before any write path.
+        validateSystemUserReference(fieldDefinition, value, errors);
+
         // 长度验证
         validateLength(fieldDefinition, value, errors, warnings);
 
@@ -131,6 +139,25 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                 .errors(errors)
                 .warnings(warnings)
                 .build();
+    }
+
+    private void validateSystemUserReference(
+            FieldDefinition fieldDefinition,
+            Object value,
+            List<String> errors) {
+        FieldDefinition.RefTarget refTarget = fieldDefinition.getRefTarget();
+        if (refTarget == null || !"sys_user".equalsIgnoreCase(refTarget.getTargetEntity())) {
+            return;
+        }
+        if (!(value instanceof String userPid) || userPid.isBlank()) {
+            return;
+        }
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null || userService == null
+                || userService.findInTenantByPid(tenantId, userPid) == null) {
+            errors.add("Field '" + fieldDefinition.getName()
+                    + "' must reference an active user in the current tenant");
+        }
     }
 
     @Override

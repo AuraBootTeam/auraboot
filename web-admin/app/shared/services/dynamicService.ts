@@ -13,6 +13,7 @@ import type {
   PageSchema,
   FieldOption,
 } from '~/types/dynamic';
+import type { DynamicBatchResult } from '~/types/dynamic';
 
 /**
  * Helper function to handle API responses
@@ -148,12 +149,12 @@ export class DynamicService {
     entityCode: string,
     updates: { id: string; data: Record<string, any> }[],
     request?: Request,
-  ): Promise<DynamicEntity[]> {
+  ): Promise<DynamicBatchResult> {
     const rows = updates.map((update) => ({
       ...update.data,
       pid: update.id,
     }));
-    const result = await put<DynamicEntity[]>(
+    const result = await put<DynamicBatchResult>(
       `${this.baseUrl}/${entityCode}/batch`,
       rows,
       undefined,
@@ -166,12 +167,7 @@ export class DynamicService {
    * 批量删除数据
    */
   async batchDelete(entityCode: string, ids: string[], request?: Request): Promise<void> {
-    const result = await del<void>(
-      `${this.baseUrl}/${entityCode}/batch`,
-      ids,
-      undefined,
-      request,
-    );
+    const result = await del<void>(`${this.baseUrl}/${entityCode}/batch`, ids, undefined, request);
     if (!ResultHelper.isSuccess(result)) {
       throw new Error(result.desc || 'Failed to batch delete entities');
     }

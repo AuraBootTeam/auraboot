@@ -112,14 +112,37 @@
           "edit": {
             "permissionCode": "crm.opportunity.manage"
           },
-          "delete": {
-            "permissionCode": "crm.opportunity.manage"
-          },
+          "delete": false,
           "export": {
             "permissionCode": "crm.opportunity.read"
           }
         },
         "bulkActions": [
+          {
+            "code": "bulk_transfer_owner",
+            "permissionCode": "crm.opportunity.manage",
+            "label": {
+              "zh-CN": "批量转移负责人",
+              "en-US": "Transfer Owner"
+            },
+            "action": {
+              "type": "bulk_field_command",
+              "command": "crm:update_opportunity",
+              "input": {
+                "field": "crm_opp_owner",
+                "label": {
+                  "zh-CN": "新负责人",
+                  "en-US": "New Owner"
+                },
+                "type": "reference",
+                "component": "MemberPicker",
+                "required": true,
+                "props": {
+                  "multiple": false
+                }
+              }
+            }
+          },
           {
             "code": "bulk_qualify",
             "permissionCode": "crm.opportunity.manage",
@@ -171,6 +194,24 @@
             "action": {
               "type": "bulk_state_transition",
               "command": "crm:lose_opportunity"
+            }
+          },
+          {
+            "code": "bulk_delete_opportunities",
+            "permissionCode": "crm.opportunity.manage",
+            "variant": "danger",
+            "label": {
+              "zh-CN": "批量删除",
+              "en-US": "Delete Selected"
+            },
+            "confirm": {
+              "zh-CN": "确定删除选中的商机吗？仅发现和资格确认阶段允许删除；其他记录会被拒绝并列出原因。",
+              "en-US": "Delete selected opportunities? Only discovery and qualification records may be deleted; other records will be rejected with reasons."
+            },
+            "action": {
+              "type": "bulk_record_command",
+              "command": "crm:delete_opportunity",
+              "operationType": "DELETE"
             }
           }
         ]

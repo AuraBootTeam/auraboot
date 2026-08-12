@@ -158,6 +158,19 @@ interface ListLoadDataParams {
   sorts?: SortConfig[];
 }
 
+interface BulkFieldCommandState {
+  button: ButtonConfig;
+  selectedIds: string[];
+  selectedCount: number;
+  actionLabel: string;
+  field: FieldConfig;
+  operationType: 'UPDATE' | 'DELETE';
+}
+
+export function buildBulkFieldCommandPayload(field: FieldConfig, value: unknown) {
+  return { [field.field]: value };
+}
+
 export interface ListReferenceDisplayConfig {
   field: string;
   modelCode: string;
@@ -970,6 +983,7 @@ function ListPageContentInner(props: PageContentProps) {
     createSelectionModel(),
   );
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkFieldCommand, setBulkFieldCommand] = useState<BulkFieldCommandState | null>(null);
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [pageState, setPageState] = useState(() => ({
     filters: { ...urlFilters } as Record<string, any>,
@@ -1754,12 +1768,14 @@ function ListPageContentInner(props: PageContentProps) {
       },
       state: {
         filters,
+        selectedIds: selectedIdList,
       },
       locale,
       t: (key: string) => t(key),
+      token,
       __dataSourceManager: dataSourceManager,
     });
-  }, [locale, filters, t, dataSourceManager]);
+  }, [locale, filters, selectedIdList, t, token, dataSourceManager]);
 
   // Get current tab filter as QueryCondition (if tabs block exists)
   const getTabFilter = useCallback((): {
@@ -2605,6 +2621,97 @@ function ListPageContentInner(props: PageContentProps) {
     [schema?.modelCode, tableName, loadData, pagination.pageSize, filters],
   );
 
+  const executeTargetedBulkCommand = useCallback(
+    async (
+      button: ButtonConfig,
+      ids: string[],
+      payload: Record<string, unknown>,
+      operationType: 'UPDATE' | 'DELETE' = 'UPDATE',
+    ) => {
+      const label = resolveButtonLabel(button);
+      const isZhLocale = locale.toLowerCase().startsWith('zh');
+      let successCount = 0;
+      const failures: BulkActionFailure[] = [];
+      const recordLabelById = new Map(
+        data.map((record) => {
+          const id = getPublicRecordKey(record) || '';
+          const recordLabel =
+            record.name ||
+            record.title ||
+            record.crm_opp_name ||
+            record.code ||
+            record.crm_opp_code ||
+            id;
+          return [id, String(recordLabel)] as const;
+        }),
+      );
+      const command = (button.action as any)?.command || button.commandCode;
+      if (!command) return;
+
+      for (const id of ids) {
+        try {
+          const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
+            method: 'post',
+            params: {
+              ...buildCommandTargetParams(id),
+              payload,
+              operationType,
+            },
+            token: token || undefined,
+          });
+          if (ResultHelper.isSuccess(result)) {
+            successCount += 1;
+          } else {
+            failures.push({
+              recordPid: id,
+              recordLabel: recordLabelById.get(id) || id,
+              reason: (result as any).desc || (result as any).message || 'Command failed',
+            });
+          }
+        } catch (error) {
+          failures.push({
+            recordPid: id,
+            recordLabel: recordLabelById.get(id) || id,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      if (successCount > 0) {
+        setSelectionState(selectionClearSelection);
+        await loadData({ page: 0, size: pagination.pageSize, filters });
+      }
+
+      if (failures.length === 0) {
+        showToast(
+          translateOrFallback(
+            t,
+            'list.bulkAction.success',
+            isZhLocale
+              ? `${label}已完成，成功 ${successCount} 条`
+              : `${label} completed for ${successCount} records`,
+          ),
+          'success',
+        );
+      } else {
+        showToast(
+          successCount > 0
+            ? translateOrFallback(
+                t,
+                'list.bulkAction.partial',
+                isZhLocale
+                  ? `${label}部分完成：成功 ${successCount} 条，失败 ${failures.length} 条`
+                  : `${label} completed for ${successCount} records; ${failures.length} failed`,
+              )
+            : failures[0]?.reason || `${label} failed`,
+          successCount > 0 ? 'warning' : 'error',
+        );
+        setBulkActionResult({ actionLabel: label, successCount, failures });
+      }
+    },
+    [data, filters, loadData, locale, pagination.pageSize, resolveButtonLabel, showToast, t, token],
+  );
+
   const handleBulkAction = useCallback(
     async (button: ButtonConfig, ids: string[]) => {
       if (ids.length === 0) return;
@@ -2625,6 +2732,30 @@ function ListPageContentInner(props: PageContentProps) {
         return;
       }
 
+      if (actionType === 'bulk_field_command') {
+        const field = (actionDef as any)?.input as FieldConfig | undefined;
+        if (!field?.field) {
+          showToast(
+            translateOrFallback(
+              t,
+              'list.bulkAction.missingInput',
+              'Bulk field action is missing its input field',
+            ),
+            'error',
+          );
+          return;
+        }
+        setBulkFieldCommand({
+          button,
+          selectedIds: [...ids],
+          selectedCount: ids.length,
+          actionLabel: resolveButtonLabel(button),
+          field,
+          operationType: (actionDef as any)?.operationType || 'UPDATE',
+        });
+        return;
+      }
+
       const confirmKey = button.confirm || button.confirmMessageKey;
       if (confirmKey) {
         const { title, content } = resolveConfirmDialog(confirmKey, t);
@@ -2636,55 +2767,22 @@ function ListPageContentInner(props: PageContentProps) {
         if (!confirmed) return;
       }
 
+      if (actionType === 'bulk_state_transition' || actionType === 'bulk_record_command') {
+        await executeTargetedBulkCommand(
+          button,
+          ids,
+          {},
+          (actionDef as any)?.operationType || 'UPDATE',
+        );
+        return;
+      }
+
       const label = resolveButtonLabel(button);
       const isZhLocale = locale.toLowerCase().startsWith('zh');
       let successCount = 0;
       const failures: BulkActionFailure[] = [];
-      const recordLabelById = new Map(
-        data.map((record) => {
-          const id = getPublicRecordKey(record) || '';
-          const label =
-            record.name ||
-            record.title ||
-            record.crm_opp_name ||
-            record.code ||
-            record.crm_opp_code ||
-            id;
-          return [id, String(label)] as const;
-        }),
-      );
-      const recordLabel = (id: string) => recordLabelById.get(id) || id;
 
-      if (actionType === 'bulk_state_transition') {
-        for (const id of ids) {
-          try {
-            const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
-              method: 'post',
-              params: {
-                ...buildCommandTargetParams(id),
-                payload: {},
-                operationType: 'UPDATE',
-              },
-              token: token || undefined,
-            });
-            if (ResultHelper.isSuccess(result)) {
-              successCount += 1;
-            } else {
-              failures.push({
-                recordPid: id,
-                recordLabel: recordLabel(id),
-                reason: (result as any).desc || (result as any).message || 'Command failed',
-              });
-            }
-          } catch (error) {
-            failures.push({
-              recordPid: id,
-              recordLabel: recordLabel(id),
-              reason: error instanceof Error ? error.message : String(error),
-            });
-          }
-        }
-      } else if (actionType === 'bulk_command') {
+      if (actionType === 'bulk_command') {
         const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
           method: 'post',
           params: {
@@ -2752,7 +2850,7 @@ function ListPageContentInner(props: PageContentProps) {
     },
     [
       canUseButton,
-      data,
+      executeTargetedBulkCommand,
       filters,
       loadData,
       locale,
@@ -2763,6 +2861,20 @@ function ListPageContentInner(props: PageContentProps) {
       t,
       token,
     ],
+  );
+
+  const handleBulkFieldCommandSubmit = useCallback(
+    async (value: unknown) => {
+      if (!bulkFieldCommand) return;
+      await executeTargetedBulkCommand(
+        bulkFieldCommand.button,
+        bulkFieldCommand.selectedIds,
+        buildBulkFieldCommandPayload(bulkFieldCommand.field, value),
+        bulkFieldCommand.operationType,
+      );
+      setBulkFieldCommand(null);
+    },
+    [bulkFieldCommand, executeTargetedBulkCommand],
   );
 
   const handleBulkEditComplete = useCallback(() => {
@@ -5288,6 +5400,7 @@ function ListPageContentInner(props: PageContentProps) {
                 onPageChange={handlePageChange}
                 onPageSizeChange={handlePageSizeChange}
                 t={t}
+                locale={locale}
                 selectedCount={effectiveSelectedCount}
                 selectedIds={selectedIdList}
                 modelCode={modelCode}
@@ -5346,6 +5459,10 @@ function ListPageContentInner(props: PageContentProps) {
             }))}
             onBulkEditComplete={handleBulkEditComplete}
             locale={locale}
+            bulkFieldCommand={bulkFieldCommand}
+            bulkFieldCommandContext={pageContext}
+            onBulkFieldCommandClose={() => setBulkFieldCommand(null)}
+            onBulkFieldCommandSubmit={handleBulkFieldCommandSubmit}
             // ImportModal
             importOpen={importOpen}
             onImportClose={() => setImportOpen(false)}

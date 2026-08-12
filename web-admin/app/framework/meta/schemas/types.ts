@@ -320,6 +320,19 @@ export type ActionDef =
   | ({ type: 'state_transition'; command: string } & CommandInputFormConfig)
   | ({ type: 'bulk_command'; command: string } & CommandInputFormConfig)
   | ({ type: 'bulk_state_transition'; command: string } & CommandInputFormConfig)
+  | {
+      /** Execute the same command once per selected record with an exact target PID. */
+      type: 'bulk_record_command';
+      command: string;
+      operationType?: 'UPDATE' | 'DELETE';
+    }
+  | {
+      /** Collect one DSL field value, then execute the command once per exact target PID. */
+      type: 'bulk_field_command';
+      command: string;
+      input: FieldConfig;
+      operationType?: 'UPDATE' | 'DELETE';
+    }
   | { type: 'navigate'; to: string; command?: string; hardReload?: boolean }
   | { type: 'builtin'; name: string }
   | { type: 'flow'; steps: FlowStep[] }

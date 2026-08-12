@@ -28,8 +28,8 @@
       "menus": 45,
       "pages": 96,
       "page-blocks": 316,
-      "page-fields": 1324,
-      "ui-actions": 466,
+      "page-fields": 1325,
+      "ui-actions": 468,
       "commands": 193,
       "permissions": 87,
       "queries": 45,
@@ -37,7 +37,7 @@
     },
     "productVerdicts": {
       "pass": 329,
-      "untested": 2317
+      "untested": 2320
     },
     "fullProductNonGoals": [
       "data migration"
@@ -20724,7 +20724,20 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[0].tabs[5].filter.field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_code:5",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_owner:5",
+          "action": "Verify field crm_opp_owner in crm_opp_table on crm_opportunity_common_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[0].action.input.field"
+        },
+        {
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_code:6",
           "action": "Verify field crm_opp_code in crm_opp_table on crm_opportunity_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -20737,7 +20750,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[0].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_name:6",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_name:7",
           "action": "Verify field crm_opp_name in crm_opp_table on crm_opportunity_common_list",
           "evidence": [
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
@@ -20752,7 +20765,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[1].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_account_id:7",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_account_id:8",
           "action": "Verify field crm_opp_account_id in crm_opp_table on crm_opportunity_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -20765,7 +20778,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[2].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_stage:8",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_stage:9",
           "action": "Verify field crm_opp_stage in crm_opp_table on crm_opportunity_common_list",
           "evidence": [
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
@@ -20780,7 +20793,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[3].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_forecast_category:9",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_forecast_category:10",
           "action": "Verify field crm_opp_forecast_category in crm_opp_table on crm_opportunity_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -20793,7 +20806,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[4].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_expected_amount:10",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_expected_amount:11",
           "action": "Verify field crm_opp_expected_amount in crm_opp_table on crm_opportunity_common_list",
           "evidence": [
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
@@ -20808,7 +20821,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[5].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_expected_close_date:11",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_expected_close_date:12",
           "action": "Verify field crm_opp_expected_close_date in crm_opp_table on crm_opportunity_common_list",
           "evidence": [
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
@@ -20823,7 +20836,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[6].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_probability:12",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_probability:13",
           "action": "Verify field crm_opp_probability in crm_opp_table on crm_opportunity_common_list",
           "evidence": [
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
@@ -20838,7 +20851,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[7].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_owner:13",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_owner:14",
           "action": "Verify field crm_opp_owner in crm_opp_table on crm_opportunity_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -20851,7 +20864,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[8].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:actions:14",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:actions:15",
           "action": "Verify field actions in crm_opp_table on crm_opportunity_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -20864,7 +20877,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[9].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:created_at:15",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:created_at:16",
           "action": "Verify field created_at in crm_opp_table on crm_opportunity_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -30406,7 +30419,20 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[1].buttons[0]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_qualify:7",
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_transfer_owner:7",
+          "action": "bulk-action bulk_transfer_owner on crm_opportunity_common_list -> bulk_field_command:crm:update_opportunity",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[0]"
+        },
+        {
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_qualify:8",
           "action": "bulk-action bulk_qualify on crm_opportunity_common_list -> bulk_state_transition:crm:qualify_opportunity",
           "evidence": [
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
@@ -30418,24 +30444,11 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[0]"
-        },
-        {
-          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_advance_proposal:8",
-          "action": "bulk-action bulk_advance_proposal on crm_opportunity_common_list -> bulk_state_transition:crm:advance_opp_to_proposal",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "authority": "blocking-release",
-          "driver": "browser",
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[1]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_advance_negotiation:9",
-          "action": "bulk-action bulk_advance_negotiation on crm_opportunity_common_list -> bulk_state_transition:crm:advance_opp_to_negotiation",
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_advance_proposal:9",
+          "action": "bulk-action bulk_advance_proposal on crm_opportunity_common_list -> bulk_state_transition:crm:advance_opp_to_proposal",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -30447,8 +30460,8 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[2]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_mark_lost:10",
-          "action": "bulk-action bulk_mark_lost on crm_opportunity_common_list -> bulk_state_transition:crm:lose_opportunity",
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_advance_negotiation:10",
+          "action": "bulk-action bulk_advance_negotiation on crm_opportunity_common_list -> bulk_state_transition:crm:advance_opp_to_negotiation",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -30460,7 +30473,33 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[3]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:view:11",
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_mark_lost:11",
+          "action": "bulk-action bulk_mark_lost on crm_opportunity_common_list -> bulk_state_transition:crm:lose_opportunity",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[4]"
+        },
+        {
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_delete_opportunities:12",
+          "action": "bulk-action bulk_delete_opportunities on crm_opportunity_common_list -> bulk_record_command:crm:delete_opportunity",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[5]"
+        },
+        {
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:view:13",
           "action": "button view on crm_opportunity_common_list -> navigate:crm_opportunity_common_detail",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30473,7 +30512,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[9].buttons[0]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:edit:12",
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:edit:14",
           "action": "button edit on crm_opportunity_common_list -> navigate:crm_opportunity_common_form",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30486,7 +30525,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[9].buttons[1]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:delete:13",
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:delete:15",
           "action": "button delete on crm_opportunity_common_list -> command:n/a",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",

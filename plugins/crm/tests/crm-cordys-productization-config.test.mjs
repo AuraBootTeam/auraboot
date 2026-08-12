@@ -151,6 +151,39 @@ test('opportunity daily-efficiency surface shares one saved-view fact across lis
   );
 });
 
+test('opportunity bulk actions transfer owners and preserve command-owned delete rules', () => {
+  const table = findBlock(opportunityList.blocks, 'crm_opp_table')?.table;
+  assert.ok(table, 'opportunity list table should exist');
+  assert.equal(table.bulkCapabilities?.delete, false);
+  assert.equal(table.bulkCapabilities?.edit?.permissionCode, 'crm.opportunity.manage');
+  assert.equal(table.bulkCapabilities?.export?.permissionCode, 'crm.opportunity.read');
+
+  const actions = new Map(table.bulkActions.map((action) => [action.code, action]));
+  const transfer = actions.get('bulk_transfer_owner');
+  assert.equal(transfer?.permissionCode, 'crm.opportunity.manage');
+  assert.deepEqual(transfer?.action, {
+    type: 'bulk_field_command',
+    command: 'crm:update_opportunity',
+    input: {
+      field: 'crm_opp_owner',
+      label: { 'zh-CN': '新负责人', 'en-US': 'New Owner' },
+      type: 'reference',
+      component: 'MemberPicker',
+      required: true,
+      props: { multiple: false },
+    },
+  });
+
+  const safeDelete = actions.get('bulk_delete_opportunities');
+  assert.equal(safeDelete?.variant, 'danger');
+  assert.deepEqual(safeDelete?.action, {
+    type: 'bulk_record_command',
+    command: 'crm:delete_opportunity',
+    operationType: 'DELETE',
+  });
+  assert.match(safeDelete?.confirm?.['zh-CN'] ?? '', /仅发现和资格确认阶段允许删除/);
+});
+
 test('forecast cockpit separates outcome hierarchy from execution status', () => {
   const primary = findBlock(forecastCockpit.blocks, 'crm_forecast_metrics');
   assert.deepEqual(

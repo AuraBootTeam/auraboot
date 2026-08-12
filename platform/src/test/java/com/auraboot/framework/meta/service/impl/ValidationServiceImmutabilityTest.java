@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ValidationServiceImmutabilityTest {
 
     /** validateImmutability never touches the mapper, so a null collaborator is honest here. */
-    private final ValidationServiceImpl validation = new ValidationServiceImpl(null);
+    private final ValidationServiceImpl validation = new ValidationServiceImpl(null, null);
 
     private ModelDefinition quoteModel() {
         FieldDefinition price = FieldDefinition.builder()

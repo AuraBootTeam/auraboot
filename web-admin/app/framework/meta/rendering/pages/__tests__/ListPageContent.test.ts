@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildListReferenceDisplayCacheKey,
+  buildBulkFieldCommandPayload,
   buildViewManageFieldOptions,
   buildListColumnSettingsDefinitions,
   buildListFilterFieldMetadata,
@@ -29,6 +30,17 @@ import {
   resolveSavedViewFilterExpressions,
 } from '../ListPageContent';
 
+describe('buildBulkFieldCommandPayload', () => {
+  it('maps the collected value only to the DSL-owned command input', () => {
+    expect(
+      buildBulkFieldCommandPayload(
+        { field: 'crm_opp_owner', component: 'MemberPicker', required: true },
+        'user-public-pid',
+      ),
+    ).toEqual({ crm_opp_owner: 'user-public-pid' });
+  });
+});
+
 describe('useSerializedSearchParamsUpdater', () => {
   it('merges same-turn functional URL updates instead of restoring a stale query string', () => {
     const committed: string[] = [];
@@ -44,16 +56,22 @@ describe('useSerializedSearchParamsUpdater', () => {
     );
 
     act(() => {
-      result.current((prev: URLSearchParams) => {
-        const next = new URLSearchParams(prev);
-        next.set('view', 'personal-view');
-        return next;
-      }, { replace: true });
-      result.current((prev: URLSearchParams) => {
-        const next = new URLSearchParams(prev);
-        next.set('pageNum', '1');
-        return next;
-      }, { replace: true });
+      result.current(
+        (prev: URLSearchParams) => {
+          const next = new URLSearchParams(prev);
+          next.set('view', 'personal-view');
+          return next;
+        },
+        { replace: true },
+      );
+      result.current(
+        (prev: URLSearchParams) => {
+          const next = new URLSearchParams(prev);
+          next.set('pageNum', '1');
+          return next;
+        },
+        { replace: true },
+      );
     });
 
     expect(committed.at(-1)).toBe('sort=updated_at%3Adesc&view=personal-view&pageNum=1');

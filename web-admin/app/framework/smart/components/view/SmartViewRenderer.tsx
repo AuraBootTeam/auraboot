@@ -23,6 +23,7 @@ import type { SavedView, ViewType } from '~/framework/smart/types/savedView';
 import type { KanbanCard, KanbanCardMoveEvent } from '~/framework/smart/types/kanban';
 import type { FilterConfig } from '~/framework/smart/types/chart';
 import { cn } from '~/utils/cn';
+import { useI18n } from '~/contexts/I18nContext';
 
 /**
  * Props for SmartViewRenderer component
@@ -117,6 +118,7 @@ export const SmartViewRenderer: React.FC<SmartViewRendererProps> = ({
   bulkEditFields,
   onDataRefresh,
 }) => {
+  const { locale, t } = useI18n();
   const viewType: ViewType = (view.viewType as ViewType) || 'table';
   const [importOpen, setImportOpen] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
@@ -296,6 +298,8 @@ export const SmartViewRenderer: React.FC<SmartViewRendererProps> = ({
           onBulkEdit={bulkEditFields ? () => setBulkEditOpen(true) : undefined}
           onBulkDelete={onBulkDelete}
           onClearSelection={onClearSelection}
+          locale={locale}
+          t={t}
         />
       )}
 
