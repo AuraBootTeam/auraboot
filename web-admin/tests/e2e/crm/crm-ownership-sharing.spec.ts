@@ -1,11 +1,13 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { createCookieSessionStorage } from 'react-router';
+import { Pool } from 'pg';
 import {
   clickRowActionByLocator,
   executeCommandViaApi,
   queryFilteredList,
   uniqueId,
 } from '../helpers';
+import { PG_CONN } from '../../helpers/environments';
 
 const PASSWORD = 'Test2026x';
 const MODEL_CODE = 'crm_account_common';
@@ -125,39 +127,66 @@ test.describe('CRM account collaboration', () => {
         (response) =>
           response.url().endsWith('/api/record-share') && response.request().method() === 'POST',
       );
+      await dialog.getByTestId('record-share-expiry-7d').click();
       await dialog.getByTestId('record-share-add-btn').click();
-      expect((await shareResponse).ok(), 'owner share request').toBe(true);
+      const completedShareResponse = await shareResponse;
+      expect(completedShareResponse.ok(), 'owner share request').toBe(true);
+      const createSharePayload = completedShareResponse.request().postDataJSON() as Record<
+        string,
+        unknown
+      >;
+      expect(createSharePayload).toMatchObject({
+        resourceCode: MODEL_CODE,
+        recordPid: ownerAccount.pid,
+        subjectType: 'member',
+        subjectPid: recipient.pid,
+        permissionMask: 'read',
+      });
+      expect(new Date(String(createSharePayload.expiresAt)).getTime()).toBeGreaterThan(
+        Date.now() + 6 * 24 * 60 * 60 * 1000,
+      );
       const shareRow = dialog
         .locator('[data-testid^="record-share-row-"]')
         .filter({ hasText: recipient.displayName });
       await expect(shareRow).toBeVisible({ timeout: 10_000 });
       await expect(shareRow).toContainText(/仅查看|View only/);
+      await expect(shareRow).toContainText(/到期于|Expires/);
       await expect(dialog).not.toContainText(recipient.pid!);
+      const sharePid = (await shareRow.getAttribute('data-testid'))?.replace(
+        'record-share-row-',
+        '',
+      );
+      expect(sharePid, 'share row exposes a stable public share PID').toMatch(/\S+/);
+      expect(sharePid, 'share row must not expose an internal numeric ID').not.toMatch(/^\d+$/);
       await testInfo.attach('owner-share-dialog', {
         body: await ownerPage.screenshot(),
         contentType: 'image/png',
       });
 
-      await expect.poll(
-        async () => {
-          const response = await recipientPage.request.get(
-            '/api/notifications?pageNum=1&pageSize=50',
-          );
-          if (!response.ok()) return null;
-          const body = await response.json().catch(() => ({}));
-          const rows = (body?.data?.records ?? []) as Array<Record<string, unknown>>;
-          return rows.find(
-            (row) =>
-              String(row.sourceType ?? '') === MODEL_CODE &&
-              String(row.sourceId ?? '') === ownerAccount.pid,
-          ) ?? null;
-        },
-        { message: 'recipient receives a record-collaboration notification' },
-      ).toMatchObject({
-        category: 'business',
-        sourceType: MODEL_CODE,
-        sourceId: ownerAccount.pid,
-      });
+      await expect
+        .poll(
+          async () => {
+            const response = await recipientPage.request.get(
+              '/api/notifications?pageNum=1&pageSize=50',
+            );
+            if (!response.ok()) return null;
+            const body = await response.json().catch(() => ({}));
+            const rows = (body?.data?.records ?? []) as Array<Record<string, unknown>>;
+            return (
+              rows.find(
+                (row) =>
+                  String(row.sourceType ?? '') === MODEL_CODE &&
+                  String(row.sourceId ?? '') === ownerAccount.pid,
+              ) ?? null
+            );
+          },
+          { message: 'recipient receives a record-collaboration notification' },
+        )
+        .toMatchObject({
+          category: 'business',
+          sourceType: MODEL_CODE,
+          sourceId: ownerAccount.pid,
+        });
 
       await expectAccountVisibility(
         recipientPage,
@@ -187,13 +216,11 @@ test.describe('CRM account collaboration', () => {
         .getByTestId('quick-filters')
         .getByRole('button', { name: /协作客户|Collaborative Accounts/ });
       await expect(collaborativeView).toBeVisible({ timeout: 10_000 });
-      const collaborativeListResponse = recipientPage.waitForResponse(
-        (response) => {
-          if (!response.url().includes(`/api/dynamic/${MODEL_CODE}/list`)) return false;
-          const filters = new URL(response.url()).searchParams.get('filters') ?? '';
-          return filters.includes('$currentSharedRecordPids') && response.status() === 200;
-        },
-      );
+      const collaborativeListResponse = recipientPage.waitForResponse((response) => {
+        if (!response.url().includes(`/api/dynamic/${MODEL_CODE}/list`)) return false;
+        const filters = new URL(response.url()).searchParams.get('filters') ?? '';
+        return filters.includes('$currentSharedRecordPids') && response.status() === 200;
+      });
       await collaborativeView.click();
       await collaborativeListResponse;
       await expect(
@@ -214,6 +241,62 @@ test.describe('CRM account collaboration', () => {
         contentType: 'image/png',
       });
 
+      await expireOwnShareForClockAdvance(sharePid!);
+      await expectAccountVisibility(
+        recipientPage,
+        ownerAccount,
+        false,
+        'expired share removes recipient list/detail visibility',
+      );
+
+      await dialog.getByTestId('record-share-dialog-close').click();
+      await ownerPage.locator('[data-testid$="share-btn"]').click();
+      await expect(dialog).toBeVisible();
+      const expiredShareRow = dialog.getByTestId(`record-share-row-${sharePid}`);
+      await expect(expiredShareRow).toContainText(/已到期|Expired/);
+      await expect(expiredShareRow.getByRole('button', { name: /续期|Renew/ })).toBeVisible();
+      await testInfo.attach('owner-expired-collaboration-visible', {
+        body: await ownerPage.screenshot(),
+        contentType: 'image/png',
+      });
+
+      await expiredShareRow.getByRole('button', { name: /续期|Renew/ }).click();
+      await expect(dialog.getByTestId('record-share-editing-member')).toContainText(
+        recipient.displayName,
+      );
+      await dialog.getByTestId('record-share-expiry-30d').click();
+      const renewalResponse = ownerPage.waitForResponse(
+        (response) =>
+          response.url().endsWith(`/api/record-share/${sharePid}`) &&
+          response.request().method() === 'PATCH',
+      );
+      await dialog.getByTestId('record-share-add-btn').click();
+      const completedRenewalResponse = await renewalResponse;
+      expect(completedRenewalResponse.ok(), 'owner renewal request').toBe(true);
+      const renewalPayload = completedRenewalResponse.request().postDataJSON() as Record<
+        string,
+        unknown
+      >;
+      expect(renewalPayload).toEqual({
+        permissionMask: 'read',
+        expiresAt: expect.any(String),
+      });
+      expect(new Date(String(renewalPayload.expiresAt)).getTime()).toBeGreaterThan(
+        Date.now() + 29 * 24 * 60 * 60 * 1000,
+      );
+      await expect(expiredShareRow).not.toContainText(/已到期|Expired/);
+      await expect(expiredShareRow).toContainText(/到期于|Expires/);
+      await expectAccountVisibility(
+        recipientPage,
+        ownerAccount,
+        true,
+        'renewed share restores recipient list/detail visibility',
+      );
+      await testInfo.attach('owner-collaboration-renewed', {
+        body: await ownerPage.screenshot(),
+        contentType: 'image/png',
+      });
+
       const existingOwnerToasts = ownerPage.getByRole('button', {
         name: 'Close notification',
       });
@@ -222,17 +305,20 @@ test.describe('CRM account collaboration', () => {
       }
       await expect(ownerPage.getByTestId('toast-stack').getByRole('alert')).toHaveCount(0);
 
-      await dialog.getByTestId('member-picker-add').click();
-      await dialog.getByTestId('member-picker-search-input').fill(recipient.email);
-      await expect(recipientOption).toBeVisible({ timeout: 10_000 });
-      await recipientOption.click();
+      await expiredShareRow.getByRole('button', { name: /编辑|Edit/ }).click();
       await dialog.getByTestId('record-share-permission-read-update').click();
       const upgradeResponse = ownerPage.waitForResponse(
         (response) =>
-          response.url().endsWith('/api/record-share') && response.request().method() === 'POST',
+          response.url().endsWith(`/api/record-share/${sharePid}`) &&
+          response.request().method() === 'PATCH',
       );
       await dialog.getByTestId('record-share-add-btn').click();
-      expect((await upgradeResponse).ok(), 'owner collaboration upgrade request').toBe(true);
+      const completedUpgradeResponse = await upgradeResponse;
+      expect(completedUpgradeResponse.ok(), 'owner collaboration upgrade request').toBe(true);
+      expect(completedUpgradeResponse.request().postDataJSON()).toEqual({
+        permissionMask: 'read,update',
+        expiresAt: expect.any(String),
+      });
       await expect(shareRow).toContainText(/可协作|Collaborate/);
       await expect(dialog.locator('[data-testid^="record-share-row-"]')).toHaveCount(1);
       await testInfo.attach('owner-collaboration-upgraded', {
@@ -258,12 +344,6 @@ test.describe('CRM account collaboration', () => {
       ).toBe(true);
       ownerAccount.name = collaborativeName;
 
-      const sharePid = (await shareRow.getAttribute('data-testid'))?.replace(
-        'record-share-row-',
-        '',
-      );
-      expect(sharePid, 'share row exposes a stable public share PID').toMatch(/\S+/);
-      expect(sharePid, 'share row must not expose an internal numeric ID').not.toMatch(/^\d+$/);
       const revokeResponse = ownerPage.waitForResponse(
         (response) =>
           response.url().endsWith(`/api/record-share/${sharePid}`) &&
@@ -298,6 +378,23 @@ test.describe('CRM account collaboration', () => {
     }
   });
 });
+
+async function expireOwnShareForClockAdvance(sharePid: string): Promise<void> {
+  const pool = new Pool(PG_CONN);
+  try {
+    const result = await pool.query(
+      `UPDATE ab_record_share
+       SET expires_at = NOW() - INTERVAL '1 minute'
+       WHERE pid = $1
+       RETURNING pid, expires_at`,
+      [sharePid],
+    );
+    expect(result.rowCount, `clock advance found share ${sharePid}`).toBe(1);
+    expect(new Date(result.rows[0].expires_at).getTime()).toBeLessThan(Date.now());
+  } finally {
+    await pool.end();
+  }
+}
 
 async function provisionSalesUser(adminPage: Page, user: TestUser): Promise<string> {
   const response = await adminPage.request.post('/api/admin/users', {

@@ -100,6 +100,22 @@ class RecordShareServiceImplTest {
     }
 
     @Test
+    void shareRecordByPidRejectsPastExpiry() {
+        assertThatThrownBy(() -> service.shareRecordByPid(
+                100L,
+                "model.user",
+                "rec_10",
+                "member",
+                "mem_5",
+                "read",
+                Instant.now().minusSeconds(1)))
+                .isInstanceOf(RootUnCheckedException.class)
+                .hasMessageContaining("future");
+
+        verify(recordShareMapper, never()).upsertByPublicPids(any());
+    }
+
+    @Test
     void shareRecordDefaultsBlankPermissionMaskToRead() {
         service.shareRecord(100L, "model.user", 10L, "member", 5L, "  ", null);
 
@@ -224,6 +240,48 @@ class RecordShareServiceImplTest {
         when(recordShareMapper.findByRecordPid(eq(100L), eq("model.user"), eq("rec_10"), any())).thenReturn(List.of(share));
 
         assertThat(service.listByRecordPid(100L, "model.user", "rec_10")).hasSize(1);
+    }
+
+    @Test
+    void listByRecordPidForManagementIncludesMapperResultWithoutExpiryFiltering() {
+        RecordShare expired = new RecordShare();
+        expired.setExpiresAt(Instant.now().minusSeconds(60));
+        when(recordShareMapper.findByRecordPidForManagement(
+                eq(100L), eq("model.user"), eq("rec_10"), any()))
+                .thenReturn(List.of(expired));
+
+        assertThat(service.listByRecordPidForManagement(100L, "model.user", "rec_10"))
+                .containsExactly(expired);
+    }
+
+    @Test
+    void updateByPidRenewsExistingShareWithoutSubjectOrRecordIdentifiers() {
+        Instant renewedUntil = Instant.now().plusSeconds(3600);
+        when(recordShareMapper.updatePolicyByPidInTenant(
+                eq(100L),
+                eq("share-99"),
+                eq("read,update"),
+                eq(renewedUntil)))
+                .thenReturn(1);
+
+        service.updateByPid(100L, " share-99 ", "read, update", renewedUntil);
+
+        verify(recordShareMapper).updatePolicyByPidInTenant(
+                eq(100L),
+                eq("share-99"),
+                eq("read,update"),
+                eq(renewedUntil));
+    }
+
+    @Test
+    void updateByPidRejectsPastExpiryWithoutDatabaseMutation() {
+        assertThatThrownBy(() -> service.updateByPid(
+                100L, "share-99", "read", Instant.now().minusSeconds(1)))
+                .isInstanceOf(RootUnCheckedException.class)
+                .hasMessageContaining("future");
+
+        verify(recordShareMapper, never()).updatePolicyByPidInTenant(
+                anyLong(), anyString(), anyString(), any());
     }
 
     @Test

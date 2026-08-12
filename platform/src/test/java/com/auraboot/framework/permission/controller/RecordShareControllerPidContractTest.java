@@ -59,7 +59,7 @@ class RecordShareControllerPidContractTest {
         share.setSubjectPid("01KMEMBERPID");
         share.setSubjectType("member");
         share.setPermissionMask("read");
-        when(recordShareService.listByRecordPid(7L, "crm_lead_common", "01KRECORDPID"))
+        when(recordShareService.listByRecordPidForManagement(7L, "crm_lead_common", "01KRECORDPID"))
                 .thenReturn(List.of(share));
         when(userService.findInTenantByPid(7L, "01KMEMBERPID"))
                 .thenReturn(UserSearchDTO.builder().pid("01KMEMBERPID").displayName("Member").build());
@@ -93,14 +93,14 @@ class RecordShareControllerPidContractTest {
         request.setSubjectType("member");
         request.setSubjectPid("01KMEMBERPID");
         request.setPermissionMask("read, update");
-        request.setExpiresAt(Instant.parse("2026-07-01T00:00:00Z"));
+        request.setExpiresAt(Instant.parse("2099-07-01T00:00:00Z"));
 
         var response = controller().shareRecord(request);
 
         assertThat(response.isSuccess()).isTrue();
         verify(recordShareService).shareRecordByPid(
                 7L, "crm_lead_common", "01KRECORDPID", "member", "01KMEMBERPID",
-                "read,update", Instant.parse("2026-07-01T00:00:00Z"));
+                "read,update", Instant.parse("2099-07-01T00:00:00Z"));
         verify(recordShareService, never()).shareRecord(
                 org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.anyString(),
@@ -116,6 +116,34 @@ class RecordShareControllerPidContractTest {
         assertThat(Arrays.stream(RecordShareController.RecordShareRequest.class.getDeclaredFields())
                 .map(Field::getName))
                 .doesNotContain("recordId", "subjectId", "id");
+    }
+
+    @Test
+    void updateDtoAndPathUsePublicSharePidOnly() {
+        MetaContext.setContext(7L, 5L, "caller-pid", "caller");
+        RecordShare share = new RecordShare();
+        share.setPid("01KSHAREPID");
+        share.setTenantId(7L);
+        share.setResourceCode("crm_lead_common");
+        share.setRecordPid("01KRECORDPID");
+        share.setSubjectPid("01KMEMBERPID");
+        when(recordShareService.getByPidInTenant(7L, "01KSHAREPID")).thenReturn(share);
+        when(userPermissionService.hasPermission(5L, MetaPermission.RECORD_SHARE_MANAGE))
+                .thenReturn(true);
+        RecordShareController.RecordShareUpdateRequest request =
+                new RecordShareController.RecordShareUpdateRequest();
+        request.setPermissionMask("read, update");
+        request.setExpiresAt(Instant.parse("2099-08-01T00:00:00Z"));
+
+        var response = controller().updateShare("01KSHAREPID", request);
+
+        assertThat(response.isSuccess()).isTrue();
+        verify(recordShareService).updateByPid(
+                7L, "01KSHAREPID", "read,update", Instant.parse("2099-08-01T00:00:00Z"));
+        assertThat(Arrays.stream(RecordShareController.RecordShareUpdateRequest.class.getDeclaredFields())
+                .map(Field::getName))
+                .containsExactlyInAnyOrder("permissionMask", "expiresAt")
+                .doesNotContain("subjectPid", "recordPid", "subjectId", "recordId", "id");
     }
 
     private RecordShareController controller() {

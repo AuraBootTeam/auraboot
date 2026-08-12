@@ -36,6 +36,7 @@ public class RecordShareServiceImpl implements RecordShareService {
     public void shareRecord(Long tenantId, String resourceCode, Long recordId,
                             String subjectType, Long subjectId,
                             String permissionMask, Instant expiresAt) {
+        validateFutureExpiry(expiresAt);
         RecordShare share = new RecordShare();
         share.setPid(UniqueIdGenerator.generate());
         share.setTenantId(tenantId);
@@ -63,6 +64,7 @@ public class RecordShareServiceImpl implements RecordShareService {
         if (subjectId == null && !StringUtils.hasText(subjectPid)) {
             throw new RootUnCheckedException(BadParam, "subjectId or subjectPid is required");
         }
+        validateFutureExpiry(expiresAt);
 
         RecordShare share = new RecordShare();
         share.setPid(UniqueIdGenerator.generate());
@@ -203,6 +205,38 @@ public class RecordShareServiceImpl implements RecordShareService {
     }
 
     @Override
+    public List<RecordShare> listByRecordPidForManagement(
+            Long tenantId, String resourceCode, String recordPid) {
+        if (!StringUtils.hasText(recordPid)) {
+            throw new RootUnCheckedException(BadParam, "recordPid is required");
+        }
+        return recordShareMapper.findByRecordPidForManagement(
+                tenantId, resourceCode, recordPid.trim(), Instant.now());
+    }
+
+    @Override
+    public void updateByPid(
+            Long tenantId,
+            String sharePid,
+            String permissionMask,
+            Instant expiresAt) {
+        if (tenantId == null || !StringUtils.hasText(sharePid)) {
+            throw new RootUnCheckedException(BadParam, "sharePid is required");
+        }
+        validateFutureExpiry(expiresAt);
+        int changed = recordShareMapper.updatePolicyByPidInTenant(
+                tenantId,
+                sharePid.trim(),
+                normalizePermissionMask(permissionMask),
+                expiresAt);
+        if (changed != 1) {
+            throw new RootUnCheckedException(BadParam, "Share not found");
+        }
+        log.info("Updated record share pid={} (mask={}, expires={})",
+                sharePid, permissionMask, expiresAt);
+    }
+
+    @Override
     public void removeByPid(Long tenantId, String sharePid) {
         RecordShare share = getByPidInTenant(tenantId, sharePid);
         if (share == null) {
@@ -234,5 +268,11 @@ public class RecordShareServiceImpl implements RecordShareService {
             return "read";
         }
         return permissionMask.trim().toLowerCase(Locale.ROOT).replace(" ", "");
+    }
+
+    private void validateFutureExpiry(Instant expiresAt) {
+        if (expiresAt != null && !expiresAt.isAfter(Instant.now())) {
+            throw new RootUnCheckedException(BadParam, "expiresAt must be in the future");
+        }
     }
 }

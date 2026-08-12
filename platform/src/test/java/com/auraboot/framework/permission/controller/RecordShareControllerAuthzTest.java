@@ -25,6 +25,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
 import java.util.Map;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -128,6 +129,16 @@ class RecordShareControllerAuthzTest {
     }
 
     @Test
+    void shareRecordRejectsExpiryThatIsNotInTheFutureBeforeMutation() {
+        RecordShareController.RecordShareRequest request = shareRequest();
+        request.setExpiresAt(Instant.now().minusSeconds(1));
+
+        assertThrows(RootUnCheckedException.class, () -> controller.shareRecord(request));
+        verify(recordShareService, never()).shareRecordByPid(
+                any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     void shareRecordFailsClosedWhenOwnerMetadataCannotBeResolved() {
         when(userPermissionService.hasPermission(CALLER_ID, MetaPermission.RECORD_SHARE_MANAGE))
                 .thenReturn(false);
@@ -146,7 +157,7 @@ class RecordShareControllerAuthzTest {
         RecordShare share = share(77L);
         share.setSubjectPid(SUBJECT_PID);
         share.setPermissionMask("read,update");
-        when(recordShareService.listByRecordPid(TENANT_ID, RESOURCE, RECORD_PID))
+        when(recordShareService.listByRecordPidForManagement(TENANT_ID, RESOURCE, RECORD_PID))
                 .thenReturn(List.of(share));
         stubSubject();
 
@@ -214,6 +225,41 @@ class RecordShareControllerAuthzTest {
         verify(recordShareService).removeByPid(TENANT_ID, SHARE_PID);
     }
 
+    @Test
+    void updateShareRejectsPastExpiryBeforeServiceMutation() {
+        RecordShare share = share(77L);
+        when(recordShareService.getByPidInTenant(TENANT_ID, SHARE_PID)).thenReturn(share);
+        when(userPermissionService.hasPermission(CALLER_ID, MetaPermission.RECORD_SHARE_MANAGE))
+                .thenReturn(true);
+        RecordShareController.RecordShareUpdateRequest request =
+                new RecordShareController.RecordShareUpdateRequest();
+        request.setPermissionMask("read");
+        request.setExpiresAt(Instant.now().minusSeconds(1));
+
+        assertThrows(RootUnCheckedException.class, () -> controller.updateShare(SHARE_PID, request));
+        verify(recordShareService, never()).updateByPid(any(), any(), any(), any());
+    }
+
+    @Test
+    void updateShareDeniedForNonOwnerWithoutAdministrativePermission() {
+        when(recordShareService.getByPidInTenant(TENANT_ID, SHARE_PID)).thenReturn(share(77L));
+        stubBusinessOwner("other-owner");
+
+        assertThrows(AccessDeniedException.class,
+                () -> controller.updateShare(SHARE_PID, updateRequest()));
+        verify(recordShareService, never()).updateByPid(any(), any(), any(), any());
+    }
+
+    @Test
+    void updateShareAllowedForCurrentBusinessOwner() {
+        when(recordShareService.getByPidInTenant(TENANT_ID, SHARE_PID)).thenReturn(share(77L));
+        stubBusinessOwner(CALLER_PID);
+
+        controller.updateShare(SHARE_PID, updateRequest());
+
+        verify(recordShareService).updateByPid(TENANT_ID, SHARE_PID, "read,update", null);
+    }
+
     private void stubBusinessOwner(String ownerPid) {
         when(userPermissionService.hasPermission(CALLER_ID, MetaPermission.RECORD_SHARE_MANAGE))
                 .thenReturn(false);
@@ -237,6 +283,13 @@ class RecordShareControllerAuthzTest {
         request.setSubjectType("member");
         request.setSubjectPid(SUBJECT_PID);
         request.setPermissionMask("read");
+        return request;
+    }
+
+    private RecordShareController.RecordShareUpdateRequest updateRequest() {
+        RecordShareController.RecordShareUpdateRequest request =
+                new RecordShareController.RecordShareUpdateRequest();
+        request.setPermissionMask("read, update");
         return request;
     }
 

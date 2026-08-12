@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.time.Instant;
 import java.util.List;
@@ -93,6 +94,37 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("resourceCode") String resourceCode,
             @Param("recordPid") String recordPid,
             @Param("now") Instant now);
+
+    /**
+     * Management projection keeps expired relationships visible. Access queries must
+     * continue to use {@link #findByRecordPid(Long, String, String, Instant)} or the
+     * count/findShared methods that apply the expiry predicate.
+     */
+    @Select("""
+        SELECT * FROM ab_record_share
+        WHERE tenant_id = #{tenantId}
+          AND resource_code = #{resourceCode}
+          AND record_pid = #{recordPid}
+        ORDER BY (expires_at IS NOT NULL AND expires_at <= #{now}), created_at DESC
+        """)
+    List<RecordShare> findByRecordPidForManagement(
+            @Param("tenantId") Long tenantId,
+            @Param("resourceCode") String resourceCode,
+            @Param("recordPid") String recordPid,
+            @Param("now") Instant now);
+
+    @Update("""
+        UPDATE ab_record_share
+        SET permission_mask = #{permissionMask},
+            expires_at = #{expiresAt}
+        WHERE tenant_id = #{tenantId}
+          AND pid = #{sharePid}
+        """)
+    int updatePolicyByPidInTenant(
+            @Param("tenantId") Long tenantId,
+            @Param("sharePid") String sharePid,
+            @Param("permissionMask") String permissionMask,
+            @Param("expiresAt") Instant expiresAt);
 
     /**
      * Find shares where a specific member is the direct subject.

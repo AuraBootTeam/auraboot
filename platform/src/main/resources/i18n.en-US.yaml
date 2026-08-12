@@ -1077,6 +1077,8 @@ record_share:
   subtitle: Invite tenant members to view or maintain this record with you
   close: Close collaboration dialog
   add_member: Add collaborator
+  edit_member: Update collaborator
+  editing_description: Change permission or renew access without creating a duplicate
   member_label: Tenant member
   member_placeholder: Choose a member
   permission: Collaboration permission
@@ -1087,12 +1089,27 @@ record_share:
   save: Save collaborator
   saving: Saving…
   saved: Collaborator saved
+  update: Update access
+  updated: Collaboration access updated
   save_failed: Failed to save collaborator
+  update_failed: Failed to update collaboration access
   load_failed: Failed to load collaborators
   current_members: Current collaborators
   empty_title: No collaborators yet
   empty_description: Choose a member and permission to start collaborating
   unavailable_member: Unavailable member
+  edit: Edit collaborator
+  renew: Renew collaborator
+  expiry: Access duration
+  expiry_never: Permanent
+  expiry_7d: 7 days
+  expiry_30d: 30 days
+  expiry_custom: Custom
+  expiry_date: Expiry date
+  expiry_never_hint: Access remains until the owner removes it
+  expiry_hint: Access ends automatically at the selected time and can be renewed later
+  expires_on: Expires
+  expired: Expired
   remove: Remove collaborator
   removed: Collaborator removed
   remove_failed: Failed to remove collaborator

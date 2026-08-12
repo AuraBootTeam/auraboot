@@ -99,6 +99,41 @@ class RecordShareMapperIT {
         });
     }
 
+    @Test
+    @DisplayName("expired relationship remains manageable but never grants access")
+    void expiredRelationshipCanBeListedAndRenewedWithoutGrantingAccessUntilRenewal() {
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+        RecordShare expired = publicShare("share-expired-renewable", "rec-renew", "read");
+        expired.setExpiresAt(now.minus(1, ChronoUnit.HOURS));
+        mapper.upsertByPublicPids(expired);
+
+        assertThat(mapper.findByRecordPid(TENANT_ID, RESOURCE, "rec-renew", now)).isEmpty();
+        assertThat(mapper.countByRecordPidAndSubjectPid(
+                TENANT_ID, RESOURCE, "rec-renew", "member", MEMBER_PID, "read", now))
+                .isZero();
+        RecordShare persistedExpired = mapper.findByRecordPidForManagement(
+                        TENANT_ID, RESOURCE, "rec-renew", now)
+                .getFirst();
+        assertThat(persistedExpired.getPid()).isEqualTo("share-expired-renewable");
+
+        Instant renewedUntil = now.plus(30, ChronoUnit.DAYS);
+        assertThat(mapper.updatePolicyByPidInTenant(
+                TENANT_ID,
+                "share-expired-renewable",
+                "read,update",
+                renewedUntil))
+                .isOne();
+        assertThat(mapper.countByRecordPidAndSubjectPid(
+                TENANT_ID, RESOURCE, "rec-renew", "member", MEMBER_PID, "update", now))
+                .isOne();
+        assertThat(mapper.findByRecordPidForManagement(TENANT_ID, RESOURCE, "rec-renew", now))
+                .singleElement()
+                .satisfies(share -> {
+                    assertThat(share.getCreatedAt()).isEqualTo(persistedExpired.getCreatedAt());
+                    assertThat(share.getCreatedBy()).isEqualTo(persistedExpired.getCreatedBy());
+                });
+    }
+
     private RecordShare publicShare(String sharePid, String recordPid, String permissionMask) {
         RecordShare share = new RecordShare();
         share.setPid(sharePid);

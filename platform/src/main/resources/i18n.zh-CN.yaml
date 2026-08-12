@@ -438,6 +438,8 @@ record_share:
   subtitle: 邀请租户成员共同查看或维护这条记录
   close: 关闭协作窗口
   add_member: 添加协作成员
+  edit_member: 更新协作成员
+  editing_description: 修改权限或续期，不会重复创建协作关系
   member_label: 租户成员
   member_placeholder: 选择成员
   permission: 协作权限
@@ -448,12 +450,27 @@ record_share:
   save: 保存协作成员
   saving: 保存中…
   saved: 协作成员已保存
+  update: 更新访问权限
+  updated: 协作权限已更新
   save_failed: 保存协作成员失败
+  update_failed: 更新协作权限失败
   load_failed: 加载协作成员失败
   current_members: 当前协作成员
   empty_title: 暂无协作成员
   empty_description: 选择成员和权限即可开始协作
   unavailable_member: 成员已不可用
+  edit: 编辑协作成员
+  renew: 为协作成员续期
+  expiry: 访问有效期
+  expiry_never: 长期有效
+  expiry_7d: 7天
+  expiry_30d: 30天
+  expiry_custom: 自定义
+  expiry_date: 到期日期
+  expiry_never_hint: 访问权限会一直保留，直到负责人主动移除
+  expiry_hint: 到期后自动失去访问权限，负责人之后仍可续期
+  expires_on: 到期于
+  expired: 已到期
   remove: 移除协作成员
   removed: 协作成员已移除
   remove_failed: 移除协作成员失败

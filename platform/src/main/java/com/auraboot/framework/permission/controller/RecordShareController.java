@@ -38,13 +38,14 @@ import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 /**
  * RecordShare Controller — REST API for per-record sharing (ReBAC).
  *
- * <p>Allows listing, creating, and removing shares for individual records.
+ * <p>Allows listing, creating, updating, and removing shares for individual records.
  * Tenant isolation is enforced via MetaContext.
  *
  * <p>Endpoints:
  * <ul>
  *   <li>GET  /api/record-share  - List shares for a record</li>
  *   <li>POST /api/record-share  - Share a record with a subject</li>
+ *   <li>PATCH /api/record-share/{sharePid} - Update a share by public PID</li>
  *   <li>DELETE /api/record-share/{sharePid} - Remove a share by public PID</li>
  * </ul>
  */
@@ -67,7 +68,7 @@ public class RecordShareController {
     private static final Set<String> PUBLIC_PERMISSION_MASKS = Set.of("read", "read,update");
 
     /**
-     * List all active shares for a record.
+     * List all shares for management, including expired relationships that can be renewed.
      *
      * @param resourceCode model/resource code (e.g. "crm_opportunity_common")
      * @param recordPid stable public record PID
@@ -85,7 +86,7 @@ public class RecordShareController {
                 resourceCode, recordPid, tenantId);
 
         List<RecordShareResponse> shares = recordShareService
-                .listByRecordPid(tenantId, resourceCode, recordPid)
+                .listByRecordPidForManagement(tenantId, resourceCode, recordPid)
                 .stream()
                 .map(share -> toResponse(tenantId, share))
                 .toList();
@@ -129,6 +130,7 @@ public class RecordShareController {
         if (!PUBLIC_PERMISSION_MASKS.contains(permissionMask)) {
             throw new RootUnCheckedException(BadParam, "permissionMask must be read or read,update");
         }
+        assertFutureExpiry(request.getExpiresAt());
         assertCanManageRecordShares(request.getResourceCode(), request.getRecordPid());
         UserSearchDTO subject = userService.findInTenantByPid(tenantId, request.getSubjectPid().trim());
         if (subject == null) {
@@ -154,6 +156,37 @@ public class RecordShareController {
     }
 
     /**
+     * Update an existing relationship by public share PID. This avoids returning a
+     * subject PID to the browser merely so an owner can renew an expired grant.
+     */
+    @PatchMapping("/{sharePid}")
+    @Operation(summary = "Update a record share policy by public PID")
+    public ApiResponse<Void> updateShare(
+            @PathVariable @NotBlank String sharePid,
+            @Valid @RequestBody RecordShareUpdateRequest request) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        RecordShare share = recordShareService.getByPidInTenant(tenantId, sharePid);
+        if (share == null) {
+            throw new AccessDeniedException("Record share not found or not accessible");
+        }
+        authorizeExistingShareManagement(share);
+        String permissionMask = normalizePermissionMask(request.getPermissionMask());
+        if (!PUBLIC_PERMISSION_MASKS.contains(permissionMask)) {
+            throw new RootUnCheckedException(BadParam, "permissionMask must be read or read,update");
+        }
+        assertFutureExpiry(request.getExpiresAt());
+        recordShareService.updateByPid(
+                tenantId, sharePid, permissionMask, request.getExpiresAt());
+        notifyShareRecipientByPid(
+                tenantId,
+                share.getSubjectPid(),
+                share.getResourceCode(),
+                share.getRecordPid(),
+                permissionMask);
+        return ApiResponse.success();
+    }
+
+    /**
      * Remove a share by its stable public PID.
      *
      * @param sharePid stable public PID of the share entry
@@ -169,7 +202,7 @@ public class RecordShareController {
         if (share == null) {
             throw new AccessDeniedException("Record share not found or not accessible");
         }
-        authorizeShareRemoval(share);
+        authorizeExistingShareManagement(share);
         recordShareService.removeByPid(tenantId, sharePid);
         return ApiResponse.success();
     }
@@ -213,10 +246,10 @@ public class RecordShareController {
     }
 
     /**
-     * Authorize removal of an existing share. Allowed for the administrator, the original
-     * owner of the underlying record.
+     * Authorize updating or removing an existing share. Allowed for an administrator or
+     * the owner of the underlying record.
      */
-    private void authorizeShareRemoval(RecordShare share) {
+    private void authorizeExistingShareManagement(RecordShare share) {
         Long callerId = MetaContext.getCurrentUserId();
         if (callerId == null) {
             throw new AccessDeniedException("Authenticated user required to manage record shares");
@@ -230,10 +263,10 @@ public class RecordShareController {
                 share.getResourceCode(), record, callerId, MetaContext.getCurrentUserPid())) {
             return;
         }
-        log.warn("Denied record-share removal: caller={} for sharePid={} ({}/{})",
+        log.warn("Denied existing record-share management: caller={} for sharePid={} ({}/{})",
                 callerId, share.getPid(), share.getResourceCode(), share.getRecordPid());
         throw new AccessDeniedException(
-                "Only the record owner or an authorized administrator can remove this share");
+                "Only the record owner or an authorized administrator can manage this share");
     }
 
     /**
@@ -325,6 +358,31 @@ public class RecordShareController {
         }
     }
 
+    private void notifyShareRecipientByPid(
+            Long tenantId,
+            String subjectPid,
+            String resourceCode,
+            String recordPid,
+            String permissionMask) {
+        if (!StringUtils.hasText(subjectPid)) {
+            return;
+        }
+        UserSearchDTO member = userService.findInTenantByPid(tenantId, subjectPid);
+        if (member == null) {
+            return;
+        }
+        User recipient = userService.findByPid(member.getPid());
+        if (recipient != null && recipient.getId() != null && recipient.isEnabled()) {
+            notifyShareRecipient(recipient, resourceCode, recordPid, permissionMask);
+        }
+    }
+
+    private static void assertFutureExpiry(Instant expiresAt) {
+        if (expiresAt != null && !expiresAt.isAfter(Instant.now())) {
+            throw new RootUnCheckedException(BadParam, "expiresAt must be in the future");
+        }
+    }
+
     private static String normalizePermissionMask(String permissionMask) {
         return StringUtils.hasText(permissionMask)
                 ? permissionMask.trim().toLowerCase().replace(" ", "")
@@ -356,6 +414,17 @@ public class RecordShareController {
         private String permissionMask = "read";
 
         /** Optional expiration time (ISO-8601). Null means no expiry. */
+        private Instant expiresAt;
+    }
+
+    @Data
+    public static class RecordShareUpdateRequest {
+
+        /** Permission mask (read or read,update). */
+        @NotBlank
+        private String permissionMask;
+
+        /** Optional future expiration time. Null means no expiry. */
         private Instant expiresAt;
     }
 
