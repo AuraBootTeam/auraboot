@@ -7,6 +7,7 @@ import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
+import com.auraboot.framework.rbac.service.MemberRoleContributor;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,7 +63,32 @@ class PermissionSnapshotCacheTest {
                 .expireAfterWrite(Duration.ofMinutes(5)));
         manager.setAllowNullValues(false);
         cache = new PermissionSnapshotCache(
-                permissionMapper, userRoleMapper, rolePermissionMapper, roleMapper, manager);
+                permissionMapper, userRoleMapper, rolePermissionMapper, roleMapper, List.of(), manager);
+    }
+
+    @Test
+    void contributedRolesJoinDirectRolesAndAreCached() {
+        MemberRoleContributor contributor = (memberId, tenantId) -> List.of(72L, 71L);
+        CaffeineCacheManager manager = new CaffeineCacheManager(
+                PermissionSnapshotCache.PERMISSION_CATALOG_CACHE,
+                PermissionSnapshotCache.USER_ROLE_CACHE,
+                PermissionSnapshotCache.ROLE_PERMISSION_CACHE,
+                PermissionSnapshotCache.BASELINE_ROLE_CACHE,
+                PermissionSnapshotCache.EFFECTIVE_PERMISSION_CACHE);
+        manager.setCaffeine(Caffeine.newBuilder().maximumSize(100));
+        manager.setAllowNullValues(false);
+        cache = new PermissionSnapshotCache(
+                permissionMapper, userRoleMapper, rolePermissionMapper, roleMapper, List.of(contributor), manager);
+        UserRole direct = new UserRole();
+        direct.setRoleId(71L);
+        when(userRoleMapper.findEffectiveByMemberIdAndTenantId(eq(9L), eq(4L), any(LocalDate.class)))
+                .thenReturn(List.of(direct));
+
+        assertThat(cache.getUserRoleIds(4L, 8L, 9L)).containsExactly(71L, 72L);
+        assertThat(cache.getUserRoleIds(4L, 8L, 9L)).containsExactly(71L, 72L);
+
+        verify(userRoleMapper, times(1))
+                .findEffectiveByMemberIdAndTenantId(eq(9L), eq(4L), any(LocalDate.class));
     }
 
     @Test

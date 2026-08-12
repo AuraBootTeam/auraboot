@@ -8,6 +8,7 @@ import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
+import com.auraboot.framework.rbac.service.MemberRoleContributor;
 import com.auraboot.framework.permission.event.UserRoleChangedEvent;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
@@ -18,6 +19,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +53,9 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
 
     @Resource
     private TenantAdminContinuityGuard tenantAdminContinuityGuard;
+
+    @Autowired(required = false)
+    private List<MemberRoleContributor> memberRoleContributors = List.of();
 
     @Override
     @Transactional
@@ -503,9 +508,17 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
     @Override
     public List<Long> getRoleIdsByMemberIdAndTenantId(Long memberId, Long tenantId) {
         List<UserRole> userRoles = findByMemberIdAndTenantId(memberId, tenantId);
-        return userRoles.stream()
+        LinkedHashSet<Long> roleIds = userRoles.stream()
                 .map(UserRole::getRoleId)
-                .collect(Collectors.toList());
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        for (MemberRoleContributor contributor : memberRoleContributors) {
+            List<Long> contributed = contributor.findRoleIds(memberId, tenantId);
+            if (contributed != null) {
+                contributed.stream().filter(Objects::nonNull).forEach(roleIds::add);
+            }
+        }
+        return List.copyOf(roleIds);
     }
 
     @Override

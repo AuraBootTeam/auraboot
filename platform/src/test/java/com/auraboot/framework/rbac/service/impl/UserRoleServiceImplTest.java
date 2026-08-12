@@ -8,6 +8,7 @@ import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
+import com.auraboot.framework.rbac.service.MemberRoleContributor;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
 import com.auraboot.framework.tenant.offboarding.TenantAdminContinuityGuard;
@@ -61,6 +62,7 @@ class UserRoleServiceImplTest {
         injectField(service, "tenantMemberMapper", tenantMemberMapper);
         injectField(service, "eventPublisher", eventPublisher);
         injectField(service, "tenantAdminContinuityGuard", tenantAdminContinuityGuard);
+        injectField(service, "memberRoleContributors", List.of());
         spyService = spy(service);
     }
 
@@ -445,6 +447,17 @@ class UserRoleServiceImplTest {
     @DisplayName("getRoleIdsByMemberIdAndTenantId returns role IDs")
     void getRoleIdsByMember() {
         when(userRoleMapper.findByMemberIdAndTenantId(1L, 10L)).thenReturn(List.of(ur(1L, 1L, 100L, 10L), ur(2L, 1L, 200L, 10L)));
+        assertEquals(List.of(100L, 200L), service.getRoleIdsByMemberIdAndTenantId(1L, 10L));
+    }
+
+    @Test
+    @DisplayName("effective roles merge direct and governed contributor assignments")
+    void effectiveRolesMergeContributors() throws Exception {
+        when(userRoleMapper.findByMemberIdAndTenantId(1L, 10L))
+                .thenReturn(List.of(ur(11L, 1L, 100L, 10L)));
+        MemberRoleContributor contributor = (memberId, tenantId) -> List.of(100L, 200L);
+        injectField(service, "memberRoleContributors", List.of(contributor));
+
         assertEquals(List.of(100L, 200L), service.getRoleIdsByMemberIdAndTenantId(1L, 10L));
     }
 
