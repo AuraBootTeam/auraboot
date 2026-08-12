@@ -12,6 +12,7 @@ import com.auraboot.framework.authoring.workspace.AuthoringWorkspaceRepository.A
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -20,6 +21,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
+import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 /** Lifecycle and append-only audit for actor-bound, read-only identity simulations. */
@@ -55,26 +57,41 @@ public class AuthoringIdentitySimulationService {
             String sourceSessionPid,
             StartIdentitySimulationRequest request) {
         SessionView session = workspaceService.get(sourceSessionPid);
-        RoleStructurePreviewView structure = roleStructurePreviewService.preview(
-                sourceSessionPid, request.rolePid());
         Identity identity = identity();
         Instant startedAt = databaseClock.now();
+        SimulationRow active = simulationRepository.findActiveForSession(
+                identity.tenantId(), identity.envId(), identity.actorUserId(),
+                sourceSessionPid, true);
+        if (active != null && startedAt.isBefore(active.expiresAt())) {
+            throw new ResponseStatusException(
+                    CONFLICT, "authoring.identity-simulation.already-active");
+        }
+        if (active != null) {
+            expire(identity, active, startedAt);
+        }
+        RoleStructurePreviewView structure = roleStructurePreviewService.preview(
+                sourceSessionPid, request.rolePid());
         Instant expiresAt = startedAt.plus(Duration.ofMinutes(request.durationMinutes()));
         String simulationPid = UniqueIdGenerator.generate();
-        simulationRepository.create(new CreateSimulation(
-                simulationPid,
-                identity.tenantId(),
-                identity.envId(),
-                identity.actorUserId(),
-                sourceSessionPid,
-                session.changeSetPid(),
-                session.pagePid(),
-                structure.targetRole().rolePid(),
-                structure.targetRole().roleCode(),
-                structure.targetRole().roleName(),
-                request.reason().trim(),
-                startedAt,
-                expiresAt));
+        try {
+            simulationRepository.create(new CreateSimulation(
+                    simulationPid,
+                    identity.tenantId(),
+                    identity.envId(),
+                    identity.actorUserId(),
+                    sourceSessionPid,
+                    session.changeSetPid(),
+                    session.pagePid(),
+                    structure.targetRole().rolePid(),
+                    structure.targetRole().roleCode(),
+                    structure.targetRole().roleName(),
+                    request.reason().trim(),
+                    startedAt,
+                    expiresAt));
+        } catch (DataIntegrityViolationException exception) {
+            throw new ResponseStatusException(
+                    CONFLICT, "authoring.identity-simulation.already-active", exception);
+        }
         audit(
                 identity,
                 session,
@@ -96,45 +113,64 @@ public class AuthoringIdentitySimulationService {
     }
 
     @Transactional
+    public List<IdentitySimulationView> active(String sourceSessionPid) {
+        workspaceService.get(sourceSessionPid);
+        Identity identity = identity();
+        SimulationRow row = simulationRepository.findRecoverableForSession(
+                identity.tenantId(), identity.envId(), identity.actorUserId(),
+                sourceSessionPid, true);
+        if (row == null) {
+            return List.of();
+        }
+        if (!"ACTIVE".equals(row.status())) {
+            return List.of(terminalView(row, row.status(), row.endedAt()));
+        }
+        Instant now = databaseClock.now();
+        if (!now.isBefore(row.expiresAt())) {
+            expire(identity, row, now);
+            return List.of(terminalView(row, "EXPIRED", now));
+        }
+        return List.of(access(identity, row, now));
+    }
+
+    @Transactional
+    public IdentitySimulationView acknowledge(String simulationPid) {
+        Identity identity = identity();
+        SimulationRow row = requireRow(identity, simulationPid, true);
+        if ("ACTIVE".equals(row.status())) {
+            throw new ResponseStatusException(
+                    CONFLICT, "authoring.identity-simulation.still-active");
+        }
+        if (row.acknowledgedAt() == null) {
+            Instant now = databaseClock.now();
+            if (!simulationRepository.acknowledge(row, now)) {
+                throw new ResponseStatusException(
+                        NOT_FOUND, "authoring.identity-simulation.stale");
+            }
+            audit(
+                    identity,
+                    row,
+                    "IDENTITY_SIMULATION_ACKNOWLEDGED",
+                    "TERMINAL_FEEDBACK_DISMISSED",
+                    durationMinutes(row));
+        }
+        return terminalView(row, row.status(), row.endedAt());
+    }
+
+    @Transactional
     public IdentitySimulationView get(String simulationPid) {
         Identity identity = identity();
         SimulationRow row = requireRow(identity, simulationPid, true);
         Instant now = databaseClock.now();
         if ("ACTIVE".equals(row.status()) && !now.isBefore(row.expiresAt())) {
-            simulationRepository.end(row, "EXPIRED", now);
-            audit(
-                    identity,
-                    row,
-                    "IDENTITY_SIMULATION_EXPIRED",
-                    "TTL_EXPIRED",
-                    durationMinutes(row));
+            expire(identity, row, now);
             return terminalView(row, "EXPIRED", now);
         }
         if (!"ACTIVE".equals(row.status())) {
             return terminalView(row, row.status(), row.endedAt());
         }
 
-        RoleStructurePreviewView structure = roleStructurePreviewService.preview(
-                row.sourceSessionPid(), row.targetRolePid());
-        if (!simulationRepository.markAccessed(row, now)) {
-            throw new ResponseStatusException(NOT_FOUND, "authoring.identity-simulation.stale");
-        }
-        audit(
-                identity,
-                row,
-                "IDENTITY_SIMULATION_ACCESSED",
-                "READ_ONLY_VIEW",
-                durationMinutes(row));
-        return view(
-                row.pid(),
-                row.sourceSessionPid(),
-                row.pagePid(),
-                structure.targetRole(),
-                "ACTIVE",
-                row.startedAt(),
-                row.expiresAt(),
-                null,
-                structure.decisions());
+        return access(identity, row, now);
     }
 
     @Transactional
@@ -171,6 +207,42 @@ public class AuthoringIdentitySimulationService {
             throw new ResponseStatusException(NOT_FOUND, "authoring.identity-simulation.not-found");
         }
         return row;
+    }
+
+    private IdentitySimulationView access(Identity identity, SimulationRow row, Instant now) {
+        RoleStructurePreviewView structure = roleStructurePreviewService.preview(
+                row.sourceSessionPid(), row.targetRolePid());
+        if (!simulationRepository.markAccessed(row, now)) {
+            throw new ResponseStatusException(NOT_FOUND, "authoring.identity-simulation.stale");
+        }
+        audit(
+                identity,
+                row,
+                "IDENTITY_SIMULATION_ACCESSED",
+                "READ_ONLY_VIEW",
+                durationMinutes(row));
+        return view(
+                row.pid(),
+                row.sourceSessionPid(),
+                row.pagePid(),
+                structure.targetRole(),
+                "ACTIVE",
+                row.startedAt(),
+                row.expiresAt(),
+                null,
+                structure.decisions());
+    }
+
+    private void expire(Identity identity, SimulationRow row, Instant now) {
+        if (!simulationRepository.end(row, "EXPIRED", now)) {
+            throw new ResponseStatusException(NOT_FOUND, "authoring.identity-simulation.stale");
+        }
+        audit(
+                identity,
+                row,
+                "IDENTITY_SIMULATION_EXPIRED",
+                "TTL_EXPIRED",
+                durationMinutes(row));
     }
 
     private IdentitySimulationView terminalView(

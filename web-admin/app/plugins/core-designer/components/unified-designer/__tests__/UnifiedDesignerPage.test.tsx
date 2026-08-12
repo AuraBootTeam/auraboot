@@ -14,6 +14,7 @@ import {
   createAuthoringAiPatchProposal,
   isAuthoringPermissionDeniedError,
   loadAuthoringCapabilities,
+  loadActiveAuthoringIdentitySimulation,
   loadAuthoringPermissionSnapshot,
   loadAuthoringNewPageWorkspaceOptions,
   loadAuthoringChangeItems,
@@ -75,7 +76,9 @@ vi.mock('../persistence/modelFieldsRepository', async () => {
 });
 
 vi.mock('~/framework/meta/authoring/authoringService', () => ({
+  acknowledgeAuthoringIdentitySimulation: vi.fn(),
   endAuthoringIdentitySimulation: vi.fn(),
+  loadActiveAuthoringIdentitySimulation: vi.fn(),
   applyAuthoringAiPatchProposal: vi.fn(),
   applyAuthoringStudioBatch: vi.fn(),
   consumeAuthoringHandoff: vi.fn(),
@@ -132,6 +135,8 @@ describe('UnifiedDesignerPage', () => {
     vi.mocked(consumeAuthoringHandoff).mockReset();
     vi.mocked(loadAuthoringSession).mockReset();
     vi.mocked(loadAuthoringCapabilities).mockReset();
+    vi.mocked(loadActiveAuthoringIdentitySimulation).mockReset();
+    vi.mocked(loadActiveAuthoringIdentitySimulation).mockResolvedValue(null);
     vi.mocked(loadAuthoringPermissionSnapshot).mockReset();
     vi.mocked(loadAuthoringPermissionSnapshot).mockResolvedValue({
       canReadDesigner: true,
@@ -1537,7 +1542,7 @@ describe('UnifiedDesignerPage', () => {
     view.rerender(<UnifiedDesignerPage />);
     expect(screen.getByTestId('studio-handoff-editable-reason')).toBeInTheDocument();
     expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
-    expect(screen.getByTestId('designer-save')).toBeEnabled();
+    await waitFor(() => expect(screen.getByTestId('designer-save')).toBeEnabled());
     expect(screen.getByTestId('inspector-field-dataSource.model-manual')).toBeEnabled();
     expect(screen.getByTestId('inspector-field-dataSource.model-manual')).toHaveValue('payment');
   });

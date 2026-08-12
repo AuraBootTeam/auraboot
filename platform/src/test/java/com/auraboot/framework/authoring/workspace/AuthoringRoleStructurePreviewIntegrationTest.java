@@ -228,17 +228,61 @@ class AuthoringRoleStructurePreviewIntegrationTest extends BaseIntegrationTest {
                 .contains(targetRolePid)
                 .doesNotContain("incident-742 permission review");
 
+        mockMvc.perform(get(
+                        "/api/authoring/sessions/{sessionPid}/identity-simulations",
+                        opened.sessionPid()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].simulationPid").value(simulationPid))
+                .andExpect(jsonPath("$.data[0].status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data[0].readOnly").value(true));
+
+        mockMvc.perform(post(
+                        "/api/authoring/sessions/{sessionPid}/identity-simulations",
+                        opened.sessionPid())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"rolePid":"%s","durationMinutes":5,
+                                 "reason":"duplicate must be rejected"}
+                                """.formatted(targetRolePid)))
+                .andExpect(status().isConflict());
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_authoring_identity_simulation
+                WHERE tenant_id = ? AND actor_user_id = ?
+                  AND source_session_pid = ? AND status = 'ACTIVE'
+                """, Integer.class,
+                getTestTenant().getId(), getTestUser().getId(), opened.sessionPid()))
+                .isEqualTo(1);
+
         mockMvc.perform(get("/api/authoring/identity-simulations/{pid}", simulationPid))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.data.decisions.length()").value(5));
-        assertThat(auditEventCount(simulationPid, "IDENTITY_SIMULATION_ACCESSED")).isEqualTo(1);
+        assertThat(auditEventCount(simulationPid, "IDENTITY_SIMULATION_ACCESSED")).isEqualTo(2);
 
         mockMvc.perform(post("/api/authoring/identity-simulations/{pid}/end", simulationPid))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("ENDED"))
                 .andExpect(jsonPath("$.data.decisions.length()").value(0));
         assertThat(auditEventCount(simulationPid, "IDENTITY_SIMULATION_ENDED")).isEqualTo(1);
+        mockMvc.perform(get(
+                        "/api/authoring/sessions/{sessionPid}/identity-simulations",
+                        opened.sessionPid()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].status").value("ENDED"));
+        mockMvc.perform(post(
+                        "/api/authoring/identity-simulations/{pid}/acknowledge",
+                        simulationPid))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ENDED"));
+        assertThat(auditEventCount(simulationPid, "IDENTITY_SIMULATION_ACKNOWLEDGED"))
+                .isEqualTo(1);
+        mockMvc.perform(get(
+                        "/api/authoring/sessions/{sessionPid}/identity-simulations",
+                        opened.sessionPid()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
     }
 
     @Test
@@ -272,10 +316,13 @@ class AuthoringRoleStructurePreviewIntegrationTest extends BaseIntegrationTest {
                     expires_at = CURRENT_TIMESTAMP - INTERVAL '1 minute'
                 WHERE pid = ?
                 """, simulationPid);
-        mockMvc.perform(get("/api/authoring/identity-simulations/{pid}", simulationPid))
+        mockMvc.perform(get(
+                        "/api/authoring/sessions/{sessionPid}/identity-simulations",
+                        opened.sessionPid()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("EXPIRED"))
-                .andExpect(jsonPath("$.data.decisions.length()").value(0));
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].status").value("EXPIRED"))
+                .andExpect(jsonPath("$.data[0].decisions.length()").value(0));
         assertThat(auditEventCount(simulationPid, "IDENTITY_SIMULATION_EXPIRED")).isEqualTo(1);
 
         jdbcTemplate.update("""

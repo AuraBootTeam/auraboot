@@ -176,6 +176,16 @@ export async function startAuthoringIdentitySimulation(
   return requireData(result, '无法启动审计身份模拟');
 }
 
+export async function loadActiveAuthoringIdentitySimulation(
+  sessionPid: string,
+): Promise<AuthoringIdentitySimulation | null> {
+  const result = await fetchResult<AuthoringIdentitySimulation[]>(
+    `/api/authoring/sessions/${encodeURIComponent(sessionPid)}/identity-simulations`,
+  );
+  const simulations = requireData(result, '无法恢复审计身份模拟');
+  return simulations[0] ?? null;
+}
+
 export async function loadAuthoringIdentitySimulation(
   simulationPid: string,
 ): Promise<AuthoringIdentitySimulation> {
@@ -193,6 +203,16 @@ export async function endAuthoringIdentitySimulation(
     { method: 'post' },
   );
   return requireData(result, '无法结束审计身份模拟');
+}
+
+export async function acknowledgeAuthoringIdentitySimulation(
+  simulationPid: string,
+): Promise<AuthoringIdentitySimulation> {
+  const result = await fetchResult<AuthoringIdentitySimulation>(
+    `/api/authoring/identity-simulations/${encodeURIComponent(simulationPid)}/acknowledge`,
+    { method: 'post' },
+  );
+  return requireData(result, '无法确认审计身份模拟终态');
 }
 
 export async function observeAuthoringChangeSet(

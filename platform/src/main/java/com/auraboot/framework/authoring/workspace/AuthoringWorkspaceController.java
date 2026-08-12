@@ -149,6 +149,13 @@ public class AuthoringWorkspaceController {
         return ApiResponse.success(identitySimulationService.start(sessionPid, request));
     }
 
+    @GetMapping("/sessions/{sessionPid}/identity-simulations")
+    @RequirePermission(MetaPermission.META_AUDIT_TRAIL_ADMIN)
+    public ApiResponse<List<IdentitySimulationView>> activeIdentitySimulation(
+            @PathVariable String sessionPid) {
+        return ApiResponse.success(identitySimulationService.active(sessionPid));
+    }
+
     @GetMapping("/identity-simulations/{simulationPid}")
     @RequirePermission(MetaPermission.META_AUDIT_TRAIL_ADMIN)
     public ApiResponse<IdentitySimulationView> getIdentitySimulation(
@@ -161,6 +168,13 @@ public class AuthoringWorkspaceController {
     public ApiResponse<IdentitySimulationView> endIdentitySimulation(
             @PathVariable String simulationPid) {
         return ApiResponse.success(identitySimulationService.end(simulationPid));
+    }
+
+    @PostMapping("/identity-simulations/{simulationPid}/acknowledge")
+    @RequirePermission(MetaPermission.META_AUDIT_TRAIL_ADMIN)
+    public ApiResponse<IdentitySimulationView> acknowledgeIdentitySimulation(
+            @PathVariable String simulationPid) {
+        return ApiResponse.success(identitySimulationService.acknowledge(simulationPid));
     }
 
     @PostMapping("/change-sets/{changeSetPid}/sessions")

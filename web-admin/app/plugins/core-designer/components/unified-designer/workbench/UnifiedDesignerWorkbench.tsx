@@ -83,7 +83,9 @@ import {
   createSyntheticPreviewRuntimeServices,
 } from '../preview/syntheticPreview';
 import {
+  acknowledgeAuthoringIdentitySimulation,
   endAuthoringIdentitySimulation,
+  loadActiveAuthoringIdentitySimulation,
   loadAuthoringIdentitySimulation,
   loadAuthoringRolePreviewTargets,
   loadAuthoringRoleStructurePreview,
@@ -236,10 +238,17 @@ export function UnifiedDesignerWorkbench({
   const [identitySimulationEnding, setIdentitySimulationEnding] = useState(false);
   const [identitySimulationError, setIdentitySimulationError] = useState<string | null>(null);
   const [identitySimulationRemainingSeconds, setIdentitySimulationRemainingSeconds] = useState(0);
+  const [identitySimulationRecoveryPending, setIdentitySimulationRecoveryPending] = useState(
+    Boolean(roleStructurePreviewSessionPid && identitySimulationAllowed),
+  );
+  const [identitySimulationRecoveryBlocked, setIdentitySimulationRecoveryBlocked] = useState(false);
+  const [identitySimulationRecoveryAttempt, setIdentitySimulationRecoveryAttempt] = useState(0);
   const identityTerminalRefreshPendingRef = useRef(false);
   const syntheticPreviewSelected = selectedRolePreviewPid === SYNTHETIC_PREVIEW_OPTION;
   const selectedTargetRolePid = syntheticPreviewSelected ? '' : selectedRolePreviewPid;
   const identitySimulationActive = identitySimulation?.status === 'ACTIVE';
+  const identitySimulationRecoveryGuarded =
+    identitySimulationRecoveryPending || identitySimulationRecoveryBlocked;
   const identitySimulationPid = identitySimulation?.simulationPid;
   const identitySimulationExpiresAt = identitySimulation?.expiresAt;
   // Primary + additive multi-selection model, extracted to a shared kernel so
@@ -390,7 +399,40 @@ export function UnifiedDesignerWorkbench({
     setIdentitySimulationFormOpen(false);
     setIdentitySimulationReason('');
     setIdentitySimulationError(null);
-  }, [roleStructurePreviewSessionPid]);
+    setIdentitySimulationRecoveryBlocked(false);
+    if (!roleStructurePreviewSessionPid || !identitySimulationAllowed) {
+      setIdentitySimulationRecoveryPending(false);
+      return;
+    }
+    let cancelled = false;
+    setIdentitySimulationRecoveryPending(true);
+    void loadActiveAuthoringIdentitySimulation(roleStructurePreviewSessionPid)
+      .then((simulation) => {
+        if (cancelled) return;
+        setIdentitySimulation(simulation);
+        if (simulation) {
+          setMode('preview');
+          setSelectedRolePreviewPid(simulation.targetRole.rolePid);
+        }
+      })
+      .catch((recoveryError: unknown) => {
+        if (cancelled) return;
+        setIdentitySimulationRecoveryBlocked(true);
+        setIdentitySimulationError(
+          recoveryError instanceof Error ? recoveryError.message : '无法恢复审计身份模拟',
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setIdentitySimulationRecoveryPending(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    identitySimulationAllowed,
+    identitySimulationRecoveryAttempt,
+    roleStructurePreviewSessionPid,
+  ]);
 
   React.useEffect(() => {
     if (!identitySimulationActive || !identitySimulationPid || !identitySimulationExpiresAt) {
@@ -431,6 +473,16 @@ export function UnifiedDesignerWorkbench({
     };
   }, [identitySimulationActive, identitySimulationExpiresAt, identitySimulationPid]);
 
+  React.useEffect(() => {
+    if (identitySimulationActive) setMode('preview');
+  }, [identitySimulationActive]);
+
+  React.useEffect(() => {
+    if (identitySimulationActive && identitySimulation && mode === 'preview') {
+      setSelectedRolePreviewPid(identitySimulation.targetRole.rolePid);
+    }
+  }, [identitySimulation, identitySimulationActive, mode]);
+
   const handleStartIdentitySimulation = async () => {
     const reason = identitySimulationReason.trim();
     if (!roleStructurePreviewSessionPid || !selectedTargetRolePid || !reason) return;
@@ -464,6 +516,24 @@ export function UnifiedDesignerWorkbench({
     } catch (endError: unknown) {
       setIdentitySimulationError(
         endError instanceof Error ? endError.message : '无法结束审计身份模拟',
+      );
+    } finally {
+      setIdentitySimulationEnding(false);
+    }
+  };
+
+  const handleDismissIdentitySimulation = async () => {
+    if (!identitySimulation || identitySimulationActive) return;
+    setIdentitySimulationEnding(true);
+    setIdentitySimulationError(null);
+    try {
+      await acknowledgeAuthoringIdentitySimulation(identitySimulation.simulationPid);
+      setIdentitySimulation(null);
+    } catch (acknowledgeError: unknown) {
+      setIdentitySimulationError(
+        acknowledgeError instanceof Error
+          ? acknowledgeError.message
+          : '无法确认审计身份模拟终态',
       );
     } finally {
       setIdentitySimulationEnding(false);
@@ -1368,7 +1438,7 @@ export function UnifiedDesignerWorkbench({
 
   return (
     <div
-      className={`flex flex-col overflow-hidden bg-slate-100 text-slate-900 ${
+      className={`relative flex flex-col overflow-hidden bg-slate-100 text-slate-900 ${
         embedded ? 'h-full min-h-[36rem]' : 'h-[calc(100vh-64px)] min-h-[656px]'
       }`}
       data-testid="unified-designer-workbench"
@@ -1384,14 +1454,27 @@ export function UnifiedDesignerWorkbench({
         canUndo={canUndo}
         canRedo={canRedo}
         returnHref={returnHref}
-        aiCopilotEnabled={aiCopilotEnabled}
+        aiCopilotEnabled={
+          aiCopilotEnabled && !identitySimulationActive && !identitySimulationRecoveryGuarded
+        }
         aiCopilotGoverned={governedAiCopilotEnabled}
         pageId={pageId}
         publishStatus={publishStatus}
         publishError={publishError}
-        onModeChange={setMode}
+        onModeChange={(nextMode) => {
+          if (
+            (identitySimulationActive || identitySimulationRecoveryGuarded) &&
+            nextMode !== 'preview'
+          )
+            return;
+          setMode(nextMode);
+        }}
         onSwitchKind={
-          contextualRestricted && !contextualPageKindSwitchEnabled ? undefined : handleSwitchKind
+          identitySimulationActive ||
+          identitySimulationRecoveryGuarded ||
+          (contextualRestricted && !contextualPageKindSwitchEnabled)
+            ? undefined
+            : handleSwitchKind
         }
         onUndo={handleUndo}
         onRedo={handleRedo}
@@ -1401,18 +1484,58 @@ export function UnifiedDesignerWorkbench({
         onExport={
           !contextualReadOnly &&
           !identitySimulationActive &&
-          effectiveRoleStructurePreview?.exportAllowed !== false
+          !identitySimulationRecoveryGuarded &&
+          effectiveRoleStructurePreview?.exportAllowed !== false &&
+          syntheticPreview?.exportAllowed !== false
             ? handleExport
             : undefined
         }
-        onImportFile={contextualReadOnly ? undefined : handleImportFile}
+        onImportFile={
+          contextualReadOnly || identitySimulationActive || identitySimulationRecoveryGuarded
+            ? undefined
+            : handleImportFile
+        }
         onOpenAiCopilot={() => setAiDialogOpen(true)}
         onOpenVersions={
           pageId && !contextualRestricted ? () => setVersionPanelOpen(true) : undefined
         }
-        readOnly={contextualReadOnly}
+        readOnly={
+          contextualReadOnly || identitySimulationActive || identitySimulationRecoveryGuarded
+        }
         contextualRestricted={contextualRestricted}
+        previewOnly={identitySimulationActive || identitySimulationRecoveryGuarded}
       />
+      {identitySimulationRecoveryGuarded ? (
+        <div
+          className="absolute inset-x-0 bottom-0 top-14 z-50 grid place-items-center bg-slate-50/95 p-6 text-center"
+          data-testid={
+            identitySimulationRecoveryBlocked
+              ? 'identity-simulation-recovery-fail-closed'
+              : 'identity-simulation-recovery-loading'
+          }
+        >
+          <div className="max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-sm font-semibold text-slate-900">
+              {identitySimulationRecoveryBlocked ? '无法确认身份模拟状态' : '正在确认身份模拟状态'}
+            </div>
+            <p className="mt-1 text-xs text-slate-600">
+              {identitySimulationRecoveryBlocked
+                ? '为避免越过只读边界，工作台已暂停编辑。请重试恢复。'
+                : '确认完成前，保存、导入、导出与设计操作暂不可用。'}
+            </p>
+            {identitySimulationRecoveryBlocked ? (
+              <button
+                type="button"
+                data-testid="identity-simulation-recovery-retry"
+                onClick={() => setIdentitySimulationRecoveryAttempt((attempt) => attempt + 1)}
+                className="mt-3 rounded-md bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-800"
+              >
+                重试恢复
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       {pageId && !contextualRestricted ? (
         <VersionHistoryPanel
           pid={pageId}
@@ -1727,7 +1850,8 @@ export function UnifiedDesignerWorkbench({
                   <button
                     type="button"
                     data-testid="identity-simulation-dismiss"
-                    onClick={() => setIdentitySimulation(null)}
+                    disabled={identitySimulationEnding}
+                    onClick={() => void handleDismissIdentitySimulation()}
                     className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100"
                   >
                     {resolveDesignerText(DESIGNER_I18N.unified.identitySimulation.dismiss, locale)}

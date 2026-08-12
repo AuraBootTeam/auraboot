@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  acknowledgeAuthoringIdentitySimulation,
   endAuthoringIdentitySimulation,
+  loadActiveAuthoringIdentitySimulation,
   loadAuthoringIdentitySimulation,
   loadAuthoringRolePreviewTargets,
   loadAuthoringRoleStructurePreview,
@@ -15,7 +17,9 @@ import { samplePageSchemaV3 } from '../fixtures/samplePageSchemaV3';
 import { UnifiedDesignerWorkbench } from '../workbench/UnifiedDesignerWorkbench';
 
 vi.mock('~/framework/meta/authoring/authoringService', () => ({
+  acknowledgeAuthoringIdentitySimulation: vi.fn(),
   endAuthoringIdentitySimulation: vi.fn(),
+  loadActiveAuthoringIdentitySimulation: vi.fn(),
   loadAuthoringIdentitySimulation: vi.fn(),
   loadAuthoringRolePreviewTargets: vi.fn(),
   loadAuthoringRoleStructurePreview: vi.fn(),
@@ -70,11 +74,63 @@ function simulation(status: 'ACTIVE' | 'ENDED' | 'EXPIRED'): AuthoringIdentitySi
 describe('UnifiedDesignerWorkbench audited identity simulation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(acknowledgeAuthoringIdentitySimulation).mockResolvedValue(simulation('ENDED'));
+    vi.mocked(loadActiveAuthoringIdentitySimulation).mockResolvedValue(null);
     vi.mocked(loadAuthoringRolePreviewTargets).mockResolvedValue([structure.targetRole]);
     vi.mocked(loadAuthoringRoleStructurePreview).mockResolvedValue(structure);
     vi.mocked(startAuthoringIdentitySimulation).mockResolvedValue(simulation('ACTIVE'));
     vi.mocked(loadAuthoringIdentitySimulation).mockResolvedValue(simulation('EXPIRED'));
     vi.mocked(endAuthoringIdentitySimulation).mockResolvedValue(simulation('ENDED'));
+  });
+
+  it('restores an active simulation after reload and locks the workbench to readonly preview', async () => {
+    vi.mocked(loadActiveAuthoringIdentitySimulation).mockResolvedValue(simulation('ACTIVE'));
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={samplePageSchemaV3}
+        roleStructurePreviewSessionPid="session-1"
+        identitySimulationAllowed
+        aiCopilot
+      />,
+    );
+
+    expect(await screen.findByTestId('identity-simulation-banner')).toHaveAttribute(
+      'data-status',
+      'ACTIVE',
+    );
+    expect(loadActiveAuthoringIdentitySimulation).toHaveBeenCalledWith('session-1');
+    expect(screen.getByTestId('unified-designer-workbench')).toHaveAttribute(
+      'data-mode',
+      'preview',
+    );
+    expect(screen.getByTestId('designer-mode-edit')).toBeDisabled();
+    expect(screen.getByTestId('designer-mode-layout')).toBeDisabled();
+    expect(screen.getByTestId('designer-save')).toBeDisabled();
+    expect(screen.queryByTestId('designer-ai-copilot')).not.toBeInTheDocument();
+  });
+
+  it('fails closed when recovery cannot confirm server state and retries explicitly', async () => {
+    vi.mocked(loadActiveAuthoringIdentitySimulation)
+      .mockRejectedValueOnce(new Error('recovery unavailable'))
+      .mockResolvedValueOnce(simulation('ACTIVE'));
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={samplePageSchemaV3}
+        roleStructurePreviewSessionPid="session-1"
+        identitySimulationAllowed
+      />,
+    );
+
+    expect(
+      await screen.findByTestId('identity-simulation-recovery-fail-closed'),
+    ).toHaveTextContent('工作台已暂停编辑');
+    expect(screen.getByTestId('designer-mode-edit')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('identity-simulation-recovery-retry'));
+    expect(await screen.findByTestId('identity-simulation-banner')).toHaveAttribute(
+      'data-status',
+      'ACTIVE',
+    );
+    expect(loadActiveAuthoringIdentitySimulation).toHaveBeenCalledTimes(2);
   });
 
   it('requires a reason, starts an actor-intersected readonly session, and ends it explicitly', async () => {
@@ -129,6 +185,9 @@ describe('UnifiedDesignerWorkbench audited identity simulation', () => {
     );
     expect(endAuthoringIdentitySimulation).toHaveBeenCalledWith('simulation-1');
     fireEvent.click(screen.getByTestId('identity-simulation-dismiss'));
+    await waitFor(() =>
+      expect(acknowledgeAuthoringIdentitySimulation).toHaveBeenCalledWith('simulation-1'),
+    );
     expect(await screen.findByTestId('role-structure-preview-banner')).toBeInTheDocument();
   });
 

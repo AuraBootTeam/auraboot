@@ -8,7 +8,9 @@ import { samplePageSchemaV3 } from '../fixtures/samplePageSchemaV3';
 import { UnifiedDesignerWorkbench } from '../workbench/UnifiedDesignerWorkbench';
 
 vi.mock('~/framework/meta/authoring/authoringService', () => ({
+  acknowledgeAuthoringIdentitySimulation: vi.fn(),
   endAuthoringIdentitySimulation: vi.fn(),
+  loadActiveAuthoringIdentitySimulation: vi.fn(),
   loadAuthoringIdentitySimulation: vi.fn(),
   loadAuthoringRolePreviewTargets: vi.fn(),
   loadAuthoringRoleStructurePreview: vi.fn(),

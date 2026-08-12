@@ -130,6 +130,64 @@ class AuthoringIdentitySimulationServiceTest {
     }
 
     @Test
+    void restoresTheOneActiveSimulationForItsSourceSession() {
+        SimulationRow row = activeRow(databaseNow.plusSeconds(300));
+        when(workspaceService.get("session-1")).thenReturn(sessionUnchecked());
+        when(simulationRepository.findRecoverableForSession(7L, 1L, 11L, "session-1", true))
+                .thenReturn(row);
+        when(roleStructurePreviewService.preview("session-1", "role-operator"))
+                .thenReturn(structure());
+        when(simulationRepository.markAccessed(any(), any())).thenReturn(true);
+
+        List<IdentitySimulationView> active = service.active("session-1");
+
+        assertThat(active).singleElement().satisfies(view -> {
+            assertThat(view.simulationPid()).isEqualTo("simulation-1");
+            assertThat(view.status()).isEqualTo("ACTIVE");
+            assertThat(view.readOnly()).isTrue();
+        });
+    }
+
+    @Test
+    void restoresTerminalFeedbackUntilTheActorAcknowledgesIt() {
+        SimulationRow ended = terminalRow("ENDED", null);
+        when(workspaceService.get("session-1")).thenReturn(sessionUnchecked());
+        when(simulationRepository.findRecoverableForSession(7L, 1L, 11L, "session-1", true))
+                .thenReturn(ended);
+
+        assertThat(service.active("session-1"))
+                .singleElement()
+                .satisfies(view -> assertThat(view.status()).isEqualTo("ENDED"));
+
+        when(simulationRepository.find(7L, 1L, 11L, "simulation-1", true))
+                .thenReturn(ended);
+        when(simulationRepository.acknowledge(eq(ended), any())).thenReturn(true);
+        IdentitySimulationView acknowledged = service.acknowledge("simulation-1");
+
+        assertThat(acknowledged.status()).isEqualTo("ENDED");
+        verify(simulationRepository).acknowledge(eq(ended), eq(databaseNow));
+        ArgumentCaptor<AuditEntry> audit = ArgumentCaptor.forClass(AuditEntry.class);
+        verify(workspaceRepository).audit(audit.capture());
+        assertThat(audit.getValue().eventType()).isEqualTo("IDENTITY_SIMULATION_ACKNOWLEDGED");
+    }
+
+    @Test
+    void rejectsASecondActiveSimulationBeforeEvaluatingAnotherTargetRole() {
+        when(workspaceService.get("session-1")).thenReturn(sessionUnchecked());
+        when(simulationRepository.findActiveForSession(7L, 1L, 11L, "session-1", true))
+                .thenReturn(activeRow(databaseNow.plusSeconds(300)));
+
+        assertThatThrownBy(() -> service.start(
+                "session-1",
+                new StartIdentitySimulationRequest("role-other", 5, "duplicate")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409 CONFLICT")
+                .hasMessageContaining("authoring.identity-simulation.already-active");
+        verify(roleStructurePreviewService, never()).preview(any(), any());
+        verify(simulationRepository, never()).create(any());
+    }
+
+    @Test
     void expiredAndForeignSessionsFailClosedWithoutReevaluatingRole() {
         SimulationRow expired = activeRow(databaseNow.minusSeconds(1));
         when(simulationRepository.find(7L, 1L, 11L, "expired", true)).thenReturn(expired);
@@ -176,6 +234,14 @@ class AuthoringIdentitySimulationServiceTest {
                 Instant.now().plusSeconds(600));
     }
 
+    private SessionView sessionUnchecked() {
+        try {
+            return session();
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
     private RoleStructurePreviewView structure() {
         return new RoleStructurePreviewView(
                 "STRUCTURE",
@@ -210,6 +276,31 @@ class AuthoringIdentitySimulationServiceTest {
                 expiresAt,
                 null,
                 null,
+                null,
                 1L);
+    }
+
+    private SimulationRow terminalRow(String status, Instant acknowledgedAt) {
+        Instant expiresAt = databaseNow.minusSeconds(30);
+        return new SimulationRow(
+                1L,
+                "simulation-1",
+                7L,
+                1L,
+                11L,
+                "session-1",
+                "changes-1",
+                "page-1",
+                "role-operator",
+                "operator",
+                "Operator",
+                "incident review",
+                status,
+                expiresAt.minusSeconds(300),
+                expiresAt,
+                databaseNow.minusSeconds(20),
+                null,
+                acknowledgedAt,
+                2L);
     }
 }

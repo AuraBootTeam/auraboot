@@ -87,7 +87,14 @@ type PermissionRecord = { pid: string; code: string };
 type RoleRecord = { pid: string; code: string };
 type ReviewWorkspace = { session: AuthoringSession };
 type CapabilityRegistry = {
-  manifests: Array<{ blockType: string; checksum: string }>;
+  manifests: Array<{
+    blockType: string;
+    checksum: string;
+    properties: Record<
+      string,
+      { propertyPath: string; allowedOperations: Array<'ADD' | 'REPLACE' | 'REMOVE' | string> }
+    >;
+  }>;
 };
 type ChangeItem = {
   changeItemPid: string;
@@ -110,6 +117,39 @@ type AuditRow = {
   reason_code: string | null;
   metadata: Record<string, unknown>;
 };
+type IdentitySimulation = {
+  simulationPid: string;
+  sourceSessionPid: string;
+  targetRole: RoleRecord & { roleName: string };
+  status: 'ACTIVE' | 'ENDED' | 'EXPIRED';
+  actorIntersectionApplied: boolean;
+  businessDataIncluded: boolean;
+  readOnly: boolean;
+  exportAllowed: boolean;
+  businessActionsAllowed: boolean;
+  decisions: unknown[];
+};
+type AiPatchProposal = {
+  proposalPid: string;
+  baseRevision: number;
+  status: 'PROPOSED' | 'APPLIED' | 'REJECTED';
+  typedPatchOnly: boolean;
+  requiresHumanApproval: boolean;
+  aggregateRisk: string;
+  aggregateRoute: string;
+  publishPolicy: string;
+  items: Array<{
+    blockId: string;
+    propertyPath: string;
+    operation: 'ADD' | 'REPLACE' | 'REMOVE';
+    value?: unknown;
+  }>;
+};
+type ApplyAiPatchProposalResult = {
+  proposal: AiPatchProposal;
+  session: AuthoringSession;
+};
+type AdminPermissionSnapshot = { rolePid: string; permissionPids: string[] };
 
 const REVIEWER = {
   roleCode: 'e2e_authoring_release_reviewer',
@@ -126,8 +166,10 @@ const ADMIN_AUTHORING_PERMISSIONS = [
   'meta.publish.update',
   'meta.publish.admin',
 ] as const;
+const WP06_ADMIN_PERMISSIONS = ['audit.trail.admin', 'meta.model.update'] as const;
 
 let gatePage: GatePage;
+let adminPermissionSnapshot: AdminPermissionSnapshot | null = null;
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -136,6 +178,9 @@ test.describe('Contextual authoring release PC golden', () => {
 
   test.beforeAll(async ({ browser }) => {
     gatePage = await createGatePageFromPublishedRuntime(browser);
+    adminPermissionSnapshot = await ensureTenantAdminPermissions(browser, [
+      ...WP06_ADMIN_PERMISSIONS,
+    ]);
   });
 
   test.beforeEach(async ({ page }) => {
@@ -143,7 +188,13 @@ test.describe('Contextual authoring release PC golden', () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    if (gatePage) await cleanupGatePage(browser, gatePage);
+    try {
+      if (gatePage) await cleanupGatePage(browser, gatePage);
+    } finally {
+      if (adminPermissionSnapshot) {
+        await restoreTenantAdminPermissions(browser, adminPermissionSnapshot);
+      }
+    }
   });
 
   test('PC-AUTH-017 @critical — failed publish stays retryable and release history rolls back atomically', async ({
@@ -1496,9 +1547,7 @@ test.describe('Contextual authoring release PC golden', () => {
     await expect(page.getByTestId('authoring-inspector')).toBeVisible();
     await expect
       .poll(async () =>
-        Math.abs(
-          (await pageScroll.evaluate((container) => container.scrollTop)) - sourceScrollY,
-        ),
+        Math.abs((await pageScroll.evaluate((container) => container.scrollTop)) - sourceScrollY),
       )
       .toBeLessThanOrEqual(4);
     const restored = await loadSession(page, opened.sessionPid, 'reload returned detail session');
@@ -1571,6 +1620,637 @@ test.describe('Contextual authoring release PC golden', () => {
     await wizard.getByRole('link', { name: '返回现场' }).click();
     await expect(page).toHaveURL(new RegExp(`${gatePage.route}$`));
     expect(createRequests).toBe(0);
+  });
+
+  test('PC-AUTH-045 @critical — role, synthetic and audited identity previews stay isolated, readonly and recoverable', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const opened = await enterAuthoringFromMenu(page);
+    await selectTableInContextualInspector(page, opened);
+    await enterStudioFromContextual(page);
+
+    let targetLoadFailurePending = true;
+    await page.route('**/api/authoring/sessions/*/role-preview-targets', async (route) => {
+      if (route.request().method() === 'GET' && targetLoadFailurePending) {
+        targetLoadFailurePending = false;
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 'CONTROLLED_TARGET_FAILURE',
+            message: 'target list unavailable',
+          }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await page.getByTestId('designer-mode-preview').click();
+    await expect(page.getByTestId('role-preview-targets-error')).toContainText(
+      'target list unavailable',
+    );
+    await page.getByTestId('designer-mode-edit').click();
+    await page.getByTestId('designer-mode-preview').click();
+    const roleSelect = page.getByTestId('role-preview-target-select');
+    await expect.poll(() => roleSelect.locator('option').count()).toBeGreaterThan(2);
+    await page.unroute('**/api/authoring/sessions/*/role-preview-targets');
+
+    const targetRolePid = await roleSelect.locator('option').evaluateAll((options) => {
+      const target = options.find((option) => {
+        const value = (option as HTMLOptionElement).value;
+        return value && value !== '__synthetic_fixture__';
+      }) as HTMLOptionElement | undefined;
+      return target?.value ?? '';
+    });
+    expect(targetRolePid, 'at least one real target role').toBeTruthy();
+
+    let rolePreviewFailurePending = true;
+    await page.route('**/api/authoring/sessions/*/role-structure-preview?*', async (route) => {
+      if (route.request().method() === 'GET' && rolePreviewFailurePending) {
+        rolePreviewFailurePending = false;
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 'CONTROLLED_ROLE_FAILURE',
+            message: 'role preview unavailable',
+          }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await roleSelect.selectOption(targetRolePid);
+    await expect(page.getByTestId('role-preview-error')).toContainText('role preview unavailable');
+    await expect(page.getByTestId('role-preview-fail-closed')).toBeVisible();
+    await roleSelect.selectOption('');
+    const rolePreviewResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'GET' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${opened.sessionPid}/role-structure-preview`,
+    );
+    await roleSelect.selectOption(targetRolePid);
+    const rolePreview = await expectApiData<{
+      actorIntersectionApplied: boolean;
+      businessDataIncluded: boolean;
+      exportAllowed: boolean;
+      businessActionsAllowed: boolean;
+    }>(await rolePreviewResponse, 'load target-role structure preview');
+    expect(rolePreview).toMatchObject({
+      actorIntersectionApplied: true,
+      businessDataIncluded: false,
+      exportAllowed: false,
+      businessActionsAllowed: false,
+    });
+    await expect(page.getByTestId('role-structure-preview-banner')).toContainText(
+      '不读取目标角色真实数据',
+    );
+    await expect(page.getByTestId('designer-export')).toBeDisabled();
+    await expect(page.getByText(gatePage.recordMarker)).toHaveCount(0);
+    await page.unroute('**/api/authoring/sessions/*/role-structure-preview?*');
+
+    let syntheticFailurePending = true;
+    await page.route('**/api/authoring/sessions/*/synthetic-preview', async (route) => {
+      if (route.request().method() === 'GET' && syntheticFailurePending) {
+        syntheticFailurePending = false;
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 'CONTROLLED_FIXTURE_FAILURE',
+            message: 'fixture unavailable',
+          }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await roleSelect.selectOption('__synthetic_fixture__');
+    await expect(page.getByTestId('synthetic-preview-error')).toContainText('fixture unavailable');
+    await expect(page.getByTestId('synthetic-preview-fail-closed')).toBeVisible();
+    await roleSelect.selectOption('');
+    const syntheticResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'GET' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${opened.sessionPid}/synthetic-preview`,
+    );
+    await roleSelect.selectOption('__synthetic_fixture__');
+    const synthetic = await expectApiData<{
+      source: string;
+      isolatedFromTenantData: boolean;
+      persisted: boolean;
+      exportAllowed: boolean;
+      businessActionsAllowed: boolean;
+      records: Array<Record<string, unknown>>;
+    }>(await syntheticResponse, 'load generated in-memory preview');
+    expect(synthetic).toMatchObject({
+      source: 'GENERATED_IN_MEMORY',
+      isolatedFromTenantData: true,
+      persisted: false,
+      exportAllowed: false,
+      businessActionsAllowed: false,
+    });
+    expect(synthetic.records).toHaveLength(3);
+    expect(JSON.stringify(synthetic)).not.toContain(gatePage.recordMarker);
+    await expect(page.getByTestId('synthetic-preview-banner')).toContainText('不查询真实租户记录');
+    await expect(page.getByTestId('synthetic-preview-record-count')).toContainText('3 条合成记录');
+    await expect(page.getByTestId('designer-export')).toBeDisabled();
+    await expect(page.getByText(gatePage.recordMarker)).toHaveCount(0);
+    await page.unroute('**/api/authoring/sessions/*/synthetic-preview');
+
+    await roleSelect.selectOption(targetRolePid);
+    await expect(page.getByTestId('role-structure-preview-banner')).toBeVisible();
+    await page.getByTestId('identity-simulation-open').click();
+    await page.getByTestId('identity-simulation-reason').fill('PC-AUTH-045 controlled denial');
+    let identityStartFailurePending = true;
+    await page.route('**/api/authoring/sessions/*/identity-simulations', async (route) => {
+      if (route.request().method() === 'POST' && identityStartFailurePending) {
+        identityStartFailurePending = false;
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 'CONTROLLED_IDENTITY_FAILURE',
+            message: 'identity start denied',
+          }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await page.getByTestId('identity-simulation-start').click();
+    await expect(page.getByTestId('identity-simulation-error')).toContainText(
+      'identity start denied',
+    );
+    await expect(page.getByTestId('role-structure-preview-banner')).toBeVisible();
+    await page
+      .getByTestId('identity-simulation-reason')
+      .fill('PC-AUTH-045 audited identity review');
+    const startResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${opened.sessionPid}/identity-simulations` &&
+        response.status() === 200,
+    );
+    await page.getByTestId('identity-simulation-start').click();
+    const firstSimulation = await expectApiData<IdentitySimulation>(
+      await startResponse,
+      'start audited identity simulation',
+    );
+    expect(firstSimulation).toMatchObject({
+      status: 'ACTIVE',
+      actorIntersectionApplied: true,
+      businessDataIncluded: false,
+      readOnly: true,
+      exportAllowed: false,
+      businessActionsAllowed: false,
+    });
+    await expect(page.getByTestId('identity-simulation-banner')).toHaveAttribute(
+      'data-status',
+      'ACTIVE',
+    );
+    await expect(page.getByTestId('identity-simulation-countdown')).toBeVisible();
+    await expect(page.getByTestId('designer-mode-edit')).toBeDisabled();
+    await expect(page.getByTestId('designer-mode-layout')).toBeDisabled();
+    await expect(page.getByTestId('designer-save')).toBeDisabled();
+    await expect(page.getByTestId('designer-export')).toHaveCount(0);
+    await expect(page.getByTestId('designer-import')).toHaveCount(0);
+    await expect(page.getByTestId('designer-ai-copilot')).toHaveCount(0);
+    await page.unroute('**/api/authoring/sessions/*/identity-simulations');
+
+    const duplicate = await page.request.post(
+      `/api/authoring/sessions/${opened.sessionPid}/identity-simulations`,
+      {
+        data: {
+          rolePid: targetRolePid,
+          durationMinutes: 5,
+          reason: 'PC-AUTH-045 duplicate active attempt',
+        },
+      },
+    );
+    expect(duplicate.status()).toBe(409);
+
+    let recoveryFailureEnabled = true;
+    await page.route('**/api/authoring/sessions/*/identity-simulations', async (route) => {
+      if (route.request().method() === 'GET' && recoveryFailureEnabled) {
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 'CONTROLLED_RECOVERY_FAILURE',
+            message: 'recovery unavailable',
+          }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('identity-simulation-recovery-fail-closed')).toContainText(
+      '工作台已暂停编辑',
+    );
+    await expect(page.getByTestId('designer-mode-edit')).toBeDisabled();
+    recoveryFailureEnabled = false;
+    await page.getByTestId('identity-simulation-recovery-retry').click();
+    await expect(page.getByTestId('identity-simulation-banner')).toHaveAttribute(
+      'data-status',
+      'ACTIVE',
+    );
+    await expect(page.getByTestId('unified-designer-workbench')).toHaveAttribute(
+      'data-mode',
+      'preview',
+    );
+    await page.unroute('**/api/authoring/sessions/*/identity-simulations');
+
+    const endResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) ===
+          `/api/authoring/identity-simulations/${firstSimulation.simulationPid}/end`,
+    );
+    await page.getByTestId('identity-simulation-end').click();
+    const ended = await expectApiData<IdentitySimulation>(
+      await endResponse,
+      'end identity simulation',
+    );
+    expect(ended.status).toBe('ENDED');
+    await expect(page.getByTestId('identity-simulation-banner')).toHaveAttribute(
+      'data-status',
+      'ENDED',
+    );
+    await page.getByTestId('identity-simulation-dismiss').click();
+    await expect(page.getByTestId('identity-simulation-banner')).toHaveCount(0);
+
+    await expect(page.getByTestId('role-structure-preview-banner')).toBeVisible();
+    await page.getByTestId('identity-simulation-open').click();
+    await page.getByTestId('identity-simulation-reason').fill('PC-AUTH-045 expiry review');
+    const secondStartResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${opened.sessionPid}/identity-simulations`,
+    );
+    await page.getByTestId('identity-simulation-start').click();
+    const expiring = await expectApiData<IdentitySimulation>(
+      await secondStartResponse,
+      'start expiring identity simulation',
+    );
+    await expireIdentitySimulation(expiring.simulationPid);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('identity-simulation-banner')).toHaveAttribute(
+      'data-status',
+      'EXPIRED',
+    );
+    await expect(page.getByTestId('identity-simulation-dismiss')).toBeVisible();
+    await page.getByTestId('identity-simulation-dismiss').click();
+    await expect(page.getByTestId('identity-simulation-banner')).toHaveCount(0);
+
+    const activeAfter = await expectApiData<IdentitySimulation[]>(
+      await page.request.get(`/api/authoring/sessions/${opened.sessionPid}/identity-simulations`),
+      'verify no active identity simulation remains',
+    );
+    expect(activeAfter).toEqual([]);
+    const audits = await loadAuditRows(opened.changeSetPid);
+    expect(audits.map((row) => row.event_type)).toEqual(
+      expect.arrayContaining([
+        'IDENTITY_SIMULATION_STARTED',
+        'IDENTITY_SIMULATION_ACCESSED',
+        'IDENTITY_SIMULATION_ENDED',
+        'IDENTITY_SIMULATION_EXPIRED',
+        'IDENTITY_SIMULATION_ACKNOWLEDGED',
+      ]),
+    );
+    expect(JSON.stringify(audits)).not.toContain('PC-AUTH-045 audited identity review');
+    expect(JSON.stringify(audits)).not.toContain('PC-AUTH-045 expiry review');
+    expect(await countGateRecord(gatePage.recordMarker)).toBeGreaterThan(0);
+
+    await mkdir(SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-045-audited-preview-boundaries.png'),
+      fullPage: true,
+    });
+  });
+
+  test('PC-AUTH-046 @critical — governed AI remains a typed human-reviewed proposal with atomic apply and stale rejection', async ({
+    page,
+    browser,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await ensureReviewer(page);
+    const opened = await enterAuthoringFromMenu(page);
+    await selectTableInContextualInspector(page, opened);
+    await enterStudioFromContextual(page);
+    await expect(page.getByTestId('designer-ai-copilot')).toBeVisible();
+
+    let liveProviderCanary: {
+      status: number | null;
+      verdict: 'available' | 'blocked_by_env';
+      response: string;
+    };
+    try {
+      const liveProvider = await page.request.post('/api/agent/nl-modeling/generate-page', {
+        data: {
+          systemPrompt: 'Return one JSON object only: {"items":[]}',
+          message: 'AuraBoot WP06 provider canary; do not invoke tools.',
+        },
+        timeout: 15_000,
+      });
+      liveProviderCanary = {
+        status: liveProvider.status(),
+        verdict: liveProvider.ok() ? 'available' : 'blocked_by_env',
+        response: (await liveProvider.text()).slice(0, 500),
+      };
+    } catch (error) {
+      liveProviderCanary = {
+        status: null,
+        verdict: 'blocked_by_env',
+        response:
+          error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500),
+      };
+    }
+    await testInfo.attach('pc-auth-046-live-provider-canary.json', {
+      body: JSON.stringify(liveProviderCanary, null, 2),
+      contentType: 'application/json',
+    });
+    if (liveProviderCanary.status !== null) {
+      expect([200, 400, 401, 403, 429, 500, 503]).toContain(liveProviderCanary.status);
+    }
+
+    const baseline = await loadSession(page, opened.sessionPid, 'load AI proposal baseline');
+    const capabilities = await expectApiData<CapabilityRegistry>(
+      await page.request.get('/api/authoring/capabilities'),
+      'load AI typed capability registry',
+    );
+    const target = findGovernedAiDensityTarget(baseline.snapshot, capabilities);
+    const initialValue = readObjectPath(target.block, target.propertyPath);
+    const proposedValue = initialValue === 'compact' ? 'comfortable' : 'compact';
+    const directValue = proposedValue === 'compact' ? 'comfortable' : 'compact';
+    const operation: 'ADD' | 'REPLACE' = initialValue === undefined ? 'ADD' : 'REPLACE';
+    expect(target.allowedOperations).toContain(operation);
+
+    let providerCall = 0;
+    let proposalRequests = 0;
+    page.on('request', (request) => {
+      if (
+        request.method() === 'POST' &&
+        apiPath(request.url()) === `/api/authoring/sessions/${opened.sessionPid}/ai-patch-proposals`
+      ) {
+        proposalRequests += 1;
+      }
+    });
+    await page.route('**/api/agent/nl-modeling/generate-page', async (route) => {
+      providerCall += 1;
+      if (providerCall === 1) {
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'controlled provider unavailable' }),
+        });
+        return;
+      }
+      if (providerCall === 2) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            content:
+              '{"items":[{"blockId":"unknown-block","propertyPath":"/props/density","operation":"REPLACE","value":"compact"}]}',
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          content: JSON.stringify({
+            items: [
+              {
+                blockId: target.blockId,
+                propertyPath: target.propertyPath,
+                operation: providerCall >= 5 ? 'REPLACE' : operation,
+                value: providerCall >= 5 ? directValue : proposedValue,
+              },
+            ],
+          }),
+        }),
+      });
+    });
+
+    await page.getByTestId('designer-ai-copilot').click();
+    const dialog = page.getByTestId('governed-ai-proposal-dialog');
+    await expect(dialog).toContainText('不会直接修改页面或绕过审批');
+    await expect(dialog).toContainText('草稿尚未变化');
+    await page
+      .getByTestId('governed-ai-description')
+      .fill('把列表密度调整为更紧凑；仅生成待人工复核的属性提案');
+    await page.getByTestId('governed-ai-proposal-generate').click();
+    await expect(page.getByTestId('governed-ai-proposal-error')).toContainText(
+      'controlled provider unavailable',
+    );
+    expect(proposalRequests).toBe(0);
+    await page.getByTestId('governed-ai-proposal-generate').click();
+    await expect(page.getByTestId('governed-ai-proposal-error')).toContainText(
+      'unknown typed target',
+    );
+    expect(proposalRequests).toBe(0);
+
+    const beforeItems = await loadAuthoringChangeItems(page, opened.sessionPid);
+    const firstProposalResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${opened.sessionPid}/ai-patch-proposals`,
+    );
+    await page.getByTestId('governed-ai-proposal-generate').click();
+    const firstProposal = await expectApiData<AiPatchProposal>(
+      await firstProposalResponse,
+      'persist first governed AI proposal',
+    );
+    expect(firstProposal).toMatchObject({
+      status: 'PROPOSED',
+      baseRevision: baseline.revision,
+      typedPatchOnly: true,
+      requiresHumanApproval: true,
+    });
+    await expect(page.getByTestId('governed-ai-proposal-review')).toContainText(
+      target.propertyPath,
+    );
+    await expect(page.getByTestId('governed-ai-proposal-item')).toContainText(
+      String(proposedValue),
+    );
+    const beforeHumanDecision = await loadSession(
+      page,
+      opened.sessionPid,
+      'proposal must not mutate draft before human decision',
+    );
+    expect(beforeHumanDecision.revision).toBe(baseline.revision);
+    expect(readObjectPath(findTableBlock(beforeHumanDecision.snapshot)!, target.propertyPath)).toBe(
+      initialValue,
+    );
+    expect(await loadAuthoringChangeItems(page, opened.sessionPid)).toEqual(beforeItems);
+
+    const rejectResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${opened.sessionPid}/ai-patch-proposals/${firstProposal.proposalPid}/reject`,
+    );
+    await page.getByTestId('governed-ai-proposal-discard').click();
+    const rejected = await expectApiData<AiPatchProposal>(
+      await rejectResponse,
+      'reject AI proposal',
+    );
+    expect(rejected.status).toBe('REJECTED');
+    await expect(dialog).toHaveCount(0);
+
+    await page.getByTestId('designer-ai-copilot').click();
+    await page
+      .getByTestId('governed-ai-description')
+      .fill('再次生成相同属性提案，等待人工确认后应用');
+    const secondProposalResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${opened.sessionPid}/ai-patch-proposals`,
+    );
+    await page.getByTestId('governed-ai-proposal-generate').click();
+    const secondProposal = await expectApiData<AiPatchProposal>(
+      await secondProposalResponse,
+      'persist second governed AI proposal',
+    );
+    const applyResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${opened.sessionPid}/ai-patch-proposals/${secondProposal.proposalPid}/apply`,
+    );
+    await page.getByTestId('governed-ai-proposal-apply').click();
+    const applied = await expectApiData<ApplyAiPatchProposalResult>(
+      await applyResponse,
+      'human applies governed AI proposal',
+    );
+    expect(applied.proposal.status).toBe('APPLIED');
+    expect(applied.session.revision).toBe(baseline.revision + 1);
+    expect(readObjectPath(findTableBlock(applied.session.snapshot)!, target.propertyPath)).toBe(
+      proposedValue,
+    );
+    expect(await loadAuthoringChangeItems(page, opened.sessionPid)).toHaveLength(
+      beforeItems.length + 1,
+    );
+
+    await page.getByTestId('designer-ai-copilot').click();
+    await page
+      .getByTestId('governed-ai-description')
+      .fill('创建一个随后被并发 revision 使其陈旧的属性提案');
+    const staleProposalResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${opened.sessionPid}/ai-patch-proposals`,
+    );
+    await page.getByTestId('governed-ai-proposal-generate').click();
+    const staleProposal = await expectApiData<AiPatchProposal>(
+      await staleProposalResponse,
+      'persist soon-stale governed AI proposal',
+    );
+    const advanced = await expectApiData<PatchResult>(
+      await page.request.patch(`/api/authoring/sessions/${opened.sessionPid}/patches`, {
+        data: {
+          expectedRevision: applied.session.revision,
+          blockId: target.blockId,
+          propertyPath: target.propertyPath,
+          operation: 'REPLACE',
+          value: directValue,
+          manifestChecksum: target.manifestChecksum,
+        },
+      }),
+      'advance revision outside proposed AI batch',
+    );
+    const staleApplyResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${opened.sessionPid}/ai-patch-proposals/${staleProposal.proposalPid}/apply`,
+    );
+    await page.getByTestId('governed-ai-proposal-apply').click();
+    expect((await staleApplyResponse).status()).toBe(409);
+    await expect(page.getByTestId('governed-ai-proposal-error')).toBeVisible();
+    const afterStale = await loadSession(
+      page,
+      opened.sessionPid,
+      'verify stale AI rejection atomicity',
+    );
+    expect(afterStale.revision).toBe(advanced.session.revision);
+    expect(readObjectPath(findTableBlock(afterStale.snapshot)!, target.propertyPath)).toBe(
+      directValue,
+    );
+    expect(await loadAuthoringChangeItems(page, opened.sessionPid)).toHaveLength(
+      beforeItems.length + 2,
+    );
+    const staleRejectResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        apiPath(response.url()) ===
+          `/api/authoring/sessions/${opened.sessionPid}/ai-patch-proposals/${staleProposal.proposalPid}/reject`,
+    );
+    await page.getByTestId('governed-ai-proposal-discard').click();
+    const staleRejected = await expectApiData<AiPatchProposal>(
+      await staleRejectResponse,
+      'reject stale proposal',
+    );
+    expect(staleRejected.status).toBe('REJECTED');
+
+    const reviewer = await openReviewer(browser);
+    try {
+      const denied = await reviewer.request.post(
+        `/api/authoring/sessions/${opened.sessionPid}/ai-patch-proposals`,
+        {
+          data: {
+            expectedRevision: afterStale.revision,
+            items: [
+              {
+                blockId: target.blockId,
+                propertyPath: target.propertyPath,
+                operation: 'REPLACE',
+                value: proposedValue,
+                manifestChecksum: target.manifestChecksum,
+              },
+            ],
+          },
+        },
+      );
+      expect(denied.status()).toBe(403);
+    } finally {
+      await reviewer.context().close();
+    }
+
+    const proposalRows = await loadAiProposalStatusCounts(opened.sessionPid);
+    expect(proposalRows).toEqual({ APPLIED: 1, REJECTED: 2 });
+    const audits = await loadAuditRows(opened.changeSetPid);
+    expect(audits.map((row) => row.event_type)).toEqual(
+      expect.arrayContaining([
+        'AI_PATCH_PROPOSAL_CREATED',
+        'AI_PATCH_PROPOSAL_APPLIED',
+        'AI_PATCH_PROPOSAL_REJECTED',
+      ]),
+    );
+    expect(JSON.stringify(audits)).not.toContain('再次生成相同属性提案');
+    expect(JSON.stringify(audits)).not.toContain('创建一个随后被并发 revision');
+    await page.unroute('**/api/agent/nl-modeling/generate-page');
+
+    await mkdir(SCREENSHOT_DIR, { recursive: true });
+    await page.getByTestId('designer-ai-copilot').click();
+    await page.getByTestId('governed-ai-description').fill('PC-AUTH-046 最终受治理 AI 边界');
+    await page.screenshot({
+      path: resolve(SCREENSHOT_DIR, 'pc-auth-046-governed-ai-boundary.png'),
+      fullPage: true,
+    });
+    await page.getByTestId('governed-ai-proposal-discard').click();
   });
 
   test('PC-AUTH-028 @critical — governed new page stays private until independent review and atomic publish', async ({
@@ -1860,6 +2540,73 @@ async function cleanupGatePage(browser: Browser, target: GatePage): Promise<void
   }
 }
 
+async function ensureTenantAdminPermissions(
+  browser: Browser,
+  permissionCodes: string[],
+): Promise<AdminPermissionSnapshot> {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  try {
+    await login(page);
+    const roles = await expectApiData<RoleRecord[]>(
+      await page.request.get('/api/roles/all'),
+      'load tenant roles for WP06 admin permission setup',
+    );
+    const role = roles.find((candidate) => candidate.code === 'tenant_admin');
+    expect(role?.pid, 'tenant_admin role for WP06 permission setup').toBeTruthy();
+    const current = await expectApiData<string[]>(
+      await page.request.get(`/api/roles/${encodeURIComponent(role!.pid)}/permissions`),
+      'load tenant_admin permissions before WP06 gate',
+    );
+    const permissions = (
+      await Promise.all(
+        ['function', 'operation', 'data', 'model'].map(async (resourceType) =>
+          expectApiData<PermissionRecord[]>(
+            await page.request.get(`/api/permissions/resource-type/${resourceType}`),
+            `load ${resourceType} permissions for WP06 gate`,
+          ),
+        ),
+      )
+    ).flat();
+    const byCode = new Map(permissions.map((permission) => [permission.code, permission.pid]));
+    const missing = permissionCodes.filter((code) => !byCode.has(code));
+    expect(missing, `missing WP06 permissions: ${missing.join(', ')}`).toEqual([]);
+    const merged = Array.from(
+      new Set([...current.map(String), ...permissionCodes.map((code) => byCode.get(code)!)]),
+    );
+    if (merged.length !== current.length) {
+      await expectApiData<boolean>(
+        await page.request.post(`/api/roles/${encodeURIComponent(role!.pid)}/permissions`, {
+          data: merged,
+        }),
+        'grant WP06 permissions to tenant_admin',
+      );
+    }
+    return { rolePid: role!.pid, permissionPids: current.map(String) };
+  } finally {
+    await context.close();
+  }
+}
+
+async function restoreTenantAdminPermissions(
+  browser: Browser,
+  snapshot: AdminPermissionSnapshot,
+): Promise<void> {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  try {
+    await login(page);
+    await expectApiData<boolean>(
+      await page.request.post(`/api/roles/${encodeURIComponent(snapshot.rolePid)}/permissions`, {
+        data: snapshot.permissionPids,
+      }),
+      'restore tenant_admin permissions after WP06 gate',
+    );
+  } finally {
+    await context.close();
+  }
+}
+
 async function ensureReviewer(adminPage: Page): Promise<void> {
   const roles = await expectApiData<RoleRecord[]>(
     await adminPage.request.get('/api/roles/all'),
@@ -2118,6 +2865,56 @@ async function loadAuditRows(changeSetPid: string): Promise<AuditRow[]> {
       [changeSetPid],
     );
     return result.rows;
+  } finally {
+    await client.end();
+  }
+}
+
+async function expireIdentitySimulation(simulationPid: string): Promise<void> {
+  const client = new PgClient(PG_CONN);
+  await client.connect();
+  try {
+    const result = await client.query(
+      `UPDATE ab_authoring_identity_simulation
+          SET started_at = CURRENT_TIMESTAMP - INTERVAL '2 minutes',
+              expires_at = CURRENT_TIMESTAMP - INTERVAL '1 minute',
+              updated_at = CURRENT_TIMESTAMP
+        WHERE pid = $1 AND status = 'ACTIVE'`,
+      [simulationPid],
+    );
+    expect(result.rowCount, 'active identity simulation selected for expiry').toBe(1);
+  } finally {
+    await client.end();
+  }
+}
+
+async function countGateRecord(recordMarker: string): Promise<number> {
+  const client = new PgClient(PG_CONN);
+  await client.connect();
+  try {
+    const result = await client.query<{ count: string }>(
+      'SELECT COUNT(*)::text AS count FROM mt_e2et_record WHERE e2et_name = $1',
+      [recordMarker],
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  } finally {
+    await client.end();
+  }
+}
+
+async function loadAiProposalStatusCounts(sessionPid: string): Promise<Record<string, number>> {
+  const client = new PgClient(PG_CONN);
+  await client.connect();
+  try {
+    const result = await client.query<{ status: string; count: string }>(
+      `SELECT status, COUNT(*)::text AS count
+         FROM ab_authoring_ai_patch_proposal
+        WHERE source_session_pid = $1
+        GROUP BY status
+        ORDER BY status`,
+      [sessionPid],
+    );
+    return Object.fromEntries(result.rows.map((row) => [row.status, Number(row.count)]));
   } finally {
     await client.end();
   }
@@ -2453,14 +3250,15 @@ async function authoringDragCanvasBlockBefore(
     }
     await settleAuthoringDrag(page);
     if (!beforeIntentVisible) continue;
-    const ordered = await page
-      .locator('[data-testid^="canvas-block-"]')
-      .evaluateAll((nodes, [firstId, secondId]) => {
+    const ordered = await page.locator('[data-testid^="canvas-block-"]').evaluateAll(
+      (nodes, [firstId, secondId]) => {
         const ids = nodes.map(
           (node) => node.getAttribute('data-testid')?.replace('canvas-block-', '') ?? '',
         );
         return ids.indexOf(firstId) < ids.indexOf(secondId);
-      }, [movingBlockId, targetBlockId] as const);
+      },
+      [movingBlockId, targetBlockId] as const,
+    );
     if (ordered) return;
   }
   throw new Error(`real pointer reorder did not place ${movingBlockId} before ${targetBlockId}`);
@@ -2572,6 +3370,34 @@ function findTableBlock(value: unknown): Record<string, unknown> | null {
     if (found) return found;
   }
   return null;
+}
+
+function findGovernedAiDensityTarget(
+  snapshot: Record<string, unknown>,
+  capabilities: CapabilityRegistry,
+): {
+  block: Record<string, unknown>;
+  blockId: string;
+  propertyPath: string;
+  allowedOperations: string[];
+  manifestChecksum: string;
+} {
+  const block = findTableBlock(snapshot);
+  expect(block?.id, 'table target for governed AI proposal').toBeTruthy();
+  const blockType = String(block!.blockType ?? block!.type ?? '');
+  const manifest = capabilities.manifests.find((candidate) => candidate.blockType === blockType);
+  expect(manifest, `capability manifest for AI target ${blockType}`).toBeTruthy();
+  const property = Object.values(manifest!.properties).find(
+    (candidate) => candidate.propertyPath === '/props/density',
+  );
+  expect(property, 'declared /props/density AI target').toBeTruthy();
+  return {
+    block: block!,
+    blockId: String(block!.id),
+    propertyPath: property!.propertyPath,
+    allowedOperations: property!.allowedOperations,
+    manifestChecksum: manifest!.checksum,
+  };
 }
 
 function findFirstSelectableBlock(value: unknown): Record<string, unknown> | null {

@@ -8,7 +8,9 @@ import { samplePageSchemaV3 } from '../fixtures/samplePageSchemaV3';
 import { UnifiedDesignerWorkbench } from '../workbench/UnifiedDesignerWorkbench';
 
 vi.mock('~/framework/meta/authoring/authoringService', () => ({
+  acknowledgeAuthoringIdentitySimulation: vi.fn(),
   endAuthoringIdentitySimulation: vi.fn(),
+  loadActiveAuthoringIdentitySimulation: vi.fn(),
   loadAuthoringIdentitySimulation: vi.fn(),
   loadAuthoringRolePreviewTargets: vi.fn(),
   loadAuthoringRoleStructurePreview: vi.fn(),
@@ -97,6 +99,7 @@ describe('UnifiedDesignerWorkbench synthetic preview', () => {
     expect(screen.getByTestId('runtime-page-customer_workspace').closest('fieldset')).toBeDisabled();
     expect(screen.queryByText('REAL-TENANT-SECRET')).not.toBeInTheDocument();
     expect(loadAuthoringSyntheticPreview).toHaveBeenCalledWith('session-1');
+    expect(screen.getByTestId('designer-export')).toBeDisabled();
 
     fireEvent.click(screen.getByTestId('synthetic-preview-exit'));
     await waitFor(() => {

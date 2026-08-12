@@ -62,6 +62,7 @@ interface WorkbenchToolbarProps {
   onOpenVersions?: () => void;
   readOnly?: boolean;
   contextualRestricted?: boolean;
+  previewOnly?: boolean;
 }
 
 // C4 — localized labels for the switchable page kinds.
@@ -100,6 +101,7 @@ export function WorkbenchToolbar({
   onOpenVersions,
   readOnly = false,
   contextualRestricted = false,
+  previewOnly = false,
 }: WorkbenchToolbarProps) {
   const { locale } = useI18n();
   const saveDisabled = readOnly || !isDirty || saveStatus === 'saving' || saveStatus === 'invalid';
@@ -251,8 +253,9 @@ export function WorkbenchToolbar({
           <button
             type="button"
             data-testid="designer-mode-edit"
+            disabled={previewOnly}
             onClick={() => onModeChange('edit')}
-            className={`rounded px-3 py-1.5 text-sm ${
+            className={`rounded px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40 ${
               mode === 'edit' ? 'bg-white font-medium text-blue-700 shadow-sm' : 'text-slate-500'
             }`}
           >
@@ -261,8 +264,9 @@ export function WorkbenchToolbar({
           <button
             type="button"
             data-testid="designer-mode-layout"
+            disabled={previewOnly}
             onClick={() => onModeChange('layout')}
-            className={`rounded px-3 py-1.5 text-sm ${
+            className={`rounded px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40 ${
               mode === 'layout' ? 'bg-white font-medium text-blue-700 shadow-sm' : 'text-slate-500'
             }`}
           >
