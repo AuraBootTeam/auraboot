@@ -94,13 +94,12 @@ describe('TeamMembersBlock', () => {
     ]);
 
     fireEvent.change(select, { target: { value: 'member-pid-2' } });
-    fireEvent.change(screen.getByTestId('team-members-role'), { target: { value: 'leader' } });
     fireEvent.click(screen.getByTestId('team-members-confirm'));
 
     await waitFor(() =>
       expect(teamService.addTeamMember).toHaveBeenCalledWith('team-pid-1', {
         memberPid: 'member-pid-2',
-        role: 'leader',
+        role: 'member',
       }),
     );
   });

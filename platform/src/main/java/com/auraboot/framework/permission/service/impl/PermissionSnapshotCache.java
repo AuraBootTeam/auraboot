@@ -124,7 +124,7 @@ public class PermissionSnapshotCache {
         if (tenantId == null || userId == null) {
             return;
         }
-        cache(USER_ROLE_CACHE).evict(new UserRoleKey(tenantId, userId));
+        cache(USER_ROLE_CACHE).evict(new UserRoleKey(tenantId, userId, LocalDate.now()));
         cache(EFFECTIVE_PERMISSION_CACHE)
                 .evict(new EffectivePermissionKey(tenantId, userId, LocalDate.now()));
     }
@@ -192,9 +192,10 @@ public class PermissionSnapshotCache {
         if (tenantId == null || userId == null || memberId == null) {
             return List.of();
         }
-        UserRoleKey key = new UserRoleKey(tenantId, userId);
+        LocalDate today = LocalDate.now();
+        UserRoleKey key = new UserRoleKey(tenantId, userId, today);
         return getOrLoad(USER_ROLE_CACHE, key, () -> {
-            List<UserRole> rows = userRoleMapper.findByMemberIdAndTenantId(memberId, tenantId);
+            List<UserRole> rows = userRoleMapper.findEffectiveByMemberIdAndTenantId(memberId, tenantId, today);
             if (rows == null || rows.isEmpty()) {
                 return List.of();
             }
@@ -274,7 +275,7 @@ public class PermissionSnapshotCache {
             Map<Long, String> codesById) {
     }
 
-    private record UserRoleKey(Long tenantId, Long userId) {
+    private record UserRoleKey(Long tenantId, Long userId, LocalDate effectiveDate) {
     }
 
     private record RolePermissionKey(Long tenantId, Long roleId, LocalDate effectiveDate) {

@@ -6,9 +6,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Data
-public class AssignRolesByPidRequest {
-    private String memberPid;
-    private List<String> rolePids;
+public class AddRoleMembersRequest {
+    private List<String> memberPids;
     private LocalDate effectiveDate;
     private LocalDate expiryDate;
 }

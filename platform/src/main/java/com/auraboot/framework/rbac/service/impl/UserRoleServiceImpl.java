@@ -25,6 +25,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 import com.auraboot.framework.common.constant.StatusConstants;
@@ -90,9 +91,19 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
     @Override
     @Transactional
     public boolean assignRolesToMemberByRolePids(String memberPid, List<String> rolePids, Long tenantId, Long operatorId) {
+        return assignRolesToMemberByRolePids(memberPid, rolePids, null, null, tenantId, operatorId);
+    }
+
+    @Override
+    @Transactional
+    public boolean assignRolesToMemberByRolePids(
+            String memberPid, List<String> rolePids, LocalDate effectiveDate, LocalDate expiryDate,
+            Long tenantId, Long operatorId) {
         if (CollectionUtils.isEmpty(rolePids)) {
             return true;
         }
+
+        validateAssignmentWindow(effectiveDate, expiryDate);
 
         TenantMember member = resolveMember(memberPid, tenantId);
         List<Long> roleIds = new ArrayList<>();
@@ -107,15 +118,25 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             roleIds.add(role.getId());
         }
 
-        return assignRolesToMember(member.getId(), roleIds, tenantId, operatorId);
+        return assignTimedRolesToMember(member.getId(), roleIds, effectiveDate, expiryDate, tenantId, operatorId);
     }
 
     @Override
     @Transactional
     public boolean assignRolesToMemberByRoleCodes(String memberPid, List<String> roleCodes, Long tenantId, Long operatorId) {
+        return assignRolesToMemberByRoleCodes(memberPid, roleCodes, null, null, tenantId, operatorId);
+    }
+
+    @Override
+    @Transactional
+    public boolean assignRolesToMemberByRoleCodes(
+            String memberPid, List<String> roleCodes, LocalDate effectiveDate, LocalDate expiryDate,
+            Long tenantId, Long operatorId) {
         if (CollectionUtils.isEmpty(roleCodes)) {
             return true;
         }
+
+        validateAssignmentWindow(effectiveDate, expiryDate);
 
         TenantMember member = resolveMember(memberPid, tenantId);
         List<Long> roleIds = new ArrayList<>();
@@ -130,7 +151,62 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             roleIds.add(role.getId());
         }
 
-        return assignRolesToMember(member.getId(), roleIds, tenantId, operatorId);
+        return assignTimedRolesToMember(member.getId(), roleIds, effectiveDate, expiryDate, tenantId, operatorId);
+    }
+
+    private boolean assignTimedRolesToMember(
+            Long memberId, List<Long> roleIds, LocalDate effectiveDate, LocalDate expiryDate,
+            Long tenantId, Long operatorId) {
+        if (effectiveDate == null && expiryDate == null) {
+            return assignRolesToMember(memberId, roleIds, tenantId, operatorId);
+        }
+        List<UserRole> assignments = new ArrayList<>();
+        boolean renewed = false;
+        for (Long roleId : roleIds) {
+            UserRole existing = findByMemberIdAndRoleIdAndTenantId(memberId, roleId, tenantId);
+            if (existing != null) {
+                existing.setEffectiveDate(effectiveDate);
+                existing.setExpiryDate(expiryDate);
+                existing.setStatus(StatusConstants.ACTIVE);
+                existing.setDeletedFlag(false);
+                existing.setUpdatedBy(operatorId);
+                existing.setUpdatedAt(Instant.now());
+                if (!updateById(existing)) {
+                    throw new BusinessException("Failed to renew role assignment: " + existing.getPid());
+                }
+                renewed = true;
+                continue;
+            }
+            UserRole assignment = new UserRole();
+            assignment.setMemberId(memberId);
+            assignment.setPid(UniqueIdGenerator.generate());
+            assignment.setTenantId(tenantId);
+            assignment.setRoleId(roleId);
+            assignment.setAssignType("direct");
+            assignment.setEffectiveDate(effectiveDate);
+            assignment.setExpiryDate(expiryDate);
+            assignment.setStatus(StatusConstants.ACTIVE);
+            assignment.setDeletedFlag(false);
+            assignment.setCreatedBy(operatorId);
+            assignment.setUpdatedBy(operatorId);
+            assignment.setCreatedAt(Instant.now());
+            assignment.setUpdatedAt(Instant.now());
+            assignments.add(assignment);
+        }
+        boolean saved = assignments.isEmpty() || saveBatch(assignments);
+        if (saved && (renewed || !assignments.isEmpty())) {
+            publishMemberRoleChange(memberId, null, "CREATE");
+        }
+        return saved;
+    }
+
+    private void validateAssignmentWindow(LocalDate effectiveDate, LocalDate expiryDate) {
+        if (effectiveDate != null && expiryDate != null && expiryDate.isBefore(effectiveDate)) {
+            throw new BusinessException("expiryDate must be on or after effectiveDate");
+        }
+        if (expiryDate != null && expiryDate.isBefore(LocalDate.now())) {
+            throw new BusinessException("expiryDate must not be in the past");
+        }
     }
 
     private TenantMember resolveMember(String memberPid, Long tenantId) {

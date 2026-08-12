@@ -23,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Field;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -154,6 +155,59 @@ class UserRoleServiceImplTest {
         assertTrue(spyService.assignRolesToMemberByRolePids("member-pid", List.of("role-pid"), 10L, 99L));
 
         verify(spyService).assignRolesToMember(1L, List.of(100L), 10L, 99L);
+    }
+
+    @Test
+    @DisplayName("timed role assignment persists an inclusive window")
+    void assignTimedRole() {
+        LocalDate from = LocalDate.now();
+        LocalDate until = from.plusDays(7);
+        when(tenantMemberMapper.findByTenantIdAndPid(10L, "member-pid"))
+                .thenReturn(member(1L, "member-pid", 10L));
+        when(roleMapper.findByTenantIdAndPid(10L, "role-pid"))
+                .thenReturn(role(100L, "role-pid", "e2et_viewer", 10L));
+        when(userRoleMapper.findByMemberIdAndRoleIdAndTenantId(1L, 100L, 10L)).thenReturn(null);
+        doReturn(true).when(spyService).saveBatch(anyList());
+
+        assertTrue(spyService.assignRolesToMemberByRolePids(
+                "member-pid", List.of("role-pid"), from, until, 10L, 99L));
+
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<List<UserRole>> captor = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(spyService).saveBatch(captor.capture());
+        assertEquals(from, captor.getValue().getFirst().getEffectiveDate());
+        assertEquals(until, captor.getValue().getFirst().getExpiryDate());
+        assertEquals(99L, captor.getValue().getFirst().getCreatedBy());
+    }
+
+    @Test
+    @DisplayName("timed role assignment renews an existing binding")
+    void renewTimedRole() {
+        LocalDate until = LocalDate.now().plusDays(14);
+        when(tenantMemberMapper.findByTenantIdAndPid(10L, "member-pid"))
+                .thenReturn(member(1L, "member-pid", 10L));
+        when(roleMapper.findByTenantIdAndPid(10L, "role-pid"))
+                .thenReturn(role(100L, "role-pid", "e2et_viewer", 10L));
+        UserRole existing = ur(11L, 1L, 100L, 10L);
+        existing.setExpiryDate(LocalDate.now().plusDays(1));
+        when(userRoleMapper.findByMemberIdAndRoleIdAndTenantId(1L, 100L, 10L)).thenReturn(existing);
+        doReturn(true).when(spyService).updateById(existing);
+
+        assertTrue(spyService.assignRolesToMemberByRolePids(
+                "member-pid", List.of("role-pid"), null, until, 10L, 99L));
+        assertEquals(until, existing.getExpiryDate());
+        assertEquals(99L, existing.getUpdatedBy());
+        verify(spyService, never()).saveBatch(anyList());
+    }
+
+    @Test
+    @DisplayName("timed role assignment rejects reversed or already expired windows")
+    void rejectInvalidTimedRoleWindow() {
+        LocalDate today = LocalDate.now();
+        assertThrows(BusinessException.class, () -> service.assignRolesToMemberByRolePids(
+                "member-pid", List.of("role-pid"), today.plusDays(2), today.plusDays(1), 10L, 99L));
+        assertThrows(BusinessException.class, () -> service.assignRolesToMemberByRolePids(
+                "member-pid", List.of("role-pid"), null, today.minusDays(1), 10L, 99L));
     }
 
     @Test

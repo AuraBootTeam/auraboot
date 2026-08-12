@@ -10,6 +10,7 @@ import com.auraboot.framework.organization.entity.TeamMember;
 import com.auraboot.framework.organization.mapper.TeamMapper;
 import com.auraboot.framework.organization.mapper.TeamMemberMapper;
 import com.auraboot.framework.organization.service.TeamMemberService;
+import com.auraboot.framework.organization.service.TeamGovernanceService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.dao.entity.User;
@@ -43,12 +44,12 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
     @Autowired
     private TenantMemberService tenantMemberService;
 
+    @Autowired
+    private TeamGovernanceService teamGovernanceService;
+
     @Override
     public List<TeamMemberResponse> listMembers(String teamPid) {
-        Team team = teamMapper.findByPid(teamPid);
-        if (team == null) {
-            throw new BusinessException("Team not found: " + teamPid);
-        }
+        Team team = teamGovernanceService.requireTeam(MetaContext.getCurrentTenantId(), teamPid);
 
         List<TeamMember> members = teamMemberMapper.findByTeamId(team.getId());
         return members.stream().map(this::toResponse).collect(Collectors.toList());
@@ -57,10 +58,8 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
     @Override
     @Transactional
     public TeamMemberResponse addMember(String teamPid, TeamMemberAddRequest request, Long operatorId) {
-        Team team = teamMapper.findByPid(teamPid);
-        if (team == null) {
-            throw new BusinessException("Team not found: " + teamPid);
-        }
+        Team team = teamGovernanceService.requireTeam(MetaContext.getCurrentTenantId(), teamPid);
+        teamGovernanceService.assertMemberRoleCanBeAdded(request.getRole());
 
         Long userId = resolveUserId(request);
 
@@ -131,10 +130,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
     @Override
     @Transactional
     public void removeMember(String teamPid, String memberPid) {
-        Team team = teamMapper.findByPid(teamPid);
-        if (team == null) {
-            throw new BusinessException("Team not found: " + teamPid);
-        }
+        Team team = teamGovernanceService.requireTeam(MetaContext.getCurrentTenantId(), teamPid);
 
         QueryWrapper<TeamMember> qw = new QueryWrapper<>();
         qw.eq("pid", memberPid)
@@ -144,6 +140,7 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
             throw new BusinessException("Team member not found: " + memberPid);
         }
 
+        teamGovernanceService.assertCanRemoveMembership(team, member);
         removeById(member.getId());
         log.info("Member removed from team: teamPid={}, memberPid={}", teamPid, memberPid);
     }

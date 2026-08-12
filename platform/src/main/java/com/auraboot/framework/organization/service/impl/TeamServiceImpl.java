@@ -1,6 +1,7 @@
 package com.auraboot.framework.organization.service.impl;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.organization.dto.*;
 import com.auraboot.framework.organization.entity.Team;
@@ -8,6 +9,7 @@ import com.auraboot.framework.organization.entity.TeamMember;
 import com.auraboot.framework.organization.mapper.TeamMapper;
 import com.auraboot.framework.organization.mapper.TeamMemberMapper;
 import com.auraboot.framework.organization.service.TeamService;
+import com.auraboot.framework.organization.service.TeamGovernanceService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -35,6 +37,9 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team> implements Te
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private TeamGovernanceService teamGovernanceService;
+
     @Override
     public List<TeamResponse> listTeams(Long tenantId) {
         QueryWrapper<Team> qw = new QueryWrapper<>();
@@ -45,10 +50,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team> implements Te
 
     @Override
     public TeamResponse getTeamByPid(String pid) {
-        Team team = teamMapper.findByPid(pid);
-        if (team == null) {
-            throw new BusinessException("Team not found: " + pid);
-        }
+        Team team = teamGovernanceService.requireTeam(MetaContext.getCurrentTenantId(), pid);
         return toResponse(team);
     }
 
@@ -74,6 +76,10 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team> implements Te
         team.setCreatedAt(Instant.now());
         team.setUpdatedAt(Instant.now());
         save(team);
+        teamGovernanceService.synchronizeLeader(team, request.getLeaderId(), userId);
+        if (request.getLeaderId() != null && !request.getLeaderId().isBlank()) {
+            updateById(team);
+        }
 
         log.info("Team created: code={}, name={}, tenantId={}", team.getCode(), team.getName(), tenantId);
         return toResponse(team);
@@ -82,10 +88,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team> implements Te
     @Override
     @Transactional
     public TeamResponse updateTeam(String pid, TeamUpdateRequest request, Long userId) {
-        Team team = teamMapper.findByPid(pid);
-        if (team == null) {
-            throw new BusinessException("Team not found: " + pid);
-        }
+        Team team = teamGovernanceService.requireTeam(MetaContext.getCurrentTenantId(), pid);
 
         if (request.getName() != null) {
             team.setName(request.getName());
@@ -94,7 +97,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team> implements Te
             team.setDescription(request.getDescription());
         }
         if (request.getLeaderId() != null) {
-            team.setLeaderId(request.getLeaderId());
+            teamGovernanceService.synchronizeLeader(team, request.getLeaderId(), userId);
         }
         if (request.getStatus() != null) {
             team.setStatus(request.getStatus());
@@ -109,10 +112,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team> implements Te
     @Override
     @Transactional
     public void deleteTeam(String pid) {
-        Team team = teamMapper.findByPid(pid);
-        if (team == null) {
-            throw new BusinessException("Team not found: " + pid);
-        }
+        Team team = teamGovernanceService.requireTeam(MetaContext.getCurrentTenantId(), pid);
 
         // Remove all members first
         QueryWrapper<TeamMember> memberQw = new QueryWrapper<>();

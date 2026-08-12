@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,6 +31,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 /** Unit coverage for cache keys, negative entries, invalidation, and concurrent miss collapse. */
 @ExtendWith(MockitoExtension.class)
@@ -139,7 +142,7 @@ class PermissionSnapshotCacheTest {
         assertThat(cache.getEffectivePermissionIds(100L, 1L, 5L))
                 .containsExactlyInAnyOrder(50L, 60L);
 
-        verify(userRoleMapper, times(1)).findByMemberIdAndTenantId(5L, 100L);
+        verify(userRoleMapper, times(1)).findEffectiveByMemberIdAndTenantId(eq(5L), eq(100L), any(LocalDate.class));
         verify(roleMapper, times(1)).findByTenantIdAndCode(100L, "tenant_member");
         verify(rolePermissionMapper, times(1)).findPermissionIdsByRole(7L);
         verify(rolePermissionMapper, times(1)).findPermissionIdsByRole(99L);
@@ -147,13 +150,13 @@ class PermissionSnapshotCacheTest {
 
     @Test
     void emptyRoleAndPermissionResultsAreCachedFailClosed() {
-        when(userRoleMapper.findByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of());
+        when(userRoleMapper.findEffectiveByMemberIdAndTenantId(eq(5L), eq(100L), any(LocalDate.class))).thenReturn(List.of());
         when(roleMapper.findByTenantIdAndCode(100L, "tenant_member")).thenReturn(null);
 
         assertThat(cache.getEffectivePermissionIds(100L, 1L, 5L)).isEmpty();
         assertThat(cache.getEffectivePermissionIds(100L, 1L, 5L)).isEmpty();
 
-        verify(userRoleMapper, times(1)).findByMemberIdAndTenantId(5L, 100L);
+        verify(userRoleMapper, times(1)).findEffectiveByMemberIdAndTenantId(eq(5L), eq(100L), any(LocalDate.class));
         verify(roleMapper, times(1)).findByTenantIdAndCode(100L, "tenant_member");
     }
 
@@ -169,8 +172,8 @@ class PermissionSnapshotCacheTest {
         assertThat(cache.getEffectivePermissionIds(100L, 1L, 5L)).containsExactly(50L);
         assertThat(cache.getEffectivePermissionIds(200L, 1L, 6L)).containsExactly(60L);
 
-        verify(userRoleMapper).findByMemberIdAndTenantId(5L, 100L);
-        verify(userRoleMapper).findByMemberIdAndTenantId(6L, 200L);
+        verify(userRoleMapper).findEffectiveByMemberIdAndTenantId(eq(5L), eq(100L), any(LocalDate.class));
+        verify(userRoleMapper).findEffectiveByMemberIdAndTenantId(eq(6L), eq(200L), any(LocalDate.class));
     }
 
     @Test
@@ -197,7 +200,7 @@ class PermissionSnapshotCacheTest {
         cache.evictUser(100L, 1L);
         cache.getEffectivePermissionIds(100L, 1L, 5L);
 
-        verify(userRoleMapper, times(2)).findByMemberIdAndTenantId(5L, 100L);
+        verify(userRoleMapper, times(2)).findEffectiveByMemberIdAndTenantId(eq(5L), eq(100L), any(LocalDate.class));
         verify(rolePermissionMapper, times(1)).findPermissionIdsByRole(7L);
     }
 
@@ -213,13 +216,13 @@ class PermissionSnapshotCacheTest {
         cache.evictRole(100L, 7L);
         assertThat(cache.getEffectivePermissionIds(100L, 1L, 5L)).containsExactly(51L);
 
-        verify(userRoleMapper, times(1)).findByMemberIdAndTenantId(5L, 100L);
+        verify(userRoleMapper, times(1)).findEffectiveByMemberIdAndTenantId(eq(5L), eq(100L), any(LocalDate.class));
         verify(rolePermissionMapper, times(2)).findPermissionIdsByRole(7L);
     }
 
     @Test
     void roleEvictionRefreshesPreviouslyMissingBaselineRole() {
-        when(userRoleMapper.findByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of());
+        when(userRoleMapper.findEffectiveByMemberIdAndTenantId(eq(5L), eq(100L), any(LocalDate.class))).thenReturn(List.of());
         Role baseline = new Role();
         baseline.setId(99L);
         when(roleMapper.findByTenantIdAndCode(100L, "tenant_member"))
@@ -240,7 +243,7 @@ class PermissionSnapshotCacheTest {
         CountDownLatch releaseLoader = new CountDownLatch(1);
         UserRole userRole = new UserRole();
         userRole.setRoleId(7L);
-        when(userRoleMapper.findByMemberIdAndTenantId(5L, 100L)).thenAnswer(invocation -> {
+        when(userRoleMapper.findEffectiveByMemberIdAndTenantId(eq(5L), eq(100L), any(LocalDate.class))).thenAnswer(invocation -> {
             loaderEntered.countDown();
             releaseLoader.await(5, TimeUnit.SECONDS);
             return List.of(userRole);
@@ -265,7 +268,7 @@ class PermissionSnapshotCacheTest {
             executor.shutdownNow();
         }
 
-        verify(userRoleMapper, times(1)).findByMemberIdAndTenantId(5L, 100L);
+        verify(userRoleMapper, times(1)).findEffectiveByMemberIdAndTenantId(eq(5L), eq(100L), any(LocalDate.class));
         verify(rolePermissionMapper, times(1)).findPermissionIdsByRole(7L);
     }
 
@@ -284,7 +287,7 @@ class PermissionSnapshotCacheTest {
     private void stubUserRole(Long tenantId, Long memberId, Long roleId) {
         UserRole userRole = new UserRole();
         userRole.setRoleId(roleId);
-        when(userRoleMapper.findByMemberIdAndTenantId(memberId, tenantId))
+        when(userRoleMapper.findEffectiveByMemberIdAndTenantId(eq(memberId), eq(tenantId), any(LocalDate.class)))
                 .thenReturn(List.of(userRole));
     }
 
