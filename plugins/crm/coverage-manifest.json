@@ -29,15 +29,15 @@
       "pages": 96,
       "page-blocks": 316,
       "page-fields": 1325,
-      "ui-actions": 468,
+      "ui-actions": 472,
       "commands": 193,
       "permissions": 91,
       "queries": 45,
       "dashboards": 37
     },
     "productVerdicts": {
-      "pass": 329,
-      "untested": 2324
+      "pass": 334,
+      "untested": 2323
     },
     "fullProductNonGoals": [
       "data migration"
@@ -419,6 +419,20 @@
         "verdict": "pass"
       },
       {
+        "id": "crm:cancel_task",
+        "goals": [
+          "RELEASE-B"
+        ],
+        "permissionCodes": [
+          "crm.activity.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+        ],
+        "permissionsVerified": false,
+        "verdict": "pass"
+      },
+      {
         "id": "crm:close_complaint",
         "goals": [
           "RG-1"
@@ -450,13 +464,15 @@
       {
         "id": "crm:complete_task",
         "goals": [
-          "RG-1"
+          "RG-1",
+          "RELEASE-B"
         ],
         "permissionCodes": [
           "crm.activity.manage"
         ],
         "evidence": [
-          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
         ],
         "permissionsVerified": true,
         "verdict": "pass"
@@ -755,13 +771,15 @@
       {
         "id": "crm:start_task",
         "goals": [
-          "RG-1"
+          "RG-1",
+          "RELEASE-B"
         ],
         "permissionCodes": [
           "crm.activity.manage"
         ],
         "evidence": [
-          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
         ],
         "permissionsVerified": true,
         "verdict": "pass"
@@ -996,6 +1014,7 @@
         "id": "crm.activity.manage",
         "evidence": [
           "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
           "plugins/crm/scripts/adoption_journey.py"
         ],
         "verdict": "pass"
@@ -1595,8 +1614,8 @@
     {
       "id": "RELEASE-B-OPPORTUNITY",
       "filePrefix": "crm-opportunity-efficiency-",
-      "expectedScenarios": 11,
-      "minimumScreenshots": 24,
+      "expectedScenarios": 12,
+      "minimumScreenshots": 27,
       "expectedCoverage": {
         "pages": [
           "crm_contact_common_list",
@@ -1614,11 +1633,17 @@
           "crm:create_opportunity",
           "crm:create_quote_summary",
           "crm:qualify_opportunity",
+          "crm:start_task",
+          "crm:complete_task",
+          "crm:cancel_task",
           "crm:win_opportunity"
         ],
         "queries": [
           "crm_account_stats",
           "crm_account_timeline"
+        ],
+        "permissions": [
+          "crm.activity.manage"
         ],
         "dashboardTargets": [
           "crm_account_360:recent_activities:recent_activities",
@@ -1628,6 +1653,10 @@
         "uiActions": [
           "crm_opportunity_common_detail:crm_opp_plan_quote_actions:create_plan_task",
           "crm_opportunity_common_detail:crm_opp_plan_quote_actions:create_quote_summary",
+          "crm_opportunity_common_detail:block_opportunity_plan:view_task",
+          "crm_opportunity_common_detail:block_opportunity_plan:start_task",
+          "crm_opportunity_common_detail:block_opportunity_plan:complete_task",
+          "crm_opportunity_common_detail:block_opportunity_plan:cancel_task",
           "crm_opportunity_common_detail:crm_opportunity_tabs:activities",
           "crm_opportunity_common_detail:crm_opportunity_tabs:plan_and_quotes",
           "crm_opportunity_common_list:crm_opp_table:bulk_qualify",
@@ -30092,7 +30121,67 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[1].tabs[1].blocks[0].buttons[2]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:block_line_items:add:8",
+          "id": "ui-action:crm_opportunity_common_detail:block_opportunity_plan:view_task:8",
+          "action": "action view_task on crm_opportunity_common_detail -> navigate:crm_activity_common_detail",
+          "evidence": [
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[1].tabs[1].blocks[1].subTable.actions[0]"
+        },
+        {
+          "id": "ui-action:crm_opportunity_common_detail:block_opportunity_plan:start_task:9",
+          "action": "action start_task on crm_opportunity_common_detail -> state_transition:crm:start_task",
+          "evidence": [
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[1].tabs[1].blocks[1].subTable.actions[1]"
+        },
+        {
+          "id": "ui-action:crm_opportunity_common_detail:block_opportunity_plan:complete_task:10",
+          "action": "action complete_task on crm_opportunity_common_detail -> state_transition:crm:complete_task",
+          "evidence": [
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[1].tabs[1].blocks[1].subTable.actions[2]"
+        },
+        {
+          "id": "ui-action:crm_opportunity_common_detail:block_opportunity_plan:cancel_task:11",
+          "action": "action cancel_task on crm_opportunity_common_detail -> state_transition:crm:cancel_task",
+          "evidence": [
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[1].tabs[1].blocks[1].subTable.actions[3]"
+        },
+        {
+          "id": "ui-action:crm_opportunity_common_detail:block_line_items:add:12",
           "action": "action add on crm_opportunity_common_detail -> command:crm:create_opp_line",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30105,7 +30194,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[1].tabs[2].blocks[0].subTable.actions[0]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:block_line_items:edit:9",
+          "id": "ui-action:crm_opportunity_common_detail:block_line_items:edit:13",
           "action": "action edit on crm_opportunity_common_detail -> command:crm:update_opp_line",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30118,7 +30207,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[1].tabs[2].blocks[0].subTable.actions[1]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:block_line_items:delete:10",
+          "id": "ui-action:crm_opportunity_common_detail:block_line_items:delete:14",
           "action": "action delete on crm_opportunity_common_detail -> command:crm:delete_opp_line",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30131,7 +30220,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[1].tabs[2].blocks[0].subTable.actions[2]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:block_contacts:add:11",
+          "id": "ui-action:crm_opportunity_common_detail:block_contacts:add:15",
           "action": "action add on crm_opportunity_common_detail -> command:crm:add_opp_contact",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30144,7 +30233,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[1].tabs[3].blocks[0].subTable.actions[0]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:block_contacts:delete:12",
+          "id": "ui-action:crm_opportunity_common_detail:block_contacts:delete:16",
           "action": "action delete on crm_opportunity_common_detail -> command:crm:remove_opp_contact",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30157,7 +30246,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[1].tabs[3].blocks[0].subTable.actions[1]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:block_customer_requests:add:13",
+          "id": "ui-action:crm_opportunity_common_detail:block_customer_requests:add:17",
           "action": "action add on crm_opportunity_common_detail -> navigate:crm:create_customer_request",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30170,7 +30259,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[1].tabs[3].blocks[1].subTable.actions[0]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:block_customer_requests:view:14",
+          "id": "ui-action:crm_opportunity_common_detail:block_customer_requests:view:18",
           "action": "action view on crm_opportunity_common_detail -> navigate:crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30183,7 +30272,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[1].tabs[3].blocks[1].subTable.actions[1]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:edit:15",
+          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:edit:19",
           "action": "button edit on crm_opportunity_common_detail -> navigate:crm_opportunity_common_form",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30196,7 +30285,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[2].buttons[0]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:log_activity:16",
+          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:log_activity:20",
           "action": "button log_activity on crm_opportunity_common_detail -> navigate:crm:log_opp_activity",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30209,7 +30298,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[2].buttons[1]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:create_task:17",
+          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:create_task:21",
           "action": "button create_task on crm_opportunity_common_detail -> navigate:crm:create_opp_task",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30222,7 +30311,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[2].buttons[2]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:create_customer_request:18",
+          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:create_customer_request:22",
           "action": "button create_customer_request on crm_opportunity_common_detail -> navigate:crm:create_customer_request",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30235,7 +30324,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[2].buttons[3]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:qualify:19",
+          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:qualify:23",
           "action": "button qualify on crm_opportunity_common_detail -> state_transition:crm:qualify_opportunity",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30248,7 +30337,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[2].buttons[4]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:advance_proposal:20",
+          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:advance_proposal:24",
           "action": "button advance_proposal on crm_opportunity_common_detail -> command:crm:advance_opp_to_proposal",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30261,7 +30350,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[2].buttons[5]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:advance_negotiation:21",
+          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:advance_negotiation:25",
           "action": "button advance_negotiation on crm_opportunity_common_detail -> command:crm:advance_opp_to_negotiation",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30274,7 +30363,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[2].buttons[6]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:win:22",
+          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:win:26",
           "action": "button win on crm_opportunity_common_detail -> state_transition:crm:win_opportunity",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30287,7 +30376,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_detail.json#root[2].buttons[7]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:lose:23",
+          "id": "ui-action:crm_opportunity_common_detail:crm_opp_detail_toolbar:lose:27",
           "action": "button lose on crm_opportunity_common_detail -> state_transition:crm:lose_opportunity",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -32112,7 +32201,8 @@
           "id": "command:crm:start_task",
           "action": "Execute crm:start_task (state_transition) through its supported user or runtime path",
           "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
           ],
           "assertion": "The command has registered release evidence.",
           "verdict": "pass",
@@ -32127,7 +32217,8 @@
           "id": "command:crm:complete_task",
           "action": "Execute crm:complete_task (state_transition) through its supported user or runtime path",
           "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
           ],
           "assertion": "The command has registered release evidence.",
           "verdict": "pass",
@@ -32141,14 +32232,16 @@
         {
           "id": "command:crm:cancel_task",
           "action": "Execute crm:cancel_task (state_transition) through its supported user or runtime path",
-          "evidence": [],
-          "assertion": "No complete browser/backend evidence pair is registered for this command.",
-          "verdict": "untested",
-          "verdict_by": null,
-          "surface": "service",
+          "evidence": [
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+          ],
+          "assertion": "The command has registered release evidence.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "journey",
           "dependencies": "real-stack",
           "authority": "blocking-release",
-          "driver": "it",
+          "driver": "browser",
           "source": "plugins/crm/config/commands/crm_activity_common.json"
         },
         {
@@ -34722,6 +34815,7 @@
           "action": "Verify allow, deny, menu, action and direct-API behavior for crm.activity.manage",
           "evidence": [
             "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
             "plugins/crm/scripts/adoption_journey.py"
           ],
           "assertion": "The permission participates in registered release evidence.",

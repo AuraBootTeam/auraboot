@@ -157,6 +157,7 @@ interface ListLoadDataParams {
   size?: number;
   filters?: Record<string, any>;
   sorts?: SortConfig[];
+  chipFilters?: ViewFilterConfig[];
 }
 
 interface BulkFieldCommandState {
@@ -1963,7 +1964,7 @@ function ListPageContentInner(props: PageContentProps) {
           const filtersParam = buildFiltersParam(
             tabCondition,
             params?.filters,
-            chipFiltersRef.current,
+            params?.chipFilters ?? chipFiltersRef.current,
           );
           if (filtersParam) {
             queryParams.filters = filtersParam;
@@ -3641,13 +3642,22 @@ function ListPageContentInner(props: PageContentProps) {
         operator: 'eq',
         value: filter.value,
       }));
-      setLocalChipFilters((previous) => {
-        const fields = new Set(next.map((filter) => filter.fieldCode));
-        return [...previous.filter((filter) => !fields.has(filter.fieldCode)), ...next];
+      const fields = new Set(next.map((filter) => filter.fieldCode));
+      const nextChipFilters = [
+        ...chipFilters.filter((filter) => !fields.has(filter.fieldCode)),
+        ...next,
+      ];
+      chipFiltersRef.current = nextChipFilters;
+      setLocalChipFilters(nextChipFilters);
+      void loadData({
+        page: 0,
+        size: pagination.pageSize,
+        filters,
+        chipFilters: nextChipFilters,
       });
       setAnalysisOpen(false);
     },
-    [setLocalChipFilters],
+    [chipFilters, filters, loadData, pagination.pageSize, setLocalChipFilters],
   );
 
   // Personal-only baseline: changes to an explicit personal view are staged as
@@ -5237,7 +5247,16 @@ function ListPageContentInner(props: PageContentProps) {
                   namedQueryCode || isApiDatasourcePage ? undefined : () => setAnalysisOpen(true)
                 }
                 chipFilters={chipFilters}
-                onChipFiltersChange={setLocalChipFilters}
+                onChipFiltersChange={(nextChipFilters) => {
+                  chipFiltersRef.current = nextChipFilters;
+                  setLocalChipFilters(nextChipFilters);
+                  void loadData({
+                    page: 0,
+                    size: pagination.pageSize,
+                    filters,
+                    chipFilters: nextChipFilters,
+                  });
+                }}
                 fieldMetadata={filterFieldMetadata}
                 resolveChipValueLabel={(filter) => {
                   if (filter.isExpression && filter.expression) {
@@ -5292,8 +5311,16 @@ function ListPageContentInner(props: PageContentProps) {
                   setEditingChipIdx(idx);
                 }}
                 onClearAll={() => {
+                  chipFiltersRef.current = [];
                   setLocalChipFilters([]);
                   setActiveSorts([]);
+                  void loadData({
+                    page: 0,
+                    size: pagination.pageSize,
+                    filters,
+                    sorts: [],
+                    chipFilters: [],
+                  });
                 }}
                 hideQuickFilters={hideQuickFilters}
                 hideSort={listExtensions?.hideSort ?? Boolean(schemaExtension.hideSort)}
@@ -5592,12 +5619,20 @@ function ListPageContentInner(props: PageContentProps) {
             schema={schema}
             tableName={tableName}
             onFilterApply={(operator, value) => {
-              setLocalChipFilters((prev) =>
-                prev.map((f, i) =>
-                  i === editingChipIdx ? { ...f, operator: operator as any, value } : f,
-                ),
+              const nextChipFilters = chipFilters.map((filter, index) =>
+                index === editingChipIdx
+                  ? { ...filter, operator: operator as ViewFilterConfig['operator'], value }
+                  : filter,
               );
+              chipFiltersRef.current = nextChipFilters;
+              setLocalChipFilters(nextChipFilters);
               setEditingChipIdx(null);
+              void loadData({
+                page: 0,
+                size: pagination.pageSize,
+                filters,
+                chipFilters: nextChipFilters,
+              });
             }}
             onFilterCancel={() => setEditingChipIdx(null)}
             // ColumnContextMenu

@@ -75,9 +75,13 @@ const RELEASE_B_COVERAGE = {
     'crm:create_opportunity',
     'crm:create_quote_summary',
     'crm:qualify_opportunity',
+    'crm:start_task',
+    'crm:complete_task',
+    'crm:cancel_task',
     'crm:win_opportunity',
   ],
   queries: ['crm_account_stats', 'crm_account_timeline'],
+  permissions: ['crm.activity.manage'],
   dashboardTargets: [
     'crm_account_360:recent_activities:recent_activities',
     'crm_account_360:recent_opportunities:recent_opportunities',
@@ -86,6 +90,10 @@ const RELEASE_B_COVERAGE = {
   uiActions: [
     'crm_opportunity_common_detail:crm_opp_plan_quote_actions:create_plan_task',
     'crm_opportunity_common_detail:crm_opp_plan_quote_actions:create_quote_summary',
+    'crm_opportunity_common_detail:block_opportunity_plan:view_task',
+    'crm_opportunity_common_detail:block_opportunity_plan:start_task',
+    'crm_opportunity_common_detail:block_opportunity_plan:complete_task',
+    'crm_opportunity_common_detail:block_opportunity_plan:cancel_task',
     'crm_opportunity_common_detail:crm_opportunity_tabs:activities',
     'crm_opportunity_common_detail:crm_opportunity_tabs:plan_and_quotes',
     'crm_opportunity_common_list:crm_opp_table:bulk_qualify',
@@ -1059,6 +1067,9 @@ export function buildReleaseManifest() {
     if (!page.permissionsVerified) continue;
     for (const code of page.permissionCodes) addPermissionEvidence(code, page.evidence);
   }
+  for (const code of RELEASE_B_COVERAGE.permissions) {
+    addPermissionEvidence(code, [EVIDENCE.releaseB]);
+  }
   const permissionRows = [...permissionEvidence.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([code, evidence]) => ({ id: code, evidence, verdict: 'pass' }));
@@ -1226,8 +1237,8 @@ export function buildReleaseManifest() {
       {
         id: 'RELEASE-B-OPPORTUNITY',
         filePrefix: 'crm-opportunity-efficiency-',
-        expectedScenarios: 11,
-        minimumScreenshots: 24,
+        expectedScenarios: 12,
+        minimumScreenshots: 27,
         expectedCoverage: RELEASE_B_COVERAGE,
       },
       {
