@@ -857,6 +857,10 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
       fullPage: true,
     });
 
+    // The restored node resumes in its contextual inspector. Close that
+    // bounded modal before following the global conflict handoff into Studio.
+    await closeInlineInspector(page);
+    await expect(page.getByRole('dialog', { name: '页面大纲' })).toBeHidden();
     await page.getByTestId('contextual-authoring-conflict-studio').click();
     await expect(page.getByTestId('authoring-conflict-panel')).toBeVisible();
     await expect(page.getByTestId('designer-dirty-state')).toContainText('未保存');

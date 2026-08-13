@@ -361,7 +361,10 @@ export function ContextualAuthoringSurface({
         setSavePermissionRevoked(false);
         setCapabilities(registry);
         setSelectedId(selected ?? schema.id);
-        setOutlineOpen(true);
+        // Returning from Studio already has an authoritative focus target.
+        // Resume directly in its inspector instead of stacking both modal
+        // drawers on viewports below 2xl.
+        setOutlineOpen(false);
         setInspectorOpen(true);
         clearCachedAuthoringReturnRequest();
         requestAnimationFrame(() => {
@@ -451,7 +454,10 @@ export function ContextualAuthoringSurface({
       setPendingEdits(remaining);
       setWorkingSchema(materializePendingSchema(schema, restored.snapshot, remaining));
       setSelectedId(recovery.edits.at(-1)?.blockId ?? schema.id);
-      setOutlineOpen(true);
+      // Local recovery restores a concrete edited node, so the inspector is
+      // the only contextual surface needed. Opening the outline as well would
+      // create two competing modal focus traps on ordinary PC viewports.
+      setOutlineOpen(false);
       setInspectorOpen(true);
       setSavePermissionRevoked(false);
       setStale(conflictCount > 0);

@@ -331,6 +331,8 @@ describe('ContextualAuthoringSurface', () => {
     );
     expect(loadAuthoringSession).toHaveBeenCalledWith('session-return');
     expect(openAuthoringSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId('authoring-outline')).toHaveClass('hidden');
+    expect(screen.getByTestId('authoring-inspector')).not.toHaveClass('hidden');
     expect(screen.getByTestId('authoring-inspector')).toHaveTextContent('Studio 草稿表格');
     await waitFor(() => expect(window.scrollTo).toHaveBeenCalledWith(16, 640));
     expect(window.location.search).toBe('?tab=open');
@@ -560,6 +562,8 @@ describe('ContextualAuthoringSurface', () => {
 
     expect(await screen.findByTestId('contextual-authoring-surface')).toBeInTheDocument();
     expect(screen.getByLabelText(/标题/)).toHaveValue('进程重启后的订单');
+    expect(screen.getByTestId('authoring-outline')).toHaveClass('hidden');
+    expect(screen.getByTestId('authoring-inspector')).not.toHaveClass('hidden');
     expect(screen.getByTestId('authoring-save-reconciliation-feedback')).toHaveTextContent(
       '已恢复页面中断前的 1 项本地变更，并确认尚未写入权威草稿',
     );
