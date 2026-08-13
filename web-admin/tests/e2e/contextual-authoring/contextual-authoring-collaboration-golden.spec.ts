@@ -12,7 +12,7 @@ import { join, resolve } from 'node:path';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { loginViaUI } from '../../helpers/wd-fixtures';
 
-const RUNTIME_ROUTE = '/production-exception-list-v4';
+const SOURCE_PAGE_KEY = 'e2et_record_list';
 const DEFAULT_PASSWORD = DEFAULT_TEST_ACCOUNT.password;
 const SCREENSHOT_DIR = resolve(
   process.env.CONTEXTUAL_AUTHORING_SCREENSHOT_DIR ?? 'test-results/contextual-authoring',
@@ -24,7 +24,7 @@ const PERSONAS = {
     roleName: 'Contextual authoring second admin',
     email: 'e2e-contextual-authoring-second-admin@test.com',
     permissions: [
-      'model.production_exception.read',
+      'model.e2et_record.read',
       'page.page.read',
       'meta.designer.read',
       'meta.designer.update',
@@ -42,7 +42,7 @@ const PERSONAS = {
     roleName: 'Contextual authoring author',
     email: 'e2e-contextual-authoring-author@test.com',
     permissions: [
-      'model.production_exception.read',
+      'model.e2et_record.read',
       'page.page.read',
       'meta.designer.read',
       'meta.designer.update',
@@ -123,10 +123,43 @@ type OpenedActor = {
   close: () => Promise<void>;
 };
 
+type CollaborationGatePage = {
+  pid: string;
+  pageKey: string;
+  route: string;
+  title: string;
+  menuId: string | number;
+};
+
+let gatePage: CollaborationGatePage;
+
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Contextual authoring PC collaboration golden', () => {
   test.describe.configure({ mode: 'serial', timeout: 180_000 });
+
+  test.beforeAll(async ({ browser }) => {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+    try {
+      await login(page, DEFAULT_TEST_ACCOUNT.email);
+      gatePage = await createCollaborationGatePage(page);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test.afterAll(async ({ browser }) => {
+    if (!gatePage) return;
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+    try {
+      await login(page, DEFAULT_TEST_ACCOUNT.email);
+      await cleanupCollaborationGatePage(page, gatePage);
+    } finally {
+      await context.close();
+    }
+  });
 
   test.beforeEach(async ({ page }) => {
     await login(page, DEFAULT_TEST_ACCOUNT.email);
@@ -1367,19 +1400,95 @@ async function login(page: Page, email: string): Promise<void> {
 
 async function openRuntimeFromMenu(page: Page): Promise<void> {
   await expect(page.locator('nav')).toBeVisible({ timeout: 10_000 });
-  const link = page.locator('nav').locator(`a[href="${RUNTIME_ROUTE}"]`).first();
+  const link = page.locator('nav').locator(`a[href="${gatePage.route}"]`).first();
   await expect(link).toBeVisible({ timeout: 10_000 });
   await link.click();
   try {
-    await page.waitForURL(new RegExp(`${RUNTIME_ROUTE}$`), { timeout: 3_000 });
+    await page.waitForURL(new RegExp(`${gatePage.route}$`), { timeout: 3_000 });
   } catch {
     // Login may finish a delayed redirect after the first SPA click; navigate once after it settles.
-    await page.goto(RUNTIME_ROUTE, { waitUntil: 'domcontentloaded' });
+    await page.goto(gatePage.route, { waitUntil: 'domcontentloaded' });
   }
-  await expect(page).toHaveURL(new RegExp(`${RUNTIME_ROUTE}$`));
-  await expect(page.getByRole('main').first().getByText('EXC-V4-REAL-001')).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(page).toHaveURL(new RegExp(`${gatePage.route}$`));
+  await expect(
+    page.getByRole('main').first().getByRole('heading', { name: gatePage.title }),
+  ).toBeVisible({ timeout: 15_000 });
+}
+
+async function createCollaborationGatePage(page: Page): Promise<CollaborationGatePage> {
+  const suffix = `${Date.now().toString(36)}_${process.pid}`;
+  const source = await expectApiData<Record<string, unknown>>(
+    await page.request.get(`/api/pages/key/${SOURCE_PAGE_KEY}`),
+    'load collaboration gate source page',
+  );
+  const menuId = Date.now();
+  const pageKey = `contextual_authoring_collaboration_gate_${suffix}`;
+  const route = `/contextual-authoring-collaboration-gate-${suffix.replaceAll('_', '-')}`;
+  const title = `Contextual Authoring Collaboration Gate ${suffix}`;
+  const created = await expectApiData<{ pid: string }>(
+    await page.request.post('/api/pages', {
+      data: {
+        pageKey,
+        modelCode: source.modelCode,
+        name: title,
+        title,
+        description: 'Self-contained collaboration and natural-clock authoring fixture',
+        kind: source.kind,
+        profile: source.profile,
+        layout: source.layout ?? {},
+        blocks: source.blocks,
+        schemaVersion: source.schemaVersion,
+        isTemplate: false,
+        sortWeight: 9999,
+        semver: '1.0.0',
+      },
+    }),
+    'create collaboration gate page',
+  );
+  await expectApiData(
+    await page.request.post(`/api/pages/${created.pid}/publish`),
+    'publish collaboration gate page',
+  );
+  const menu = await expectApiData<{ id: string | number }>(
+    await page.request.post('/api/menu/create', {
+      data: {
+        id: menuId,
+        pid: `menu_${suffix}`,
+        code: pageKey,
+        name: title,
+        path: route,
+        component: 'dynamic-page',
+        type: 1,
+        permissionCode: 'page.page.read',
+        visible: true,
+        orderNo: 9999,
+        pageKey,
+        pagePid: created.pid,
+        status: 'active',
+        deletedFlag: false,
+      },
+    }),
+    'mount collaboration gate page in menu',
+  );
+  return { pid: created.pid, pageKey, route, title, menuId: menu.id };
+}
+
+async function cleanupCollaborationGatePage(
+  page: Page,
+  target: CollaborationGatePage,
+): Promise<void> {
+  await expectApiData(
+    await page.request.delete(`/api/menu/${encodeURIComponent(String(target.menuId))}`),
+    'delete collaboration gate menu',
+  );
+  await expectApiData(
+    await page.request.post(`/api/pages/${encodeURIComponent(target.pid)}/unpublish`),
+    'unpublish collaboration gate page',
+  );
+  await expectApiData(
+    await page.request.delete(`/api/pages/${encodeURIComponent(target.pid)}`),
+    'delete collaboration gate page',
+  );
 }
 
 async function enterAuthoringFromRuntime(page: Page): Promise<AuthoringSession> {
@@ -1596,8 +1705,8 @@ async function stageLocalDensityEdit(page: Page, session: AuthoringSession) {
   const value = readObjectPath(table!, '/props/density') === 'compact' ? 'comfortable' : 'compact';
   await page.getByTestId('authoring-outline-open').click();
   await page.getByTestId(`authoring-outline-${String(table!.id)}`).click();
-  await page.getByRole('button', { name: '关闭页面大纲' }).click();
-  await page.getByTestId('authoring-inspector-open').click();
+  await expect(page.getByTestId('authoring-outline')).toBeHidden();
+  await expect(page.getByTestId('authoring-inspector')).toBeVisible();
   const editor = page.getByTestId('authoring-property-/props/density').locator('input');
   await expect(editor).toBeVisible();
   await editor.fill(value);
@@ -1612,8 +1721,8 @@ async function stageLocalTitleAndSpanEdits(
 ) {
   await page.getByTestId('authoring-outline-open').click();
   await page.getByTestId(`authoring-outline-${tableId}`).click();
-  await page.getByRole('button', { name: '关闭页面大纲' }).click();
-  await page.getByTestId('authoring-inspector-open').click();
+  await expect(page.getByTestId('authoring-outline')).toBeHidden();
+  await expect(page.getByTestId('authoring-inspector')).toBeVisible();
   const titleEditor = page.getByTestId('authoring-property-/title').locator('input');
   const spanEditor = page.getByTestId('authoring-property-/layout/span').locator('input');
   await expect(titleEditor).toBeVisible();

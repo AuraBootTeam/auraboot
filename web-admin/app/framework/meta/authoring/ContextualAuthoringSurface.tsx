@@ -736,6 +736,10 @@ export function ContextualAuthoringSurface({
   const selectNode = useCallback(
     (nodeId: string) => {
       setSelectedId(nodeId);
+      // Below the persistent 2xl layout the outline and inspector are modal
+      // drawers. Hand selection directly from the outline to the inspector so
+      // two focus traps never overlap and leave the outline controls inert.
+      setOutlineOpen(false);
       setInspectorOpen(true);
       const sourceId = nodeIndex.byId.get(nodeId)?.sourceId;
       if (sourceId) {

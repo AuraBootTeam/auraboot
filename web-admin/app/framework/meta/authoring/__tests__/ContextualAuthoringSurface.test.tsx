@@ -286,6 +286,20 @@ describe('ContextualAuthoringSurface', () => {
     expect(safeTab).toHaveBeenCalledTimes(1);
   });
 
+  it('hands a contextual selection from the outline drawer to the inspector drawer', async () => {
+    renderSurface(vi.fn(), vi.fn());
+    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+    await screen.findByTestId('contextual-authoring-surface');
+
+    fireEvent.click(screen.getByTestId('authoring-outline-open'));
+    expect(screen.getByTestId('authoring-outline')).toBeVisible();
+    fireEvent.click(screen.getByTestId('authoring-outline-table-1'));
+
+    expect(screen.getByTestId('authoring-outline')).toHaveClass('hidden');
+    expect(screen.getByTestId('authoring-inspector')).not.toHaveClass('hidden');
+    expect(screen.getByTestId('authoring-inspector')).toHaveTextContent('订单表格');
+  });
+
   it('restores the same session, focus and scroll after returning from Studio', async () => {
     window.history.replaceState(
       null,
