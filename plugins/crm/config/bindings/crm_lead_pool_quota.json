@@ -1,0 +1,8 @@
+[
+  { "modelCode": "crm_lead_pool_quota", "fieldCode": "crm_lpq_key", "sequence": 1, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_pool_quota", "fieldCode": "crm_lpq_pool_id", "sequence": 2, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_pool_quota", "fieldCode": "crm_lpq_user_id", "sequence": 3, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_pool_quota", "fieldCode": "crm_lpq_local_date", "sequence": 4, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_pool_quota", "fieldCode": "crm_lpq_pick_count", "sequence": 5, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_pool_quota", "fieldCode": "crm_lpq_limit_snapshot", "sequence": 6, "required": true, "visible": true, "editable": false }
+]

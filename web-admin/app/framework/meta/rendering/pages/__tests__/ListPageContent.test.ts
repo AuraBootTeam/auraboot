@@ -28,7 +28,31 @@ import {
   useSerializedSearchParamsUpdater,
   viewFilterToQueryCondition,
   resolveSavedViewFilterExpressions,
+  resolveInitialListTabKey,
 } from '../ListPageContent';
+
+describe('resolveInitialListTabKey', () => {
+  it('uses the explicit all tab when the DSL provides one', () => {
+    expect(
+      resolveInitialListTabKey([
+        { blockType: 'tabs', tabs: [{ key: 'available' }, { key: 'all' }] },
+      ]),
+    ).toBe('all');
+  });
+
+  it('uses the first DSL tab when no all tab exists', () => {
+    expect(
+      resolveInitialListTabKey([
+        { blockType: 'tabs', tabs: [{ key: 'available' }, { key: 'claimed' }] },
+      ]),
+    ).toBe('available');
+  });
+
+  it('falls back to all when the page has no valid tabs', () => {
+    expect(resolveInitialListTabKey([])).toBe('all');
+    expect(resolveInitialListTabKey([{ blockType: 'tabs', tabs: [{}] }])).toBe('all');
+  });
+});
 
 describe('buildBulkFieldCommandPayload', () => {
   it('maps the collected value only to the DSL-owned command input', () => {

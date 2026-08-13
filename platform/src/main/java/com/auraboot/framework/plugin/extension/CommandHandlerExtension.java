@@ -54,6 +54,9 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Well-known key for the target version accepted by the command boundary. */
     String EXPECTED_VERSION_KEY = "__expectedVersion";
 
+    /** Well-known key for the authenticated user's stable public PID. */
+    String CURRENT_USER_PID_KEY = "__currentUserPid";
+
     /**
      * Get the command type this handler processes.
      * Format: "namespace:command-name" (e.g., "billing:generate-invoice")
@@ -268,6 +271,20 @@ public interface CommandHandlerExtension extends ExtensionPoint {
                     ? settings.get(INDEPENDENT_TRANSACTION_ACCESSOR_KEY) : null;
             return accessor instanceof IndependentTransactionAccessor
                     ? (IndependentTransactionAccessor) accessor : null;
+        }
+
+        /** Returns the host-owned record-share bridge, or {@code null} on older hosts. */
+        public RecordShareAccessor recordShareAccessor() {
+            Object accessor = settings != null ? settings.get(RecordShareAccessor.SETTINGS_KEY) : null;
+            return accessor instanceof RecordShareAccessor value ? value : null;
+        }
+
+        /** Returns the authenticated user's stable public PID. */
+        public String currentUserPid() {
+            Object value = settings != null ? settings.get(CURRENT_USER_PID_KEY) : null;
+            if (value == null) return null;
+            String text = String.valueOf(value).trim();
+            return text.isEmpty() ? null : text;
         }
 
         /**

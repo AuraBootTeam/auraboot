@@ -17,6 +17,44 @@ function renderDialog(detail: Record<string, any>) {
 describe('FormDialog choice fields', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('renders a MemberPicker command input and submits the selected user pid', async () => {
+    const onSubmit = vi.fn();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: '0',
+        data: {
+          records: [{
+            displayName: 'Sales One',
+            user: { pid: 'user-sales-1', email: 'sales@example.com' },
+          }],
+        },
+      }),
+    }));
+    renderDialog({
+      title: '分配线索',
+      fields: [{
+        field: 'crm_lpi_claimed_by',
+        label: '分配给',
+        type: 'reference',
+        component: 'MemberPicker',
+        required: true,
+        props: { multiple: false },
+      }],
+      fieldOptions: {},
+      defaults: {},
+      onSubmit,
+    });
+
+    expect(screen.getByRole('dialog', { name: '分配线索' })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('member-picker-add'));
+    fireEvent.click(await screen.findByTestId('member-picker-option-user-sales-1'));
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+
+    expect(onSubmit).toHaveBeenCalledWith({ crm_lpi_claimed_by: 'user-sales-1' });
   });
 
   it('uses localized fallbacks instead of leaking missing i18n keys', () => {

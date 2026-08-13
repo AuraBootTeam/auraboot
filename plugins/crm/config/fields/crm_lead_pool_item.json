@@ -1,0 +1,19 @@
+[
+  { "code": "crm_lpi_lead_key", "displayName:zh-CN": "线索唯一键", "displayName:en": "Lead Key", "dataType": "string", "constraints": { "required": true, "unique": true, "maxLength": 100 }, "feature": { "readonly": true } },
+  { "code": "crm_lpi_lead_id", "displayName:zh-CN": "线索", "displayName:en": "Lead", "dataType": "reference", "referenceModelCode": "crm_lead_common", "constraints": { "required": true }, "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_lpi_pool_id", "displayName:zh-CN": "线索池", "displayName:en": "Lead Pool", "dataType": "reference", "referenceModelCode": "crm_lead_pool", "constraints": { "required": true }, "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_lpi_status", "displayName:zh-CN": "池内状态", "displayName:en": "Pool Status", "dataType": "enum", "dictCode": "crm_lead_pool_item_status", "constraints": { "required": true }, "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_lpi_lead_code", "displayName:zh-CN": "线索编号", "displayName:en": "Lead Code", "dataType": "string", "feature": { "readonly": true, "searchable": true, "sortable": true } },
+  { "code": "crm_lpi_company", "displayName:zh-CN": "公司名称", "displayName:en": "Company", "dataType": "string", "feature": { "readonly": true, "searchable": true, "sortable": true } },
+  { "code": "crm_lpi_contact_name", "displayName:zh-CN": "联系人", "displayName:en": "Contact", "dataType": "string", "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_lpi_contact_phone", "displayName:zh-CN": "联系电话", "displayName:en": "Contact Phone", "dataType": "string", "feature": { "readonly": true } },
+  { "code": "crm_lpi_source", "displayName:zh-CN": "线索来源", "displayName:en": "Source", "dataType": "enum", "dictCode": "crm_lead_source", "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_lpi_score", "displayName:zh-CN": "评分", "displayName:en": "Score", "dataType": "integer", "feature": { "readonly": true, "sortable": true } },
+  { "code": "crm_lpi_previous_owner", "displayName:zh-CN": "前负责人", "displayName:en": "Previous Owner", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } },
+  { "code": "crm_lpi_entered_at", "displayName:zh-CN": "入池时间", "displayName:en": "Entered At", "dataType": "datetime", "constraints": { "required": true }, "feature": { "readonly": true, "sortable": true } },
+  { "code": "crm_lpi_entered_by", "displayName:zh-CN": "入池操作人", "displayName:en": "Entered By", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } },
+  { "code": "crm_lpi_reason", "displayName:zh-CN": "入池原因", "displayName:en": "Entry Reason", "dataType": "text", "feature": { "readonly": true } },
+  { "code": "crm_lpi_claim_release_at", "displayName:zh-CN": "可领取时间", "displayName:en": "Claim Release At", "dataType": "datetime", "feature": { "readonly": true, "sortable": true } },
+  { "code": "crm_lpi_claimed_at", "displayName:zh-CN": "领取/分配时间", "displayName:en": "Claimed or Assigned At", "dataType": "datetime", "feature": { "readonly": true, "sortable": true } },
+  { "code": "crm_lpi_claimed_by", "displayName:zh-CN": "领取/获配用户", "displayName:en": "Claimed or Assigned User", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } }
+]

@@ -39,6 +39,7 @@ import com.auraboot.framework.plugin.pf4j.AsyncTaskAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.IndependentTransactionAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.FileAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.LlmProviderAccessorImpl;
+import com.auraboot.framework.plugin.extension.RecordShareAccessor;
 import com.auraboot.module.bitemporal.service.BiTemporalService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -89,6 +90,9 @@ public class HandlerPhase implements CommandPhase {
 
     @Autowired(required = false)
     private org.springframework.transaction.PlatformTransactionManager platformTransactionManager;
+
+    @Autowired(required = false)
+    private RecordShareAccessor recordShareAccessor;
 
     @Override public String name() { return "handler"; }
 
@@ -550,6 +554,10 @@ public class HandlerPhase implements CommandPhase {
             if (userId != null) {
                 pluginSettings.put("__currentUser", userId.toString());
             }
+            if (StringUtils.hasText(MetaContext.getCurrentUserPid())) {
+                pluginSettings.put(CommandHandlerExtension.CURRENT_USER_PID_KEY,
+                        MetaContext.getCurrentUserPid().trim());
+            }
             if (StringUtils.hasText(request.getClientRequestId())) {
                 pluginSettings.put(CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
                         request.getClientRequestId().trim());
@@ -581,6 +589,9 @@ public class HandlerPhase implements CommandPhase {
                 pluginSettings.put(CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY,
                         new IndependentTransactionAccessorImpl(
                                 platformTransactionManager, dynamicDataService));
+            }
+            if (recordShareAccessor != null) {
+                pluginSettings.put(RecordShareAccessor.SETTINGS_KEY, recordShareAccessor);
             }
             CommandHandlerExtension.CommandContext pluginContext = CommandHandlerExtension.CommandContext.builder()
                     .tenantId(tenantId)

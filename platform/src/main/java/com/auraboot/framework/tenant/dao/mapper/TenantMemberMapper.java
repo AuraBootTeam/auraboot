@@ -85,6 +85,22 @@ public interface TenantMemberMapper extends BaseMapper<TenantMember> {
             """)
     TenantMember findByTenantIdAndUserId(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 
+    /** Resolve an active tenant member from the stable public PID used by reference fields. */
+    @Select("""
+            SELECT tm.*
+            FROM ab_tenant_member tm
+            INNER JOIN ab_user u ON u.id = tm.user_id
+            WHERE tm.tenant_id = #{tenantId}
+              AND u.pid = #{userPid}
+              AND LOWER(tm.status) = 'active'
+              AND tm.deleted_flag = FALSE
+              AND u.deleted_flag = FALSE
+            LIMIT 1
+            """)
+    TenantMember findActiveByTenantIdAndUserPid(
+            @Param("tenantId") Long tenantId,
+            @Param("userPid") String userPid);
+
     /**
      * Find a tenant member by public PID within a tenant.
      */

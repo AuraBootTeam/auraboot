@@ -18,15 +18,21 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'com.auraboot:platform-plugin-api:1.0.0-SNAPSHOT'
+    def localPluginApiJar = providers.gradleProperty('platformPluginApiJar').orNull
+    compileOnly localPluginApiJar != null
+            ? files(localPluginApiJar)
+            : 'com.auraboot:platform-plugin-api:1.0.0-SNAPSHOT'
     compileOnly 'org.pf4j:pf4j:3.13.0'
     annotationProcessor 'org.pf4j:pf4j:3.13.0'
     compileOnly 'org.projectlombok:lombok:1.18.32'
     annotationProcessor 'org.projectlombok:lombok:1.18.32'
     compileOnly 'org.slf4j:slf4j-api:2.0.12'
     compileOnly 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+    compileOnly 'org.springframework:spring-context:6.2.19'
 
-    testImplementation 'com.auraboot:platform-plugin-api:1.0.0-SNAPSHOT'
+    testImplementation localPluginApiJar != null
+            ? files(localPluginApiJar)
+            : 'com.auraboot:platform-plugin-api:1.0.0-SNAPSHOT'
     testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
     testImplementation 'org.pf4j:pf4j:3.13.0'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
@@ -59,7 +65,7 @@ jar {
             'Plugin-Version': version,
             'Plugin-Class': 'com.auraboot.plugins.crm.CrmPlugin',
             'Plugin-Provider': 'AuraBoot Team',
-            'Plugin-Description': 'CRM hybrid backend: lead scoring engine + lead assignment engine + command handlers'
+            'Plugin-Description': 'CRM hybrid backend: scoring, assignment, governed lead pools, automation and command handlers'
         )
     }
 

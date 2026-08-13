@@ -1,0 +1,15 @@
+{
+  "pageKey": "crm_lead_pool_item_detail", "name:zh-CN": "池内线索详情", "name:en": "Pooled Lead Detail", "modelCode": "crm_lead_pool_item", "kind": "detail", "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "blocks": [
+    { "id": "lead_snapshot", "blockType": "form-section", "title": { "zh-CN": "线索快照", "en": "Lead Snapshot" }, "columns": 3, "fields": [
+      { "field": "crm_lpi_pool_id", "readOnly": true }, { "field": "crm_lpi_status", "readOnly": true }, { "field": "crm_lpi_lead_code", "readOnly": true },
+      { "field": "crm_lpi_company", "readOnly": true }, { "field": "crm_lpi_contact_name", "readOnly": true }, { "field": "crm_lpi_contact_phone", "readOnly": true },
+      { "field": "crm_lpi_source", "readOnly": true }, { "field": "crm_lpi_score", "readOnly": true }, { "field": "crm_lpi_previous_owner", "readOnly": true }
+    ] },
+    { "id": "pool_evidence", "blockType": "form-section", "title": { "zh-CN": "入池与领取证据", "en": "Pool and Claim Evidence" }, "columns": 3, "fields": [
+      { "field": "crm_lpi_entered_at", "readOnly": true }, { "field": "crm_lpi_entered_by", "readOnly": true }, { "field": "crm_lpi_claim_release_at", "readOnly": true },
+      { "field": "crm_lpi_claimed_at", "readOnly": true }, { "field": "crm_lpi_claimed_by", "readOnly": true }, { "field": "crm_lpi_reason", "readOnly": true }
+    ] }
+  ]
+}

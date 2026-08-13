@@ -27,7 +27,10 @@ import type {
 import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
-import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import {
+  resolveCommandErrorMessage,
+  useActionHandler,
+} from '~/framework/meta/hooks/useActionHandler';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import { confirmDialog } from '~/utils/confirmDialog';
 import {
@@ -171,6 +174,18 @@ interface BulkFieldCommandState {
 
 export function buildBulkFieldCommandPayload(field: FieldConfig, value: unknown) {
   return { [field.field]: value };
+}
+
+export function resolveInitialListTabKey(blocks: unknown): string {
+  if (!Array.isArray(blocks)) return 'all';
+  const tabsBlock = blocks.find(
+    (block): block is { blockType: string; tabs?: Array<{ key?: unknown }> } =>
+      Boolean(block && typeof block === 'object' && (block as any).blockType === 'tabs'),
+  );
+  const tabs = Array.isArray(tabsBlock?.tabs) ? tabsBlock.tabs : [];
+  const allTab = tabs.find((tab) => tab?.key === 'all');
+  const initialKey = allTab?.key ?? tabs[0]?.key;
+  return typeof initialKey === 'string' && initialKey.length > 0 ? initialKey : 'all';
 }
 
 export interface ListReferenceDisplayConfig {
@@ -1316,7 +1331,7 @@ function ListPageContentInner(props: PageContentProps) {
   );
 
   // Tab state for tabs
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState(() => resolveInitialListTabKey(schema?.blocks));
   const [importOpen, setImportOpen] = useState(false);
   const [viewManageOpen, setViewManageOpen] = useState(false);
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
@@ -2671,7 +2686,7 @@ function ListPageContentInner(props: PageContentProps) {
             failures.push({
               recordPid: id,
               recordLabel: recordLabelById.get(id) || id,
-              reason: (result as any).desc || (result as any).message || 'Command failed',
+              reason: resolveCommandErrorMessage(result, command),
             });
           }
         } catch (error) {
@@ -2806,7 +2821,7 @@ function ListPageContentInner(props: PageContentProps) {
           failures.push({
             recordPid: command,
             recordLabel: command,
-            reason: (result as any).desc || (result as any).message || 'Command failed',
+            reason: resolveCommandErrorMessage(result, command),
           });
         }
       } else {

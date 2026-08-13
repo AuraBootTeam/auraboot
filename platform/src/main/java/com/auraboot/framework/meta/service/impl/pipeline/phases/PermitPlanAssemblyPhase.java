@@ -176,12 +176,17 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
         if (tenantId == null || (!StringUtils.hasText(memberPid) && memberId == null)) {
             return false;
         }
-        return recordShareService.isSharedByPid(
+        boolean shared = recordShareService.isSharedByPid(
                 tenantId,
                 ctx.getCommand().getModelCode(),
                 ctx.getRequest().getTargetRecordId(),
                 memberId,
                 memberPid,
                 "update");
+        log.debug("Shared-target write check: command={} operation={} tenant={} memberId={} "
+                        + "target={} shared={}",
+                ctx.getCommandCode(), operation, tenantId, memberId,
+                ctx.getRequest().getTargetRecordId(), shared);
+        return shared;
     }
 }
