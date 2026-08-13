@@ -3,6 +3,7 @@ import { test, expect, type Page } from '../../fixtures';
 import { read as xlsxRead, utils as XLSXUtils, write as xlsxWrite } from 'xlsx';
 import { executeCommandViaApi, queryFilteredList } from '../helpers';
 import { loginViaUI } from '../../helpers/wd-fixtures';
+import { BACKEND_URL, BASE_URL, PG_CONN } from '../../helpers/environments';
 
 const ADMIN_EMAIL = 'admin@auraboot.com';
 const PASSWORD = 'Test2026x';
@@ -16,6 +17,7 @@ const EVIDENCE_DIR =
   '/Users/ghj/work/auraboot/.workspace/evidence/crm-multimodel-import-20260813-s143';
 
 mkdirSync(EVIDENCE_DIR, { recursive: true });
+mkdirSync(`${EVIDENCE_DIR}/api-evidence`, { recursive: true });
 
 function workbook(rows: Array<Record<string, unknown>>, template: Buffer): Buffer {
   const book = xlsxRead(template, { type: 'buffer' });
@@ -115,18 +117,27 @@ async function upload(
   });
 }
 
-async function downloadCorrectionWorkbook(page: Page, model: string): Promise<Buffer> {
+async function downloadCorrectionWorkbook(
+  page: Page,
+  model: string,
+  options: { mode?: 'insert' | 'update'; resultStep?: boolean } = {},
+): Promise<Buffer> {
+  const mode = options.mode ?? 'insert';
   const responsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === 'GET' &&
       response.url().includes(`/api/meta/excel/import/${model}/error-report/`),
   );
   const downloadPromise = page.waitForEvent('download');
-  await page.getByTestId('import-download-error-report').click();
+  await page
+    .getByTestId(
+      options.resultStep ? 'import-result-download-error-report' : 'import-download-error-report',
+    )
+    .click();
   const [response, download] = await Promise.all([responsePromise, downloadPromise]);
   expect(response.ok(), response.ok() ? undefined : await response.text()).toBeTruthy();
   expect(response.headers()['content-disposition']).toContain('import-errors.xlsx');
-  expect(download.suggestedFilename()).toBe(`${model}-insert-import-errors.xlsx`);
+  expect(download.suggestedFilename()).toBe(`${model}-${mode}-import-errors.xlsx`);
   const downloadedPath = await download.path();
   expect(downloadedPath).not.toBeNull();
   const content = readFileSync(downloadedPath!);
@@ -138,9 +149,12 @@ async function uploadCorrectionWorkbook(
   page: Page,
   name: string,
   buffer: Buffer,
+  resultStep = false,
 ): Promise<void> {
   const chooserPromise = page.waitForEvent('filechooser');
-  await page.getByTestId('import-upload-correction').click();
+  await page
+    .getByTestId(resultStep ? 'import-result-upload-correction' : 'import-upload-correction')
+    .click();
   const chooser = await chooserPromise;
   await chooser.setFiles({
     name,
@@ -177,7 +191,7 @@ function correctWorkbookValue(
 async function submitAndExpect(
   page: Page,
   model: string,
-  expected: { created: number; updated: number; total: number },
+  expected: { created: number; updated: number; failed?: number; total: number },
   timeout = 45_000,
 ): Promise<{ taskId: string }> {
   const importResponsePromise = page.waitForResponse(
@@ -192,7 +206,7 @@ async function submitAndExpect(
   await expect(page.getByTestId('import-result')).toContainText('导入完成', { timeout });
   await expect(page.getByTestId('import-result-created')).toHaveText(String(expected.created));
   await expect(page.getByTestId('import-result-updated')).toHaveText(String(expected.updated));
-  await expect(page.getByTestId('import-result-failed')).toHaveText('0');
+  await expect(page.getByTestId('import-result-failed')).toHaveText(String(expected.failed ?? 0));
   await expect(page.getByTestId('import-result-total')).toHaveText(String(expected.total));
   return { taskId: String(importBody?.data?.taskId ?? '') };
 }
@@ -247,6 +261,8 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
   const duplicateAccountName = `重名客户-${suffix}`;
   const sourceLeadCompany = `来源线索-${suffix}`;
   const importedLeadCompany = `批量导入线索-${suffix}`;
+  const partialUpdateLeadCompany = `异步部分成功线索-${suffix}`;
+  const recoveryLeadCompany = `异步纠错线索-${suffix}`;
   const updateOpportunityName = `待更新商机-${suffix}`;
   let accountPid = '';
   let accountCode = '';
@@ -256,6 +272,10 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
   let updateOpportunityCode = '';
   let importedLeadPid = '';
   let importedLeadCode = '';
+  let partialUpdateLeadPid = '';
+  let partialUpdateLeadCode = '';
+  let recoveryLeadPid = '';
+  let recoveryLeadCode = '';
   let leadTemplate: Buffer;
   let contactTemplate: Buffer;
   let opportunityTemplate: Buffer;
@@ -303,6 +323,39 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
       sourceLeadPid = lead.recordId;
       const leadRecord = await recordByPid(page, LEAD, sourceLeadPid);
       sourceLeadCode = String(leadRecord.crm_lead_code);
+
+      for (const fixture of [
+        {
+          company: partialUpdateLeadCompany,
+          requirement: '异步部分成功后必须保留的需求',
+          assign: (pid: string, code: string) => {
+            partialUpdateLeadPid = pid;
+            partialUpdateLeadCode = code;
+          },
+        },
+        {
+          company: recoveryLeadCompany,
+          requirement: '纠错重传后必须保留的需求',
+          assign: (pid: string, code: string) => {
+            recoveryLeadPid = pid;
+            recoveryLeadCode = code;
+          },
+        },
+      ]) {
+        const created = await executeCommandViaApi(
+          page,
+          'crm:create_lead',
+          {
+            crm_lead_company: fixture.company,
+            crm_lead_contact_name: '异步纠错夹具',
+            crm_lead_requirement: fixture.requirement,
+          },
+          undefined,
+          'create',
+        );
+        const record = await recordByPid(page, LEAD, created.recordId);
+        fixture.assign(created.recordId, String(record.crm_lead_code));
+      }
 
       const opportunity = await executeCommandViaApi(
         page,
@@ -488,11 +541,7 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
 
     const corrected = correctWorkbookValue(correction, 1, '所属客户', accountCode);
     writeFileSync(`${EVIDENCE_DIR}/04-contact-correction-fixed.xlsx`, corrected);
-    await uploadCorrectionWorkbook(
-      page,
-      `contact-corrected-${suffix}.xlsx`,
-      corrected,
-    );
+    await uploadCorrectionWorkbook(page, `contact-corrected-${suffix}.xlsx`, corrected);
     await expect(page.getByText('预检通过，可以导入')).toBeVisible();
     await page.screenshot({
       path: `${EVIDENCE_DIR}/04-contact-correction-passed.png`,
@@ -519,7 +568,10 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
     await expect(page.getByTestId('import-validation-summary')).toContainText(
       '关联值不唯一，请改用唯一业务编码或 PID',
     );
-    await page.screenshot({ path: `${EVIDENCE_DIR}/05-contact-ambiguous-blocked.png`, fullPage: true });
+    await page.screenshot({
+      path: `${EVIDENCE_DIR}/05-contact-ambiguous-blocked.png`,
+      fullPage: true,
+    });
     expect(await recordsByField(page, CONTACT, 'crm_ct_name', contactName)).toHaveLength(0);
   });
 
@@ -624,13 +676,237 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
     const elapsedMs = Date.now() - startedAt;
     expect(taskId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
     expect(elapsedMs).toBeLessThanOrEqual(180_000);
-    const statusResponse = await page.request.get(`/api/meta/excel/import/${LEAD}/status/${taskId}`);
+    const statusResponse = await page.request.get(
+      `/api/meta/excel/import/${LEAD}/status/${taskId}`,
+    );
     expect(statusResponse.ok(), await statusResponse.text()).toBeTruthy();
     const statusBody = await statusResponse.json();
+    writeFileSync(
+      `${EVIDENCE_DIR}/api-evidence/cmm-09-terminal-task.json`,
+      `${JSON.stringify(statusBody, null, 2)}\n`,
+    );
     expect(String(statusBody?.data?.status).toLowerCase()).toBe('completed');
     expect(statusBody?.data?.processedRows).toBe(2000);
     expect(statusBody?.data?.result?.createdCount).toBe(2000);
     expect(await filteredTotal(page, LEAD, 'crm_lead_company', bulkPrefix)).toBe(2000);
     await page.screenshot({ path: `${EVIDENCE_DIR}/08-lead-2000-result.png`, fullPage: true });
+  });
+
+  test('CMM-10 async partial update downloads one failed row and recovers by re-upload', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    const updatedCompany = `${partialUpdateLeadCompany}-已更新`;
+    const recoveredCompany = `${recoveryLeadCompany}-已修正`;
+    const missingCode = `MISSING-${suffix}`;
+
+    await openModelFromMenu(page, LEAD);
+    await openImport(page);
+    await page.getByTestId('import-mode-update').click();
+    const updateTemplate = await downloadTemplate(page, LEAD);
+    await upload(
+      page,
+      `lead-async-partial-${suffix}.xlsx`,
+      [
+        { 线索编号: partialUpdateLeadCode, 公司名称: updatedCompany, 需求描述: '' },
+        { 线索编号: missingCode, 公司名称: recoveredCompany, 需求描述: '' },
+      ],
+      updateTemplate,
+    );
+    await expect(page.getByText('预检通过，可以导入')).toBeVisible();
+
+    const { taskId } = await submitAndExpect(
+      page,
+      LEAD,
+      { created: 0, updated: 1, failed: 1, total: 2 },
+      90_000,
+    );
+    expect(taskId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+    await expect(page.getByTestId('import-result')).toContainText('导入完成，部分行失败');
+    await expect(page.getByTestId('import-result')).toContainText(
+      '未找到与“线索编号”匹配的现有记录，请修正匹配值后重试',
+    );
+    await expect(page.getByTestId('import-result-download-error-report')).toBeVisible();
+    await expect(page.getByTestId('import-result-upload-correction')).toBeVisible();
+    await page.screenshot({
+      path: `${EVIDENCE_DIR}/09-lead-async-partial-result.png`,
+      fullPage: true,
+    });
+
+    const statusResponse = await page.request.get(
+      `/api/meta/excel/import/${LEAD}/status/${taskId}`,
+    );
+    expect(statusResponse.ok(), await statusResponse.text()).toBeTruthy();
+    const statusBody = await statusResponse.json();
+    expect(String(statusBody?.data?.status).toLowerCase()).toBe('completed');
+    expect(statusBody?.data?.totalRows).toBe(2);
+    expect(statusBody?.data?.processedRows).toBe(2);
+    expect(statusBody?.data?.result?.updatedCount).toBe(1);
+    expect(statusBody?.data?.result?.errorCount).toBe(1);
+    expect(statusBody?.data?.result?.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rowNumber: 3,
+          message: expect.stringContaining('No existing record matches crm_lead_code='),
+        }),
+      ]),
+    );
+    expect(statusBody?.data?.result?.errorReportUrl).toContain(`/error-report/${taskId}`);
+    writeFileSync(
+      `${EVIDENCE_DIR}/api-evidence/cmm-10-terminal-task.json`,
+      `${JSON.stringify(statusBody, null, 2)}\n`,
+    );
+
+    const correction = await downloadCorrectionWorkbook(page, LEAD, {
+      mode: 'update',
+      resultStep: true,
+    });
+    writeFileSync(`${EVIDENCE_DIR}/10-lead-async-partial-correction-original.xlsx`, correction);
+    const correctionBook = xlsxRead(correction, { type: 'buffer' });
+    const correctionRows = XLSXUtils.sheet_to_json<Record<string, unknown>>(
+      correctionBook.Sheets[correctionBook.SheetNames[0]],
+      { defval: '' },
+    );
+    expect(correctionRows).toHaveLength(1);
+    expect(JSON.stringify(correctionRows)).toContain(recoveredCompany);
+    expect(JSON.stringify(correctionRows)).not.toContain(updatedCompany);
+    const correctionErrors = XLSXUtils.sheet_to_json<Record<string, unknown>>(
+      correctionBook.Sheets['Import errors'],
+      { defval: '' },
+    );
+    expect(JSON.stringify(correctionErrors)).toContain('线索编号');
+    expect(JSON.stringify(correctionErrors)).toContain('未找到与“线索编号”匹配的现有记录');
+    expect(JSON.stringify(correctionErrors)).not.toContain('crm_lead_code');
+
+    const corrected = correctWorkbookValue(correction, 0, '线索编号', recoveryLeadCode);
+    writeFileSync(`${EVIDENCE_DIR}/10-lead-async-partial-correction-fixed.xlsx`, corrected);
+    await uploadCorrectionWorkbook(
+      page,
+      `lead-async-partial-corrected-${suffix}.xlsx`,
+      corrected,
+      true,
+    );
+    await expect(page.getByText('预检通过，可以导入')).toBeVisible();
+    await submitAndExpect(page, LEAD, { created: 0, updated: 1, total: 1 });
+    await page.screenshot({
+      path: `${EVIDENCE_DIR}/11-lead-async-partial-recovered.png`,
+      fullPage: true,
+    });
+
+    const partialRecord = await recordByPid(page, LEAD, partialUpdateLeadPid);
+    const recoveryRecord = await recordByPid(page, LEAD, recoveryLeadPid);
+    expect(partialRecord.crm_lead_company).toBe(updatedCompany);
+    expect(partialRecord.crm_lead_requirement).toBe('异步部分成功后必须保留的需求');
+    expect(recoveryRecord.crm_lead_company).toBe(recoveredCompany);
+    expect(recoveryRecord.crm_lead_requirement).toBe('纠错重传后必须保留的需求');
+    expect(await recordsByField(page, LEAD, 'crm_lead_code', partialUpdateLeadCode)).toHaveLength(
+      1,
+    );
+    expect(await recordsByField(page, LEAD, 'crm_lead_code', recoveryLeadCode)).toHaveLength(1);
+    writeFileSync(
+      `${EVIDENCE_DIR}/api-evidence/cmm-10-persisted-records.json`,
+      `${JSON.stringify(
+        {
+          partialRecord: {
+            pid: partialUpdateLeadPid,
+            code: partialUpdateLeadCode,
+            company: partialRecord.crm_lead_company,
+            requirement: partialRecord.crm_lead_requirement,
+          },
+          recoveryRecord: {
+            pid: recoveryLeadPid,
+            code: recoveryLeadCode,
+            company: recoveryRecord.crm_lead_company,
+            requirement: recoveryRecord.crm_lead_requirement,
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    writeFileSync(
+      `${EVIDENCE_DIR}/screenshots-index.csv`,
+      [
+        'caseId,screenshot,description,url,persona',
+        'CMM-C10,09-lead-async-partial-result.png,"异步部分成功、业务化行错误、纠错入口",/p/crm_lead_common,tenant_admin',
+        'CMM-C10,11-lead-async-partial-recovered.png,"失败行修正重传后 1 更新 0 失败",/p/crm_lead_common,tenant_admin',
+      ].join('\n') + '\n',
+    );
+    writeFileSync(
+      `${EVIDENCE_DIR}/acceptance-manifest.json`,
+      `${JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          runtime: {
+            name: process.env.CRM_IMPORT_RUNTIME_NAME ?? null,
+            slot: process.env.CRM_IMPORT_RUNTIME_SLOT ?? null,
+            web: BASE_URL,
+            backend: BACKEND_URL,
+            database: PG_CONN.database,
+            sourceRoot: process.cwd().replace(/\/web-admin$/, ''),
+          },
+          axes: {
+            surface: 'journey',
+            dependencies: 'real-stack',
+            authority: 'blocking-release',
+            driver: 'browser',
+          },
+          summary: { pass: 12, untested: 8, total: 20, coveragePercent: 60 },
+          cases: [
+            ['CMM-C10-01', 'update precheck accepts existing and missing match values', 'pass'],
+            ['CMM-C10-02', 'two-row upload returns a durable public task id', 'pass'],
+            ['CMM-C10-03', 'partial result reports one update and one failure', 'pass'],
+            ['CMM-C10-04', 'terminal task is reconstructed as completed with exact counts', 'pass'],
+            ['CMM-C10-05', 'durable status retains row number and actionable error', 'pass'],
+            ['CMM-C10-06', 'correction download is authorized OOXML with update filename', 'pass'],
+            ['CMM-C10-07', 'correction workbook contains exactly the failed row', 'pass'],
+            ['CMM-C10-08', 'correction workbook omits the already successful row', 'pass'],
+            ['CMM-C10-09', 'error sheet uses business label and no internal field code', 'pass'],
+            ['CMM-C10-10', 'corrected workbook re-upload passes validation', 'pass'],
+            ['CMM-C10-11', 'corrected failed row persists exactly once', 'pass'],
+            ['CMM-C10-12', 'first successful row remains exact and is not replayed', 'pass'],
+            ['CMM-C11-01', 'report storage provider upload failure', 'untested'],
+            ['CMM-C11-02', 'scheduled retention expiry and expired download UX', 'untested'],
+            ['CMM-C11-03', 'multi-node task polling and report download', 'untested'],
+            ['CMM-C12-01', 'user cancellation', 'untested'],
+            ['CMM-C12-02', 'explicit retry operation', 'untested'],
+            ['CMM-C12-03', 'service restart during a running import', 'untested'],
+            ['CMM-C12-04', '10k-row capacity and latency', 'untested'],
+            ['CMM-C12-05', '100k-row capacity and latency', 'untested'],
+          ].map(([id, claim, verdict]) => ({
+            id,
+            claim,
+            verdict,
+            evidence:
+              verdict === 'pass'
+                ? [
+                    '09-lead-async-partial-result.png',
+                    '10-lead-async-partial-correction-original.xlsx',
+                    '11-lead-async-partial-recovered.png',
+                    'api-evidence/cmm-10-terminal-task.json',
+                    'api-evidence/cmm-10-persisted-records.json',
+                    'artifacts/*/trace.zip',
+                  ]
+                : [],
+          })),
+          evidence: [
+            '09-lead-async-partial-result.png',
+            '10-lead-async-partial-correction-original.xlsx',
+            '10-lead-async-partial-correction-fixed.xlsx',
+            '11-lead-async-partial-recovered.png',
+            'api-evidence/cmm-10-terminal-task.json',
+            'api-evidence/cmm-10-persisted-records.json',
+            'artifacts/*/trace.zip',
+          ],
+          trust: {
+            retries: 0,
+            mutation:
+              'Expected failed=0 produced a deterministic red result because the real UI reported failed=1.',
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
   });
 });

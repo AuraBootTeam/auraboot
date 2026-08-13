@@ -60,7 +60,8 @@ class ExcelEdgeCaseTest {
     void setUp() {
         importService = new ExcelImportService(
                 dynamicDataService, metaModelService, importJobMapper, policyResolver,
-                commandExecutor, referenceResolver, new TypeSystemManager(), errorReportService);
+                commandExecutor, referenceResolver, new TypeSystemManager(), errorReportService,
+                new com.fasterxml.jackson.databind.ObjectMapper());
         lenient().when(policyResolver.requireEnabled(anyString())).thenReturn(ExcelImportPolicy.builder()
                 .modelCode("test_model")
                 .enabled(true)

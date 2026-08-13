@@ -255,11 +255,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
         setError(
           cause instanceof Error
             ? cause.message
-            : t(
-                'import.error.error_report',
-                undefined,
-                '修正工作簿下载失败，请重试。',
-              ),
+            : t('import.error.error_report', undefined, '修正工作簿下载失败，请重试。'),
         );
       } finally {
         setDownloadingErrorReport(false);
@@ -422,11 +418,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
       const namedRequired = /^Field '([^']+)' is required$/.exec(message);
       if (namedRequired) {
         const field = fieldLabel(namedRequired[1]);
-        return t(
-          'import.validation.named_required',
-          { field },
-          `字段“${field}”为必填项`,
-        );
+        return t('import.validation.named_required', { field }, `字段“${field}”为必填项`);
       }
       if (message === 'Required field is missing') {
         return t('import.validation.required', undefined, '必填字段缺失');
@@ -452,15 +444,11 @@ export const ImportModal: React.FC<ImportModalProps> = ({
         return t('import.validation.reference', undefined, referenceMessage);
       }
       if (referenceMessage === '关联值不唯一，请改用唯一业务编码或 PID') {
-        return t(
-          'import.validation.reference_ambiguous',
-          undefined,
-          referenceMessage,
-        );
+        return t('import.validation.reference_ambiguous', undefined, referenceMessage);
       }
-      const executionMessage = resolveImportExecutionMessage(message);
+      const executionMessage = resolveImportExecutionMessage(message, fieldLabels);
       if (executionMessage) {
-        return t('import.validation.row_write_failed', undefined, executionMessage);
+        return t(executionMessage.key, executionMessage.params, executionMessage.fallback);
       }
       return resolveImportMessageFieldCodes(message, fieldLabels);
     },
@@ -643,11 +631,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                       )}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={resetState}
-                    className="text-accent text-sm"
-                  >
+                  <button type="button" onClick={resetState} className="text-accent text-sm">
                     {t('import.change_file', undefined, '更换文件')}
                   </button>
                 </div>
@@ -713,16 +697,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                           className="border-accent text-accent hover:bg-accent-weak rounded-control border px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {downloadingErrorReport
-                            ? t(
-                                'import.correction.downloading',
-                                undefined,
-                                '正在下载修正工作簿…',
-                              )
-                            : t(
-                                'import.correction.download',
-                                undefined,
-                                '下载修正工作簿',
-                              )}
+                            ? t('import.correction.downloading', undefined, '正在下载修正工作簿…')
+                            : t('import.correction.download', undefined, '下载修正工作簿')}
                         </button>
                         <button
                           type="button"
@@ -731,11 +707,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                           onClick={chooseCorrectionFile}
                           className="bg-accent rounded-control px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          {t(
-                            'import.correction.upload',
-                            undefined,
-                            '上传修正工作簿',
-                          )}
+                          {t('import.correction.upload', undefined, '上传修正工作簿')}
                         </button>
                       </div>
                     )}
@@ -801,8 +773,16 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                 </h3>
                 <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {[
-                    ['created', t('import.result.created', undefined, '新增'), importResult.created],
-                    ['updated', t('import.result.updated', undefined, '更新'), importResult.updated],
+                    [
+                      'created',
+                      t('import.result.created', undefined, '新增'),
+                      importResult.created,
+                    ],
+                    [
+                      'updated',
+                      t('import.result.updated', undefined, '更新'),
+                      importResult.updated,
+                    ],
                     ['failed', t('import.result.failed', undefined, '失败'), importResult.failed],
                     ['total', t('import.result.total', undefined, '总计'), importResult.total],
                   ].map(([key, label, value]) => (
@@ -845,16 +825,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                         className="border-accent text-accent hover:bg-accent-weak rounded-control border px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {downloadingErrorReport
-                          ? t(
-                              'import.correction.downloading',
-                              undefined,
-                              '正在下载修正工作簿…',
-                            )
-                          : t(
-                              'import.correction.download',
-                              undefined,
-                              '下载修正工作簿',
-                            )}
+                          ? t('import.correction.downloading', undefined, '正在下载修正工作簿…')
+                          : t('import.correction.download', undefined, '下载修正工作簿')}
                       </button>
                       <button
                         type="button"

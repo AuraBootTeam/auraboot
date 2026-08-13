@@ -14,7 +14,31 @@ describe('resolveImportExecutionMessage', () => {
       resolveImportExecutionMessage(
         'Import row could not be saved. Check the field values and try again.',
       ),
-    ).toBe('该行无法保存，请检查字段值与模板要求后重试');
+    ).toEqual({
+      key: 'import.validation.row_write_failed',
+      fallback: '该行无法保存，请检查字段值与模板要求后重试',
+    });
+  });
+
+  it('localizes update match failures without leaking internal field codes', () => {
+    expect(
+      resolveImportExecutionMessage('No existing record matches crm_lead_code=MISSING-001', {
+        crm_lead_code: '线索编号',
+      }),
+    ).toEqual({
+      key: 'import.validation.update_record_missing',
+      params: { field: '线索编号' },
+      fallback: '未找到与“线索编号”匹配的现有记录，请修正匹配值后重试',
+    });
+    expect(
+      resolveImportExecutionMessage('Import match key is not unique: crm_lead_code=LEAD-001', {
+        crm_lead_code: '线索编号',
+      }),
+    ).toEqual({
+      key: 'import.validation.update_match_ambiguous',
+      params: { field: '线索编号' },
+      fallback: '匹配字段“线索编号”对应多条记录，请改用唯一业务值后重试',
+    });
   });
 
   it('does not reinterpret unrelated business errors', () => {

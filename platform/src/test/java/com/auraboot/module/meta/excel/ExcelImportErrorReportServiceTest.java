@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -65,6 +66,9 @@ class ExcelImportErrorReportServiceTest {
         code.setDisplayName("Customer code");
         org.mockito.Mockito.lenient().when(metaModelService.getModelFields("crm_lead"))
                 .thenReturn(List.of(name, code));
+        org.mockito.Mockito.lenient().when(i18nService.getValue(
+                        "zh-CN", "import.validation.update_record_missing"))
+                .thenReturn("未找到与“{field}”匹配的现有记录，请修正匹配值后重试");
     }
 
     @AfterEach
@@ -110,6 +114,39 @@ class ExcelImportErrorReportServiceTest {
         assertEquals(2, reuploadRows.size());
         assertEquals("L-002", reuploadRows.get(0).get("Customer code"));
         assertEquals("L-004", reuploadRows.get(1).get("Customer code"));
+    }
+
+    @Test
+    void buildCorrectionWorkbook_shouldLocalizeUpdateMatchFailureAndAnnotateMatchColumn()
+            throws Exception {
+        byte[] source = workbook(
+                new String[]{"Name", "Customer code"},
+                new String[][]{
+                        {"Updated", "L-001"},
+                        {"Needs correction", "MISSING-001"}
+                });
+
+        byte[] report = reportService.buildCorrectionWorkbook(
+                "crm_lead", source,
+                List.of(new ImportValidationError(
+                        3, null, "No existing record matches code=MISSING-001")),
+                "zh-CN", ExcelImportErrorReportService.RowSelection.ERROR_ROWS);
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(report))) {
+            Sheet importSheet = workbook.getSheetAt(0);
+            assertEquals(1, importSheet.getLastRowNum());
+            assertNull(importSheet.getRow(1).getCell(0).getCellComment());
+            assertNotNull(importSheet.getRow(1).getCell(1).getCellComment());
+            String comment = importSheet.getRow(1).getCell(1).getCellComment().getString().getString();
+            assertTrue(comment.contains("未找到与“Customer code”匹配的现有记录"));
+            assertFalse(comment.contains("code=MISSING-001"));
+
+            Sheet errorsSheet = workbook.getSheet("Import errors");
+            assertEquals("Customer code", errorsSheet.getRow(1).getCell(1).getStringCellValue());
+            assertEquals(
+                    "未找到与“Customer code”匹配的现有记录，请修正匹配值后重试",
+                    errorsSheet.getRow(1).getCell(2).getStringCellValue());
+        }
     }
 
     @Test

@@ -70,7 +70,8 @@ class ExcelImportServiceTest {
     void setUp() {
         importService = new ExcelImportService(
                 dynamicDataService, metaModelService, importJobMapper, policyResolver,
-                commandExecutor, referenceResolver, new TypeSystemManager(), errorReportService);
+                commandExecutor, referenceResolver, new TypeSystemManager(), errorReportService,
+                new ObjectMapper());
         lenient().when(policyResolver.requireEnabled(anyString())).thenReturn(ExcelImportPolicy.builder()
                 .modelCode("test_model")
                 .enabled(true)
@@ -144,8 +145,10 @@ class ExcelImportServiceTest {
         job.setImportMode("insert");
         job.setTotalRows(3);
         job.setProcessedRows(3);
-        job.setSuccessRows(3);
-        job.setErrorRows(0);
+        job.setSuccessRows(2);
+        job.setErrorRows(1);
+        job.setErrorDetails("[{\"rowNumber\":3,\"fieldCode\":null,"
+                + "\"message\":\"No existing record matches code=MISSING-001\"}]");
         when(importJobMapper.selectOne(any())).thenReturn(job);
 
         MetaContext.setContext(7L, 42L, "test-user", "tester");
@@ -155,8 +158,13 @@ class ExcelImportServiceTest {
             assertNotNull(status);
             assertEquals("completed", status.getStatus());
             assertEquals(3, status.getProcessedRows());
-            assertEquals(3, status.getResult().getCreatedCount());
-            assertEquals(0, status.getResult().getErrorCount());
+            assertEquals(2, status.getResult().getCreatedCount());
+            assertEquals(1, status.getResult().getErrorCount());
+            assertEquals(1, status.getResult().getErrors().size());
+            assertEquals(3, status.getResult().getErrors().get(0).getRowNumber());
+            assertEquals(
+                    "No existing record matches code=MISSING-001",
+                    status.getResult().getErrors().get(0).getMessage());
             assertFalse(new ObjectMapper().writeValueAsString(status).contains("tenantId"));
             assertFalse(new ObjectMapper().writeValueAsString(status).contains("createdBy"));
         } finally {

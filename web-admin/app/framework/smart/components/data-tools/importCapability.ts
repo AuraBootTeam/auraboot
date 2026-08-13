@@ -45,10 +45,40 @@ export function resolveImportReferenceMessage(message: string): string | null {
   return null;
 }
 
+export interface ImportExecutionMessage {
+  key: string;
+  params?: Record<string, string>;
+  fallback: string;
+}
+
 /** Keep infrastructure details out of the UI and give the user an actionable next step. */
-export function resolveImportExecutionMessage(message: string): string | null {
+export function resolveImportExecutionMessage(
+  message: string,
+  labels: Readonly<Record<string, string>> = {},
+): ImportExecutionMessage | null {
+  const missingUpdateTarget = /^No existing record matches ([^=]+)=/.exec(message);
+  if (missingUpdateTarget) {
+    const field = resolveImportFieldLabel(missingUpdateTarget[1].trim(), labels);
+    return {
+      key: 'import.validation.update_record_missing',
+      params: { field },
+      fallback: `未找到与“${field}”匹配的现有记录，请修正匹配值后重试`,
+    };
+  }
+  const ambiguousUpdateTarget = /^Import match key is not unique: ([^=]+)=/.exec(message);
+  if (ambiguousUpdateTarget) {
+    const field = resolveImportFieldLabel(ambiguousUpdateTarget[1].trim(), labels);
+    return {
+      key: 'import.validation.update_match_ambiguous',
+      params: { field },
+      fallback: `匹配字段“${field}”对应多条记录，请改用唯一业务值后重试`,
+    };
+  }
   if (message.startsWith('Import row could not be saved.')) {
-    return '该行无法保存，请检查字段值与模板要求后重试';
+    return {
+      key: 'import.validation.row_write_failed',
+      fallback: '该行无法保存，请检查字段值与模板要求后重试',
+    };
   }
   return null;
 }
