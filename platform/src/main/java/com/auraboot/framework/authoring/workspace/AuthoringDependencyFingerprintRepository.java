@@ -22,8 +22,9 @@ public class AuthoringDependencyFingerprintRepository {
     private static final String MODEL_SQL = """
             SELECT m.pid, m.version, m.row_version, m.updated_at,
                    md5(COALESCE((jsonb_agg(jsonb_build_array(
-                       f.pid, f.version, f.row_version, f.updated_at,
-                       b.pid, b.updated_at, b.required, b.visible, b.editable,
+                       f.pid, f.version, f.row_version, EXTRACT(EPOCH FROM f.updated_at),
+                       b.pid, EXTRACT(EPOCH FROM b.updated_at),
+                       b.required, b.visible, b.editable,
                        b.field_order, b.alias_code, b.dict_override_code,
                        b.searchable, b.deleted_flag)
                        ORDER BY b.field_order, f.code)
@@ -44,7 +45,8 @@ public class AuthoringDependencyFingerprintRepository {
     private static final String DICTIONARY_SQL = """
             SELECT d.pid, d.version, d.version AS row_version, d.updated_at,
                    md5(COALESCE((jsonb_agg(jsonb_build_array(
-                       i.pid, i.updated_at, i.value, i.label, i.parent_value,
+                       i.pid, EXTRACT(EPOCH FROM i.updated_at),
+                       i.value, i.label, i.parent_value,
                        i.sort_no, i.status)
                        ORDER BY i.sort_no, i.value)
                        FILTER (WHERE i.id IS NOT NULL))::text, '[]'))
@@ -67,7 +69,8 @@ public class AuthoringDependencyFingerprintRepository {
             FROM ab_command_definition c
             LEFT JOIN LATERAL (
                 SELECT (jsonb_agg(jsonb_build_array(
-                            b.pid, b.updated_at, b.rule_type, b.expression,
+                            b.pid, EXTRACT(EPOCH FROM b.updated_at),
+                            b.rule_type, b.expression,
                             b.target_model, b.target_field, b.source_field,
                             b.handler_class, b.event_type, b.config, b.sequence,
                             b.enabled, b.status)
@@ -93,7 +96,8 @@ public class AuthoringDependencyFingerprintRepository {
             FROM ab_named_query q
             LEFT JOIN LATERAL (
                 SELECT (jsonb_agg(jsonb_build_array(
-                            f.field_code, f.updated_at, f.column_expr, f.data_type,
+                            f.field_code, EXTRACT(EPOCH FROM f.updated_at),
+                            f.column_expr, f.data_type,
                             f.operators, f.dict_code, f.sortable, f.searchable,
                             f.ui_component, f.linked_field, f.required,
                             f.sort_order, f.ui_config)

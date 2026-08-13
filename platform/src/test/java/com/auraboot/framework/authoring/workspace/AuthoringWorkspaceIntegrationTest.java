@@ -1821,6 +1821,34 @@ class AuthoringWorkspaceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void dependencyFingerprintIsStableAcrossDatabaseSessionTimeZones() {
+        PageSchema page = insertPage("normal");
+        ensureDictionary("authoring_timezone_status");
+        page.setBlocks("""
+                [{"id":"table-1","blockType":"table",
+                  "props":{"density":"normal"},
+                  "columns":[{"field":"status","dictCode":"authoring_timezone_status"}]}]
+                """);
+        pageSchemaMapper.updateById(page);
+        SessionView opened = workspaceService.open(new OpenSessionRequest(page.getPid(), null));
+        PatchResult patched = patchDensity(opened, "compact");
+
+        jdbcTemplate.execute("SET LOCAL TIME ZONE 'UTC'");
+        SessionView prepared = governanceService.prepare(
+                opened.sessionPid(), new RevisionRequest(patched.session().revision()));
+        assertThat(prepared.impactState()).isEqualTo("KNOWN");
+
+        jdbcTemplate.execute("SET LOCAL TIME ZONE 'Asia/Shanghai'");
+        ChangeSetView submitted = governanceService.submit(
+                opened.sessionPid(), new RevisionRequest(prepared.revision()));
+
+        assertThat(submitted.status()).isEqualTo("APPROVED");
+        assertThat(submitted.validationState()).isEqualTo("VALID");
+        assertThat(submitted.impactState()).isEqualTo("KNOWN");
+        assertThat(submitted.publishState()).isEqualTo("READY");
+    }
+
+    @Test
     void dictionaryItemDriftInvalidatesAnExactRevisionImpactResult() {
         PageSchema page = insertPage("normal");
         ensureDictionary("authoring_test_status");
