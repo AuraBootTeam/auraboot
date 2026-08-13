@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 import dns from 'node:dns';
 
+import { BASE_URL } from '../../helpers/playwright-env';
+
 dns.setDefaultResultOrder('ipv4first');
 delete process.env.http_proxy;
 delete process.env.HTTP_PROXY;
@@ -21,7 +23,7 @@ export default defineConfig({
   timeout: 90_000,
   reporter: [['list']],
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5243',
+    baseURL: BASE_URL,
     headless: true,
     trace: 'on',
     screenshot: 'only-on-failure',
