@@ -11,6 +11,7 @@ const EVIDENCE_DIR =
 const ADMIN_EMAIL = 'admin@auraboot.com';
 const PASSWORD = 'Test2026x';
 const OTHER_OWNER_EMAIL = `${RUN.slice(-18)}-owner@crm.example`;
+const VIEWER_EMAIL = `${RUN.slice(-18)}-viewer@crm.example`;
 const TODAY = new Date().toISOString().slice(0, 10);
 const NEXT_MONTH = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -21,6 +22,7 @@ const names = {
   otherOwned: `${RUN} 非本人负责商机`,
   won: `${RUN} 华东智造云已赢单`,
   task: `${RUN} 完成技术方案复核`,
+  cancelTask: `${RUN} 取消过期拜访计划`,
   contact: `${RUN} 王敏`,
   bulkDiscovery: `${RUN} 华东智造云批量资格确认`,
   forecastPeriod: `FY26Q3-${RUN.slice(-10)}`,
@@ -35,6 +37,7 @@ const ids = {
   otherOwned: '',
   won: '',
   task: '',
+  cancelTask: '',
   quote: '',
   forecast: '',
   personalView: '',
@@ -55,6 +58,7 @@ const expectedScenarios = [
   'advanced-filter-saved-view-export',
   'current-view-self-service-analysis',
   'opportunity-plan-quote-context',
+  'opportunity-follow-up-task-lifecycle',
   'forecast-first-screen-hierarchy',
   'merged-customer-activity-timeline',
   'account-dashboard-drilldown-fact',
@@ -78,9 +82,13 @@ const expectedCoverage = {
     'crm:create_opportunity',
     'crm:create_quote_summary',
     'crm:qualify_opportunity',
+    'crm:start_task',
+    'crm:complete_task',
+    'crm:cancel_task',
     'crm:win_opportunity',
   ],
   queries: ['crm_account_stats', 'crm_account_timeline'],
+  permissions: ['crm.activity.manage'],
   dashboardTargets: [
     'crm_account_360:recent_activities:recent_activities',
     'crm_account_360:recent_opportunities:recent_opportunities',
@@ -89,6 +97,10 @@ const expectedCoverage = {
   uiActions: [
     'crm_opportunity_common_detail:crm_opp_plan_quote_actions:create_plan_task',
     'crm_opportunity_common_detail:crm_opp_plan_quote_actions:create_quote_summary',
+    'crm_opportunity_common_detail:block_opportunity_plan:view_task',
+    'crm_opportunity_common_detail:block_opportunity_plan:start_task',
+    'crm_opportunity_common_detail:block_opportunity_plan:complete_task',
+    'crm_opportunity_common_detail:block_opportunity_plan:cancel_task',
     'crm_opportunity_common_detail:crm_opportunity_tabs:activities',
     'crm_opportunity_common_detail:crm_opportunity_tabs:plan_and_quotes',
     'crm_opportunity_common_list:crm_opp_table:bulk_qualify',
@@ -139,6 +151,7 @@ const completedCoverage: Record<CoverageAxis, Set<string>> = Object.fromEntries(
 ) as Record<CoverageAxis, Set<string>>;
 const screenshots: string[] = [];
 let adminJwt = '';
+let viewerJwt = '';
 
 function cover(axis: CoverageAxis, ...items: string[]): void {
   for (const item of items) completedCoverage[axis].add(item);
@@ -211,6 +224,16 @@ async function provisionUser(email: string, roleCode: string, displayName: strin
   const pid = findValue(body?.data, ['pid', 'userPid']);
   expect(pid, `${roleCode} user must return a public pid`).toBeTruthy();
   return String(pid);
+}
+
+async function loginApi(email: string): Promise<string> {
+  const body = assertOk(await api('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password: PASSWORD }),
+  }, ''), `API login ${email}`);
+  const jwt = findValue(body?.data, ['jwt']);
+  expect(jwt, `${email} API login must return a JWT`).toBeTruthy();
+  return String(jwt);
 }
 
 async function executeTransition(code: string, targetRecordPid: string): Promise<void> {
@@ -338,6 +361,13 @@ async function seedJourney(): Promise<void> {
     crm_act_due_date: TODAY,
     crm_act_priority: 'high',
   });
+  ids.cancelTask = await executeCreate('crm:create_opp_task', {
+    sourceRecordPid: ids.proposal,
+    crm_act_subject: names.cancelTask,
+    crm_act_content: '客户时间冲突，取消旧计划并重新安排。',
+    crm_act_due_date: TODAY,
+    crm_act_priority: 'medium',
+  });
   ids.quote = await executeCreate('crm:create_quote_summary', {
     crm_qs_account_id: ids.account,
     crm_qs_opportunity_id: ids.proposal,
@@ -368,9 +398,9 @@ async function seedJourney(): Promise<void> {
   });
 }
 
-async function uiLogin(page: Page): Promise<void> {
+async function uiLogin(page: Page, email = ADMIN_EMAIL): Promise<void> {
   const response = await page.request.post(`${BASE}/login`, {
-    form: { email: ADMIN_EMAIL, password: PASSWORD, remember: 'on', redirectTo: '/' },
+    form: { email, password: PASSWORD, remember: 'on', redirectTo: '/' },
     maxRedirects: 0,
   });
   expect([302, 303], `UI login: HTTP ${response.status()}`).toContain(response.status());
@@ -459,6 +489,8 @@ test.beforeAll(async () => {
   ids.adminUser = String(currentUser?.pid || '');
   expect(ids.adminUser, 'current admin must expose a public pid').toBeTruthy();
   ids.otherOwner = await provisionUser(OTHER_OWNER_EMAIL, 'crm_sales', `${RUN} 异地销售`);
+  await provisionUser(VIEWER_EMAIL, 'crm_viewer', `${RUN} 只读观察者`);
+  viewerJwt = await loginApi(VIEWER_EMAIL);
   const priorPersonalViews = assertOk(await api(
     '/api/views/personal?modelCode=crm_opportunity_common&pageKey=crm_opportunity_common_list',
   ), 'prior personal opportunity views').data ?? [];
@@ -1088,6 +1120,106 @@ test('opportunity keeps the next task and quote in one navigable context', async
     'crm_opportunity_common_detail:crm_opp_plan_quote_actions:create_quote_summary',
   );
   completedScenarios.add('opportunity-plan-quote-context');
+});
+
+test('opportunity follow-up tasks enforce read-only permissions and complete their lifecycle in context', async ({ page }, testInfo) => {
+  const deniedStart = await api('/api/meta/commands/execute/crm:start_task', {
+    method: 'POST',
+    body: JSON.stringify({
+      payload: {},
+      targetRecordPid: ids.task,
+      operationType: 'update',
+    }),
+  }, viewerJwt);
+  expect(deniedStart.response.status, JSON.stringify(deniedStart.body)).toBe(403);
+  expect(String(deniedStart.body?.code), JSON.stringify(deniedStart.body)).not.toBe('0');
+  expect((await getRecord('crm_activity_common', ids.task)).crm_act_status).toBe('open');
+
+  await uiLogin(page, VIEWER_EMAIL);
+  await page.goto(`${BASE}/p/crm_opportunity_common/view/${ids.proposal}`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await expect(page.getByRole('heading', { name: names.proposal })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('tab', { name: /报价与计划|Quotes & Plan/ }).click();
+
+  const viewerTaskRow = page.locator('tr').filter({ hasText: names.task }).first();
+  await expect(viewerTaskRow).toBeVisible();
+  await expect(viewerTaskRow.getByRole('button', { name: /查看|View/ })).toBeVisible();
+  await expect(viewerTaskRow.getByRole('button', { name: /开始|Start/ })).toHaveCount(0);
+  await expect(viewerTaskRow.getByRole('button', { name: /完成|Complete/ })).toHaveCount(0);
+  await expect(viewerTaskRow.getByRole('button', { name: /取消|Cancel/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /安排下一任务|Plan Next Task/ })).toHaveCount(0);
+  await assertNoRawCodes(page);
+  await shot(page, testInfo, 'release-e-opportunity-follow-up-viewer-permission.png');
+
+  await uiLogin(page);
+  await page.goto(`${BASE}/p/crm_opportunity_common/view/${ids.proposal}`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await expect(page.getByRole('heading', { name: names.proposal })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('tab', { name: /报价与计划|Quotes & Plan/ }).click();
+
+  let taskRow = page.locator('tr').filter({ hasText: names.task }).first();
+  await taskRow.getByRole('button', { name: /查看|View/ }).click();
+  await expect(page).toHaveURL((url) =>
+    url.pathname === `/p/crm_activity_common/view/${ids.task}`,
+  );
+  await page.goBack({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('tab', { name: /报价与计划|Quotes & Plan/ }).click();
+
+  taskRow = page.locator('tr').filter({ hasText: names.task }).first();
+  const startResponse = page.waitForResponse((response) =>
+    response.request().method() === 'POST'
+      && response.url().includes('/api/meta/commands/execute/crm:start_task'),
+  { timeout: 20_000 });
+  await taskRow.getByRole('button', { name: /开始|Start/ }).click();
+  expect((await startResponse).ok()).toBeTruthy();
+  await expect(taskRow).toContainText(/进行中|In Progress/);
+
+  const completeResponse = page.waitForResponse((response) =>
+    response.request().method() === 'POST'
+      && response.url().includes('/api/meta/commands/execute/crm:complete_task'),
+  { timeout: 20_000 });
+  await taskRow.getByRole('button', { name: /完成|Complete/ }).click();
+  expect((await completeResponse).ok()).toBeTruthy();
+  await expect(taskRow).toContainText(/已完成|Done/);
+  await expect(taskRow.getByRole('button', { name: /开始|Start/ })).toHaveCount(0);
+  await expect(taskRow.getByRole('button', { name: /完成|Complete/ })).toHaveCount(0);
+  await expect(taskRow.getByRole('button', { name: /取消|Cancel/ })).toHaveCount(0);
+
+  const cancelRow = page.locator('tr').filter({ hasText: names.cancelTask }).first();
+  const cancelResponse = page.waitForResponse((response) =>
+    response.request().method() === 'POST'
+      && response.url().includes('/api/meta/commands/execute/crm:cancel_task'),
+  { timeout: 20_000 });
+  await cancelRow.getByRole('button', { name: /取消|Cancel/ }).click();
+  const dialog = page.getByTestId('confirm-dialog');
+  await expect(dialog).toContainText(/取消后不可再开始或完成|cannot be started or completed/);
+  await shot(page, testInfo, 'release-e-opportunity-follow-up-cancel-confirmation.png');
+  await page.getByTestId('confirm-ok').click();
+  expect((await cancelResponse).ok()).toBeTruthy();
+  await expect(cancelRow).toContainText(/已取消|Cancelled/);
+
+  expect((await getRecord('crm_activity_common', ids.task)).crm_act_status).toBe('done');
+  expect((await getRecord('crm_activity_common', ids.cancelTask)).crm_act_status).toBe('cancelled');
+  await assertNoRawCodes(page);
+  await shot(page, testInfo, 'release-e-opportunity-follow-up-lifecycle-complete.png');
+
+  cover(
+    'commands',
+    'crm:start_task',
+    'crm:complete_task',
+    'crm:cancel_task',
+  );
+  cover(
+    'uiActions',
+    'crm_opportunity_common_detail:block_opportunity_plan:view_task',
+    'crm_opportunity_common_detail:block_opportunity_plan:start_task',
+    'crm_opportunity_common_detail:block_opportunity_plan:complete_task',
+    'crm_opportunity_common_detail:block_opportunity_plan:cancel_task',
+  );
+  cover('permissions', 'crm.activity.manage');
+  completedScenarios.add('opportunity-follow-up-task-lifecycle');
 });
 
 test('opportunity activity tab merges business follow-up with system changes', async ({ page }, testInfo) => {

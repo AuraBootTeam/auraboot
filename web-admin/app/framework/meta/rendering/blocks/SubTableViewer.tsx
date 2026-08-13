@@ -44,6 +44,9 @@ import {
   getLegacyCompatibleRecordPid,
 } from '~/framework/meta/utils/publicRecordId';
 import { promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
+import { useAuth } from '~/contexts/AuthContext';
+import { confirmDialog } from '~/utils/confirmDialog';
+import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 
 export interface SubTableViewerProps {
   config: SubTableConfig;
@@ -97,6 +100,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   onDataChange,
 }) => {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
   const { timezone, formats } = useTimezone();
   const [rows, setRows] = useState<Record<string, any>[]>([]);
   const [loading, setLoading] = useState(true);
@@ -743,6 +747,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     reloadRows,
     onDataChange,
     resolvedDefaultValues,
+    validateFieldValue,
   ]);
 
   // Delete command handler
@@ -858,9 +863,11 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   );
 
   const isRowActionVisible = useCallback(
-    (button: ButtonConfig, row: Record<string, any>) =>
-      evaluateRowCondition(button.visibleWhen, row),
-    [evaluateRowCondition],
+    (button: ButtonConfig, row: Record<string, any>) => {
+      if (button.permissionCode && !hasPermission(button.permissionCode)) return false;
+      return evaluateRowCondition(button.visibleWhen, row);
+    },
+    [evaluateRowCondition, hasPermission],
   );
 
   const isRowActionDisabled = useCallback(
@@ -875,6 +882,20 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   const handleRowAction = useCallback(
     async (button: ButtonConfig, row: Record<string, any>, rowIndex: number) => {
+      if (button.permissionCode && !hasPermission(button.permissionCode)) return;
+      const confirmConfig = button.confirm ?? button.confirmMessageKey;
+      if (confirmConfig) {
+        const confirmation =
+          typeof confirmConfig === 'object'
+            ? { content: getLocalizedText(confirmConfig, locale, t) }
+            : resolveConfirmDialog(confirmConfig, t);
+        const confirmed = await confirmDialog({
+          ...confirmation,
+          variant: button.danger || button.variant === 'danger' ? 'danger' : 'default',
+        });
+        if (!confirmed) return;
+      }
+
       const rowPid = getLegacyCompatibleRecordPid(row);
       const actionDef = button.action && typeof button.action === 'object' ? button.action : null;
       const actionType = (actionDef as any)?.type || (button.commandCode ? 'command' : null);
@@ -919,8 +940,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
               inputFields,
               (actionDef as any)?.inputFieldsTitle ?? (button as any).inputFieldsTitle,
               fetchResult,
-              (actionDef as any)?.inputFieldsSubmitLabel ??
-                (button as any).inputFieldsSubmitLabel,
+              (actionDef as any)?.inputFieldsSubmitLabel ?? (button as any).inputFieldsSubmitLabel,
             );
           } catch {
             return;
@@ -951,7 +971,17 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
         setRowActionLoadingKey(null);
       }
     },
-    [navigate, onDataChange, reloadRows, resolveNavigatePath, resolveRowActionCommand, token],
+    [
+      hasPermission,
+      locale,
+      navigate,
+      onDataChange,
+      reloadRows,
+      resolveNavigatePath,
+      resolveRowActionCommand,
+      t,
+      token,
+    ],
   );
 
   // Enter edit mode for a row
@@ -1353,7 +1383,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                         <td
                           key={col.field}
                           className={`text-text-2 px-4 py-2 text-sm ${cellAlign}${
-                            canInlineEdit ? 'cursor-pointer hover:bg-hover' : ''
+                            canInlineEdit ? 'hover:bg-hover cursor-pointer' : ''
                           }`}
                           onDoubleClick={canInlineEdit ? () => handleStartEdit(row) : undefined}
                         >
@@ -1376,7 +1406,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                               onClick={handleSaveEdit}
                               disabled={editSaving}
                               data-testid={`subtable-edit-save-${rowIndex}`}
-                              className="text-accent mr-2 text-xs hover:text-accent disabled:opacity-50"
+                              className="text-accent hover:text-accent mr-2 text-xs disabled:opacity-50"
                             >
                               {editSaving
                                 ? '...'
@@ -1451,7 +1481,9 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                             )}
                             {config.commands?.delete && (
                               <button
-                                onClick={() => handleDeleteRow(getLegacyCompatibleRecordPid(row) || '')}
+                                onClick={() =>
+                                  handleDeleteRow(getLegacyCompatibleRecordPid(row) || '')
+                                }
                                 disabled={
                                   deletingId === getLegacyCompatibleRecordPid(row) || !!editingRowId
                                 }
@@ -1476,10 +1508,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
             {/* Inline add form row */}
             {isEditable && isAdding && (
-              <tr
-                className="border-border bg-accent-weak border-t"
-                data-testid="subtable-add-form"
-              >
+              <tr className="border-border bg-accent-weak border-t" data-testid="subtable-add-form">
                 {effectiveColumns.map((col: EnrichedColumnConfig) => (
                   <td
                     key={col.field}
@@ -1543,7 +1572,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                     onClick={handleAddRow}
                     disabled={saving}
                     data-testid="subtable-save-btn"
-                    className="text-accent mr-2 text-xs hover:text-accent disabled:opacity-50"
+                    className="text-accent hover:text-accent mr-2 text-xs disabled:opacity-50"
                   >
                     {saving
                       ? '...'

@@ -270,6 +270,64 @@
                 },
                 "readOnly": true,
                 "maxHeight": 320,
+                "actions": [
+                  {
+                    "code": "view_task",
+                    "permissionCode": "crm.activity.read",
+                    "label": {
+                      "zh-CN": "查看",
+                      "en-US": "View"
+                    },
+                    "action": {
+                      "type": "navigate",
+                      "to": "crm_activity_common_detail"
+                    }
+                  },
+                  {
+                    "code": "start_task",
+                    "permissionCode": "crm.activity.manage",
+                    "visibleWhen": "row.crm_act_type === 'task' && row.crm_act_status === 'open'",
+                    "label": {
+                      "zh-CN": "开始",
+                      "en-US": "Start"
+                    },
+                    "action": {
+                      "type": "state_transition",
+                      "command": "crm:start_task"
+                    }
+                  },
+                  {
+                    "code": "complete_task",
+                    "permissionCode": "crm.activity.manage",
+                    "visibleWhen": "row.crm_act_type === 'task' && (row.crm_act_status === 'open' || row.crm_act_status === 'in_progress')",
+                    "label": {
+                      "zh-CN": "完成",
+                      "en-US": "Complete"
+                    },
+                    "action": {
+                      "type": "state_transition",
+                      "command": "crm:complete_task"
+                    }
+                  },
+                  {
+                    "code": "cancel_task",
+                    "permissionCode": "crm.activity.manage",
+                    "danger": true,
+                    "visibleWhen": "row.crm_act_type === 'task' && (row.crm_act_status === 'open' || row.crm_act_status === 'in_progress')",
+                    "label": {
+                      "zh-CN": "取消",
+                      "en-US": "Cancel"
+                    },
+                    "confirm": {
+                      "zh-CN": "确定取消该跟进任务？取消后不可再开始或完成。",
+                      "en-US": "Cancel this follow-up task? A cancelled task cannot be started or completed."
+                    },
+                    "action": {
+                      "type": "state_transition",
+                      "command": "crm:cancel_task"
+                    }
+                  }
+                ],
                 "columns": [
                   {
                     "field": "crm_act_type",

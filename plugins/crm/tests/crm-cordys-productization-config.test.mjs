@@ -144,6 +144,20 @@ test('opportunity daily-efficiency surface shares one saved-view fact across lis
   const actions = findBlock(planAndQuotes?.blocks, 'crm_opp_plan_quote_actions');
   assert.equal(plan?.subTable?.dataSource?.params?.objectType, 'opportunity');
   assert.ok(plan?.subTable?.columns?.some((column) => column.field === 'crm_act_due_date'));
+  const planActions = new Map(plan?.subTable?.actions?.map((action) => [action.code, action]));
+  assert.deepEqual([...planActions.keys()], [
+    'view_task',
+    'start_task',
+    'complete_task',
+    'cancel_task',
+  ]);
+  assert.equal(planActions.get('view_task')?.permissionCode, 'crm.activity.read');
+  for (const code of ['start_task', 'complete_task', 'cancel_task']) {
+    assert.equal(planActions.get(code)?.permissionCode, 'crm.activity.manage');
+    assert.ok(planActions.get(code)?.visibleWhen, `${code} must be status-aware`);
+  }
+  assert.equal(planActions.get('cancel_task')?.danger, true);
+  assert.match(planActions.get('cancel_task')?.confirm?.['zh-CN'] ?? '', /取消后不可再开始或完成/);
   assert.equal(quotes?.subTable?.parentField, 'crm_qs_opportunity_id');
   assert.deepEqual(
     actions?.buttons?.map((button) => button.code),
