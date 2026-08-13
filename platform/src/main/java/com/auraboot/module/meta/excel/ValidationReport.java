@@ -22,6 +22,12 @@ public class ValidationReport {
     private int validRows;
     private List<RowError> errors = new ArrayList<>();
     private List<RowWarning> warnings = new ArrayList<>();
+    /** Public task id backing the correction workbook when validation fails. */
+    private String taskId;
+    /** Authorized API URL for downloading the failed-row correction workbook. */
+    private String errorReportUrl;
+    /** True when validation completed but the correction workbook could not be generated. */
+    private boolean errorReportFailed;
 
     /**
      * Whether the file passed validation (no errors; warnings are acceptable).

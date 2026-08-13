@@ -36,6 +36,14 @@ describe('isBinaryDownloadPath', () => {
     expect(isBinaryDownloadPath('/api/meta/excel/template/crm_lead_common?mode=update')).toBe(true);
   });
 
+  it('detects Excel correction workbooks before axios can corrupt OOXML bytes', () => {
+    expect(
+      isBinaryDownloadPath(
+        '/api/meta/excel/import/crm_contact_common/error-report/01KZXG1MV9C7QYCKFVVKVXMWR6',
+      ),
+    ).toBe(true);
+  });
+
   it('does not over-match paths that merely contain "download"', () => {
     expect(isBinaryDownloadPath('/api/downloads/list')).toBe(false);
     expect(isBinaryDownloadPath('/api/file/downloaded')).toBe(false);

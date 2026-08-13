@@ -3,9 +3,12 @@ package com.auraboot.module.meta.excel;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.i18n.util.I18nLocaleResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -21,7 +24,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Files;
 import java.util.List;
-import java.util.Map;
 
 /**
  * REST controller for Excel import operations.
@@ -38,6 +40,8 @@ public class ExcelImportController {
     private final ExcelImportService importService;
     private final ExcelValidationEngine validationEngine;
     private final ExcelImportPolicyResolver policyResolver;
+    private final ExcelImportErrorReportService errorReportService;
+    private final I18nLocaleResolver i18nLocaleResolver;
 
     private static final long MAX_IMPORT_BYTES = 10L * 1024L * 1024L;
 
@@ -94,7 +98,8 @@ public class ExcelImportController {
             @RequestParam(defaultValue = "false") boolean skipErrors,
             @RequestParam(defaultValue = "false") boolean dryRun,
             @RequestParam(defaultValue = "insert") String mode,
-            @RequestParam(required = false) String matchKey) {
+            @RequestParam(required = false) String matchKey,
+            HttpServletRequest httpRequest) {
 
         validateUpload(file);
         ExcelImportPolicy policy = policyResolver.requireEnabled(modelCode);
@@ -104,6 +109,7 @@ public class ExcelImportController {
         options.setDryRun(dryRun);
         options.setImportMode(mode);
         options.setMatchKey(matchKey);
+        options.setReportLocale(i18nLocaleResolver.resolveLocale(httpRequest));
 
         try {
             // Check row count — larger files run asynchronously. The default is 1000;
@@ -116,8 +122,12 @@ public class ExcelImportController {
                         .map(error -> new ImportValidationError(
                                 error.getRowNumber(), error.getFieldCode(), error.getMessage()))
                         .toList();
-                return ApiResponse.success("Validation failed",
-                        ExcelImportResult.withErrors(errors, validation.getTotalRows()));
+                ExcelImportResult invalidResult = ExcelImportResult.withErrors(
+                        errors, validation.getTotalRows());
+                attachSynchronousReport(modelCode, file.getOriginalFilename(), mode,
+                        fileBytes, invalidResult, options.getReportLocale(),
+                        ExcelImportErrorReportService.RowSelection.ALL_ROWS);
+                return ApiResponse.success("Validation failed", invalidResult);
             }
             int rowCount = validation.getTotalRows();
 
@@ -131,6 +141,11 @@ public class ExcelImportController {
 
             ExcelImportResult result = importService.importExcel(
                     modelCode, new java.io.ByteArrayInputStream(fileBytes), options);
+            if (result.isHasErrors() && result.getErrors() != null && !result.getErrors().isEmpty()) {
+                attachSynchronousReport(modelCode, file.getOriginalFilename(), mode,
+                        fileBytes, result, options.getReportLocale(),
+                        reportSelection(result, options));
+            }
             return ApiResponse.success(result);
         } catch (IOException e) {
             log.error("Failed to read uploaded Excel file: {}", e.getMessage());
@@ -162,12 +177,37 @@ public class ExcelImportController {
             @PathVariable String modelCode,
             @RequestParam MultipartFile file,
             @RequestParam(defaultValue = "insert") String mode,
-            @RequestParam(required = false) String matchKey) {
+            @RequestParam(required = false) String matchKey,
+            HttpServletRequest httpRequest) {
         validateUpload(file);
         ExcelImportPolicy policy = policyResolver.requireEnabled(modelCode);
         policyResolver.validateMode(policy, mode, matchKey);
         try {
-            ValidationReport report = validationEngine.validate(modelCode, file.getInputStream(), mode, matchKey);
+            byte[] fileBytes = file.getBytes();
+            ValidationReport report = validationEngine.validate(
+                    modelCode, new java.io.ByteArrayInputStream(fileBytes), mode, matchKey);
+            if (!report.isValid()) {
+                List<ImportValidationError> errors = report.getErrors().stream()
+                        .map(error -> new ImportValidationError(
+                                error.getRowNumber(), error.getFieldCode(), error.getMessage()))
+                        .toList();
+                try {
+                    ExcelImportErrorReportService.ReportRegistration registration =
+                            errorReportService.createReport(modelCode, file.getOriginalFilename(), mode,
+                                    fileBytes, errors, report.getTotalRows(), 0,
+                                    i18nLocaleResolver.resolveLocale(httpRequest),
+                                    ExcelImportErrorReportService.RowSelection.ALL_ROWS);
+                    report.setTaskId(registration.taskId());
+                    report.setErrorReportUrl(registration.downloadUrl());
+                } catch (RuntimeException reportError) {
+                    // CATCH: validation remains authoritative if non-transactional report storage
+                    // is unavailable. The UI can still show every row error inline.
+                    log.error("Validation completed but its correction workbook could not be "
+                                    + "created: model={}, file={}",
+                            modelCode, file.getOriginalFilename(), reportError);
+                    report.setErrorReportFailed(true);
+                }
+            }
             return ApiResponse.success(report);
         } catch (IOException e) {
             log.error("Failed to validate Excel file for model {}: {}", modelCode, e.getMessage());
@@ -215,6 +255,60 @@ public class ExcelImportController {
             throw new BusinessException("Import task not found: " + taskId);
         }
         return importService.subscribeProgress(taskId, status);
+    }
+
+    /**
+     * Download the failed-row correction workbook for an import owned by the current user.
+     */
+    @GetMapping("/import/{modelCode}/error-report/{taskId}")
+    @RequirePermission("model.{modelCode}.import")
+    public ResponseEntity<Resource> downloadErrorReport(
+            @PathVariable String modelCode, @PathVariable String taskId) {
+        ExcelImportErrorReportService.ReportDownload report =
+                errorReportService.findDownload(modelCode, taskId);
+        if (report == null) {
+            return ResponseEntity.notFound().build();
+        }
+        String fileName = URLEncoder.encode(report.fileName(), StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename*=UTF-8''" + fileName)
+                .contentType(MediaType.parseMediaType(
+                        ExcelImportErrorReportService.XLSX_CONTENT_TYPE))
+                .body(new InputStreamResource(report.content()));
+    }
+
+    private void attachSynchronousReport(String modelCode, String fileName, String mode,
+                                         byte[] fileBytes, ExcelImportResult result,
+                                         String locale,
+                                         ExcelImportErrorReportService.RowSelection rowSelection) {
+        try {
+            ExcelImportErrorReportService.ReportRegistration registration =
+                    errorReportService.createReport(modelCode, fileName, mode, fileBytes,
+                            result.getErrors(), result.getTotalRows(), result.getSuccessCount(), locale,
+                            rowSelection);
+
+            result.setTaskId(registration.taskId());
+            result.setErrorReportUrl(registration.downloadUrl());
+        } catch (RuntimeException reportError) {
+            // CATCH: report storage is non-transactional. Preserve truthful row counts because
+            // synchronous imports may already have committed successful rows.
+            log.error("Import completed with row errors but its correction workbook could not "
+                    + "be created: model={}, file={}", modelCode, fileName, reportError);
+            result.setErrorReportFailed(true);
+        }
+    }
+
+    private ExcelImportErrorReportService.RowSelection reportSelection(
+            ExcelImportResult result, ImportOptions options) {
+        if (result.getSuccessCount() == 0
+                && result.getErrorCount() < result.getTotalRows()) {
+            return ExcelImportErrorReportService.RowSelection.ALL_ROWS;
+        }
+        return options.isSkipErrors()
+                ? ExcelImportErrorReportService.RowSelection.ERROR_ROWS
+                : ExcelImportErrorReportService.RowSelection.FROM_FIRST_ERROR;
     }
 
     private void validateUpload(MultipartFile file) {

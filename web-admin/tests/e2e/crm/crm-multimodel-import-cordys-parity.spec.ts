@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { test, expect, type Page } from '../../fixtures';
 import { read as xlsxRead, utils as XLSXUtils, write as xlsxWrite } from 'xlsx';
 import { executeCommandViaApi, queryFilteredList } from '../helpers';
@@ -113,6 +113,65 @@ async function upload(
   await expect(page.getByTestId('import-validation-summary')).toBeVisible({
     timeout: validationTimeout,
   });
+}
+
+async function downloadCorrectionWorkbook(page: Page, model: string): Promise<Buffer> {
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      response.url().includes(`/api/meta/excel/import/${model}/error-report/`),
+  );
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByTestId('import-download-error-report').click();
+  const [response, download] = await Promise.all([responsePromise, downloadPromise]);
+  expect(response.ok(), response.ok() ? undefined : await response.text()).toBeTruthy();
+  expect(response.headers()['content-disposition']).toContain('import-errors.xlsx');
+  expect(download.suggestedFilename()).toBe(`${model}-insert-import-errors.xlsx`);
+  const downloadedPath = await download.path();
+  expect(downloadedPath).not.toBeNull();
+  const content = readFileSync(downloadedPath!);
+  expect(content.subarray(0, 4).toString('hex')).toBe('504b0304');
+  return content;
+}
+
+async function uploadCorrectionWorkbook(
+  page: Page,
+  name: string,
+  buffer: Buffer,
+): Promise<void> {
+  const chooserPromise = page.waitForEvent('filechooser');
+  await page.getByTestId('import-upload-correction').click();
+  const chooser = await chooserPromise;
+  await chooser.setFiles({
+    name,
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer,
+  });
+  await expect(page.getByTestId('import-validation-summary')).toBeVisible({ timeout: 30_000 });
+}
+
+function correctWorkbookValue(
+  correction: Buffer,
+  rowIndex: number,
+  header: string,
+  value: string,
+): Buffer {
+  const book = xlsxRead(correction, { type: 'buffer' });
+  expect(book.SheetNames).toContain('Import errors');
+  const sheet = book.Sheets[book.SheetNames[0]];
+  const rows = XLSXUtils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+  expect(rows.length).toBeGreaterThan(rowIndex);
+  const actualHeader = Object.keys(rows[0]).find((candidate) =>
+    candidate.replace(/^\*\s+/, '').includes(header),
+  );
+  expect(actualHeader).toBeTruthy();
+  rows[rowIndex][actualHeader!] = value;
+  XLSXUtils.sheet_add_json(sheet, rows, {
+    header: Object.keys(rows[0]),
+    origin: 'A1',
+    skipHeader: false,
+  });
+  return xlsxWrite(book, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
 }
 
 async function submitAndExpect(
@@ -379,15 +438,22 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
     expect(pidRecords[0].crm_ct_account_id).toBe(accountPid);
   });
 
-  test('CMM-04 missing account code blocks contact with zero writes', async ({ page }) => {
-    const contactName = `不存在客户联系人-${suffix}`;
-    expect(await recordsByField(page, CONTACT, 'crm_ct_name', contactName)).toHaveLength(0);
+  test('CMM-04 failed precheck downloads, corrects, and re-uploads all pending rows', async ({
+    page,
+  }) => {
+    const validContactName = `待保留有效联系人-${suffix}`;
+    const invalidContactName = `待修正关联联系人-${suffix}`;
+    expect(await recordsByField(page, CONTACT, 'crm_ct_name', validContactName)).toHaveLength(0);
+    expect(await recordsByField(page, CONTACT, 'crm_ct_name', invalidContactName)).toHaveLength(0);
     await openModelFromMenu(page, CONTACT);
     await openImport(page);
     await upload(
       page,
       `contact-missing-account-${suffix}.xlsx`,
-      [{ 所属客户: `MISSING-${suffix}`, 联系人姓名: contactName }],
+      [
+        { 所属客户: accountCode, 联系人姓名: validContactName },
+        { 所属客户: `MISSING-${suffix}`, 联系人姓名: invalidContactName },
+      ],
       contactTemplate,
     );
     await expect(page.getByText('预检未通过，请修正文件')).toBeVisible();
@@ -395,8 +461,46 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
     await expect(page.getByTestId('import-validation-summary')).toContainText(
       '关联记录不存在或无权访问',
     );
-    await page.screenshot({ path: `${EVIDENCE_DIR}/03-contact-missing-blocked.png`, fullPage: true });
-    expect(await recordsByField(page, CONTACT, 'crm_ct_name', contactName)).toHaveLength(0);
+    await expect(page.getByTestId('import-download-error-report')).toBeVisible();
+    await expect(page.getByTestId('import-upload-correction')).toBeVisible();
+    await page.screenshot({
+      path: `${EVIDENCE_DIR}/03-contact-correction-offered.png`,
+      fullPage: true,
+    });
+    expect(await recordsByField(page, CONTACT, 'crm_ct_name', validContactName)).toHaveLength(0);
+    expect(await recordsByField(page, CONTACT, 'crm_ct_name', invalidContactName)).toHaveLength(0);
+
+    const correction = await downloadCorrectionWorkbook(page, CONTACT);
+    writeFileSync(`${EVIDENCE_DIR}/04-contact-correction-original.xlsx`, correction);
+    const correctionBook = xlsxRead(correction, { type: 'buffer' });
+    const correctionRows = XLSXUtils.sheet_to_json<Record<string, unknown>>(
+      correctionBook.Sheets[correctionBook.SheetNames[0]],
+      { defval: '' },
+    );
+    expect(correctionRows).toHaveLength(2);
+    expect(JSON.stringify(correctionRows)).toContain(validContactName);
+    expect(JSON.stringify(correctionRows)).toContain(invalidContactName);
+    const detailRows = XLSXUtils.sheet_to_json<Record<string, unknown>>(
+      correctionBook.Sheets['Import errors'],
+      { defval: '' },
+    );
+    expect(JSON.stringify(detailRows)).toContain('关联记录不存在或无权访问');
+
+    const corrected = correctWorkbookValue(correction, 1, '所属客户', accountCode);
+    writeFileSync(`${EVIDENCE_DIR}/04-contact-correction-fixed.xlsx`, corrected);
+    await uploadCorrectionWorkbook(
+      page,
+      `contact-corrected-${suffix}.xlsx`,
+      corrected,
+    );
+    await expect(page.getByText('预检通过，可以导入')).toBeVisible();
+    await page.screenshot({
+      path: `${EVIDENCE_DIR}/04-contact-correction-passed.png`,
+      fullPage: true,
+    });
+    await submitAndExpect(page, CONTACT, { created: 2, updated: 0, total: 2 });
+    expect(await recordsByField(page, CONTACT, 'crm_ct_name', validContactName)).toHaveLength(1);
+    expect(await recordsByField(page, CONTACT, 'crm_ct_name', invalidContactName)).toHaveLength(1);
   });
 
   test('CMM-05 ambiguous account name blocks contact with zero writes', async ({ page }) => {
@@ -415,7 +519,7 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
     await expect(page.getByTestId('import-validation-summary')).toContainText(
       '关联值不唯一，请改用唯一业务编码或 PID',
     );
-    await page.screenshot({ path: `${EVIDENCE_DIR}/04-contact-ambiguous-blocked.png`, fullPage: true });
+    await page.screenshot({ path: `${EVIDENCE_DIR}/05-contact-ambiguous-blocked.png`, fullPage: true });
     expect(await recordsByField(page, CONTACT, 'crm_ct_name', contactName)).toHaveLength(0);
   });
 
@@ -444,7 +548,7 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
     );
     await expect(page.getByText('预检通过，可以导入')).toBeVisible();
     await submitAndExpect(page, OPPORTUNITY, { created: 1, updated: 0, total: 1 });
-    await page.screenshot({ path: `${EVIDENCE_DIR}/05-opportunity-result.png`, fullPage: true });
+    await page.screenshot({ path: `${EVIDENCE_DIR}/06-opportunity-result.png`, fullPage: true });
     const records = await recordsByField(page, OPPORTUNITY, 'crm_opp_name', opportunityName);
     expect(records).toHaveLength(1);
     expect(records[0].crm_opp_account_id).toBe(accountPid);
@@ -492,7 +596,7 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
         },
       });
       expect(response.status()).toBe(403);
-      await page.screenshot({ path: `${EVIDENCE_DIR}/06-viewer-no-import.png`, fullPage: true });
+      await page.screenshot({ path: `${EVIDENCE_DIR}/07-viewer-no-import.png`, fullPage: true });
     } finally {
       await context.close();
     }
@@ -527,6 +631,6 @@ test.describe('CRM multi-model Excel import — Cordys parity', () => {
     expect(statusBody?.data?.processedRows).toBe(2000);
     expect(statusBody?.data?.result?.createdCount).toBe(2000);
     expect(await filteredTotal(page, LEAD, 'crm_lead_company', bulkPrefix)).toBe(2000);
-    await page.screenshot({ path: `${EVIDENCE_DIR}/07-lead-2000-result.png`, fullPage: true });
+    await page.screenshot({ path: `${EVIDENCE_DIR}/08-lead-2000-result.png`, fullPage: true });
   });
 });

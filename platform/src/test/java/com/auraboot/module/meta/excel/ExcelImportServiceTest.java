@@ -61,19 +61,24 @@ class ExcelImportServiceTest {
     @Mock
     private ExcelReferenceResolver referenceResolver;
 
+    @Mock
+    private ExcelImportErrorReportService errorReportService;
+
     private ExcelImportService importService;
 
     @BeforeEach
     void setUp() {
         importService = new ExcelImportService(
                 dynamicDataService, metaModelService, importJobMapper, policyResolver,
-                commandExecutor, referenceResolver, new TypeSystemManager());
+                commandExecutor, referenceResolver, new TypeSystemManager(), errorReportService);
         lenient().when(policyResolver.requireEnabled(anyString())).thenReturn(ExcelImportPolicy.builder()
                 .modelCode("test_model")
                 .enabled(true)
                 .modes(java.util.Set.of("insert", "update"))
                 .updateKeys(List.of("code"))
-                .createFields(java.util.Set.of("name", "code", "pe_so_code", "pe_so_name", "pe_so_qty", "pe_so_total", "pe_total", "pe_name"))
+                .createFields(java.util.Set.of(
+                        "name", "code", "pe_so_code", "pe_so_name", "pe_so_qty",
+                        "pe_so_total", "pe_total", "pe_name"))
                 .updateFields(java.util.Set.of("name", "code"))
                 .build());
     }

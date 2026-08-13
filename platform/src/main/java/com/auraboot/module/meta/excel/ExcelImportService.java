@@ -75,6 +75,7 @@ public class ExcelImportService {
     private final CommandExecutor commandExecutor;
     private final ExcelReferenceResolver referenceResolver;
     private final TypeSystemManager typeSystemManager;
+    private final ExcelImportErrorReportService errorReportService;
 
     @Value("${auraboot.excel-import.async-threshold:1000}")
     private int asyncThreshold = DEFAULT_ASYNC_THRESHOLD;
@@ -371,6 +372,22 @@ public class ExcelImportService {
                 MetaContext.restore(contextSnapshot);
                 ExcelImportResult result = importExcelWithProgress(modelCode,
                         new java.io.ByteArrayInputStream(bytes), options, taskId, jobId);
+                if (result.isHasErrors() && result.getErrors() != null && !result.getErrors().isEmpty()) {
+                    result.setTaskId(taskId);
+                    try {
+                        String reportUrl = errorReportService.attachReport(
+                                jobId, taskId, modelCode, bytes, result.getErrors(),
+                                options.getReportLocale(), reportSelection(result, options));
+                        result.setErrorReportUrl(reportUrl);
+                    } catch (RuntimeException reportError) {
+                        // CATCH: report storage is non-transactional and must not overwrite the
+                        // truthful result of rows that may already have been committed.
+                        log.error("Async import completed with row errors but its correction "
+                                + "workbook could not be created: task={}, model={}",
+                                taskId, modelCode, reportError);
+                        result.setErrorReportFailed(true);
+                    }
+                }
                 status.setResult(result);
                 status.setProcessedRows(result.getTotalRows());
                 status.setTotalRows(result.getTotalRows());
@@ -383,7 +400,9 @@ public class ExcelImportService {
                 emitProgress(taskId, result.getTotalRows(), result.getTotalRows(),
                         result.getErrorCount(), "completed");
             } catch (Exception e) {
-                log.error("Async import failed for task {}: {}", taskId, e.getMessage());
+                // CATCH: top-level async boundary — no caller can observe this failure, so keep
+                // the complete cause chain alongside the durable failed task state.
+                log.error("Async import failed for task {}: {}", taskId, e.getMessage(), e);
                 status.setStatus(StatusConstants.FAILED);
                 status.setResult(ExcelImportResult.builder()
                         .hasErrors(true)
@@ -555,6 +574,7 @@ public class ExcelImportService {
             int successRows = valueOrZero(job.getSuccessRows());
             int errorRows = valueOrZero(job.getErrorRows());
             boolean updateMode = "update".equalsIgnoreCase(job.getImportMode());
+            boolean reportExpired = errorRows > 0 && errorReportService.isReportExpired(job);
             restored.setResult(ExcelImportResult.builder()
                     .totalRows(valueOrZero(job.getTotalRows()))
                     .successCount(successRows)
@@ -562,6 +582,11 @@ public class ExcelImportService {
                     .createdCount(updateMode ? 0 : successRows)
                     .updatedCount(updateMode ? successRows : 0)
                     .errors(List.of())
+                    .taskId(job.getPid())
+                    .errorReportUrl(reportExpired ? null : job.getErrorReportUrl())
+                    .errorReportFailed(errorRows > 0
+                            && job.getErrorReportUrl() == null && !reportExpired)
+                    .errorReportExpired(reportExpired)
                     .hasErrors(errorRows > 0 || StatusConstants.FAILED.equalsIgnoreCase(persistedStatus))
                     .build());
         }
@@ -580,6 +605,17 @@ public class ExcelImportService {
     private String normalizeMode(ImportOptions options) {
         String mode = options == null ? null : options.getImportMode();
         return mode == null || mode.isBlank() ? "insert" : mode.toLowerCase(Locale.ROOT);
+    }
+
+    private ExcelImportErrorReportService.RowSelection reportSelection(
+            ExcelImportResult result, ImportOptions options) {
+        if (result.getSuccessCount() == 0
+                && result.getErrorCount() < result.getTotalRows()) {
+            return ExcelImportErrorReportService.RowSelection.ALL_ROWS;
+        }
+        return options.isSkipErrors()
+                ? ExcelImportErrorReportService.RowSelection.ERROR_ROWS
+                : ExcelImportErrorReportService.RowSelection.FROM_FIRST_ERROR;
     }
 
     private static int valueOrZero(Integer value) {

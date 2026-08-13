@@ -3347,6 +3347,21 @@
     "en-US": "The referenced record does not exist or is not accessible"
   },
   {
+    "key": "import.validation.reference_ambiguous",
+    "zh-CN": "关联值不唯一，请改用唯一业务编码或 PID",
+    "en-US": "The reference value is ambiguous. Use a unique business key or PID."
+  },
+  {
+    "key": "import.validation.row_write_failed",
+    "zh-CN": "该行无法保存，请检查字段值与模板要求后重试",
+    "en-US": "This row could not be saved. Check its values against the template and try again."
+  },
+  {
+    "key": "import.validation.named_required",
+    "zh-CN": "字段“{field}”为必填项",
+    "en-US": "Field “{field}” is required"
+  },
+  {
     "key": "import.row",
     "zh-CN": "第 {row} 行",
     "en-US": "Row {row}"
@@ -3400,6 +3415,61 @@
     "key": "import.error.match_key",
     "zh-CN": "更新导入必须选择匹配字段。",
     "en-US": "Choose a match field for update mode."
+  },
+  {
+    "key": "import.correction.pending_hint",
+    "zh-CN": "下载包含全部待导入行的修正工作簿，修正标记单元格后直接重新上传。",
+    "en-US": "Download the correction workbook with every row still pending import, fix the marked cells, and upload it again."
+  },
+  {
+    "key": "import.correction.partial_hint",
+    "zh-CN": "已成功的记录不会出现在修正工作簿中。修正失败行后可直接再次上传。",
+    "en-US": "Successful records are excluded from the correction workbook. Fix the failed rows and upload it again."
+  },
+  {
+    "key": "import.correction.download",
+    "zh-CN": "下载修正工作簿",
+    "en-US": "Download correction workbook"
+  },
+  {
+    "key": "import.correction.downloading",
+    "zh-CN": "正在下载修正工作簿…",
+    "en-US": "Downloading correction workbook…"
+  },
+  {
+    "key": "import.correction.upload",
+    "zh-CN": "上传修正工作簿",
+    "en-US": "Upload corrected workbook"
+  },
+  {
+    "key": "import.error.error_report",
+    "zh-CN": "修正工作簿下载失败，请重试。",
+    "en-US": "The correction workbook could not be downloaded. Try again."
+  },
+  {
+    "key": "import.error.error_report_unavailable",
+    "zh-CN": "错误明细已保留在当前页面，但修正工作簿暂时无法生成。请修正原文件后重新上传。",
+    "en-US": "The row errors remain visible here, but the correction workbook is unavailable. Fix the original file and upload it again."
+  },
+  {
+    "key": "import.error.error_report_expired",
+    "zh-CN": "修正工作簿已超过保留期。请基于原文件重新执行预检。",
+    "en-US": "The correction workbook has expired. Validate the original file again to create a new one."
+  },
+  {
+    "key": "import.report.original_row",
+    "zh-CN": "原文件行号",
+    "en-US": "Original row"
+  },
+  {
+    "key": "import.report.field",
+    "zh-CN": "字段",
+    "en-US": "Field"
+  },
+  {
+    "key": "import.report.issue",
+    "zh-CN": "问题说明",
+    "en-US": "Issue"
   },
   {
     "key": "action.close",

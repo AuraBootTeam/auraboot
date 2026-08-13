@@ -51,13 +51,16 @@ class ExcelEdgeCaseTest {
     @Mock
     private ExcelReferenceResolver referenceResolver;
 
+    @Mock
+    private ExcelImportErrorReportService errorReportService;
+
     private ExcelImportService importService;
 
     @BeforeEach
     void setUp() {
         importService = new ExcelImportService(
                 dynamicDataService, metaModelService, importJobMapper, policyResolver,
-                commandExecutor, referenceResolver, new TypeSystemManager());
+                commandExecutor, referenceResolver, new TypeSystemManager(), errorReportService);
         lenient().when(policyResolver.requireEnabled(anyString())).thenReturn(ExcelImportPolicy.builder()
                 .modelCode("test_model")
                 .enabled(true)
