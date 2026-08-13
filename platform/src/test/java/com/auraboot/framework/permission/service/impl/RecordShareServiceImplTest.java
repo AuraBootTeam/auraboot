@@ -82,7 +82,7 @@ class RecordShareServiceImplTest {
         service.shareRecordByPid(100L, "model.user", "rec_10", "member", "mem_5", "read", expires);
 
         ArgumentCaptor<RecordShare> captor = ArgumentCaptor.forClass(RecordShare.class);
-        verify(recordShareMapper).insert(captor.capture());
+        verify(recordShareMapper).upsertByPublicPids(captor.capture());
 
         RecordShare share = captor.getValue();
         assertThat(share.getTenantId()).isEqualTo(100L);
@@ -97,6 +97,22 @@ class RecordShareServiceImplTest {
         assertThat(share.getPid()).isNotBlank();
         assertThat(share.getCreatedAt()).isNotNull();
         assertThat(share.getCreatedBy()).isEqualTo(99L);
+    }
+
+    @Test
+    void shareRecordByPidRejectsPastExpiry() {
+        assertThatThrownBy(() -> service.shareRecordByPid(
+                100L,
+                "model.user",
+                "rec_10",
+                "member",
+                "mem_5",
+                "read",
+                Instant.now().minusSeconds(1)))
+                .isInstanceOf(RootUnCheckedException.class)
+                .hasMessageContaining("future");
+
+        verify(recordShareMapper, never()).upsertByPublicPids(any());
     }
 
     @Test
@@ -227,40 +243,77 @@ class RecordShareServiceImplTest {
     }
 
     @Test
-    void removeByIdThrowsWhenNotFound() {
-        when(recordShareMapper.selectById(99L)).thenReturn(null);
+    void listByRecordPidForManagementIncludesMapperResultWithoutExpiryFiltering() {
+        RecordShare expired = new RecordShare();
+        expired.setExpiresAt(Instant.now().minusSeconds(60));
+        when(recordShareMapper.findByRecordPidForManagement(
+                eq(100L), eq("model.user"), eq("rec_10"), any()))
+                .thenReturn(List.of(expired));
 
-        assertThatThrownBy(() -> service.removeById(100L, 99L))
-                .isInstanceOf(RootUnCheckedException.class)
-                .hasMessageContaining("99");
+        assertThat(service.listByRecordPidForManagement(100L, "model.user", "rec_10"))
+                .containsExactly(expired);
     }
 
     @Test
-    void removeByIdThrowsWhenCrossTenant() {
-        RecordShare share = new RecordShare();
-        share.setId(99L);
-        share.setTenantId(999L); // different tenant
-        share.setResourceCode("model.user");
-        share.setRecordId(10L);
-        when(recordShareMapper.selectById(99L)).thenReturn(share);
+    void updateByPidRenewsExistingShareWithoutSubjectOrRecordIdentifiers() {
+        Instant renewedUntil = Instant.now().plusSeconds(3600);
+        when(recordShareMapper.updatePolicyByPidInTenant(
+                eq(100L),
+                eq("share-99"),
+                eq("read,update"),
+                eq(renewedUntil)))
+                .thenReturn(1);
 
-        assertThatThrownBy(() -> service.removeById(100L, 99L))
+        service.updateByPid(100L, " share-99 ", "read, update", renewedUntil);
+
+        verify(recordShareMapper).updatePolicyByPidInTenant(
+                eq(100L),
+                eq("share-99"),
+                eq("read,update"),
+                eq(renewedUntil));
+    }
+
+    @Test
+    void updateByPidRejectsPastExpiryWithoutDatabaseMutation() {
+        assertThatThrownBy(() -> service.updateByPid(
+                100L, "share-99", "read", Instant.now().minusSeconds(1)))
+                .isInstanceOf(RootUnCheckedException.class)
+                .hasMessageContaining("future");
+
+        verify(recordShareMapper, never()).updatePolicyByPidInTenant(
+                anyLong(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void removeByPidThrowsWhenNotFound() {
+        when(recordShareMapper.findByPidInTenant(100L, "share-99")).thenReturn(null);
+
+        assertThatThrownBy(() -> service.removeByPid(100L, "share-99"))
+                .isInstanceOf(RootUnCheckedException.class)
+                .hasMessageContaining("not found");
+    }
+
+    @Test
+    void removeByPidDoesNotResolveCrossTenantShare() {
+        when(recordShareMapper.findByPidInTenant(100L, "share-99")).thenReturn(null);
+
+        assertThatThrownBy(() -> service.removeByPid(100L, "share-99"))
                 .isInstanceOf(RootUnCheckedException.class);
 
-        verify(recordShareMapper, never()).deleteById(anyLong());
+        verify(recordShareMapper, never()).deleteByPidInTenant(anyLong(), anyString());
     }
 
     @Test
-    void removeByIdDeletesWhenTenantMatches() {
+    void removeByPidDeletesWhenTenantMatches() {
         RecordShare share = new RecordShare();
-        share.setId(99L);
+        share.setPid("share-99");
         share.setTenantId(100L);
         share.setResourceCode("model.user");
-        share.setRecordId(10L);
-        when(recordShareMapper.selectById(99L)).thenReturn(share);
+        share.setRecordPid("rec-10");
+        when(recordShareMapper.findByPidInTenant(100L, "share-99")).thenReturn(share);
 
-        service.removeById(100L, 99L);
+        service.removeByPid(100L, "share-99");
 
-        verify(recordShareMapper).deleteById(99L);
+        verify(recordShareMapper).deleteByPidInTenant(100L, "share-99");
     }
 }

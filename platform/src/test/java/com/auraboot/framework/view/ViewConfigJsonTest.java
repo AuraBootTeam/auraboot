@@ -37,4 +37,33 @@ class ViewConfigJsonTest {
         assertThat(readBack.getToolbarActions()).hasSize(2);
         assertThat(readBack.getToolbarActions().get(1).getPinned()).isFalse();
     }
+
+    @Test
+    void filterExpressionsRoundTripThroughJson() throws Exception {
+        String json = """
+                {
+                  "filters": [
+                    {
+                      "fieldCode": "crm_opp_owner",
+                      "operator": "eq",
+                      "value": null,
+                      "isExpression": true,
+                      "expression": "#currentUser"
+                    }
+                  ]
+                }
+                """;
+
+        ViewConfig config = objectMapper.readValue(json, ViewConfig.class);
+
+        assertThat(config.getFilters()).hasSize(1);
+        assertThat(config.getFilters().getFirst().getIsExpression()).isTrue();
+        assertThat(config.getFilters().getFirst().getExpression()).isEqualTo("#currentUser");
+
+        String serialized = objectMapper.writeValueAsString(config);
+        ViewConfig readBack = objectMapper.readValue(serialized, ViewConfig.class);
+
+        assertThat(readBack.getFilters().getFirst().getIsExpression()).isTrue();
+        assertThat(readBack.getFilters().getFirst().getExpression()).isEqualTo("#currentUser");
+    }
 }

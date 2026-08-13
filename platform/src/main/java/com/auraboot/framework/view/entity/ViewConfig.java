@@ -478,6 +478,16 @@ public class ViewConfig {
         private Object value;
 
         /**
+         * Whether the filter value is resolved from a supported runtime expression.
+         */
+        private Boolean isExpression;
+
+        /**
+         * Runtime expression such as ${system.currentUser}.
+         */
+        private String expression;
+
+        /**
          * Logic operator to combine with previous filter: AND, OR
          */
         private String logic;

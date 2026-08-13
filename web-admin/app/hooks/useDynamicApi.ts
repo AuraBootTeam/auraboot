@@ -12,6 +12,7 @@ import type {
   PageSchema,
   FieldOption,
   UseDynamicApiReturn,
+  DynamicBatchResult,
 } from '~/types/dynamic';
 
 /**
@@ -110,7 +111,7 @@ export function useDynamicApi(): UseDynamicApiReturn {
     async (
       entityCode: string,
       updates: { id: string; data: Record<string, any> }[],
-    ): Promise<DynamicEntity[]> => {
+    ): Promise<DynamicBatchResult> => {
       return wrapApiCall(() => dynamicService.batchUpdate(entityCode, updates));
     },
     [wrapApiCall],

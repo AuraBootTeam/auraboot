@@ -32,6 +32,7 @@ import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.dto.PermissionCreateRequest;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.PermissionService;
+import com.auraboot.framework.permission.service.DataScopeService;
 import com.auraboot.framework.permission.service.RolePermissionService;
 import com.auraboot.framework.plugin.dto.imports.BindingRuleDTO;
 import com.auraboot.framework.plugin.dto.imports.DictDefinitionDTO;
@@ -41,6 +42,7 @@ import com.auraboot.framework.plugin.dto.imports.PermissionDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ResourceAction;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.RoleDataScopeDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.RolePermissionPolicyDefinitionDTO;
 import com.auraboot.framework.plugin.entity.PluginResource;
 import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
@@ -99,6 +101,7 @@ class PluginResourceImporterImplApplyTest {
     @Mock private DictService dictService;
     @Mock private CommandService commandService;
     @Mock private PermissionService permissionService;
+    @Mock private DataScopeService dataScopeService;
     @Mock private RolePermissionService rolePermissionService;
     @Mock private RoleService roleService;
     @Mock private UserRoleService userRoleService;
@@ -549,6 +552,125 @@ class PluginResourceImporterImplApplyTest {
         assertThat(result.getAction()).isEqualTo(ResourceAction.UPDATE.code());
         verify(rolePermissionService).inheritDefaultDataScope(77L, List.of(1001L));
         verify(rolePermissionService, never()).assignPermissionsToRole(77L, List.of(1001L));
+    }
+
+    @Test
+    @DisplayName("importRole materializes explicit per-permission data scope after binding")
+    void importRole_materializesExplicitPermissionDataScope() {
+        when(roleMapper.existsByCode(1L, "sales_manager")).thenReturn(true);
+        when(roleMapper.findIdByCode(1L, "sales_manager")).thenReturn(77L);
+        when(roleMapper.findPidByCode(1L, "sales_manager")).thenReturn("rp");
+
+        PermissionDTO permission = new PermissionDTO();
+        permission.setId(1001L);
+        permission.setResourceCode("crm_opportunity_common");
+        permission.setAction("read");
+        when(permissionService.findByCode("model.crm_opportunity_common.read"))
+                .thenReturn(permission);
+        when(rolePermissionMapper.countByRoleAndPermission(77L, 1001L, 1L)).thenReturn(1);
+
+        RoleDefinitionDTO dto = RoleDefinitionDTO.builder()
+                .code("sales_manager")
+                .name("Sales manager")
+                .defaultDataScopeType("all")
+                .permissions(List.of("model.crm_opportunity_common.read"))
+                .dataScopes(List.of(RoleDataScopeDefinitionDTO.builder()
+                        .permissionCode("model.crm_opportunity_common.read")
+                        .scopeType("dept_and_sub")
+                        .build()))
+                .build();
+
+        importer.importRole(dto, "plg", "imp", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE);
+
+        verify(dataScopeService).setScope(
+                1L, 77L, "crm_opportunity_common", "read", "dept_and_sub", "MAX");
+    }
+
+    @Test
+    @DisplayName("importRole rejects an explicit data scope whose permission is unresolved")
+    void importRole_rejectsUnresolvedPermissionDataScope() {
+        when(roleMapper.existsByCode(1L, "sales_manager")).thenReturn(true);
+        when(roleMapper.findIdByCode(1L, "sales_manager")).thenReturn(77L);
+        when(roleMapper.findPidByCode(1L, "sales_manager")).thenReturn("rp");
+        when(permissionService.findByCode("missing.permission")).thenReturn(null);
+
+        RoleDefinitionDTO dto = RoleDefinitionDTO.builder()
+                .code("sales_manager")
+                .name("Sales manager")
+                .dataScopes(List.of(RoleDataScopeDefinitionDTO.builder()
+                        .permissionCode("missing.permission")
+                        .scopeType("dept_and_sub")
+                        .build()))
+                .build();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> importer.importRole(
+                dto, "plg", "imp", 1L, ImportRequest.ConflictStrategy.OVERWRITE))
+                .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class)
+                .hasMessageContaining("unresolved permission");
+    }
+
+    @Test
+    @DisplayName("importRole rejects an explicit data scope whose permission has no internal id")
+    void importRole_rejectsPermissionWithoutInternalIdDataScope() {
+        when(roleMapper.existsByCode(1L, "sales_manager")).thenReturn(true);
+        when(roleMapper.findIdByCode(1L, "sales_manager")).thenReturn(77L);
+        when(roleMapper.findPidByCode(1L, "sales_manager")).thenReturn("rp");
+
+        PermissionDTO permission = new PermissionDTO();
+        permission.setResourceCode("crm_opportunity_common");
+        permission.setAction("read");
+        when(permissionService.findByCode("model.crm_opportunity_common.read"))
+                .thenReturn(permission);
+
+        RoleDefinitionDTO dto = RoleDefinitionDTO.builder()
+                .code("sales_manager")
+                .name("Sales manager")
+                .permissions(List.of("model.crm_opportunity_common.read"))
+                .dataScopes(List.of(RoleDataScopeDefinitionDTO.builder()
+                        .permissionCode("model.crm_opportunity_common.read")
+                        .scopeType("dept_and_sub")
+                        .build()))
+                .build();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> importer.importRole(
+                dto, "plg", "imp", 1L, ImportRequest.ConflictStrategy.OVERWRITE))
+                .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class)
+                .hasMessageContaining("unresolved permission");
+        verify(dataScopeService, never()).setScope(anyLong(), anyLong(), anyString(), anyString(),
+                anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("importRole rejects an explicit data scope that is not bound to the role")
+    void importRole_rejectsUnboundPermissionDataScope() {
+        when(roleMapper.existsByCode(1L, "sales_manager")).thenReturn(true);
+        when(roleMapper.findIdByCode(1L, "sales_manager")).thenReturn(77L);
+        when(roleMapper.findPidByCode(1L, "sales_manager")).thenReturn("rp");
+
+        PermissionDTO permission = new PermissionDTO();
+        permission.setId(1001L);
+        permission.setResourceCode("crm_opportunity_common");
+        permission.setAction("read");
+        when(permissionService.findByCode("model.crm_opportunity_common.read"))
+                .thenReturn(permission);
+        when(rolePermissionMapper.countByRoleAndPermission(77L, 1001L, 1L)).thenReturn(0);
+
+        RoleDefinitionDTO dto = RoleDefinitionDTO.builder()
+                .code("sales_manager")
+                .name("Sales manager")
+                .dataScopes(List.of(RoleDataScopeDefinitionDTO.builder()
+                        .permissionCode("model.crm_opportunity_common.read")
+                        .scopeType("dept_and_sub")
+                        .build()))
+                .build();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> importer.importRole(
+                dto, "plg", "imp", 1L, ImportRequest.ConflictStrategy.OVERWRITE))
+                .isInstanceOf(com.auraboot.framework.plugin.exception.PluginException.class)
+                .hasMessageContaining("not bound to the role");
+        verify(dataScopeService, never()).setScope(anyLong(), anyLong(), anyString(), anyString(),
+                anyString(), anyString());
     }
 
     // ==================== importBindingRule CREATE / UPDATE ====================

@@ -64,6 +64,11 @@ public class RoleDefinitionDTO {
     private List<RolePermissionPolicyDefinitionDTO> permissionPolicies;
 
     /**
+     * Optional per-permission data-scope overrides materialized during import.
+     */
+    private List<RoleDataScopeDefinitionDTO> dataScopes;
+
+    /**
      * Optional seed member references assigned to this role during plugin import.
      * Supported value: CURRENT_MEMBER.
      */

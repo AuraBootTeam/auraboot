@@ -972,6 +972,7 @@ search:
   open: Open
   close: Close
 common:
+  collaborative_records: Collaborative records
   field:
     status: Status
   status:
@@ -987,6 +988,8 @@ common:
   updated_at: Updated At
   creator: Created By
   modifier: Updated By
+  current_user: Current user
+  current_department: Current department
   create: Create
   new: New
   edit: Edit
@@ -996,9 +999,53 @@ common:
   submit: Submit
   sort: Sort
   fields: Fields
+  column_settings_title: Configure view fields
+  column_settings_help: Choose fields, order and width; settings are saved with the current view
+  column_settings_search: Search field name or code
+  column_settings_restore: Restore default
+  column_settings_density: Row density
+  column_settings_density_help: Applied to this view only
+  column_settings_visible_summary: "{visible} of {total} fields visible"
+  column_settings_show_all: Show all
+  column_settings_system: System
+  column_settings_pin_left: Pin left
+  column_settings_pin_right: Pin right
+  column_settings_width: Column width
+  column_settings_minimum: Keep at least one field visible
+  column_settings_unsaved: Changes will be saved with this view
+  column_settings_unchanged: No changes
+  column_settings_apply: Apply to view
+  column_settings_save_failed: Failed to save view settings
+  row_height_short: Compact
+  row_height_medium: Standard
+  row_height_tall: Spacious
+  row_height_extra_tall: Extra spacious
   filter: Filter
   search: Search
   add_filter: Add Filter
+  view_analysis: View analysis
+  view_analysis_scope: Current view
+  view_analysis_help: Analyze every matching record and click a chart point to return to the exact list
+  view_analysis_filters: Filters
+  view_analysis_chart_type: Chart type
+  view_analysis_chart_bar: Bar
+  view_analysis_chart_line: Line
+  view_analysis_chart_pie: Pie
+  view_analysis_chart_donut: Donut
+  view_analysis_chart_funnel: Funnel
+  view_analysis_group: Group by
+  view_analysis_metric: Measure
+  view_analysis_count: Record count
+  view_analysis_sum: Sum
+  view_analysis_avg: Average
+  view_analysis_numeric_field: Numeric field
+  view_analysis_drill_hint: Click any data point to filter the list
+  view_analysis_refresh: Refresh
+  view_analysis_failed: Analysis failed
+  view_analysis_empty: No matching data
+  view_analysis_empty_help: Adjust the list filters and try again
+  view_analysis_breakdown: Breakdown
+  view_analysis_open_records: Open matching records
   clear_all: Clear All
   search_fields: Search fields...
   no_fields_found: No fields found
@@ -1024,6 +1071,60 @@ common:
     invalid: JSON must be an object or array
     invalid_short: Invalid
     format: Format
+
+record_share:
+  title: Record collaboration
+  subtitle: Invite tenant members to view or maintain this record with you
+  close: Close collaboration dialog
+  add_member: Add collaborator
+  edit_member: Update collaborator
+  editing_description: Change permission or renew access without creating a duplicate
+  member_label: Tenant member
+  member_placeholder: Choose a member
+  permission: Collaboration permission
+  permission_read_title: View only
+  permission_read_description: Can view this record, but cannot change it
+  permission_collaborate_title: Collaborate
+  permission_collaborate_description: Can view and update this record together
+  save: Save collaborator
+  saving: Saving…
+  saved: Collaborator saved
+  update: Update access
+  updated: Collaboration access updated
+  save_failed: Failed to save collaborator
+  update_failed: Failed to update collaboration access
+  load_failed: Failed to load collaborators
+  current_members: Current collaborators
+  empty_title: No collaborators yet
+  empty_description: Choose a member and permission to start collaborating
+  unavailable_member: Unavailable member
+  edit: Edit collaborator
+  renew: Renew collaborator
+  expiry: Access duration
+  expiry_never: Permanent
+  expiry_7d: 7 days
+  expiry_30d: 30 days
+  expiry_custom: Custom
+  expiry_date: Expiry date
+  expiry_never_hint: Access remains until the owner removes it
+  expiry_hint: Access ends automatically at the selected time and can be renewed later
+  expires_on: Expires
+  expired: Expired
+  remove: Remove collaborator
+  removed: Collaborator removed
+  remove_failed: Failed to remove collaborator
+  notification_title: Record collaboration updated
+  notification_content: You now have {0} access to a shared record. Open its collaborative view to continue.
+  notification_permission_read: view-only
+  notification_permission_collaborate: collaboration
+
+member_picker:
+  select: Select member…
+  add: Add
+  search_placeholder: Search members…
+  searching: Searching…
+  empty: No members found
+
 admin:
   org:
     title: Organization Management

@@ -52,6 +52,7 @@ const EVIDENCE = {
   rg3Guide: 'plugins/crm/README.md',
   releaseB: 'plugins/crm/e2e/opportunity-efficiency.golden.spec.ts',
   dashboards: 'plugins/crm/e2e/crm-dashboards.golden.spec.ts',
+  forecastVariance: 'plugins/crm/e2e/forecast-variance.golden.spec.ts',
 };
 
 // Executable denominator owned by the opportunity-efficiency true-stack gate.
@@ -74,6 +75,7 @@ const RELEASE_B_COVERAGE = {
     'crm:create_opportunity',
     'crm:create_quote_summary',
     'crm:qualify_opportunity',
+    'crm:win_opportunity',
   ],
   queries: ['crm_account_stats', 'crm_account_timeline'],
   dashboardTargets: [
@@ -87,6 +89,13 @@ const RELEASE_B_COVERAGE = {
     'crm_opportunity_common_detail:crm_opportunity_tabs:activities',
     'crm_opportunity_common_detail:crm_opportunity_tabs:plan_and_quotes',
     'crm_opportunity_common_list:crm_opp_table:bulk_qualify',
+    'crm_opportunity_common_list:platform:add_advanced_filter',
+    'crm_opportunity_common_list:platform:configure_view_columns',
+    'crm_opportunity_common_list:platform:export_filtered_csv',
+    'crm_opportunity_common_list:platform:analyze_current_view',
+    'crm_opportunity_common_list:platform:select_preset_view',
+    'crm_opportunity_common_list:platform:drill_chart_to_list',
+    'crm_opportunity_common_list:platform:save_advanced_filters',
     'crm_opportunity_common_list:crm_opp_tabs:proposal',
   ],
   blocks: [
@@ -165,6 +174,33 @@ const DASHBOARD_COVERAGE = {
     'crm_sales_forecast:table_stage_detail',
   ],
   uiActions: ['crm_dashboard:block_kpi_cards:new_leads_drilldown'],
+};
+const FORECAST_VARIANCE_COVERAGE = {
+  queries: ['crm_forecast_variance_summary', 'crm_forecast_variance_drivers'],
+  blocks: [
+    'crm_forecast_cockpit:crm_forecast_variance_summary_intro',
+    'crm_forecast_cockpit:crm_forecast_variance_summary',
+    'crm_forecast_cockpit:crm_forecast_variance_drivers_intro',
+    'crm_forecast_cockpit:crm_forecast_variance_drivers',
+  ],
+  fields: [
+    'crm_forecast_cockpit:crm_forecast_variance_summary:measure',
+    'crm_forecast_cockpit:crm_forecast_variance_summary:submitted_amount',
+    'crm_forecast_cockpit:crm_forecast_variance_summary:current_amount',
+    'crm_forecast_cockpit:crm_forecast_variance_summary:variance_amount',
+    'crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_name',
+    'crm_forecast_cockpit:crm_forecast_variance_drivers:account_name',
+    'crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_stage',
+    'crm_forecast_cockpit:crm_forecast_variance_drivers:forecast_category',
+    'crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_expected_amount',
+    'crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_probability',
+    'crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_expected_close_date',
+    'crm_forecast_cockpit:crm_forecast_variance_drivers:variance_driver',
+  ],
+  uiActions: [
+    'crm_forecast_cockpit:crm_forecast_tabs:variance',
+    'crm_forecast_cockpit:crm_forecast_variance_drivers:open_variance_opportunity',
+  ],
 };
 const CORE_WORKBENCH_COVERAGE = {
   pages: RG1_PAGES,
@@ -299,6 +335,9 @@ const releaseBCoverageSets = Object.fromEntries(
 const dashboardCoverageSets = Object.fromEntries(
   Object.entries(DASHBOARD_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
 );
+const forecastVarianceCoverageSets = Object.fromEntries(
+  Object.entries(FORECAST_VARIANCE_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
+);
 
 function json(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(PLUGIN_ROOT, 'config', relativePath), 'utf8'));
@@ -306,7 +345,8 @@ function json(relativePath) {
 
 function jsonDirectory(relativePath) {
   const directory = path.join(PLUGIN_ROOT, 'config', relativePath);
-  return fs.readdirSync(directory)
+  return fs
+    .readdirSync(directory)
     .filter((name) => name.endsWith('.json'))
     .sort()
     .flatMap((name) => {
@@ -317,7 +357,8 @@ function jsonDirectory(relativePath) {
 
 function jsonDirectoryEntries(relativePath) {
   const directory = path.join(PLUGIN_ROOT, 'config', relativePath);
-  return fs.readdirSync(directory)
+  return fs
+    .readdirSync(directory)
     .filter((name) => name.endsWith('.json'))
     .sort()
     .flatMap((name) => {
@@ -352,7 +393,10 @@ function allBlocks(page) {
 
 function actionTarget(action) {
   if (action.onClick?.action === 'command.execute') {
-    return { targetType: 'command', target: action.onClick.args?.command ?? null };
+    return {
+      targetType: 'command',
+      target: action.onClick.args?.command ?? null,
+    };
   }
   if (action.onClick?.action === 'navigate') {
     return { targetType: 'route', target: action.onClick.args?.to ?? null };
@@ -366,8 +410,12 @@ function evidenceForCommand(code, rg1Commands) {
     files.push(EVIDENCE.rg1Browser);
   }
   if (RG2_COMMANDS.includes(code)) {
-    files.push(code === 'crm:record_order_commitment' ? EVIDENCE.rg2OrderStack : EVIDENCE.rg2QdpStack);
-    files.push(code === 'crm:record_order_commitment' ? EVIDENCE.rg2OrderBrowser : EVIDENCE.rg2QdpBrowser);
+    files.push(
+      code === 'crm:record_order_commitment' ? EVIDENCE.rg2OrderStack : EVIDENCE.rg2QdpStack,
+    );
+    files.push(
+      code === 'crm:record_order_commitment' ? EVIDENCE.rg2OrderBrowser : EVIDENCE.rg2QdpBrowser,
+    );
   }
   if (RG3_COMMANDS.includes(code)) files.push(EVIDENCE.rg3Journey);
   if (releaseBCoverageSets.commands.has(code)) files.push(EVIDENCE.releaseB);
@@ -409,10 +457,12 @@ function executableRow({
 function walkConfig(candidate, visitor, currentPath = 'root', currentBlockId = null) {
   if (!candidate || typeof candidate !== 'object') return;
   if (Array.isArray(candidate)) {
-    candidate.forEach((item, index) => walkConfig(item, visitor, `${currentPath}[${index}]`, currentBlockId));
+    candidate.forEach((item, index) =>
+      walkConfig(item, visitor, `${currentPath}[${index}]`, currentBlockId),
+    );
     return;
   }
-  const nextBlockId = candidate.blockType ? candidate.id ?? currentBlockId : currentBlockId;
+  const nextBlockId = candidate.blockType ? (candidate.id ?? currentBlockId) : currentBlockId;
   visitor(candidate, currentPath, nextBlockId);
   for (const [key, value] of Object.entries(candidate)) {
     walkConfig(value, visitor, `${currentPath}.${key}`, nextBlockId);
@@ -428,7 +478,10 @@ function resolveUiActionTarget(item) {
     };
   }
   if (item?.onClick?.action === 'command.execute') {
-    return { targetType: 'command', target: item.onClick.args?.command ?? null };
+    return {
+      targetType: 'command',
+      target: item.onClick.args?.command ?? null,
+    };
   }
   if (item?.onClick?.action === 'navigate') {
     return { targetType: 'navigate', target: item.onClick.args?.to ?? null };
@@ -548,7 +601,9 @@ function buildProductGroups({
 
   const modelRows = models.map((model) => {
     const modelPages = pages.filter((page) => page.modelCode === model.code);
-    const directMenu = menus.some((menu) => menu.pageKey && modelPages.some((page) => page.pageKey === menu.pageKey));
+    const directMenu = menus.some(
+      (menu) => menu.pageKey && modelPages.some((page) => page.pageKey === menu.pageKey),
+    );
     const directlyExposed = modelPages.length > 0 || directMenu;
     const modelCommands = commandByModel.get(model.code) ?? [];
     const expectedKinds = directlyExposed
@@ -568,9 +623,10 @@ function buildProductGroups({
       action: directlyExposed
         ? `Expose ${model.code} through required ${expectedKinds.join('/')} page surfaces`
         : `Keep support model ${model.code} out of the direct-page denominator`,
-      assertion: missingKinds.length > 0
-        ? `Missing required page kinds: ${missingKinds.join(', ')}`
-        : `Actual page kinds: ${actualKinds.join(', ') || 'support-only'}; expected: ${expectedKinds.join(', ') || 'none'}`,
+      assertion:
+        missingKinds.length > 0
+          ? `Missing required page kinds: ${missingKinds.join(', ')}`
+          : `Actual page kinds: ${actualKinds.join(', ') || 'support-only'}; expected: ${expectedKinds.join(', ') || 'none'}`,
       evidence: ['plugins/crm/tests/crm-release-coverage.test.mjs'],
       verdict: missingKinds.length > 0 ? 'gap' : 'pass',
       verdictBy: 'spec-assert',
@@ -587,9 +643,10 @@ function buildProductGroups({
     return executableRow({
       id: `page:${page.pageKey}`,
       action: `Open ${page.pageKey} (${page.kind}) from its supported product entry and exercise its complete page journey`,
-      assertion: evidence.length > 0
-        ? 'Real-stack browser evidence exists for the current release scope.'
-        : 'No qualifying browser journey is registered for this page; it remains in the denominator.',
+      assertion:
+        evidence.length > 0
+          ? 'Real-stack browser evidence exists for the current release scope.'
+          : 'No qualifying browser journey is registered for this page; it remains in the denominator.',
       evidence,
       verdict: evidence.length > 0 ? 'pass' : 'untested',
       verdictBy: evidence.length > 0 ? 'spec-assert' : null,
@@ -608,57 +665,72 @@ function buildProductGroups({
       const evidence = uniq([
         ...(coreWorkbenchCoverageSets.blocks.has(blockKey) ? [EVIDENCE.rg1Browser] : []),
         ...(releaseBCoverageSets.blocks.has(blockKey) ? [EVIDENCE.releaseB] : []),
+        ...(forecastVarianceCoverageSets.blocks.has(blockKey) ? [EVIDENCE.forecastVariance] : []),
       ]);
-      blockRows.push(executableRow({
-        id: `block:${safeId(page.pageKey)}:${safeId(block.id)}:${index}`,
-        action: `Render and semantically verify ${block.blockType} block ${block.id} on ${page.pageKey}`,
-        assertion: evidence.length > 0
-          ? 'The registered real-stack journey renders this block and asserts its business state.'
-          : 'Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.',
-        evidence,
-        verdict: evidence.length > 0 ? 'pass' : 'untested',
-        verdictBy: evidence.length > 0 ? 'spec-assert' : null,
-        source: `${entry.source}#${block.path}`,
-      }));
+      blockRows.push(
+        executableRow({
+          id: `block:${safeId(page.pageKey)}:${safeId(block.id)}:${index}`,
+          action: `Render and semantically verify ${block.blockType} block ${block.id} on ${page.pageKey}`,
+          assertion:
+            evidence.length > 0
+              ? 'The registered real-stack journey renders this block and asserts its business state.'
+              : 'Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.',
+          evidence,
+          verdict: evidence.length > 0 ? 'pass' : 'untested',
+          verdictBy: evidence.length > 0 ? 'spec-assert' : null,
+          source: `${entry.source}#${block.path}`,
+        }),
+      );
     });
     structure.fields.forEach((field, index) => {
       const fieldKey = `${page.pageKey}:${field.blockId}:${field.field}`;
       const evidence = uniq([
         ...(coreWorkbenchCoverageSets.fields.has(fieldKey) ? [EVIDENCE.rg1Browser] : []),
         ...(releaseBCoverageSets.fields.has(fieldKey) ? [EVIDENCE.releaseB] : []),
+        ...(forecastVarianceCoverageSets.fields.has(fieldKey) ? [EVIDENCE.forecastVariance] : []),
       ]);
-      fieldRows.push(executableRow({
-        id: `field:${safeId(page.pageKey)}:${safeId(field.blockId)}:${safeId(field.field)}:${index}`,
-        action: `Verify field ${field.field} in ${field.blockId} on ${page.pageKey}`,
-        assertion: evidence.length > 0
-          ? 'The registered real-stack journey asserts this field fact in its consuming page.'
-          : 'Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.',
-        evidence,
-        verdict: evidence.length > 0 ? 'pass' : 'untested',
-        verdictBy: evidence.length > 0 ? 'spec-assert' : null,
-        source: `${entry.source}#${field.path}`,
-      }));
+      fieldRows.push(
+        executableRow({
+          id: `field:${safeId(page.pageKey)}:${safeId(field.blockId)}:${safeId(field.field)}:${index}`,
+          action: `Verify field ${field.field} in ${field.blockId} on ${page.pageKey}`,
+          assertion:
+            evidence.length > 0
+              ? 'The registered real-stack journey asserts this field fact in its consuming page.'
+              : 'Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.',
+          evidence,
+          verdict: evidence.length > 0 ? 'pass' : 'untested',
+          verdictBy: evidence.length > 0 ? 'spec-assert' : null,
+          source: `${entry.source}#${field.path}`,
+        }),
+      );
     });
     structure.uiActions.forEach((item, index) => {
       const releaseAction = releaseSemanticMap.get(`${page.pageKey}:${item.blockId}:${item.code}`);
       const releaseBAction = releaseBCoverageSets.uiActions.has(
         `${page.pageKey}:${item.blockId}:${item.code}`,
       );
+      const forecastVarianceAction = forecastVarianceCoverageSets.uiActions.has(
+        `${page.pageKey}:${item.blockId}:${item.code}`,
+      );
       const evidence = uniq([
         ...(releaseAction?.evidence ?? []),
         ...(releaseBAction ? [EVIDENCE.releaseB] : []),
+        ...(forecastVarianceAction ? [EVIDENCE.forecastVariance] : []),
       ]);
-      uiActionRows.push(executableRow({
-        id: `ui-action:${safeId(page.pageKey)}:${safeId(item.blockId)}:${safeId(item.code)}:${index}`,
-        action: `${item.actionKind} ${item.code} on ${page.pageKey} -> ${item.targetType}:${item.target ?? 'n/a'}`,
-        assertion: evidence.length > 0
-          ? 'The registered real-stack journey executes this semantic action and asserts its user-visible result.'
-          : 'This visible action has no qualifying executable evidence and remains in the denominator.',
-        evidence,
-        verdict: evidence.length > 0 ? 'pass' : 'untested',
-        verdictBy: evidence.length > 0 ? 'spec-assert' : null,
-        source: `${entry.source}#${item.path}`,
-      }));
+      uiActionRows.push(
+        executableRow({
+          id: `ui-action:${safeId(page.pageKey)}:${safeId(item.blockId)}:${safeId(item.code)}:${index}`,
+          action: `${item.actionKind} ${item.code} on ${page.pageKey} -> ${item.targetType}:${item.target ?? 'n/a'}`,
+          assertion:
+            evidence.length > 0
+              ? 'The registered real-stack journey executes this semantic action and asserts its user-visible result.'
+              : 'This visible action has no qualifying executable evidence and remains in the denominator.',
+          evidence,
+          verdict: evidence.length > 0 ? 'pass' : 'untested',
+          verdictBy: evidence.length > 0 ? 'spec-assert' : null,
+          source: `${entry.source}#${item.path}`,
+        }),
+      );
     });
   }
 
@@ -748,14 +820,18 @@ function buildProductGroups({
     for (const widget of dashboard.widgets ?? []) {
       const cards = Array.isArray(widget.config?.cards) ? widget.config.cards : null;
       const targets = cards?.length
-        ? cards.map((card) => ({ id: card.field ?? 'card', drillDown: card.drillDown ?? widget.config?.drillDown }))
+        ? cards.map((card) => ({
+            id: card.field ?? 'card',
+            drillDown: card.drillDown ?? widget.config?.drillDown,
+          }))
         : [{ id: widget.id, drillDown: widget.config?.drillDown }];
       for (const target of targets) {
         const rowActions = Array.isArray(widget.config?.table?.rowActions)
           ? widget.config.table.rowActions
           : [];
-        const rowDetailConfigured = rowActions.some((action) =>
-          action?.action?.type === 'navigate' && Boolean(action.action.to));
+        const rowDetailConfigured = rowActions.some(
+          (action) => action?.action?.type === 'navigate' && Boolean(action.action.to),
+        );
         const actionableMetric = widget.type !== 'smart-table-chart' || rowActions.length > 0;
         const drillDownConfigured = Boolean(target.drillDown?.enabled) || rowDetailConfigured;
         const targetKey = `${dashboard.code}:${widget.id}:${target.id}`;
@@ -764,51 +840,69 @@ function buildProductGroups({
           ...(releaseBCoverageSets.dashboardTargets.has(targetKey) ? [EVIDENCE.releaseB] : []),
           ...(dashboardCoverageSets.dashboardTargets.has(widgetKey) ? [EVIDENCE.dashboards] : []),
         ]);
-        dashboardRows.push(executableRow({
-          id: `dashboard:${dashboard.code}:${widget.id}:${safeId(target.id)}`,
-          action: `Render ${dashboard.code}/${widget.id}/${target.id} with localized business data and a valid configured detail path`,
-          assertion: evidence.length > 0
-            ? 'The registered true-stack journey asserts widget data, record context, layout and technical-leak absence.'
-            : actionableMetric && !drillDownConfigured
-            ? 'Actionable metric or chart has no drill-down contract.'
-            : rowDetailConfigured
-              ? 'A row-level detail path exists; value, identity and destination equivalence are not yet registered.'
-              : 'Widget rendering, named-query values, filters and destination equivalence are not yet registered.',
-          evidence,
-          verdict: evidence.length > 0
-            ? 'pass'
-            : actionableMetric && !drillDownConfigured ? 'gap' : 'untested',
-          verdictBy: evidence.length > 0 ? 'spec-assert' : null,
-          source: `plugins/crm/config/dashboards/${dashboard.code}.json`,
-        }));
+        dashboardRows.push(
+          executableRow({
+            id: `dashboard:${dashboard.code}:${widget.id}:${safeId(target.id)}`,
+            action: `Render ${dashboard.code}/${widget.id}/${target.id} with localized business data and a valid configured detail path`,
+            assertion:
+              evidence.length > 0
+                ? 'The registered true-stack journey asserts widget data, record context, layout and technical-leak absence.'
+                : actionableMetric && !drillDownConfigured
+                  ? 'Actionable metric or chart has no drill-down contract.'
+                  : rowDetailConfigured
+                    ? 'A row-level detail path exists; value, identity and destination equivalence are not yet registered.'
+                    : 'Widget rendering, named-query values, filters and destination equivalence are not yet registered.',
+            evidence,
+            verdict:
+              evidence.length > 0
+                ? 'pass'
+                : actionableMetric && !drillDownConfigured
+                  ? 'gap'
+                  : 'untested',
+            verdictBy: evidence.length > 0 ? 'spec-assert' : null,
+            source: `plugins/crm/config/dashboards/${dashboard.code}.json`,
+          }),
+        );
       }
     }
   }
 
   return [
-    { id: 'model-surfaces', title: 'Model and page-surface contracts', rows: modelRows },
+    {
+      id: 'model-surfaces',
+      title: 'Model and page-surface contracts',
+      rows: modelRows,
+    },
     { id: 'menus', title: 'Menu entries and navigation', rows: menuRows },
     { id: 'pages', title: 'All CRM pages', rows: pageRows },
     { id: 'page-blocks', title: 'Every page block', rows: blockRows },
     { id: 'page-fields', title: 'Every page field reference', rows: fieldRows },
-    { id: 'ui-actions', title: 'Every visible page action and tab', rows: uiActionRows },
+    {
+      id: 'ui-actions',
+      title: 'Every visible page action and tab',
+      rows: uiActionRows,
+    },
     { id: 'commands', title: 'All CRM commands', rows: commandRows },
     { id: 'permissions', title: 'All CRM permissions', rows: permissionRows },
     { id: 'queries', title: 'All CRM named queries', rows: queryRows },
-    { id: 'dashboards', title: 'Dashboard widgets and drill-down facts', rows: dashboardRows },
+    {
+      id: 'dashboards',
+      title: 'Dashboard widgets and drill-down facts',
+      rows: dashboardRows,
+    },
   ];
 }
 
 export function buildReleaseManifest() {
   const pageEntries = jsonDirectoryEntries('pages/');
   const commandEntries = jsonDirectoryEntries('commands/');
-  const pages = new Map(
-    pageEntries.map(({ value: page }) => [page.pageKey, page]),
-  );
+  const pages = new Map(pageEntries.map(({ value: page }) => [page.pageKey, page]));
   const commands = new Map(commandEntries.map(({ value: command }) => [command.code, command]));
   const permissionDefinitions = json('permissions.json');
   const queryDefinitions = json('named-queries.json');
-  const permissions = new Map(permissionDefinitions.map((permission) => [permission.code, permission]));
+  const permissions = new Map(
+    permissionDefinitions.map((permission) => [permission.code, permission]),
+  );
   const queries = new Map(queryDefinitions.map((query) => [query.code, query]));
   const menus = json('menus.json');
   const models = json('models.json');
@@ -834,8 +928,11 @@ export function buildReleaseManifest() {
     }
   }
   assert.equal(semanticActions.length, 26, 'RG-1 semantic-action denominator drifted');
-  assert.equal(new Set(semanticActions.map((row) => row.id)).size, 26,
-    'RG-1 semantic action codes must be unique');
+  assert.equal(
+    new Set(semanticActions.map((row) => row.id)).size,
+    26,
+    'RG-1 semantic action codes must be unique',
+  );
 
   const coreWorkbenchRuntimeCoverage = {
     ...CORE_WORKBENCH_COVERAGE,
@@ -845,17 +942,43 @@ export function buildReleaseManifest() {
     const separator = blockKey.indexOf(':');
     const pageKey = blockKey.slice(0, separator);
     const blockId = blockKey.slice(separator + 1);
-    assert.ok(allBlocks(pages.get(pageKey)).some((block) => block.id === blockId),
-      `RG-1 covered block no longer exists: ${blockKey}`);
+    assert.ok(
+      allBlocks(pages.get(pageKey)).some((block) => block.id === blockId),
+      `RG-1 covered block no longer exists: ${blockKey}`,
+    );
   }
   for (const fieldKey of CORE_WORKBENCH_COVERAGE.fields) {
     const [pageKey, blockId, ...fieldParts] = fieldKey.split(':');
     const field = fieldParts.join(':');
     const page = pages.get(pageKey);
     const structure = collectPageStructure(page, `plugins/crm/config/pages/${pageKey}.json`);
-    assert.ok(structure.fields.some((candidate) =>
-      candidate.blockId === blockId && candidate.field === field),
-    `RG-1 covered field no longer exists: ${fieldKey}`);
+    assert.ok(
+      structure.fields.some(
+        (candidate) => candidate.blockId === blockId && candidate.field === field,
+      ),
+      `RG-1 covered field no longer exists: ${fieldKey}`,
+    );
+  }
+  for (const blockKey of FORECAST_VARIANCE_COVERAGE.blocks) {
+    const separator = blockKey.indexOf(':');
+    const pageKey = blockKey.slice(0, separator);
+    const blockId = blockKey.slice(separator + 1);
+    assert.ok(
+      allBlocks(pages.get(pageKey)).some((block) => block.id === blockId),
+      `forecast-variance covered block no longer exists: ${blockKey}`,
+    );
+  }
+  for (const fieldKey of FORECAST_VARIANCE_COVERAGE.fields) {
+    const [pageKey, blockId, ...fieldParts] = fieldKey.split(':');
+    const field = fieldParts.join(':');
+    const page = pages.get(pageKey);
+    const structure = collectPageStructure(page, `plugins/crm/config/pages/${pageKey}.json`);
+    assert.ok(
+      structure.fields.some(
+        (candidate) => candidate.blockId === blockId && candidate.field === field,
+      ),
+      `forecast-variance covered field no longer exists: ${fieldKey}`,
+    );
   }
 
   const rg1Commands = new Set(
@@ -886,37 +1009,39 @@ export function buildReleaseManifest() {
     };
   });
 
-  const pageRows = uniq([...RG1_PAGES, ...RG2_PAGES, ...RELEASE_B_COVERAGE.pages]).map((pageKey) => {
-    const page = pages.get(pageKey);
-    assert.ok(page, `missing release page ${pageKey}`);
-    const goals = [
-      ...(RG1_PAGES.includes(pageKey) ? ['RG-1'] : []),
-      ...(pageKey === 'crm_lead_desk_workbench' ? ['RG-3'] : []),
-      ...(RG2_PAGES.includes(pageKey) ? ['RG-2'] : []),
-      ...(releaseBCoverageSets.pages.has(pageKey) ? ['RELEASE-B'] : []),
-    ];
-    const evidence = uniq([
-      ...(RG1_PAGES.includes(pageKey) ? [EVIDENCE.rg1Browser] : []),
-      ...(pageKey === 'crm_lead_desk_workbench' ? [EVIDENCE.rg3Journey] : []),
-      ...(pageKey === 'crm_qdp_release_workbench' ? [EVIDENCE.rg2QdpBrowser] : []),
-      ...(RG2_PAGES.includes(pageKey) && pageKey !== 'crm_qdp_release_workbench'
-        ? [EVIDENCE.rg2OrderBrowser]
-        : []),
-      ...(releaseBCoverageSets.pages.has(pageKey) ? [EVIDENCE.releaseB] : []),
-    ]);
-    const menuPermissions = menus
-      .filter((menu) => menu.pageKey === pageKey && menu.permissionCode)
-      .map((menu) => menu.permissionCode);
-    return {
-      id: pageKey,
-      goals,
-      kind: page.kind,
-      permissionCodes: uniq([page.permissionCode, ...menuPermissions].filter(Boolean)),
-      evidence: uniq(evidence),
-      permissionsVerified: goals.some((goal) => goal !== 'RELEASE-B'),
-      verdict: 'pass',
-    };
-  });
+  const pageRows = uniq([...RG1_PAGES, ...RG2_PAGES, ...RELEASE_B_COVERAGE.pages]).map(
+    (pageKey) => {
+      const page = pages.get(pageKey);
+      assert.ok(page, `missing release page ${pageKey}`);
+      const goals = [
+        ...(RG1_PAGES.includes(pageKey) ? ['RG-1'] : []),
+        ...(pageKey === 'crm_lead_desk_workbench' ? ['RG-3'] : []),
+        ...(RG2_PAGES.includes(pageKey) ? ['RG-2'] : []),
+        ...(releaseBCoverageSets.pages.has(pageKey) ? ['RELEASE-B'] : []),
+      ];
+      const evidence = uniq([
+        ...(RG1_PAGES.includes(pageKey) ? [EVIDENCE.rg1Browser] : []),
+        ...(pageKey === 'crm_lead_desk_workbench' ? [EVIDENCE.rg3Journey] : []),
+        ...(pageKey === 'crm_qdp_release_workbench' ? [EVIDENCE.rg2QdpBrowser] : []),
+        ...(RG2_PAGES.includes(pageKey) && pageKey !== 'crm_qdp_release_workbench'
+          ? [EVIDENCE.rg2OrderBrowser]
+          : []),
+        ...(releaseBCoverageSets.pages.has(pageKey) ? [EVIDENCE.releaseB] : []),
+      ]);
+      const menuPermissions = menus
+        .filter((menu) => menu.pageKey === pageKey && menu.permissionCode)
+        .map((menu) => menu.permissionCode);
+      return {
+        id: pageKey,
+        goals,
+        kind: page.kind,
+        permissionCodes: uniq([page.permissionCode, ...menuPermissions].filter(Boolean)),
+        evidence: uniq(evidence),
+        permissionsVerified: goals.some((goal) => goal !== 'RELEASE-B'),
+        verdict: 'pass',
+      };
+    },
+  );
 
   const permissionEvidence = new Map();
   const addPermissionEvidence = (code, files) => {
@@ -924,7 +1049,8 @@ export function buildReleaseManifest() {
     assert.ok(permissions.has(code), `missing release permission ${code}`);
     permissionEvidence.set(code, uniq([...(permissionEvidence.get(code) ?? []), ...files]));
   };
-  for (const action of semanticActions) addPermissionEvidence(action.permissionCode, action.evidence);
+  for (const action of semanticActions)
+    addPermissionEvidence(action.permissionCode, action.evidence);
   for (const command of commandRows) {
     if (!command.permissionsVerified) continue;
     for (const code of command.permissionCodes) addPermissionEvidence(code, command.evidence);
@@ -933,7 +1059,8 @@ export function buildReleaseManifest() {
     if (!page.permissionsVerified) continue;
     for (const code of page.permissionCodes) addPermissionEvidence(code, page.evidence);
   }
-  const permissionRows = [...permissionEvidence.entries()].sort(([a], [b]) => a.localeCompare(b))
+  const permissionRows = [...permissionEvidence.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
     .map(([code, evidence]) => ({ id: code, evidence, verdict: 'pass' }));
 
   const queryEvidence = new Map();
@@ -957,7 +1084,12 @@ export function buildReleaseManifest() {
     assert.ok(queries.has(code), `missing dashboard named query ${code}`);
     queryEvidence.set(code, uniq([...(queryEvidence.get(code) ?? []), EVIDENCE.dashboards]));
   }
-  const queryRows = [...queryEvidence.entries()].sort(([a], [b]) => a.localeCompare(b))
+  for (const code of FORECAST_VARIANCE_COVERAGE.queries) {
+    assert.ok(queries.has(code), `missing forecast-variance named query ${code}`);
+    queryEvidence.set(code, uniq([...(queryEvidence.get(code) ?? []), EVIDENCE.forecastVariance]));
+  }
+  const queryRows = [...queryEvidence.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
     .map(([code, evidence]) => {
       const query = queries.get(code);
       return {
@@ -970,7 +1102,10 @@ export function buildReleaseManifest() {
     });
 
   for (const source of Object.values(EVIDENCE)) {
-    assert.ok(fs.existsSync(path.join(REPO_ROOT, source)), `missing executable evidence source ${source}`);
+    assert.ok(
+      fs.existsSync(path.join(REPO_ROOT, source)),
+      `missing executable evidence source ${source}`,
+    );
   }
 
   const groups = buildProductGroups({
@@ -987,11 +1122,15 @@ export function buildReleaseManifest() {
     releaseQueryRows: queryRows,
     releaseSemanticActions: semanticActions,
   });
-  const productDenominator = Object.fromEntries(groups.map((group) => [group.id, group.rows.length]));
-  const productVerdicts = groups.flatMap((group) => group.rows).reduce((counts, row) => {
-    counts[row.verdict] = (counts[row.verdict] ?? 0) + 1;
-    return counts;
-  }, {});
+  const productDenominator = Object.fromEntries(
+    groups.map((group) => [group.id, group.rows.length]),
+  );
+  const productVerdicts = groups
+    .flatMap((group) => group.rows)
+    .reduce((counts, row) => {
+      counts[row.verdict] = (counts[row.verdict] ?? 0) + 1;
+      return counts;
+    }, {});
 
   return {
     schemaVersion: 2,
@@ -1014,10 +1153,31 @@ export function buildReleaseManifest() {
       fullProductNonGoals: ['data migration'],
     },
     goals: [
-      { id: 'RG-1', verdict: 'pass', note: '26/26 semantic actions and five workbenches have real-stack browser evidence.' },
-      { id: 'RG-2', verdict: 'pass', note: 'QDP release and order commitment have true-stack and browser evidence.' },
-      { id: 'RG-3', verdict: 'partial', note: 'Clean-room automation passes; independent non-developer human sign-off is still pending.' },
-      { id: 'RG-4', verdict: 'pass', note: 'This committed manifest is freshness-gated and mutation-falsifiable.' },
+      {
+        id: 'RG-1',
+        verdict: 'pass',
+        note: '26/26 semantic actions and five workbenches have real-stack browser evidence.',
+      },
+      {
+        id: 'RG-2',
+        verdict: 'pass',
+        note: 'QDP release and order commitment have true-stack and browser evidence.',
+      },
+      {
+        id: 'RG-3',
+        verdict: 'partial',
+        note: 'Clean-room automation passes; independent non-developer human sign-off is still pending.',
+      },
+      {
+        id: 'RG-4',
+        verdict: 'pass',
+        note: 'This committed manifest is freshness-gated and mutation-falsifiable.',
+      },
+      {
+        id: 'CORDYS-FORECAST-VARIANCE',
+        verdict: 'pass',
+        note: 'Selected forecast submissions are compared with live owner facts and drilled down to exact opportunity drivers.',
+      },
     ],
     axes: {
       semanticActions,
@@ -1035,16 +1195,39 @@ export function buildReleaseManifest() {
         minimumScreenshots: 20,
         expectedCoverage: coreWorkbenchRuntimeCoverage,
       },
-      { id: 'RG2-QDP-STACK', filePrefix: 'qdp-release-center-true-stack-', minimumChecks: 20 },
-      { id: 'RG2-QDP-BROWSER', filePrefix: 'qdp-release-center-browser-', minimumScenarios: 6, minimumScreenshots: 1 },
-      { id: 'RG2-ORDER-STACK', filePrefix: 'order-commitment-true-stack-', minimumChecks: 8 },
-      { id: 'RG2-ORDER-BROWSER', filePrefix: 'order-commitment-browser-', minimumScenarios: 3, minimumScreenshots: 2 },
-      { id: 'RG3-CLEAN-ROOM', filePrefix: 'crm-adoption-journey-', maximumElapsedSeconds: 1800, minimumCheckpoints: 6 },
+      {
+        id: 'RG2-QDP-STACK',
+        filePrefix: 'qdp-release-center-true-stack-',
+        minimumChecks: 20,
+      },
+      {
+        id: 'RG2-QDP-BROWSER',
+        filePrefix: 'qdp-release-center-browser-',
+        minimumScenarios: 6,
+        minimumScreenshots: 1,
+      },
+      {
+        id: 'RG2-ORDER-STACK',
+        filePrefix: 'order-commitment-true-stack-',
+        minimumChecks: 8,
+      },
+      {
+        id: 'RG2-ORDER-BROWSER',
+        filePrefix: 'order-commitment-browser-',
+        minimumScenarios: 3,
+        minimumScreenshots: 2,
+      },
+      {
+        id: 'RG3-CLEAN-ROOM',
+        filePrefix: 'crm-adoption-journey-',
+        maximumElapsedSeconds: 1800,
+        minimumCheckpoints: 6,
+      },
       {
         id: 'RELEASE-B-OPPORTUNITY',
         filePrefix: 'crm-opportunity-efficiency-',
-        expectedScenarios: 7,
-        minimumScreenshots: 12,
+        expectedScenarios: 11,
+        minimumScreenshots: 24,
         expectedCoverage: RELEASE_B_COVERAGE,
       },
       {
@@ -1058,12 +1241,20 @@ export function buildReleaseManifest() {
         requireNoFailedRuntimeRequests: true,
         requireSeedLineage: true,
       },
+      {
+        id: 'CRM-FORECAST-VARIANCE',
+        filePrefix: 'crm-forecast-variance-',
+        expectedActions: 8,
+        minimumScreenshots: 2,
+        expectedCoverage: FORECAST_VARIANCE_COVERAGE,
+      },
     ],
     untested: [
       {
         id: 'RG3-INDEPENDENT-HUMAN-ADOPTER',
         verdict: 'untested',
-        reason: 'A developer-authored automation run cannot prove that a person who did not participate in development completed the browser journey.',
+        reason:
+          'A developer-authored automation run cannot prove that a person who did not participate in development completed the browser journey.',
       },
     ],
     groups,
@@ -1073,14 +1264,21 @@ export function buildReleaseManifest() {
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]));
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, stable(value[key])]),
+    );
   }
   return value;
 }
 
 export function assertManifestMatches(actual, expected = buildReleaseManifest()) {
-  assert.deepEqual(stable(actual), stable(expected),
-    'committed CRM coverage manifest drifted from DSL, executable evidence, or release scope');
+  assert.deepEqual(
+    stable(actual),
+    stable(expected),
+    'committed CRM coverage manifest drifted from DSL, executable evidence, or release scope',
+  );
 }
 
 function walkFiles(root) {
@@ -1098,8 +1296,10 @@ function assertSameMembers(actual, expected, label) {
 }
 
 function validateScreenshots(receipt, minimum, label) {
-  assert.ok((receipt.screenshots ?? []).length >= minimum,
-    `${label} expected at least ${minimum} screenshots`);
+  assert.ok(
+    (receipt.screenshots ?? []).length >= minimum,
+    `${label} expected at least ${minimum} screenshots`,
+  );
   for (const screenshot of receipt.screenshots ?? []) {
     assert.ok(fs.existsSync(screenshot), `${label} screenshot is missing: ${screenshot}`);
     assert.ok(fs.statSync(screenshot).size > 0, `${label} screenshot is empty: ${screenshot}`);
@@ -1119,58 +1319,126 @@ export function verifyRuntimeEvidence(evidenceRoot, manifest = buildReleaseManif
       }))
       .filter(({ receipt }) => (receipt.verdict ?? receipt.technicalVerdict) === 'pass');
     assert.ok(candidates.length > 0, `${contract.id} has no passing machine receipt`);
-    const selected = contract.id === 'RG3-CLEAN-ROOM'
-      ? candidates.sort((a, b) => (b.receipt.elapsedSeconds ?? 0) - (a.receipt.elapsedSeconds ?? 0))[0]
-      : candidates.sort((a, b) => b.mtimeMs - a.mtimeMs)[0];
+    const selected =
+      contract.id === 'RG3-CLEAN-ROOM'
+        ? candidates.sort(
+            (a, b) => (b.receipt.elapsedSeconds ?? 0) - (a.receipt.elapsedSeconds ?? 0),
+          )[0]
+        : candidates.sort((a, b) => b.mtimeMs - a.mtimeMs)[0];
     const { file, receipt } = selected;
 
     if (contract.expectedActions) {
-      assert.equal(receipt.expectedActions?.length, contract.expectedActions, `${contract.id} denominator`);
-      assertSameMembers(receipt.completedActions, receipt.expectedActions, `${contract.id} incomplete action set`);
+      assert.equal(
+        receipt.expectedActions?.length,
+        contract.expectedActions,
+        `${contract.id} denominator`,
+      );
+      assertSameMembers(
+        receipt.completedActions,
+        receipt.expectedActions,
+        `${contract.id} incomplete action set`,
+      );
     }
     if (contract.expectedScenarios) {
-      assert.equal(receipt.expectedScenarios?.length, contract.expectedScenarios, `${contract.id} scenario denominator`);
-      assertSameMembers(receipt.completedScenarios, receipt.expectedScenarios, `${contract.id} incomplete scenarios`);
+      assert.equal(
+        receipt.expectedScenarios?.length,
+        contract.expectedScenarios,
+        `${contract.id} scenario denominator`,
+      );
+      assertSameMembers(
+        receipt.completedScenarios,
+        receipt.expectedScenarios,
+        `${contract.id} incomplete scenarios`,
+      );
     }
     if (contract.minimumScenarios) {
-      assert.ok((receipt.expectedScenarios ?? []).length >= contract.minimumScenarios, `${contract.id} scenario count`);
-      assertSameMembers(receipt.completedScenarios, receipt.expectedScenarios, `${contract.id} incomplete scenarios`);
+      assert.ok(
+        (receipt.expectedScenarios ?? []).length >= contract.minimumScenarios,
+        `${contract.id} scenario count`,
+      );
+      assertSameMembers(
+        receipt.completedScenarios,
+        receipt.expectedScenarios,
+        `${contract.id} incomplete scenarios`,
+      );
     }
     if (contract.minimumChecks) {
-      assert.ok((receipt.checks ?? []).length >= contract.minimumChecks, `${contract.id} check count`);
-      assert.ok(receipt.checks.every((check) => check.result === 'pass'), `${contract.id} contains a failed check`);
+      assert.ok(
+        (receipt.checks ?? []).length >= contract.minimumChecks,
+        `${contract.id} check count`,
+      );
+      assert.ok(
+        receipt.checks.every((check) => check.result === 'pass'),
+        `${contract.id} contains a failed check`,
+      );
     }
     if (contract.minimumCheckpoints) {
-      assert.ok((receipt.checkpoints ?? []).length >= contract.minimumCheckpoints, `${contract.id} checkpoint count`);
-      assert.ok(receipt.checkpoints.every((check) => check.result === 'pass'), `${contract.id} contains a failed checkpoint`);
+      assert.ok(
+        (receipt.checkpoints ?? []).length >= contract.minimumCheckpoints,
+        `${contract.id} checkpoint count`,
+      );
+      assert.ok(
+        receipt.checkpoints.every((check) => check.result === 'pass'),
+        `${contract.id} contains a failed checkpoint`,
+      );
     }
     if (contract.maximumElapsedSeconds) {
-      assert.ok(receipt.elapsedSeconds <= contract.maximumElapsedSeconds, `${contract.id} exceeded deadline`);
+      assert.ok(
+        receipt.elapsedSeconds <= contract.maximumElapsedSeconds,
+        `${contract.id} exceeded deadline`,
+      );
     }
-    if (contract.minimumScreenshots) validateScreenshots(receipt, contract.minimumScreenshots, contract.id);
+    if (contract.minimumScreenshots)
+      validateScreenshots(receipt, contract.minimumScreenshots, contract.id);
     if (contract.expectedTechnicalVerdict) {
-      assert.equal(receipt.technicalVerdict, contract.expectedTechnicalVerdict,
-        `${contract.id} technical verdict`);
+      assert.equal(
+        receipt.technicalVerdict,
+        contract.expectedTechnicalVerdict,
+        `${contract.id} technical verdict`,
+      );
     }
     if (contract.expectedDataMigration) {
-      assert.equal(receipt.dataMigration, contract.expectedDataMigration,
-        `${contract.id} data-migration scope`);
+      assert.equal(
+        receipt.dataMigration,
+        contract.expectedDataMigration,
+        `${contract.id} data-migration scope`,
+      );
     }
     if (contract.requireNoFailedRuntimeRequests) {
-      assert.deepEqual(receipt.failedRuntimeRequests, [], `${contract.id} runtime request failures`);
+      assert.deepEqual(
+        receipt.failedRuntimeRequests,
+        [],
+        `${contract.id} runtime request failures`,
+      );
     }
     if (contract.requireSeedLineage) {
-      assert.ok(['self-seeded', 'reuse-clean-seed'].includes(receipt.fixtureMode),
-        `${contract.id} fixture mode`);
+      assert.ok(
+        ['self-seeded', 'reuse-clean-seed'].includes(receipt.fixtureMode),
+        `${contract.id} fixture mode`,
+      );
       let seedReceipt = receipt;
       if (receipt.fixtureMode === 'reuse-clean-seed') {
-        assert.ok(receipt.seedReceipt, `${contract.id} reused fixture must identify its seed receipt`);
+        assert.ok(
+          receipt.seedReceipt,
+          `${contract.id} reused fixture must identify its seed receipt`,
+        );
         assert.ok(fs.existsSync(receipt.seedReceipt), `${contract.id} seed receipt is missing`);
         seedReceipt = JSON.parse(fs.readFileSync(receipt.seedReceipt, 'utf8'));
       }
-      assert.equal(seedReceipt.fixtureMode, 'self-seeded', `${contract.id} seed must be self-seeded`);
+      assert.equal(
+        seedReceipt.fixtureMode,
+        'self-seeded',
+        `${contract.id} seed must be self-seeded`,
+      );
       assert.equal(seedReceipt.technicalVerdict, 'pass', `${contract.id} seed verdict`);
-      for (const key of ['account', 'leads', 'opportunities', 'activities', 'quotes', 'complaint']) {
+      for (const key of [
+        'account',
+        'leads',
+        'opportunities',
+        'activities',
+        'quotes',
+        'complaint',
+      ]) {
         assert.ok(seedReceipt.recordIds?.[key], `${contract.id} seed receipt missing ${key}`);
       }
     }
@@ -1178,8 +1446,16 @@ export function verifyRuntimeEvidence(evidenceRoot, manifest = buildReleaseManif
       for (const [axis, expected] of Object.entries(contract.expectedCoverage)) {
         const coverage = receipt.coverage?.[axis];
         assert.ok(coverage, `${contract.id} missing coverage axis ${axis}`);
-        assertSameMembers(coverage.expected, expected, `${contract.id} ${axis} declared denominator drift`);
-        assertSameMembers(coverage.completed, expected, `${contract.id} ${axis} incomplete runtime coverage`);
+        assertSameMembers(
+          coverage.expected,
+          expected,
+          `${contract.id} ${axis} declared denominator drift`,
+        );
+        assertSameMembers(
+          coverage.completed,
+          expected,
+          `${contract.id} ${axis} incomplete runtime coverage`,
+        );
       }
     }
     results.push({
@@ -1212,13 +1488,20 @@ export function runMutationProof(manifest) {
 
   assertManifestMatches(manifest);
   phases.push({ phase: 'green-restored', result: 'pass' });
-  return { schemaVersion: 2, verdict: 'pass', mutation: 'remove one of 26 semantic actions', phases };
+  return {
+    schemaVersion: 2,
+    verdict: 'pass',
+    mutation: 'remove one of 26 semantic actions',
+    phases,
+  };
 }
 
 export function assertFullProductReady(manifest) {
-  const incomplete = manifest.groups.flatMap((group) => group.rows
-    .filter((row) => row.verdict !== 'pass')
-    .map((row) => `${group.id}/${row.id}:${row.verdict}`));
+  const incomplete = manifest.groups.flatMap((group) =>
+    group.rows
+      .filter((row) => row.verdict !== 'pass')
+      .map((row) => `${group.id}/${row.id}:${row.verdict}`),
+  );
   assert.equal(
     incomplete.length,
     0,
@@ -1243,7 +1526,9 @@ function main(argv) {
   if (argv.includes('--require-full-product')) assertFullProductReady(actual);
 
   const evidenceRoot = option(argv, '--evidence-root');
-  const runtimeEvidence = evidenceRoot ? verifyRuntimeEvidence(path.resolve(evidenceRoot), actual) : [];
+  const runtimeEvidence = evidenceRoot
+    ? verifyRuntimeEvidence(path.resolve(evidenceRoot), actual)
+    : [];
   const mutation = argv.includes('--self-test-mutation') ? runMutationProof(actual) : null;
   const mutationEvidencePath = option(argv, '--mutation-evidence');
   if (mutationEvidencePath && mutation) {
@@ -1254,7 +1539,9 @@ function main(argv) {
   const report = {
     verdict: 'pass',
     manifest: path.relative(REPO_ROOT, manifestPath),
-    counts: Object.fromEntries(Object.entries(actual.axes).map(([axis, rows]) => [axis, rows.length])),
+    counts: Object.fromEntries(
+      Object.entries(actual.axes).map(([axis, rows]) => [axis, rows.length]),
+    ),
     productDenominator: actual.scope.productDenominator,
     productVerdicts: actual.scope.productVerdicts,
     explicitUntested: actual.untested.length,

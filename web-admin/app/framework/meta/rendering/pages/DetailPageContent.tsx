@@ -810,6 +810,36 @@ function DetailPageContentInner(props: PageContentProps) {
   );
 
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [canManageRecordShares, setCanManageRecordShares] = useState(false);
+
+  useEffect(() => {
+    if (schema?.extension?.showShare === false || !recordModelCode || !routeRecordPid) {
+      setCanManageRecordShares(false);
+      return;
+    }
+    let cancelled = false;
+    const params = new URLSearchParams({
+      resourceCode: recordModelCode,
+      recordPid: routeRecordPid,
+    });
+    fetchResult<{ canManage?: boolean }>(
+      `/api/record-share/manage-capability?${params.toString()}`,
+      { method: 'get', token: token || undefined },
+    )
+      .then((result) => {
+        if (!cancelled) {
+          setCanManageRecordShares(
+            ResultHelper.isSuccess(result) && result.data?.canManage === true,
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCanManageRecordShares(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [recordModelCode, routeRecordPid, schema?.extension?.showShare, token]);
 
   const runtimeContext = useMemo(
     () => ({
@@ -1143,13 +1173,13 @@ function DetailPageContentInner(props: PageContentProps) {
               className="print-hide flex max-w-full flex-wrap items-center justify-start gap-2 sm:justify-end"
               data-print="hide"
             >
-              {schema.extension?.showShare !== false && (
+              {schema.extension?.showShare !== false && canManageRecordShares && (
                 <button
                   onClick={() => setShareDialogOpen(true)}
                   className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-3 py-1.5 text-sm font-medium"
                   data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'share-btn')}
                 >
-                  {t('action.share') || 'Share'}
+                  {t('action.share')}
                 </button>
               )}
               {schema.extension?.showReport !== false && recordData?.pid && (

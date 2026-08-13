@@ -142,19 +142,23 @@ public interface RecordShareService {
             Long tenantId, String resourceCode, String recordPid);
 
     /**
-     * Remove a share by its ID.
-     *
-     * @param tenantId tenant ID (for security verification)
-     * @param shareId  share record ID
+     * List every share relationship for management, including expired grants.
+     * Expired grants remain visible to the owner so they can be renewed or removed,
+     * while all access-evaluation methods continue to exclude them.
      */
-    void removeById(Long tenantId, Long shareId);
+    java.util.List<com.auraboot.framework.permission.entity.RecordShare> listByRecordPidForManagement(
+            Long tenantId, String resourceCode, String recordPid);
 
-    /**
-     * Look up a share by its ID, scoped to the tenant.
-     *
-     * @param tenantId tenant ID (for isolation)
-     * @param shareId  share record ID
-     * @return the share, or {@code null} if not found or belonging to another tenant
-     */
-    com.auraboot.framework.permission.entity.RecordShare getByIdInTenant(Long tenantId, Long shareId);
+    /** Update the permission mask and optional expiry through the public share PID. */
+    void updateByPid(
+            Long tenantId,
+            String sharePid,
+            String permissionMask,
+            Instant expiresAt);
+
+    /** Remove a share by its stable public PID, scoped to the tenant. */
+    void removeByPid(Long tenantId, String sharePid);
+
+    /** Look up a share by its stable public PID, scoped to the tenant. */
+    com.auraboot.framework.permission.entity.RecordShare getByPidInTenant(Long tenantId, String sharePid);
 }

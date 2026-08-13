@@ -417,11 +417,11 @@ test.describe('Dashboard Management', () => {
     // Verify DSL toolbar create button (data-testid="toolbar-btn-create")
     await expect(page.locator('[data-testid="toolbar-btn-create"]')).toBeVisible();
 
-    // Verify Import/Export buttons exist in the more menu
+    // Dashboard management supports export but does not opt in to generic Excel import.
     const moreMenuBtn = page.locator('[data-testid="toolbar-more-menu"]');
     await expect(moreMenuBtn).toBeVisible();
     await moreMenuBtn.click();
-    await expect(page.locator('[data-testid="more-menu-import"]')).toBeVisible();
+    await expect(page.locator('[data-testid="more-menu-import"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="more-menu-export-excel"]')).toBeVisible();
     // Close the menu
     await page.keyboard.press('Escape');

@@ -29,6 +29,13 @@ describe('isBinaryDownloadPath', () => {
     ).toBe(true);
   });
 
+  it('detects generated Excel template endpoints before axios can decode OOXML as text', () => {
+    expect(
+      isBinaryDownloadPath('/api/meta/excel/template/crm_account_common?mode=insert'),
+    ).toBe(true);
+    expect(isBinaryDownloadPath('/api/meta/excel/template/crm_lead_common?mode=update')).toBe(true);
+  });
+
   it('does not over-match paths that merely contain "download"', () => {
     expect(isBinaryDownloadPath('/api/downloads/list')).toBe(false);
     expect(isBinaryDownloadPath('/api/file/downloaded')).toBe(false);

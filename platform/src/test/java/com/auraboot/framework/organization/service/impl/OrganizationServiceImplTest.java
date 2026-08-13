@@ -1,6 +1,7 @@
 package com.auraboot.framework.organization.service.impl;
 
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.organization.dto.DepartmentTreeNode;
@@ -12,6 +13,7 @@ import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -64,6 +66,11 @@ class OrganizationServiceImplTest {
     @BeforeEach
     void setUp() {
         // some tests don't need dept/emp lookups — use lenient stubs only when registered
+    }
+
+    @AfterEach
+    void clearMetaContext() {
+        MetaContext.clear();
     }
 
     @Test
@@ -125,6 +132,74 @@ class OrganizationServiceImplTest {
         when(dynamicDataService.list(eq("org_employee"), any(DynamicQueryRequest.class)))
             .thenReturn(page(List.of()));
         assertNull(service.getEmployeeByMemberPid("m2"));
+    }
+
+    @Test
+    @DisplayName("getEmployeeByUserPid uses the public user reference and handles blank or missing links")
+    void getEmployeeByUserPid() {
+        assertNull(service.getEmployeeByUserPid(null));
+        assertNull(service.getEmployeeByUserPid(" "));
+
+        Map<String, Object> e = emp("e1", "d1", null);
+        when(dynamicDataService.list(eq("org_employee"), any(DynamicQueryRequest.class)))
+            .thenAnswer(invocation -> {
+                DynamicQueryRequest request = invocation.getArgument(1);
+                assertEquals("org_emp_user_id", request.getConditions().getFirst().getFieldName());
+                assertEquals("user-pid-1", request.getConditions().getFirst().getValue());
+                return page(List.of(e));
+            });
+        assertSame(e, service.getEmployeeByUserPid("user-pid-1"));
+
+        when(dynamicDataService.list(eq("org_employee"), any(DynamicQueryRequest.class)))
+            .thenReturn(page(List.of()));
+        assertNull(service.getEmployeeByUserPid("missing-user"));
+    }
+
+    @Test
+    @DisplayName("getCurrentDepartmentUserPids resolves current member, descendants and every employee page")
+    void getCurrentDepartmentUserPids() {
+        MetaContext.setContext(9L, 7L, "current-user", "tester");
+        MetaContext.setMemberId(5L);
+        TenantMember member = new TenantMember();
+        member.setPid("member-5");
+        when(tenantMemberService.getById(5L)).thenReturn(member);
+
+        Map<String, Object> current = emp("current-emp", "d1", null);
+        current.put("org_emp_member_id", "member-5");
+        current.put("org_emp_user_id", "current-user");
+        Map<String, Object> peer = emp("peer-emp", "d1-child", null);
+        peer.put("org_emp_user_id", "peer-user");
+
+        Map<String, Object> root = dept("d1", "root", null, null);
+        Map<String, Object> child = dept("d1-child", "child", "d1", null);
+        when(dynamicDataService.list(eq("org_department"), any(DynamicQueryRequest.class)))
+            .thenReturn(page(List.of(root, child)));
+        when(dynamicDataService.list(eq("org_employee"), any(DynamicQueryRequest.class)))
+            .thenAnswer(invocation -> {
+                DynamicQueryRequest request = invocation.getArgument(1);
+                if (request.getPageSize() == 1) {
+                    return page(List.of(current));
+                }
+                if (request.getConditions() == null) {
+                    return page(List.of()); // employee counts during department-tree build
+                }
+                assertEquals(List.of("d1", "d1-child"), request.getConditions().getFirst().getValues());
+                return page(List.of(current, peer));
+            });
+
+        assertEquals(List.of("current-user", "peer-user"),
+                service.getCurrentDepartmentUserPids(true));
+    }
+
+    @Test
+    @DisplayName("getCurrentDepartmentUserPids fails closed without a linked member or department")
+    void getCurrentDepartmentUserPidsMissingLink() {
+        assertTrue(service.getCurrentDepartmentUserPids(true).isEmpty());
+
+        MetaContext.setContext(9L, 7L, "current-user", "tester");
+        MetaContext.setMemberId(5L);
+        when(tenantMemberService.getById(5L)).thenReturn(null);
+        assertTrue(service.getCurrentDepartmentUserPids(true).isEmpty());
     }
 
     @Test

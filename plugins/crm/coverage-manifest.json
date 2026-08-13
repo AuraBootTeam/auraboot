@@ -27,17 +27,17 @@
       "model-surfaces": 37,
       "menus": 45,
       "pages": 96,
-      "page-blocks": 312,
-      "page-fields": 1312,
-      "ui-actions": 464,
+      "page-blocks": 316,
+      "page-fields": 1325,
+      "ui-actions": 468,
       "commands": 193,
-      "permissions": 87,
-      "queries": 43,
+      "permissions": 91,
+      "queries": 45,
       "dashboards": 37
     },
     "productVerdicts": {
-      "pass": 309,
-      "untested": 2317
+      "pass": 329,
+      "untested": 2324
     },
     "fullProductNonGoals": [
       "data migration"
@@ -63,6 +63,11 @@
       "id": "RG-4",
       "verdict": "pass",
       "note": "This committed manifest is freshness-gated and mutation-falsifiable."
+    },
+    {
+      "id": "CORDYS-FORECAST-VARIANCE",
+      "verdict": "pass",
+      "note": "Selected forecast submissions are compared with live owner facts and drilled down to exact opportunity drivers."
     }
   ],
   "axes": {
@@ -793,13 +798,15 @@
       {
         "id": "crm:win_opportunity",
         "goals": [
-          "RG-1"
+          "RG-1",
+          "RELEASE-B"
         ],
         "permissionCodes": [
           "crm.opportunity.manage"
         ],
         "evidence": [
-          "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
         ],
         "permissionsVerified": true,
         "verdict": "pass"
@@ -1193,6 +1200,28 @@
         "verdict": "pass"
       },
       {
+        "id": "crm_forecast_variance_drivers",
+        "resourceCode": "crm_opportunity_common",
+        "actionCode": "read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/e2e/forecast-variance.golden.spec.ts",
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_forecast_variance_summary",
+        "resourceCode": "crm_forecast_submission",
+        "actionCode": "read",
+        "evidence": [
+          "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+          "plugins/crm/e2e/forecast-variance.golden.spec.ts",
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
         "id": "crm_lead_desk_queue",
         "resourceCode": "crm_lead_common",
         "actionCode": "read",
@@ -1566,8 +1595,8 @@
     {
       "id": "RELEASE-B-OPPORTUNITY",
       "filePrefix": "crm-opportunity-efficiency-",
-      "expectedScenarios": 7,
-      "minimumScreenshots": 12,
+      "expectedScenarios": 11,
+      "minimumScreenshots": 24,
       "expectedCoverage": {
         "pages": [
           "crm_contact_common_list",
@@ -1584,7 +1613,8 @@
           "crm:create_opp_task",
           "crm:create_opportunity",
           "crm:create_quote_summary",
-          "crm:qualify_opportunity"
+          "crm:qualify_opportunity",
+          "crm:win_opportunity"
         ],
         "queries": [
           "crm_account_stats",
@@ -1601,6 +1631,13 @@
           "crm_opportunity_common_detail:crm_opportunity_tabs:activities",
           "crm_opportunity_common_detail:crm_opportunity_tabs:plan_and_quotes",
           "crm_opportunity_common_list:crm_opp_table:bulk_qualify",
+          "crm_opportunity_common_list:platform:add_advanced_filter",
+          "crm_opportunity_common_list:platform:configure_view_columns",
+          "crm_opportunity_common_list:platform:export_filtered_csv",
+          "crm_opportunity_common_list:platform:analyze_current_view",
+          "crm_opportunity_common_list:platform:select_preset_view",
+          "crm_opportunity_common_list:platform:drill_chart_to_list",
+          "crm_opportunity_common_list:platform:save_advanced_filters",
           "crm_opportunity_common_list:crm_opp_tabs:proposal"
         ],
         "blocks": [
@@ -1695,6 +1732,42 @@
       "expectedDataMigration": "out-of-scope-development-stage",
       "requireNoFailedRuntimeRequests": true,
       "requireSeedLineage": true
+    },
+    {
+      "id": "CRM-FORECAST-VARIANCE",
+      "filePrefix": "crm-forecast-variance-",
+      "expectedActions": 8,
+      "minimumScreenshots": 2,
+      "expectedCoverage": {
+        "queries": [
+          "crm_forecast_variance_summary",
+          "crm_forecast_variance_drivers"
+        ],
+        "blocks": [
+          "crm_forecast_cockpit:crm_forecast_variance_summary_intro",
+          "crm_forecast_cockpit:crm_forecast_variance_summary",
+          "crm_forecast_cockpit:crm_forecast_variance_drivers_intro",
+          "crm_forecast_cockpit:crm_forecast_variance_drivers"
+        ],
+        "fields": [
+          "crm_forecast_cockpit:crm_forecast_variance_summary:measure",
+          "crm_forecast_cockpit:crm_forecast_variance_summary:submitted_amount",
+          "crm_forecast_cockpit:crm_forecast_variance_summary:current_amount",
+          "crm_forecast_cockpit:crm_forecast_variance_summary:variance_amount",
+          "crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_name",
+          "crm_forecast_cockpit:crm_forecast_variance_drivers:account_name",
+          "crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_stage",
+          "crm_forecast_cockpit:crm_forecast_variance_drivers:forecast_category",
+          "crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_expected_amount",
+          "crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_probability",
+          "crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_expected_close_date",
+          "crm_forecast_cockpit:crm_forecast_variance_drivers:variance_driver"
+        ],
+        "uiActions": [
+          "crm_forecast_cockpit:crm_forecast_tabs:variance",
+          "crm_forecast_cockpit:crm_forecast_variance_drivers:open_variance_opportunity"
+        ]
+      }
     }
   ],
   "untested": [
@@ -6119,7 +6192,67 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[1].blocks[0]"
         },
         {
-          "id": "block:crm_forecast_cockpit:crm_forecast_status:7",
+          "id": "block:crm_forecast_cockpit:crm_forecast_variance_summary_intro:7",
+          "action": "Render and semantically verify description block crm_forecast_variance_summary_intro on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[0]"
+        },
+        {
+          "id": "block:crm_forecast_cockpit:crm_forecast_variance_summary:8",
+          "action": "Render and semantically verify table block crm_forecast_variance_summary on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[1]"
+        },
+        {
+          "id": "block:crm_forecast_cockpit:crm_forecast_variance_drivers_intro:9",
+          "action": "Render and semantically verify description block crm_forecast_variance_drivers_intro on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[2]"
+        },
+        {
+          "id": "block:crm_forecast_cockpit:crm_forecast_variance_drivers:10",
+          "action": "Render and semantically verify table block crm_forecast_variance_drivers on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[3]"
+        },
+        {
+          "id": "block:crm_forecast_cockpit:crm_forecast_status:11",
           "action": "Render and semantically verify status-banner block crm_forecast_status on crm_forecast_cockpit",
           "evidence": [
             "plugins/crm/e2e/core-workbenches.golden.spec.ts"
@@ -6134,7 +6267,7 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[5]"
         },
         {
-          "id": "block:crm_forecast_cockpit:crm_forecast_actions:8",
+          "id": "block:crm_forecast_cockpit:crm_forecast_actions:12",
           "action": "Render and semantically verify workbench-action-bar block crm_forecast_actions on crm_forecast_cockpit",
           "evidence": [
             "plugins/crm/e2e/core-workbenches.golden.spec.ts"
@@ -6149,7 +6282,7 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[6]"
         },
         {
-          "id": "block:crm_forecast_cockpit:crm_forecast_context:9",
+          "id": "block:crm_forecast_cockpit:crm_forecast_context:13",
           "action": "Render and semantically verify evidence-panel block crm_forecast_context on crm_forecast_cockpit",
           "evidence": [
             "plugins/crm/e2e/core-workbenches.golden.spec.ts"
@@ -16123,7 +16256,187 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[1].blocks[0].columns[3].field"
         },
         {
-          "id": "field:crm_forecast_cockpit:crm_forecast_status:crm_fcst_owner_display:12",
+          "id": "field:crm_forecast_cockpit:crm_forecast_variance_summary:measure:12",
+          "action": "Verify field measure in crm_forecast_variance_summary on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[1].columns[0].field"
+        },
+        {
+          "id": "field:crm_forecast_cockpit:crm_forecast_variance_summary:submitted_amount:13",
+          "action": "Verify field submitted_amount in crm_forecast_variance_summary on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[1].columns[1].field"
+        },
+        {
+          "id": "field:crm_forecast_cockpit:crm_forecast_variance_summary:current_amount:14",
+          "action": "Verify field current_amount in crm_forecast_variance_summary on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[1].columns[2].field"
+        },
+        {
+          "id": "field:crm_forecast_cockpit:crm_forecast_variance_summary:variance_amount:15",
+          "action": "Verify field variance_amount in crm_forecast_variance_summary on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[1].columns[3].field"
+        },
+        {
+          "id": "field:crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_name:16",
+          "action": "Verify field crm_opp_name in crm_forecast_variance_drivers on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[3].columns[0].field"
+        },
+        {
+          "id": "field:crm_forecast_cockpit:crm_forecast_variance_drivers:account_name:17",
+          "action": "Verify field account_name in crm_forecast_variance_drivers on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[3].columns[1].field"
+        },
+        {
+          "id": "field:crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_stage:18",
+          "action": "Verify field crm_opp_stage in crm_forecast_variance_drivers on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[3].columns[2].field"
+        },
+        {
+          "id": "field:crm_forecast_cockpit:crm_forecast_variance_drivers:forecast_category:19",
+          "action": "Verify field forecast_category in crm_forecast_variance_drivers on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[3].columns[3].field"
+        },
+        {
+          "id": "field:crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_expected_amount:20",
+          "action": "Verify field crm_opp_expected_amount in crm_forecast_variance_drivers on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[3].columns[4].field"
+        },
+        {
+          "id": "field:crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_probability:21",
+          "action": "Verify field crm_opp_probability in crm_forecast_variance_drivers on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[3].columns[5].field"
+        },
+        {
+          "id": "field:crm_forecast_cockpit:crm_forecast_variance_drivers:crm_opp_expected_close_date:22",
+          "action": "Verify field crm_opp_expected_close_date in crm_forecast_variance_drivers on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[3].columns[6].field"
+        },
+        {
+          "id": "field:crm_forecast_cockpit:crm_forecast_variance_drivers:variance_driver:23",
+          "action": "Verify field variance_driver in crm_forecast_variance_drivers on crm_forecast_cockpit",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[3].columns[7].field"
+        },
+        {
+          "id": "field:crm_forecast_cockpit:crm_forecast_status:crm_fcst_owner_display:24",
           "action": "Verify field crm_fcst_owner_display in crm_forecast_status on crm_forecast_cockpit",
           "evidence": [
             "plugins/crm/e2e/core-workbenches.golden.spec.ts"
@@ -16138,7 +16451,7 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[5].summaryFields[0].field"
         },
         {
-          "id": "field:crm_forecast_cockpit:crm_forecast_status:crm_fcst_commit_amount:13",
+          "id": "field:crm_forecast_cockpit:crm_forecast_status:crm_fcst_commit_amount:25",
           "action": "Verify field crm_fcst_commit_amount in crm_forecast_status on crm_forecast_cockpit",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -16151,7 +16464,7 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[5].summaryFields[1].field"
         },
         {
-          "id": "field:crm_forecast_cockpit:crm_forecast_status:crm_fcst_best_case_amount:14",
+          "id": "field:crm_forecast_cockpit:crm_forecast_status:crm_fcst_best_case_amount:26",
           "action": "Verify field crm_fcst_best_case_amount in crm_forecast_status on crm_forecast_cockpit",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -16164,7 +16477,7 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[5].summaryFields[2].field"
         },
         {
-          "id": "field:crm_forecast_cockpit:crm_forecast_status:crm_fcst_pipeline_amount:15",
+          "id": "field:crm_forecast_cockpit:crm_forecast_status:crm_fcst_pipeline_amount:27",
           "action": "Verify field crm_fcst_pipeline_amount in crm_forecast_status on crm_forecast_cockpit",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -16177,7 +16490,7 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[5].summaryFields[3].field"
         },
         {
-          "id": "field:crm_forecast_cockpit:crm_forecast_context:crm_fcst_code:16",
+          "id": "field:crm_forecast_cockpit:crm_forecast_context:crm_fcst_code:28",
           "action": "Verify field crm_fcst_code in crm_forecast_context on crm_forecast_cockpit",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -16190,7 +16503,7 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[7].sections[0].field"
         },
         {
-          "id": "field:crm_forecast_cockpit:crm_forecast_context:crm_fcst_period:17",
+          "id": "field:crm_forecast_cockpit:crm_forecast_context:crm_fcst_period:29",
           "action": "Verify field crm_fcst_period in crm_forecast_context on crm_forecast_cockpit",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -16203,7 +16516,7 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[7].sections[1].field"
         },
         {
-          "id": "field:crm_forecast_cockpit:crm_forecast_context:crm_fcst_owner_display:18",
+          "id": "field:crm_forecast_cockpit:crm_forecast_context:crm_fcst_owner_display:30",
           "action": "Verify field crm_fcst_owner_display in crm_forecast_context on crm_forecast_cockpit",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -16216,7 +16529,7 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[7].sections[2].field"
         },
         {
-          "id": "field:crm_forecast_cockpit:crm_forecast_context:crm_fcst_commit_amount:19",
+          "id": "field:crm_forecast_cockpit:crm_forecast_context:crm_fcst_commit_amount:31",
           "action": "Verify field crm_fcst_commit_amount in crm_forecast_context on crm_forecast_cockpit",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -16229,7 +16542,7 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[7].sections[3].field"
         },
         {
-          "id": "field:crm_forecast_cockpit:crm_forecast_context:crm_fcst_best_case_amount:20",
+          "id": "field:crm_forecast_cockpit:crm_forecast_context:crm_fcst_best_case_amount:32",
           "action": "Verify field crm_fcst_best_case_amount in crm_forecast_context on crm_forecast_cockpit",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -16242,7 +16555,7 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[7].sections[4].field"
         },
         {
-          "id": "field:crm_forecast_cockpit:crm_forecast_context:crm_fcst_notes:21",
+          "id": "field:crm_forecast_cockpit:crm_forecast_context:crm_fcst_notes:33",
           "action": "Verify field crm_fcst_notes in crm_forecast_context on crm_forecast_cockpit",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -20411,7 +20724,20 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[0].tabs[5].filter.field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_code:5",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_owner:5",
+          "action": "Verify field crm_opp_owner in crm_opp_table on crm_opportunity_common_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[0].action.input.field"
+        },
+        {
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_code:6",
           "action": "Verify field crm_opp_code in crm_opp_table on crm_opportunity_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -20424,7 +20750,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[0].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_name:6",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_name:7",
           "action": "Verify field crm_opp_name in crm_opp_table on crm_opportunity_common_list",
           "evidence": [
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
@@ -20439,7 +20765,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[1].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_account_id:7",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_account_id:8",
           "action": "Verify field crm_opp_account_id in crm_opp_table on crm_opportunity_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -20452,7 +20778,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[2].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_stage:8",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_stage:9",
           "action": "Verify field crm_opp_stage in crm_opp_table on crm_opportunity_common_list",
           "evidence": [
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
@@ -20467,7 +20793,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[3].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_forecast_category:9",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_forecast_category:10",
           "action": "Verify field crm_opp_forecast_category in crm_opp_table on crm_opportunity_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -20480,7 +20806,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[4].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_expected_amount:10",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_expected_amount:11",
           "action": "Verify field crm_opp_expected_amount in crm_opp_table on crm_opportunity_common_list",
           "evidence": [
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
@@ -20495,7 +20821,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[5].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_expected_close_date:11",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_expected_close_date:12",
           "action": "Verify field crm_opp_expected_close_date in crm_opp_table on crm_opportunity_common_list",
           "evidence": [
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
@@ -20510,7 +20836,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[6].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_probability:12",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_probability:13",
           "action": "Verify field crm_opp_probability in crm_opp_table on crm_opportunity_common_list",
           "evidence": [
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
@@ -20525,7 +20851,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[7].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_owner:13",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:crm_opp_owner:14",
           "action": "Verify field crm_opp_owner in crm_opp_table on crm_opportunity_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -20538,7 +20864,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[8].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:actions:14",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:actions:15",
           "action": "Verify field actions in crm_opp_table on crm_opportunity_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -20551,7 +20877,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[9].field"
         },
         {
-          "id": "field:crm_opportunity_common_list:crm_opp_table:created_at:15",
+          "id": "field:crm_opportunity_common_list:crm_opp_table:created_at:16",
           "action": "Verify field created_at in crm_opp_table on crm_opportunity_common_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -28427,7 +28753,22 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[1]"
         },
         {
-          "id": "ui-action:crm_forecast_cockpit:crm_forecast_submission_queue:view_forecast:4",
+          "id": "ui-action:crm_forecast_cockpit:crm_forecast_tabs:variance:4",
+          "action": "tab variance on crm_forecast_cockpit -> view-state:variance",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2]"
+        },
+        {
+          "id": "ui-action:crm_forecast_cockpit:crm_forecast_submission_queue:view_forecast:5",
           "action": "row-action view_forecast on crm_forecast_cockpit -> navigate:crm_forecast_submission_detail",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -28440,7 +28781,22 @@
           "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[0].blocks[0].rowActions[0]"
         },
         {
-          "id": "ui-action:crm_forecast_cockpit:crm_forecast_actions:submit_forecast:5",
+          "id": "ui-action:crm_forecast_cockpit:crm_forecast_variance_drivers:open_variance_opportunity:6",
+          "action": "row-action open_variance_opportunity on crm_forecast_cockpit -> navigate:crm_opportunity_common_detail",
+          "evidence": [
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_forecast_cockpit.json#root[4].tabs[2].blocks[3].rowActions[0]"
+        },
+        {
+          "id": "ui-action:crm_forecast_cockpit:crm_forecast_actions:submit_forecast:7",
           "action": "action submit_forecast on crm_forecast_cockpit -> command:crm:submit_forecast",
           "evidence": [
             "plugins/crm/e2e/core-workbenches.golden.spec.ts"
@@ -30063,7 +30419,20 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[1].buttons[0]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_qualify:7",
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_transfer_owner:7",
+          "action": "bulk-action bulk_transfer_owner on crm_opportunity_common_list -> bulk_field_command:crm:update_opportunity",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[0]"
+        },
+        {
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_qualify:8",
           "action": "bulk-action bulk_qualify on crm_opportunity_common_list -> bulk_state_transition:crm:qualify_opportunity",
           "evidence": [
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
@@ -30075,24 +30444,11 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[0]"
-        },
-        {
-          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_advance_proposal:8",
-          "action": "bulk-action bulk_advance_proposal on crm_opportunity_common_list -> bulk_state_transition:crm:advance_opp_to_proposal",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "authority": "blocking-release",
-          "driver": "browser",
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[1]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_advance_negotiation:9",
-          "action": "bulk-action bulk_advance_negotiation on crm_opportunity_common_list -> bulk_state_transition:crm:advance_opp_to_negotiation",
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_advance_proposal:9",
+          "action": "bulk-action bulk_advance_proposal on crm_opportunity_common_list -> bulk_state_transition:crm:advance_opp_to_proposal",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -30104,8 +30460,8 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[2]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_mark_lost:10",
-          "action": "bulk-action bulk_mark_lost on crm_opportunity_common_list -> bulk_state_transition:crm:lose_opportunity",
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_advance_negotiation:10",
+          "action": "bulk-action bulk_advance_negotiation on crm_opportunity_common_list -> bulk_state_transition:crm:advance_opp_to_negotiation",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -30117,7 +30473,33 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[3]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:view:11",
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_mark_lost:11",
+          "action": "bulk-action bulk_mark_lost on crm_opportunity_common_list -> bulk_state_transition:crm:lose_opportunity",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[4]"
+        },
+        {
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:bulk_delete_opportunities:12",
+          "action": "bulk-action bulk_delete_opportunities on crm_opportunity_common_list -> bulk_record_command:crm:delete_opportunity",
+          "evidence": [],
+          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].table.bulkActions[5]"
+        },
+        {
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:view:13",
           "action": "button view on crm_opportunity_common_list -> navigate:crm_opportunity_common_detail",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30130,7 +30512,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[9].buttons[0]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:edit:12",
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:edit:14",
           "action": "button edit on crm_opportunity_common_list -> navigate:crm_opportunity_common_form",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -30143,7 +30525,7 @@
           "source": "plugins/crm/config/pages/crm_opportunity_common_list.json#root[2].columns[9].buttons[1]"
         },
         {
-          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:delete:13",
+          "id": "ui-action:crm_opportunity_common_list:crm_opp_table:delete:15",
           "action": "button delete on crm_opportunity_common_list -> command:n/a",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -33490,7 +33872,8 @@
           "id": "command:crm:win_opportunity",
           "action": "Execute crm:win_opportunity (state_transition) through its supported user or runtime path",
           "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
           ],
           "assertion": "The command has registered release evidence.",
           "verdict": "pass",
@@ -35375,6 +35758,58 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/permissions.json"
+        },
+        {
+          "id": "permission:model.crm_account_common.import",
+          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_account_common.import",
+          "evidence": [],
+          "assertion": "Positive and negative persona evidence is not registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/permissions.json"
+        },
+        {
+          "id": "permission:model.crm_contact_common.import",
+          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_contact_common.import",
+          "evidence": [],
+          "assertion": "Positive and negative persona evidence is not registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/permissions.json"
+        },
+        {
+          "id": "permission:model.crm_lead_common.import",
+          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_lead_common.import",
+          "evidence": [],
+          "assertion": "Positive and negative persona evidence is not registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/permissions.json"
+        },
+        {
+          "id": "permission:model.crm_opportunity_common.import",
+          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_opportunity_common.import",
+          "evidence": [],
+          "assertion": "Positive and negative persona evidence is not registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/permissions.json"
         }
       ]
     },
@@ -35963,6 +36398,40 @@
           "action": "Execute crm_forecast_cockpit_stats with tenant isolation and assert non-empty business semantics where fixtures require data",
           "evidence": [
             "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+          ],
+          "assertion": "The named query has registered release evidence.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "http",
+          "source": "plugins/crm/config/named-queries.json"
+        },
+        {
+          "id": "query:crm_forecast_variance_summary",
+          "action": "Execute crm_forecast_variance_summary with tenant isolation and assert non-empty business semantics where fixtures require data",
+          "evidence": [
+            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts",
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+          ],
+          "assertion": "The named query has registered release evidence.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "api",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "http",
+          "source": "plugins/crm/config/named-queries.json"
+        },
+        {
+          "id": "query:crm_forecast_variance_drivers",
+          "action": "Execute crm_forecast_variance_drivers with tenant isolation and assert non-empty business semantics where fixtures require data",
+          "evidence": [
+            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+            "plugins/crm/e2e/forecast-variance.golden.spec.ts",
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
           ],
           "assertion": "The named query has registered release evidence.",

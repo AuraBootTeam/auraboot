@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams } from 'react-router';
+import { createSearchParams, useSearchParams } from 'react-router';
 import { BlockRenderer, type PageContentProps } from '@auraboot/runtime-kernel';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -50,7 +50,6 @@ import {
   type RowHeight,
   type SavedView,
   type SavedViewCreateRequest,
-  type ColumnConfig as ViewColumnConfig,
   type ViewType,
   type ViewScope,
   type ViewConfig,
@@ -69,7 +68,19 @@ import { ListTabs } from './list/ListTabs';
 import { ListPagination } from './list/ListPagination';
 import { ListModals } from './list/ListModals';
 import { ListToolbar } from './list/ListToolbar';
+import { ViewAnalysisDrawer } from './list/ViewAnalysisDrawer';
+import {
+  buildColumnSettingsRows,
+  serializeColumnSettings,
+  type ColumnSettingsDefinition,
+  type ColumnSettingsSavePayload,
+} from '~/framework/smart/components/view/ColumnSettingsPanel';
 import { ListTable } from './list/ListTable';
+import {
+  BulkActionResultDialog,
+  type BulkActionFailure,
+  type BulkActionResult,
+} from './list/BulkActionResultDialog';
 import {
   areFiltersEqual,
   areSortsEqual,
@@ -101,6 +112,7 @@ import {
   selectedCount as selectionSelectedCount,
   isPageFullySelected as selectionIsPageFullySelected,
   getExplicitIds as selectionGetExplicitIds,
+  getExcludedIds as selectionGetExcludedIds,
   isAllMatching as selectionIsAllMatching,
 } from './list/selectionModel';
 import {
@@ -125,6 +137,7 @@ import {
   mergeViewConfigPatch,
   summarizeViewConfigPatch,
 } from '~/framework/smart/utils/savedViewPersistence';
+import { canUseImport } from '~/framework/smart/components/data-tools/importCapability';
 
 // Dict data item type
 interface DictItem {
@@ -144,6 +157,19 @@ interface ListLoadDataParams {
   size?: number;
   filters?: Record<string, any>;
   sorts?: SortConfig[];
+}
+
+interface BulkFieldCommandState {
+  button: ButtonConfig;
+  selectedIds: string[];
+  selectedCount: number;
+  actionLabel: string;
+  field: FieldConfig;
+  operationType: 'UPDATE' | 'DELETE';
+}
+
+export function buildBulkFieldCommandPayload(field: FieldConfig, value: unknown) {
+  return { [field.field]: value };
 }
 
 export interface ListReferenceDisplayConfig {
@@ -220,6 +246,49 @@ export function viewConfigFiltersToRuntimeFilters(
     restoredFilters[filter.fieldCode] = filter.value;
   }
   return restoredFilters;
+}
+
+export interface SavedViewFilterExpressionContext {
+  /** Public user PID used by reference fields such as an opportunity owner. */
+  currentUserPid?: string;
+}
+
+const CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER = {
+  $currentDepartmentOwnerPids: { includeSubDepartments: true },
+} as const;
+
+const CURRENT_SHARED_RECORD_PIDS_RESOLVER = {
+  $currentSharedRecordPids: { action: 'read' },
+} as const;
+
+/**
+ * Resolve the deliberately small, documented set of SavedView filter expressions.
+ *
+ * SavedView expressions are convenience filters, not an authorization boundary;
+ * backend data-scope policies remain authoritative. Unknown expressions are left
+ * inactive instead of accidentally reusing a stale static value.
+ */
+export function resolveSavedViewFilterExpressions(
+  filters: ViewFilterConfig[] | undefined,
+  context: SavedViewFilterExpressionContext,
+): ViewFilterConfig[] {
+  return (filters ?? []).map((filter) => {
+    if (!filter.isExpression) return filter;
+
+    const expression = String(filter.expression ?? '').trim();
+    const resolvedValue =
+      expression === '#currentUser' || expression === '${system.currentUser}'
+        ? context.currentUserPid?.trim() || undefined
+        : expression === '#currentDepartmentOwners' ||
+            expression === '${system.currentDepartmentOwners}'
+          ? CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER
+          : expression === '#currentSharedRecords' ||
+              expression === '${system.currentSharedRecords}'
+            ? CURRENT_SHARED_RECORD_PIDS_RESOLVER
+            : undefined;
+
+    return { ...filter, value: resolvedValue };
+  });
 }
 
 function clearTransientViewSearchParams(params: URLSearchParams): void {
@@ -347,6 +416,40 @@ export function useRestoreSavedViewFromUrl({
   }, [urlViewPid, savedViews, viewsLoading, selectView, setActiveViewType]);
 }
 
+type SearchParamsSetter = ReturnType<typeof useSearchParams>[1];
+
+/**
+ * Serialize URL search-param writes made during the same React turn.
+ *
+ * React Router's functional `setSearchParams` form does not queue updates like
+ * React state does. List state can change sorts, filters, pagination and the
+ * selected SavedView together, so independently queued writers could otherwise
+ * restore an older query string and drop a newly selected `view` parameter.
+ */
+export function useSerializedSearchParamsUpdater(
+  searchParams: URLSearchParams,
+  setSearchParams: SearchParamsSetter,
+): SearchParamsSetter {
+  const latestSearchParamsRef = useRef(new URLSearchParams(searchParams));
+
+  useEffect(() => {
+    latestSearchParamsRef.current = new URLSearchParams(searchParams);
+  }, [searchParams]);
+
+  return useCallback<SearchParamsSetter>(
+    (nextInit, options) => {
+      const resolvedInit =
+        typeof nextInit === 'function'
+          ? nextInit(new URLSearchParams(latestSearchParamsRef.current))
+          : nextInit;
+      const next = createSearchParams(resolvedInit);
+      latestSearchParamsRef.current = new URLSearchParams(next);
+      setSearchParams(next, options);
+    },
+    [setSearchParams],
+  );
+}
+
 export function resolveTableBlockRowActions(tableBlock: any): ButtonConfig[] {
   const blockRowActions = Array.isArray(tableBlock?.rowActions) ? tableBlock.rowActions : [];
   const tableRowActions = Array.isArray(tableBlock?.table?.rowActions)
@@ -471,6 +574,109 @@ export function resolveColumnCapabilityDataType(
   );
 }
 
+export interface ListFilterFieldMetadata {
+  fieldCode: string;
+  label: string;
+  fieldType: string;
+  dictCode?: string;
+  referenceModelCode?: string;
+  referenceValueField?: string;
+  referenceDisplayField?: string;
+}
+
+/**
+ * Build the typed metadata shared by the filter picker, filter chips and value editor.
+ *
+ * A table column is primarily a presentation contract, so many DSL pages omit its
+ * data type. The model field metadata remains the source of truth for filter
+ * operators and editors (money must expose numeric comparisons, enums their dict,
+ * and references their target model).
+ */
+export function buildListFilterFieldMetadata(
+  tableColumns: ColumnConfig[],
+  modelFieldMap: Map<string, any> | undefined,
+  resolveLabel: (column: ColumnConfig) => string,
+): ListFilterFieldMetadata[] {
+  return tableColumns
+    .filter((column) => !column.isActionColumn && Boolean(column.field))
+    .map((column) => {
+      const meta = modelFieldMap?.get(column.field);
+      const refTarget = readRefTargetConfig(column, meta);
+      const referenceModelCode = String(
+        refTarget.modelCode ||
+          refTarget.targetModel ||
+          refTarget.targetEntity ||
+          meta?.referenceModelCode ||
+          meta?.extension?.referenceModelCode ||
+          '',
+      ).trim();
+      return {
+        fieldCode: column.field,
+        label: resolveLabel(column),
+        fieldType: resolveColumnCapabilityDataType(column, modelFieldMap),
+        dictCode: column.dictCode || meta?.dictCode || meta?.extension?.dictCode || undefined,
+        referenceModelCode: referenceModelCode || undefined,
+        referenceValueField: String(
+          refTarget.valueField || refTarget.targetValueField || refTarget.idField || 'pid',
+        ),
+        referenceDisplayField:
+          String(
+            refTarget.displayField || refTarget.labelField || refTarget.targetField || '',
+          ).trim() || undefined,
+      };
+    });
+}
+
+export interface ListQueryFilterCondition {
+  fieldName: string;
+  operator: string;
+  value?: unknown;
+  values?: unknown[];
+}
+
+/** Preserve array-valued IN/BETWEEN filters for the dynamic query contract. */
+export function viewFilterToQueryCondition(
+  filter: ViewFilterConfig,
+): ListQueryFilterCondition | null {
+  if (!filter.fieldCode) return null;
+  const operator = (filter.operator || 'eq').toUpperCase();
+  if (operator === 'ISNULL' || operator === 'ISNOTNULL') {
+    return { fieldName: filter.fieldCode, operator, value: null };
+  }
+  if (filter.value == null || filter.value === '') return null;
+  if (operator === 'IN' || operator === 'BETWEEN') {
+    const values = Array.isArray(filter.value) ? filter.value : [filter.value];
+    if (values.length === 0) return null;
+    return { fieldName: filter.fieldCode, operator, values };
+  }
+  return {
+    fieldName: filter.fieldCode,
+    operator,
+    value: operator === 'LIKE' ? `%${String(filter.value)}%` : filter.value,
+  };
+}
+
+/** Convert the dynamic-list condition shape to the export endpoint shape. */
+export function queryConditionToExportCondition(condition: ListQueryFilterCondition): {
+  field: string;
+  operator: string;
+  value: unknown;
+} {
+  return {
+    field: condition.fieldName,
+    operator: condition.operator,
+    value: condition.values ?? condition.value ?? null,
+  };
+}
+
+export function resolveUrlFilterSyncAction(
+  pendingLocalEncoding: string | null | undefined,
+  currentUrlEncoding: string | null,
+): 'apply-url' | 'ack-local' | 'wait-for-local' {
+  if (pendingLocalEncoding === undefined) return 'apply-url';
+  return pendingLocalEncoding === currentUrlEncoding ? 'ack-local' : 'wait-for-local';
+}
+
 export interface ViewManageFieldOption {
   code: string;
   name: string;
@@ -506,6 +712,57 @@ export function buildViewManageFieldOptions(
   }
 
   return Array.from(byCode.values());
+}
+
+export function buildListColumnSettingsDefinitions(
+  baseColumns: ColumnConfig[],
+  modelFieldMap: Map<string, any> | undefined,
+  systemColumns: ColumnConfig[],
+  resolveLabel: (column: ColumnConfig) => string,
+): ColumnSettingsDefinition[] {
+  const definitions = new Map<string, ColumnSettingsDefinition>();
+
+  for (const column of baseColumns) {
+    if (!column.field || column.isActionColumn) continue;
+    definitions.set(column.field, {
+      field: column.field,
+      label: resolveLabel(column),
+      dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
+      group: 'business',
+      defaultVisible: true,
+      defaultWidth:
+        typeof column.width === 'number'
+          ? column.width
+          : typeof column.width === 'string'
+            ? Number.parseInt(column.width, 10) || undefined
+            : undefined,
+      defaultFrozenPosition: column.fixed,
+    });
+  }
+
+  for (const [fieldCode, meta] of modelFieldMap?.entries() ?? []) {
+    if (!fieldCode || meta?.visible === false || definitions.has(fieldCode)) continue;
+    definitions.set(fieldCode, {
+      field: fieldCode,
+      label: resolveFieldMetaDisplayName(fieldCode, modelFieldMap) ?? fieldCode,
+      dataType: resolveFieldMetaDataType(fieldCode, modelFieldMap) ?? 'text',
+      group: 'business',
+      defaultVisible: false,
+    });
+  }
+
+  for (const column of systemColumns) {
+    if (!column.field || definitions.has(column.field)) continue;
+    definitions.set(column.field, {
+      field: column.field,
+      label: resolveLabel(column),
+      dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
+      group: 'system',
+      defaultVisible: false,
+    });
+  }
+
+  return Array.from(definitions.values());
 }
 
 export function collectListReferenceDisplayConfigs(
@@ -691,7 +948,8 @@ function ListPageContentInner(props: PageContentProps) {
   );
 
   // Parse filter_* params from URL for drill-down navigation
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, routerSetSearchParams] = useSearchParams();
+  const setSearchParams = useSerializedSearchParamsUpdater(searchParams, routerSetSearchParams);
   const urlFilters = useMemo(() => {
     const filters: Record<string, any> = {};
     searchParams.forEach((value, key) => {
@@ -726,6 +984,8 @@ function ListPageContentInner(props: PageContentProps) {
     createSelectionModel(),
   );
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkFieldCommand, setBulkFieldCommand] = useState<BulkFieldCommandState | null>(null);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
   const [pageState, setPageState] = useState(() => ({
     filters: { ...urlFilters } as Record<string, any>,
     pagination: {
@@ -738,6 +998,9 @@ function ListPageContentInner(props: PageContentProps) {
   // P2-1 fix: destructure state for convenience
   const { filters, pagination } = pageState;
   const schemaExtension = (schema as any)?.extension ?? {};
+  const isApiDatasourcePage = Boolean(
+    schema?.dataSource?.type === 'api' && schema.dataSource.endpoint,
+  );
   const skipListData = shouldSkipListData(schema);
   const skipModelFieldMeta = shouldSkipModelFieldMeta(schema, skipListData);
   const miscBlocksPosition = resolveListMiscBlocksPosition(schema);
@@ -801,6 +1064,17 @@ function ListPageContentInner(props: PageContentProps) {
   const [activeSorts, setActiveSorts] = useState<SortConfig[]>(() => urlSorts);
   // Active filter chips — user-added filters via chip bar (separate from filters)
   const [chipFilters, setChipFilters] = useState<ViewFilterConfig[]>(() => urlChipFilters);
+  const pendingChipFilterUrlSyncRef = useRef<string | null | undefined>(undefined);
+  const setLocalChipFilters = useCallback(
+    (update: ViewFilterConfig[] | ((previous: ViewFilterConfig[]) => ViewFilterConfig[])) => {
+      setChipFilters((previous) => {
+        const next = typeof update === 'function' ? update(previous) : update;
+        pendingChipFilterUrlSyncRef.current = encodeFilters(next);
+        return next;
+      });
+    },
+    [],
+  );
   // FilterFieldPicker state
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
   const [fieldPickerAnchor, setFieldPickerAnchor] = useState<
@@ -811,6 +1085,11 @@ function ListPageContentInner(props: PageContentProps) {
   const [valuePopoverAnchor, setValuePopoverAnchor] = useState<
     { x: number; y: number } | undefined
   >();
+  const chipFiltersRef = useRef<ViewFilterConfig[]>(chipFilters);
+
+  useEffect(() => {
+    chipFiltersRef.current = chipFilters;
+  }, [chipFilters]);
 
   // Client-side grouping state
   const [groupByField, setGroupByField] = useState<string | null>(null);
@@ -908,7 +1187,11 @@ function ListPageContentInner(props: PageContentProps) {
   // explicit mode this is the full cross-page pick; in all-matching mode we
   // fall back to the currently-selected rows on this page (a finite, safe set)
   // — export is the cross-page path and uses the filter directly.
-  const selectedIdList = allMatchingSelected ? Array.from(selectedIds) : explicitSelectedIds;
+  const selectedIdList = allMatchingSelected ? [] : explicitSelectedIds;
+  const allMatchingExcludedIds = useMemo(
+    () => selectionGetExcludedIds(selectionState),
+    [selectionState],
+  );
   // Whether row selection (checkbox column + bulk bar + select-all banner) is
   // active for this page — DSL opt-in via the table block, minus any host-level
   // override.
@@ -972,8 +1255,18 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Sync URL chip filters -> local state (supports refresh and browser back/forward).
   useEffect(() => {
+    const currentUrlEncoding = searchParams.get('filters');
+    const syncAction = resolveUrlFilterSyncAction(
+      pendingChipFilterUrlSyncRef.current,
+      currentUrlEncoding,
+    );
+    if (syncAction === 'wait-for-local') return;
+    if (syncAction === 'ack-local') {
+      pendingChipFilterUrlSyncRef.current = undefined;
+      return;
+    }
     setChipFilters((prev) => (areFiltersEqual(prev, urlChipFilters) ? prev : urlChipFilters));
-  }, [urlChipFilters]);
+  }, [searchParams, urlChipFilters]);
 
   // Sync URL sorts -> local state (supports refresh and browser back/forward).
   useEffect(() => {
@@ -1065,6 +1358,7 @@ function ListPageContentInner(props: PageContentProps) {
   const [memberImportResult, setMemberImportResult] = useState<TenantMemberImportResult | null>(
     null,
   );
+  const [bulkActionResult, setBulkActionResult] = useState<BulkActionResult | null>(null);
   const { formats: dateTimeFormats, timezone: effectiveTimezone } = useTimezone();
   const pendingSavedViewFiltersRef = useRef<Record<string, any> | null>(null);
   // When restoring a preset view from ?preset= on mount, skip the first run of
@@ -1077,6 +1371,10 @@ function ListPageContentInner(props: PageContentProps) {
 
   // SavedView integration
   const modelCode = schema?.modelCode || tableName;
+  const importConfig = schemaExtension.import as
+    | import('~/framework/smart/components/data-tools/ImportModal').ImportConfiguration
+    | undefined;
+  const canImport = canUseImport(importConfig, hasPermission);
   const pageKey = resolveListSavedViewPageKey(schema, tableName);
   const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant_member';
   const hideSavedViews =
@@ -1103,7 +1401,7 @@ function ListPageContentInner(props: PageContentProps) {
   } = useSavedViews({
     modelCode,
     pageKey,
-    scopeFilter: 'personal',
+    scopeFilter: 'all',
     autoLoad: !!schema && !hideSavedViews && !skipListData,
   });
 
@@ -1133,10 +1431,9 @@ function ListPageContentInner(props: PageContentProps) {
     void loadChipPins();
   }, [loadChipPins]);
 
-  // Team-scoped views the user may pin for their team. The saved-view list above
-  // is personal-only (scopeFilter='personal'), so team views are fetched
-  // separately and only when the user can author team pins (team-manage or the
-  // broader view-manage, mirroring the backend gate).
+  // Team-scoped views the user may pin for their team. They are already visible
+  // in the all-scope selector; this separate fetch is only for team pin authoring
+  // and remains permission-gated.
   const canManageTeamPins =
     hasPermission('dashboard.saved_view.team.update') ||
     hasPermission('dashboard.saved_view.update');
@@ -1220,9 +1517,16 @@ function ListPageContentInner(props: PageContentProps) {
       value: tab.filter.value,
     };
   }, [activeTab, schema?.blocks]);
+  const resolvedEffectiveViewFilters = useMemo(
+    () =>
+      resolveSavedViewFilterExpressions(effectiveViewConfig?.filters, {
+        currentUserPid: user?.pid,
+      }),
+    [effectiveViewConfig?.filters, user?.pid],
+  );
   const activeRuntimeViewFilters = useMemo<ViewFilterConfig[]>(() => {
     const merged = [
-      ...(effectiveViewConfig?.filters ?? []),
+      ...resolvedEffectiveViewFilters,
       ...Object.entries(filters)
         .filter(([, value]) => value != null && value !== '')
         .map(([fieldCode, value]) => ({
@@ -1238,7 +1542,7 @@ function ListPageContentInner(props: PageContentProps) {
       unique.set(`${filter.fieldCode}:${filter.operator}:${JSON.stringify(filter.value)}`, filter);
     }
     return Array.from(unique.values());
-  }, [activeTabViewFilter, chipFilters, effectiveViewConfig?.filters, filters]);
+  }, [activeTabViewFilter, chipFilters, filters, resolvedEffectiveViewFilters]);
   const effectiveNonNullViewConfig = useMemo<Partial<ViewConfig>>(
     () =>
       Object.fromEntries(
@@ -1356,10 +1660,17 @@ function ListPageContentInner(props: PageContentProps) {
   const applyViewConfigToListState = useCallback(
     (viewConfig: ViewConfig | undefined): Record<string, any> => {
       const vc = viewConfig ?? {};
-      const restoredFilters = viewConfigFiltersToRuntimeFilters(vc.filters);
+      const restoredViewFilters = resolveSavedViewFilterExpressions(vc.filters, {
+        currentUserPid: user?.pid,
+      });
+      const restoredFilters: Record<string, any> = {};
 
       pendingSavedViewFiltersRef.current = restoredFilters;
       setFilters(restoredFilters);
+      chipFiltersRef.current = restoredViewFilters;
+      setChipFilters((prev) =>
+        areFiltersEqual(prev, restoredViewFilters) ? prev : restoredViewFilters,
+      );
 
       const restoredSorts = vc.sorts ?? [];
       setActiveSorts((prev) => (areSortsEqual(prev, restoredSorts) ? prev : restoredSorts));
@@ -1373,7 +1684,7 @@ function ListPageContentInner(props: PageContentProps) {
 
       return restoredFilters;
     },
-    [setFilters, setPagination],
+    [setFilters, setPagination, user?.pid],
   );
 
   // Apply SavedView viewConfig (pagination + filters + sorts) when view changes.
@@ -1462,12 +1773,14 @@ function ListPageContentInner(props: PageContentProps) {
       },
       state: {
         filters,
+        selectedIds: selectedIdList,
       },
       locale,
       t: (key: string) => t(key),
+      token,
       __dataSourceManager: dataSourceManager,
     });
-  }, [locale, filters, t, dataSourceManager]);
+  }, [locale, filters, selectedIdList, t, token, dataSourceManager]);
 
   // Get current tab filter as QueryCondition (if tabs block exists)
   const getTabFilter = useCallback((): {
@@ -1510,7 +1823,7 @@ function ListPageContentInner(props: PageContentProps) {
       userFilters?: Record<string, any>,
       chipFiltersList?: ViewFilterConfig[],
     ) => {
-      const conditions: Array<{ fieldName: string; operator: string; value: string }> = [];
+      const conditions: ListQueryFilterCondition[] = [];
       if (tabCondition) {
         conditions.push(tabCondition);
       }
@@ -1550,23 +1863,8 @@ function ListPageContentInner(props: PageContentProps) {
       if (chipFiltersList) {
         for (const cf of chipFiltersList) {
           if (!cf.fieldCode) continue;
-          // Skip unary operators (isNull/isNotNull) that don't need a value
-          if (cf.operator === 'isNull' || cf.operator === 'isNotNull') {
-            conditions.push({
-              fieldName: cf.fieldCode,
-              operator: cf.operator.toUpperCase(),
-              value: '',
-            });
-            continue;
-          }
-          if (cf.value == null || cf.value === '') continue;
-          const op = cf.operator?.toUpperCase() || 'EQ';
-          const val = String(cf.value);
-          conditions.push({
-            fieldName: cf.fieldCode,
-            operator: op,
-            value: op === 'LIKE' ? `%${val}%` : val,
-          });
+          const condition = viewFilterToQueryCondition(cf);
+          if (condition) conditions.push(condition);
         }
       }
       return conditions.length > 0 ? JSON.stringify(conditions) : undefined;
@@ -1662,7 +1960,11 @@ function ListPageContentInner(props: PageContentProps) {
         } else {
           // For standard dynamic tables, use JSON filters array
           const tabCondition = getTabFilter();
-          const filtersParam = buildFiltersParam(tabCondition, params?.filters, chipFilters);
+          const filtersParam = buildFiltersParam(
+            tabCondition,
+            params?.filters,
+            chipFiltersRef.current,
+          );
           if (filtersParam) {
             queryParams.filters = filtersParam;
           }
@@ -1752,7 +2054,6 @@ function ListPageContentInner(props: PageContentProps) {
       namedQueryCode,
       tableBlock,
       activeSorts,
-      chipFilters,
       skipListData,
     ],
   );
@@ -2268,6 +2569,7 @@ function ListPageContentInner(props: PageContentProps) {
     const encoded = encodeFilters(chipFilters);
     const currentEncoded = searchParams.get('filters');
     if ((encoded ?? null) === (currentEncoded ?? null)) return;
+    pendingChipFilterUrlSyncRef.current = encoded;
     shouldPersistPaginationToUrlRef.current = true;
     setSearchParams(
       (prev) => {
@@ -2324,6 +2626,97 @@ function ListPageContentInner(props: PageContentProps) {
     [schema?.modelCode, tableName, loadData, pagination.pageSize, filters],
   );
 
+  const executeTargetedBulkCommand = useCallback(
+    async (
+      button: ButtonConfig,
+      ids: string[],
+      payload: Record<string, unknown>,
+      operationType: 'UPDATE' | 'DELETE' = 'UPDATE',
+    ) => {
+      const label = resolveButtonLabel(button);
+      const isZhLocale = locale.toLowerCase().startsWith('zh');
+      let successCount = 0;
+      const failures: BulkActionFailure[] = [];
+      const recordLabelById = new Map(
+        data.map((record) => {
+          const id = getPublicRecordKey(record) || '';
+          const recordLabel =
+            record.name ||
+            record.title ||
+            record.crm_opp_name ||
+            record.code ||
+            record.crm_opp_code ||
+            id;
+          return [id, String(recordLabel)] as const;
+        }),
+      );
+      const command = (button.action as any)?.command || button.commandCode;
+      if (!command) return;
+
+      for (const id of ids) {
+        try {
+          const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
+            method: 'post',
+            params: {
+              ...buildCommandTargetParams(id),
+              payload,
+              operationType,
+            },
+            token: token || undefined,
+          });
+          if (ResultHelper.isSuccess(result)) {
+            successCount += 1;
+          } else {
+            failures.push({
+              recordPid: id,
+              recordLabel: recordLabelById.get(id) || id,
+              reason: (result as any).desc || (result as any).message || 'Command failed',
+            });
+          }
+        } catch (error) {
+          failures.push({
+            recordPid: id,
+            recordLabel: recordLabelById.get(id) || id,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      if (successCount > 0) {
+        setSelectionState(selectionClearSelection);
+        await loadData({ page: 0, size: pagination.pageSize, filters });
+      }
+
+      if (failures.length === 0) {
+        showToast(
+          translateOrFallback(
+            t,
+            'list.bulkAction.success',
+            isZhLocale
+              ? `${label}已完成，成功 ${successCount} 条`
+              : `${label} completed for ${successCount} records`,
+          ),
+          'success',
+        );
+      } else {
+        showToast(
+          successCount > 0
+            ? translateOrFallback(
+                t,
+                'list.bulkAction.partial',
+                isZhLocale
+                  ? `${label}部分完成：成功 ${successCount} 条，失败 ${failures.length} 条`
+                  : `${label} completed for ${successCount} records; ${failures.length} failed`,
+              )
+            : failures[0]?.reason || `${label} failed`,
+          successCount > 0 ? 'warning' : 'error',
+        );
+        setBulkActionResult({ actionLabel: label, successCount, failures });
+      }
+    },
+    [data, filters, loadData, locale, pagination.pageSize, resolveButtonLabel, showToast, t, token],
+  );
+
   const handleBulkAction = useCallback(
     async (button: ButtonConfig, ids: string[]) => {
       if (ids.length === 0) return;
@@ -2344,6 +2737,30 @@ function ListPageContentInner(props: PageContentProps) {
         return;
       }
 
+      if (actionType === 'bulk_field_command') {
+        const field = (actionDef as any)?.input as FieldConfig | undefined;
+        if (!field?.field) {
+          showToast(
+            translateOrFallback(
+              t,
+              'list.bulkAction.missingInput',
+              'Bulk field action is missing its input field',
+            ),
+            'error',
+          );
+          return;
+        }
+        setBulkFieldCommand({
+          button,
+          selectedIds: [...ids],
+          selectedCount: ids.length,
+          actionLabel: resolveButtonLabel(button),
+          field,
+          operationType: (actionDef as any)?.operationType || 'UPDATE',
+        });
+        return;
+      }
+
       const confirmKey = button.confirm || button.confirmMessageKey;
       if (confirmKey) {
         const { title, content } = resolveConfirmDialog(confirmKey, t);
@@ -2355,32 +2772,22 @@ function ListPageContentInner(props: PageContentProps) {
         if (!confirmed) return;
       }
 
-      const label = resolveButtonLabel(button);
-      let successCount = 0;
-      const failures: string[] = [];
+      if (actionType === 'bulk_state_transition' || actionType === 'bulk_record_command') {
+        await executeTargetedBulkCommand(
+          button,
+          ids,
+          {},
+          (actionDef as any)?.operationType || 'UPDATE',
+        );
+        return;
+      }
 
-      if (actionType === 'bulk_state_transition') {
-        for (const id of ids) {
-          try {
-            const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
-              method: 'post',
-              params: {
-                ...buildCommandTargetParams(id),
-                payload: {},
-                operationType: 'UPDATE',
-              },
-              token: token || undefined,
-            });
-            if (ResultHelper.isSuccess(result)) {
-              successCount += 1;
-            } else {
-              failures.push((result as any).desc || (result as any).message || id);
-            }
-          } catch (error) {
-            failures.push(error instanceof Error ? error.message : String(error));
-          }
-        }
-      } else if (actionType === 'bulk_command') {
+      const label = resolveButtonLabel(button);
+      const isZhLocale = locale.toLowerCase().startsWith('zh');
+      let successCount = 0;
+      const failures: BulkActionFailure[] = [];
+
+      if (actionType === 'bulk_command') {
         const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
           method: 'post',
           params: {
@@ -2395,7 +2802,11 @@ function ListPageContentInner(props: PageContentProps) {
         if (ResultHelper.isSuccess(result)) {
           successCount = ids.length;
         } else {
-          failures.push((result as any).desc || (result as any).message || command);
+          failures.push({
+            recordPid: command,
+            recordLabel: command,
+            reason: (result as any).desc || (result as any).message || 'Command failed',
+          });
         }
       } else {
         showToast(
@@ -2419,7 +2830,9 @@ function ListPageContentInner(props: PageContentProps) {
           translateOrFallback(
             t,
             'list.bulkAction.success',
-            `${label} completed for ${successCount} records`,
+            isZhLocale
+              ? `${label}已完成，成功 ${successCount} 条`
+              : `${label} completed for ${successCount} records`,
           ),
           'success',
         );
@@ -2428,18 +2841,24 @@ function ListPageContentInner(props: PageContentProps) {
           translateOrFallback(
             t,
             'list.bulkAction.partial',
-            `${label} completed for ${successCount} records; ${failures.length} failed`,
+            isZhLocale
+              ? `${label}部分完成：成功 ${successCount} 条，失败 ${failures.length} 条`
+              : `${label} completed for ${successCount} records; ${failures.length} failed`,
           ),
           'warning',
         );
+        setBulkActionResult({ actionLabel: label, successCount, failures });
       } else {
-        showToast(failures[0] || `${label} failed`, 'error');
+        showToast(failures[0]?.reason || `${label} failed`, 'error');
+        setBulkActionResult({ actionLabel: label, successCount, failures });
       }
     },
     [
       canUseButton,
+      executeTargetedBulkCommand,
       filters,
       loadData,
+      locale,
       modelCode,
       pagination.pageSize,
       resolveButtonLabel,
@@ -2447,6 +2866,20 @@ function ListPageContentInner(props: PageContentProps) {
       t,
       token,
     ],
+  );
+
+  const handleBulkFieldCommandSubmit = useCallback(
+    async (value: unknown) => {
+      if (!bulkFieldCommand) return;
+      await executeTargetedBulkCommand(
+        bulkFieldCommand.button,
+        bulkFieldCommand.selectedIds,
+        buildBulkFieldCommandPayload(bulkFieldCommand.field, value),
+        bulkFieldCommand.operationType,
+      );
+      setBulkFieldCommand(null);
+    },
+    [bulkFieldCommand, executeTargetedBulkCommand],
   );
 
   const handleBulkEditComplete = useCallback(() => {
@@ -2785,26 +3218,29 @@ function ListPageContentInner(props: PageContentProps) {
   }, [allBlocks]);
 
   // System fields on every dynamic entity — not in DSL but available in API response
-  const SYSTEM_FIELD_DEFS: ColumnConfig[] = [
-    {
-      field: 'created_at',
-      label: t(getSystemFieldI18nKey('created_at') || 'common.created_at') || 'Created At',
-      valueType: 'datetime' as any,
-    },
-    {
-      field: 'updated_at',
-      label: t(getSystemFieldI18nKey('updated_at') || 'common.updated_at') || 'Updated At',
-      valueType: 'datetime' as any,
-    },
-    {
-      field: 'created_by',
-      label: t('common.creator') || 'Created By',
-    },
-    {
-      field: 'updated_by',
-      label: t('common.modifier') || 'Updated By',
-    },
-  ];
+  const SYSTEM_FIELD_DEFS: ColumnConfig[] = useMemo(
+    () => [
+      {
+        field: 'created_at',
+        label: t(getSystemFieldI18nKey('created_at') || 'common.created_at') || 'Created At',
+        valueType: 'datetime' as any,
+      },
+      {
+        field: 'updated_at',
+        label: t(getSystemFieldI18nKey('updated_at') || 'common.updated_at') || 'Updated At',
+        valueType: 'datetime' as any,
+      },
+      {
+        field: 'created_by',
+        label: t('common.creator') || 'Created By',
+      },
+      {
+        field: 'updated_by',
+        label: t('common.modifier') || 'Updated By',
+      },
+    ],
+    [t],
+  );
 
   // Get columns: prefer table.columns, fallback to block-level columns
   // Then apply SavedView column visibility/order overrides
@@ -2850,22 +3286,46 @@ function ListPageContentInner(props: PageContentProps) {
 
     const viewColMap = new Map(viewColumns.map((vc) => [vc.fieldCode, vc]));
     // Filter visible columns and apply order
-    // Include system fields that are explicitly enabled in viewConfig
+    // Include model and system fields that are explicitly enabled in viewConfig.
+    // This lets SavedView promote a valid model field that the DSL table does
+    // not show by default, while the page schema remains the default layout.
     const baseFields = new Set(baseCols.map((c) => c.field));
+    const modelCols: ColumnConfig[] = [];
+    for (const vc of viewColumns) {
+      if (vc.visible === false || baseFields.has(vc.fieldCode)) continue;
+      const meta = modelFieldMap.get(vc.fieldCode);
+      if (!meta) continue;
+      const renderComponent = resolveFieldMetaRenderComponent(vc.fieldCode, modelFieldMap);
+      const dataType = resolveFieldMetaDataType(vc.fieldCode, modelFieldMap);
+      modelCols.push({
+        field: vc.fieldCode,
+        label: resolveFieldMetaDisplayName(vc.fieldCode, modelFieldMap) ?? vc.fieldCode,
+        valueType: renderComponentToValueType(renderComponent),
+        sorter: dataType,
+        sortable: true,
+        dictCode: meta.dictCode || meta.extension?.dictCode || undefined,
+        refTarget: meta.refTarget || meta.extension?.refTarget || undefined,
+      } as ColumnConfig);
+      baseFields.add(vc.fieldCode);
+    }
     const sysCols = SYSTEM_FIELD_DEFS.filter((sf) => {
       const vc = viewColMap.get(sf.field);
       return vc && vc.visible !== false && !baseFields.has(sf.field);
     });
-    const allCols = [...baseCols, ...sysCols];
+    const allCols = [...baseCols, ...modelCols, ...sysCols];
     const visibleCols = allCols
       .map((col) => {
         const vc = viewColMap.get(col.field);
         if (vc && vc.visible === false) return null;
-        // Apply width override
-        if (vc?.width) {
-          return { ...col, width: vc.width };
-        }
-        return col;
+        return {
+          ...col,
+          ...(vc?.width ? { width: vc.width } : {}),
+          ...(vc?.frozen && vc.frozenPosition
+            ? { fixed: vc.frozenPosition }
+            : vc?.frozen === false
+              ? { fixed: undefined }
+              : {}),
+        };
       })
       .filter((col): col is ColumnConfig => col !== null);
 
@@ -2880,7 +3340,7 @@ function ListPageContentInner(props: PageContentProps) {
     }
 
     return visibleCols;
-  }, [tableBlock, effectiveViewConfig]);
+  }, [tableBlock, effectiveViewConfig, modelFieldMap, SYSTEM_FIELD_DEFS]);
 
   const referenceDisplayConfigs = useMemo(
     () => collectListReferenceDisplayConfigs(tableColumns, modelFieldMap),
@@ -3128,44 +3588,19 @@ function ListPageContentInner(props: PageContentProps) {
     [appendListSearch, schema, tableBlock, tableName, navigate, listExtensions?.disableRowClick],
   );
 
-  // All column definitions for ColumnSettingsPanel (with labels)
+  // All model-backed column definitions for ColumnSettingsPanel. DSL columns
+  // define the default visible subset; other readable model fields begin hidden.
   const allColumnDefs = useMemo(() => {
     if (!tableBlock) return [];
     const cols = (tableBlock as BlockConfig).table?.columns || tableBlock.columns;
     if (!Array.isArray(cols)) return [];
-    const dslCols = (cols as ColumnConfig[])
-      .filter((c) => !c.isActionColumn)
-      .map((col) => ({
-        field: col.field,
-        label: col.label
-          ? typeof col.label === 'string'
-            ? col.label
-            : getLocalizedText(col.label, locale, t)
-          : (() => {
-              const systemKey = getSystemFieldI18nKey(col.field);
-              if (systemKey) {
-                const systemLabel = t(systemKey);
-                if (systemLabel !== systemKey) return systemLabel;
-              }
-              const mc = schema?.modelCode || tableName;
-              const modelKey = `model.${mc}.${col.field}.label`;
-              const modelLabel = t(modelKey);
-              if (modelLabel !== modelKey) return modelLabel;
-              const fieldKey = `field.${col.field}.label`;
-              const fieldLabel = t(fieldKey);
-              if (fieldLabel !== fieldKey) return fieldLabel;
-              const commonKey = `common.field.${col.field}`;
-              const commonLabel = t(commonKey);
-              return commonLabel !== commonKey ? commonLabel : col.field;
-            })(),
-      }));
-    // Append system fields (hidden by default in ColumnSettingsPanel)
-    const sysDefs = SYSTEM_FIELD_DEFS.map((sf) => ({
-      field: sf.field,
-      label: typeof sf.label === 'string' ? sf.label : sf.field,
-    }));
-    return [...dslCols, ...sysDefs];
-  }, [tableBlock, locale, t, tableName, schema?.modelCode]);
+    return buildListColumnSettingsDefinitions(
+      cols as ColumnConfig[],
+      modelFieldMap,
+      SYSTEM_FIELD_DEFS,
+      resolveColumnLabel,
+    );
+  }, [tableBlock, modelFieldMap, resolveColumnLabel, SYSTEM_FIELD_DEFS]);
 
   const viewManageFields = useMemo(() => {
     const fieldMap = new Map(
@@ -3183,6 +3618,37 @@ function ListPageContentInner(props: PageContentProps) {
 
     return Array.from(fieldMap.values());
   }, [tableColumns, modelFieldMap, resolveColumnLabel]);
+
+  const filterFieldMetadata = useMemo(() => {
+    const businessFields = buildListFilterFieldMetadata(
+      tableColumns,
+      modelFieldMap,
+      resolveColumnLabel,
+    );
+    const known = new Set(businessFields.map((field) => field.fieldCode));
+    const systemFields = buildListFilterFieldMetadata(
+      SYSTEM_FIELD_DEFS.filter((column) => !known.has(column.field)),
+      modelFieldMap,
+      resolveColumnLabel,
+    );
+    return [...businessFields, ...systemFields];
+  }, [tableColumns, modelFieldMap, resolveColumnLabel, SYSTEM_FIELD_DEFS]);
+
+  const handleAnalysisDrillDown = useCallback(
+    (drillFilters: import('~/framework/smart/types/chart').FilterConfig[]) => {
+      const next = drillFilters.map<ViewFilterConfig>((filter) => ({
+        fieldCode: filter.field,
+        operator: 'eq',
+        value: filter.value,
+      }));
+      setLocalChipFilters((previous) => {
+        const fields = new Set(next.map((filter) => filter.fieldCode));
+        return [...previous.filter((filter) => !fields.has(filter.fieldCode)), ...next];
+      });
+      setAnalysisOpen(false);
+    },
+    [setLocalChipFilters],
+  );
 
   // Personal-only baseline: changes to an explicit personal view are staged as
   // a visible local draft. The user chooses save-current, save-as-new, or discard.
@@ -3426,25 +3892,35 @@ function ListPageContentInner(props: PageContentProps) {
     },
   });
 
+  const buildCurrentColumnSettings = useCallback(
+    () =>
+      serializeColumnSettings(buildColumnSettingsRows(allColumnDefs, effectiveViewConfig?.columns)),
+    [allColumnDefs, effectiveViewConfig?.columns],
+  );
+
   // Handle column reorder via drag-and-drop
   const handleColumnReorder = useCallback(
     (newOrder: string[]) => {
       setColumnOrder(newOrder);
-      // Persist to SavedView
-      const cols = newOrder.map((fieldCode, idx) => {
-        const existing = effectiveViewConfig?.columns?.find((c) => c.fieldCode === fieldCode);
-        return { ...(existing || { fieldCode }), fieldCode, order: idx };
-      });
-      autoSave({ columns: cols });
+      const existing = buildCurrentColumnSettings();
+      const byField = new Map(existing.map((column) => [column.fieldCode, column]));
+      const reordered = newOrder.map((fieldCode, order) => ({
+        ...(byField.get(fieldCode) || { fieldCode }),
+        fieldCode,
+        order,
+      }));
+      const trailing = existing
+        .filter((column) => !newOrder.includes(column.fieldCode))
+        .map((column, index) => ({ ...column, order: newOrder.length + index }));
+      autoSave({ columns: [...reordered, ...trailing] });
     },
-    [effectiveViewConfig, autoSave],
+    [autoSave, buildCurrentColumnSettings],
   );
 
   // Handle column resize
   const handleColumnResize = useCallback(
     (field: string, width: number) => {
-      if (!currentView) return;
-      const cols = [...(effectiveViewConfig?.columns || [])];
+      const cols = buildCurrentColumnSettings();
       const idx = cols.findIndex((c) => c.fieldCode === field);
       if (idx >= 0) {
         cols[idx] = { ...cols[idx], width };
@@ -3453,13 +3929,13 @@ function ListPageContentInner(props: PageContentProps) {
       }
       autoSave({ columns: cols });
     },
-    [currentView, effectiveViewConfig, autoSave],
+    [autoSave, buildCurrentColumnSettings],
   );
 
   // Handle column settings save -> update SavedView
   const handleColumnSettingsSave = useCallback(
-    async (columns: ViewColumnConfig[]) => {
-      await ensureViewAndUpdateConfig({ columns });
+    async ({ columns, rowHeight }: ColumnSettingsSavePayload) => {
+      await ensureViewAndUpdateConfig({ columns, rowHeight }, { rethrow: true });
     },
     [ensureViewAndUpdateConfig],
   );
@@ -3561,8 +4037,12 @@ function ListPageContentInner(props: PageContentProps) {
         }
       }
     }
+    for (const filter of chipFilters) {
+      const condition = viewFilterToQueryCondition(filter);
+      if (condition) conditions.push(queryConditionToExportCondition(condition));
+    }
     return conditions.length > 0 ? conditions : undefined;
-  }, [filters, getTabFilter]);
+  }, [chipFilters, filters, getTabFilter]);
 
   // Shared export request — posts the given conditions to the export endpoint
   // and triggers a browser download of the returned file.
@@ -3578,6 +4058,7 @@ function ListPageContentInner(props: PageContentProps) {
           body: JSON.stringify({
             format: format === 'xlsx' ? 'excel' : 'csv',
             conditions,
+            keyword: keywordRef.current.trim() || undefined,
           }),
         });
         if (!res.ok) throw new Error('Export request failed');
@@ -3615,7 +4096,13 @@ function ListPageContentInner(props: PageContentProps) {
   const handleExportSelected = useCallback(
     async (format: 'xlsx' | 'csv' = 'xlsx') => {
       if (allMatchingSelected) {
-        await runExport(format, exportFilterConditions);
+        const conditions = [
+          ...(exportFilterConditions ?? []),
+          ...(allMatchingExcludedIds.length > 0
+            ? [{ field: 'pid', operator: 'NOT_IN', value: allMatchingExcludedIds }]
+            : []),
+        ];
+        await runExport(format, conditions.length > 0 ? conditions : undefined);
         return;
       }
       if (explicitSelectedIds.length === 0) return;
@@ -3625,7 +4112,13 @@ function ListPageContentInner(props: PageContentProps) {
       ];
       await runExport(format, conditions);
     },
-    [allMatchingSelected, runExport, exportFilterConditions, explicitSelectedIds],
+    [
+      allMatchingExcludedIds,
+      allMatchingSelected,
+      runExport,
+      exportFilterConditions,
+      explicitSelectedIds,
+    ],
   );
 
   // Row height from current view config (with fallback)
@@ -3833,15 +4326,15 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Save current filters to SavedView
   const handleSaveFilters = useCallback(async () => {
-    const viewFilters = Object.entries(filters)
+    const formFilters = Object.entries(filters)
       .filter(([, v]) => v != null && v !== '')
       .map(([field, value]) => ({
         fieldCode: field,
         operator: 'eq' as const,
         value: String(value),
       }));
-    await ensureViewAndUpdateConfig({ filters: viewFilters });
-  }, [filters, ensureViewAndUpdateConfig]);
+    await ensureViewAndUpdateConfig({ filters: [...formFilters, ...chipFilters] });
+  }, [filters, chipFilters, ensureViewAndUpdateConfig]);
 
   const loadCurrentInviteCode = useCallback(async () => {
     if (!isTenantMemberPage) return;
@@ -4177,11 +4670,7 @@ function ListPageContentInner(props: PageContentProps) {
             }}
             hideSavedViews={hideSavedViews}
             hideBuiltInImport={
-              skipListData
-                ? true
-                : (listExtensions?.hideBuiltInImport ??
-                  (schema as any)?.extension?.hideBuiltInImport ??
-                  (schema as any)?.extension?.hideToolbarMore)
+              skipListData ? true : (listExtensions?.hideBuiltInImport ?? !canImport)
             }
             hideBuiltInExport={
               skipListData
@@ -4744,24 +5233,51 @@ function ListPageContentInner(props: PageContentProps) {
                 rowHeight={effectiveViewConfig?.rowHeight}
                 onRowHeightChange={handleRowHeightChange}
                 onColumnSettingsOpen={() => setColumnSettingsOpen(true)}
+                onAnalysisOpen={
+                  namedQueryCode || isApiDatasourcePage ? undefined : () => setAnalysisOpen(true)
+                }
                 chipFilters={chipFilters}
-                onChipFiltersChange={setChipFilters}
-                fieldMetadata={tableColumns
-                  .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
-                  .map((c: ColumnConfig) => ({
-                    fieldCode: c.field,
-                    label: resolveColumnLabel(c),
-                    fieldType: c.valueType || c.sorter || 'text',
-                    dictCode: c.dictCode,
-                  }))}
+                onChipFiltersChange={setLocalChipFilters}
+                fieldMetadata={filterFieldMetadata}
                 resolveChipValueLabel={(filter) => {
-                  const col = tableColumns.find((c: ColumnConfig) => c.field === filter.fieldCode);
-                  const dc = (col as any)?.dictCode as string | undefined;
+                  if (filter.isExpression && filter.expression) {
+                    if (
+                      filter.expression === '#currentUser' ||
+                      filter.expression === '${system.currentUser}'
+                    ) {
+                      return (
+                        user?.name ||
+                        user?.nickname ||
+                        user?.username ||
+                        translateCommon('common.current_user', '当前用户')
+                      );
+                    }
+                    if (
+                      filter.expression === '#currentDepartmentOwners' ||
+                      filter.expression === '${system.currentDepartmentOwners}'
+                    ) {
+                      return translateCommon('common.current_department', '当前部门');
+                    }
+                    if (
+                      filter.expression === '#currentSharedRecords' ||
+                      filter.expression === '${system.currentSharedRecords}'
+                    ) {
+                      return translateCommon('common.collaborative_records', '协作记录');
+                    }
+                    return filter.expression;
+                  }
+                  const dc = filterFieldMetadata.find(
+                    (field) => field.fieldCode === filter.fieldCode,
+                  )?.dictCode;
                   if (!dc) return undefined;
-                  const item = dictDataCache.current
-                    .get(dc)
-                    ?.find((i) => String(i.value) === String(filter.value));
-                  return item?.label;
+                  const values = Array.isArray(filter.value) ? filter.value : [filter.value];
+                  const items = dictDataCache.current.get(dc);
+                  const labels = values.map(
+                    (value) =>
+                      items?.find((item) => String(item.value) === String(value))?.label ??
+                      String(value),
+                  );
+                  return labels.join('、');
                 }}
                 onAddFilter={(e?: React.MouseEvent) => {
                   const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect?.();
@@ -4776,7 +5292,7 @@ function ListPageContentInner(props: PageContentProps) {
                   setEditingChipIdx(idx);
                 }}
                 onClearAll={() => {
-                  setChipFilters([]);
+                  setLocalChipFilters([]);
                   setActiveSorts([]);
                 }}
                 hideQuickFilters={hideQuickFilters}
@@ -4792,6 +5308,17 @@ function ListPageContentInner(props: PageContentProps) {
                 }
               />
 
+              <ViewAnalysisDrawer
+                open={analysisOpen}
+                onClose={() => setAnalysisOpen(false)}
+                modelCode={schema?.modelCode || tableName}
+                viewName={getLocalizedText(currentView?.name, locale, t)}
+                keyword={keyword}
+                filters={activeRuntimeViewFilters}
+                fields={filterFieldMetadata}
+                onDrillDown={handleAnalysisDrillDown}
+              />
+
               {/* T9 — cross-page select-all banner. Shown once the whole page
                   is selected and more matching records exist beyond it, or
                   while in "all N matching" mode. */}
@@ -4804,6 +5331,7 @@ function ListPageContentInner(props: PageContentProps) {
                 onSelectAllMatching={handleSelectAllMatching}
                 onClearSelection={clearAllSelection}
                 t={t}
+                locale={locale}
               />
 
               {/* Table area — extracted to ListTable with DnD column reorder */}
@@ -4873,15 +5401,24 @@ function ListPageContentInner(props: PageContentProps) {
                 onPageChange={handlePageChange}
                 onPageSizeChange={handlePageSizeChange}
                 t={t}
+                locale={locale}
                 selectedCount={effectiveSelectedCount}
                 selectedIds={selectedIdList}
                 modelCode={modelCode}
-                onBulkEdit={builtInBulkCapabilities.edit ? () => setBulkEditOpen(true) : undefined}
-                onBulkDelete={builtInBulkCapabilities.delete ? handleBulkDelete : undefined}
+                onBulkEdit={
+                  builtInBulkCapabilities.edit && !allMatchingSelected
+                    ? () => setBulkEditOpen(true)
+                    : undefined
+                }
+                onBulkDelete={
+                  builtInBulkCapabilities.delete && !allMatchingSelected
+                    ? handleBulkDelete
+                    : undefined
+                }
                 onBulkExport={
                   builtInBulkCapabilities.export ? () => handleExportSelected('xlsx') : undefined
                 }
-                bulkActions={visibleBulkActions}
+                bulkActions={allMatchingSelected ? [] : visibleBulkActions}
                 onBulkAction={handleBulkAction}
                 resolveBulkActionLabel={resolveButtonLabel}
                 onClearSelection={clearAllSelection}
@@ -4923,8 +5460,13 @@ function ListPageContentInner(props: PageContentProps) {
             }))}
             onBulkEditComplete={handleBulkEditComplete}
             locale={locale}
+            bulkFieldCommand={bulkFieldCommand}
+            bulkFieldCommandContext={pageContext}
+            onBulkFieldCommandClose={() => setBulkFieldCommand(null)}
+            onBulkFieldCommandSubmit={handleBulkFieldCommandSubmit}
             // ImportModal
             importOpen={importOpen}
+            importConfig={importConfig}
             onImportClose={() => setImportOpen(false)}
             onImportComplete={handleImportComplete}
             // ViewManagePanel
@@ -5014,19 +5556,13 @@ function ListPageContentInner(props: PageContentProps) {
             onColumnSettingsClose={() => setColumnSettingsOpen(false)}
             allColumnDefs={allColumnDefs}
             viewColumns={effectiveViewConfig?.columns}
+            columnSettingsRowHeight={effectiveRowHeight}
             onColumnSettingsSave={handleColumnSettingsSave}
             t={t}
             // FilterFieldPicker
             fieldPickerOpen={fieldPickerOpen}
             fieldPickerAnchor={fieldPickerAnchor}
-            fieldPickerFields={tableColumns
-              .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
-              .map((c: ColumnConfig) => ({
-                fieldCode: c.field,
-                label: resolveColumnLabel(c),
-                fieldType: c.valueType || c.sorter || 'text',
-                dictCode: c.dictCode,
-              }))}
+            filterFieldMetadata={filterFieldMetadata}
             chipFilterFieldCodes={chipFilters.map((f) => f.fieldCode)}
             onFieldPickerSelect={(fieldCode) => {
               // Add a new empty filter chip and immediately open the value popover
@@ -5035,7 +5571,7 @@ function ListPageContentInner(props: PageContentProps) {
                 operator: 'eq',
                 value: '',
               };
-              setChipFilters((prev) => {
+              setLocalChipFilters((prev) => {
                 const next = [...prev, newFilter];
                 // Open value popover for the newly added chip
                 setTimeout(() => {
@@ -5056,7 +5592,7 @@ function ListPageContentInner(props: PageContentProps) {
             schema={schema}
             tableName={tableName}
             onFilterApply={(operator, value) => {
-              setChipFilters((prev) =>
+              setLocalChipFilters((prev) =>
                 prev.map((f, i) =>
                   i === editingChipIdx ? { ...f, operator: operator as any, value } : f,
                 ),
@@ -5079,20 +5615,33 @@ function ListPageContentInner(props: PageContentProps) {
                 ]);
               }
             }}
-            onFreeze={(_pos) => {
-              // Column freeze is handled via DSL config; for runtime, update SavedView
-              // This would require extending ViewColumnConfig with frozen support
+            onFreeze={(position) => {
+              if (!contextMenu) return;
+              const fieldCode = contextMenu.column.field;
+              const columns = buildCurrentColumnSettings().map((column) => {
+                if (column.fieldCode === fieldCode) {
+                  return position === 'none'
+                    ? { ...column, frozen: false, frozenPosition: undefined }
+                    : {
+                        ...column,
+                        visible: true,
+                        frozen: true,
+                        frozenPosition: position,
+                      };
+                }
+                return column;
+              });
+              void ensureViewAndUpdateConfig({ columns });
             }}
             onHide={() => {
               if (!contextMenu) return;
-              const cols = (effectiveViewConfig?.columns || []).map((c) =>
-                c.fieldCode === contextMenu.column.field ? { ...c, visible: false } : c,
+              if (tableColumns.filter((column) => !column.isActionColumn).length <= 1) return;
+              const columns = buildCurrentColumnSettings().map((column) =>
+                column.fieldCode === contextMenu.column.field
+                  ? { ...column, visible: false, frozen: false, frozenPosition: undefined }
+                  : column,
               );
-              // If column not in saved config yet, add it as hidden
-              if (!cols.find((c) => c.fieldCode === contextMenu.column.field)) {
-                cols.push({ fieldCode: contextMenu.column.field, visible: false });
-              }
-              void ensureViewAndUpdateConfig({ columns: cols });
+              void ensureViewAndUpdateConfig({ columns });
             }}
             onFilterByColumn={() => {
               // Placeholder — will be connected to FilterChipBar in integration step
@@ -5117,6 +5666,12 @@ function ListPageContentInner(props: PageContentProps) {
         </div>
       </div>
       <AsyncTaskModalHost />
+      <BulkActionResultDialog
+        result={bulkActionResult}
+        onClose={() => setBulkActionResult(null)}
+        locale={locale}
+        t={t}
+      />
     </DataSourceProvider>
   );
 }

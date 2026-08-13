@@ -50,7 +50,10 @@ test('opportunity detail is a stage-led workspace with one primary transition an
     rail?.stages?.map((stage) => stage.value),
     ['discovery', 'qualification', 'proposal', 'negotiation', 'closed_won'],
   );
-  assert.deepEqual(rail?.terminalStages?.map((stage) => stage.value), ['closed_lost']);
+  assert.deepEqual(
+    rail?.terminalStages?.map((stage) => stage.value),
+    ['closed_lost'],
+  );
 
   const recentActivities = findBlock(detail.blocks, 'block_recent_activities');
   assert.equal(recentActivities?.blockType, 'sub-table');
@@ -59,7 +62,11 @@ test('opportunity detail is a stage-led workspace with one primary transition an
   const toolbar = findBlock(detail.blocks, 'crm_opp_detail_toolbar');
   const transitions = new Map(toolbar.buttons.map((button) => [button.code, button]));
   for (const code of ['qualify', 'advance_proposal', 'advance_negotiation', 'win']) {
-    assert.equal(transitions.get(code)?.primary, true, `${code} should be the stage primary action`);
+    assert.equal(
+      transitions.get(code)?.primary,
+      true,
+      `${code} should be the stage primary action`,
+    );
     assert.ok(transitions.get(code)?.visibleWhen, `${code} should only show in its source stage`);
   }
   assert.equal(transitions.get('log_activity')?.label?.['zh-CN'], '记录活动');
@@ -68,6 +75,57 @@ test('opportunity detail is a stage-led workspace with one primary transition an
 
 test('opportunity daily-efficiency surface shares one saved-view fact across list and kanban', () => {
   assert.equal(opportunityList.extension?.enableMultiView, true);
+  const opportunityViews = savedViews
+    .filter((view) => view.modelCode === 'crm_opportunity_common')
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+  assert.deepEqual(
+    opportunityViews.map((view) => view.viewKey),
+    [
+      'crm_opportunity_all_table',
+      'crm_opportunity_my_table',
+      'crm_opportunity_department_table',
+      'crm_opportunity_won_table',
+      'crm_opportunity_pipeline_board',
+    ],
+  );
+  assert.equal(opportunityViews.filter((view) => view.isDefault).length, 1);
+  assert.equal(opportunityViews[0].isDefault, true);
+
+  const myOpportunities = opportunityViews.find(
+    (view) => view.viewKey === 'crm_opportunity_my_table',
+  );
+  assert.deepEqual(myOpportunities.viewConfig.filters, [
+    {
+      fieldCode: 'crm_opp_owner',
+      operator: 'eq',
+      value: null,
+      isExpression: true,
+      expression: '#currentUser',
+    },
+  ]);
+  assert.equal(myOpportunities.pinAsQuickFilter, true);
+
+  const departmentOpportunities = opportunityViews.find(
+    (view) => view.viewKey === 'crm_opportunity_department_table',
+  );
+  assert.deepEqual(departmentOpportunities.viewConfig.filters, [
+    {
+      fieldCode: 'crm_opp_owner',
+      operator: 'in',
+      value: null,
+      isExpression: true,
+      expression: '#currentDepartmentOwners',
+    },
+  ]);
+  assert.equal(departmentOpportunities.pinAsQuickFilter, true);
+
+  const wonOpportunities = opportunityViews.find(
+    (view) => view.viewKey === 'crm_opportunity_won_table',
+  );
+  assert.deepEqual(wonOpportunities.viewConfig.filters, [
+    { fieldCode: 'crm_opp_stage', operator: 'eq', value: 'closed_won' },
+  ]);
+
   const pipelineBoard = savedViews.find(
     (view) => view.modelCode === 'crm_opportunity_common' && view.viewType === 'kanban',
   );
@@ -93,6 +151,39 @@ test('opportunity daily-efficiency surface shares one saved-view fact across lis
   );
 });
 
+test('opportunity bulk actions transfer owners and preserve command-owned delete rules', () => {
+  const table = findBlock(opportunityList.blocks, 'crm_opp_table')?.table;
+  assert.ok(table, 'opportunity list table should exist');
+  assert.equal(table.bulkCapabilities?.delete, false);
+  assert.equal(table.bulkCapabilities?.edit?.permissionCode, 'crm.opportunity.manage');
+  assert.equal(table.bulkCapabilities?.export?.permissionCode, 'crm.opportunity.read');
+
+  const actions = new Map(table.bulkActions.map((action) => [action.code, action]));
+  const transfer = actions.get('bulk_transfer_owner');
+  assert.equal(transfer?.permissionCode, 'crm.opportunity.manage');
+  assert.deepEqual(transfer?.action, {
+    type: 'bulk_field_command',
+    command: 'crm:update_opportunity',
+    input: {
+      field: 'crm_opp_owner',
+      label: { 'zh-CN': '新负责人', 'en-US': 'New Owner' },
+      type: 'reference',
+      component: 'MemberPicker',
+      required: true,
+      props: { multiple: false },
+    },
+  });
+
+  const safeDelete = actions.get('bulk_delete_opportunities');
+  assert.equal(safeDelete?.variant, 'danger');
+  assert.deepEqual(safeDelete?.action, {
+    type: 'bulk_record_command',
+    command: 'crm:delete_opportunity',
+    operationType: 'DELETE',
+  });
+  assert.match(safeDelete?.confirm?.['zh-CN'] ?? '', /仅发现和资格确认阶段允许删除/);
+});
+
 test('forecast cockpit separates outcome hierarchy from execution status', () => {
   const primary = findBlock(forecastCockpit.blocks, 'crm_forecast_metrics');
   assert.deepEqual(
@@ -111,6 +202,67 @@ test('forecast cockpit separates outcome hierarchy from execution status', () =>
   assert.match(forecastStats.fromSql, /crm_opp_forecast_category = 'commit'/);
 });
 
+test('forecast cockpit explains a selected submission with live owner facts and exact deal drivers', () => {
+  const summarySource = forecastCockpit.dataSources.forecastVarianceSummary;
+  const driverSource = forecastCockpit.dataSources.forecastVarianceDrivers;
+  for (const source of [summarySource, driverSource]) {
+    assert.equal(source.type, 'namedQuery');
+    assert.equal(source.params.submissionPid, '${state.selectedForecast.pid}');
+    assert.deepEqual(source.dependOn, ['state.selectedForecast.pid']);
+    assert.equal(source.format, 'records');
+  }
+
+  const varianceTab = findBlock(forecastCockpit.blocks, 'crm_forecast_tabs')?.tabs?.find(
+    (tab) => tab.key === 'variance',
+  );
+  assert.equal(varianceTab?.label?.['zh-CN'], '偏差解释');
+  assert.match(
+    findBlock(varianceTab?.blocks, 'crm_forecast_variance_summary_intro')?.content?.['zh-CN'] ?? '',
+    /提交预测与实时事实/,
+  );
+  assert.match(
+    findBlock(varianceTab?.blocks, 'crm_forecast_variance_drivers_intro')?.content?.['zh-CN'] ?? '',
+    /偏差商机驱动/,
+  );
+
+  const summaryBlock = findBlock(varianceTab?.blocks, 'crm_forecast_variance_summary');
+  assert.deepEqual(
+    summaryBlock?.columns?.map((column) => column.field),
+    ['measure', 'submitted_amount', 'current_amount', 'variance_amount'],
+  );
+
+  const driverBlock = findBlock(varianceTab?.blocks, 'crm_forecast_variance_drivers');
+  assert.ok(driverBlock?.columns?.some((column) => column.field === 'variance_driver'));
+  assert.equal(
+    driverBlock?.columns?.find((column) => column.field === 'crm_opp_probability')?.render,
+    '${record.crm_opp_probability}%',
+  );
+  assert.equal(driverBlock?.rowActions?.[0]?.code, 'open_variance_opportunity');
+  assert.equal(driverBlock?.rowActions?.[0]?.permissionCode, 'crm.opportunity.read');
+
+  const summaryQuery = namedQueries.find((query) => query.code === 'crm_forecast_variance_summary');
+  assert.equal(summaryQuery?.resourceCode, 'crm_forecast_submission');
+  assert.match(summaryQuery?.fromSql ?? '', /f\.pid = CAST\(#\{params\.submissionPid\} AS text\)/);
+  assert.match(
+    summaryQuery?.fromSql ?? '',
+    /o\.crm_opp_owner IS NOT DISTINCT FROM f\.crm_fcst_owner/,
+  );
+  assert.match(summaryQuery?.fromSql ?? '', /^SELECT /);
+  assert.deepEqual(
+    summaryQuery?.outputFields?.slice(-4).map((field) => field.code),
+    ['measure', 'submitted_amount', 'current_amount', 'variance_amount'],
+  );
+
+  const driversQuery = namedQueries.find((query) => query.code === 'crm_forecast_variance_drivers');
+  assert.equal(driversQuery?.resourceCode, 'crm_opportunity_common');
+  assert.match(
+    driversQuery?.fromSql ?? '',
+    /o\.crm_opp_stage NOT IN \('closed_won', 'closed_lost'\)/,
+  );
+  assert.match(driversQuery?.fromSql ?? '', /AS variance_driver/);
+  assert.match(driversQuery?.fromSql ?? '', /^SELECT /);
+});
+
 test('command-owned QDP evidence models opt out of empty generated detail shells', () => {
   for (const code of [
     'crm_file_package_common',
@@ -119,7 +271,11 @@ test('command-owned QDP evidence models opt out of empty generated detail shells
   ]) {
     const model = models.find((candidate) => candidate.code === code);
     assert.equal(model?.commandOnlyCreate, true, `${code} should stay command-owned`);
-    assert.equal(model?.extension?.skipDetailPage, true, `${code} should not expose an empty shell`);
+    assert.equal(
+      model?.extension?.skipDetailPage,
+      true,
+      `${code} should not expose an empty shell`,
+    );
   }
 });
 
@@ -131,8 +287,10 @@ test('CRM workbenches expose business owner labels and a lead conversion receipt
   assert.equal(convert.resultReceipt?.title?.['zh-CN'], '线索转化完成');
   assert.equal(convert.resultReceipt?.links?.length, 4);
 
-  const opportunityOwner = findBlock(opportunityWorkspace.blocks, 'crm_opportunity_attention')
-    .summaryFields.find((field) => field.label?.['zh-CN'] === '负责人');
+  const opportunityOwner = findBlock(
+    opportunityWorkspace.blocks,
+    'crm_opportunity_attention',
+  ).summaryFields.find((field) => field.label?.['zh-CN'] === '负责人');
   assert.equal(opportunityOwner.field, 'owner_name');
   const opportunityQueue = findBlock(opportunityWorkspace.blocks, 'crm_opportunity_queue');
   assert.ok(opportunityQueue.columns.some((column) => column.field === 'owner_name'));

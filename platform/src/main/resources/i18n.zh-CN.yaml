@@ -9,6 +9,9 @@ common:
   updated_at: 更新时间
   creator: 创建人
   modifier: 修改人
+  current_user: 当前用户
+  current_department: 当前部门
+  collaborative_records: 协作记录
   loading: 加载中...
   actionFailed: 操作失败
   close: 关闭
@@ -35,9 +38,53 @@ common:
   view: 查看
   sort: 排序
   fields: 字段
+  column_settings_title: 配置视图字段
+  column_settings_help: 选择字段、调整顺序与列宽；配置会随当前视图保存
+  column_settings_search: 搜索字段名称或编码
+  column_settings_restore: 恢复默认
+  column_settings_density: 行高密度
+  column_settings_density_help: 仅应用于当前视图
+  column_settings_visible_summary: "已显示 {visible}/{total} 个字段"
+  column_settings_show_all: 显示全部
+  column_settings_system: 系统
+  column_settings_pin_left: 固定到左侧
+  column_settings_pin_right: 固定到右侧
+  column_settings_width: 列宽
+  column_settings_minimum: 至少保留一个可见字段
+  column_settings_unsaved: 变更将随当前视图保存
+  column_settings_unchanged: 暂无变更
+  column_settings_apply: 应用到视图
+  column_settings_save_failed: 保存视图配置失败
+  row_height_short: 紧凑
+  row_height_medium: 标准
+  row_height_tall: 宽松
+  row_height_extra_tall: 超宽松
   filter: 筛选
   search: 搜索
   add_filter: 添加筛选
+  view_analysis: 视图分析
+  view_analysis_scope: 当前视图
+  view_analysis_help: 分析当前视图的全部匹配记录，点击图表即可返回精确列表
+  view_analysis_filters: 筛选条件
+  view_analysis_chart_type: 图表类型
+  view_analysis_chart_bar: 柱状图
+  view_analysis_chart_line: 折线图
+  view_analysis_chart_pie: 饼图
+  view_analysis_chart_donut: 环形图
+  view_analysis_chart_funnel: 漏斗图
+  view_analysis_group: 分组字段
+  view_analysis_metric: 统计指标
+  view_analysis_count: 记录数
+  view_analysis_sum: 求和
+  view_analysis_avg: 平均值
+  view_analysis_numeric_field: 数值字段
+  view_analysis_drill_hint: 点击任意数据点，将列表筛选到对应记录
+  view_analysis_refresh: 刷新
+  view_analysis_failed: 分析加载失败
+  view_analysis_empty: 当前条件下暂无数据
+  view_analysis_empty_help: 请调整列表筛选后重试
+  view_analysis_breakdown: 数据明细
+  view_analysis_open_records: 查看对应记录
   clear_all: 清除全部
   search_fields: 搜索字段...
   no_fields_found: 未找到字段
@@ -385,6 +432,59 @@ common:
 #  validation_code_length: 模型编码长度为2-50个字符
 #  validation_display_name_length: 显示名称长度为2-100个字符
 #  validation_description_length: 描述长度不能超过500个字符
+
+record_share:
+  title: 记录协作
+  subtitle: 邀请租户成员共同查看或维护这条记录
+  close: 关闭协作窗口
+  add_member: 添加协作成员
+  edit_member: 更新协作成员
+  editing_description: 修改权限或续期，不会重复创建协作关系
+  member_label: 租户成员
+  member_placeholder: 选择成员
+  permission: 协作权限
+  permission_read_title: 仅查看
+  permission_read_description: 可以查看该记录，但不能修改
+  permission_collaborate_title: 可协作
+  permission_collaborate_description: 可以共同查看和编辑该记录
+  save: 保存协作成员
+  saving: 保存中…
+  saved: 协作成员已保存
+  update: 更新访问权限
+  updated: 协作权限已更新
+  save_failed: 保存协作成员失败
+  update_failed: 更新协作权限失败
+  load_failed: 加载协作成员失败
+  current_members: 当前协作成员
+  empty_title: 暂无协作成员
+  empty_description: 选择成员和权限即可开始协作
+  unavailable_member: 成员已不可用
+  edit: 编辑协作成员
+  renew: 为协作成员续期
+  expiry: 访问有效期
+  expiry_never: 长期有效
+  expiry_7d: 7天
+  expiry_30d: 30天
+  expiry_custom: 自定义
+  expiry_date: 到期日期
+  expiry_never_hint: 访问权限会一直保留，直到负责人主动移除
+  expiry_hint: 到期后自动失去访问权限，负责人之后仍可续期
+  expires_on: 到期于
+  expired: 已到期
+  remove: 移除协作成员
+  removed: 协作成员已移除
+  remove_failed: 移除协作成员失败
+  notification_title: 客户协作权限已更新
+  notification_content: 你已获得一条共享记录的{0}权限，请从对应的协作视图查看。
+  notification_permission_read: 仅查看
+  notification_permission_collaborate: 可协作
+
+member_picker:
+  select: 选择成员…
+  add: 添加
+  search_placeholder: 搜索成员…
+  searching: 搜索中…
+  empty: 未找到成员
 
 # Notification System
 notification:

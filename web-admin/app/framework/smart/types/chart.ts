@@ -24,11 +24,24 @@ export interface FilterConfig {
   /** Field name to filter on */
   field: string;
   /** Filter operator */
-  operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'in';
+  operator:
+    | 'eq'
+    | 'ne'
+    | 'gt'
+    | 'gte'
+    | 'lt'
+    | 'lte'
+    | 'like'
+    | 'in'
+    | 'not_in'
+    | 'is_null'
+    | 'is_not_null'
+    | 'relative';
   /** Filter value */
   value: unknown;
   /** Logical operator for combining with other filters */
   logic?: 'and' | 'OR';
+  children?: FilterConfig[];
 }
 
 /**
@@ -57,6 +70,8 @@ export interface AggregateQueryRequest {
   metrics?: MetricConfig[];
   /** Filter conditions */
   filters?: FilterConfig[];
+  /** Free-text search across the model's searchable fields. */
+  keyword?: string;
   /** Group by fields (usually same as dimensions) */
   groupBy?: string[];
   /** Order by configurations */
@@ -130,6 +145,8 @@ export interface ChartDataSource {
   metrics?: MetricConfig[];
   /** Filter conditions */
   filters?: FilterConfig[];
+  /** Free-text search across the model's searchable fields. */
+  keyword?: string;
   /** Parameters for named queries */
   parameters?: Record<string, unknown>;
   /** Maximum rows to return */

@@ -127,6 +127,53 @@ describe('ListTable selection column layout', () => {
     expect(actionCell).not.toHaveClass('w-px');
   });
 
+  it('moves pinned fields to table edges and gives every sticky field a non-overlapping offset', () => {
+    renderListTable({
+      enableSelection: true,
+      columns: [
+        { field: 'name', label: '商机名称', width: 200 },
+        { field: 'amount', label: '预期金额', width: 140, fixed: 'left' },
+        { field: 'competitor', label: '竞争对手', width: 180, fixed: 'right' },
+        { field: 'stage', label: '商机阶段', width: 120 },
+        { field: 'probability', label: '成功概率', width: 100, fixed: 'right' },
+        {
+          field: '_actions',
+          label: '操作',
+          isActionColumn: true,
+          width: 112,
+          buttons: [{ code: 'view', label: '查看' }],
+        } as any,
+      ],
+      data: [
+        {
+          pid: 'opp-1',
+          name: '华东智造云',
+          amount: 320000,
+          competitor: 'CordysCRM',
+          stage: '方案提报',
+          probability: 60,
+        },
+      ],
+    });
+
+    const headers = screen
+      .getAllByRole('columnheader')
+      .map((header: HTMLElement) => header.textContent?.trim())
+      .filter(Boolean);
+    expect(headers).toEqual([
+      '预期金额',
+      '商机名称',
+      '商机阶段',
+      '竞争对手',
+      '成功概率',
+      'table.actions',
+    ]);
+    expect(screen.getByTestId('table-header-amount')).toHaveStyle({ left: '40px' });
+    expect(screen.getByTestId('table-header-probability')).toHaveStyle({ right: '112px' });
+    expect(screen.getByTestId('table-header-competitor')).toHaveStyle({ right: '212px' });
+    expect(screen.getByTestId('table-cell-0-competitor')).toHaveStyle({ right: '212px' });
+  });
+
   it('does not render the summary footer when no column declares an aggregate', () => {
     renderListTable();
     expect(screen.queryByTestId('list-summary-row')).not.toBeInTheDocument();

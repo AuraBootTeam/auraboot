@@ -2,6 +2,7 @@ package com.auraboot.framework.permission.mapper;
 
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.permission.entity.RecordShare;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -78,6 +79,73 @@ class RecordShareMapperIT {
         assertThat(mapper.countByRecordAndUser(
                 TENANT_ID, RESOURCE, 101L, MEMBER_ID, "delete", now))
                 .isZero();
+    }
+
+    @Test
+    @DisplayName("public-PID collaborator upsert upgrades the existing relationship")
+    void upsertByPublicPidsUpdatesPermissionWithoutDuplicatingShare() {
+        RecordShare readOnly = publicShare("share-original", "rec-upsert", "read");
+        mapper.upsertByPublicPids(readOnly);
+
+        RecordShare collaborator = publicShare("share-replacement", "rec-upsert", "read,update");
+        mapper.upsertByPublicPids(collaborator);
+
+        List<RecordShare> shares = mapper.findByRecordPid(
+                TENANT_ID, RESOURCE, "rec-upsert", Instant.now());
+        assertThat(shares).singleElement().satisfies(share -> {
+            assertThat(share.getPid()).isEqualTo("share-original");
+            assertThat(share.getPermissionMask()).isEqualTo("read,update");
+            assertThat(share.getSubjectPid()).isEqualTo(MEMBER_PID);
+        });
+    }
+
+    @Test
+    @DisplayName("expired relationship remains manageable but never grants access")
+    void expiredRelationshipCanBeListedAndRenewedWithoutGrantingAccessUntilRenewal() {
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+        RecordShare expired = publicShare("share-expired-renewable", "rec-renew", "read");
+        expired.setExpiresAt(now.minus(1, ChronoUnit.HOURS));
+        mapper.upsertByPublicPids(expired);
+
+        assertThat(mapper.findByRecordPid(TENANT_ID, RESOURCE, "rec-renew", now)).isEmpty();
+        assertThat(mapper.countByRecordPidAndSubjectPid(
+                TENANT_ID, RESOURCE, "rec-renew", "member", MEMBER_PID, "read", now))
+                .isZero();
+        RecordShare persistedExpired = mapper.findByRecordPidForManagement(
+                        TENANT_ID, RESOURCE, "rec-renew", now)
+                .getFirst();
+        assertThat(persistedExpired.getPid()).isEqualTo("share-expired-renewable");
+
+        Instant renewedUntil = now.plus(30, ChronoUnit.DAYS);
+        assertThat(mapper.updatePolicyByPidInTenant(
+                TENANT_ID,
+                "share-expired-renewable",
+                "read,update",
+                renewedUntil))
+                .isOne();
+        assertThat(mapper.countByRecordPidAndSubjectPid(
+                TENANT_ID, RESOURCE, "rec-renew", "member", MEMBER_PID, "update", now))
+                .isOne();
+        assertThat(mapper.findByRecordPidForManagement(TENANT_ID, RESOURCE, "rec-renew", now))
+                .singleElement()
+                .satisfies(share -> {
+                    assertThat(share.getCreatedAt()).isEqualTo(persistedExpired.getCreatedAt());
+                    assertThat(share.getCreatedBy()).isEqualTo(persistedExpired.getCreatedBy());
+                });
+    }
+
+    private RecordShare publicShare(String sharePid, String recordPid, String permissionMask) {
+        RecordShare share = new RecordShare();
+        share.setPid(sharePid);
+        share.setTenantId(TENANT_ID);
+        share.setResourceCode(RESOURCE);
+        share.setRecordPid(recordPid);
+        share.setSubjectType("member");
+        share.setSubjectPid(MEMBER_PID);
+        share.setPermissionMask(permissionMask);
+        share.setCreatedAt(Instant.now());
+        share.setCreatedBy(MEMBER_ID);
+        return share;
     }
 
     private void insert(

@@ -24,6 +24,7 @@ export interface DraggableColumnHeaderProps {
   onContextMenu: (e: React.MouseEvent, column: ColumnConfig) => void;
   draggable?: boolean;
   width?: number | string;
+  frozenOffset?: number;
 }
 
 export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
@@ -36,6 +37,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
   onContextMenu,
   draggable = true,
   width,
+  frozenOffset = 0,
 }: DraggableColumnHeaderProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: column.field,
@@ -98,6 +100,8 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
       : column.width
         ? { width: typeof column.width === 'number' ? `${column.width}px` : column.width }
         : {}),
+    ...(isFrozenLeft ? { left: `${frozenOffset}px` } : {}),
+    ...(isFrozenRight ? { right: `${frozenOffset}px` } : {}),
   };
 
   // Action column: no drag, no sort, no resize

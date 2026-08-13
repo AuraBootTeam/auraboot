@@ -5,13 +5,13 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const readJson = (relativePath) => JSON.parse(
-  fs.readFileSync(path.join(pluginRoot, 'config', relativePath), 'utf8'),
-);
+const readJson = (relativePath) =>
+  JSON.parse(fs.readFileSync(path.join(pluginRoot, 'config', relativePath), 'utf8'));
 
 const pagesDir = path.join(pluginRoot, 'config', 'pages');
 const pages = new Map(
-  fs.readdirSync(pagesDir)
+  fs
+    .readdirSync(pagesDir)
     .filter((name) => name.endsWith('.json'))
     .map((name) => {
       const page = JSON.parse(fs.readFileSync(path.join(pagesDir, name), 'utf8'));
@@ -25,7 +25,8 @@ const roles = new Map(readJson('roles.json').map((role) => [role.code, role]));
 
 const commandDir = path.join(pluginRoot, 'config', 'commands');
 const commands = new Map(
-  fs.readdirSync(commandDir)
+  fs
+    .readdirSync(commandDir)
     .filter((name) => name.endsWith('.json'))
     .flatMap((name) => JSON.parse(fs.readFileSync(path.join(commandDir, name), 'utf8')))
     .map((command) => [command.code, command]),
@@ -68,7 +69,12 @@ const workbenches = [
     pageKey: 'crm_forecast_cockpit',
     menu: 'crm_forecast_cockpit_workspace',
     permission: 'crm.forecast.read',
-    queryCodes: ['crm_forecast_cockpit_stats', 'crm_sales_forecast_by_owner'],
+    queryCodes: [
+      'crm_forecast_cockpit_stats',
+      'crm_sales_forecast_by_owner',
+      'crm_forecast_variance_summary',
+      'crm_forecast_variance_drivers',
+    ],
   },
   {
     pageKey: 'crm_activity_service_desk',
@@ -98,19 +104,28 @@ test('five core workbenches are standalone DSL pages reachable from the primary 
 
     const blocks = allBlocks(page);
     for (const blockType of ['metric-strip', 'table', 'status-banner', 'evidence-panel']) {
-      assert.ok(blocks.some((block) => block.blockType === blockType),
-        `${expected.pageKey} must include ${blockType}`);
+      assert.ok(
+        blocks.some((block) => block.blockType === blockType),
+        `${expected.pageKey} must include ${blockType}`,
+      );
     }
-    assert.ok(blocks.some((block) => block.blockType === 'workbench-action-bar'),
-      `${expected.pageKey} must expose an explicit next-action surface`);
+    assert.ok(
+      blocks.some((block) => block.blockType === 'workbench-action-bar'),
+      `${expected.pageKey} must expose an explicit next-action surface`,
+    );
 
     for (const queryCode of expected.queryCodes) {
       const query = namedQueries.get(queryCode);
       assert.ok(query, `${queryCode} must exist`);
-      assert.match(query.fromSql, /#\{params\.tenantId\}/,
-        `${queryCode} must remain tenant-scoped`);
-      assert.ok(Array.isArray(query.outputFields) && query.outputFields.length > 0,
-        `${queryCode} must declare its output contract`);
+      assert.match(
+        query.fromSql,
+        /#\{params\.tenantId\}/,
+        `${queryCode} must remain tenant-scoped`,
+      );
+      assert.ok(
+        Array.isArray(query.outputFields) && query.outputFields.length > 0,
+        `${queryCode} must declare its output contract`,
+      );
     }
   }
 });
@@ -127,8 +142,11 @@ test('record queues declare the governed model/action used by role data scopes',
     assert.equal(query.resourceCode, resourceCode, queryCode);
     assert.equal(query.actionCode, 'read', queryCode);
   }
-  assert.match(namedQueries.get('crm_activity_service_queue').fromSql, /AS crm_act_owner/,
-    'the unified queue must retain the governed task-owner column for outer DataScope filtering');
+  assert.match(
+    namedQueries.get('crm_activity_service_queue').fromSql,
+    /AS crm_act_owner/,
+    'the unified queue must retain the governed task-owner column for outer DataScope filtering',
+  );
 });
 
 test('core workbench lifecycle buttons reference real CRM commands', () => {
@@ -138,10 +156,12 @@ test('core workbench lifecycle buttons reference real CRM commands', () => {
     for (const block of allBlocks(pages.get(expected.pageKey))) {
       for (const action of block.actions ?? []) {
         actions.push(action);
-        assert.ok(action.permissionCode, `${expected.pageKey}.${action.code} must be permission-gated`);
-        const command = action.onClick?.action === 'command.execute'
-          ? action.onClick?.args?.command
-          : undefined;
+        assert.ok(
+          action.permissionCode,
+          `${expected.pageKey}.${action.code} must be permission-gated`,
+        );
+        const command =
+          action.onClick?.action === 'command.execute' ? action.onClick?.args?.command : undefined;
         if (command) {
           referenced.add(command);
           assert.ok(
@@ -162,25 +182,42 @@ test('core workbench lifecycle buttons reference real CRM commands', () => {
 test('formal CRM roles align the five workbench menu and action contracts', () => {
   const required = {
     crm_admin: [
-      'crm.account.manage', 'crm.lead.manage', 'crm.opportunity.manage',
-      'crm.forecast.manage', 'crm.activity.manage', 'crm.complaint.manage',
+      'crm.account.manage',
+      'crm.lead.manage',
+      'crm.opportunity.manage',
+      'crm.forecast.manage',
+      'crm.activity.manage',
+      'crm.complaint.manage',
     ],
     crm_sales: [
-      'crm.account.manage', 'crm.lead.manage', 'crm.opportunity.manage',
-      'crm.forecast.manage', 'crm.activity.manage',
+      'crm.account.manage',
+      'crm.lead.manage',
+      'crm.opportunity.manage',
+      'crm.forecast.manage',
+      'crm.activity.manage',
     ],
     crm_sales_manager: [
-      'crm.account.manage', 'crm.lead.manage', 'crm.opportunity.manage',
-      'crm.forecast.manage', 'crm.activity.manage',
+      'crm.account.manage',
+      'crm.lead.manage',
+      'crm.opportunity.manage',
+      'crm.forecast.manage',
+      'crm.activity.manage',
     ],
     crm_qdp_release_manager: [
-      'crm.qdp.release', 'crm.qdp.read', 'crm.quote_summary.manage',
+      'crm.qdp.release',
+      'crm.qdp.read',
+      'crm.quote_summary.manage',
       'crm.order_commitment.manage',
     ],
     crm_service: ['crm.account.read', 'crm.activity.manage', 'crm.complaint.manage'],
     crm_viewer: [
-      'crm.account.read', 'crm.lead.read', 'crm.opportunity.read',
-      'crm.forecast.read', 'crm.activity.read', 'crm.complaint.read', 'crm.qdp.read',
+      'crm.account.read',
+      'crm.lead.read',
+      'crm.opportunity.read',
+      'crm.forecast.read',
+      'crm.activity.read',
+      'crm.complaint.read',
+      'crm.qdp.read',
     ],
   };
   for (const [roleCode, permissions] of Object.entries(required)) {
@@ -190,27 +227,51 @@ test('formal CRM roles align the five workbench menu and action contracts', () =
       assert.ok(role.permissions.includes(permission), `${roleCode} is missing ${permission}`);
     }
   }
-  assert.ok(!roles.get('crm_viewer').permissions.some((permission) => permission.endsWith('.manage')),
-    'crm_viewer must stay read-only');
-  assert.ok(!roles.get('crm_service').permissions.includes('crm.forecast.read'),
-    'crm_service must not gain unrelated forecast access');
+  assert.ok(
+    !roles.get('crm_viewer').permissions.some((permission) => permission.endsWith('.manage')),
+    'crm_viewer must stay read-only',
+  );
+  assert.ok(
+    !roles.get('crm_service').permissions.includes('crm.forecast.read'),
+    'crm_service must not gain unrelated forecast access',
+  );
 });
 
 test('CRM navigation exposes operating dashboards and keeps superseded workbenches hidden', () => {
   assert.equal(menus.get('crm_records')?.parentCode, 'crm_root');
   assert.equal(menus.get('crm_operations')?.parentCode, 'crm_root');
-  for (const code of ['crm_accounts', 'crm_contacts', 'crm_leads', 'crm_opportunities',
-    'crm_customer_requests', 'crm_quote_summaries', 'crm_tasks', 'crm_activities',
-    'crm_complaints', 'crm_forecast_submit', 'crm_approval_case_menu',
-    'crm_review_common_menu', 'crm_risk_common_menu', 'crm_clarification_common_menu']) {
-    assert.equal(menus.get(code)?.parentCode, 'crm_records', `${code} belongs under business records`);
+  for (const code of [
+    'crm_accounts',
+    'crm_contacts',
+    'crm_leads',
+    'crm_opportunities',
+    'crm_customer_requests',
+    'crm_quote_summaries',
+    'crm_tasks',
+    'crm_activities',
+    'crm_complaints',
+    'crm_forecast_submit',
+    'crm_approval_case_menu',
+    'crm_review_common_menu',
+    'crm_risk_common_menu',
+    'crm_clarification_common_menu',
+  ]) {
+    assert.equal(
+      menus.get(code)?.parentCode,
+      'crm_records',
+      `${code} belongs under business records`,
+    );
   }
   for (const code of ['crm_dashboard', 'crm_sales_forecast']) {
     assert.equal(menus.get(code)?.visible, true, `${code} must be reachable from CRM operations`);
     assert.match(menus.get(code)?.path ?? '', /^\/dashboards\/view\//);
   }
   for (const code of ['crm_sales_workbench', 'crm_manager_workbench']) {
-    assert.equal(menus.get(code)?.visible, false, `${code} legacy entry must not compete with workspaces`);
+    assert.equal(
+      menus.get(code)?.visible,
+      false,
+      `${code} legacy entry must not compete with workspaces`,
+    );
   }
   assert.equal(menus.get('crm_qdp_release_center')?.orderNo, 6);
 });
@@ -237,18 +298,27 @@ test('workbench-only decision labels are dictionary-backed and localized', () =>
 
 test('status-banner summaries never expose CRM lifecycle storage codes', () => {
   const expectedMaps = [
-    ['crm_lead_desk_workbench', 'crm_lead_status', ['new', 'contacted', 'qualified', 'converted', 'lost']],
-    ['crm_opportunity_workspace', 'crm_opp_stage', [
-      'discovery', 'qualification', 'proposal', 'negotiation', 'closed_won', 'closed_lost',
-    ]],
+    [
+      'crm_lead_desk_workbench',
+      'crm_lead_status',
+      ['new', 'contacted', 'qualified', 'converted', 'lost'],
+    ],
+    [
+      'crm_opportunity_workspace',
+      'crm_opp_stage',
+      ['discovery', 'qualification', 'proposal', 'negotiation', 'closed_won', 'closed_lost'],
+    ],
     ['crm_activity_service_desk', 'item_kind', ['task', 'complaint']],
-    ['crm_activity_service_desk', 'item_status', [
-      'open', 'in_progress', 'done', 'cancelled', 'investigating', 'resolved', 'closed',
-    ]],
+    [
+      'crm_activity_service_desk',
+      'item_status',
+      ['open', 'in_progress', 'done', 'cancelled', 'investigating', 'resolved', 'closed'],
+    ],
   ];
   for (const [pageKey, fieldCode, values] of expectedMaps) {
-    const banner = allBlocks(pages.get(pageKey))
-      .find((block) => block.blockType === 'status-banner');
+    const banner = allBlocks(pages.get(pageKey)).find(
+      (block) => block.blockType === 'status-banner',
+    );
     const summary = banner?.summaryFields?.find((field) => field.field === fieldCode);
     assert.ok(summary?.valueMap, `${pageKey}.${fieldCode} must map storage values`);
     for (const value of values) {

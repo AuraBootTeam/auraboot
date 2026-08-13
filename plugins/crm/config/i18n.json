@@ -2576,6 +2576,90 @@
     "refType": "ui"
   },
   {
+    "key": "crm.saved_view.all_accounts",
+    "zh-CN": "全部客户",
+    "en-US": "All Accounts",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.all_accounts_description",
+    "zh-CN": "按最近更新时间查看可访问的全部客户",
+    "en-US": "All accessible accounts ordered by latest update",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.collaborative_accounts",
+    "zh-CN": "协作客户",
+    "en-US": "Collaborative Accounts",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.collaborative_accounts_description",
+    "zh-CN": "其他负责人邀请我查看或共同维护的客户",
+    "en-US": "Accounts another owner invited me to view or maintain",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.all_opportunities",
+    "zh-CN": "全部商机",
+    "en-US": "All Opportunities",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.all_opportunities_description",
+    "zh-CN": "按最近更新时间查看全部商机",
+    "en-US": "All opportunities ordered by latest update",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.my_opportunities",
+    "zh-CN": "我的商机",
+    "en-US": "My Opportunities",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.my_opportunities_description",
+    "zh-CN": "仅显示当前用户负责的商机",
+    "en-US": "Opportunities owned by the current user",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.department_opportunities",
+    "zh-CN": "部门商机",
+    "en-US": "Department Opportunities",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.department_opportunities_description",
+    "zh-CN": "当前部门及其下级部门成员负责的商机",
+    "en-US": "Opportunities owned by members of the current department and its descendants",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.won_opportunities",
+    "zh-CN": "赢单商机",
+    "en-US": "Won Opportunities",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.won_opportunities_description",
+    "zh-CN": "已完成赢单的商机",
+    "en-US": "Opportunities completed as won",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
     "key": "crm.saved_view.pipeline_board",
     "zh-CN": "销售管道看板",
     "en-US": "Pipeline Board",

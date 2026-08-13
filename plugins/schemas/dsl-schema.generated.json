@@ -1141,6 +1141,60 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "bulk_record_command",
+              "description": "Execute the same command once per selected record with an exact target PID."
+            },
+            "command": {
+              "type": "string"
+            },
+            "operationType": {
+              "type": "string",
+              "enum": [
+                "UPDATE",
+                "DELETE"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "command"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "bulk_field_command",
+              "description": "Collect one DSL field value, then execute the command once per exact target PID."
+            },
+            "command": {
+              "type": "string"
+            },
+            "input": {
+              "$ref": "#/definitions/FieldConfig"
+            },
+            "operationType": {
+              "type": "string",
+              "enum": [
+                "UPDATE",
+                "DELETE"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "command",
+            "input"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "navigate"
             },
             "to": {
@@ -1343,6 +1397,77 @@
         },
         "selection": {
           "$ref": "#/definitions/SelectionConfig"
+        },
+        "bulkCapabilities": {
+          "type": "object",
+          "properties": {
+            "edit": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "permissionCode": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "delete": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "permissionCode": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "export": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "permissionCode": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "description": "Permission-aware controls for the generic edit/delete/export bulk bar."
+        },
+        "bulkActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ButtonConfig"
+          },
+          "description": "DSL-configured business bulk actions, executed through commands."
         },
         "columns": {
           "type": "array",
@@ -2708,5 +2833,5 @@
       ]
     }
   },
-  "$comment": "Auto-generated from web-admin/app/meta/schemas/dsl-schema-types.ts — DO NOT EDIT MANUALLY. Run: cd web-admin && pnpm generate:dsl-schema"
+  "$comment": "Auto-generated from web-admin/app/framework/meta/schemas/dsl-schema-types.ts — DO NOT EDIT MANUALLY. Run: cd web-admin && pnpm generate:dsl-schema"
 }

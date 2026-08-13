@@ -321,7 +321,8 @@ export const SmartLineChart: React.FC<SmartLineChartProps> = ({
       if (!data?.meta?.dimensions?.length) return;
 
       const dimension = data.meta.dimensions[0];
-      const clickedValue = params.name;
+      const clickedRow = params.dataIndex == null ? undefined : data.rows[params.dataIndex];
+      const clickedValue = clickedRow?.[dimension] ?? params.name;
 
       if (!clickedValue) return;
 
@@ -334,9 +335,7 @@ export const SmartLineChart: React.FC<SmartLineChartProps> = ({
       // Handle drill-down
       if (drillDown?.enabled && onDrillDown) {
         const row =
-          params.dataIndex == null
-            ? data.rows.find((candidate) => candidate[dimension] === clickedValue)
-            : data.rows[params.dataIndex];
+          clickedRow ?? data.rows.find((candidate) => candidate[dimension] === clickedValue);
         onDrillDown(enrichDrillDownFilters(filter, row, drillDown));
       }
 

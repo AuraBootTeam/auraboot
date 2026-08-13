@@ -9,6 +9,8 @@
       "e2et.order.read",
       "e2et.order.approve",
       "e2et.order.export",
+      "model.e2et_order.import",
+      "model.e2et_customer.import",
       "e2et.customer.manage",
       "e2et.customer.read",
       "e2et.payment.manage",
@@ -45,6 +47,8 @@
       "e2et.order.read",
       "e2et.customer.manage",
       "e2et.customer.read",
+      "model.e2et_order.import",
+      "model.e2et_customer.import",
       "e2et.payment.manage"
     ]
   }

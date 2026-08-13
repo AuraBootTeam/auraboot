@@ -49,6 +49,10 @@
       "model.crm_contact_common.read",
       "model.crm_lead_common.read",
       "model.crm_opportunity_common.read",
+      "model.crm_account_common.import",
+      "model.crm_contact_common.import",
+      "model.crm_lead_common.import",
+      "model.crm_opportunity_common.import",
       "model.crm_customer_request_common.read",
       "model.crm_quote_summary_common.read",
       "model.crm_forecast_submission.read",
@@ -121,6 +125,10 @@
       "model.crm_contact_common.read",
       "model.crm_lead_common.read",
       "model.crm_opportunity_common.read",
+      "model.crm_account_common.import",
+      "model.crm_contact_common.import",
+      "model.crm_lead_common.import",
+      "model.crm_opportunity_common.import",
       "model.crm_customer_request_common.read",
       "model.crm_quote_summary_common.read",
       "model.crm_forecast_submission.read",
@@ -150,6 +158,13 @@
     "name:en": "Sales Manager",
     "description": "Sales manager: manages team accounts, opportunities, quotes and orders; basis for commission attribution and approvals (extended in ICM milestones)",
     "defaultDataScopeType": "all",
+    "dataScopes": [
+      {
+        "permissionCode": "model.crm_opportunity_common.read",
+        "scopeType": "dept_and_sub",
+        "mergeStrategy": "MAX"
+      }
+    ],
     "permissions": [
       "meta.command.execute",
       "data.datasource.read",
@@ -186,6 +201,10 @@
       "model.crm_contact_common.read",
       "model.crm_lead_common.read",
       "model.crm_opportunity_common.read",
+      "model.crm_account_common.import",
+      "model.crm_contact_common.import",
+      "model.crm_lead_common.import",
+      "model.crm_opportunity_common.import",
       "model.crm_customer_request_common.read",
       "model.crm_quote_summary_common.read",
       "model.crm_forecast_submission.read",

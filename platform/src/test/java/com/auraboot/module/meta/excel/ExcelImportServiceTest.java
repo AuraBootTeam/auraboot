@@ -1,9 +1,13 @@
 package com.auraboot.module.meta.excel;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.FieldDefinition;
+import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.module.meta.excel.mapper.ImportJobMapper;
+import com.auraboot.module.meta.excel.entity.ImportJob;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -11,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.ByteArrayInputStream;
@@ -22,9 +27,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 
 /**
  * Unit tests for ExcelImportService.
@@ -41,11 +50,26 @@ class ExcelImportServiceTest {
     @Mock
     private ImportJobMapper importJobMapper;
 
+    @Mock
+    private ExcelImportPolicyResolver policyResolver;
+
+    @Mock
+    private CommandExecutor commandExecutor;
+
     private ExcelImportService importService;
 
     @BeforeEach
     void setUp() {
-        importService = new ExcelImportService(dynamicDataService, metaModelService, importJobMapper);
+        importService = new ExcelImportService(
+                dynamicDataService, metaModelService, importJobMapper, policyResolver, commandExecutor);
+        lenient().when(policyResolver.requireEnabled(anyString())).thenReturn(ExcelImportPolicy.builder()
+                .modelCode("test_model")
+                .enabled(true)
+                .modes(java.util.Set.of("insert", "update"))
+                .updateKeys(List.of("code"))
+                .createFields(java.util.Set.of("name", "code", "pe_so_code", "pe_so_name", "pe_so_qty", "pe_so_total", "pe_total", "pe_name"))
+                .updateFields(java.util.Set.of("name", "code"))
+                .build());
     }
 
     /**
@@ -91,6 +115,70 @@ class ExcelImportServiceTest {
         assertEquals("w001", rows.get(0).get("code"));
         assertEquals("10.5", rows.get(0).get("price"));
         assertEquals("Widget B", rows.get(1).get("name"));
+    }
+
+    @Test
+    void asyncThreshold_shouldKeepProductionDefault() {
+        assertEquals(ExcelImportService.DEFAULT_ASYNC_THRESHOLD, importService.getAsyncThreshold());
+    }
+
+    @Test
+    void getImportStatus_shouldRestoreCompletedTaskFromTenantScopedJob() throws Exception {
+        ImportJob job = new ImportJob();
+        job.setPid("01KZVZ3H2H6KJRTA25BFKNS441");
+        job.setTenantId(7L);
+        job.setCreatedBy(42L);
+        job.setModelCode("test_model");
+        job.setStatus("completed");
+        job.setImportMode("insert");
+        job.setTotalRows(3);
+        job.setProcessedRows(3);
+        job.setSuccessRows(3);
+        job.setErrorRows(0);
+        when(importJobMapper.selectOne(any())).thenReturn(job);
+
+        MetaContext.setContext(7L, 42L, "test-user", "tester");
+        try {
+            ExcelImportService.AsyncImportStatus status =
+                    importService.requireImportStatus("test_model", job.getPid());
+            assertNotNull(status);
+            assertEquals("completed", status.getStatus());
+            assertEquals(3, status.getProcessedRows());
+            assertEquals(3, status.getResult().getCreatedCount());
+            assertEquals(0, status.getResult().getErrorCount());
+            assertFalse(new ObjectMapper().writeValueAsString(status).contains("tenantId"));
+            assertFalse(new ObjectMapper().writeValueAsString(status).contains("createdBy"));
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    @Test
+    void getImportStatus_shouldNotRestoreAnotherTenantsTask() {
+        when(importJobMapper.selectOne(any())).thenReturn(null);
+        MetaContext.setContext(8L, 42L, "test-user", "tester");
+        try {
+            assertNull(importService.requireImportStatus(
+                    "test_model", "01KZVZ3H2H6KJRTA25BFKNS441"));
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    @Test
+    void getImportStatus_shouldFailClosedForAnotherCreatorInSameTenant() {
+        when(importJobMapper.selectOne(any())).thenReturn(null);
+        MetaContext.setContext(7L, 99L, "other-user", "other");
+        try {
+            assertNull(importService.requireImportStatus(
+                    "test_model", "01KZVZ3H2H6KJRTA25BFKNS441"));
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<Wrapper<ImportJob>> query = ArgumentCaptor.forClass(Wrapper.class);
+            verify(importJobMapper).selectOne(query.capture());
+            assertNotNull(query.getValue());
+        } finally {
+            MetaContext.clear();
+        }
     }
 
     @Test
@@ -305,6 +393,93 @@ class ExcelImportServiceTest {
     }
 
     @Test
+    void testGenerateTemplate_doesNotMarkCommandDefaultAsRequired() throws IOException {
+        var fields = List.of(
+                FieldDefinition.builder().code("pe_so_name").displayName("Name").required(true).build(),
+                FieldDefinition.builder().code("pe_so_code").displayName("Code").required(true).build()
+        );
+        when(metaModelService.getModelFields("test_model")).thenReturn(fields);
+        when(policyResolver.requireEnabled("test_model")).thenReturn(ExcelImportPolicy.builder()
+                .modelCode("test_model").enabled(true).modes(java.util.Set.of("insert"))
+                .createFields(java.util.Set.of("pe_so_name", "pe_so_code"))
+                .createAutoSetFields(java.util.Set.of("pe_so_code"))
+                .build());
+
+        Path template = importService.generateImportTemplate("test_model");
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(Files.newInputStream(template))) {
+            var header = wb.getSheetAt(0).getRow(0);
+            assertEquals("* Name", header.getCell(0).getStringCellValue());
+            assertEquals("Code", header.getCell(1).getStringCellValue());
+        } finally {
+            Files.deleteIfExists(template);
+        }
+    }
+
+    @Test
+    void importExcel_shouldUseAUniqueRunIdForEachUpload() throws IOException {
+        when(metaModelService.getModelFields("test_model")).thenReturn(List.of(
+                FieldDefinition.builder().code("name").displayName("Name").build()));
+        ExcelImportPolicy commandPolicy = ExcelImportPolicy.builder()
+                .modelCode("test_model").enabled(true).modes(java.util.Set.of("insert"))
+                .createCommand("test:create").createFields(java.util.Set.of("name")).build();
+        when(policyResolver.requireEnabled("test_model")).thenReturn(commandPolicy);
+
+        byte[] fileBytes = createExcel(new String[]{"name"}, new String[][]{{"Acme"}}).readAllBytes();
+        ExcelImportResult first;
+        ExcelImportResult second;
+        MetaContext.setContext(7L, 42L, "test-user", "tester");
+        try {
+            first = importService.importExcel(
+                    "test_model", new ByteArrayInputStream(fileBytes), new ImportOptions());
+            second = importService.importExcel(
+                    "test_model", new ByteArrayInputStream(fileBytes), new ImportOptions());
+        } finally {
+            MetaContext.clear();
+        }
+
+        assertEquals(1, first.getSuccessCount(), () -> "first import errors: " + first.getErrors());
+        assertEquals(1, second.getSuccessCount(), () -> "second import errors: " + second.getErrors());
+
+        var requestCaptor = org.mockito.ArgumentCaptor.forClass(CommandExecuteRequest.class);
+        verify(commandExecutor, times(2)).execute(eq("test:create"), requestCaptor.capture());
+        assertNotEquals(requestCaptor.getAllValues().get(0).getClientRequestId(),
+                requestCaptor.getAllValues().get(1).getClientRequestId());
+        assertTrue(requestCaptor.getAllValues().stream()
+                .allMatch(request -> request.getClientRequestId().startsWith("excel:")));
+    }
+
+    @Test
+    void importExcel_shouldOmitBlankAutoSetCellsSoCommandDefaultsApply() throws IOException {
+        when(metaModelService.getModelFields("test_model")).thenReturn(List.of(
+                FieldDefinition.builder().code("name").displayName("Name").build(),
+                FieldDefinition.builder().code("status").displayName("Status").build()));
+        when(policyResolver.requireEnabled("test_model")).thenReturn(ExcelImportPolicy.builder()
+                .modelCode("test_model").enabled(true).modes(java.util.Set.of("insert"))
+                .createCommand("test:create")
+                .createFields(java.util.Set.of("name", "status"))
+                .createAutoSetFields(java.util.Set.of("status"))
+                .build());
+
+        ExcelImportResult result;
+        MetaContext.setContext(7L, 42L, "test-user", "tester");
+        try {
+            result = importService.importExcel(
+                    "test_model",
+                    createExcel(new String[]{"Name", "Status"}, new String[][]{{"Acme", ""}}),
+                    new ImportOptions());
+        } finally {
+            MetaContext.clear();
+        }
+
+        assertEquals(1, result.getCreatedCount(), () -> "import errors: " + result.getErrors());
+        ArgumentCaptor<CommandExecuteRequest> request = ArgumentCaptor.forClass(CommandExecuteRequest.class);
+        verify(commandExecutor).execute(eq("test:create"), request.capture());
+        assertEquals("Acme", request.getValue().getPayload().get("name"));
+        assertFalse(request.getValue().getPayload().containsKey("status"));
+    }
+
+    @Test
     void testGenerateTemplate_excludesAutoFields() throws IOException {
         var fields = List.of(
                 FieldDefinition.builder().code("id").displayName("ID").primaryKey(true).build(),
@@ -418,10 +593,10 @@ class ExcelImportServiceTest {
         verify(dynamicDataService, never()).create(anyString(), anyMap());
     }
 
-    // ==================== UPSERT mode tests ====================
+    // ==================== UPDATE mode tests ====================
 
     @Test
-    void testUpsert_createsWhenNotFound() throws IOException {
+    void testUpdate_doesNotCreateWhenNotFound() throws IOException {
         String[] headers = {"code", "name"};
         String[][] data = {{"NEW-001", "New Item"}};
         ByteArrayInputStream stream = createExcel(headers, data);
@@ -430,23 +605,22 @@ class ExcelImportServiceTest {
         // list() returns empty — no existing record
         when(dynamicDataService.list(eq("test_model"), any()))
                 .thenReturn(new com.auraboot.framework.meta.dto.PaginationResult<>(List.of(), 0L, 1, 1));
-        when(dynamicDataService.create(eq("test_model"), anyMap()))
-                .thenReturn(Map.of("pid", "1"));
-
         ImportOptions options = new ImportOptions();
-        options.setUpsertKey("code");
+        options.setImportMode("update");
+        options.setMatchKey("code");
 
         ExcelImportResult result = importService.importExcel("test_model", stream, options);
 
-        assertEquals(1, result.getSuccessCount());
-        assertEquals(1, result.getCreatedCount());
+        assertEquals(0, result.getSuccessCount());
+        assertEquals(0, result.getCreatedCount());
         assertEquals(0, result.getUpdatedCount());
-        verify(dynamicDataService).create(eq("test_model"), anyMap());
+        assertEquals(1, result.getErrorCount());
+        verify(dynamicDataService, never()).create(anyString(), anyMap());
         verify(dynamicDataService, never()).update(anyString(), anyString(), anyMap());
     }
 
     @Test
-    void testUpsert_updatesWhenFound() throws IOException {
+    void testUpdate_updatesWhenFound() throws IOException {
         String[] headers = {"code", "name"};
         String[][] data = {{"EXIST-001", "Updated Name"}};
         ByteArrayInputStream stream = createExcel(headers, data);
@@ -460,7 +634,8 @@ class ExcelImportServiceTest {
                 .thenReturn(Map.of("pid", "existing-pid-123"));
 
         ImportOptions options = new ImportOptions();
-        options.setUpsertKey("code");
+        options.setImportMode("update");
+        options.setMatchKey("code");
 
         ExcelImportResult result = importService.importExcel("test_model", stream, options);
 

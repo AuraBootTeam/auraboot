@@ -42,23 +42,24 @@ function fieldIcon(fieldType: string): string {
 }
 
 /** Short human-readable badge for the field type */
-function typeBadge(fieldType: string): string {
-  const map: Record<string, string> = {
-    text: 'Text',
-    number: 'Num',
-    integer: 'Int',
-    decimal: 'Dec',
-    money: 'Money',
-    currency: 'Money',
-    date: 'Date',
-    datetime: 'DateTime',
-    boolean: 'Bool',
-    enum: 'Enum',
-    dict: 'Dict',
-    reference: 'Ref',
-    user: 'User',
+function typeBadge(fieldType: string, zh: boolean): string {
+  const map: Record<string, [string, string]> = {
+    text: ['文本', 'Text'],
+    number: ['数值', 'Num'],
+    integer: ['整数', 'Int'],
+    decimal: ['小数', 'Dec'],
+    money: ['金额', 'Money'],
+    currency: ['金额', 'Money'],
+    date: ['日期', 'Date'],
+    datetime: ['日期时间', 'DateTime'],
+    boolean: ['是/否', 'Bool'],
+    enum: ['选项', 'Enum'],
+    dict: ['选项', 'Dict'],
+    reference: ['关联', 'Ref'],
+    user: ['用户', 'User'],
   };
-  return map[fieldType.toLowerCase()] ?? fieldType;
+  const labels = map[fieldType.toLowerCase()];
+  return labels ? labels[zh ? 0 : 1] : fieldType;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +74,10 @@ export function FilterFieldPicker({
   onSelect,
   onClose,
 }: FilterFieldPickerProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const zh = locale.startsWith('zh');
+  const l = (key: string, zhFallback: string, enFallback: string) =>
+    t(key, undefined, zh ? zhFallback : enFallback);
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -112,6 +116,7 @@ export function FilterFieldPicker({
     <button
       key={f.fieldCode}
       type="button"
+      data-testid={`filter-field-${f.fieldCode}`}
       className="hover:bg-hover flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm"
       onClick={() => {
         onSelect(f.fieldCode);
@@ -121,7 +126,7 @@ export function FilterFieldPicker({
       <span className="flex-shrink-0 text-base leading-none">{fieldIcon(f.fieldType)}</span>
       <span className="text-text flex-1 truncate">{f.label}</span>
       <span className="bg-subtle text-text-2 flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium">
-        {typeBadge(f.fieldType)}
+        {typeBadge(f.fieldType, zh)}
       </span>
       {activeSet.has(f.fieldCode) && <span className="text-accent flex-shrink-0">&#10003;</span>}
     </button>
@@ -130,6 +135,7 @@ export function FilterFieldPicker({
   const content = (
     <div
       ref={containerRef}
+      data-testid="filter-field-picker"
       className="border-border bg-panel shadow-pop fixed z-[9999] flex max-h-[360px] min-w-[240px] flex-col overflow-hidden rounded-lg border"
       style={{ left: anchorEl.x, top: anchorEl.y }}
     >
@@ -138,7 +144,7 @@ export function FilterFieldPicker({
         <input
           type="text"
           className="border-border bg-panel text-text placeholder:text-text-3 focus:border-accent w-full rounded border px-2 py-1 text-sm outline-none"
-          placeholder={t('common.search_fields', undefined, 'Search fields...')}
+          placeholder={l('common.search_fields', '搜索字段…', 'Search fields...')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           autoFocus
@@ -149,14 +155,14 @@ export function FilterFieldPicker({
       <div className="flex-1 overflow-y-auto p-1">
         {filtered.length === 0 && (
           <p className="text-text-3 px-2 py-3 text-center text-sm">
-            {t('common.no_fields_found', undefined, 'No fields found')}
+            {l('common.no_fields_found', '未找到字段', 'No fields found')}
           </p>
         )}
 
         {commonFields.length > 0 && (
           <>
             <p className="text-text-3 px-2 pt-1 pb-0.5 text-[10px] font-semibold tracking-wider uppercase">
-              {t('common.common_fields', undefined, 'Common Fields')}
+              {l('common.common_fields', '常用字段', 'Common Fields')}
             </p>
             {commonFields.map(renderItem)}
           </>
@@ -165,7 +171,7 @@ export function FilterFieldPicker({
         {otherFields.length > 0 && (
           <>
             <p className="text-text-3 mt-1 px-2 pt-1 pb-0.5 text-[10px] font-semibold tracking-wider uppercase">
-              {t('common.other_fields', undefined, 'Other Fields')}
+              {l('common.other_fields', '其他字段', 'Other Fields')}
             </p>
             {otherFields.map(renderItem)}
           </>

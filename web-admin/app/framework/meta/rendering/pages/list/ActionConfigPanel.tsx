@@ -11,6 +11,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
 import type { ToolbarActionConfig } from '~/framework/smart/types/savedView';
 import { cn } from '~/utils/cn';
+import { useI18n } from '~/contexts/I18nContext';
 
 export interface ActionConfigPanelProps {
   buttons: ButtonConfig[];
@@ -19,14 +20,16 @@ export interface ActionConfigPanelProps {
   /** Called on every change (toggle, drag reorder) — auto-saves immediately */
   onChange: (config: ToolbarActionConfig[]) => void;
   onClose: () => void;
+  /** Built-ins unavailable for this page or actor must not reappear in configuration. */
+  hiddenBuiltinCodes?: string[];
 }
 
 // Built-in actions that are always available (not from DSL)
 const BUILTIN_ACTIONS = [
-  { code: '_import', label: 'Import' },
-  { code: '_export_excel', label: 'Export Excel' },
-  { code: '_export_csv', label: 'Export CSV' },
-  { code: '_print', label: 'Print' },
+  { code: '_import', labelKey: 'action.import', fallback: '导入' },
+  { code: '_export_excel', labelKey: 'data_tools.export_excel', fallback: '导出 Excel' },
+  { code: '_export_csv', labelKey: 'data_tools.export_csv', fallback: '导出 CSV' },
+  { code: '_print', labelKey: 'action.print', fallback: '打印' },
 ];
 
 interface ActionItem {
@@ -43,7 +46,9 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
   resolveLabel,
   onChange,
   onClose,
+  hiddenBuiltinCodes,
 }) => {
+  const { t } = useI18n();
   const [items, setItems] = useState<ActionItem[]>([]);
   const initialized = useRef(false);
   const dragItem = useRef<number | null>(null);
@@ -68,11 +73,13 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
     });
 
     // Built-in items (always start unpinned unless configured)
-    const builtinItems: ActionItem[] = BUILTIN_ACTIONS.map((ba, _i) => {
+    const builtinItems: ActionItem[] = BUILTIN_ACTIONS.filter(
+      (ba) => !hiddenBuiltinCodes?.includes(ba.code),
+    ).map((ba, _i) => {
       const cfg = configMap.get(ba.code);
       return {
         code: ba.code,
-        label: ba.label,
+        label: t(ba.labelKey, undefined, ba.fallback),
         visible: cfg?.visible ?? true,
         pinned: cfg?.pinned ?? false,
         isBuiltin: true,
@@ -95,7 +102,7 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
     setItems(result);
     // Mark as initialized after first render so we don't auto-save the initial load
     initialized.current = true;
-  }, [buttons, currentConfig, resolveLabel]);
+  }, [buttons, currentConfig, hiddenBuiltinCodes, resolveLabel, t]);
 
   // Auto-save on every change (skip initial mount)
   const emitChange = useCallback(
@@ -213,7 +220,9 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
       <span className="text-text-2 flex-1 truncate">
         {item.label}
         {item.isBuiltin && (
-          <span className="text-text-3 ml-1.5 text-[10px] font-normal">(built-in)</span>
+          <span className="text-text-3 ml-1.5 text-[10px] font-normal">
+            ({t('action_config.builtin', undefined, '内置')})
+          </span>
         )}
       </span>
 
@@ -223,7 +232,11 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         data-testid={`action-config-pin-${item.code}`}
         onClick={() => togglePinned(item.code)}
         className="text-text-3 hover:bg-hover hover:text-accent rounded p-1"
-        title={item.pinned ? 'Move to menu' : 'Pin to toolbar'}
+        title={
+          item.pinned
+            ? t('action_config.move_to_menu', undefined, '移到更多菜单')
+            : t('action_config.pin_to_toolbar', undefined, '固定到工具栏')
+        }
       >
         {item.pinned ? (
           <svg
@@ -263,7 +276,11 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
             ? 'text-status-green hover:bg-status-green-bg'
             : 'text-text-3 hover:bg-hover',
         )}
-        title={item.visible ? 'Hide button' : 'Show button'}
+        title={
+          item.visible
+            ? t('action_config.hide_button', undefined, '隐藏按钮')
+            : t('action_config.show_button', undefined, '显示按钮')
+        }
       >
         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           {item.visible ? (
@@ -294,10 +311,13 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
       <div className="rounded-card bg-panel w-full max-w-md shadow-xl">
         {/* Header */}
         <div className="border-border flex items-center justify-between border-b px-5 py-4">
-          <h3 className="text-text text-base font-semibold">Configure Buttons</h3>
+          <h3 className="text-text text-base font-semibold">
+            {t('action_config.title', undefined, '配置按钮')}
+          </h3>
           <button
             type="button"
             data-testid="action-config-close"
+            aria-label={t('action.close', undefined, '关闭')}
             onClick={onClose}
             className="rounded-control text-text-3 hover:bg-hover hover:text-text-2 p-1"
           >
@@ -316,11 +336,13 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
           {/* Toolbar (pinned) section */}
           <div className="text-text-2 mb-2 text-xs font-medium tracking-wide uppercase">
-            Toolbar
+            {t('action_config.toolbar', undefined, '工具栏')}
           </div>
           <div className="mb-3 space-y-0.5">
             {pinnedItems.length === 0 ? (
-              <div className="text-text-3 px-3 py-2 text-sm italic">No pinned buttons</div>
+              <div className="text-text-3 px-3 py-2 text-sm italic">
+                {t('action_config.no_pinned', undefined, '没有固定按钮')}
+              </div>
             ) : (
               pinnedItems.map((item, idx) => renderItem(item, idx, 'pinned'))
             )}
@@ -329,17 +351,21 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
           {/* Divider */}
           <div className="my-3 flex items-center gap-2">
             <div className="border-border flex-1 border-t" />
-            <span className="text-text-3 text-xs">Below this line: in ··· menu</span>
+            <span className="text-text-3 text-xs">
+              {t('action_config.divider', undefined, '此线以下显示在 ··· 菜单')}
+            </span>
             <div className="border-border flex-1 border-t" />
           </div>
 
           {/* Overflow section */}
           <div className="text-text-2 mb-2 text-xs font-medium tracking-wide uppercase">
-            More Menu
+            {t('action_config.more_menu', undefined, '更多菜单')}
           </div>
           <div className="space-y-0.5">
             {overflowItems.length === 0 ? (
-              <div className="text-text-3 px-3 py-2 text-sm italic">No overflow buttons</div>
+              <div className="text-text-3 px-3 py-2 text-sm italic">
+                {t('action_config.no_overflow', undefined, '没有更多按钮')}
+              </div>
             ) : (
               overflowItems.map((item, idx) => renderItem(item, idx, 'overflow'))
             )}

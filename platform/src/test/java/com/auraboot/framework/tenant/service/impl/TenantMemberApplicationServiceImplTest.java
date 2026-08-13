@@ -89,6 +89,7 @@ class TenantMemberApplicationServiceImplTest {
         u.setId(id);
         u.setPid("up-" + id);
         u.setEmail(email);
+        u.setNickName("用户 " + id);
         return u;
     }
 
@@ -123,6 +124,7 @@ class TenantMemberApplicationServiceImplTest {
         var result = service.searchMembers(req, 7L);
         assertNotNull(result);
         assertEquals(1, result.getRecords().size());
+        assertEquals("用户 7", result.getRecords().get(0).getUser().getRealName());
     }
 
     @Test

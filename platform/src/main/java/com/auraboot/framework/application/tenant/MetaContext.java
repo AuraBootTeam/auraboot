@@ -476,6 +476,19 @@ public class MetaContext {
     }
 
     /**
+     * Return the public record PID pinned by the current permit plan for this model.
+     * A mismatched model never inherits another model's target.
+     */
+    public static String getCommandPermitTargetFor(String modelCode) {
+        CommandPermitExecution permit = COMMAND_PERMIT.get();
+        if (permit == null
+                || !java.util.Objects.equals(permit.targetModel, modelCode)) {
+            return null;
+        }
+        return permit.targetRecordId;
+    }
+
+    /**
      * The optimistic version captured for this exact command target, or null for a derived row,
      * an unversioned target, or a direct non-command call.
      */

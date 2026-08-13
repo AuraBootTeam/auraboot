@@ -68,7 +68,7 @@ function renderSelector(
 }
 
 describe('ViewSelector', () => {
-  it('opens a personal-only dropdown from the title trigger without entering management', () => {
+  it('opens an authorized scope-grouped dropdown from the title trigger without entering management', () => {
     const onManageViews = vi.fn();
     renderSelector({ onManageViews });
 
@@ -78,10 +78,10 @@ describe('ViewSelector', () => {
     const listbox = screen.getByRole('listbox', { name: '选择视图' });
     expect(listbox).toHaveTextContent('个人视图');
     expect(listbox).toHaveTextContent('我的表格');
-    expect(listbox).not.toHaveTextContent('团队共享');
-    expect(listbox).not.toHaveTextContent('全员视图');
-    expect(listbox).not.toHaveTextContent('研发团队看板');
-    expect(listbox).not.toHaveTextContent('全员默认');
+    expect(listbox).toHaveTextContent('团队共享');
+    expect(listbox).toHaveTextContent('全员视图');
+    expect(listbox).toHaveTextContent('研发团队看板');
+    expect(listbox).toHaveTextContent('全员默认');
   });
 
   it('renders the implicit saved view as a default-view baseline instead of a personal view row', () => {
@@ -143,7 +143,7 @@ describe('ViewSelector', () => {
     expect(screen.getByTestId('view-option-plugin-view')).toHaveTextContent('预置');
   });
 
-  it('names an active global plugin preset in the trigger without listing global views', () => {
+  it('names and lists an accessible global plugin preset', () => {
     const pipelinePreset = makeView({
       pid: 'pipeline-board',
       name: 'Pipeline Board',
@@ -152,7 +152,7 @@ describe('ViewSelector', () => {
       isDefault: true,
       viewConfig: { meta: { managedBy: 'plugin', locked: true, allowUserCopy: true } },
     });
-    renderSelector({ views: [], currentView: pipelinePreset });
+    renderSelector({ views: [pipelinePreset], currentView: pipelinePreset });
 
     const trigger = screen.getByTestId('view-selector-trigger');
     expect(trigger).toHaveTextContent('Pipeline Board');
@@ -161,7 +161,9 @@ describe('ViewSelector', () => {
 
     fireEvent.click(trigger);
     const listbox = screen.getByRole('listbox');
-    expect(listbox).not.toHaveTextContent('Pipeline Board');
+    expect(listbox).toHaveTextContent('全员视图');
+    expect(listbox).toHaveTextContent('Pipeline Board');
+    expect(screen.getByTestId('view-option-pipeline-board')).toHaveTextContent('预置');
     expect(screen.getByTestId('view-option-default')).toBeInTheDocument();
   });
 

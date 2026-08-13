@@ -42,6 +42,17 @@ test('sales-owned CRM models expose owner fields used by the self scope', async 
   }
 });
 
+test('sales manager narrows opportunity reads to the current department hierarchy', async () => {
+  const roles = await readJson('roles.json');
+  const manager = roles.find((role) => role.code === 'crm_sales_manager');
+
+  assert.deepEqual(manager?.dataScopes, [{
+    permissionCode: 'model.crm_opportunity_common.read',
+    scopeType: 'dept_and_sub',
+    mergeStrategy: 'MAX',
+  }]);
+});
+
 test('sales role can read every core model governed by its self scope', async () => {
   const roles = await readJson('roles.json');
   const sales = roles.find((role) => role.code === 'crm_sales');

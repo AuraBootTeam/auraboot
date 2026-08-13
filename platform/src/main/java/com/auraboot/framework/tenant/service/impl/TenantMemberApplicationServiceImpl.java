@@ -666,8 +666,11 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
                     userInfo.setUsername(user.getUserName());
                     userInfo.setEmail(user.getEmail());
                     userInfo.setPhone(user.getMobile());
-//                    userInfo.setRealName(user.getRealName());
-//                    userInfo.setAvatar(user.getAvatar());
+                    // ab_user.nick_name is the human-facing display name used by
+                    // authentication and organization APIs. Expose it through the
+                    // existing public DTO field so member pickers never fall back to
+                    // long usernames or email addresses when a real name is present.
+                    userInfo.setRealName(user.getNickName());
                     response.setUser(userInfo);
                 }
             } catch (Exception e) {

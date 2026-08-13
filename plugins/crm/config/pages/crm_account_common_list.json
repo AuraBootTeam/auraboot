@@ -5,6 +5,14 @@
   "modelCode": "crm_account_common",
   "kind": "list",
   "schemaVersion": 4,
+  "extension": {
+    "import": {
+      "enabled": true,
+      "permissionCode": "model.crm_account_common.import",
+      "modes": ["insert", "update"],
+      "updateKeys": ["crm_acc_code"]
+    }
+  },
   "layout": {
     "type": "grid",
     "cols": 12

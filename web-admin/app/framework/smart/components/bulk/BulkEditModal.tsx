@@ -104,7 +104,16 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({
         data: { [selectedField]: parsedValue },
       }));
 
-      await dynamicService.batchUpdate(modelCode, updates);
+      const result = await dynamicService.batchUpdate(modelCode, updates);
+      if (result.failed > 0 || Number(result.skipped || 0) > 0) {
+        const firstFailure = result.failedItems?.[0]?.error || result.errors?.[0];
+        throw new Error(
+          firstFailure ||
+            (isZh
+              ? `批量更新未全部完成：成功 ${result.success} 条，失败 ${result.failed} 条`
+              : `Bulk update was incomplete: ${result.success} succeeded, ${result.failed} failed`),
+        );
+      }
       onUpdateComplete?.();
       onClose();
     } catch (err) {
