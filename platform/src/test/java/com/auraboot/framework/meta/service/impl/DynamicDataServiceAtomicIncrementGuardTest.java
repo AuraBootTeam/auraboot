@@ -116,7 +116,6 @@ class DynamicDataServiceAtomicIncrementGuardTest {
     @Test
     void command_owned_counter_rejects_direct_atomic_increment() {
         ModelDefinition protectedModel = protectedCounterModel();
-        when(metadataService.getDefinitionByCode("cr_cj_profile")).thenReturn(protectedModel);
         when(metadataService.getModelDefinition("cr_cj_profile"))
                 .thenReturn(Optional.of(protectedModel));
 
@@ -132,7 +131,6 @@ class DynamicDataServiceAtomicIncrementGuardTest {
     @Test
     void exact_authorized_command_may_increment_its_owned_counter() {
         ModelDefinition protectedModel = protectedCounterModel();
-        when(metadataService.getDefinitionByCode("cr_cj_profile")).thenReturn(protectedModel);
         when(metadataService.getModelDefinition("cr_cj_profile"))
                 .thenReturn(Optional.of(protectedModel));
         when(metadataService.getPrimaryKeyField("cr_cj_profile")).thenReturn(pidField);
@@ -175,7 +173,6 @@ class DynamicDataServiceAtomicIncrementGuardTest {
 
     @Test
     void increment_passes_null_cap_to_mapper() {
-        when(metadataService.getDefinitionByCode("cr_cj_profile")).thenReturn(testModel);
         when(metadataService.getPrimaryKeyField("cr_cj_profile")).thenReturn(pidField);
         when(mapper.atomicIncrementReturning(anyString(), anyString(), isNull(), anyString(),
                 anyString(), anyLong(), anyString(), anyLong(), any()))
@@ -188,11 +185,11 @@ class DynamicDataServiceAtomicIncrementGuardTest {
         verify(mapper).atomicIncrementReturning(
                 eq("cr_cj_profile"), eq("cr_cj_followed_count"), isNull(),
                 eq("pid"), anyString(), eq(1L), eq("rec-1"), eq(1L), eq(7L));
+        verify(metadataService, never()).getDefinitionByCode(anyString());
     }
 
     @Test
     void returns_new_value_from_mapper() {
-        when(metadataService.getDefinitionByCode("cr_cj_profile")).thenReturn(testModel);
         when(metadataService.getPrimaryKeyField("cr_cj_profile")).thenReturn(pidField);
         when(mapper.atomicIncrementReturning(anyString(), anyString(), anyString(), anyString(),
                 anyString(), anyLong(), anyString(), anyLong(), any()))
@@ -208,7 +205,6 @@ class DynamicDataServiceAtomicIncrementGuardTest {
 
     @Test
     void empty_mapper_result_returns_empty_optional() {
-        when(metadataService.getDefinitionByCode("cr_cj_profile")).thenReturn(testModel);
         when(metadataService.getPrimaryKeyField("cr_cj_profile")).thenReturn(pidField);
         when(mapper.atomicIncrementReturning(anyString(), anyString(), anyString(), anyString(),
                 anyString(), anyLong(), anyString(), anyLong(), any()))

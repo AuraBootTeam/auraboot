@@ -1,9 +1,106 @@
-import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import {
+  expect,
+  test,
+  type APIResponse,
+  type Browser,
+  type BrowserContext,
+  type Page,
+  type Response,
+} from '@playwright/test';
+import { ensureSidebarExpanded } from '../helpers';
 
 const ADMIN_EMAIL = 'admin@auraboot.com';
 const PASSWORD = 'Test2026x';
 
 type CommandResult = Record<string, unknown>;
+
+const COLD_CLAIM_SQL_BUDGET = 120;
+const STEADY_COMMAND_SQL_BUDGET = 100;
+const REJECT_SQL_BUDGET = 75;
+
+async function navigateToCrmMenu(page: Page, section: RegExp, href: string): Promise<void> {
+  await ensureSidebarExpanded(page);
+  const nav = page.locator('nav, aside, [role="navigation"]').first();
+  const leaf = nav.locator(`a[href="${href}"]`).first();
+  if (!(await leaf.isVisible().catch(() => false))) {
+    const crmRoot = nav.getByRole('button', { name: /客户关系管理|CRM/i }).first();
+    if (await crmRoot.isVisible().catch(() => false)) await crmRoot.click();
+  }
+  if (!(await leaf.isVisible().catch(() => false))) {
+    await nav.getByRole('button', { name: section }).first().click();
+  }
+  await expect(leaf, `CRM sidebar leaf ${href}`).toBeVisible({ timeout: 8_000 });
+  await leaf.click();
+  await expect(page).toHaveURL(new RegExp(href.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+}
+
+function assertSqlCount(
+  rawCount: string | null | undefined,
+  label: string,
+  budget: number,
+): number {
+  expect(rawCount, `${label} must expose X-SQL-Count from the real backend`).toBeTruthy();
+  const count = Number(rawCount);
+  expect(Number.isInteger(count) && count >= 0, `${label} invalid X-SQL-Count=${rawCount}`).toBe(
+    true,
+  );
+  expect(count, `${label} exceeded SQL budget ${budget}`).toBeLessThanOrEqual(budget);
+  return count;
+}
+
+function assertApiSqlCount(response: APIResponse, label: string, budget: number): number {
+  return assertSqlCount(response.headers()['x-sql-count'], label, budget);
+}
+
+async function captureUiCommandSqlCount(
+  page: Page,
+  commandCode: string,
+  label: string,
+  budget: number,
+  action: () => Promise<void>,
+): Promise<number> {
+  const [response] = await Promise.all([
+    page.waitForResponse(
+      (candidate) =>
+        candidate.request().method() === 'POST' &&
+        candidate.url().includes(`/api/meta/commands/execute/${commandCode}`),
+      { timeout: 20_000 },
+    ),
+    action(),
+  ]);
+  return assertSqlCount(await response.headerValue('x-sql-count'), label, budget);
+}
+
+async function captureUiCommandSqlCounts(
+  page: Page,
+  commandCode: string,
+  expectedCount: number,
+  label: string,
+  budget: number,
+  action: () => Promise<void>,
+): Promise<number[]> {
+  const responses: Response[] = [];
+  const listener = (response: Response): void => {
+    if (
+      response.request().method() === 'POST' &&
+      response.url().includes(`/api/meta/commands/execute/${commandCode}`)
+    ) {
+      responses.push(response);
+    }
+  };
+  page.on('response', listener);
+  try {
+    await action();
+    await expect.poll(() => responses.length, { timeout: 20_000 }).toBe(expectedCount);
+    return await Promise.all(
+      responses.map(async (response, index) =>
+        assertSqlCount(await response.headerValue('x-sql-count'), `${label} ${index + 1}`, budget),
+      ),
+    );
+  } finally {
+    page.off('response', listener);
+  }
+}
 
 async function uiLogin(page: Page, email: string): Promise<void> {
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
@@ -117,7 +214,11 @@ async function createLeadAndMove(
   return { leadPid, itemPid };
 }
 
-async function openAs(browser: Browser, baseURL: string, email: string): Promise<{
+async function openAs(
+  browser: Browser,
+  baseURL: string,
+  email: string,
+): Promise<{
   context: BrowserContext;
   page: Page;
 }> {
@@ -135,6 +236,7 @@ test.describe('CRM lead-pool Cordys parity W1', () => {
     browser,
     baseURL,
   }, testInfo) => {
+    const sqlEvidence: Record<string, number> = {};
     await uiLogin(page, ADMIN_EMAIL);
     const stamp = `${Date.now()}`;
     const meResponse = await page.request.get('/api/auth/me');
@@ -198,15 +300,23 @@ test.describe('CRM lead-pool Cordys parity W1', () => {
       const salesMeBody = await salesMeResponse.json();
       expect(JSON.stringify(salesMeBody?.data?.permissions)).toContain('crm.lead_pool.read');
       expect(JSON.stringify(salesMeBody?.data?.permissions)).toContain('crm.lead_pool.pick');
-      await salesPage.goto('/p/crm_lead_pool_item');
+      await navigateToCrmMenu(salesPage, /业务档案|Business Records/i, '/p/crm_lead_pool_item');
       await expect(salesPage).toHaveURL(/crm_lead_pool_item/, { timeout: 15_000 });
       await expect(salesPage.getByText(singleA, { exact: true })).toBeVisible({ timeout: 15_000 });
       await expect(salesPage.getByText(singleB, { exact: true })).toBeVisible({ timeout: 15_000 });
 
       const rowA = salesPage.getByRole('row', { name: new RegExp(singleA) });
       await rowA.getByRole('button', { name: 'More actions' }).click();
-      await salesPage.getByTestId('row-action-claim').click();
-      await expect(salesPage.getByText(singleA, { exact: true })).toHaveCount(0, { timeout: 15_000 });
+      sqlEvidence.singleClaim = await captureUiCommandSqlCount(
+        salesPage,
+        'crm:claim_pool_lead',
+        'first successful member claim',
+        COLD_CLAIM_SQL_BUDGET,
+        () => salesPage.getByTestId('row-action-claim').click(),
+      );
+      await expect(salesPage.getByText(singleA, { exact: true })).toHaveCount(0, {
+        timeout: 15_000,
+      });
       await testInfo.attach('sales-single-claim-available-tab', {
         body: await salesPage.screenshot(),
         contentType: 'image/png',
@@ -221,6 +331,11 @@ test.describe('CRM lead-pool Cordys parity W1', () => {
       );
       const capacityBody = await capacityResponse.json().catch(() => ({}));
       expect(JSON.stringify(capacityBody)).toContain('Lead capacity reached');
+      sqlEvidence.capacityReject = assertApiSqlCount(
+        capacityResponse,
+        'capacity rejection',
+        REJECT_SQL_BUDGET,
+      );
 
       await command(
         page,
@@ -239,11 +354,16 @@ test.describe('CRM lead-pool Cordys parity W1', () => {
       );
       const quotaBody = await quotaResponse.json().catch(() => ({}));
       expect(JSON.stringify(quotaBody)).toContain('Daily lead-pool claim limit reached');
+      sqlEvidence.quotaReject = assertApiSqlCount(
+        quotaResponse,
+        'daily quota rejection',
+        REJECT_SQL_BUDGET,
+      );
     } finally {
       await salesSession.context.close();
     }
 
-    await page.goto('/p/crm_lead_pool_item');
+    await navigateToCrmMenu(page, /业务档案|Business Records/i, '/p/crm_lead_pool_item');
     const assignRow = page.getByRole('row', { name: new RegExp(assignA) });
     await assignRow.getByRole('button', { name: 'More actions' }).click();
     await page.getByTestId('row-action-assign').click();
@@ -252,7 +372,13 @@ test.describe('CRM lead-pool Cordys parity W1', () => {
     await assignDialog.getByTestId('member-picker-add').click();
     await assignDialog.getByTestId('member-picker-search-input').fill(sales.email);
     await assignDialog.getByTestId(`member-picker-option-${sales.pid}`).click();
-    await assignDialog.getByRole('button', { name: /确认|确定|提交|Submit|Confirm/i }).click();
+    sqlEvidence.singleAssign = await captureUiCommandSqlCount(
+      page,
+      'crm:assign_pool_lead',
+      'successful administrator assignment',
+      STEADY_COMMAND_SQL_BUDGET,
+      () => assignDialog.getByRole('button', { name: /确认|确定|提交|Submit|Confirm/i }).click(),
+    );
     await expect(page.getByText(assignA, { exact: true })).toHaveCount(0, { timeout: 15_000 });
     await testInfo.attach('admin-single-assign-result', {
       body: await page.screenshot(),
@@ -262,13 +388,28 @@ test.describe('CRM lead-pool Cordys parity W1', () => {
     const managerSession = await openAs(browser, baseURL ?? 'http://localhost:5251', manager.email);
     try {
       const managerPage = managerSession.page;
-      await managerPage.goto('/p/crm_lead_pool_item');
+      await navigateToCrmMenu(managerPage, /业务档案|Business Records/i, '/p/crm_lead_pool_item');
       for (const company of [batchA, batchB]) {
         const row = managerPage.getByRole('row', { name: new RegExp(company) });
         await row.getByRole('checkbox').click();
       }
-      await managerPage.getByRole('button', { name: /批量领取|Claim Selected/, exact: true }).click();
-      await managerPage.getByRole('dialog').getByRole('button', { name: /确认|Confirm/, exact: true }).click();
+      await managerPage
+        .getByRole('button', { name: /批量领取|Claim Selected/, exact: true })
+        .click();
+      const batchClaimCounts = await captureUiCommandSqlCounts(
+        managerPage,
+        'crm:claim_pool_lead',
+        2,
+        'successful manager batch claim',
+        STEADY_COMMAND_SQL_BUDGET,
+        () =>
+          managerPage
+            .getByRole('dialog')
+            .getByRole('button', { name: /确认|Confirm/, exact: true })
+            .click(),
+      );
+      sqlEvidence.managerBatchClaim1 = batchClaimCounts[0];
+      sqlEvidence.managerBatchClaim2 = batchClaimCounts[1];
       await expect(managerPage.getByText(/批量领取已完成.*成功 2 条|Claim.*2/i)).toBeVisible({
         timeout: 20_000,
       });
@@ -282,7 +423,7 @@ test.describe('CRM lead-pool Cordys parity W1', () => {
       await managerSession.context.close();
     }
 
-    await page.goto('/p/crm_lead_owner_history');
+    await navigateToCrmMenu(page, /运营与配置|Operations/i, '/p/crm_lead_owner_history');
     await expect(page.getByText(/领取|Claimed/).first()).toBeVisible();
     await expect(page.getByText('CordysCRM W1 automated parity journey').first()).toBeVisible();
     await testInfo.attach('lead-owner-history', {
@@ -294,5 +435,9 @@ test.describe('CRM lead-pool Cordys parity W1', () => {
     const persistedBody = await persistedLead.json();
     expect(String(persistedBody?.data?.crm_lead_assigned_to)).toBe(sales.pid);
     expect(String(persistedBody?.data?.crm_lead_pool_state)).toBe('owned');
+    await testInfo.attach('lead-pool-sql-budget.json', {
+      body: Buffer.from(JSON.stringify(sqlEvidence, null, 2)),
+      contentType: 'application/json',
+    });
   });
 });
