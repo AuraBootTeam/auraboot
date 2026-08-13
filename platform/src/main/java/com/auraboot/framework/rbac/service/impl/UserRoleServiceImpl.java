@@ -8,15 +8,18 @@ import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
+import com.auraboot.framework.rbac.service.MemberRoleContributor;
 import com.auraboot.framework.permission.event.UserRoleChangedEvent;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
+import com.auraboot.framework.tenant.offboarding.TenantAdminContinuityGuard;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +27,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 import com.auraboot.framework.common.constant.StatusConstants;
@@ -46,6 +50,12 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
 
     @Resource
     private ApplicationEventPublisher eventPublisher;
+
+    @Resource
+    private TenantAdminContinuityGuard tenantAdminContinuityGuard;
+
+    @Autowired(required = false)
+    private List<MemberRoleContributor> memberRoleContributors = List.of();
 
     @Override
     @Transactional
@@ -86,9 +96,19 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
     @Override
     @Transactional
     public boolean assignRolesToMemberByRolePids(String memberPid, List<String> rolePids, Long tenantId, Long operatorId) {
+        return assignRolesToMemberByRolePids(memberPid, rolePids, null, null, tenantId, operatorId);
+    }
+
+    @Override
+    @Transactional
+    public boolean assignRolesToMemberByRolePids(
+            String memberPid, List<String> rolePids, LocalDate effectiveDate, LocalDate expiryDate,
+            Long tenantId, Long operatorId) {
         if (CollectionUtils.isEmpty(rolePids)) {
             return true;
         }
+
+        validateAssignmentWindow(effectiveDate, expiryDate);
 
         TenantMember member = resolveMember(memberPid, tenantId);
         List<Long> roleIds = new ArrayList<>();
@@ -103,15 +123,25 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             roleIds.add(role.getId());
         }
 
-        return assignRolesToMember(member.getId(), roleIds, tenantId, operatorId);
+        return assignTimedRolesToMember(member.getId(), roleIds, effectiveDate, expiryDate, tenantId, operatorId);
     }
 
     @Override
     @Transactional
     public boolean assignRolesToMemberByRoleCodes(String memberPid, List<String> roleCodes, Long tenantId, Long operatorId) {
+        return assignRolesToMemberByRoleCodes(memberPid, roleCodes, null, null, tenantId, operatorId);
+    }
+
+    @Override
+    @Transactional
+    public boolean assignRolesToMemberByRoleCodes(
+            String memberPid, List<String> roleCodes, LocalDate effectiveDate, LocalDate expiryDate,
+            Long tenantId, Long operatorId) {
         if (CollectionUtils.isEmpty(roleCodes)) {
             return true;
         }
+
+        validateAssignmentWindow(effectiveDate, expiryDate);
 
         TenantMember member = resolveMember(memberPid, tenantId);
         List<Long> roleIds = new ArrayList<>();
@@ -126,7 +156,62 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             roleIds.add(role.getId());
         }
 
-        return assignRolesToMember(member.getId(), roleIds, tenantId, operatorId);
+        return assignTimedRolesToMember(member.getId(), roleIds, effectiveDate, expiryDate, tenantId, operatorId);
+    }
+
+    private boolean assignTimedRolesToMember(
+            Long memberId, List<Long> roleIds, LocalDate effectiveDate, LocalDate expiryDate,
+            Long tenantId, Long operatorId) {
+        if (effectiveDate == null && expiryDate == null) {
+            return assignRolesToMember(memberId, roleIds, tenantId, operatorId);
+        }
+        List<UserRole> assignments = new ArrayList<>();
+        boolean renewed = false;
+        for (Long roleId : roleIds) {
+            UserRole existing = findByMemberIdAndRoleIdAndTenantId(memberId, roleId, tenantId);
+            if (existing != null) {
+                existing.setEffectiveDate(effectiveDate);
+                existing.setExpiryDate(expiryDate);
+                existing.setStatus(StatusConstants.ACTIVE);
+                existing.setDeletedFlag(false);
+                existing.setUpdatedBy(operatorId);
+                existing.setUpdatedAt(Instant.now());
+                if (!updateById(existing)) {
+                    throw new BusinessException("Failed to renew role assignment: " + existing.getPid());
+                }
+                renewed = true;
+                continue;
+            }
+            UserRole assignment = new UserRole();
+            assignment.setMemberId(memberId);
+            assignment.setPid(UniqueIdGenerator.generate());
+            assignment.setTenantId(tenantId);
+            assignment.setRoleId(roleId);
+            assignment.setAssignType("direct");
+            assignment.setEffectiveDate(effectiveDate);
+            assignment.setExpiryDate(expiryDate);
+            assignment.setStatus(StatusConstants.ACTIVE);
+            assignment.setDeletedFlag(false);
+            assignment.setCreatedBy(operatorId);
+            assignment.setUpdatedBy(operatorId);
+            assignment.setCreatedAt(Instant.now());
+            assignment.setUpdatedAt(Instant.now());
+            assignments.add(assignment);
+        }
+        boolean saved = assignments.isEmpty() || saveBatch(assignments);
+        if (saved && (renewed || !assignments.isEmpty())) {
+            publishMemberRoleChange(memberId, null, "CREATE");
+        }
+        return saved;
+    }
+
+    private void validateAssignmentWindow(LocalDate effectiveDate, LocalDate expiryDate) {
+        if (effectiveDate != null && expiryDate != null && expiryDate.isBefore(effectiveDate)) {
+            throw new BusinessException("expiryDate must be on or after effectiveDate");
+        }
+        if (expiryDate != null && expiryDate.isBefore(LocalDate.now())) {
+            throw new BusinessException("expiryDate must not be in the past");
+        }
     }
 
     private TenantMember resolveMember(String memberPid, Long tenantId) {
@@ -147,6 +232,7 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             return true;
         }
 
+        tenantAdminContinuityGuard.assertRolesCanBeRemoved(memberId, tenantId, roleIds);
         QueryWrapper<UserRole> wrapper = new QueryWrapper<>();
         wrapper.eq("member_id", memberId)
                 .in("role_id", roleIds);
@@ -175,6 +261,8 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
     @Override
     @Transactional
     public boolean removeAllRolesFromMemberInTenant(Long memberId, Long tenantId) {
+        tenantAdminContinuityGuard.assertRolesCanBeRemoved(
+                memberId, tenantId, getRoleIdsByMemberIdAndTenantId(memberId, tenantId));
         boolean removed = userRoleMapper.deleteByMemberIdAndTenantId(memberId, tenantId) >= 0;
         publishMemberRoleChange(memberId, null, "DELETE");
         return removed;
@@ -298,6 +386,15 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             }
         }
 
+        records.stream()
+                .collect(Collectors.groupingBy(UserRole::getTenantId))
+                .forEach((recordTenantId, tenantRecords) -> tenantRecords.stream()
+                        .collect(Collectors.groupingBy(UserRole::getMemberId))
+                        .forEach((memberId, memberRecords) -> tenantAdminContinuityGuard.assertRolesCanBeRemoved(
+                                memberId,
+                                recordTenantId,
+                                memberRecords.stream().map(UserRole::getRoleId).toList())));
+
         if (!removeByIds(userRoleIds)) {
             return 0;
         }
@@ -328,6 +425,13 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         if (CollectionUtils.isEmpty(records)) {
             return 0;
         }
+
+        records.stream()
+                .collect(Collectors.groupingBy(UserRole::getMemberId))
+                .forEach((memberId, memberRecords) -> tenantAdminContinuityGuard.assertRolesCanBeRemoved(
+                        memberId,
+                        tenantId,
+                        memberRecords.stream().map(UserRole::getRoleId).toList()));
 
         List<Long> ids = records.stream()
                 .map(UserRole::getId)
@@ -404,9 +508,17 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
     @Override
     public List<Long> getRoleIdsByMemberIdAndTenantId(Long memberId, Long tenantId) {
         List<UserRole> userRoles = findByMemberIdAndTenantId(memberId, tenantId);
-        return userRoles.stream()
+        LinkedHashSet<Long> roleIds = userRoles.stream()
                 .map(UserRole::getRoleId)
-                .collect(Collectors.toList());
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        for (MemberRoleContributor contributor : memberRoleContributors) {
+            List<Long> contributed = contributor.findRoleIds(memberId, tenantId);
+            if (contributed != null) {
+                contributed.stream().filter(Objects::nonNull).forEach(roleIds::add);
+            }
+        }
+        return List.copyOf(roleIds);
     }
 
     @Override
@@ -550,6 +662,11 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
     @Override
     @Transactional
     public boolean deactivateUserRole(Long userRoleId) {
+        UserRole record = getById(userRoleId);
+        if (record != null) {
+            tenantAdminContinuityGuard.assertRolesCanBeRemoved(
+                    record.getMemberId(), record.getTenantId(), List.of(record.getRoleId()));
+        }
         UpdateWrapper<UserRole> wrapper = new UpdateWrapper<>();
         wrapper.eq("id", userRoleId)
                 .set("status", StatusConstants.INACTIVE)
@@ -587,6 +704,16 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             return 0;
         }
 
+        List<UserRole> records = listByIds(userRoleIds);
+        records.stream()
+                .collect(Collectors.groupingBy(UserRole::getTenantId))
+                .forEach((recordTenantId, tenantRecords) -> tenantRecords.stream()
+                        .collect(Collectors.groupingBy(UserRole::getMemberId))
+                        .forEach((memberId, memberRecords) -> tenantAdminContinuityGuard.assertRolesCanBeRemoved(
+                                memberId,
+                                recordTenantId,
+                                memberRecords.stream().map(UserRole::getRoleId).toList())));
+
         UpdateWrapper<UserRole> wrapper = new UpdateWrapper<>();
         wrapper.in("id", userRoleIds)
                 .set("status", StatusConstants.INACTIVE)
@@ -601,6 +728,7 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
 
     @Override
     public boolean removeMemberRole(Long memberId, Long roleId, Long tenantId) {
+        tenantAdminContinuityGuard.assertRolesCanBeRemoved(memberId, tenantId, List.of(roleId));
         QueryWrapper<UserRole> wrapper = new QueryWrapper<>();
         wrapper.eq("member_id", memberId)
                 .eq("role_id", roleId)

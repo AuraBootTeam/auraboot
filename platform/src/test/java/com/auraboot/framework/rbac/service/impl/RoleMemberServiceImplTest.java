@@ -3,6 +3,7 @@ package com.auraboot.framework.rbac.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.rbac.dto.RoleMemberDTO;
 import com.auraboot.framework.rbac.entity.Role;
@@ -25,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -127,7 +129,7 @@ class RoleMemberServiceImplTest {
     @DisplayName("addMembers no-op for empty list")
     void addMembersEmpty() {
         service.addMembers(100L, List.of());
-        verify(userRoleService, never()).assignRolesToMember(any(), any(), any(), any());
+        verify(userRoleService, never()).assignRolesToMemberByRolePids(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -140,7 +142,9 @@ class RoleMemberServiceImplTest {
     @Test
     @DisplayName("addMembers skips invalid pid and cross-tenant members")
     void addMembersSkipInvalid() {
-        when(roleService.getById(100L)).thenReturn(new Role());
+        Role role = new Role();
+        role.setPid("role-pid-100");
+        when(roleService.getById(100L)).thenReturn(role);
         when(tenantMemberService.findByPid("none")).thenReturn(null);
 
         TenantMember crossTenant = member(2L, 22L, "mp-2");
@@ -151,8 +155,26 @@ class RoleMemberServiceImplTest {
         when(tenantMemberService.findByPid("mp-1")).thenReturn(ok);
 
         service.addMembers(100L, List.of("none", "mp-2", "mp-1"));
-        verify(userRoleService).assignRolesToMember(1L, List.of(100L), 10L, 1L);
-        verify(userRoleService, never()).assignRolesToMember(2L, List.of(100L), 10L, 1L);
+        verify(userRoleService).assignRolesToMemberByRolePids(
+                "mp-1", List.of("role-pid-100"), null, null, 10L, 1L);
+        verify(userRoleService, never()).assignRolesToMemberByRolePids(
+                org.mockito.ArgumentMatchers.eq("mp-2"), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("addMembers forwards a PID-safe effective and expiry window")
+    void addMembersTimed() {
+        Role role = new Role();
+        role.setPid("role-pid-100");
+        when(roleService.getById(100L)).thenReturn(role);
+        when(tenantMemberService.findByPid("mp-1")).thenReturn(member(1L, 11L, "mp-1"));
+        LocalDate effectiveDate = LocalDate.now();
+        LocalDate expiryDate = effectiveDate.plusDays(7);
+
+        service.addMembers(100L, List.of("mp-1"), effectiveDate, expiryDate);
+
+        verify(userRoleService).assignRolesToMemberByRolePids(
+                "mp-1", List.of("role-pid-100"), effectiveDate, expiryDate, 10L, 1L);
     }
 
     @Test
@@ -208,5 +230,22 @@ class RoleMemberServiceImplTest {
         List<RoleMemberDTO> out = service.getCandidates(100L, "carla");
         assertEquals(1, out.size());
         assertNotNull(out.get(0));
+    }
+
+    @Test
+    @DisplayName("getCandidates remains usable when the optional employee model is absent")
+    void getCandidatesWithoutEmployeeModel() {
+        when(userRoleService.list(any(QueryWrapper.class))).thenReturn(List.of());
+        TenantMember candidate = member(3L, 33L, "mp-3");
+        when(tenantMemberService.findByTenantId(10L)).thenReturn(List.of(candidate));
+        when(userService.findByUserIds(any())).thenReturn(List.of(user(33L, "carla@x.com", "Carla")));
+        when(organizationService.getEmployeesByMemberPids(anyCollection()))
+                .thenThrow(new MetaServiceException("Model not found: org_employee"));
+
+        List<RoleMemberDTO> out = service.getCandidates(100L, "carla@x.com");
+
+        assertEquals(1, out.size());
+        assertEquals("Carla", out.get(0).userName());
+        assertEquals("carla@x.com", out.get(0).email());
     }
 }

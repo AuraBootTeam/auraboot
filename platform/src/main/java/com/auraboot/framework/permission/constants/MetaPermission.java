@@ -255,6 +255,9 @@ public final class MetaPermission {
      */
     public static final String USER_ROLE_MANAGE = "org.user_role.update";
 
+    /** Tenant member lifecycle administration exposed by the platform-admin DSL plugin. */
+    public static final String TENANT_MEMBER_MANAGE = "admin_tenant_member";
+
     /**
      * User-Role binding read permission
      */

@@ -4,6 +4,7 @@ import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.rbac.dto.RoleMemberDTO;
 
 import java.util.List;
+import java.time.LocalDate;
 
 /**
  * Service for managing role memberships.
@@ -24,6 +25,8 @@ public interface RoleMemberService {
      * @param memberPids list of tenant member PIDs (string)
      */
     void addMembers(Long roleId, List<String> memberPids);
+
+    void addMembers(Long roleId, List<String> memberPids, LocalDate effectiveDate, LocalDate expiryDate);
 
     /**
      * Remove members from a role (batch).

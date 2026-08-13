@@ -34,6 +34,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -247,5 +248,24 @@ class CommandExecutorFailureAuditTest {
         verify(effectExecutor).saveAuditLog(
                 eq(77L), eq("iot.task.transition"), isNull(), eq(42L), any(), isNull(),
                 eq(false), contains("iot.error.version_conflict"), anyLong(), any(), any());
+    }
+
+    @Test
+    void executePreservesAccessDeniedExceptionForHttp403Mapping() {
+        MetaContext.setContext(77L, 42L, "user_42", "Operator");
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setPayload(Map.of());
+
+        org.mockito.Mockito.doThrow(new AccessDeniedException("record ownership required"))
+                .when(commandPipeline)
+                .executeGuardedPhases(any(CommandPipelineContext.class));
+
+        assertThatThrownBy(() -> commandExecutor.execute("qr:pause", request))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessage("record ownership required");
+
+        verify(effectExecutor).saveAuditLog(
+                eq(77L), eq("qr:pause"), isNull(), eq(42L), any(), isNull(),
+                eq(false), contains("record ownership required"), anyLong(), any(), any());
     }
 }

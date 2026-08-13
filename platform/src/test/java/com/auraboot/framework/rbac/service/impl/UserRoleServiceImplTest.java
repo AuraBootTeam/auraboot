@@ -8,8 +8,10 @@ import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
+import com.auraboot.framework.rbac.service.MemberRoleContributor;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
+import com.auraboot.framework.tenant.offboarding.TenantAdminContinuityGuard;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -22,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Field;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -45,6 +48,7 @@ class UserRoleServiceImplTest {
     @Mock private RoleMapper roleMapper;
     @Mock private TenantMemberMapper tenantMemberMapper;
     @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    @Mock private TenantAdminContinuityGuard tenantAdminContinuityGuard;
 
     private UserRoleServiceImpl service;
     private UserRoleServiceImpl spyService;
@@ -57,6 +61,8 @@ class UserRoleServiceImplTest {
         injectField(service, "roleMapper", roleMapper);
         injectField(service, "tenantMemberMapper", tenantMemberMapper);
         injectField(service, "eventPublisher", eventPublisher);
+        injectField(service, "tenantAdminContinuityGuard", tenantAdminContinuityGuard);
+        injectField(service, "memberRoleContributors", List.of());
         spyService = spy(service);
     }
 
@@ -151,6 +157,59 @@ class UserRoleServiceImplTest {
         assertTrue(spyService.assignRolesToMemberByRolePids("member-pid", List.of("role-pid"), 10L, 99L));
 
         verify(spyService).assignRolesToMember(1L, List.of(100L), 10L, 99L);
+    }
+
+    @Test
+    @DisplayName("timed role assignment persists an inclusive window")
+    void assignTimedRole() {
+        LocalDate from = LocalDate.now();
+        LocalDate until = from.plusDays(7);
+        when(tenantMemberMapper.findByTenantIdAndPid(10L, "member-pid"))
+                .thenReturn(member(1L, "member-pid", 10L));
+        when(roleMapper.findByTenantIdAndPid(10L, "role-pid"))
+                .thenReturn(role(100L, "role-pid", "e2et_viewer", 10L));
+        when(userRoleMapper.findByMemberIdAndRoleIdAndTenantId(1L, 100L, 10L)).thenReturn(null);
+        doReturn(true).when(spyService).saveBatch(anyList());
+
+        assertTrue(spyService.assignRolesToMemberByRolePids(
+                "member-pid", List.of("role-pid"), from, until, 10L, 99L));
+
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<List<UserRole>> captor = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(spyService).saveBatch(captor.capture());
+        assertEquals(from, captor.getValue().getFirst().getEffectiveDate());
+        assertEquals(until, captor.getValue().getFirst().getExpiryDate());
+        assertEquals(99L, captor.getValue().getFirst().getCreatedBy());
+    }
+
+    @Test
+    @DisplayName("timed role assignment renews an existing binding")
+    void renewTimedRole() {
+        LocalDate until = LocalDate.now().plusDays(14);
+        when(tenantMemberMapper.findByTenantIdAndPid(10L, "member-pid"))
+                .thenReturn(member(1L, "member-pid", 10L));
+        when(roleMapper.findByTenantIdAndPid(10L, "role-pid"))
+                .thenReturn(role(100L, "role-pid", "e2et_viewer", 10L));
+        UserRole existing = ur(11L, 1L, 100L, 10L);
+        existing.setExpiryDate(LocalDate.now().plusDays(1));
+        when(userRoleMapper.findByMemberIdAndRoleIdAndTenantId(1L, 100L, 10L)).thenReturn(existing);
+        doReturn(true).when(spyService).updateById(existing);
+
+        assertTrue(spyService.assignRolesToMemberByRolePids(
+                "member-pid", List.of("role-pid"), null, until, 10L, 99L));
+        assertEquals(until, existing.getExpiryDate());
+        assertEquals(99L, existing.getUpdatedBy());
+        verify(spyService, never()).saveBatch(anyList());
+    }
+
+    @Test
+    @DisplayName("timed role assignment rejects reversed or already expired windows")
+    void rejectInvalidTimedRoleWindow() {
+        LocalDate today = LocalDate.now();
+        assertThrows(BusinessException.class, () -> service.assignRolesToMemberByRolePids(
+                "member-pid", List.of("role-pid"), today.plusDays(2), today.plusDays(1), 10L, 99L));
+        assertThrows(BusinessException.class, () -> service.assignRolesToMemberByRolePids(
+                "member-pid", List.of("role-pid"), null, today.minusDays(1), 10L, 99L));
     }
 
     @Test
@@ -322,6 +381,7 @@ class UserRoleServiceImplTest {
         doReturn(List.of(ur(1L, 1L, 100L, 10L))).when(spyService).listByIds(anyList());
         doReturn(true).when(spyService).removeByIds(anyList());
         assertEquals(1, spyService.batchRemoveRoles(List.of(1L)));
+        verify(tenantAdminContinuityGuard).assertRolesCanBeRemoved(1L, 10L, List.of(100L));
     }
 
     @Test
@@ -387,6 +447,17 @@ class UserRoleServiceImplTest {
     @DisplayName("getRoleIdsByMemberIdAndTenantId returns role IDs")
     void getRoleIdsByMember() {
         when(userRoleMapper.findByMemberIdAndTenantId(1L, 10L)).thenReturn(List.of(ur(1L, 1L, 100L, 10L), ur(2L, 1L, 200L, 10L)));
+        assertEquals(List.of(100L, 200L), service.getRoleIdsByMemberIdAndTenantId(1L, 10L));
+    }
+
+    @Test
+    @DisplayName("effective roles merge direct and governed contributor assignments")
+    void effectiveRolesMergeContributors() throws Exception {
+        when(userRoleMapper.findByMemberIdAndTenantId(1L, 10L))
+                .thenReturn(List.of(ur(11L, 1L, 100L, 10L)));
+        MemberRoleContributor contributor = (memberId, tenantId) -> List.of(100L, 200L);
+        injectField(service, "memberRoleContributors", List.of(contributor));
+
         assertEquals(List.of(100L, 200L), service.getRoleIdsByMemberIdAndTenantId(1L, 10L));
     }
 
@@ -461,16 +532,22 @@ class UserRoleServiceImplTest {
     @DisplayName("activateUserRole/deactivateUserRole update status")
     void activateDeactivate() {
         doReturn(true).when(spyService).update(any(UpdateWrapper.class));
+        doReturn(ur(1L, 1L, 100L, 10L)).when(spyService).getById(1L);
         assertTrue(spyService.activateUserRole(1L));
         assertTrue(spyService.deactivateUserRole(1L));
+        verify(tenantAdminContinuityGuard).assertRolesCanBeRemoved(1L, 10L, List.of(100L));
     }
 
     @Test
     @DisplayName("batchActivate/batchDeactivate return list size on success")
     void batchActivateDeactivate() {
         doReturn(true).when(spyService).update(any(UpdateWrapper.class));
+        doReturn(List.of(ur(1L, 1L, 100L, 10L), ur(2L, 2L, 101L, 10L)))
+                .when(spyService).listByIds(List.of(1L, 2L));
         assertEquals(2, spyService.batchActivateUserRoles(List.of(1L, 2L)));
         assertEquals(2, spyService.batchDeactivateUserRoles(List.of(1L, 2L)));
+        verify(tenantAdminContinuityGuard).assertRolesCanBeRemoved(1L, 10L, List.of(100L));
+        verify(tenantAdminContinuityGuard).assertRolesCanBeRemoved(2L, 10L, List.of(101L));
     }
 
     @Test

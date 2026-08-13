@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 /**
      * 用户角色关联实体 - 用户与角色的多对多关系
@@ -28,8 +29,8 @@ import java.time.Instant;
 
         private String assignType;          // 分配类型：DIRECT, INHERITED
 
-        private Instant effectiveDate;         // 生效日期
-        private Instant expiryDate;            // 失效日期
+        private LocalDate effectiveDate;       // 生效日期（含）
+        private LocalDate expiryDate;          // 失效日期（含）
 
         private String status;              // 状态：ACTIVE, INACTIVE
         private Boolean deletedFlag = false; // 逻辑删除标记

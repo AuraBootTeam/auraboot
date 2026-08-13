@@ -5,8 +5,10 @@ import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.common.util.PaginationSafetyUtils;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.rbac.dto.RoleMemberDTO;
+import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.service.RoleMemberService;
 import com.auraboot.framework.rbac.service.RoleService;
@@ -24,6 +26,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
+import java.time.LocalDate;
 import java.util.stream.Collectors;
 
 /**
@@ -89,7 +92,7 @@ public class RoleMemberServiceImpl implements RoleMemberService {
             .map(TenantMember::getPid)
             .filter(Objects::nonNull)
             .collect(Collectors.toSet());
-        Map<String, Map<String, Object>> empMap = organizationService.getEmployeesByMemberPids(memberPids);
+        Map<String, Map<String, Object>> empMap = optionalEmployeeData(memberPids);
 
         // 6. Build DTOs from pre-fetched data
         List<RoleMemberDTO> dtos = pageMembers.stream()
@@ -102,6 +105,13 @@ public class RoleMemberServiceImpl implements RoleMemberService {
     @Override
     @Transactional
     public void addMembers(Long roleId, List<String> memberPids) {
+        addMembers(roleId, memberPids, null, null);
+    }
+
+    @Override
+    @Transactional
+    public void addMembers(Long roleId, List<String> memberPids,
+                           LocalDate effectiveDate, LocalDate expiryDate) {
         if (CollectionUtils.isEmpty(memberPids)) {
             return;
         }
@@ -109,7 +119,8 @@ public class RoleMemberServiceImpl implements RoleMemberService {
         Long tenantId = MetaContext.getCurrentTenantId();
         Long operatorId = MetaContext.getCurrentUserId();
 
-        if (roleService.getById(roleId) == null) {
+        Role role = roleService.getById(roleId);
+        if (role == null) {
             throw new BusinessException("Role not found: " + roleId);
         }
 
@@ -124,7 +135,9 @@ public class RoleMemberServiceImpl implements RoleMemberService {
                 continue;
             }
             // Phase 2: directly use member.getId() as the subject
-            userRoleService.assignRolesToMember(member.getId(), List.of(roleId), tenantId, operatorId);
+            userRoleService.assignRolesToMemberByRolePids(
+                    memberPid, List.of(role.getPid()),
+                    effectiveDate, expiryDate, tenantId, operatorId);
         }
     }
 
@@ -199,7 +212,7 @@ public class RoleMemberServiceImpl implements RoleMemberService {
             .map(TenantMember::getPid)
             .filter(Objects::nonNull)
             .collect(Collectors.toSet());
-        Map<String, Map<String, Object>> limitedEmpMap = organizationService.getEmployeesByMemberPids(limitedMemberPids);
+        Map<String, Map<String, Object>> limitedEmpMap = optionalEmployeeData(limitedMemberPids);
 
         // 8. Enrich with pre-fetched data
         return limited.stream()
@@ -208,6 +221,15 @@ public class RoleMemberServiceImpl implements RoleMemberService {
     }
 
     // --- private helpers ---
+
+    private Map<String, Map<String, Object>> optionalEmployeeData(Collection<String> memberPids) {
+        try {
+            return organizationService.getEmployeesByMemberPids(memberPids);
+        } catch (MetaServiceException exception) {
+            log.warn("Role member organization enrichment is unavailable: {}", exception.getMessage());
+            return Collections.emptyMap();
+        }
+    }
 
     private List<UserRole> findUserRolesByRoleId(Long roleId, Long tenantId) {
         QueryWrapper<UserRole> wrapper = new QueryWrapper<>();
@@ -251,7 +273,9 @@ public class RoleMemberServiceImpl implements RoleMemberService {
             email,
             departmentName,
             positionName,
-            userRole != null ? userRole.getCreatedAt() : null
+            userRole != null ? userRole.getCreatedAt() : null,
+            userRole != null ? userRole.getEffectiveDate() : null,
+            userRole != null ? userRole.getExpiryDate() : null
         );
     }
 

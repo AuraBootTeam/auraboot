@@ -6,11 +6,15 @@ import com.auraboot.framework.application.annotation.CurrentUserId;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.tenant.controller.request.ApproveRequest;
+import com.auraboot.framework.tenant.controller.request.MemberLifecycleRequest;
 import com.auraboot.framework.tenant.dto.MemberQueryRequest;
 import com.auraboot.framework.tenant.dto.MemberResponse;
 import com.auraboot.framework.tenant.dto.TenantMemberImportRow;
 import com.auraboot.framework.tenant.dto.TenantMemberImportResult;
+import com.auraboot.framework.tenant.dto.TenantMemberOffboardingImpactResponse;
+import com.auraboot.framework.tenant.dto.TenantMemberOffboardingCandidate;
 import com.auraboot.framework.tenant.service.CurrentUserTeamResolver;
 import com.auraboot.framework.tenant.service.TenantMemberApplicationService;
 import lombok.extern.slf4j.Slf4j;
@@ -63,7 +67,7 @@ public class TenantMemberController {
     }
 
     @PostMapping("/{memberPid}/approve")
-    @RequirePermission("member_management")
+    @RequirePermission(MetaPermission.TENANT_MEMBER_MANAGE)
     @ResponseBody
     public ApiResponse<Boolean> approveMember(
             @PathVariable String memberPid,
@@ -75,26 +79,48 @@ public class TenantMemberController {
     }
 
     @PutMapping("/{memberPid}/status")
-    @RequirePermission("member_management")
+    @RequirePermission(MetaPermission.TENANT_MEMBER_MANAGE)
     @ResponseBody
     public ApiResponse<Boolean> updateMemberStatus(
             @PathVariable String memberPid,
-            @RequestBody ApproveRequest approveRequest,
+            @RequestBody MemberLifecycleRequest approveRequest,
             @CurrentUserId Long userId) {
         
-        boolean result = memberApplicationService.updateMemberStatus(memberPid, approveRequest.getAction(), approveRequest.getReason(), userId);
+        boolean result = memberApplicationService.updateMemberStatus(
+                memberPid, approveRequest.getAction(), approveRequest.getReason(),
+                approveRequest.getTargetMemberPid(), userId);
         return ApiResponse.success(result);
     }
 
     @DeleteMapping("/{memberPid}")
-    @RequirePermission("member_management")
+    @RequirePermission(MetaPermission.TENANT_MEMBER_MANAGE)
     @ResponseBody
     public ApiResponse<Boolean> removeMember(
             @PathVariable String memberPid,
+            @RequestParam(required = false) String targetMemberPid,
             @CurrentUserId Long userId) {
         
-        boolean result = memberApplicationService.removeMember(memberPid, userId);
+        boolean result = memberApplicationService.removeMember(memberPid, targetMemberPid, userId);
         return ApiResponse.success(result);
+    }
+
+    @GetMapping("/{memberPid}/offboarding-impact")
+    @RequirePermission(MetaPermission.TENANT_MEMBER_MANAGE)
+    public ApiResponse<TenantMemberOffboardingImpactResponse> inspectOffboardingImpact(
+            @PathVariable String memberPid,
+            @RequestParam(required = false) String targetMemberPid,
+            @RequestParam(defaultValue = "remove") String action,
+            @CurrentUserId Long userId) {
+        return ApiResponse.success(memberApplicationService.inspectOffboardingImpact(
+                memberPid, targetMemberPid, action, userId));
+    }
+
+    @GetMapping("/{memberPid}/offboarding-candidates")
+    @RequirePermission(MetaPermission.TENANT_MEMBER_MANAGE)
+    public ApiResponse<List<TenantMemberOffboardingCandidate>> listOffboardingCandidates(
+            @PathVariable String memberPid,
+            @CurrentUserId Long userId) {
+        return ApiResponse.success(memberApplicationService.listOffboardingCandidates(memberPid, userId));
     }
 
     @GetMapping("/{memberPid}/teams")
@@ -114,7 +140,7 @@ public class TenantMemberController {
     }
 
     @PostMapping("/import")
-    @RequirePermission("member_management")
+    @RequirePermission(MetaPermission.TENANT_MEMBER_MANAGE)
     @ResponseBody
     public ApiResponse<TenantMemberImportResult> importMembers(
             @RequestParam("file") MultipartFile file,
@@ -123,7 +149,7 @@ public class TenantMemberController {
     }
 
     @PostMapping("/import-rows")
-    @RequirePermission("member_management")
+    @RequirePermission(MetaPermission.TENANT_MEMBER_MANAGE)
     @ResponseBody
     public ApiResponse<TenantMemberImportResult> importMembersFromRows(
             @RequestBody List<TenantMemberImportRow> rows,
@@ -132,7 +158,7 @@ public class TenantMemberController {
     }
 
     @PostMapping("/batch-delete")
-    @RequirePermission("member_management")
+    @RequirePermission(MetaPermission.TENANT_MEMBER_MANAGE)
     @ResponseBody
     public ApiResponse<Boolean> batchRemoveMembers(
             @RequestBody List<String> memberPids,

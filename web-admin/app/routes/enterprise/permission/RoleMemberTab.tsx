@@ -182,24 +182,35 @@ export default function RoleMemberTab({ rolePid }: RoleMemberTabProps) {
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700">
+              <colgroup>
+                <col className="w-[28%]" />
+                <col className="w-[12%]" />
+                <col className="w-[12%]" />
+                <col className="w-[15%]" />
+                <col className="w-[27%]" />
+                <col className="w-[6%]" />
+              </colgroup>
               <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     {t('admin.permission.members.colName', undefined, 'Name')}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="whitespace-nowrap px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     {t('admin.permission.members.colDepartment', undefined, 'Department')}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="whitespace-nowrap px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     {t('admin.permission.members.colPosition', undefined, 'Position')}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="whitespace-nowrap px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     {t('admin.permission.members.colAssignedAt', undefined, 'Assigned')}
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
-                    {t('common.actions', undefined, 'Actions')}
+                  <th className="whitespace-nowrap px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    {t('admin.permission.members.colValidity', undefined, 'Validity')}
+                  </th>
+                  <th className="px-2 py-3 text-right text-xs font-medium text-gray-500">
+                    <span className="sr-only">{t('common.actions', undefined, 'Actions')}</span>
                   </th>
                 </tr>
               </thead>
@@ -216,27 +227,33 @@ export default function RoleMemberTab({ rolePid }: RoleMemberTabProps) {
                         <div className="text-xs text-gray-400">{member.email}</div>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                    <td className="whitespace-nowrap px-2 py-3 text-sm text-gray-500 dark:text-gray-400">
                       {member.departmentName || '-'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                    <td className="whitespace-nowrap px-2 py-3 text-sm text-gray-500 dark:text-gray-400">
                       {member.positionName || '-'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                    <td className="whitespace-nowrap px-2 py-3 text-sm text-gray-500 dark:text-gray-400">
                       {member.assignedAt
                         ? new Date(member.assignedAt).toLocaleDateString()
                         : '-'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                    <td className="whitespace-nowrap px-2 py-3 text-sm text-gray-500 dark:text-gray-400">
+                      {member.effectiveDate || member.expiryDate
+                        ? `${member.effectiveDate || '立即'} - ${member.expiryDate || '长期'}`
+                        : t('admin.permission.members.permanent', undefined, 'Permanent')}
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-3 text-right">
                       <button
                         data-testid={`role-member-remove-${member.memberId}`}
+                        aria-label={`${t('common.remove', undefined, 'Remove')} ${member.userName}`}
+                        title={t('common.remove', undefined, 'Remove')}
                         onClick={() =>
                           setConfirmRemove({ open: true, member })
                         }
-                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                       >
-                        <TrashIcon className="h-3.5 w-3.5" />
-                        {t('common.remove', undefined, 'Remove')}
+                        <TrashIcon className="h-4 w-4" />
                       </button>
                     </td>
                   </tr>

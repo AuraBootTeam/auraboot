@@ -143,6 +143,40 @@ public interface TenantMemberMapper extends BaseMapper<TenantMember> {
             """)
     long countUserRolesInTenant(@Param("userId") Long userId, @Param("tenantId") Long tenantId);
 
+    @Select("""
+            SELECT COUNT(DISTINCT tm.id)
+            FROM ab_tenant_member tm
+            JOIN ab_user_role ur ON ur.member_id = tm.id
+            WHERE tm.tenant_id = #{tenantId}
+              AND tm.id <> #{excludedMemberId}
+              AND LOWER(tm.status) = 'active'
+              AND tm.deleted_flag = FALSE
+              AND ur.role_id = #{roleId}
+              AND LOWER(ur.status) = 'active'
+              AND ur.deleted_flag = FALSE
+            """)
+    long countOtherActiveMembersWithRole(
+            @Param("tenantId") Long tenantId,
+            @Param("excludedMemberId") Long excludedMemberId,
+            @Param("roleId") Long roleId);
+
+    @Select("""
+            SELECT tm.pid AS "memberPid",
+                   COALESCE(NULLIF(u.nick_name, ''), NULLIF(u.user_name, ''), u.email) AS "displayName",
+                   u.email
+            FROM ab_tenant_member tm
+            JOIN ab_user u ON u.id = tm.user_id
+            WHERE tm.tenant_id = #{tenantId}
+              AND tm.pid <> #{excludedMemberPid}
+              AND LOWER(tm.status) = 'active'
+              AND tm.deleted_flag = FALSE
+              AND u.deleted_flag = FALSE
+            ORDER BY "displayName", tm.pid
+            """)
+    List<java.util.Map<String, Object>> findActiveOffboardingCandidates(
+            @Param("tenantId") Long tenantId,
+            @Param("excludedMemberPid") String excludedMemberPid);
+
 //    /**
 //     * 查询成员详情(包含用户信息)
 //     */

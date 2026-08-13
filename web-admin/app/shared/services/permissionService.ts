@@ -277,10 +277,15 @@ export class PermissionService implements IPermissionService {
   /**
    * Add members to a role
    */
-  async addRoleMembers(rolePid: string, memberPids: string[], request?: Request): Promise<void> {
-    const result = await fetchResult<void>(`/api/roles/${rolePid}/members`, {
+  async addRoleMembers(
+    rolePid: string,
+    memberPids: string[],
+    window?: { effectiveDate?: string; expiryDate?: string },
+    request?: Request,
+  ): Promise<void> {
+    const result = await fetchResult<void>(`/api/roles/${rolePid}/members/assign`, {
       method: 'post',
-      params: memberPids as unknown as Record<string, any>,
+      params: { memberPids, ...window },
     }, request);
     if (!ResultHelper.isSuccess(result)) {
       throw new Error(result.desc || 'Failed to add role members');

@@ -62,6 +62,9 @@ export default function AddMemberDialog({
   const [candidatesLoading, setCandidatesLoading] = useState(false);
   const [listKeyword, setListKeyword] = useState('');
   const [listSelectedPids, setListSelectedPids] = useState<Set<string>>(new Set());
+  const [temporary, setTemporary] = useState(false);
+  const [effectiveDate, setEffectiveDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [expiryDate, setExpiryDate] = useState('');
 
   // ---------------------------------------------------------------------------
   // Reset state when dialog opens
@@ -74,6 +77,9 @@ export default function AddMemberDialog({
       setListSelectedPids(new Set());
       setListKeyword('');
       setCandidates([]);
+      setTemporary(false);
+      setEffectiveDate(new Date().toISOString().slice(0, 10));
+      setExpiryDate('');
     }
   }, [open]);
 
@@ -144,7 +150,11 @@ export default function AddMemberDialog({
 
     setSubmitting(true);
     try {
-      await permissionService.addRoleMembers(rolePid, memberPids);
+      await permissionService.addRoleMembers(
+        rolePid,
+        memberPids,
+        temporary ? { effectiveDate, expiryDate } : undefined,
+      );
       showSuccessToast(
         (t('admin.permission.members.addSuccess', undefined, '{count} member(s) added')).replace(
           '{count}',
@@ -211,6 +221,44 @@ export default function AddMemberDialog({
               {t('admin.permission.members.tabList', undefined, 'Member List')}
             </button>
           </nav>
+        </div>
+
+        <div className="rounded-md border border-gray-200 p-3 dark:border-gray-700">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-800 dark:text-gray-200">
+            <input
+              type="checkbox"
+              data-testid="add-member-temporary"
+              checked={temporary}
+              onChange={(event) => setTemporary(event.target.checked)}
+              className="rounded text-blue-600"
+            />
+            {t('admin.permission.members.temporary', undefined, 'Time-bounded access')}
+          </label>
+          {temporary && (
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                {t('admin.permission.members.effectiveDate', undefined, 'Effective date')}
+                <input
+                  type="date"
+                  data-testid="add-member-effective-date"
+                  value={effectiveDate}
+                  onChange={(event) => setEffectiveDate(event.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+                />
+              </label>
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                {t('admin.permission.members.expiryDate', undefined, 'Expiry date')}
+                <input
+                  type="date"
+                  data-testid="add-member-expiry-date"
+                  min={effectiveDate}
+                  value={expiryDate}
+                  onChange={(event) => setExpiryDate(event.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+                />
+              </label>
+            </div>
+          )}
         </div>
 
         {/* Tab content */}
@@ -352,7 +400,7 @@ export default function AddMemberDialog({
             </button>
             <button
               data-testid="add-member-confirm"
-              disabled={selectedCount === 0 || submitting}
+              disabled={selectedCount === 0 || submitting || (temporary && (!effectiveDate || !expiryDate))}
               onClick={handleConfirm}
               className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >

@@ -6,6 +6,7 @@ import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.rbac.dto.RoleMemberDTO;
+import com.auraboot.framework.rbac.dto.AddRoleMembersRequest;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.service.RoleMemberService;
 import com.auraboot.framework.rbac.service.RoleService;
@@ -57,6 +58,17 @@ public class RoleMemberController {
             @PathVariable String rolePid,
             @RequestBody List<String> memberPids) {
         roleMemberService.addMembers(resolveRoleId(rolePid), memberPids);
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/assign")
+    @RequirePermission(MetaPermission.USER_ROLE_MANAGE)
+    @Operation(summary = "Add permanent or time-bounded members to a role")
+    public ApiResponse<Void> assignMembers(
+            @PathVariable String rolePid,
+            @RequestBody AddRoleMembersRequest request) {
+        roleMemberService.addMembers(resolveRoleId(rolePid), request.getMemberPids(),
+                request.getEffectiveDate(), request.getExpiryDate());
         return ApiResponse.success();
     }
 
