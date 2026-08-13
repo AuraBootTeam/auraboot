@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
-@TableName("ab_import_job")
+@TableName(value = "ab_import_job", autoResultMap = true)
 public class ImportJob {
 
     @TableId(value = "id", type = IdType.AUTO)
