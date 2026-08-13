@@ -285,6 +285,13 @@ dependencies {
     implementation "org.apache.kafka:kafka-clients:${kafkaClientsVersion}"
     runtimeOnly project(':platform-mq-kafka')
 
+    // Storage providers are runtime-selected by aura.storage.type. Keep every shipped
+    // implementation in the assembled application so a non-local configuration cannot
+    // silently degrade to process-local disk.
+    runtimeOnly project(':platform-storage-minio')
+    runtimeOnly project(':platform-storage-s3')
+    runtimeOnly project(':platform-storage-oss')
+
     // ULID
     implementation 'de.huxhorn.sulky:de.huxhorn.sulky.ulid:8.3.0'
 

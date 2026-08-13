@@ -1,0 +1,20 @@
+{
+  "before": {
+    "pid": "01KZXTV9M87SPETM4GVH1K73XJ",
+    "status": "completed",
+    "error_report_url": "/api/meta/excel/import/crm_lead_common/error-report/01KZXTV9M87SPETM4GVH1K73XJ",
+    "completed_at": "2026-08-13T07:11:30.370Z",
+    "total_rows": 2,
+    "success_rows": 1,
+    "error_rows": 1
+  },
+  "after": {
+    "pid": "01KZXTV9M87SPETM4GVH1K73XJ",
+    "status": "completed",
+    "error_report_url": null,
+    "completed_at": "2026-08-05T15:11:30.579Z",
+    "total_rows": 2,
+    "success_rows": 1,
+    "error_rows": 1
+  }
+}

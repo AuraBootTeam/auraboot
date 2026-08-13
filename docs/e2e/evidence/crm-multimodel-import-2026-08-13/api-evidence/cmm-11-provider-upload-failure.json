@@ -1,0 +1,23 @@
+{
+  "code": "0",
+  "message": "OK",
+  "data": {
+    "totalRows": 1,
+    "validRows": 0,
+    "errors": [
+      {
+        "rowNumber": 2,
+        "fieldCode": "crm_ct_account_id",
+        "message": "Referenced record does not exist or is not accessible for 所属客户: 'MISSING-1786633674899-32yvx' (accepted: crm_acc_code, crm_acc_name)",
+        "value": "MISSING-1786633674899-32yvx"
+      }
+    ],
+    "warnings": [],
+    "taskId": null,
+    "errorReportUrl": null,
+    "errorReportFailed": true,
+    "valid": false
+  },
+  "context": null,
+  "timestamp": 1786633681101
+}

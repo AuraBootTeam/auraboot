@@ -4,7 +4,7 @@ import com.auraboot.framework.infrastructure.storage.local.LocalStorageProvider;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -35,7 +35,7 @@ public class StorageAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnMissingBean(StorageProvider.class)
+    @ConditionalOnProperty(name = "aura.storage.type", havingValue = "local", matchIfMissing = true)
     public StorageProvider localStorageProvider(StorageProperties props) {
         return new LocalStorageProvider(props);
     }
@@ -45,12 +45,12 @@ public class StorageAutoConfiguration {
         String type = properties.getType();
         if (!"local".equals(type)) {
             StorageProvider provider = providerHolder.getIfAvailable();
-            if (provider == null || "local".equals(provider.type().name())) {
-                log.warn("aura.storage.type={} is configured but no matching provider module found. "
-                        + "Add 'platform-storage-{}' to your dependencies. Falling back to LocalStorageProvider.", type, type);
-            } else {
-                log.info("StorageProvider activated: type={}, provider={}", type, provider.getClass().getSimpleName());
+            if (provider == null || !type.equalsIgnoreCase(provider.type().name())) {
+                throw new IllegalStateException("aura.storage.type=" + type
+                        + " is configured but its StorageProvider is unavailable");
             }
+            log.info("StorageProvider activated: type={}, provider={}", type,
+                    provider.getClass().getSimpleName());
         }
     }
 }

@@ -1,0 +1,32 @@
+{
+  "code": "0",
+  "message": "OK",
+  "data": {
+    "taskId": "01KZXNMZ15EYW6KT4MG6D2XJAS",
+    "modelCode": "crm_lead_common",
+    "status": "completed",
+    "totalRows": 2,
+    "processedRows": 2,
+    "result": {
+      "totalRows": 2,
+      "successCount": 1,
+      "errorCount": 1,
+      "createdCount": 0,
+      "updatedCount": 1,
+      "errors": [
+        {
+          "rowNumber": 3,
+          "fieldCode": null,
+          "message": "No existing record matches crm_lead_code=MISSING-1786628368943-irjin"
+        }
+      ],
+      "hasErrors": true,
+      "taskId": "01KZXNMZ15EYW6KT4MG6D2XJAS",
+      "errorReportUrl": "/api/meta/excel/import/crm_lead_common/error-report/01KZXNMZ15EYW6KT4MG6D2XJAS",
+      "errorReportFailed": false,
+      "errorReportExpired": false
+    }
+  },
+  "context": null,
+  "timestamp": 1786628440390
+}

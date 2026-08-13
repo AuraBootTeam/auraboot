@@ -31,6 +31,7 @@ public interface ImportJobMapper extends BaseMapper<ImportJob> {
               AND deleted_flag = FALSE
             ORDER BY completed_at ASC
             LIMIT #{limit}
+            FOR UPDATE SKIP LOCKED
             """)
     List<ImportJob> findExpiredReports(@Param("cutoff") LocalDateTime cutoff,
                                        @Param("limit") int limit);
