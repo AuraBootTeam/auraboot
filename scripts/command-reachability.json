@@ -34,6 +34,7 @@
       "crm:list_contacts": "Agent/API query surface; the dynamic list page reads the standard data endpoint.",
       "crm:detail_customer_request": "Agent/API query surface; the dynamic detail page reads the standard data endpoint.",
       "crm:list_customer_requests": "Agent/API query surface; the dynamic list page reads the standard data endpoint.",
+      "crm:intake_customer_request": "Authenticated connector and batch-ingestion boundary; end users inspect its immutable provenance on the Customer Request detail page, while exposing this evidence-enforcing writer as a UI form would create an untrusted manual source path.",
       "crm:detail_email_log": "Agent/API query surface; the dynamic detail page reads the standard data endpoint.",
       "crm:list_email_logs": "Agent/API query surface; the dynamic list page reads the standard data endpoint.",
       "crm:detail_email_template": "Agent/API query surface; the dynamic detail page reads the standard data endpoint.",

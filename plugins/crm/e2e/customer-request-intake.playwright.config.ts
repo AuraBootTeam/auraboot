@@ -8,18 +8,20 @@ for (const key of ['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY']) {
 process.env.NO_PROXY = 'localhost,127.0.0.1';
 process.env.no_proxy = process.env.NO_PROXY;
 
-const opportunityBulkOperationsSpecNames = [
-  'opportunity-bulk-operations.golden',
+const customerRequestIntakeSpecNames = [
+  'customer-request-intake.golden',
 ];
 
 export default defineConfig({
   testDir: '.',
-  testMatch: opportunityBulkOperationsSpecNames.map((name) => `${name}.spec.ts`),
-  outputDir: process.env.CRM_BULK_ARTIFACT_DIR || '/tmp/crm-opportunity-bulk-artifacts',
+  testMatch: customerRequestIntakeSpecNames.map((name) => `${name}.spec.ts`),
+  outputDir:
+    process.env.CUSTOMER_REQUEST_INTAKE_BROWSER_ARTIFACT_DIR
+    || '/tmp/crm-customer-request-intake-browser-artifacts',
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  timeout: 180_000,
+  timeout: 90_000,
   reporter: [['list']],
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5231',
@@ -31,5 +33,8 @@ export default defineConfig({
     navigationTimeout: 30_000,
     launchOptions: { args: ['--no-proxy-server'] },
   },
-  projects: [{ name: 'crm-opportunity-bulk-chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [{
+    name: 'customer-request-intake-chromium',
+    use: { ...devices['Desktop Chrome'] },
+  }],
 });

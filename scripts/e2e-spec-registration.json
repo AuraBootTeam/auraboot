@@ -9,9 +9,23 @@
     },
     {
       "dir": "plugins/crm/e2e",
-      "configFile": "plugins/crm/e2e/qdp-release-center.playwright.config.ts",
-      "arrayName": "qdpReleaseCenterSpecNames",
-      "project": "qdp-chromium"
+      "projects": [
+        {
+          "configFile": "plugins/crm/e2e/qdp-release-center.playwright.config.ts",
+          "arrayName": "qdpReleaseCenterSpecNames",
+          "project": "qdp-chromium"
+        },
+        {
+          "configFile": "plugins/crm/e2e/opportunity-bulk-operations.playwright.config.ts",
+          "arrayName": "opportunityBulkOperationsSpecNames",
+          "project": "crm-opportunity-bulk-chromium"
+        },
+        {
+          "configFile": "plugins/crm/e2e/customer-request-intake.playwright.config.ts",
+          "arrayName": "customerRequestIntakeSpecNames",
+          "project": "customer-request-intake-chromium"
+        }
+      ]
     }
   ],
   "allow": {

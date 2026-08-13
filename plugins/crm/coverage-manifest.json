@@ -27,16 +27,16 @@
       "model-surfaces": 50,
       "menus": 55,
       "pages": 128,
-      "page-blocks": 412,
-      "page-fields": 1754,
-      "ui-actions": 623,
-      "commands": 246,
+      "page-blocks": 413,
+      "page-fields": 1761,
+      "ui-actions": 624,
+      "commands": 247,
       "permissions": 114,
       "queries": 55,
       "dashboards": 37
     },
     "productVerdicts": {
-      "pass": 725,
+      "pass": 735,
       "untested": 2749
     },
     "fullProductNonGoals": [
@@ -68,6 +68,11 @@
       "id": "CORDYS-FORECAST-VARIANCE",
       "verdict": "pass",
       "note": "Selected forecast submissions are compared with live owner facts and drilled down to exact opportunity drivers."
+    },
+    {
+      "id": "AMOS-P0-B01",
+      "verdict": "pass",
+      "note": "The governed external Customer Request intake command and its read-only source-evidence summary have true-stack and browser evidence; actual Email/Portal connectors and Excel UX remain outside this slice."
     },
     {
       "id": "CORDYS-CUSTOMER-POOL",
@@ -884,6 +889,21 @@
           "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
         ],
         "permissionsVerified": true,
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:intake_customer_request",
+        "goals": [
+          "AMOS-P0-B01"
+        ],
+        "permissionCodes": [
+          "crm.customer_request.manage"
+        ],
+        "evidence": [
+          "plugins/crm/e2e/customer-request-intake.golden.spec.ts",
+          "plugins/crm/scripts/it/customer_request_intake_true_stack.py"
+        ],
+        "permissionsVerified": false,
         "verdict": "pass"
       },
       {
@@ -2695,6 +2715,34 @@
         "uiActions": [
           "crm_forecast_cockpit:crm_forecast_tabs:variance",
           "crm_forecast_cockpit:crm_forecast_variance_drivers:open_variance_opportunity"
+        ]
+      }
+    },
+    {
+      "id": "AMOS-P0-B01-STACK",
+      "filePrefix": "customer-request-intake-true-stack-",
+      "minimumChecks": 9
+    },
+    {
+      "id": "AMOS-P0-B01-BROWSER",
+      "filePrefix": "customer-request-intake-browser-",
+      "minimumScenarios": 2,
+      "minimumScreenshots": 2,
+      "expectedCoverage": {
+        "blocks": [
+          "crm_customer_request_common_detail:crm_cr_source_evidence"
+        ],
+        "fields": [
+          "crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_channel",
+          "crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_system",
+          "crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_message_ref",
+          "crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_received_at",
+          "crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_ingested_at",
+          "crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_field_evidence_count",
+          "crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_content_hash"
+        ],
+        "uiActions": [
+          "crm_customer_request_common_detail:crm_cr_tabs:source_evidence"
         ]
       }
     },
@@ -8904,7 +8952,22 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[0].tabs[2].blocks[0]"
         },
         {
-          "id": "block:crm_customer_request_common_detail:crm_cr_qdp_history:4",
+          "id": "block:crm_customer_request_common_detail:crm_cr_source_evidence:4",
+          "action": "Render and semantically verify detail-section block crm_cr_source_evidence on crm_customer_request_common_detail",
+          "evidence": [
+            "plugins/crm/e2e/customer-request-intake.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[0].tabs[3].blocks[0]"
+        },
+        {
+          "id": "block:crm_customer_request_common_detail:crm_cr_qdp_history:5",
           "action": "Render and semantically verify sub-table block crm_cr_qdp_history on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
@@ -8917,7 +8980,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[1]"
         },
         {
-          "id": "block:crm_customer_request_common_detail:crm_cr_detail_toolbar:5",
+          "id": "block:crm_customer_request_common_detail:crm_cr_detail_toolbar:6",
           "action": "Render and semantically verify toolbar block crm_cr_detail_toolbar on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
@@ -22331,7 +22394,112 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[0].tabs[2].blocks[0].subTable.columns[6].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_code:28",
+          "id": "field:crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_channel:28",
+          "action": "Verify field crm_cr_source_channel in crm_cr_source_evidence on crm_customer_request_common_detail",
+          "evidence": [
+            "plugins/crm/e2e/customer-request-intake.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[0].tabs[3].blocks[0].fields[0].field"
+        },
+        {
+          "id": "field:crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_system:29",
+          "action": "Verify field crm_cr_source_system in crm_cr_source_evidence on crm_customer_request_common_detail",
+          "evidence": [
+            "plugins/crm/e2e/customer-request-intake.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[0].tabs[3].blocks[0].fields[1].field"
+        },
+        {
+          "id": "field:crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_message_ref:30",
+          "action": "Verify field crm_cr_source_message_ref in crm_cr_source_evidence on crm_customer_request_common_detail",
+          "evidence": [
+            "plugins/crm/e2e/customer-request-intake.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[0].tabs[3].blocks[0].fields[2].field"
+        },
+        {
+          "id": "field:crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_received_at:31",
+          "action": "Verify field crm_cr_source_received_at in crm_cr_source_evidence on crm_customer_request_common_detail",
+          "evidence": [
+            "plugins/crm/e2e/customer-request-intake.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[0].tabs[3].blocks[0].fields[3].field"
+        },
+        {
+          "id": "field:crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_ingested_at:32",
+          "action": "Verify field crm_cr_ingested_at in crm_cr_source_evidence on crm_customer_request_common_detail",
+          "evidence": [
+            "plugins/crm/e2e/customer-request-intake.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[0].tabs[3].blocks[0].fields[4].field"
+        },
+        {
+          "id": "field:crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_field_evidence_count:33",
+          "action": "Verify field crm_cr_field_evidence_count in crm_cr_source_evidence on crm_customer_request_common_detail",
+          "evidence": [
+            "plugins/crm/e2e/customer-request-intake.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[0].tabs[3].blocks[0].fields[5].field"
+        },
+        {
+          "id": "field:crm_customer_request_common_detail:crm_cr_source_evidence:crm_cr_source_content_hash:34",
+          "action": "Verify field crm_cr_source_content_hash in crm_cr_source_evidence on crm_customer_request_common_detail",
+          "evidence": [
+            "plugins/crm/e2e/customer-request-intake.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[0].tabs[3].blocks[0].fields[6].field"
+        },
+        {
+          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_code:35",
           "action": "Verify field crm_qdp_code in crm_cr_qdp_history on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22344,7 +22512,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[1].subTable.columns[0].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_revision_no:29",
+          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_revision_no:36",
           "action": "Verify field crm_qdp_revision_no in crm_cr_qdp_history on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22357,7 +22525,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[1].subTable.columns[1].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_status:30",
+          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_status:37",
           "action": "Verify field crm_qdp_status in crm_cr_qdp_history on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22370,7 +22538,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[1].subTable.columns[2].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_requirement_version:31",
+          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_requirement_version:38",
           "action": "Verify field crm_qdp_requirement_version in crm_cr_qdp_history on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22383,7 +22551,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[1].subTable.columns[3].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_qualification_verdict:32",
+          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_qualification_verdict:39",
           "action": "Verify field crm_qdp_qualification_verdict in crm_cr_qdp_history on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22396,7 +22564,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[1].subTable.columns[4].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_file_package_hash:33",
+          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_file_package_hash:40",
           "action": "Verify field crm_qdp_file_package_hash in crm_cr_qdp_history on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22409,7 +22577,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[1].subTable.columns[5].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_pack_set_summary:34",
+          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_pack_set_summary:41",
           "action": "Verify field crm_qdp_pack_set_summary in crm_cr_qdp_history on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22422,7 +22590,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[1].subTable.columns[6].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_prepared_at:35",
+          "id": "field:crm_customer_request_common_detail:crm_cr_qdp_history:crm_qdp_prepared_at:42",
           "action": "Verify field crm_qdp_prepared_at in crm_cr_qdp_history on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22435,7 +22603,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[1].subTable.columns[7].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_primary_file_id:36",
+          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_primary_file_id:43",
           "action": "Verify field crm_qdp_primary_file_id in crm_cr_detail_toolbar on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22448,7 +22616,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[0].action.inputFields[0].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_requirement_version:37",
+          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_requirement_version:44",
           "action": "Verify field crm_qdp_requirement_version in crm_cr_detail_toolbar on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22461,7 +22629,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[0].action.inputFields[1].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_customer_confirmation_ref:38",
+          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_customer_confirmation_ref:45",
           "action": "Verify field crm_qdp_customer_confirmation_ref in crm_cr_detail_toolbar on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22474,7 +22642,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[0].action.inputFields[2].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_customer_confirmed_by:39",
+          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_customer_confirmed_by:46",
           "action": "Verify field crm_qdp_customer_confirmed_by in crm_cr_detail_toolbar on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22487,7 +22655,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[0].action.inputFields[3].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_customer_confirmed_at:40",
+          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_customer_confirmed_at:47",
           "action": "Verify field crm_qdp_customer_confirmed_at in crm_cr_detail_toolbar on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22500,7 +22668,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[0].action.inputFields[4].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_pack_set:41",
+          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_pack_set:48",
           "action": "Verify field crm_qdp_pack_set in crm_cr_detail_toolbar on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22513,7 +22681,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[0].action.inputFields[5].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_downstream_impact:42",
+          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_downstream_impact:49",
           "action": "Verify field crm_qdp_downstream_impact in crm_cr_detail_toolbar on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22526,7 +22694,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[0].action.inputFields[6].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_assumptions:43",
+          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_assumptions:50",
           "action": "Verify field crm_qdp_assumptions in crm_cr_detail_toolbar on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22539,7 +22707,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[0].action.inputFields[7].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_approved_exceptions:44",
+          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_approved_exceptions:51",
           "action": "Verify field crm_qdp_approved_exceptions in crm_cr_detail_toolbar on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -22552,7 +22720,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[0].action.inputFields[8].field"
         },
         {
-          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_release_note:45",
+          "id": "field:crm_customer_request_common_detail:crm_cr_detail_toolbar:crm_qdp_release_note:52",
           "action": "Verify field crm_qdp_release_note in crm_cr_detail_toolbar on crm_customer_request_common_detail",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -39066,7 +39234,22 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[0].tabs[2]"
         },
         {
-          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:prepare_qdp_draft:3",
+          "id": "ui-action:crm_customer_request_common_detail:crm_cr_tabs:source_evidence:3",
+          "action": "tab source_evidence on crm_customer_request_common_detail -> view-state:source_evidence",
+          "evidence": [
+            "plugins/crm/e2e/customer-request-intake.golden.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[0].tabs[3]"
+        },
+        {
+          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:prepare_qdp_draft:4",
           "action": "button prepare_qdp_draft on crm_customer_request_common_detail -> command:crm:prepare_qdp_draft",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -39079,7 +39262,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[0]"
         },
         {
-          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:edit:4",
+          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:edit:5",
           "action": "button edit on crm_customer_request_common_detail -> navigate:crm_customer_request_common_form",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -39092,7 +39275,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[1]"
         },
         {
-          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:submit:5",
+          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:submit:6",
           "action": "button submit on crm_customer_request_common_detail -> command:crm:submit_customer_request",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -39105,7 +39288,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[2]"
         },
         {
-          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:start:6",
+          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:start:7",
           "action": "button start on crm_customer_request_common_detail -> command:crm:start_customer_request",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -39118,7 +39301,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[3]"
         },
         {
-          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:quoted:7",
+          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:quoted:8",
           "action": "button quoted on crm_customer_request_common_detail -> command:crm:mark_customer_request_quoted",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -39131,7 +39314,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[4]"
         },
         {
-          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:win:8",
+          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:win:9",
           "action": "button win on crm_customer_request_common_detail -> state_transition:crm:win_customer_request",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -39144,7 +39327,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[5]"
         },
         {
-          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:lose:9",
+          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:lose:10",
           "action": "button lose on crm_customer_request_common_detail -> command:crm:lose_customer_request",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -39157,7 +39340,7 @@
           "source": "plugins/crm/config/pages/crm_customer_request_common_detail.json#root[2].buttons[6]"
         },
         {
-          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:cancel:10",
+          "id": "ui-action:crm_customer_request_common_detail:crm_cr_detail_toolbar:cancel:11",
           "action": "button cancel on crm_customer_request_common_detail -> state_transition:crm:cancel_customer_request",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -45315,6 +45498,22 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "it",
+          "source": "plugins/crm/config/commands/crm_customer_request_common.json"
+        },
+        {
+          "id": "command:crm:intake_customer_request",
+          "action": "Execute crm:intake_customer_request (custom) through its supported user or runtime path",
+          "evidence": [
+            "plugins/crm/e2e/customer-request-intake.golden.spec.ts",
+            "plugins/crm/scripts/it/customer_request_intake_true_stack.py"
+          ],
+          "assertion": "The command has registered release evidence.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
           "source": "plugins/crm/config/commands/crm_customer_request_common.json"
         },
         {

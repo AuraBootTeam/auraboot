@@ -19,7 +19,7 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.doesNotMatch(JSON.stringify(committed.run), /auraboot-enterprise/);
 
   assert.equal(committed.axes.semanticActions.length, 26);
-  assert.equal(committed.axes.commands.length, 58);
+  assert.equal(committed.axes.commands.length, 59);
   assert.equal(committed.axes.pages.length, 34);
   assert.equal(committed.axes.permissions.length, 24);
   assert.equal(committed.axes.queries.length, 40);
@@ -45,13 +45,13 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
     ],
   );
   assert.equal(committed.scope.productDenominator.pages, 128);
-  assert.equal(committed.scope.productDenominator.commands, 246);
+  assert.equal(committed.scope.productDenominator.commands, 247);
   assert.equal(committed.scope.productDenominator.permissions, 114);
-  assert.equal(committed.scope.productDenominator['page-blocks'], 412);
-  assert.equal(committed.scope.productDenominator['page-fields'], 1754);
-  assert.equal(committed.scope.productDenominator['ui-actions'], 623);
+  assert.equal(committed.scope.productDenominator['page-blocks'], 413);
+  assert.equal(committed.scope.productDenominator['page-fields'], 1761);
+  assert.equal(committed.scope.productDenominator['ui-actions'], 624);
   assert.equal(committed.scope.productDenominator.queries, 55);
-  assert.equal(committed.scope.productVerdicts.pass, 725);
+  assert.equal(committed.scope.productVerdicts.pass, 735);
   assert.equal(committed.scope.productVerdicts.untested, 2749);
   assert.ok(committed.scope.productVerdicts.untested > 0);
   assert.equal(committed.scope.productVerdicts.gap ?? 0, 0);
@@ -117,6 +117,25 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.equal(forecastVarianceContract.expectedCoverage.blocks.length, 4);
   assert.equal(forecastVarianceContract.expectedCoverage.fields.length, 12);
   assert.equal(forecastVarianceContract.expectedCoverage.uiActions.length, 2);
+  const intakeStackContract = committed.runtimeEvidenceContracts.find(
+    (contract) => contract.id === 'AMOS-P0-B01-STACK',
+  );
+  assert.equal(intakeStackContract.minimumChecks, 9);
+  const intakeBrowserContract = committed.runtimeEvidenceContracts.find(
+    (contract) => contract.id === 'AMOS-P0-B01-BROWSER',
+  );
+  assert.equal(intakeBrowserContract.minimumScenarios, 2);
+  assert.equal(intakeBrowserContract.minimumScreenshots, 2);
+  assert.equal(
+    committed.axes.commands.find((row) => row.id === 'crm:intake_customer_request')?.verdict,
+    'pass',
+  );
+  const sourceEvidenceRows =
+    committed.groups
+      .find((group) => group.id === 'page-fields')
+      ?.rows.filter((row) => row.id.includes('crm_cr_source_evidence')) ?? [];
+  assert.equal(sourceEvidenceRows.length, 7);
+  assert.ok(sourceEvidenceRows.every((row) => row.verdict === 'pass'));
   const customerPoolContract = committed.runtimeEvidenceContracts.find(
     (contract) => contract.id === 'CRM-CUSTOMER-POOL',
   );

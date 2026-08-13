@@ -151,6 +151,10 @@
     },
     {
       "type": "command",
+      "code": "crm:intake_customer_request"
+    },
+    {
+      "type": "command",
       "code": "crm:add_campaign_member"
     },
     {

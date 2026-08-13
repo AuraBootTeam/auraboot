@@ -137,6 +137,12 @@
     "displayName:en": "Source Channel",
     "dataType": "enum",
     "dictCode": "crm_customer_request_source_channel",
+    "immutable": true,
+    "allowedWriterCommands": [
+      "crm:create_customer_request",
+      "crm:convert_lead",
+      "crm:intake_customer_request"
+    ],
     "feature": {
       "searchable": true
     }
@@ -200,6 +206,137 @@
     "displayName:zh-CN": "需求摘要",
     "displayName:en": "Summary",
     "dataType": "text"
+  },
+  {
+    "code": "crm_cr_source_business_key",
+    "displayName:zh-CN": "来源业务键指纹",
+    "displayName:en": "Source Business Key Fingerprint",
+    "description": "Tenant-scoped SHA-256 identity derived by crm:intake_customer_request from source channel, source system and source message reference.",
+    "dataType": "string",
+    "immutable": true,
+    "allowedWriterCommands": ["crm:intake_customer_request"],
+    "constraints": {
+      "unique": true,
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cr_source_system",
+    "displayName:zh-CN": "来源系统",
+    "displayName:en": "Source System",
+    "dataType": "string",
+    "immutable": true,
+    "allowedWriterCommands": ["crm:intake_customer_request"],
+    "constraints": {
+      "maxLength": 80
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cr_source_message_ref",
+    "displayName:zh-CN": "来源消息引用",
+    "displayName:en": "Source Message Reference",
+    "dataType": "string",
+    "immutable": true,
+    "allowedWriterCommands": ["crm:intake_customer_request"],
+    "constraints": {
+      "maxLength": 256
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cr_source_received_at",
+    "displayName:zh-CN": "来源接收时间",
+    "displayName:en": "Source Received At",
+    "dataType": "datetime",
+    "immutable": true,
+    "allowedWriterCommands": ["crm:intake_customer_request"],
+    "feature": {
+      "sortable": true
+    }
+  },
+  {
+    "code": "crm_cr_source_content_hash",
+    "displayName:zh-CN": "来源内容指纹",
+    "displayName:en": "Source Content Fingerprint",
+    "dataType": "string",
+    "immutable": true,
+    "allowedWriterCommands": ["crm:intake_customer_request"],
+    "constraints": {
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_cr_intake_snapshot",
+    "displayName:zh-CN": "原始接入快照",
+    "displayName:en": "Original Intake Snapshot",
+    "description": "Immutable canonical copy of the source facts received before later qualification or editing.",
+    "dataType": "json",
+    "immutable": true,
+    "allowedWriterCommands": ["crm:intake_customer_request"]
+  },
+  {
+    "code": "crm_cr_source_provenance",
+    "displayName:zh-CN": "来源血缘",
+    "displayName:en": "Source Provenance",
+    "dataType": "json",
+    "immutable": true,
+    "allowedWriterCommands": ["crm:intake_customer_request"]
+  },
+  {
+    "code": "crm_cr_field_evidence",
+    "displayName:zh-CN": "字段证据引用",
+    "displayName:en": "Field Evidence References",
+    "dataType": "json",
+    "immutable": true,
+    "allowedWriterCommands": ["crm:intake_customer_request"]
+  },
+  {
+    "code": "crm_cr_field_evidence_count",
+    "displayName:zh-CN": "证据化字段数",
+    "displayName:en": "Evidence-backed Fields",
+    "dataType": "integer",
+    "immutable": true,
+    "allowedWriterCommands": ["crm:intake_customer_request"],
+    "constraints": {
+      "min": 1
+    }
+  },
+  {
+    "code": "crm_cr_intake_client_request_id",
+    "displayName:zh-CN": "接入请求标识",
+    "displayName:en": "Intake Request Identity",
+    "dataType": "string",
+    "immutable": true,
+    "allowedWriterCommands": ["crm:intake_customer_request"],
+    "constraints": {
+      "maxLength": 128
+    }
+  },
+  {
+    "code": "crm_cr_ingested_at",
+    "displayName:zh-CN": "接入时间",
+    "displayName:en": "Ingested At",
+    "dataType": "datetime",
+    "immutable": true,
+    "allowedWriterCommands": ["crm:intake_customer_request"],
+    "feature": {
+      "sortable": true
+    }
   },
   {
     "code": "crm_cr_submitted_at",

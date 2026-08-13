@@ -86,18 +86,37 @@ export function auditRegistrations({ root, config }) {
       continue;
     }
 
-    const cfgAbs = path.join(root, reg.configFile);
-    if (!fs.existsSync(cfgAbs)) {
-      findings.push({ level: 'error', kind: 'missing-config', registry: reg.dir,
-        message: `config file does not exist: ${reg.configFile}` });
-      continue;
+    // A governed directory may have several purpose-built Playwright projects.
+    // Registration is their union: a spec only needs to be selectable by one
+    // real project, and must not be smuggled into an unrelated suite merely to
+    // satisfy this structural gate. The legacy single-project shape remains
+    // supported for existing registries.
+    const projects = reg.projects ?? [reg];
+    const registered = [];
+    const projectNames = [];
+    let registryReadable = true;
+    for (const project of projects) {
+      const cfgAbs = path.join(root, project.configFile);
+      projectNames.push(project.project);
+      if (!fs.existsSync(cfgAbs)) {
+        findings.push({ level: 'error', kind: 'missing-config', registry: reg.dir,
+          message: `config file does not exist: ${project.configFile}` });
+        registryReadable = false;
+        continue;
+      }
+      const names = readNameArray(fs.readFileSync(cfgAbs, 'utf8'), project.arrayName);
+      if (names === null) {
+        findings.push({ level: 'error', kind: 'missing-array', registry: reg.dir,
+          message: `array ${project.arrayName} not found in ${project.configFile}` });
+        registryReadable = false;
+        continue;
+      }
+      registered.push(...names);
     }
-    const registered = readNameArray(fs.readFileSync(cfgAbs, 'utf8'), reg.arrayName);
-    if (registered === null) {
-      findings.push({ level: 'error', kind: 'missing-array', registry: reg.dir,
-        message: `array ${reg.arrayName} not found in ${reg.configFile}` });
-      continue;
-    }
+    // If one declared project cannot be read, the union's denominator is
+    // unknown. The structural error above is authoritative; emitting orphan
+    // guesses as a secondary cascade would be misleading.
+    if (!registryReadable) continue;
 
     const allow = config.allow?.[reg.dir] ?? {};
     const registeredSet = new Set(registered);
@@ -121,8 +140,8 @@ export function auditRegistrations({ root, config }) {
         kind: baselined ? 'orphan-baselined' : 'orphan',
         registry: reg.dir,
         spec,
-        message: `${spec}.spec.ts exists but project "${reg.project}" can never select it `
-          + `(not in ${reg.arrayName}); it runs as "No tests found" + exit 0`
+        message: `${spec}.spec.ts exists but projects "${projectNames.join(', ')}" can never select it `
+          + '(not in any declared registry array); it runs as "No tests found" + exit 0'
           + (baselined ? ' [pre-existing at gate introduction — awaiting triage]' : ''),
       });
     }
@@ -145,8 +164,8 @@ export function auditRegistrations({ root, config }) {
         message: `allowlist entry "${spec}" has no file; drop it` });
     }
 
-    summary.push({ registry: reg.dir, project: reg.project,
-      files: files.length, registered: registered.length,
+    summary.push({ registry: reg.dir, project: projectNames.join(', '),
+      files: files.length, registered: registeredSet.size,
       allowed: Object.keys(allow).length });
   }
 

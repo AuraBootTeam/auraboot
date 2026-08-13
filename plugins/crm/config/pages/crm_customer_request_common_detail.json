@@ -201,6 +201,57 @@
               }
             }
           ]
+        },
+        {
+          "key": "source_evidence",
+          "label": {
+            "zh-CN": "来源与证据",
+            "en-US": "Source and Evidence"
+          },
+          "blocks": [
+            {
+              "id": "crm_cr_source_evidence",
+              "blockType": "detail-section",
+              "title": {
+                "zh-CN": "外部需求接入证据",
+                "en-US": "External Request Intake Evidence"
+              },
+              "description": {
+                "zh-CN": "仅展示由受控接入命令固化的来源与证据摘要；原始快照、字段定位和值指纹保持只读并进入命令审计。",
+                "en-US": "Only source and evidence facts frozen by the governed intake command are shown. The original snapshot, field locators and value fingerprints remain read-only and command-audited."
+              },
+              "fields": [
+                {
+                  "field": "crm_cr_source_channel",
+                  "layout": { "colSpan": 3 }
+                },
+                {
+                  "field": "crm_cr_source_system",
+                  "layout": { "colSpan": 3 }
+                },
+                {
+                  "field": "crm_cr_source_message_ref",
+                  "layout": { "colSpan": 6 }
+                },
+                {
+                  "field": "crm_cr_source_received_at",
+                  "layout": { "colSpan": 4 }
+                },
+                {
+                  "field": "crm_cr_ingested_at",
+                  "layout": { "colSpan": 4 }
+                },
+                {
+                  "field": "crm_cr_field_evidence_count",
+                  "layout": { "colSpan": 4 }
+                },
+                {
+                  "field": "crm_cr_source_content_hash",
+                  "layout": { "colSpan": 12 }
+                }
+              ]
+            }
+          ]
         }
       ]
     },

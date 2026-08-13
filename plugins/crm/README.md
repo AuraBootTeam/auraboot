@@ -227,6 +227,41 @@ node plugins/crm/scripts/verify_release_coverage.mjs
 The QDP and order-commitment real-stack/browser gates live under
 `plugins/crm/scripts/it/` and `plugins/crm/e2e/`.
 
+## Governed external Customer Request intake
+
+External and batch channels create the existing `crm_customer_request_common`
+object through `crm:intake_customer_request`; there is no second Customer
+Request model or generic persistence path. Connectors must provide a stable
+`clientRequestId`, source channel/system/message reference, received time, the
+accepted Customer Request facts, and a field-evidence locator for every supplied
+fact. The command derives a tenant-scoped source identity and content digest,
+freezes the original snapshot/provenance/evidence, and behaves as follows:
+
+- an exact platform `clientRequestId` replay returns the command replay;
+- the same source identity and canonical content returns the existing request;
+- changed intent under either identity fails closed without modifying the first
+  request;
+- direct mutation of source/provenance/evidence fields is rejected;
+- dry-run validates the full envelope without persistence.
+
+Operators inspect the localized, read-only source summary on the Customer
+Request detail page. Raw snapshots and field locators remain outside that page.
+Actual Email/Portal connector credentials and Excel parsing are integration
+concerns: they must call this command rather than introduce another writer.
+
+Verify the contract and the executable real-stack/browser drivers with:
+
+```bash
+node --test plugins/crm/tests/crm-customer-request-intake-config.test.mjs
+gradle -p plugins/crm/backend test \
+  --tests com.auraboot.plugins.crm.handler.IntakeCustomerRequestHandlerTest
+BACKEND_URL=http://127.0.0.1:<backend-port> \
+PG_DB=<isolated-db> EVIDENCE_DIR=<evidence-dir> \
+  python3 plugins/crm/scripts/it/customer_request_intake_true_stack.py
+cd web-admin && npx playwright test \
+  -c ../plugins/crm/e2e/customer-request-intake.playwright.config.ts
+```
+
 ## Licensing
 
 This package follows the repository's AuraBoot License 1.3. The repository is
