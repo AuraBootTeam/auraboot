@@ -2803,19 +2803,17 @@ describe('RecursiveBlockRenderer', () => {
 
     fireEvent.click(action);
 
-    await waitFor(() => {
-      expect(runtimeServices.executeAction).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'action_secure_export' }),
-        expect.objectContaining({
-          pageId: 'permission_action_allowed_page',
-          blockId: 'action_secure_export',
-          actionType: 'command',
-          permissionCode: 'meta.page-schema.export',
-        }),
-      );
-    });
-    expect(screen.getByTestId('runtime-action-status-action_secure_export')).toHaveTextContent(
-      'Secure export completed',
+    expect(
+      await screen.findByTestId('runtime-action-status-action_secure_export'),
+    ).toHaveTextContent('Secure export completed');
+    expect(runtimeServices.executeAction).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'action_secure_export' }),
+      expect.objectContaining({
+        pageId: 'permission_action_allowed_page',
+        blockId: 'action_secure_export',
+        actionType: 'command',
+        permissionCode: 'meta.page-schema.export',
+      }),
     );
   });
 
