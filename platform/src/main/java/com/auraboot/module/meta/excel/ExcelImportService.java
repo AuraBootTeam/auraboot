@@ -38,6 +38,9 @@ import java.util.concurrent.Executors;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
 
 /**
@@ -67,6 +70,9 @@ public class ExcelImportService {
     static final int BATCH_SIZE = 500;
     /** Row count threshold above which import runs asynchronously. */
     static final int DEFAULT_ASYNC_THRESHOLD = 1000;
+    static final int MAX_PERSISTED_ROW_ERRORS = 100;
+    private static final TypeReference<List<ImportValidationError>> IMPORT_ERRORS_TYPE =
+            new TypeReference<>() { };
 
     private final DynamicDataService dynamicDataService;
     private final MetaModelService metaModelService;
@@ -76,6 +82,7 @@ public class ExcelImportService {
     private final ExcelReferenceResolver referenceResolver;
     private final TypeSystemManager typeSystemManager;
     private final ExcelImportErrorReportService errorReportService;
+    private final ObjectMapper objectMapper;
 
     @Value("${auraboot.excel-import.async-threshold:1000}")
     private int asyncThreshold = DEFAULT_ASYNC_THRESHOLD;
@@ -581,7 +588,7 @@ public class ExcelImportService {
                     .errorCount(errorRows)
                     .createdCount(updateMode ? 0 : successRows)
                     .updatedCount(updateMode ? successRows : 0)
-                    .errors(List.of())
+                    .errors(readPersistedErrors(job))
                     .taskId(job.getPid())
                     .errorReportUrl(reportExpired ? null : job.getErrorReportUrl())
                     .errorReportFailed(errorRows > 0
@@ -1286,6 +1293,7 @@ public class ExcelImportService {
         job.setProcessedRows(result.getSuccessCount() + result.getErrorCount());
         job.setSuccessRows(result.getSuccessCount());
         job.setErrorRows(result.getErrorCount());
+        job.setErrorDetails(serializeErrors(result.getErrors()));
         // TODO: [timezone-unification] Change to Instant once ImportJob entity fields are migrated.
         LocalDateTime now = utcNow();
         job.setCompletedAt(now);
@@ -1308,6 +1316,32 @@ public class ExcelImportService {
             }
         } catch (Exception e) {
             log.warn("Failed to update import job status {}: {}", jobId, e.getMessage());
+        }
+    }
+
+    private String serializeErrors(List<ImportValidationError> errors) {
+        if (errors == null || errors.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(
+                    errors.stream().limit(MAX_PERSISTED_ROW_ERRORS).toList());
+        } catch (JsonProcessingException serializationError) {
+            log.error("Failed to serialize durable import row errors", serializationError);
+            return null;
+        }
+    }
+
+    private List<ImportValidationError> readPersistedErrors(ImportJob job) {
+        if (job.getErrorDetails() == null || job.getErrorDetails().isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(job.getErrorDetails(), IMPORT_ERRORS_TYPE);
+        } catch (JsonProcessingException parseError) {
+            log.error("Failed to restore durable row errors for import task {}", job.getPid(),
+                    parseError);
+            return List.of();
         }
     }
 

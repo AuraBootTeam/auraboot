@@ -458,13 +458,14 @@ public class ExcelImportErrorReportService {
             if (reportExcelRow == null) {
                 continue;
             }
-            int column = error.getFieldCode() == null
-                    ? 0 : fieldColumns.getOrDefault(error.getFieldCode(), 0);
+            String errorFieldCode = errorFieldCode(error);
+            String errorFieldLabel = errorFieldCode == null
+                    ? "" : fieldLabels.getOrDefault(errorFieldCode, errorFieldCode);
+            int column = errorFieldCode == null
+                    ? 0 : fieldColumns.getOrDefault(errorFieldCode, 0);
             messagesByCell.computeIfAbsent(reportExcelRow + ":" + column,
                     ignored -> new ArrayList<>()).add(localizeErrorMessage(
-                            locale, error.getMessage(), error.getFieldCode() == null
-                                    ? "" : fieldLabels.getOrDefault(
-                                            error.getFieldCode(), error.getFieldCode())));
+                            locale, error.getMessage(), errorFieldLabel));
         }
 
         Map<Short, CellStyle> warningStyles = new HashMap<>();
@@ -532,13 +533,14 @@ public class ExcelImportErrorReportService {
                 .toList();
         for (int index = 0; index < ordered.size(); index++) {
             ImportValidationError error = ordered.get(index);
+            String errorFieldCode = errorFieldCode(error);
+            String errorFieldLabel = errorFieldCode == null
+                    ? "" : fieldLabels.getOrDefault(errorFieldCode, errorFieldCode);
             Row row = details.createRow(index + 1);
             row.createCell(0).setCellValue(error.getRowNumber());
-            row.createCell(1).setCellValue(error.getFieldCode() == null
-                    ? "" : fieldLabels.getOrDefault(error.getFieldCode(), error.getFieldCode()));
-            row.createCell(2).setCellValue(localizeErrorMessage(locale, error.getMessage(),
-                    error.getFieldCode() == null ? "" : fieldLabels.getOrDefault(
-                            error.getFieldCode(), error.getFieldCode())));
+            row.createCell(1).setCellValue(errorFieldLabel);
+            row.createCell(2).setCellValue(localizeErrorMessage(
+                    locale, error.getMessage(), errorFieldLabel));
         }
         details.setColumnWidth(0, 4000);
         details.setColumnWidth(1, 7000);
@@ -594,11 +596,40 @@ public class ExcelImportErrorReportService {
         if (message.startsWith(ExcelImportService.ROW_WRITE_FAILED_MESSAGE)) {
             return localized(locale, "import.validation.row_write_failed", message);
         }
+        if (message.startsWith("No existing record matches ")) {
+            return localized(locale, "import.validation.update_record_missing", message)
+                    .replace("{field}", fieldLabel);
+        }
+        if (message.startsWith("Import match key is not unique: ")) {
+            return localized(locale, "import.validation.update_match_ambiguous", message)
+                    .replace("{field}", fieldLabel);
+        }
         if (message.startsWith("Field '") && message.endsWith("' is required")) {
             return localized(locale, "import.validation.named_required", message)
                     .replace("{field}", fieldLabel);
         }
         return message;
+    }
+
+    private String errorFieldCode(ImportValidationError error) {
+        if (error.getFieldCode() != null && !error.getFieldCode().isBlank()) {
+            return error.getFieldCode();
+        }
+        String message = error.getMessage();
+        if (message == null) {
+            return null;
+        }
+        for (String prefix : List.of(
+                "No existing record matches ",
+                "Import match key is not unique: ")) {
+            if (message.startsWith(prefix)) {
+                int delimiter = message.indexOf('=', prefix.length());
+                if (delimiter > prefix.length()) {
+                    return message.substring(prefix.length(), delimiter).trim();
+                }
+            }
+        }
+        return null;
     }
 
     private String localized(String locale, String key, String fallback) {

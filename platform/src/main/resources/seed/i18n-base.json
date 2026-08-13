@@ -3357,6 +3357,16 @@
     "en-US": "This row could not be saved. Check its values against the template and try again."
   },
   {
+    "key": "import.validation.update_record_missing",
+    "zh-CN": "未找到与“{field}”匹配的现有记录，请修正匹配值后重试",
+    "en-US": "No existing record matches “{field}”. Correct the match value and try again."
+  },
+  {
+    "key": "import.validation.update_match_ambiguous",
+    "zh-CN": "匹配字段“{field}”对应多条记录，请改用唯一业务值后重试",
+    "en-US": "The match field “{field}” resolves to multiple records. Use a unique business value and try again."
+  },
+  {
     "key": "import.validation.named_required",
     "zh-CN": "字段“{field}”为必填项",
     "en-US": "Field “{field}” is required"
