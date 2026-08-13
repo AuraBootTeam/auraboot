@@ -9,6 +9,7 @@ import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.TypeSystemManager;
 import com.auraboot.module.meta.excel.entity.ImportJob;
 import com.auraboot.module.meta.excel.mapper.ImportJobMapper;
 import lombok.RequiredArgsConstructor;
@@ -59,6 +60,9 @@ import jakarta.annotation.PreDestroy;
 @RequiredArgsConstructor
 public class ExcelImportService {
 
+    static final String ROW_WRITE_FAILED_MESSAGE =
+            "Import row could not be saved. Check the field values and try again.";
+
     /** Number of rows per batch for import insert operations. */
     static final int BATCH_SIZE = 500;
     /** Row count threshold above which import runs asynchronously. */
@@ -69,6 +73,8 @@ public class ExcelImportService {
     private final ImportJobMapper importJobMapper;
     private final ExcelImportPolicyResolver policyResolver;
     private final CommandExecutor commandExecutor;
+    private final ExcelReferenceResolver referenceResolver;
+    private final TypeSystemManager typeSystemManager;
 
     @Value("${auraboot.excel-import.async-threshold:1000}")
     private int asyncThreshold = DEFAULT_ASYNC_THRESHOLD;
@@ -152,6 +158,11 @@ public class ExcelImportService {
             mappedRows.add(mapped);
         }
 
+        List<ImportValidationError> referenceErrors = resolveReferenceValues(fieldDefs, mappedRows);
+        if (!referenceErrors.isEmpty()) {
+            return ExcelImportResult.withErrors(referenceErrors, mappedRows.size());
+        }
+
         // 3. Validate
         List<ImportValidationError> errors = new ArrayList<>(validate(mappedRows));
         if (!errors.isEmpty() && !options.isSkipErrors()) {
@@ -184,7 +195,7 @@ public class ExcelImportService {
             // UPDATE never creates a missing record. This matches the Cordys import contract.
             for (int i = 0; i < mappedRows.size(); i++) {
                 try {
-                    Map<String, Object> rowData = new HashMap<>(mappedRows.get(i));
+                    Map<String, Object> rowData = convertRowValues(fieldDefs, mappedRows.get(i));
                     Object keyValue = rowData.get(matchKey);
                     String existingId = findExistingRecordId(modelCode, matchKey, keyValue);
 
@@ -195,6 +206,9 @@ public class ExcelImportService {
                     updatedCount++;
                     success++;
                 } catch (Exception e) {
+                    // CATCH: per-row import tolerance — report this row and keep processing only
+                    // when skipErrors is enabled; retain the full cause in server logs.
+                    log.warn("Excel update row failed: model={}, row={}", modelCode, i + 2, e);
                     errorCount++;
                     errors.add(new ImportValidationError(i + 2, null, safeMessage(e)));
                     if (!options.isSkipErrors()) {
@@ -205,10 +219,14 @@ public class ExcelImportService {
         } else if (policy.getCreateCommand() != null) {
             for (int i = 0; i < mappedRows.size(); i++) {
                 try {
-                    executeCreate(policy, modelCode, new HashMap<>(mappedRows.get(i)), i + 2, importRunId);
+                    executeCreate(policy, modelCode, convertRowValues(fieldDefs, mappedRows.get(i)),
+                            i + 2, importRunId);
                     success++;
                     createdCount++;
                 } catch (Exception e) {
+                    // CATCH: per-row import tolerance — report this row and keep processing only
+                    // when skipErrors is enabled; retain the full cause in server logs.
+                    log.warn("Excel create row failed: model={}, row={}", modelCode, i + 2, e);
                     errorCount++;
                     errors.add(new ImportValidationError(i + 2, null, safeMessage(e)));
                     if (!options.isSkipErrors()) {
@@ -225,20 +243,27 @@ public class ExcelImportService {
                 try {
                     List<Map<String, Object>> batchData = new ArrayList<>();
                     for (Map<String, String> row : batch) {
-                        batchData.add(new HashMap<>(row));
+                        batchData.add(allowedPayload(convertRowValues(fieldDefs, row),
+                                policy.getCreateFields()));
                     }
                     dynamicDataService.batchCreate(modelCode, batchData);
                     success += batch.size();
                     createdCount += batch.size();
                 } catch (Exception batchError) {
                     // Batch failed — fall back to per-row for error isolation
-                    log.warn("Batch insert failed, falling back to per-row: {}", batchError.getMessage());
+                    log.warn("Batch insert failed for model {}; falling back to per-row",
+                            modelCode, batchError);
                     for (int i = 0; i < batch.size(); i++) {
                         try {
-                            dynamicDataService.create(modelCode, new HashMap<>(batch.get(i)));
+                            dynamicDataService.create(modelCode,
+                                    allowedPayload(convertRowValues(fieldDefs, batch.get(i)),
+                                            policy.getCreateFields()));
                             success++;
                             createdCount++;
                         } catch (Exception e) {
+                            // CATCH: per-row fallback isolates a bad row after the batch failed.
+                            log.warn("Excel CRUD row failed: model={}, row={}",
+                                    modelCode, batchStart + i + 2, e);
                             errorCount++;
                             errors.add(new ImportValidationError(batchStart + i + 2, null, safeMessage(e)));
                             if (!options.isSkipErrors()) {
@@ -421,6 +446,11 @@ public class ExcelImportService {
             mappedRows.add(mapped);
         }
 
+        List<ImportValidationError> referenceErrors = resolveReferenceValues(fieldDefs, mappedRows);
+        if (!referenceErrors.isEmpty()) {
+            return ExcelImportResult.withErrors(referenceErrors, mappedRows.size());
+        }
+
         List<ImportValidationError> errors = new ArrayList<>(validate(mappedRows));
         int success = 0;
         int errorCount = 0;
@@ -440,7 +470,7 @@ public class ExcelImportService {
             for (int i = 0; i < batch.size(); i++) {
                 int rowNumber = batchStart + i + 2;
                 try {
-                    Map<String, Object> rowData = new HashMap<>(batch.get(i));
+                    Map<String, Object> rowData = convertRowValues(fieldDefs, batch.get(i));
                     if ("update".equals(mode)) {
                         Object keyValue = rowData.get(matchKey);
                         String existingId = findExistingRecordId(modelCode, matchKey, keyValue);
@@ -455,6 +485,10 @@ public class ExcelImportService {
                     }
                     success++;
                 } catch (Exception e) {
+                    // CATCH: per-row import tolerance — the async task must persist a truthful
+                    // partial result instead of terminating without row-level evidence.
+                    log.warn("Async Excel import row failed: task={}, model={}, row={}",
+                            taskId, modelCode, rowNumber, e);
                     errorCount++;
                     errors.add(new ImportValidationError(rowNumber, null, safeMessage(e)));
                     if (!options.isSkipErrors()) {
@@ -559,15 +593,6 @@ public class ExcelImportService {
     private void executeCreate(ExcelImportPolicy policy, String modelCode,
                                Map<String, Object> rowData, int rowNumber, String importRunId) {
         Map<String, Object> payload = allowedPayload(rowData, policy.getCreateFields());
-        // A generated template contains columns for command defaults. Empty Excel cells
-        // parse as "", which must mean "omitted" or CommandAutoSetExecutor will see an
-        // explicit value and skip default_value (for example account status=active).
-        for (String field : policy.getCreateAutoSetFields()) {
-            Object value = payload.get(field);
-            if (value == null || (value instanceof String text && text.isBlank())) {
-                payload.remove(field);
-            }
-        }
         if (policy.getCreateCommand() == null) {
             dynamicDataService.create(modelCode, payload);
             return;
@@ -583,9 +608,6 @@ public class ExcelImportService {
     private void executeUpdate(ExcelImportPolicy policy, String modelCode, String recordPid,
                                Map<String, Object> rowData, int rowNumber, String importRunId) {
         Map<String, Object> payload = allowedPayload(rowData, policy.getUpdateFields());
-        // Cordys UPDATE semantics: a blank spreadsheet cell does not erase stored data.
-        payload.entrySet().removeIf(entry -> entry.getValue() == null
-                || (entry.getValue() instanceof String value && value.isBlank()));
         if (policy.getUpdateCommand() == null) {
             dynamicDataService.update(modelCode, recordPid, payload);
             return;
@@ -602,11 +624,48 @@ public class ExcelImportService {
     private Map<String, Object> allowedPayload(Map<String, Object> rowData, Set<String> allowedFields) {
         Map<String, Object> payload = new LinkedHashMap<>();
         for (Map.Entry<String, Object> entry : rowData.entrySet()) {
-            if (allowedFields.contains(entry.getKey())) {
+            Object value = entry.getValue();
+            // Empty template cells mean "omitted" for INSERT and "preserve" for UPDATE.
+            // Passing "" to numeric/date/reference fields leaks spreadsheet representation
+            // into the command/DB layer and can suppress command defaults or cause type errors.
+            if (allowedFields.contains(entry.getKey())
+                    && value != null
+                    && (!(value instanceof String text) || !text.isBlank())) {
                 payload.put(entry.getKey(), entry.getValue());
             }
         }
         return payload;
+    }
+
+    /** Convert validated spreadsheet strings to the Java types required by commands and SQL. */
+    Map<String, Object> convertRowValues(List<FieldDefinition> fieldDefs, Map<String, String> row) {
+        if (row == null || row.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, FieldDefinition> fieldsByCode = new HashMap<>();
+        if (fieldDefs != null) {
+            for (FieldDefinition field : fieldDefs) {
+                if (field != null && field.getCode() != null) {
+                    fieldsByCode.put(field.getCode(), field);
+                }
+            }
+        }
+        Map<String, Object> converted = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : row.entrySet()) {
+            String value = entry.getValue();
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            FieldDefinition field = fieldsByCode.get(entry.getKey());
+            // Older models and compatibility fixtures can omit dataType. In that case the
+            // import contract remains pass-through; conversion is only authoritative when
+            // metadata explicitly declares a type.
+            converted.put(entry.getKey(), field == null
+                    || field.getDataType() == null
+                    || field.getDataType().isBlank()
+                    ? value : typeSystemManager.convertValue(value, field));
+        }
+        return converted;
     }
 
     private String importRequestId(String modelCode, String mode, int rowNumber, String importRunId) {
@@ -615,9 +674,59 @@ public class ExcelImportService {
     }
 
     private static String safeMessage(Exception error) {
-        return error.getMessage() == null || error.getMessage().isBlank()
-                ? error.getClass().getSimpleName()
-                : error.getMessage();
+        String message = error.getMessage();
+        if (error instanceof BusinessException && message != null && !message.isBlank()
+                && !looksLikeInfrastructureFailure(message)) {
+            return message;
+        }
+        return ROW_WRITE_FAILED_MESSAGE;
+    }
+
+    private static boolean looksLikeInfrastructureFailure(String message) {
+        String normalized = message.toLowerCase(Locale.ROOT);
+        return normalized.contains("org.postgresql")
+                || normalized.contains("bad sql grammar")
+                || normalized.contains("error updating database")
+                || normalized.contains("dynamicdatamapper")
+                || normalized.contains("mybatis")
+                || normalized.contains("java.sql")
+                || normalized.contains("sqlstate")
+                || normalized.contains("###");
+    }
+
+    /** Resolve uploaded business reference values to their configured stored value. */
+    List<ImportValidationError> resolveReferenceValues(List<FieldDefinition> fieldDefs,
+                                                       List<Map<String, String>> rows) {
+        if (fieldDefs == null || fieldDefs.isEmpty() || rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        Map<String, FieldDefinition> references = new LinkedHashMap<>();
+        for (FieldDefinition field : fieldDefs) {
+            if ("reference".equalsIgnoreCase(field.getDataType())
+                    && field.getRefTarget() != null
+                    && field.getRefTarget().getTargetEntity() != null
+                    && !field.getRefTarget().getTargetEntity().isBlank()) {
+                references.put(field.getCode(), field);
+            }
+        }
+
+        List<ImportValidationError> errors = new ArrayList<>();
+        for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
+            Map<String, String> row = rows.get(rowIndex);
+            for (Map.Entry<String, FieldDefinition> reference : references.entrySet()) {
+                String uploaded = row.get(reference.getKey());
+                if (uploaded == null || uploaded.isBlank()) {
+                    continue;
+                }
+                try {
+                    row.put(reference.getKey(), referenceResolver.resolve(reference.getValue(), uploaded));
+                } catch (Exception error) {
+                    errors.add(new ImportValidationError(
+                            rowIndex + 2, reference.getKey(), safeMessage(error)));
+                }
+            }
+        }
+        return errors;
     }
 
     /**
@@ -768,6 +877,8 @@ public class ExcelImportService {
 
             // Write header row
             var headerRow = sheet.createRow(0);
+            var commentDrawing = sheet.createDrawingPatriarch();
+            List<Map.Entry<FieldDefinition, String>> referenceHints = new ArrayList<>();
             for (int i = 0; i < importableFields.size(); i++) {
                 FieldDefinition fd = importableFields.get(i);
                 var cell = headerRow.createCell(i);
@@ -782,6 +893,20 @@ public class ExcelImportService {
                 }
                 cell.setCellValue(label);
                 cell.setCellStyle(required ? requiredStyle : normalStyle);
+
+                String referenceHint = referenceResolver.importHint(fd);
+                if (referenceHint != null) {
+                    var anchor = workbook.getCreationHelper().createClientAnchor();
+                    anchor.setCol1(i);
+                    anchor.setCol2(Math.min(i + 4, importableFields.size()));
+                    anchor.setRow1(0);
+                    anchor.setRow2(5);
+                    var comment = commentDrawing.createCellComment(anchor);
+                    comment.setString(workbook.getCreationHelper().createRichTextString(referenceHint));
+                    comment.setAuthor("AuraBoot");
+                    cell.setCellComment(comment);
+                    referenceHints.add(Map.entry(fd, referenceHint));
+                }
             }
 
             // Auto-size columns with minimum width
@@ -790,6 +915,26 @@ public class ExcelImportService {
                 if (sheet.getColumnWidth(i) < 4000) {
                     sheet.setColumnWidth(i, 4000);
                 }
+            }
+
+            if (!referenceHints.isEmpty()) {
+                var instructions = workbook.createSheet("填写说明");
+                var instructionHeader = instructions.createRow(0);
+                instructionHeader.createCell(0).setCellValue("字段");
+                instructionHeader.createCell(1).setCellValue("填写规则");
+                instructionHeader.getCell(0).setCellStyle(normalStyle);
+                instructionHeader.getCell(1).setCellStyle(normalStyle);
+                for (int i = 0; i < referenceHints.size(); i++) {
+                    var hintRow = instructions.createRow(i + 1);
+                    FieldDefinition field = referenceHints.get(i).getKey();
+                    hintRow.createCell(0).setCellValue(
+                            field.getDisplayName() == null || field.getDisplayName().isBlank()
+                                    ? field.getCode() : field.getDisplayName());
+                    hintRow.createCell(1).setCellValue(referenceHints.get(i).getValue());
+                }
+                instructions.setColumnWidth(0, 6000);
+                instructions.setColumnWidth(1, 24000);
+                instructions.createFreezePane(0, 1);
             }
 
             try (OutputStream os = Files.newOutputStream(tempFile)) {

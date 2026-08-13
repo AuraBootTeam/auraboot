@@ -33,3 +33,22 @@ export function resolveImportMessageFieldCodes(
     message,
   );
 }
+
+/** Map stable backend reference failures to user-facing import guidance. */
+export function resolveImportReferenceMessage(message: string): string | null {
+  if (message.startsWith('Referenced record does not exist or is not accessible')) {
+    return '关联记录不存在或无权访问';
+  }
+  if (message.startsWith('Reference value is ambiguous')) {
+    return '关联值不唯一，请改用唯一业务编码或 PID';
+  }
+  return null;
+}
+
+/** Keep infrastructure details out of the UI and give the user an actionable next step. */
+export function resolveImportExecutionMessage(message: string): string | null {
+  if (message.startsWith('Import row could not be saved.')) {
+    return '该行无法保存，请检查字段值与模板要求后重试';
+  }
+  return null;
+}

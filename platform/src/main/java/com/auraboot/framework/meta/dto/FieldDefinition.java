@@ -323,6 +323,14 @@ public class FieldDefinition {
         private String targetField;
         /** Field code to display from the referenced entity (e.g. "name"). Defaults to "name". */
         private String displayField;
+        /**
+         * Exact target fields accepted as human-facing Excel import keys.
+         *
+         * <p>The stored reference value remains {@link #valueField} (normally {@code pid}).
+         * These fields only resolve an uploaded business value to that stored value. An empty
+         * list therefore preserves the legacy PID-only contract.</p>
+         */
+        private List<String> importMatchFields;
     }
 
     private static String mapDataTypeToPgCast(String dataType) {

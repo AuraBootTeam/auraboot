@@ -1,7 +1,7 @@
 package com.auraboot.module.meta.excel;
 
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.FieldDefinition;
-import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import org.apache.poi.ss.usermodel.Row;
@@ -36,17 +36,17 @@ class ExcelValidationEngineTest {
     private MetaFieldService metaFieldService;
 
     @Mock
-    private DynamicDataService dynamicDataService;
+    private ExcelImportPolicyResolver policyResolver;
 
     @Mock
-    private ExcelImportPolicyResolver policyResolver;
+    private ExcelReferenceResolver referenceResolver;
 
     private ExcelValidationEngine validationEngine;
 
     @BeforeEach
     void setUp() {
         validationEngine = new ExcelValidationEngine(
-                metaModelService, metaFieldService, dynamicDataService, policyResolver);
+                metaModelService, metaFieldService, policyResolver, referenceResolver);
         lenient().when(policyResolver.requireEnabled(anyString())).thenAnswer(invocation -> {
             String modelCode = invocation.getArgument(0);
             List<FieldDefinition> fields = metaModelService.getModelFields(modelCode);
@@ -299,6 +299,28 @@ class ExcelValidationEngineTest {
         assertTrue(report.isValid());
         assertTrue(report.getErrors().isEmpty());
         assertTrue(report.getWarnings().isEmpty());
+    }
+
+    @Test
+    void validate_referenceUsesBusinessKeyResolverAndReportsItsFailure() throws IOException {
+        FieldDefinition account = FieldDefinition.builder()
+                .code("account_id").displayName("Account").dataType("reference").required(true)
+                .refTarget(FieldDefinition.RefTarget.builder()
+                        .targetEntity("account").valueField("pid")
+                        .importMatchFields(List.of("account_code")).build())
+                .build();
+        when(metaModelService.getModelFields("contact")).thenReturn(List.of(account));
+        when(referenceResolver.resolve(account, "ACC-MISSING"))
+                .thenThrow(new BusinessException(
+                        "Referenced record does not exist or is not accessible for Account"));
+
+        ValidationReport report = validationEngine.validate("contact",
+                createExcel(new String[]{"Account"}, new String[][]{{"ACC-MISSING"}}));
+
+        assertFalse(report.isValid());
+        assertEquals(0, report.getValidRows());
+        assertEquals("account_id", report.getErrors().get(0).getFieldCode());
+        assertTrue(report.getErrors().get(0).getMessage().contains("does not exist"));
     }
 
     // ==================== isTypeValid unit tests ====================

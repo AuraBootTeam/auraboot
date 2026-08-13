@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '~/utils/cn';
 import { ResultHelper } from '~/utils/type';
 import { useI18n } from '~/contexts/I18nContext';
-import { resolveImportFieldLabel, resolveImportMessageFieldCodes } from './importCapability';
+import {
+  resolveImportFieldLabel,
+  resolveImportExecutionMessage,
+  resolveImportMessageFieldCodes,
+  resolveImportReferenceMessage,
+} from './importCapability';
 
 export type ImportMode = 'insert' | 'update';
 
@@ -378,8 +383,20 @@ export const ImportModal: React.FC<ImportModalProps> = ({
       if (message === 'Duplicate column header') {
         return t('import.validation.duplicate_header', undefined, '存在重复列头');
       }
-      if (message === 'Referenced record does not exist or is not accessible') {
-        return t('import.validation.reference', undefined, '关联记录不存在或无权访问');
+      const referenceMessage = resolveImportReferenceMessage(message);
+      if (referenceMessage === '关联记录不存在或无权访问') {
+        return t('import.validation.reference', undefined, referenceMessage);
+      }
+      if (referenceMessage === '关联值不唯一，请改用唯一业务编码或 PID') {
+        return t(
+          'import.validation.reference_ambiguous',
+          undefined,
+          referenceMessage,
+        );
+      }
+      const executionMessage = resolveImportExecutionMessage(message);
+      if (executionMessage) {
+        return t('import.validation.row_write_failed', undefined, executionMessage);
       }
       return resolveImportMessageFieldCodes(message, fieldLabels);
     },
