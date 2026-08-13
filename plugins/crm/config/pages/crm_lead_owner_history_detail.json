@@ -1,0 +1,10 @@
+{
+  "pageKey": "crm_lead_owner_history_detail", "name:zh-CN": "线索归属证据", "name:en": "Lead Ownership Evidence", "modelCode": "crm_lead_owner_history", "kind": "detail", "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "blocks": [
+    { "id": "ownership_evidence", "blockType": "form-section", "title": { "zh-CN": "不可变归属证据", "en": "Immutable Ownership Evidence" }, "columns": 2, "fields": [
+      { "field": "crm_loh_lead_id", "readOnly": true }, { "field": "crm_loh_pool_id", "readOnly": true }, { "field": "crm_loh_event", "readOnly": true }, { "field": "crm_loh_occurred_at", "readOnly": true },
+      { "field": "crm_loh_previous_owner", "readOnly": true }, { "field": "crm_loh_next_owner", "readOnly": true }, { "field": "crm_loh_actor", "readOnly": true }, { "field": "crm_loh_reason", "readOnly": true }
+    ] }
+  ]
+}

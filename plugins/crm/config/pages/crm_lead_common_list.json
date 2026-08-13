@@ -194,6 +194,24 @@
               "type": "bulk_state_transition",
               "command": "crm:lose_lead"
             }
+          },
+          {
+            "code": "bulk_move_to_pool",
+            "permissionCode": "crm.lead_pool.move",
+            "label": {
+              "zh-CN": "批量移入线索池",
+              "en-US": "Move Selected to Pool"
+            },
+            "action": {
+              "type": "bulk_field_command",
+              "command": "crm:move_lead_to_pool",
+              "input": {
+                "field": "crm_lead_last_pool_id",
+                "label": { "zh-CN": "目标线索池", "en-US": "Target Lead Pool" },
+                "type": "reference",
+                "required": true
+              }
+            }
           }
         ]
       },
@@ -262,6 +280,13 @@
                 "type": "navigate",
                 "to": "crm_lead_common_form"
               }
+            },
+            {
+              "code": "move_to_pool",
+              "permissionCode": "crm.lead_pool.move",
+              "label": { "zh-CN": "移入线索池", "en": "Move to Pool" },
+              "visibleWhen": "row.crm_lead_pool_state != 'in_pool'",
+              "action": { "type": "command", "command": "crm:move_lead_to_pool" }
             },
             {
               "code": "delete",

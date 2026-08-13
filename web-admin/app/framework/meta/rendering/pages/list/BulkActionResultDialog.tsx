@@ -104,14 +104,7 @@ export function BulkActionResultDialog({
                           {failure.recordLabel}
                         </td>
                         <td className="text-status-red px-3 py-2 break-words">
-                          {failure.reason === 'Bad parameter'
-                            ? tr(
-                                'list.bulkAction.invalidState',
-                                undefined,
-                                '当前记录状态不满足操作条件',
-                                'The current record state does not allow this action',
-                              )
-                            : failure.reason}
+                          {failure.reason}
                         </td>
                       </tr>
                     ))}

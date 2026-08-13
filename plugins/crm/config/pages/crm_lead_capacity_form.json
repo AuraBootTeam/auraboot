@@ -1,0 +1,10 @@
+{
+  "pageKey": "crm_lead_capacity_form", "name:zh-CN": "线索库容设置", "name:en": "Lead Capacity Setting", "modelCode": "crm_lead_capacity", "kind": "form", "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12, "gap": 16 },
+  "blocks": [
+    { "id": "capacity", "blockType": "form-section", "title": { "zh-CN": "用户库容", "en": "User Capacity" }, "fields": [
+      { "field": "crm_lcap_user_id", "colSpan": 6, "required": true }, { "field": "crm_lcap_capacity", "colSpan": 3, "required": true }, { "field": "crm_lcap_status", "colSpan": 3, "required": true }, { "field": "crm_lcap_remark", "colSpan": 12 }
+    ] },
+    { "id": "buttons", "blockType": "form-buttons", "buttons": [ { "code": "submit", "primary": true, "label": "$i18n:common.button.save", "action": { "type": "command" } }, { "code": "cancel", "label": "$i18n:common.button.cancel" } ] }
+  ]
+}

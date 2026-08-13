@@ -787,5 +787,103 @@
     "domain_category": "crm",
     "data_sensitivity": "confidential",
     "lifecycle_description": "Draft -> Compiling -> Validation Failed / Ready for Review -> Released -> Superseded. Published content changes always create a new numbered QDP revision; only async compilation and lifecycle evidence may change on an existing record."
+  },
+  {
+    "code": "crm_lead_pool",
+    "displayName:zh-CN": "线索池",
+    "displayName:en": "Lead Pool",
+    "description": "Configures lead-pool membership, claim limits, cooldowns and automatic recycling.",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Waves",
+      "category": "crm",
+      "titleField": "crm_lp_name",
+      "subtitleField": "crm_lp_code"
+    },
+    "semantic_description": "A governed shared lead pool. Members may see and claim available pool items; administrators may assign them and maintain policy. Capacity, daily limits and cooldowns are enforced by the command handler.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Enabled <-> Disabled. A pool with available items cannot be deleted."
+  },
+  {
+    "code": "crm_lead_capacity",
+    "displayName:zh-CN": "线索库容",
+    "displayName:en": "Lead Capacity",
+    "description": "Maximum concurrently owned open leads for one sales user.",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Gauge",
+      "category": "crm",
+      "titleField": "crm_lcap_user_id",
+      "subtitleField": "crm_lcap_capacity",
+      "dataScope": { "ownerField": "crm_lcap_user_id" }
+    },
+    "semantic_description": "Per-user lead ownership capacity used by claim and manager assignment. A missing active record means unlimited capacity; duplicate active user configurations are rejected by the unique user key.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Active or inactive capacity configuration."
+  },
+  {
+    "code": "crm_lead_pool_item",
+    "displayName:zh-CN": "线索池条目",
+    "displayName:en": "Lead Pool Item",
+    "description": "Command-owned operational projection of one lead entering, leaving or being recycled into a pool.",
+    "modelType": "entity",
+    "modelCategory": "activity",
+    "commandOnlyCreate": true,
+    "extension": {
+      "icon": "Inbox",
+      "category": "crm",
+      "titleField": "crm_lpi_company",
+      "subtitleField": "crm_lpi_lead_code",
+      "dataScope": { "ownerField": "crm_lpi_claimed_by" }
+    },
+    "semantic_description": "Concurrency-safe pool projection. The unique lead key and available-to-claim compare-and-set prevent two users claiming the same lead. Snapshot fields keep the shared queue readable without weakening ordinary lead owner data scope.",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "Available -> Claiming -> Claimed / Assigned; re-entry returns the same item to Available."
+  },
+  {
+    "code": "crm_lead_pool_quota",
+    "displayName:zh-CN": "线索领取额度",
+    "displayName:en": "Lead Claim Quota",
+    "description": "Command-owned per-pool, per-user, per-day claim counter.",
+    "modelType": "entity",
+    "modelCategory": "activity",
+    "commandOnlyCreate": true,
+    "extension": {
+      "icon": "Hash",
+      "category": "crm",
+      "skipDetailPage": true,
+      "titleField": "crm_lpq_key",
+      "subtitleField": "crm_lpq_pick_count",
+      "dataScope": { "ownerField": "crm_lpq_user_id" }
+    },
+    "semantic_description": "Atomic daily claim counter bounded by the pool limit snapshot.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "One immutable identity per pool-user-local-date; the claim counter only increases."
+  },
+  {
+    "code": "crm_lead_owner_history",
+    "displayName:zh-CN": "线索归属历史",
+    "displayName:en": "Lead Ownership History",
+    "description": "Immutable audit evidence for move, claim, assign and automatic recycle events.",
+    "modelType": "entity",
+    "modelCategory": "activity",
+    "immutable": true,
+    "commandOnlyCreate": true,
+    "extension": {
+      "icon": "History",
+      "category": "crm",
+      "titleField": "crm_loh_event",
+      "subtitleField": "crm_loh_occurred_at"
+    },
+    "semantic_description": "Append-only lead ownership history recording pool, previous owner, next owner, actor, reason and timestamp for every governed transition.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Append-only evidence; records are never edited or deleted."
   }
 ]

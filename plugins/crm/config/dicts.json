@@ -4119,5 +4119,69 @@
       { "value": "ready_to_close", "label": "Ready to Close", "label:zh-CN": "等待关闭", "sortNo": 50, "status": "enabled", "extension": { "color": "green" } },
       { "value": "task", "label": "Planned Task", "label:zh-CN": "计划任务", "sortNo": 60, "status": "enabled", "extension": { "color": "blue" } }
     ]
+  },
+  {
+    "code": "crm_lead_pool_status",
+    "name": "Lead Pool Status",
+    "name:zh-CN": "线索池状态",
+    "dictType": "static",
+    "items": [
+      { "value": "enabled", "label": "Enabled", "label:zh-CN": "已启用", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "disabled", "label": "Disabled", "label:zh-CN": "已停用", "sortNo": 20, "status": "enabled", "extension": { "color": "gray" } }
+    ]
+  },
+  {
+    "code": "crm_lead_capacity_status",
+    "name": "Lead Capacity Status",
+    "name:zh-CN": "线索库容状态",
+    "dictType": "static",
+    "items": [
+      { "value": "active", "label": "Active", "label:zh-CN": "生效", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "inactive", "label": "Inactive", "label:zh-CN": "停用", "sortNo": 20, "status": "enabled", "extension": { "color": "gray" } }
+    ]
+  },
+  {
+    "code": "crm_lead_pool_item_status",
+    "name": "Lead Pool Item Status",
+    "name:zh-CN": "线索池条目状态",
+    "dictType": "static",
+    "items": [
+      { "value": "available", "label": "Available", "label:zh-CN": "待领取", "sortNo": 10, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "claiming", "label": "Claiming", "label:zh-CN": "领取中", "sortNo": 20, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "claimed", "label": "Claimed", "label:zh-CN": "已领取", "sortNo": 30, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "assigned", "label": "Assigned", "label:zh-CN": "已分配", "sortNo": 40, "status": "enabled", "extension": { "color": "green" } }
+    ]
+  },
+  {
+    "code": "crm_lead_ownership_state",
+    "name": "Lead Ownership State",
+    "name:zh-CN": "线索归属状态",
+    "dictType": "static",
+    "items": [
+      { "value": "owned", "label": "Owned", "label:zh-CN": "已归属", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "in_pool", "label": "In Pool", "label:zh-CN": "在线索池", "sortNo": 20, "status": "enabled", "extension": { "color": "blue" } }
+    ]
+  },
+  {
+    "code": "crm_lead_recycle_basis",
+    "name": "Lead Recycle Basis",
+    "name:zh-CN": "线索回收口径",
+    "dictType": "static",
+    "items": [
+      { "value": "last_activity", "label": "Last Activity", "label:zh-CN": "最近跟进", "sortNo": 10, "status": "enabled" },
+      { "value": "claimed_at", "label": "Claimed At", "label:zh-CN": "最近领取", "sortNo": 20, "status": "enabled" }
+    ]
+  },
+  {
+    "code": "crm_lead_owner_event",
+    "name": "Lead Ownership Event",
+    "name:zh-CN": "线索归属事件",
+    "dictType": "static",
+    "items": [
+      { "value": "moved_to_pool", "label": "Moved to Pool", "label:zh-CN": "移入线索池", "sortNo": 10, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "claimed", "label": "Claimed", "label:zh-CN": "领取", "sortNo": 20, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "assigned", "label": "Assigned", "label:zh-CN": "分配", "sortNo": 30, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "auto_recycled", "label": "Automatically Recycled", "label:zh-CN": "自动回收", "sortNo": 40, "status": "enabled", "extension": { "color": "amber" } }
+    ]
   }
 ]

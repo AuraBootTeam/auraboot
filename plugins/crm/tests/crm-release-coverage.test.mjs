@@ -19,7 +19,7 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.doesNotMatch(JSON.stringify(committed.run), /auraboot-enterprise/);
 
   assert.equal(committed.axes.semanticActions.length, 26);
-  assert.equal(committed.axes.commands.length, 29);
+  assert.equal(committed.axes.commands.length, 30);
   assert.equal(committed.axes.pages.length, 11);
   assert.equal(committed.axes.permissions.length, 17);
   assert.equal(committed.axes.queries.length, 31);
@@ -44,15 +44,15 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
       'dashboards',
     ],
   );
-  assert.equal(committed.scope.productDenominator.pages, 96);
-  assert.equal(committed.scope.productDenominator.commands, 193);
-  assert.equal(committed.scope.productDenominator.permissions, 91);
-  assert.equal(committed.scope.productDenominator['page-blocks'], 316);
-  assert.equal(committed.scope.productDenominator['page-fields'], 1325);
-  assert.equal(committed.scope.productDenominator['ui-actions'], 468);
+  assert.equal(committed.scope.productDenominator.pages, 106);
+  assert.equal(committed.scope.productDenominator.commands, 208);
+  assert.equal(committed.scope.productDenominator.permissions, 101);
+  assert.equal(committed.scope.productDenominator['page-blocks'], 336);
+  assert.equal(committed.scope.productDenominator['page-fields'], 1420);
+  assert.equal(committed.scope.productDenominator['ui-actions'], 500);
   assert.equal(committed.scope.productDenominator.queries, 45);
-  assert.equal(committed.scope.productVerdicts.pass, 329);
-  assert.equal(committed.scope.productVerdicts.untested, 2324);
+  assert.equal(committed.scope.productVerdicts.pass, 339);
+  assert.equal(committed.scope.productVerdicts.untested, 2505);
   assert.ok(committed.scope.productVerdicts.untested > 0);
   assert.equal(committed.scope.productVerdicts.gap ?? 0, 0);
   const coreWorkbenchContract = committed.runtimeEvidenceContracts.find(
@@ -73,8 +73,8 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   const releaseBContract = committed.runtimeEvidenceContracts.find(
     (contract) => contract.id === 'RELEASE-B-OPPORTUNITY',
   );
-  assert.equal(releaseBContract.expectedScenarios, 11);
-  assert.equal(releaseBContract.minimumScreenshots, 24);
+  assert.equal(releaseBContract.expectedScenarios, 12);
+  assert.equal(releaseBContract.minimumScreenshots, 27);
   assert.ok(releaseBContract.expectedCoverage.commands.includes('crm:win_opportunity'));
   assert.ok(
     releaseBContract.expectedCoverage.uiActions.includes(
@@ -87,6 +87,7 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
     'dashboardTargets',
     'fields',
     'pages',
+    'permissions',
     'queries',
     'uiActions',
   ]);

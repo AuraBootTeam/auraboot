@@ -1,0 +1,44 @@
+{
+  "pageKey": "crm_lead_pool_list",
+  "name:zh-CN": "线索池设置",
+  "name:en": "Lead Pool Settings",
+  "modelCode": "crm_lead_pool",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12 },
+  "blocks": [
+    {
+      "id": "crm_lp_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        { "code": "create", "primary": true, "permissionCode": "crm.lead_pool.manage", "label": "$i18n:common.button.create", "action": { "type": "navigate", "to": "crm_lead_pool_form" } },
+        { "code": "run_recycle", "permissionCode": "crm.lead_pool.recycle", "label": { "zh-CN": "立即执行回收", "en": "Run Recycle Now" }, "action": { "type": "command", "command": "crm:run_lead_pool_recycle" } }
+      ]
+    },
+    {
+      "id": "crm_lp_table",
+      "blockType": "table",
+      "columns": [
+        { "field": "crm_lp_code", "width": 150, "sortable": true },
+        { "field": "crm_lp_name", "width": 200, "sortable": true },
+        { "field": "crm_lp_status", "width": 100, "renderType": "tag", "dictCode": "crm_lead_pool_status" },
+        { "field": "crm_lp_daily_pick_limit", "width": 120, "align": "right" },
+        { "field": "crm_lp_new_cooldown_days", "width": 130, "align": "right" },
+        { "field": "crm_lp_previous_owner_cooldown_days", "width": 150, "align": "right" },
+        { "field": "crm_lp_auto_recycle", "width": 110 },
+        { "field": "crm_lp_recycle_after_days", "width": 130, "align": "right" },
+        {
+          "field": "actions", "isActionColumn": true, "label": "$i18n:common.actions",
+          "buttons": [
+            { "code": "view", "label": "$i18n:common.button.view", "action": { "type": "navigate", "to": "crm_lead_pool_detail" } },
+            { "code": "edit", "permissionCode": "crm.lead_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_lead_pool_form" } },
+            { "code": "toggle", "permissionCode": "crm.lead_pool.manage", "label": { "zh-CN": "启用/停用", "en": "Enable/Disable" }, "action": { "type": "command", "command": "crm:toggle_lead_pool" } },
+            { "code": "delete", "danger": true, "permissionCode": "crm.lead_pool.manage", "label": "$i18n:common.button.delete", "confirm": { "zh-CN": "仅空线索池可删除，确认继续？", "en": "Only an empty pool can be deleted. Continue?" }, "action": { "type": "command", "command": "crm:delete_lead_pool" } }
+          ]
+        }
+      ],
+      "searchFields": ["crm_lp_code", "crm_lp_name"],
+      "defaultSort": { "field": "updated_at", "order": "desc" }
+    }
+  ]
+}
