@@ -2,9 +2,25 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canUseImport,
+  resolveImportExecutionMessage,
   resolveImportFieldLabel,
   resolveImportMessageFieldCodes,
+  resolveImportReferenceMessage,
 } from '../importCapability';
+
+describe('resolveImportExecutionMessage', () => {
+  it('maps the stable backend row-write failure to actionable copy', () => {
+    expect(
+      resolveImportExecutionMessage(
+        'Import row could not be saved. Check the field values and try again.',
+      ),
+    ).toBe('该行无法保存，请检查字段值与模板要求后重试');
+  });
+
+  it('does not reinterpret unrelated business errors', () => {
+    expect(resolveImportExecutionMessage('Duplicate code')).toBeNull();
+  });
+});
 
 describe('canUseImport', () => {
   it('fails closed when the page DSL does not explicitly enable import', () => {
@@ -21,6 +37,28 @@ describe('canUseImport', () => {
 
     expect(canUseImport(config, () => false)).toBe(false);
     expect(canUseImport(config, (permission) => permission === config.permissionCode)).toBe(true);
+  });
+});
+
+describe('resolveImportReferenceMessage', () => {
+  it('localizes a missing or inaccessible business-key reference with diagnostic suffixes', () => {
+    expect(
+      resolveImportReferenceMessage(
+        "Referenced record does not exist or is not accessible for 所属客户: 'X' (accepted: crm_acc_code)",
+      ),
+    ).toBe('关联记录不存在或无权访问');
+  });
+
+  it('explains how to disambiguate a non-unique reference', () => {
+    expect(
+      resolveImportReferenceMessage(
+        "Reference value is ambiguous for 所属客户: '同名客户' matched multiple records",
+      ),
+    ).toBe('关联值不唯一，请改用唯一业务编码或 PID');
+  });
+
+  it('leaves unrelated backend failures to the generic resolver', () => {
+    expect(resolveImportReferenceMessage('Import task failed')).toBeNull();
   });
 });
 

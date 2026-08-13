@@ -50,6 +50,9 @@ public class FieldRefTargetBean {
      * 值字段名
      */
     private String valueField;
+
+    /** Excel import may resolve these exact business fields to valueField. */
+    private List<String> importMatchFields;
     
     /**
      * API配置

@@ -23,9 +23,10 @@
     "referenceModelCode": "crm_account_common",
     "refTarget": {
       "targetModel": "crm_account_common",
-      "targetField": "id",
+      "valueField": "pid",
       "relationship": "many_to_one",
-      "displayField": "crm_acc_name"
+      "displayField": "crm_acc_name",
+      "importMatchFields": ["crm_acc_code", "crm_acc_name"]
     },
     "feature": { "searchable": true }
   },
@@ -34,7 +35,13 @@
     "displayName:zh-CN": "来源线索",
     "displayName:en": "Source Lead",
     "dataType": "reference",
-    "referenceModelCode": "crm_lead_common"
+    "referenceModelCode": "crm_lead_common",
+    "refTarget": {
+      "targetModel": "crm_lead_common",
+      "valueField": "pid",
+      "displayField": "crm_lead_company",
+      "importMatchFields": ["crm_lead_code", "crm_lead_company"]
+    }
   },
   {
     "code": "crm_opp_stage",

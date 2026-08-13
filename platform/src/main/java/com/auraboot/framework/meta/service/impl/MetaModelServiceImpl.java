@@ -1733,6 +1733,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                 .valueField(bean.getValueField())
                 .targetField(bean.getTargetField())
                 .displayField(bean.getDisplayField())
+                .importMatchFields(bean.getImportMatchFields())
                 .build();
     }
 

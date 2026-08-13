@@ -85,6 +85,39 @@ scripts/dev/stop-isolated.sh --slug=crm-adoption
 
 No data migration is part of this development-stage adoption path.
 
+## Excel import business keys
+
+CRM import is configured per model and remains fail-closed unless both the model
+`extension.importPolicy` and its `model.{modelCode}.import` permission are present.
+Account, Lead and Opportunity support insert/update; Contact supports insert only
+because it has no safe unique update key.
+
+Reference columns accept either the stored public PID or one exact business value
+declared by the field's `refTarget.importMatchFields`. The current CRM contract is:
+
+| Import model | Reference column | Accepted business keys |
+| --- | --- | --- |
+| Contact | Account | `crm_acc_code`, `crm_acc_name` |
+| Opportunity | Account | `crm_acc_code`, `crm_acc_name` |
+| Opportunity | Source Lead | `crm_lead_code`, `crm_lead_company` |
+
+Business-key resolution goes through the normal dynamic-data read path, so tenant,
+data-scope and soft-delete rules remain authoritative. Missing and ambiguous values
+fail during precheck and perform zero writes; ambiguous display names must be replaced
+with a unique business code or PID. Generated templates preserve the normal import
+header and add the accepted keys to cell comments and the `填写说明` worksheet.
+
+Blank cells mean “omitted” on insert and “preserve the stored value” on update. Before
+command execution, nonblank spreadsheet values are converted using the field metadata
+type; database or mapper details are retained in server logs and never returned in the
+row-level UI error.
+
+The real-stack Cordys-parity journey is
+`web-admin/tests/e2e/crm/crm-multimodel-import-cordys-parity.spec.ts`. Its committed
+evidence manifest lives in
+`docs/e2e/evidence/crm-multimodel-import-2026-08-13/`; the full Playwright traces stay
+in the workspace evidence directory to avoid adding large binaries to clone history.
+
 ## First use in the browser
 
 Open the Vite URL printed by `start-isolated.sh` and sign in as

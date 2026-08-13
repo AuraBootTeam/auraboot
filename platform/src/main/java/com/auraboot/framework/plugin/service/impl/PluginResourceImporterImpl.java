@@ -694,8 +694,9 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
      * {@code refTarget.targetModel}, {@code refTarget.targetEntity}) into the canonical
      * {@code refTarget.targetEntity}. The persisted {@code ref_target} therefore always uses
      * {@code targetEntity}; the alias keys ({@code modelCode}/{@code targetModel}) are dropped so the
-     * runtime has a single shape to read. Other refTarget keys (valueField, relationship, filter, …)
-     * are preserved. C1: import is the single normalization point; runtime reads canonical only.
+     * runtime has a single shape to read. Other refTarget keys (valueField, importMatchFields,
+     * relationship, filter, …) are preserved. C1: import is the single normalization point;
+     * runtime reads canonical only.
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> resolveFieldRefTarget(FieldDefinitionDTO dto) {
