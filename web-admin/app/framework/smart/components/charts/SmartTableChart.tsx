@@ -20,6 +20,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import type { LocalizedText } from '~/framework/meta/schemas/types';
 import { cn } from '~/utils/cn';
+import { enrichDrillDownFilters } from '~/framework/smart/utils/drillDownFilters';
 
 /**
  * Per-column override delivered via `widget.config.table.columns`. Lets the
@@ -39,6 +40,12 @@ export interface SmartTableChartColumn {
   dictCode?: string;
   /** Optional per-column align: 'left' | 'right' | 'center'. */
   align?: 'left' | 'right' | 'center';
+  /** Business display formatting for model/API table values. */
+  format?: 'date' | 'datetime' | 'number' | 'currency' | 'percent';
+  currency?: string;
+  precision?: number;
+  prefix?: string;
+  suffix?: string;
 }
 
 export interface SmartTableChartProps {
@@ -64,6 +71,10 @@ export interface SmartTableChartProps {
   table?: {
     columns?: SmartTableChartColumn[];
   };
+  /** Record filters applied by the model-table shorthand branch. */
+  filters?: FilterConfig[];
+  /** Default server/client sort for model-table rows. */
+  defaultSort?: { field: string; order: 'asc' | 'desc' };
   /** Page size for pagination */
   pageSize?: number;
   /** Show pagination controls */
@@ -104,6 +115,8 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   dataSource,
   modelCode,
   table,
+  filters,
+  defaultSort,
   pageSize = 10,
   showPagination = true,
   sortable = true,
@@ -118,6 +131,10 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   style,
 }) => {
   const { locale } = useI18n();
+  const l = useCallback(
+    (zh: string, en: string) => (locale === 'zh-CN' ? zh : en),
+    [locale],
+  );
   const tableColumns = table?.columns;
   const isConfigured = isDataSourceConfigured(dataSource, modelCode, tableColumns);
 
@@ -146,6 +163,8 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   const [apiRows, setApiRows] = useState<Record<string, unknown>[]>([]);
   const [apiLoading, setApiLoading] = useState(false);
   const [apiError, setApiError] = useState<Error | null>(null);
+  const modelFiltersKey = useMemo(() => JSON.stringify(filters ?? []), [filters]);
+  const modelSortKey = `${defaultSort?.field ?? ''}:${defaultSort?.order ?? ''}`;
 
   // Stable value-key for the api params: dataSource (and its params object) is a fresh object
   // on every parent render, so depending on the object identity re-runs the fetch effect every
@@ -199,10 +218,23 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
       pageNum: '1',
       pageSize: String(pageSize * 5), // headroom for sort/pagination on client
     };
-    fetchResult<{ records?: Record<string, unknown>[] }>(
-      `/api/dynamic/${modelCode}/list`,
-      { method: 'get', params },
-    )
+    if (filters?.length) {
+      params.filters = JSON.stringify(
+        filters.map((filter) => ({
+          fieldName: filter.field,
+          operator: String(filter.operator || 'eq').toUpperCase(),
+          value: filter.value,
+        })),
+      );
+    }
+    if (defaultSort?.field) {
+      params.sortField = defaultSort.field;
+      params.sortOrder = defaultSort.order;
+    }
+    fetchResult<{ records?: Record<string, unknown>[] }>(`/api/dynamic/${modelCode}/list`, {
+      method: 'get',
+      params,
+    })
       .then((result) => {
         if (cancelled) return;
         if (ResultHelper.isSuccess(result) && result.data?.records) {
@@ -221,7 +253,10 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [useModelBranch, modelCode, pageSize]);
+  // `modelFiltersKey` / `modelSortKey` are stable value keys. Dashboard config
+  // objects may be reconstructed by the renderer without changing semantics.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useModelBranch, modelCode, pageSize, modelFiltersKey, modelSortKey]);
 
   const data = useChartBranch
     ? chartData
@@ -234,22 +269,24 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
             metrics: [] as string[],
           },
         }
-    : useModelBranch
-      ? {
-          rows: modelRows,
-          summary: {},
-          meta: {
-            dimensions: tableColumns?.map((c) => c.field) ?? [],
-            metrics: [] as string[],
-          },
-        }
-      : null;
+      : useModelBranch
+        ? {
+            rows: modelRows,
+            summary: {},
+            meta: {
+              dimensions: tableColumns?.map((c) => c.field) ?? [],
+              metrics: [] as string[],
+            },
+          }
+        : null;
   const loading = useChartBranch ? chartLoading : useApiBranch ? apiLoading : modelLoading;
   const error = useChartBranch ? chartError : useApiBranch ? apiError : modelError;
 
   const [currentPage, setCurrentPage] = useState(0);
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortKey, setSortKey] = useState<string | null>(defaultSort?.field ?? null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(
+    defaultSort?.order ?? 'asc',
+  );
 
   /**
    * Resolved column descriptors. Priority:
@@ -260,16 +297,15 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
    * Each entry carries the field code plus a pre-resolved header label so the
    * `<th>` render path can stay declarative.
    */
-  const columns = useMemo<{ field: string; label: string; align?: 'left' | 'right' | 'center' }[]>(() => {
+  const columns = useMemo<
+    Array<SmartTableChartColumn & { label: string }>
+  >(() => {
     if (tableColumns && tableColumns.length > 0) {
       return tableColumns.map((col) => {
-        const resolvedLabel = col.label
-          ? getLocalizedText(col.label, locale)
-          : col.field;
+        const resolvedLabel = col.label ? getLocalizedText(col.label, locale) : col.field;
         return {
-          field: col.field,
+          ...col,
           label: resolvedLabel || col.field,
-          align: col.align,
         };
       });
     }
@@ -338,7 +374,9 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
         );
       if (!dimension) return;
       const filter: FilterConfig = { field: dimension, operator: 'eq', value: row[dimension] };
-      if (drillDown?.enabled && onDrillDown) onDrillDown([filter]);
+      if (drillDown?.enabled && onDrillDown) {
+        onDrillDown(enrichDrillDownFilters(filter, row, drillDown));
+      }
       if (linkage?.enabled && linkage?.emitFilter && onLinkageEmit) onLinkageEmit([filter]);
     },
     [data, drillDown, linkage, onDrillDown, onLinkageEmit],
@@ -355,8 +393,10 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
       >
         <div className="text-center">
           <div className="mb-3 text-4xl text-gray-400">📋</div>
-          <div className="font-medium text-gray-500">{title || 'Data Table'}</div>
-          <div className="mt-1 text-sm text-gray-400">Please configure data source</div>
+          <div className="font-medium text-gray-500">{title || l('数据表格', 'Data Table')}</div>
+          <div className="mt-1 text-sm text-gray-400">
+            {l('请配置数据源', 'Please configure data source')}
+          </div>
         </div>
       </div>
     );
@@ -373,7 +413,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
       >
         <div className="flex flex-col items-center gap-2">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-          <span className="text-sm text-gray-500">Loading...</span>
+          <span className="text-sm text-gray-500">{l('加载中...', 'Loading...')}</span>
         </div>
       </div>
     );
@@ -390,7 +430,9 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
         role="alert"
       >
         <div className="text-center">
-          <div className="mb-2 text-lg text-red-500">Failed to load data</div>
+          <div className="mb-2 text-lg text-red-500">
+            {l('数据加载失败', 'Failed to load data')}
+          </div>
           <div className="text-sm text-gray-500">{error.message}</div>
         </div>
       </div>
@@ -416,6 +458,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
                 <th
                   key={col.field}
                   onClick={() => handleSort(col.field)}
+                  style={col.width ? { width: col.width, maxWidth: col.width } : undefined}
                   className={cn(
                     'px-4 py-2.5 text-xs font-medium tracking-wider whitespace-nowrap text-gray-500 uppercase',
                     col.align === 'right' && 'text-right',
@@ -447,13 +490,16 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
                 {columns.map((col) => (
                   <td
                     key={col.field}
+                    style={col.width ? { width: col.width, maxWidth: col.width } : undefined}
                     className={cn(
-                      'px-4 py-2.5 whitespace-nowrap text-gray-700',
+                      'overflow-hidden px-4 py-2.5 text-ellipsis whitespace-nowrap text-gray-700',
                       col.align === 'right' && 'text-right',
                       col.align === 'center' && 'text-center',
                     )}
                   >
-                    {formatCell(cellLabels, col.field, row[col.field])}
+                    <span title={formatCell(cellLabels, col, row[col.field], locale)}>
+                      {formatCell(cellLabels, col, row[col.field], locale)}
+                    </span>
                   </td>
                 ))}
               </tr>
@@ -461,7 +507,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
             {paginatedRows.length === 0 && (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-400">
-                  No data available
+                  {l('暂无数据', 'No data available')}
                 </td>
               </tr>
             )}
@@ -471,7 +517,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
 
       {showPagination && totalPages > 1 && (
         <div className="flex items-center justify-between border-t border-gray-200 px-4 py-2.5 text-sm text-gray-500">
-          <span>{sortedRows.length} rows</span>
+          <span>{l(`共 ${sortedRows.length} 条`, `${sortedRows.length} rows`)}</span>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -479,7 +525,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
               onClick={() => setCurrentPage((p) => p - 1)}
               className="rounded px-2 py-1 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Prev
+              {l('上一页', 'Prev')}
             </button>
             <span>
               {currentPage + 1} / {totalPages}
@@ -490,7 +536,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
               onClick={() => setCurrentPage((p) => p + 1)}
               className="rounded px-2 py-1 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Next
+              {l('下一页', 'Next')}
             </button>
           </div>
         </div>
@@ -508,17 +554,55 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
  */
 function formatCell(
   labels: Record<string, Record<string, string>>,
-  field: string,
+  column: SmartTableChartColumn,
   value: unknown,
+  locale: string,
 ): string {
-  const label = value == null ? undefined : labels[field]?.[String(value)];
-  return label ?? formatCellValue(value);
+  const label = value == null ? undefined : labels[column.field]?.[String(value)];
+  return label ?? formatCellValue(value, column, locale);
 }
 
-function formatCellValue(value: unknown): string {
+function formatCellValue(
+  value: unknown,
+  column: SmartTableChartColumn,
+  locale: string,
+): string {
   if (value === null || value === undefined) return '-';
-  if (typeof value === 'number') {
-    return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  const activeLocale = locale === 'zh-CN' ? 'zh-CN' : 'en-US';
+  if (column.format === 'date' || column.format === 'datetime') {
+    const date = new Date(String(value));
+    if (!Number.isNaN(date.getTime())) {
+      return new Intl.DateTimeFormat(activeLocale, {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        ...(column.format === 'datetime'
+          ? { hour: '2-digit', minute: '2-digit', hour12: false }
+          : {}),
+      }).format(date);
+    }
+  }
+  if (column.format === 'currency') {
+    return `${column.prefix ?? ''}${new Intl.NumberFormat(activeLocale, {
+      style: 'currency',
+      currency: column.currency ?? 'CNY',
+      minimumFractionDigits: column.precision ?? 0,
+      maximumFractionDigits: column.precision ?? 0,
+    }).format(Number(value) || 0)}${column.suffix ?? ''}`;
+  }
+  if (column.format === 'percent') {
+    const raw = Number(value) || 0;
+    const normalized = Math.abs(raw) <= 1 ? raw * 100 : raw;
+    return `${column.prefix ?? ''}${new Intl.NumberFormat(activeLocale, {
+      minimumFractionDigits: column.precision ?? 0,
+      maximumFractionDigits: column.precision ?? 0,
+    }).format(normalized)}%${column.suffix ?? ''}`;
+  }
+  if (typeof value === 'number' || column.format === 'number') {
+    return `${column.prefix ?? ''}${new Intl.NumberFormat(activeLocale, {
+      minimumFractionDigits: column.precision ?? 0,
+      maximumFractionDigits: column.precision ?? (Number.isInteger(Number(value)) ? 0 : 2),
+    }).format(Number(value) || 0)}${column.suffix ?? ''}`;
   }
   return String(value);
 }

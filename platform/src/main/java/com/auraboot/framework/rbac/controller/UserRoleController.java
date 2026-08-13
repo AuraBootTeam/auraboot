@@ -100,7 +100,8 @@ public class UserRoleController {
 
         Long tenantId = MetaContext.getCurrentTenantId();
         boolean result = userRoleService.assignRolesToMemberByRoleCodes(
-                request.getMemberPid(), request.getRoleCodes(), tenantId, operatorId);
+                request.getMemberPid(), request.getRoleCodes(), request.getEffectiveDate(),
+                request.getExpiryDate(), tenantId, operatorId);
         return ApiResponse.success(result);
     }
 
@@ -112,7 +113,8 @@ public class UserRoleController {
 
         Long tenantId = MetaContext.getCurrentTenantId();
         boolean result = userRoleService.assignRolesToMemberByRolePids(
-                request.getMemberPid(), request.getRolePids(), tenantId, operatorId);
+                request.getMemberPid(), request.getRolePids(), request.getEffectiveDate(),
+                request.getExpiryDate(), tenantId, operatorId);
         return ApiResponse.success(result);
     }
 
@@ -234,7 +236,8 @@ public class UserRoleController {
         Long tenantId = MetaContext.getCurrentTenantId();
         boolean result = requests.stream()
                 .allMatch(request -> userRoleService.assignRolesToMemberByRolePids(
-                        request.getMemberPid(), request.getRolePids(), tenantId, operatorId));
+                        request.getMemberPid(), request.getRolePids(), request.getEffectiveDate(),
+                        request.getExpiryDate(), tenantId, operatorId));
         return ApiResponse.success(result);
     }
 

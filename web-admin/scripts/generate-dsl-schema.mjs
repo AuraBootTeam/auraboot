@@ -5,7 +5,7 @@
  * Usage:  node scripts/generate-dsl-schema.mjs          (from web-admin/)
  *    or:  pnpm generate:dsl-schema                    (from web-admin/)
  *
- * Reads:  app/meta/schemas/dsl-schema-types.ts
+ * Reads:  app/framework/meta/schemas/dsl-schema-types.ts
  * Writes: ../plugins/schemas/dsl-schema.generated.json
  */
 import { createGenerator } from 'ts-json-schema-generator';
@@ -18,7 +18,7 @@ const WEB_ADMIN = resolve(__dirname, '..');
 const ROOT = resolve(WEB_ADMIN, '..');
 
 const config = {
-  path: resolve(WEB_ADMIN, 'app/meta/schemas/dsl-schema-types.ts'),
+  path: resolve(WEB_ADMIN, 'app/framework/meta/schemas/dsl-schema-types.ts'),
   tsconfig: resolve(WEB_ADMIN, 'tsconfig.json'),
   type: 'DslSchema',
   additionalProperties: false,
@@ -178,7 +178,7 @@ addPageTypeDiscriminator(output);
 
 // Add metadata
 output.$comment =
-  'Auto-generated from web-admin/app/meta/schemas/dsl-schema-types.ts — DO NOT EDIT MANUALLY. Run: cd web-admin && pnpm generate:dsl-schema';
+  'Auto-generated from web-admin/app/framework/meta/schemas/dsl-schema-types.ts — DO NOT EDIT MANUALLY. Run: cd web-admin && pnpm generate:dsl-schema';
 
 const outPath = resolve(ROOT, 'plugins/schemas/dsl-schema.generated.json');
 writeFileSync(outPath, JSON.stringify(output, null, 2) + '\n');

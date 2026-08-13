@@ -722,7 +722,19 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
       let formattedDisplayValue = value;
       const options = field.props?.options || [];
 
-      if (['smartdate', 'date'].includes(componentType) && value) {
+      if (
+        ['money', 'smartmoneyinput', 'number', 'smartnumber', 'smartnumberinput'].includes(
+          componentType,
+        ) &&
+        value !== null &&
+        value !== undefined &&
+        value !== '' &&
+        Number.isFinite(Number(value))
+      ) {
+        formattedDisplayValue = new Intl.NumberFormat(locale, {
+          maximumFractionDigits: Number(field.props?.precision ?? 8),
+        }).format(Number(value));
+      } else if (['smartdate', 'date'].includes(componentType) && value) {
         formattedDisplayValue = new Date(value).toLocaleDateString(locale);
       } else if (['smartdatetime', 'datetime'].includes(componentType) && value) {
         formattedDisplayValue = new Date(value).toLocaleString(locale);

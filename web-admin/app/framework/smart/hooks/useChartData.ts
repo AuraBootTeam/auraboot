@@ -293,6 +293,7 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
         dimensions: currentDataSource.dimensions,
         metrics: currentDataSource.metrics,
         filters: [...(currentDataSource.filters || []), ...(currentLinkageFilters || [])],
+        keyword: currentDataSource.keyword,
         parameters: currentDataSource.parameters,
         orderBy: currentDataSource.orderBy,
         limit: currentDataSource.limit,

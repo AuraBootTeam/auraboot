@@ -216,6 +216,14 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             if (field.isJsonbVirtual()) {
                 continue;
             }
+            // row_version is a platform-owned concurrency primitive. A plugin may bind it
+            // so pages can submit expectedVersion, but its business field metadata must not
+            // weaken the physical invariant (for example nullable or DEFAULT 0).
+            if ("row_version".equals(columnName)) {
+                columnDefinitions.add("    row_version INTEGER NOT NULL DEFAULT 1");
+                existingColumns.add(columnName);
+                continue;
+            }
             String columnDef = generateColumnDefinition(field);
             columnDefinitions.add("    " + columnDef);
             existingColumns.add(columnName);
@@ -1138,6 +1146,7 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
     private List<String> buildSyncDdls(ModelDefinition model, SchemaSyncOptions options) {
         List<String> ddlStatements = new ArrayList<>();
         String tableName = model.getTableName();
+        SqlSafetyUtils.validateIdentifier(tableName, "table name");
 
         if (!tableMetadataService.tableExists(tableName)) {
             ddlStatements.add(generateCreateTableDDL(model));
@@ -1160,6 +1169,27 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             ddlStatements.add("ALTER TABLE " + tableName
                     + " ADD COLUMN IF NOT EXISTS row_version INTEGER NOT NULL DEFAULT 1");
             newlyAddedColumns.add("row_version");
+        } else {
+            boolean nullable = tableMetadataService.isColumnNullable(tableName, "row_version");
+            String dialectName = ddlDialectProvider.getDialect().getName();
+
+            if ("PostgreSQL".equalsIgnoreCase(dialectName)) {
+                if (nullable) {
+                    // Backfill first so SET NOT NULL is safe for tables imported by older
+                    // platform versions where an explicit DSL binding shadowed the system column.
+                    ddlStatements.add("UPDATE " + tableName + " SET row_version = 1 WHERE row_version IS NULL");
+                    ddlStatements.add("ALTER TABLE " + tableName + " ALTER COLUMN row_version SET NOT NULL");
+                }
+                // SET DEFAULT is idempotent and avoids a second metadata connection querying
+                // the relation while the import transaction owns DDL locks.
+                ddlStatements.add("ALTER TABLE " + tableName + " ALTER COLUMN row_version SET DEFAULT 1");
+            } else {
+                if (nullable) {
+                    ddlStatements.add("UPDATE " + tableName + " SET row_version = 1 WHERE row_version IS NULL");
+                }
+                ddlStatements.add("ALTER TABLE " + tableName
+                        + " MODIFY COLUMN row_version INTEGER NOT NULL DEFAULT 1");
+            }
         }
 
         for (FieldDefinition field : model.getFields()) {

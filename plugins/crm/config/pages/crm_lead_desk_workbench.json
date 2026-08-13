@@ -1,0 +1,293 @@
+{
+  "pageKey": "crm_lead_desk_workbench",
+  "name:zh-CN": "线索工作台",
+  "name:en": "Lead Desk",
+  "modelCode": "crm_lead_common",
+  "description": "Role-based lead desk ordered by assignment, staleness, qualification and conversion readiness.",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "extension": { "showShare": false, "showReport": false, "showPrint": false, "showEdit": false },
+  "dataSources": {
+    "leadStats": {
+      "type": "namedQuery",
+      "queryCode": "crm_lead_desk_stats",
+      "params": {},
+      "adaptor": "table",
+      "format": "records"
+    },
+    "leadQueue": {
+      "type": "namedQuery",
+      "queryCode": "crm_lead_desk_queue",
+      "params": {
+        "leadKeyword": "${state.searchKeyword}",
+        "viewFilter": "${state.viewFilter}"
+      },
+      "dependOn": ["state.searchKeyword", "state.viewFilter"],
+      "adaptor": "table",
+      "format": "records"
+    }
+  },
+  "blocks": [
+    {
+      "id": "crm_lead_desk_metrics",
+      "blockType": "metric-strip",
+      "dataSource": "leadStats",
+      "variant": "cards",
+      "columns": 4,
+      "metrics": [
+        {
+          "key": "actionable",
+          "label": { "zh-CN": "待推进线索", "en": "Actionable Leads" },
+          "valueField": "actionable_count",
+          "subText": { "zh-CN": "新建、已联系或已合格", "en": "New, contacted or qualified" },
+          "tone": "blue",
+          "icon": "Radar",
+          "activeWhen": "state.viewFilter == null || state.viewFilter == '' || state.viewFilter == 'all'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "all" } }
+        },
+        {
+          "key": "unassigned",
+          "label": { "zh-CN": "待分配", "en": "Unassigned" },
+          "valueField": "unassigned_count",
+          "subText": { "zh-CN": "缺少明确负责人", "en": "No accountable owner" },
+          "tone": "red",
+          "icon": "UserRoundX",
+          "activeWhen": "state.viewFilter == 'unassigned'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "unassigned" } }
+        },
+        {
+          "key": "stale",
+          "label": { "zh-CN": "长期未跟进", "en": "Stale Follow-up" },
+          "valueField": "stale_count",
+          "subText": { "zh-CN": "14 天无有效互动", "en": "No activity for 14 days" },
+          "tone": "amber",
+          "icon": "ClockAlert",
+          "activeWhen": "state.viewFilter == 'stale'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "stale" } }
+        },
+        {
+          "key": "qualified",
+          "label": { "zh-CN": "可转化", "en": "Ready to Convert" },
+          "valueField": "qualified_count",
+          "subText": { "zh-CN": "已通过资格判断", "en": "Qualification completed" },
+          "tone": "green",
+          "icon": "BadgeCheck",
+          "activeWhen": "state.viewFilter == 'qualified'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "qualified" } }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_desk_search",
+      "blockType": "filters",
+      "onSearch": { "action": "dataSource.reload", "args": { "dataSourceId": "leadQueue" } },
+      "onReset": { "action": "state.set", "args": { "searchKeyword": "" } },
+      "fields": [
+        {
+          "field": "crm_lead_company",
+          "component": "SmartInput",
+          "bindState": "searchKeyword",
+          "label": { "zh-CN": "搜索线索队列", "en": "Search lead queue" },
+          "placeholder": { "zh-CN": "输入公司、联系人或线索编号", "en": "Search company, contact or lead code" }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_desk_header_actions",
+      "blockType": "workbench-action-bar",
+      "surface": "bare",
+      "density": "compact",
+      "align": "end",
+      "actions": [
+        {
+          "code": "open_lead_record",
+          "permissionCode": "crm.lead.read",
+          "label": { "zh-CN": "打开线索档案", "en": "Open Lead Record" },
+          "variant": "secondary",
+          "visibleWhen": "state.selectedLead != null",
+          "onClick": { "action": "navigate", "args": { "to": "/p/crm_lead_common/view/${state.selectedLead.pid}" } }
+        },
+        {
+          "code": "create_lead",
+          "permissionCode": "crm.lead.manage",
+          "label": { "zh-CN": "新建线索", "en": "Create Lead" },
+          "variant": "primary",
+          "onClick": { "action": "navigate", "args": { "to": "/p/crm_lead_common/new" } }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_desk_queue",
+      "blockType": "table",
+      "title": { "zh-CN": "线索优先队列", "en": "Lead Priority Queue" },
+      "dataSource": "leadQueue",
+      "density": "compact",
+      "maxHeight": 430,
+      "selection": { "mode": "single", "bind": "selectedLead", "defaultFirst": true },
+      "columns": [
+        { "field": "crm_lead_company", "width": 210, "label": { "zh-CN": "公司", "en": "Company" } },
+        { "field": "crm_lead_contact_name", "width": 130, "label": { "zh-CN": "联系人", "en": "Contact" } },
+        { "field": "crm_lead_status", "width": 110, "dictCode": "crm_lead_status", "label": { "zh-CN": "线索阶段", "en": "Stage" } },
+        { "field": "crm_lead_score", "width": 85, "align": "right", "label": { "zh-CN": "评分", "en": "Score" } },
+        { "field": "owner_name", "width": 140, "label": { "zh-CN": "负责人", "en": "Owner" } },
+        { "field": "last_activity_at", "width": 145, "valueType": "datetime", "label": { "zh-CN": "最近互动", "en": "Last Activity" } },
+        { "field": "days_since_activity", "width": 105, "align": "right", "label": { "zh-CN": "未跟进天数", "en": "Idle Days" } },
+        { "field": "next_action", "width": 135, "dictCode": "crm_lead_next_action", "label": { "zh-CN": "建议动作", "en": "Next Action" } }
+      ],
+      "rowActions": [
+        {
+          "code": "view_lead",
+          "label": { "zh-CN": "查看线索", "en": "View Lead" },
+          "permissionCode": "crm.lead.read",
+          "action": { "type": "navigate", "to": "crm_lead_conversion" }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_next_action_banner",
+      "blockType": "status-banner",
+      "context": "${state.selectedLead}",
+      "statusField": "next_action",
+      "toneMap": {
+        "assign_owner": "red",
+        "convert": "green",
+        "qualify": "amber",
+        "follow_up": "amber",
+        "continue_nurture": "blue"
+      },
+      "titleMap": {
+        "assign_owner": { "zh-CN": "先明确负责人", "en": "Assign an owner first" },
+        "convert": { "zh-CN": "线索已具备转化条件", "en": "Lead is ready to convert" },
+        "qualify": { "zh-CN": "高分线索等待资格确认", "en": "High-score lead awaits qualification" },
+        "follow_up": { "zh-CN": "跟进已超时", "en": "Follow-up is overdue" },
+        "continue_nurture": { "zh-CN": "继续培育并记录互动", "en": "Continue nurturing and record activity" }
+      },
+      "descriptionMap": {
+        "assign_owner": { "zh-CN": "未分配的线索不能形成可问责的下一步。", "en": "An unassigned lead has no accountable next step." },
+        "convert": { "zh-CN": "转化将原子创建客户、联系人、商机和客户需求。", "en": "Conversion atomically creates the account, contact, opportunity and customer request." },
+        "qualify": { "zh-CN": "核对需求、联系结果和评分后再标记合格。", "en": "Review the requirement, contact outcome and score before qualification." },
+        "follow_up": { "zh-CN": "先打开线索档案记录一次真实互动，再决定资格状态。", "en": "Record a real interaction before deciding qualification." }
+      },
+      "summaryFields": [
+        {
+          "field": "crm_lead_status",
+          "label": { "zh-CN": "当前阶段", "en": "Current Stage" },
+          "valueMap": {
+            "new": { "zh-CN": "新建", "en": "New" },
+            "contacted": { "zh-CN": "已联系", "en": "Contacted" },
+            "qualified": { "zh-CN": "已合格", "en": "Qualified" },
+            "converted": { "zh-CN": "已转化", "en": "Converted" },
+            "lost": { "zh-CN": "已关闭", "en": "Closed" }
+          }
+        },
+        { "field": "crm_lead_score", "label": { "zh-CN": "线索评分", "en": "Lead Score" } },
+        { "field": "owner_name", "label": { "zh-CN": "负责人", "en": "Owner" } },
+        { "field": "last_activity_at", "label": { "zh-CN": "最近互动", "en": "Last Activity" } }
+      ]
+    },
+    {
+      "id": "crm_lead_lifecycle_actions",
+      "blockType": "workbench-action-bar",
+      "title": { "zh-CN": "下一步动作", "en": "Next Action" },
+      "surface": "card",
+      "density": "compact",
+      "actions": [
+        {
+          "code": "contact_lead",
+          "permissionCode": "crm.lead.manage",
+          "label": { "zh-CN": "标记已联系", "en": "Mark Contacted" },
+          "variant": "secondary",
+          "visibleWhen": "state.selectedLead != null && state.selectedLead.crm_lead_status == 'new'",
+          "onClick": { "action": "command.execute", "args": { "command": "crm:contact_lead", "operationType": "update", "targetRecordPid": "${state.selectedLead.pid}", "reload": ["leadStats", "leadQueue"] } }
+        },
+        {
+          "code": "qualify_lead",
+          "permissionCode": "crm.lead.manage",
+          "label": { "zh-CN": "标记合格", "en": "Qualify Lead" },
+          "variant": "primary",
+          "visibleWhen": "state.selectedLead != null && (state.selectedLead.crm_lead_status == 'new' || state.selectedLead.crm_lead_status == 'contacted')",
+          "onClick": { "action": "command.execute", "args": { "command": "crm:qualify_lead", "operationType": "update", "targetRecordPid": "${state.selectedLead.pid}", "reload": ["leadStats", "leadQueue"] } }
+        },
+        {
+          "code": "convert_lead",
+          "permissionCode": "crm.lead.manage",
+          "label": { "zh-CN": "转化为商机", "en": "Convert to Opportunity" },
+          "variant": "primary",
+          "visibleWhen": "state.selectedLead != null && state.selectedLead.crm_lead_status == 'qualified'",
+          "confirm": { "zh-CN": "将原子创建客户、联系人、商机和客户需求。确认转化吗？", "en": "This atomically creates an account, contact, opportunity and customer request. Continue?" },
+          "resultReceipt": {
+            "title": { "zh-CN": "线索转化完成", "en": "Lead Conversion Completed" },
+            "description": { "zh-CN": "客户、联系人、商机和客户需求已经创建，可直接进入下一步。", "en": "The account, contact, opportunity, and customer request are ready." },
+            "links": [
+              { "key": "account", "label": { "zh-CN": "打开客户", "en": "Open Account" }, "resultField": "accountId", "to": "/p/crm_account_common/view/${value}" },
+              { "key": "contact", "label": { "zh-CN": "打开联系人", "en": "Open Contact" }, "resultField": "contactId", "to": "/p/crm_contact_common/view/${value}" },
+              { "key": "opportunity", "label": { "zh-CN": "打开商机", "en": "Open Opportunity" }, "resultField": "opportunityId", "to": "/p/crm_opportunity_common/view/${value}" },
+              { "key": "request", "label": { "zh-CN": "打开客户需求", "en": "Open Customer Request" }, "resultField": "customerRequestId", "to": "/p/crm_customer_request_common/view/${value}" }
+            ]
+          },
+          "onClick": {
+            "action": "command.execute",
+            "args": {
+              "command": "crm:convert_lead",
+              "operationType": "update",
+              "targetRecordPid": "${state.selectedLead.pid}",
+              "reload": ["leadStats", "leadQueue"],
+              "feedback": {
+                "successMessage": { "zh-CN": "线索已完成原子转化", "en": "Lead conversion completed" },
+                "errorMessage": { "zh-CN": "线索转化失败，未写入部分结果", "en": "Lead conversion failed without partial writes" }
+              }
+            }
+          }
+        },
+        {
+          "code": "lose_lead",
+          "permissionCode": "crm.lead.manage",
+          "label": { "zh-CN": "关闭线索", "en": "Close Lead" },
+          "variant": "danger",
+          "visibleWhen": "state.selectedLead != null && (state.selectedLead.crm_lead_status == 'new' || state.selectedLead.crm_lead_status == 'contacted' || state.selectedLead.crm_lead_status == 'qualified')",
+          "confirm": { "zh-CN": "关闭后该线索将退出待推进队列。确认继续吗？", "en": "The lead will leave the actionable queue. Continue?" },
+          "onClick": { "action": "command.execute", "args": { "command": "crm:lose_lead", "operationType": "update", "targetRecordPid": "${state.selectedLead.pid}", "reload": ["leadStats", "leadQueue"] } }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_context",
+      "blockType": "evidence-panel",
+      "context": "${state.selectedLead}",
+      "title": { "zh-CN": "线索决策上下文", "en": "Lead Decision Context" },
+      "sections": [
+        { "key": "code", "label": { "zh-CN": "线索编号", "en": "Lead Code" }, "field": "crm_lead_code" },
+        {
+          "key": "source",
+          "label": { "zh-CN": "来源", "en": "Source" },
+          "field": "crm_lead_source",
+          "valueMap": {
+            "website": { "zh-CN": "官网", "en": "Website" },
+            "referral": { "zh-CN": "客户转介绍", "en": "Referral" },
+            "exhibition": { "zh-CN": "展会", "en": "Exhibition" },
+            "phone": { "zh-CN": "电话", "en": "Phone" },
+            "email": { "zh-CN": "邮件", "en": "Email" },
+            "other": { "zh-CN": "其他", "en": "Other" }
+          }
+        },
+        { "key": "industry", "label": { "zh-CN": "行业", "en": "Industry" }, "field": "crm_lead_industry" },
+        { "key": "owner", "label": { "zh-CN": "负责人", "en": "Owner" }, "field": "owner_name" },
+        { "key": "activity", "label": { "zh-CN": "最近互动", "en": "Last Activity" }, "field": "last_activity_at" },
+        {
+          "key": "next",
+          "label": { "zh-CN": "建议动作", "en": "Next Action" },
+          "field": "next_action",
+          "valueMap": {
+            "assign_owner": { "zh-CN": "分配负责人", "en": "Assign owner" },
+            "convert": { "zh-CN": "转化商机", "en": "Convert" },
+            "qualify": { "zh-CN": "资格确认", "en": "Qualify" },
+            "follow_up": { "zh-CN": "立即跟进", "en": "Follow up" },
+            "continue_nurture": { "zh-CN": "继续培育", "en": "Continue nurture" }
+          }
+        }
+      ],
+      "empty": { "title": { "zh-CN": "选择一条线索，查看资格、跟进和转化上下文", "en": "Select a lead to review qualification, follow-up and conversion context" } }
+    }
+  ]
+}

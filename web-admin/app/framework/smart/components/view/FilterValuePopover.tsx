@@ -30,6 +30,8 @@ export interface FilterValuePopoverProps {
   fieldType: string;
   dictCode?: string;
   referenceModelCode?: string;
+  referenceValueField?: string;
+  referenceDisplayField?: string;
   token?: string;
   operator: string;
   value: unknown;
@@ -41,44 +43,114 @@ export interface FilterValuePopoverProps {
 // Operator definitions per field type
 // ---------------------------------------------------------------------------
 
-type OperatorDef = { value: ViewFilterConfig['operator']; labelKey: string; fallbackZh: string; fallbackEn: string };
+type OperatorDef = {
+  value: ViewFilterConfig['operator'];
+  labelKey: string;
+  fallbackZh: string;
+  fallbackEn: string;
+};
 
 const TEXT_OPS: OperatorDef[] = [
   { value: 'eq', labelKey: 'filter.operator.eq', fallbackZh: '等于', fallbackEn: 'Equals' },
   { value: 'ne', labelKey: 'filter.operator.ne', fallbackZh: '不等于', fallbackEn: 'Not equals' },
   { value: 'like', labelKey: 'filter.operator.like', fallbackZh: '包含', fallbackEn: 'Contains' },
-  { value: 'isNull', labelKey: 'filter.operator.isNull', fallbackZh: '为空', fallbackEn: 'Is empty' },
-  { value: 'isNotNull', labelKey: 'filter.operator.isNotNull', fallbackZh: '不为空', fallbackEn: 'Is not empty' },
+  {
+    value: 'isNull',
+    labelKey: 'filter.operator.isNull',
+    fallbackZh: '为空',
+    fallbackEn: 'Is empty',
+  },
+  {
+    value: 'isNotNull',
+    labelKey: 'filter.operator.isNotNull',
+    fallbackZh: '不为空',
+    fallbackEn: 'Is not empty',
+  },
 ];
 
 const NUMBER_OPS: OperatorDef[] = [
   { value: 'eq', labelKey: 'filter.operator.eq', fallbackZh: '等于', fallbackEn: 'Equals' },
   { value: 'ne', labelKey: 'filter.operator.ne', fallbackZh: '不等于', fallbackEn: 'Not equals' },
   { value: 'gt', labelKey: 'filter.operator.gt', fallbackZh: '大于', fallbackEn: 'Greater than' },
-  { value: 'gte', labelKey: 'filter.operator.gte', fallbackZh: '大于等于', fallbackEn: 'Greater or equal' },
+  {
+    value: 'gte',
+    labelKey: 'filter.operator.gte',
+    fallbackZh: '大于等于',
+    fallbackEn: 'Greater or equal',
+  },
   { value: 'lt', labelKey: 'filter.operator.lt', fallbackZh: '小于', fallbackEn: 'Less than' },
-  { value: 'lte', labelKey: 'filter.operator.lte', fallbackZh: '小于等于', fallbackEn: 'Less or equal' },
-  { value: 'isNull', labelKey: 'filter.operator.isNull', fallbackZh: '为空', fallbackEn: 'Is empty' },
-  { value: 'isNotNull', labelKey: 'filter.operator.isNotNull', fallbackZh: '不为空', fallbackEn: 'Is not empty' },
+  {
+    value: 'lte',
+    labelKey: 'filter.operator.lte',
+    fallbackZh: '小于等于',
+    fallbackEn: 'Less or equal',
+  },
+  {
+    value: 'isNull',
+    labelKey: 'filter.operator.isNull',
+    fallbackZh: '为空',
+    fallbackEn: 'Is empty',
+  },
+  {
+    value: 'isNotNull',
+    labelKey: 'filter.operator.isNotNull',
+    fallbackZh: '不为空',
+    fallbackEn: 'Is not empty',
+  },
 ];
 
 const DATE_OPS: OperatorDef[] = [
   { value: 'eq', labelKey: 'filter.operator.eq', fallbackZh: '等于', fallbackEn: 'Equals' },
   { value: 'gt', labelKey: 'filter.operator.after', fallbackZh: '晚于', fallbackEn: 'After' },
-  { value: 'gte', labelKey: 'filter.operator.onOrAfter', fallbackZh: '不早于', fallbackEn: 'On or after' },
+  {
+    value: 'gte',
+    labelKey: 'filter.operator.onOrAfter',
+    fallbackZh: '不早于',
+    fallbackEn: 'On or after',
+  },
   { value: 'lt', labelKey: 'filter.operator.before', fallbackZh: '早于', fallbackEn: 'Before' },
-  { value: 'lte', labelKey: 'filter.operator.onOrBefore', fallbackZh: '不晚于', fallbackEn: 'On or before' },
-  { value: 'between', labelKey: 'filter.operator.between', fallbackZh: '介于', fallbackEn: 'Between' },
-  { value: 'isNull', labelKey: 'filter.operator.isNull', fallbackZh: '为空', fallbackEn: 'Is empty' },
-  { value: 'isNotNull', labelKey: 'filter.operator.isNotNull', fallbackZh: '不为空', fallbackEn: 'Is not empty' },
+  {
+    value: 'lte',
+    labelKey: 'filter.operator.onOrBefore',
+    fallbackZh: '不晚于',
+    fallbackEn: 'On or before',
+  },
+  {
+    value: 'between',
+    labelKey: 'filter.operator.between',
+    fallbackZh: '介于',
+    fallbackEn: 'Between',
+  },
+  {
+    value: 'isNull',
+    labelKey: 'filter.operator.isNull',
+    fallbackZh: '为空',
+    fallbackEn: 'Is empty',
+  },
+  {
+    value: 'isNotNull',
+    labelKey: 'filter.operator.isNotNull',
+    fallbackZh: '不为空',
+    fallbackEn: 'Is not empty',
+  },
 ];
 
 const ENUM_OPS: OperatorDef[] = [
   { value: 'eq', labelKey: 'filter.operator.eq', fallbackZh: '等于', fallbackEn: 'Equals' },
   { value: 'ne', labelKey: 'filter.operator.ne', fallbackZh: '不等于', fallbackEn: 'Not equals' },
   { value: 'in', labelKey: 'filter.operator.in', fallbackZh: '属于', fallbackEn: 'In' },
-  { value: 'isNull', labelKey: 'filter.operator.isNull', fallbackZh: '为空', fallbackEn: 'Is empty' },
-  { value: 'isNotNull', labelKey: 'filter.operator.isNotNull', fallbackZh: '不为空', fallbackEn: 'Is not empty' },
+  {
+    value: 'isNull',
+    labelKey: 'filter.operator.isNull',
+    fallbackZh: '为空',
+    fallbackEn: 'Is empty',
+  },
+  {
+    value: 'isNotNull',
+    labelKey: 'filter.operator.isNotNull',
+    fallbackZh: '不为空',
+    fallbackEn: 'Is not empty',
+  },
 ];
 
 const BOOLEAN_OPS: OperatorDef[] = [
@@ -134,6 +206,8 @@ export function FilterValuePopover({
   fieldType,
   dictCode,
   referenceModelCode,
+  referenceValueField = 'pid',
+  referenceDisplayField,
   operator: initialOperator,
   value: initialValue,
   onApply,
@@ -144,6 +218,7 @@ export function FilterValuePopover({
   const [value, setValue] = useState<unknown>(initialValue);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dictOptions, setDictOptions] = useState<DictOption[]>([]);
+  const [referenceOptions, setReferenceOptions] = useState<DictOption[]>([]);
   const zh = locale === 'zh-CN' || locale.startsWith('zh');
   const l = (key: string, zhFallback: string, enFallback: string) =>
     t(key, undefined, zh ? zhFallback : enFallback);
@@ -166,6 +241,48 @@ export function FilterValuePopover({
       cancelled = true;
     };
   }, [dictCode, open]);
+
+  // Resolve reference values to real selectable record identifiers. A free-text
+  // label is not a valid equality filter for reference columns.
+  useEffect(() => {
+    if (!referenceModelCode || !open) return;
+    let cancelled = false;
+    (async () => {
+      const isUser = referenceModelCode === 'sys_user';
+      const result = await fetchResult<any>(
+        isUser
+          ? '/api/admin/users/search'
+          : `/api/dynamic/${encodeURIComponent(referenceModelCode)}/list`,
+        {
+          method: 'get',
+          params: isUser ? { keyword: '', size: 200 } : { pageNum: 1, pageSize: 200 },
+          token: undefined,
+        },
+      );
+      if (cancelled || !ResultHelper.isSuccess(result) || !result.data) return;
+      const rows = Array.isArray(result.data)
+        ? result.data
+        : result.data.records || result.data.content || [];
+      const options = rows
+        .map((row: Record<string, unknown>) => {
+          const rawValue = row[referenceValueField] ?? row.pid;
+          const rawLabel =
+            (referenceDisplayField ? row[referenceDisplayField] : undefined) ??
+            row.displayName ??
+            row.name ??
+            row.title ??
+            row.label ??
+            rawValue;
+          if (rawValue == null || rawLabel == null) return null;
+          return { value: String(rawValue), label: String(rawLabel) };
+        })
+        .filter((option: DictOption | null): option is DictOption => option !== null);
+      setReferenceOptions(options);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, referenceDisplayField, referenceModelCode, referenceValueField]);
 
   // Sync from props when popover opens
   useEffect(() => {
@@ -225,6 +342,7 @@ export function FilterValuePopover({
       return (
         <input
           type="number"
+          data-testid="filter-value-input"
           className="border-border bg-panel text-text placeholder:text-text-3 focus:border-accent w-full rounded border px-2 py-1.5 text-sm outline-none"
           placeholder={l('filter.value.placeholder', '请输入筛选值', 'Enter value...')}
           value={value != null ? String(value) : ''}
@@ -302,6 +420,7 @@ export function FilterValuePopover({
     if ((ft === 'ENUM' || ft === 'DICT') && dictOptions.length > 0 && operator !== 'in') {
       return (
         <select
+          data-testid="filter-value-input"
           className="border-border bg-panel text-text focus:border-accent w-full rounded border px-2 py-1.5 text-sm outline-none"
           value={value != null ? String(value) : ''}
           onChange={(e) => setValue(e.target.value || null)}
@@ -316,16 +435,21 @@ export function FilterValuePopover({
       );
     }
 
-    // Reference / User — text search input
+    // Reference / User — select a real record id while displaying its label.
     if ((ft === 'REFERENCE' || ft === 'USER') && referenceModelCode) {
       return (
-        <input
-          type="text"
-          placeholder={l('filter.reference.placeholder', '按名称或 ID 搜索', 'Search by name or ID...')}
+        <select
           className="border-border bg-panel text-text placeholder:text-text-3 focus:border-accent w-full rounded border px-2 py-1.5 text-sm outline-none"
           value={value != null ? String(value) : ''}
           onChange={(e) => setValue(e.target.value || null)}
-        />
+        >
+          <option value="">{l('common.select_placeholder', '请选择', '-- Select --')}</option>
+          {referenceOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       );
     }
 
@@ -344,6 +468,7 @@ export function FilterValuePopover({
   const content = (
     <div
       ref={containerRef}
+      data-testid="filter-value-popover"
       className="border-border bg-panel shadow-pop fixed z-[9999] min-w-[260px] rounded-lg border p-3"
       style={{ left: anchorEl.x, top: anchorEl.y }}
     >
@@ -351,6 +476,7 @@ export function FilterValuePopover({
       <div className="mb-2 flex items-center gap-2">
         <span className="text-text flex-shrink-0 text-sm font-medium">{fieldLabel}</span>
         <select
+          data-testid="filter-operator-select"
           className="border-border bg-panel text-text focus:border-accent flex-1 rounded border px-2 py-1 text-sm outline-none"
           value={operator}
           onChange={(e) => {
@@ -381,6 +507,7 @@ export function FilterValuePopover({
         </button>
         <button
           type="button"
+          data-testid="filter-apply"
           className="bg-accent hover:bg-accent-hover disabled:bg-disabled disabled:text-text-3 rounded px-3 py-1 text-sm text-white disabled:cursor-not-allowed"
           disabled={!canApply}
           onClick={() => {

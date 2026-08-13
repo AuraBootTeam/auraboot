@@ -5,6 +5,7 @@ import com.auraboot.framework.bi.dto.ReportExportFile;
 import com.auraboot.framework.bi.dto.ReportExportRequest;
 import com.auraboot.framework.bi.service.ReportStorageService;
 import com.auraboot.framework.bi.service.impl.ReportExportServiceImpl;
+import com.auraboot.framework.branding.BrandingIdentity;
 import com.auraboot.framework.bi.service.impl.ReportRenderClient;
 import com.auraboot.framework.bi.service.impl.ReportRenderProperties;
 import com.auraboot.framework.meta.entity.PageSchema;
@@ -91,7 +92,7 @@ class ReportExportServiceLiveIT {
 
     @Test
     @EnabledIf("rendererAvailable")
-    void exportPdf_throughRealRenderer_producesWysiwygPdf() throws Exception {
+    void exportPdfThroughRealRendererProducesWysiwygPdf() throws Exception {
         ReportRenderProperties props = new ReportRenderProperties();
         props.setEnabled(true);
         props.setCommand(List.of(tsx().toString(), cli().toString()));
@@ -100,7 +101,7 @@ class ReportExportServiceLiveIT {
 
         ReportExportServiceImpl service = new ReportExportServiceImpl(
                 pageSchemaMapper, new ObjectMapper(), dynamicDataService, namedQueryService,
-                reportStorageService, auditTrailService, client);
+                reportStorageService, auditTrailService, client, BrandingIdentity::community);
         MetaContext.setContext(7L, 99L, "user-pid", "tester");
 
         PageSchema page = new PageSchema();

@@ -7,7 +7,9 @@ import {
   readDataSourceRecord,
   readDataSourceState,
   readPath,
+  resolveRuntimeValue,
   useDataSourceSubscription,
+  useRuntimeStateSubscription,
 } from './workbenchBlockUtils';
 
 export interface StatusBannerBlockRendererProps {
@@ -78,6 +80,20 @@ function formatSummaryValue(
 
   const precision = Number(field?.precision);
   const numericValue = typeof value === 'number' ? value : Number(String(value).trim());
+  if (
+    (field?.valueType === 'currency' || field?.format === 'currency') &&
+    Number.isFinite(numericValue)
+  ) {
+    const fractionDigits = Number.isInteger(precision) && precision >= 0 && precision <= 20
+      ? precision
+      : 2;
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: String(field?.currencyCode || 'CNY').toUpperCase(),
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    }).format(numericValue);
+  }
   if (
     Number.isInteger(precision) &&
     precision >= 0 &&
@@ -181,9 +197,12 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
   const t = context.t || ((key: string) => key);
   const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
 
+  useRuntimeStateSubscription(runtime);
   useDataSourceSubscription(runtime, dataSourceId);
   const dataSourceState = readDataSourceState(runtime, dataSourceId);
-  const record = readDataSourceRecord(runtime, dataSourceId);
+  const record =
+    resolveRuntimeValue(runtime, (block as any).context) ||
+    readDataSourceRecord(runtime, dataSourceId);
 
   const statusField = String((block as any).statusField || 'status');
   const errorField = String((block as any).errorField || 'errorMessage');

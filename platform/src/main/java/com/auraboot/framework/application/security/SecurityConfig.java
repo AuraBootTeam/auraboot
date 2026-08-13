@@ -43,6 +43,9 @@ public class SecurityConfig {
     @Autowired
     private ScopeRestrictionFilter scopeRestrictionFilter;
 
+    @Autowired
+    private ExternalApiKeyAuthenticationFilter externalApiKeyAuthenticationFilter;
+
     /** CORS rules for public key-authenticated endpoints owned by other modules. */
     @Autowired(required = false)
     private List<PublicCorsContributor> publicCorsContributors;
@@ -110,7 +113,8 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(scopeRestrictionFilter, JwtAuthenticationFilter.class);
+                .addFilterBefore(scopeRestrictionFilter, JwtAuthenticationFilter.class)
+                .addFilterBefore(externalApiKeyAuthenticationFilter, ScopeRestrictionFilter.class);
 
         // Test-only: honor X-Test-Spoof-User-Id AFTER JwtAuthenticationFilter
         // populates MetaContext. Bean is only present when the "test" profile
@@ -167,6 +171,7 @@ public class SecurityConfig {
             "Authorization",
             "Content-Type",
             "X-Requested-With",
+            "X-Aura-API-Key",
             "Accept",
             "Origin",
             "X-Tenant-Id",

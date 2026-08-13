@@ -10,6 +10,7 @@ import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.permission.engine.model.PermissionResult;
 import com.auraboot.framework.permission.service.PermissionFacade;
+import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Decides, at the boundary, whether the caller may act on the record they NAMED in the request.
@@ -56,6 +58,7 @@ public class CommandTargetScopePhase implements CommandPhase {
     private final DynamicDataService dynamicDataService;
     private final ApplicationContext applicationContext;
     private final PlatformTransactionManager transactionManager;
+    private final ExtensionRegistry extensionRegistry;
 
     @Override
     public String name() {
@@ -67,7 +70,33 @@ public class CommandTargetScopePhase implements CommandPhase {
         CommandDefinition command = ctx.getCommand();
         return command == null
                 || !StringUtils.hasText(command.getModelCode())
-                || !StringUtils.hasText(ctx.getRequest().getTargetRecordId());
+                || !StringUtils.hasText(ctx.getRequest().getTargetRecordId())
+                || isHandlerManagedTarget(ctx);
+    }
+
+    private boolean isHandlerManagedTarget(CommandPipelineContext ctx) {
+        String handlerCode = resolveHandlerCode(ctx);
+        return Optional.ofNullable(extensionRegistry)
+                .flatMap(registry -> registry.getCommandHandler(handlerCode))
+                .map(handler -> {
+                    boolean requiresPersistence = handler.requiresDslPersistence(
+                            handlerCode, ctx.getExecConfig(), ctx.getRequest());
+                    ctx.setHasPluginHandler(true);
+                    ctx.setPluginRequiresDslPersistence(requiresPersistence);
+                    return !requiresPersistence;
+                })
+                .orElse(false);
+    }
+
+    private String resolveHandlerCode(CommandPipelineContext ctx) {
+        Map<String, Object> config = ctx.getExecConfig();
+        if (config != null) {
+            Object handler = config.get("handler");
+            if (handler instanceof String handlerCode && StringUtils.hasText(handlerCode)) {
+                return handlerCode.trim();
+            }
+        }
+        return ctx.getCommandCode();
     }
 
     @Override

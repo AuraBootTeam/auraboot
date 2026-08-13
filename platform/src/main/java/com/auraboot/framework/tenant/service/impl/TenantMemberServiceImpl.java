@@ -120,21 +120,15 @@ public class TenantMemberServiceImpl extends ServiceImpl<TenantMemberMapper, Ten
     public Page<TenantMember> findMembers(int pageNum, int pageSize, Long tenantId,
                                           String keyword, String memberType, String status) {
         Page<TenantMember> page = new Page<>(pageNum, pageSize);
-        QueryWrapper<TenantMember> queryWrapper = new QueryWrapper<>();
-        // ab_tenant_member is in ignoreTable list, so TenantLineInterceptor does NOT auto-add tenant_id.
-        // We must filter by tenant_id explicitly.
-        queryWrapper.eq("tenant_id", tenantId);
-
-        // keyword search is not supported on tenant member directly (fields like position/department
-        // were removed from the schema). Callers should filter by user email at the application layer.
-
-        if (StringUtils.hasText(status)) {
-            queryWrapper.eq("status", status);
-        }
-
-        queryWrapper.orderByDesc("created_at");
-
-        return page(page, queryWrapper);
+        // ab_tenant_member is excluded from the automatic tenant interceptor, so the mapper query
+        // carries an explicit tenant predicate. It joins ab_user only for safe name/email keyword
+        // matching; the response projection still hides internal IDs.
+        return tenantMemberMapper.searchMembersPage(
+                page,
+                tenantId,
+                StringUtils.hasText(keyword) ? keyword.trim() : null,
+                StringUtils.hasText(memberType) ? memberType.trim().toLowerCase(Locale.ROOT) : null,
+                StringUtils.hasText(status) ? status.trim().toLowerCase(Locale.ROOT) : null);
     }
 
 //    @Override

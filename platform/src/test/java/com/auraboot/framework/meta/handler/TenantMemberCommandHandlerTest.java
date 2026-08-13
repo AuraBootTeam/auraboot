@@ -90,14 +90,15 @@ class TenantMemberCommandHandlerTest {
     @Test
     void execute_suspendMember_withReason_returnsCorrectStatus() {
         CommandHandlerContext ctx = buildContext("admin:suspend_member", "mbr-004", 100L,
-                Map.of("reason", "Policy violation"));
+                Map.of("reason", "Policy violation", "targetMemberPid", "mbr-target"));
 
         Map<String, Object> result = handler.execute(ctx);
 
         assertThat(result.get("action")).isEqualTo("suspend");
         assertThat(result.get("newStatus")).isEqualTo("suspended");
         assertThat(result.get("reason")).isEqualTo("Policy violation");
-        verify(tenantMemberApplicationService).updateMemberStatus("mbr-004", "suspended", "Policy violation", 100L);
+        verify(tenantMemberApplicationService).updateMemberStatus(
+                "mbr-004", "suspended", "Policy violation", "mbr-target", 100L);
     }
 
     // =========================================================
@@ -121,13 +122,15 @@ class TenantMemberCommandHandlerTest {
 
     @Test
     void execute_leaveMember_setsInactive() {
-        CommandHandlerContext ctx = buildContext("admin:leave_member", "mbr-006", 100L, null);
+        CommandHandlerContext ctx = buildContext("admin:leave_member", "mbr-006", 100L,
+                Map.of("targetMemberPid", "mbr-target"));
 
         Map<String, Object> result = handler.execute(ctx);
 
         assertThat(result.get("action")).isEqualTo("leave");
         assertThat(result.get("newStatus")).isEqualTo("inactive");
-        verify(tenantMemberApplicationService).updateMemberStatus("mbr-006", "inactive", null, 100L);
+        verify(tenantMemberApplicationService).updateMemberStatus(
+                "mbr-006", "inactive", null, "mbr-target", 100L);
     }
 
     // =========================================================
@@ -136,13 +139,14 @@ class TenantMemberCommandHandlerTest {
 
     @Test
     void execute_deleteMember_callsRemoveAndSetsRemoved() {
-        CommandHandlerContext ctx = buildContext("admin:delete_member", "mbr-007", 100L, null);
+        CommandHandlerContext ctx = buildContext("admin:delete_member", "mbr-007", 100L,
+                Map.of("targetMemberPid", "mbr-target"));
 
         Map<String, Object> result = handler.execute(ctx);
 
         assertThat(result.get("action")).isEqualTo("delete");
         assertThat(result.get("removed")).isEqualTo(true);
-        verify(tenantMemberApplicationService).removeMember("mbr-007", 100L);
+        verify(tenantMemberApplicationService).removeMember("mbr-007", "mbr-target", 100L);
     }
 
     @Test

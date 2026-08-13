@@ -10,9 +10,11 @@ import {
   MoonIcon,
   ComputerDesktopIcon,
   GlobeAltIcon,
+  InformationCircleIcon,
   SparklesIcon,
 } from '@heroicons/react/24/outline';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData } from '~/root-data';
+import { COMMUNITY_BRANDING } from '~/config/branding';
 import { useTheme } from '~/contexts/ThemeContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { useSmartText } from '~/utils/i18n';
@@ -43,6 +45,8 @@ export default function Header({
   const { state: aiState, togglePanel: toggleAI } = useAuraBot();
   const rootData = useRootLoaderData();
   const user = rootData?.user ?? null;
+  const branding = rootData?.branding ?? COMMUNITY_BRANDING;
+  const hasMenus = (rootData?.menus?.length ?? 0) > 0;
   const { theme, setTheme, isDark } = useTheme();
   const { t, locale, setLocale } = useI18n();
   const st = useSmartText();
@@ -51,7 +55,9 @@ export default function Header({
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
-  const [spaces, setSpaces] = useState<Array<{ tenantId: string; tenantName: string; tenantDisplayName: string; spaceType: string }>>([]);
+  const [spaces, setSpaces] = useState<
+    Array<{ tenantId: string; tenantName: string; tenantDisplayName: string; spaceType: string }>
+  >([]);
   // Hydration marker (same pattern as Login.tsx): the SSR header renders the
   // avatar long before React attaches its click handlers, so E2E must be able
   // to wait for interactivity instead of clicking a dead button.
@@ -64,6 +70,11 @@ export default function Header({
 
   const workspaceLabel = st('$i18n:header.workspaces', 'Workspaces');
   const platformConsoleLabel = st('$i18n:header.platform_console', 'Platform Console');
+  const aboutLabel = t(
+    'about.menuLabel',
+    { productName: branding.productName },
+    locale === 'zh-CN' ? `关于 ${branding.productName}` : `About ${branding.productName}`,
+  );
   const sidebarToggleLabel = sidebarOpen
     ? t('sidebar.closeMenu', undefined, 'Close navigation menu')
     : t('sidebar.openMenu', undefined, 'Open navigation menu');
@@ -92,7 +103,9 @@ export default function Header({
     if (!user || simplified) return;
     fetch('/api/tenant-selection/my-spaces')
       .then((res) => (res.ok ? res.json() : null))
-      .then((result) => { if (result?.data) setSpaces(result.data); })
+      .then((result) => {
+        if (result?.data) setSpaces(result.data);
+      })
       .catch(() => {});
   }, [user, simplified]);
 
@@ -173,10 +186,10 @@ export default function Header({
       data-print="hide"
       data-hydrated={hydrated ? 'true' : 'false'}
     >
-      <div className="flex h-14 items-center justify-between bg-gradient-to-r from-white/50 to-gray-50/50 px-4 sm:px-6 lg:px-8 dark:from-gray-800/50 dark:to-gray-900/50">
+      <div className="flex h-14 items-center justify-between bg-gradient-to-r from-white/50 to-gray-50/50 px-2 sm:px-6 lg:px-8 dark:from-gray-800/50 dark:to-gray-900/50">
         {/* Left: logo and menu button */}
-        <div className="flex items-center">
-          {showSidebar && (
+        <div className="flex min-w-0 items-center">
+          {showSidebar && hasMenus && (
             <button
               type="button"
               aria-controls="app-sidebar"
@@ -190,13 +203,22 @@ export default function Header({
             </button>
           )}
 
-          <Link to="/" className="ms-4 flex items-center lg:ms-0">
-            <img className="h-8 w-8 rounded-lg" src="/android-chrome-192x192.png" alt="AuraBoot" />
-            <span className="ms-3 text-xl font-bold text-gray-900 dark:text-white">AuraBoot</span>
+          <Link to="/" className="ms-2 flex shrink-0 items-center sm:ms-4 lg:ms-0">
+            <img
+              className="h-7 w-7 rounded-lg sm:h-8 sm:w-8"
+              src={branding.logoUrl}
+              alt={branding.productName}
+            />
+            <span
+              data-testid="header-brand-name"
+              className="ms-3 hidden text-xl font-bold text-gray-900 xl:inline dark:text-white"
+            >
+              {branding.productName}
+            </span>
             {envChipLabel && (
               <span
                 data-testid="header-env-chip"
-                className="ml-2 px-1.5 py-0.5 text-[11px] font-medium text-gray-500 bg-[#f6f9fc] rounded dark:bg-gray-700 dark:text-gray-300"
+                className="ml-2 hidden rounded bg-[#f6f9fc] px-1.5 py-0.5 text-[11px] font-medium text-gray-500 xl:inline-flex dark:bg-gray-700 dark:text-gray-300"
               >
                 {envChipLabel}
               </span>
@@ -205,7 +227,7 @@ export default function Header({
 
           {/* Current tenant name — hidden when env chip already encodes it (avoids "AuraBoot [Dev] · AuraBoot Dev") */}
           {!simplified && user?.tenantName && !tenantDuplicatesChip && (
-            <span className="ms-3 hidden items-center text-sm text-gray-400 sm:flex dark:text-gray-500">
+            <span className="ms-3 hidden items-center text-sm text-gray-400 2xl:flex dark:text-gray-500">
               <span className="mx-2">·</span>
               <span data-testid="current-tenant-name">{user.tenantName}</span>
             </span>
@@ -213,7 +235,7 @@ export default function Header({
         </div>
 
         {/* Right: toolbar */}
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           {/* Global search Cmd+K */}
           {!simplified && <CommandPalette />}
 
@@ -222,7 +244,7 @@ export default function Header({
             <button
               onClick={toggleAI}
               data-testid="ai-panel-toggle"
-              className={`flex w-8 h-8 items-center justify-center rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-md ${
+              className={`hidden h-8 w-8 items-center justify-center rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-md sm:flex ${
                 aiState.panelState === 'expanded'
                   ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
                   : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
@@ -241,10 +263,14 @@ export default function Header({
 
           {/* Language switch — only shown in non-compact mode */}
           {!simplified && showLanguageSwitch && (
-            <div className="relative" ref={langDropdownRef} data-testid="lang-toggle">
+            <div
+              className="relative hidden sm:block"
+              ref={langDropdownRef}
+              data-testid="lang-toggle"
+            >
               <button
                 onClick={() => setShowLangDropdown(!showLangDropdown)}
-                className="flex w-8 h-8 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                className="flex h-8 w-8 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
               >
                 <GlobeAltIcon className="h-5 w-5" />
               </button>
@@ -277,10 +303,14 @@ export default function Header({
           )}
 
           {/* Theme switch */}
-          <div className="relative" ref={themeDropdownRef} data-testid="theme-toggle">
+          <div
+            className="relative hidden sm:block"
+            ref={themeDropdownRef}
+            data-testid="theme-toggle"
+          >
             <button
               onClick={() => setShowThemeDropdown(!showThemeDropdown)}
-              className="flex w-8 h-8 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              className="flex h-8 w-8 items-center justify-center rounded-xl text-gray-500 transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
             >
               {isHydrated && isDark ? (
                 <MoonIcon className="h-6 w-6" />
@@ -319,12 +349,7 @@ export default function Header({
           </div>
 
           {/* Divider */}
-          {user && (
-            <span
-              className="mx-1.5 w-px h-5 bg-[#e3e8ee] dark:bg-gray-700"
-              aria-hidden
-            />
-          )}
+          {user && <span className="mx-1.5 h-5 w-px bg-[#e3e8ee] dark:bg-gray-700" aria-hidden />}
 
           {/* User menu */}
           {user ? (
@@ -334,7 +359,7 @@ export default function Header({
                 className="flex items-center rounded-full ring-2 ring-transparent transition-all duration-200 hover:scale-105 hover:bg-gray-100 hover:shadow-md hover:ring-gray-200 dark:hover:bg-gray-700 dark:hover:ring-gray-600"
               >
                 <img
-                  className="w-[30px] h-[30px] rounded-full object-cover shadow-sm border border-[#e3e8ee] dark:border-gray-700"
+                  className="h-[30px] w-[30px] rounded-full border border-[#e3e8ee] object-cover shadow-sm dark:border-gray-700"
                   src="/avatar.jpeg"
                   alt="User avatar"
                 />
@@ -356,64 +381,80 @@ export default function Header({
                   </div>
 
                   {/* Tenant list */}
-                  {spaces.filter(s => s.spaceType === 'business').length > 0 && (
+                  {spaces.filter((s) => s.spaceType === 'business').length > 0 && (
                     <div className="border-b border-gray-200 py-1 dark:border-gray-700">
-                      <p className="px-4 py-1 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                      <p className="px-4 py-1 text-xs font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
                         {workspaceLabel}
                       </p>
-                      {spaces.filter(s => s.spaceType === 'business').map((space) => {
-                        const isCurrent = String(user.tenantId) === String(space.tenantId);
-                        return (
-                          <button
-                            key={space.tenantId}
-                            data-testid={`tenant-switch-${space.tenantId}`}
-                            onClick={() => {
-                              if (isCurrent) return;
-                              setShowUserDropdown(false);
-                              const form = document.createElement('form');
-                              form.method = 'POST';
-                              form.action = '/_action/switch-space';
-                              const tid = document.createElement('input');
-                              tid.type = 'hidden'; tid.name = 'tenantId'; tid.value = space.tenantId;
-                              form.appendChild(tid);
-                              const redir = document.createElement('input');
-                              redir.type = 'hidden'; redir.name = 'redirectTo'; redir.value = '/';
-                              form.appendChild(redir);
-                              document.body.appendChild(form);
-                              form.submit();
-                            }}
-                            className={`flex w-full items-center gap-3 px-4 py-2 text-sm transition-colors ${
-                              isCurrent
-                                ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                                : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
-                            }`}
-                          >
-                            <BuildingOffice2Icon className={`h-4 w-4 flex-shrink-0 ${isCurrent ? 'text-blue-500' : 'text-gray-400'}`} />
-                            <span className="truncate">{space.tenantDisplayName || space.tenantName}</span>
-                            {isCurrent && <span className="ms-auto text-xs text-blue-500">&#10003;</span>}
-                          </button>
-                        );
-                      })}
+                      {spaces
+                        .filter((s) => s.spaceType === 'business')
+                        .map((space) => {
+                          const isCurrent = String(user.tenantId) === String(space.tenantId);
+                          return (
+                            <button
+                              key={space.tenantId}
+                              data-testid={`tenant-switch-${space.tenantId}`}
+                              onClick={() => {
+                                if (isCurrent) return;
+                                setShowUserDropdown(false);
+                                const form = document.createElement('form');
+                                form.method = 'POST';
+                                form.action = '/_action/switch-space';
+                                const tid = document.createElement('input');
+                                tid.type = 'hidden';
+                                tid.name = 'tenantId';
+                                tid.value = space.tenantId;
+                                form.appendChild(tid);
+                                const redir = document.createElement('input');
+                                redir.type = 'hidden';
+                                redir.name = 'redirectTo';
+                                redir.value = '/';
+                                form.appendChild(redir);
+                                document.body.appendChild(form);
+                                form.submit();
+                              }}
+                              className={`flex w-full items-center gap-3 px-4 py-2 text-sm transition-colors ${
+                                isCurrent
+                                  ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
+                                  : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                              }`}
+                            >
+                              <BuildingOffice2Icon
+                                className={`h-4 w-4 flex-shrink-0 ${isCurrent ? 'text-blue-500' : 'text-gray-400'}`}
+                              />
+                              <span className="truncate">
+                                {space.tenantDisplayName || space.tenantName}
+                              </span>
+                              {isCurrent && (
+                                <span className="ms-auto text-xs text-blue-500">&#10003;</span>
+                              )}
+                            </button>
+                          );
+                        })}
                     </div>
                   )}
 
                   {/* Platform Console — only for platform_admin users */}
-                  {spaces.some(s => s.spaceType === 'platform') && (
+                  {spaces.some((s) => s.spaceType === 'platform') && (
                     <div className="border-b border-gray-200 py-1 dark:border-gray-700">
                       <button
                         data-testid="platform-console-link"
                         onClick={() => {
                           setShowUserDropdown(false);
-                          const platformSpace = spaces.find(s => s.spaceType === 'platform');
+                          const platformSpace = spaces.find((s) => s.spaceType === 'platform');
                           if (!platformSpace) return;
                           const form = document.createElement('form');
                           form.method = 'POST';
                           form.action = '/_action/switch-space';
                           const tid = document.createElement('input');
-                          tid.type = 'hidden'; tid.name = 'tenantId'; tid.value = platformSpace.tenantId;
+                          tid.type = 'hidden';
+                          tid.name = 'tenantId';
+                          tid.value = platformSpace.tenantId;
                           form.appendChild(tid);
                           const redir = document.createElement('input');
-                          redir.type = 'hidden'; redir.name = 'redirectTo'; redir.value = '/platform/plugins';
+                          redir.type = 'hidden';
+                          redir.name = 'redirectTo';
+                          redir.value = '/platform/plugins';
                           form.appendChild(redir);
                           document.body.appendChild(form);
                           form.submit();
@@ -425,6 +466,18 @@ export default function Header({
                       </button>
                     </div>
                   )}
+
+                  <div className="border-b border-gray-200 py-1 dark:border-gray-700">
+                    <Link
+                      to="/about"
+                      data-testid="about-link"
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                      onClick={() => setShowUserDropdown(false)}
+                    >
+                      <InformationCircleIcon className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                      <span>{aboutLabel}</span>
+                    </Link>
+                  </div>
 
                   {/* Logout */}
                   <Link

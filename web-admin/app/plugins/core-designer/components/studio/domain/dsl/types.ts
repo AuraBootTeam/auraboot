@@ -122,6 +122,7 @@ export type BlockType =
   | 'table'
   | 'stat-card'
   | 'metric-strip'
+  | 'stage-rail'
   | 'record-inspector'
   | 'candidate-list'
   | 'workbench-action-bar'

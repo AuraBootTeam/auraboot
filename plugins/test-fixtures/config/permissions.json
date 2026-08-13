@@ -32,6 +32,26 @@
     "module": "e2e-test-order"
   },
   {
+    "code": "model.e2et_order.import",
+    "name:zh-CN": "导入测试订单",
+    "name:en": "Import Test Orders",
+    "description": "Import test orders from validated XLSX files",
+    "resourceType": "model",
+    "module": "e2e-test-order",
+    "resourceCode": "e2et_order",
+    "action": "import"
+  },
+  {
+    "code": "model.e2et_customer.import",
+    "name:zh-CN": "导入测试客户",
+    "name:en": "Import Test Customers",
+    "description": "Import test customers from validated XLSX files",
+    "resourceType": "model",
+    "module": "e2e-test-order",
+    "resourceCode": "e2et_customer",
+    "action": "import"
+  },
+  {
     "code": "e2et.customer.manage",
     "name:zh-CN": "客户管理",
     "name:en": "Customer Management",

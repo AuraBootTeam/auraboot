@@ -34,6 +34,17 @@ export interface AssembleQuickFilterChipsInput {
   pins?: QuickFilterViewPin[];
 }
 
+function localizeViewLabel(
+  view: SavedView,
+  t: AssembleQuickFilterChipsInput['t'],
+): string {
+  const name = String(view.name ?? '');
+  if (!name.startsWith('$i18n:')) return name;
+  const key = name.slice('$i18n:'.length);
+  const localized = t(key, undefined, name);
+  return localized && localized !== key ? localized : name;
+}
+
 /**
  * Merge presets + pinned views into one ordered chip list.
  *
@@ -75,7 +86,7 @@ export function assembleQuickFilterChips(input: AssembleQuickFilterChipsInput): 
     viewChips.push({
       kind: 'view',
       viewPid: view.pid,
-      label: view.name,
+      label: localizeViewLabel(view, t),
       icon: meta?.quickFilterIcon,
       order,
     });

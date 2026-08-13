@@ -250,6 +250,54 @@ class DataScopeServiceImplTest {
         assertThat(c.deptPids()).containsExactlyInAnyOrder("dept-1", "dept-1.1");
     }
 
+    @Test
+    void resolveScopeUsesOwnerDerivedDepartmentWhenConfigured() {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope scope = new RoleDataScope();
+        scope.setScopeType("dept_and_sub");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString()))
+                .thenReturn(List.of(scope));
+        TenantMember member = new TenantMember();
+        member.setPid("member-pid");
+        when(tenantMemberMapper.selectById(5L)).thenReturn(member);
+        when(organizationService.getEmployeeByMemberPid("member-pid"))
+                .thenReturn(Map.of("org_emp_dept_id", "dept-1"));
+        when(organizationService.getDeptAndSubPids("dept-1"))
+                .thenReturn(List.of("dept-1", "dept-1.1"));
+        when(metaModelService.getModelDefinition("crm_opportunity_common"))
+                .thenReturn(Optional.of(ModelDefinition.builder().build()));
+        when(metaModelService.findByCode("crm_opportunity_common")).thenReturn(
+                MetaModelDTO.builder().extension(Map.of("dataScope", Map.of(
+                        "ownerField", "crm_opp_owner",
+                        "departmentOwnerField", "crm_opp_owner"))).build());
+        when(metaModelService.getFieldDataType("crm_opportunity_common", "crm_opp_owner"))
+                .thenReturn(DataTypeMapping.builder().javaType("String").build());
+
+        DataScopeCondition condition = service.resolveScope(5L, "crm_opportunity_common", "read");
+
+        assertThat(condition.deptField()).isEqualTo("org_emp_dept_id");
+        assertThat(condition.deptOwnerField()).isEqualTo("crm_opp_owner");
+        assertThat(condition.deptPids()).containsExactly("dept-1", "dept-1.1");
+    }
+
+    @Test
+    void ownerDepartmentMembershipFailsClosedWhenOwnerOrEmployeeLinkMissing() {
+        assertThat(service.isOwnerInDepartments(null, List.of("dept-1"))).isFalse();
+        assertThat(service.isOwnerInDepartments("user-pid", List.of())).isFalse();
+        when(organizationService.getEmployeeByUserPid("missing-user")).thenReturn(null);
+        assertThat(service.isOwnerInDepartments("missing-user", List.of("dept-1"))).isFalse();
+    }
+
+    @Test
+    void ownerDepartmentMembershipUsesAuthoritativeEmployeeDepartment() {
+        when(organizationService.getEmployeeByUserPid("user-pid"))
+                .thenReturn(Map.of("org_emp_dept_id", "dept-1.1"));
+
+        assertThat(service.isOwnerInDepartments("user-pid", List.of("dept-1", "dept-1.1")))
+                .isTrue();
+        assertThat(service.isOwnerInDepartments("user-pid", List.of("dept-2"))).isFalse();
+    }
+
     // ---- SELF owner value must match the owner COLUMN type (2026-06-28 Quote/BOM incident) ----
     // A varchar/ULID ownerField (e.g. crm_acc_owner) compared against the numeric userId produced
     // "operator does not exist: character varying = bigint" -> self-scoped list 500. The self value

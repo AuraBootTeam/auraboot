@@ -1,5 +1,6 @@
 package com.auraboot.framework.organization.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
@@ -126,6 +127,80 @@ public class OrganizationServiceImpl implements OrganizationService {
         PaginationResult<Map<String, Object>> result = dynamicDataService.list(MODEL_EMPLOYEE, request);
         List<Map<String, Object>> records = result.getRecords();
         return (records == null || records.isEmpty()) ? null : records.get(0);
+    }
+
+    @Override
+    public Map<String, Object> getEmployeeByUserPid(String userPid) {
+        if (userPid == null || userPid.isBlank()) {
+            return null;
+        }
+        DynamicQueryRequest request = DynamicQueryRequest.builder()
+            .pageNum(1)
+            .pageSize(1)
+            .conditions(List.of(
+                QueryCondition.builder()
+                    .fieldName(EMP_USER_ID)
+                    .operator(QueryCondition.Operator.EQ)
+                    .value(userPid)
+                    .build()
+            ))
+            .build();
+
+        PaginationResult<Map<String, Object>> result = dynamicDataService.list(MODEL_EMPLOYEE, request);
+        List<Map<String, Object>> records = result.getRecords();
+        return (records == null || records.isEmpty()) ? null : records.get(0);
+    }
+
+    @Override
+    public List<String> getCurrentDepartmentUserPids(boolean includeSubDepartments) {
+        Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
+        if (memberId == null) {
+            return List.of();
+        }
+        TenantMember member = tenantMemberService.getById(memberId);
+        if (member == null || member.getPid() == null || member.getPid().isBlank()) {
+            return List.of();
+        }
+        Map<String, Object> currentEmployee = getEmployeeByMemberPid(member.getPid());
+        String currentDeptPid = currentEmployee != null
+                ? asString(currentEmployee.get(EMP_DEPT_ID)) : null;
+        if (currentDeptPid == null || currentDeptPid.isBlank()) {
+            return List.of();
+        }
+
+        List<String> deptPids = includeSubDepartments
+                ? getDeptAndSubPids(currentDeptPid)
+                : List.of(currentDeptPid);
+        if (deptPids.isEmpty()) {
+            return List.of();
+        }
+
+        LinkedHashSet<String> userPids = new LinkedHashSet<>();
+        int pageNum = 1;
+        int totalPages;
+        do {
+            DynamicQueryRequest request = DynamicQueryRequest.builder()
+                .pageNum(pageNum)
+                .pageSize(MAX_QUERY_PAGE_SIZE)
+                .conditions(List.of(
+                    QueryCondition.builder()
+                        .fieldName(EMP_DEPT_ID)
+                        .operator(QueryCondition.Operator.IN)
+                        .values(new ArrayList<>(deptPids))
+                        .build()
+                ))
+                .build();
+            PaginationResult<Map<String, Object>> result = dynamicDataService.list(MODEL_EMPLOYEE, request);
+            for (Map<String, Object> employee : Optional.ofNullable(result.getRecords()).orElse(List.of())) {
+                String userPid = asString(employee.get(EMP_USER_ID));
+                if (userPid != null && !userPid.isBlank()) {
+                    userPids.add(userPid);
+                }
+            }
+            totalPages = result.getTotalPages() != null ? result.getTotalPages() : 0;
+            pageNum++;
+        } while (pageNum <= totalPages);
+        return List.copyOf(userPids);
     }
 
     @Override

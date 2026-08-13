@@ -9,6 +9,10 @@
     "extension": {
       "titleField": "e2et_order_title",
       "subtitleField": "e2et_order_no",
+      "importPolicy": {
+        "enabled": true,
+        "modes": ["insert"]
+      },
       "rules": [
         {
           "id": "delivery-after-order",
@@ -119,7 +123,11 @@
     "modelCategory": "master",
     "extension": {
       "titleField": "e2et_cust_name",
-      "subtitleField": "e2et_cust_code"
+      "subtitleField": "e2et_cust_code",
+      "importPolicy": {
+        "enabled": true,
+        "modes": ["insert"]
+      }
     },
     "semantic_description": "Self-contained reference target for REFERENCE field and UNIQUE_COMPOSITE validation testing.",
     "domain_category": "platform",

@@ -22,6 +22,13 @@ public interface DataScopeService {
     DataScopeCondition resolveScope(Long memberId, String resourceCode, String actionCode);
 
     /**
+     * Resolve whether an owner user PID currently belongs to one of the permitted departments.
+     * This supports records such as CRM opportunities whose department is derived from their owner
+     * instead of copied into a stale business-record snapshot.
+     */
+    boolean isOwnerInDepartments(String ownerUserPid, List<String> departmentPids);
+
+    /**
      * Set a data scope for a specific role/resource/action combination (upsert).
      */
     void setScope(Long tenantId, Long roleId, String resourceCode, String actionCode,

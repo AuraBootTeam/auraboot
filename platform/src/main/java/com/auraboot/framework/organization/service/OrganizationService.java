@@ -39,6 +39,22 @@ public interface OrganizationService {
     Map<String, Object> getEmployeeByMemberPid(String memberPid);
 
     /**
+     * Get the employee record linked to a public user PID.
+     *
+     * @param userPid public user PID stored by user-reference owner fields
+     * @return employee dynamic record, or null if not linked
+     */
+    Map<String, Object> getEmployeeByUserPid(String userPid);
+
+    /**
+     * Resolve public user PIDs for the current member's department.
+     *
+     * @param includeSubDepartments whether descendant departments are included
+     * @return linked user PIDs; empty when the current member has no employee/department link
+     */
+    List<String> getCurrentDepartmentUserPids(boolean includeSubDepartments);
+
+    /**
      * Batch find employees by member PIDs.
      *
      * @param memberPids collection of member PIDs

@@ -105,10 +105,10 @@ test('account list hides private health/contact columns and resolves owner name'
   assert.equal(owner.refTarget?.displayField, 'displayName');
 });
 
-test('account menu is exposed as an independent root menu', () => {
+test('account menu is grouped under the canonical business-records entry', () => {
   const accountMenu = menuByCode.get('crm_accounts');
   assert.ok(accountMenu, 'crm_accounts menu should exist');
-  assert.equal(accountMenu.parentCode, null);
+  assert.equal(accountMenu.parentCode, 'crm_records');
   assert.equal(accountMenu['name:zh-CN'], '客户');
   assert.equal(accountMenu.path, '/p/crm_account_common');
 });

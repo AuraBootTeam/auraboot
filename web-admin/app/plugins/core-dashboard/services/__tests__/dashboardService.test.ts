@@ -27,6 +27,10 @@ describe('dashboardService.normalizeDashboard', () => {
           config: {
             title: { 'zh-CN': '最新商机', en: 'Recent Opportunities' },
             modelCode: 'crm_opportunity_common',
+            filters: [{ field: 'crm_opp_account_id', operator: 'eq', value: 'ACC-001' }],
+            defaultSort: { field: 'created_at', order: 'desc' },
+            pageSize: 5,
+            showPagination: false,
             table: {
               columns: [{ field: 'crm_opp_name', label: { 'zh-CN': '商机名称' } }],
             },
@@ -41,6 +45,15 @@ describe('dashboardService.normalizeDashboard', () => {
       en: 'Recent Opportunities',
     });
     expect(dashboard.widgets[0].config.table).toBeTruthy();
+    expect(dashboard.widgets[0].config.filters).toEqual([
+      { field: 'crm_opp_account_id', operator: 'eq', value: 'ACC-001' },
+    ]);
+    expect(dashboard.widgets[0].config.defaultSort).toEqual({
+      field: 'created_at',
+      order: 'desc',
+    });
+    expect(dashboard.widgets[0].config.pageSize).toBe(5);
+    expect(dashboard.widgets[0].config.showPagination).toBe(false);
     expect(dashboard.widgets[0].config.dataSource).toBeUndefined();
   });
 
@@ -146,6 +159,56 @@ describe('dashboardService.normalizeDashboard', () => {
     expect(config.precision).toBe(2);
     expect(config.suffix).toBe('元');
     expect(config.label).toEqual({ 'zh-CN': '回款金额', en: 'Collected' });
+  });
+
+  it('preserves chart presentation keys through the normalized dataSource branch', () => {
+    const dashboard = normalizeDashboard(
+      baseDashboard([
+        {
+          id: 'lead_source',
+          type: 'smart-pie-chart',
+          x: 0,
+          y: 0,
+          w: 6,
+          h: 2,
+          config: {
+            dataSource: { type: 'namedQuery', queryCode: 'crm_lead_source_distribution' },
+            ring: true,
+            showLabel: false,
+            innerRadius: '48%',
+            outerRadius: '72%',
+            labelPosition: 'inside',
+          },
+        },
+        {
+          id: 'pipeline',
+          type: 'smart-bar-chart',
+          x: 6,
+          y: 0,
+          w: 6,
+          h: 2,
+          config: {
+            dataSource: { type: 'namedQuery', queryCode: 'crm_opportunity_pipeline_stats' },
+            orientation: 'horizontal',
+            stacked: true,
+            showLabel: true,
+          },
+        },
+      ]),
+    );
+
+    expect(dashboard.widgets[0].config).toMatchObject({
+      ring: true,
+      showLabel: false,
+      innerRadius: '48%',
+      outerRadius: '72%',
+      labelPosition: 'inside',
+    });
+    expect(dashboard.widgets[1].config).toMatchObject({
+      orientation: 'horizontal',
+      stacked: true,
+      showLabel: true,
+    });
   });
 
   it('preserves authored shortcut rows through the dataSource branch', () => {

@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -100,6 +101,28 @@ public interface DataAccessor {
     Map<String, Object> update(String modelCode, String recordId, Map<String, Object> data);
 
     /**
+     * Atomically replace one field only when its stored value still equals {@code expectedValue}.
+     *
+     * <p>The default preserves compatibility with existing plugin test doubles through a guarded
+     * read/update fallback. Runtime implementations should override this with one scoped
+     * compare-and-set statement. This is intended for narrow ledger/control-state transitions,
+     * not for general record updates that require automation or change-log side effects.
+     *
+     * @since 2.8.0
+     */
+    default boolean compareAndSet(String modelCode,
+                                  String recordId,
+                                  String fieldCode,
+                                  Object expectedValue,
+                                  Object nextValue) {
+        Map<String, Object> current = getById(modelCode, recordId);
+        if (current == null || !Objects.equals(current.get(fieldCode), expectedValue)) {
+            return false;
+        }
+        return update(modelCode, recordId, Map.of(fieldCode, nextValue)) != null;
+    }
+
+    /**
      * Batch create multiple records.
      *
      * @param modelCode the model code
@@ -132,6 +155,30 @@ public interface DataAccessor {
      * @param recordId  the record ID to delete
      */
     void delete(String modelCode, String recordId);
+
+    /**
+     * Delete multiple records in one model.
+     *
+     * <p>The default preserves compatibility with existing plugin test doubles by delegating to
+     * {@link #delete} once per distinct non-blank id. Runtime implementations should override this
+     * method and issue one tenant- and data-scope-guarded batch delete.
+     *
+     * @since 2.8.0
+     */
+    default void batchDelete(String modelCode, Collection<String> recordIds) {
+        if (recordIds == null || recordIds.isEmpty()) {
+            return;
+        }
+        LinkedHashSet<String> distinct = new LinkedHashSet<>();
+        for (String recordId : recordIds) {
+            if (recordId != null && !recordId.isBlank()) {
+                distinct.add(recordId);
+            }
+        }
+        for (String recordId : distinct) {
+            delete(modelCode, recordId);
+        }
+    }
 
     /**
      * Atomically increment one numeric field, optionally bounded by another

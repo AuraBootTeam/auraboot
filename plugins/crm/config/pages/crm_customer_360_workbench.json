@@ -1,0 +1,205 @@
+{
+  "pageKey": "crm_customer_360_workbench",
+  "name:zh-CN": "客户 360",
+  "name:en": "Customer 360",
+  "modelCode": "crm_account_common",
+  "description": "Role-oriented customer portfolio workspace that combines relationship depth, pipeline, activity and service risk.",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "extension": {
+    "showShare": false,
+    "showReport": false,
+    "showPrint": false,
+    "showEdit": false
+  },
+  "dataSources": {
+    "customerStats": {
+      "type": "namedQuery",
+      "queryCode": "crm_customer_360_stats",
+      "params": {},
+      "adaptor": "table",
+      "format": "records"
+    },
+    "customerQueue": {
+      "type": "namedQuery",
+      "queryCode": "crm_customer_360_queue",
+      "params": {
+        "customerKeyword": "${state.searchKeyword}",
+        "viewFilter": "${state.viewFilter}"
+      },
+      "dependOn": ["state.searchKeyword", "state.viewFilter"],
+      "adaptor": "table",
+      "format": "records"
+    }
+  },
+  "blocks": [
+    {
+      "id": "crm_customer_metrics",
+      "blockType": "metric-strip",
+      "dataSource": "customerStats",
+      "variant": "cards",
+      "columns": 4,
+      "metrics": [
+        {
+          "key": "all_customers",
+          "label": { "zh-CN": "全部客户", "en": "All Customers" },
+          "valueField": "total_accounts",
+          "subText": { "zh-CN": "统一客户上下文", "en": "Unified customer context" },
+          "tone": "blue",
+          "icon": "Building2",
+          "activeWhen": "state.viewFilter == null || state.viewFilter == '' || state.viewFilter == 'all'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "all" } }
+        },
+        {
+          "key": "active_customers",
+          "label": { "zh-CN": "活跃客户", "en": "Active Customers" },
+          "valueField": "active_accounts",
+          "subText": { "zh-CN": "当前有效关系", "en": "Current active relationships" },
+          "tone": "green",
+          "icon": "CircleCheckBig",
+          "activeWhen": "state.viewFilter == 'active'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "active" } }
+        },
+        {
+          "key": "pipeline_customers",
+          "label": { "zh-CN": "在途商机客户", "en": "Customers in Pipeline" },
+          "valueField": "pipeline_accounts",
+          "subText": { "zh-CN": "有未关闭商机", "en": "With open opportunities" },
+          "tone": "amber",
+          "icon": "TrendingUp",
+          "activeWhen": "state.viewFilter == 'pipeline'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "pipeline" } }
+        },
+        {
+          "key": "service_risk",
+          "label": { "zh-CN": "服务风险客户", "en": "Service Risk" },
+          "valueField": "service_risk_accounts",
+          "subText": { "zh-CN": "存在未结投诉", "en": "With unresolved complaints" },
+          "tone": "red",
+          "icon": "TriangleAlert",
+          "activeWhen": "state.viewFilter == 'service_risk'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "service_risk" } }
+        }
+      ]
+    },
+    {
+      "id": "crm_customer_search",
+      "blockType": "filters",
+      "onSearch": { "action": "dataSource.reload", "args": { "dataSourceId": "customerQueue" } },
+      "onReset": { "action": "state.set", "args": { "searchKeyword": "" } },
+      "fields": [
+        {
+          "field": "crm_acc_name",
+          "component": "SmartInput",
+          "bindState": "searchKeyword",
+          "label": { "zh-CN": "搜索客户组合", "en": "Search customer portfolio" },
+          "placeholder": { "zh-CN": "输入客户名称或客户编号", "en": "Search by customer name or code" }
+        }
+      ]
+    },
+    {
+      "id": "crm_customer_actions",
+      "blockType": "workbench-action-bar",
+      "surface": "bare",
+      "density": "compact",
+      "align": "end",
+      "actions": [
+        {
+          "code": "open_customer_record",
+          "permissionCode": "crm.account.read",
+          "label": { "zh-CN": "打开客户档案", "en": "Open Customer Record" },
+          "variant": "secondary",
+          "permissionCode": "crm.account.read",
+          "visibleWhen": "state.selectedAccount != null",
+          "onClick": {
+            "action": "navigate",
+            "args": { "to": "/p/crm_account_common/view/${state.selectedAccount.pid}" }
+          }
+        },
+        {
+          "code": "create_customer",
+          "permissionCode": "crm.account.manage",
+          "label": { "zh-CN": "新建客户", "en": "Create Customer" },
+          "variant": "primary",
+          "permissionCode": "crm.account.manage",
+          "onClick": { "action": "navigate", "args": { "to": "/p/crm_account_common/new" } }
+        }
+      ]
+    },
+    {
+      "id": "crm_customer_queue",
+      "blockType": "table",
+      "title": { "zh-CN": "客户关注队列", "en": "Customer Attention Queue" },
+      "dataSource": "customerQueue",
+      "density": "compact",
+      "maxHeight": 430,
+      "selection": { "mode": "single", "bind": "selectedAccount", "defaultFirst": true },
+      "columns": [
+        { "field": "crm_acc_name", "width": 220, "label": { "zh-CN": "客户", "en": "Customer" } },
+        { "field": "crm_acc_status", "width": 110, "dictCode": "crm_account_status", "label": { "zh-CN": "关系状态", "en": "Relationship" } },
+        { "field": "crm_acc_health_band", "width": 110, "dictCode": "crm_health_band", "label": { "zh-CN": "健康度", "en": "Health" } },
+        { "field": "open_opportunities", "width": 105, "align": "right", "label": { "zh-CN": "在途商机", "en": "Open Deals" } },
+        { "field": "pipeline_amount", "width": 130, "align": "right", "valueType": "currency", "label": { "zh-CN": "管道金额", "en": "Pipeline" } },
+        { "field": "days_since_activity", "width": 110, "align": "right", "label": { "zh-CN": "未互动天数", "en": "Idle Days" } },
+        { "field": "open_complaints", "width": 105, "align": "right", "label": { "zh-CN": "未结投诉", "en": "Open Issues" } },
+        { "field": "attention_reason", "width": 130, "dictCode": "crm_customer_attention_reason", "label": { "zh-CN": "关注原因", "en": "Attention" } }
+      ],
+      "rowActions": [
+        {
+          "code": "view_customer",
+          "label": { "zh-CN": "查看客户", "en": "View Customer" },
+          "permissionCode": "crm.account.read",
+          "action": { "type": "navigate", "to": "crm_account_common_detail" }
+        }
+      ]
+    },
+    {
+      "id": "crm_customer_attention",
+      "blockType": "status-banner",
+      "context": "${state.selectedAccount}",
+      "statusField": "attention_reason",
+      "toneMap": {
+        "service_risk": "red",
+        "health_risk": "red",
+        "pipeline": "amber",
+        "active": "green",
+        "watch": "gray"
+      },
+      "titleMap": {
+        "service_risk": { "zh-CN": "服务风险需要优先处理", "en": "Service risk requires attention" },
+        "health_risk": { "zh-CN": "客户健康度处于风险区", "en": "Customer health is at risk" },
+        "pipeline": { "zh-CN": "存在在途商机", "en": "Open pipeline requires coordination" },
+        "active": { "zh-CN": "客户关系正常", "en": "Customer relationship is active" },
+        "watch": { "zh-CN": "保持观察", "en": "Keep under watch" }
+      },
+      "descriptionMap": {
+        "service_risk": { "zh-CN": "先查看未结投诉和最近互动，再安排下一次客户沟通。", "en": "Review unresolved complaints and the latest activity before the next touch." },
+        "health_risk": { "zh-CN": "核对健康评分、商机和互动频率，明确恢复负责人。", "en": "Review health, pipeline and contact cadence, then assign recovery ownership." },
+        "pipeline": { "zh-CN": "在同一客户上下文核对商机、联系人和最近活动。", "en": "Review opportunities, contacts and recent activity in one customer context." }
+      },
+      "summaryFields": [
+        { "field": "owner_name", "label": { "zh-CN": "客户负责人", "en": "Owner" } },
+        { "field": "contact_count", "label": { "zh-CN": "联系人", "en": "Contacts" } },
+        { "field": "open_opportunities", "label": { "zh-CN": "在途商机", "en": "Open Deals" } },
+        { "field": "pipeline_amount", "valueType": "currency", "precision": 0, "label": { "zh-CN": "管道金额", "en": "Pipeline" } }
+      ]
+    },
+    {
+      "id": "crm_customer_evidence",
+      "blockType": "evidence-panel",
+      "context": "${state.selectedAccount}",
+      "title": { "zh-CN": "客户关系上下文", "en": "Customer Relationship Context" },
+      "description": { "zh-CN": "客户身份、关系健康、管道、互动和服务风险使用同一选中上下文。", "en": "Identity, relationship health, pipeline, activity and service risk share the same selected customer context." },
+      "sections": [
+        { "key": "identity", "label": { "zh-CN": "客户编号", "en": "Customer Code" }, "field": "crm_acc_code" },
+        { "key": "industry", "label": { "zh-CN": "行业", "en": "Industry" }, "field": "crm_acc_industry" },
+        { "key": "health", "label": { "zh-CN": "健康评分", "en": "Health Score" }, "field": "crm_acc_health_score" },
+        { "key": "contacts", "label": { "zh-CN": "联系人数量", "en": "Contacts" }, "field": "contact_count" },
+        { "key": "activity", "label": { "zh-CN": "最近互动", "en": "Last Activity" }, "field": "last_activity_at" },
+        { "key": "service", "label": { "zh-CN": "未结投诉", "en": "Open Complaints" }, "field": "open_complaints" }
+      ],
+      "empty": { "title": { "zh-CN": "选择一位客户，查看关系、管道和服务上下文", "en": "Select a customer to review relationship, pipeline and service context" } }
+    }
+  ]
+}

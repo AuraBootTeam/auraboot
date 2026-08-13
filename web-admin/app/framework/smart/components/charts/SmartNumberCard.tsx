@@ -43,6 +43,7 @@ interface NumberCardItem {
   format?: 'number' | 'currency' | 'percent';
   prefix?: string;
   suffix?: string;
+  drillDown?: DrillDownConfig;
 }
 
 /**
@@ -71,7 +72,7 @@ export interface SmartNumberCardProps {
    * Pick a specific column from the response when the data source returns multiple
    * (e.g. a single named query feeding multiple KPI cards). When set, the card reads
    * `data.rows[0][metricField]` instead of `data.rows[0][data.meta.metrics[0]]`.
-  */
+   */
   metricField?: string;
   /** Multi-KPI card configuration backed by the first returned row */
   cards?: NumberCardItem[];
@@ -223,12 +224,13 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
   // When `metricField` is set the caller targets a single column from a multi-field
   // response (e.g. four KPI cards each reading one field of the same overview query).
   // In that case we must NOT auto-expand to a multi-card grid — stay in single-value mode.
-  const effectiveCards: NumberCardItem[] | undefined =
-    cards?.length
-      ? cards
-      : dataSource?.type === 'api' && !metricField && Object.keys(firstRow).length > 1
-        ? Object.keys(firstRow).slice(0, 6).map((field) => ({ field, label: field }))
-        : undefined;
+  const effectiveCards: NumberCardItem[] | undefined = cards?.length
+    ? cards
+    : dataSource?.type === 'api' && !metricField && Object.keys(firstRow).length > 1
+      ? Object.keys(firstRow)
+          .slice(0, 6)
+          .map((field) => ({ field, label: field }))
+      : undefined;
 
   const formatCardValue = (
     raw: unknown,
@@ -319,27 +321,47 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
             : 'grid-cols-2 md:grid-cols-3 xl:grid-cols-6';
 
     return (
-      <div
-        className={cn('grid h-full gap-3', cardGridClass, className)}
-        style={style}
-      >
-        {effectiveCards.map((card) => (
-          <div key={card.field} className="h-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-medium text-slate-500">{resolveCardLabel(card)}</div>
-            <div className="mt-3 text-2xl font-semibold text-slate-950 tabular-nums">
-              {loading
-                ? '...'
-                : error
-                  ? 'Error'
-                  : formatCardValue(firstRow[card.field], card.format, card.prefix, card.suffix)}
+      <div className={cn('grid h-full gap-3', cardGridClass, className)} style={style}>
+        {effectiveCards.map((card) => {
+          const cardDrillDown = card.drillDown ?? drillDown;
+          const cardClickable = Boolean(cardDrillDown?.enabled && onDrillDown);
+          const cardContent = (
+            <>
+              <div className="text-xs font-medium text-slate-500">{resolveCardLabel(card)}</div>
+              <div className="mt-3 text-2xl font-semibold text-slate-950 tabular-nums">
+                {loading
+                  ? '...'
+                  : error
+                    ? 'Error'
+                    : formatCardValue(firstRow[card.field], card.format, card.prefix, card.suffix)}
+              </div>
+              <div
+                className="mt-3 h-1 w-8 rounded-full"
+                style={{ backgroundColor: card.color ?? color }}
+                aria-hidden="true"
+              />
+            </>
+          );
+          const cardClassName = cn(
+            'h-full rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition',
+            cardClickable && 'cursor-pointer hover:border-sky-300 hover:shadow-md',
+          );
+          return cardClickable ? (
+            <button
+              key={card.field}
+              type="button"
+              className={cardClassName}
+              data-testid={`number-card-${card.field}-drilldown`}
+              onClick={() => onDrillDown?.(cardDrillDown!)}
+            >
+              {cardContent}
+            </button>
+          ) : (
+            <div key={card.field} className={cardClassName}>
+              {cardContent}
             </div>
-            <div
-              className="mt-3 h-1 w-8 rounded-full"
-              style={{ backgroundColor: card.color ?? color }}
-              aria-hidden="true"
-            />
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   }
@@ -388,7 +410,10 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
               <div className="h-3 w-24 animate-pulse rounded-full bg-slate-200/60" />
             </div>
           ) : error ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600" role="alert">
+            <div
+              className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600"
+              role="alert"
+            >
               <span className="font-medium">Error: </span>
               {error.message || 'Failed to load data'}
             </div>
@@ -401,7 +426,8 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
                 Waiting for first record
               </div>
               <div className="text-xs leading-5 text-slate-500">
-                This KPI is ready. It will update automatically once matching business data is created.
+                This KPI is ready. It will update automatically once matching business data is
+                created.
               </div>
             </div>
           ) : (

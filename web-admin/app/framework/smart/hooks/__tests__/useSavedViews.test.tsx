@@ -91,6 +91,34 @@ describe('useSavedViews', () => {
     expect(result.current.currentView?.pid).toBe('personal');
     expect(result.current.groupedViews.team).toEqual([]);
     expect(result.current.groupedViews.global).toEqual([]);
+    expect(result.current.accessibleViews.map((view: SavedView) => view.pid)).toEqual([
+      'team',
+      'global',
+      'personal',
+    ]);
+  });
+
+  it('can activate an accessible plugin preset without exposing it as a personal view', async () => {
+    const personal = makeView({ pid: 'personal', name: 'My View', scope: 'personal' });
+    const globalKanban = makeView({
+      pid: 'pipeline-board',
+      name: 'Pipeline Board',
+      scope: 'global',
+      viewType: 'kanban',
+      isDefault: true,
+    });
+    mockService.getAccessibleViews.mockResolvedValue([personal, globalKanban]);
+    mockService.getDefaultView.mockResolvedValue(globalKanban);
+
+    const { result } = renderHook(() =>
+      useSavedViews({ modelCode: 'order', scopeFilter: 'personal' }),
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.views.map((view: SavedView) => view.pid)).toEqual(['personal']);
+    act(() => result.current.selectView('pipeline-board'));
+    expect(result.current.currentView?.pid).toBe('pipeline-board');
+    expect(result.current.currentView?.viewType).toBe('kanban');
   });
 
   it('keeps the backend-composed personal default instead of replacing it with the raw list row', async () => {

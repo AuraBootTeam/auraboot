@@ -68,6 +68,12 @@ public class AggregateQueryRequest {
     private List<FilterConfig> filters;
 
     /**
+     * Optional free-text search using the model's searchable-field contract.
+     * This keeps aggregate charts aligned with the records visible in a dynamic list.
+     */
+    private String keyword;
+
+    /**
      * Explicit GROUP BY fields.
      * If not specified, dimensions will be used for grouping.
      */

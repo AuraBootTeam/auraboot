@@ -20,6 +20,7 @@ import {
 } from '~/shared/services/reportTemplateService';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useI18n } from '~/contexts/I18nContext';
 
 export interface ToolbarActionGroupProps {
   buttons: ButtonConfig[];
@@ -27,7 +28,7 @@ export interface ToolbarActionGroupProps {
   onAction: (button: ButtonConfig) => void;
   onConfigChange: (config: ToolbarActionConfig[]) => void;
   resolveLabel: (button: ButtonConfig) => string;
-  t?: (key: string) => string;
+  t?: (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   evaluateVisible: (button: ButtonConfig) => boolean;
   onImport: () => void;
   onExport: (format: 'xlsx' | 'csv') => void;
@@ -95,7 +96,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
   onAction,
   onConfigChange,
   resolveLabel,
-  t,
+  t: providedT,
   evaluateVisible,
   onImport,
   onExport,
@@ -113,6 +114,8 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
   const [generatingReport, setGeneratingReport] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { showErrorToast, showSuccessToast } = useToastContext();
+  const { t: contextT } = useI18n();
+  const t = providedT ?? contextT;
 
   const effectiveConfig = useMemo(
     () => mergeConfig(buttons, toolbarActions),
@@ -218,14 +221,20 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        showSuccessToast(`Report generated: ${template.name}`);
+        showSuccessToast(
+          t('data_tools.report_generated', { name: template.name }, `报表已生成：${template.name}`),
+        );
       } catch (err) {
-        showErrorToast(err instanceof Error ? err.message : 'Report generation failed');
+        showErrorToast(
+          err instanceof Error
+            ? err.message
+            : t('data_tools.report_generation_failed', undefined, '报表生成失败'),
+        );
       } finally {
         setGeneratingReport(false);
       }
     },
-    [filters, showErrorToast, showSuccessToast],
+    [filters, showErrorToast, showSuccessToast, t],
   );
 
   return (
@@ -264,7 +273,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
               'disabled:cursor-not-allowed disabled:opacity-50',
               'transition-colors duration-150',
             )}
-            title="More actions"
+            title={t('action.more', undefined, '更多操作')}
           >
             {generatingReport ? (
               <span className="rounded-pill border-border-strong border-t-accent h-4 w-4 animate-spin border-2" />
@@ -319,7 +328,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
                     />
                   </svg>
-                  Import
+                  {t('import.title', undefined, '导入数据')}
                 </button>
               )}
 
@@ -346,7 +355,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                       d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  Export Excel
+                  {t('data_tools.export_excel', undefined, '导出 Excel')}
                 </button>
               )}
 
@@ -373,7 +382,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                       d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  Export CSV
+                  {t('data_tools.export_csv', undefined, '导出 CSV')}
                 </button>
               )}
 
@@ -397,7 +406,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                       d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
                     />
                   </svg>
-                  Print
+                  {t('action.print', undefined, '打印')}
                 </button>
               )}
 
@@ -406,7 +415,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                   <div className="bg-border mx-2 my-1 h-px" />
                   {loadingReports ? (
                     <div className="text-text-3 px-3.5 py-2 text-center text-xs">
-                      Loading reports...
+                      {t('data_tools.loading_reports', undefined, '正在加载报表…')}
                     </div>
                   ) : (
                     reportTemplates.map((tpl) => (
@@ -462,7 +471,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                     d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                   />
                 </svg>
-                Configure buttons...
+                {t('data_tools.configure_buttons', undefined, '配置按钮…')}
               </button>
             </div>
           )}
@@ -478,6 +487,11 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
           t={t}
           onChange={(config) => onConfigChange(config)}
           onClose={() => setConfigPanelOpen(false)}
+          hiddenBuiltinCodes={[
+            ...(hideBuiltInImport ? ['_import'] : []),
+            ...(hideBuiltInExport ? ['_export_excel', '_export_csv'] : []),
+            ...(hideBuiltInPrint ? ['_print'] : []),
+          ]}
         />
       )}
     </>

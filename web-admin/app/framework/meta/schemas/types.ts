@@ -300,12 +300,41 @@ export interface ColumnConfig {
   tagConfig?: Record<string, unknown>;
 }
 
+export interface CommandInputFieldConfig {
+  field: string;
+  label?: string | LocalizedText;
+  helpText?: string | LocalizedText;
+  placeholder?: string | LocalizedText;
+  type?: string;
+  required?: boolean;
+  [key: string]: unknown;
+}
+
+export interface CommandInputFormConfig {
+  inputFields?: CommandInputFieldConfig[];
+  inputFieldsTitle?: string | LocalizedText;
+  inputFieldsSubmitLabel?: string | LocalizedText;
+}
+
 // Action definition — unified button behavior
 export type ActionDef =
-  | { type: 'command'; command: string }
-  | { type: 'state_transition'; command: string }
-  | { type: 'bulk_command'; command: string }
-  | { type: 'bulk_state_transition'; command: string }
+  | ({ type: 'command'; command: string } & CommandInputFormConfig)
+  | ({ type: 'state_transition'; command: string } & CommandInputFormConfig)
+  | ({ type: 'bulk_command'; command: string } & CommandInputFormConfig)
+  | ({ type: 'bulk_state_transition'; command: string } & CommandInputFormConfig)
+  | {
+      /** Execute the same command once per selected record with an exact target PID. */
+      type: 'bulk_record_command';
+      command: string;
+      operationType?: 'UPDATE' | 'DELETE';
+    }
+  | {
+      /** Collect one DSL field value, then execute the command once per exact target PID. */
+      type: 'bulk_field_command';
+      command: string;
+      input: FieldConfig;
+      operationType?: 'UPDATE' | 'DELETE';
+    }
   | { type: 'navigate'; to: string; command?: string; hardReload?: boolean }
   | { type: 'builtin'; name: string }
   | { type: 'flow'; steps: FlowStep[] }
@@ -387,6 +416,14 @@ export interface TableConfig {
   density?: 'default' | 'compact';
   pagination?: PaginationConfig;
   selection?: SelectionConfig;
+  /** Permission-aware controls for the generic edit/delete/export bulk bar. */
+  bulkCapabilities?: {
+    edit?: boolean | { enabled?: boolean; permissionCode?: string };
+    delete?: boolean | { enabled?: boolean; permissionCode?: string };
+    export?: boolean | { enabled?: boolean; permissionCode?: string };
+  };
+  /** DSL-configured business bulk actions, executed through commands. */
+  bulkActions?: ButtonConfig[];
   columns: ColumnConfig[];
   /** Row-level action buttons (displayed in each row) */
   rowActions?: ButtonConfig[];
@@ -460,6 +497,8 @@ export interface SubTableConfig {
   editableWhen?: string;
   columns: ColumnConfig[];
   actions?: ButtonConfig[];
+  /** @deprecated Use actions. Kept for imported DSL compatibility. */
+  rowActions?: ButtonConfig[];
   summary?: SummaryConfig;
   resolveVia?: ResolveViaConfig;
   /**

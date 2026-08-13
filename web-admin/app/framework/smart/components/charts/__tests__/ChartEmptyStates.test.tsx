@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SmartBarChart } from '../SmartBarChart';
 import { SmartLineChart } from '../SmartLineChart';
@@ -80,5 +80,57 @@ describe('dashboard chart empty states', () => {
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(grid).toHaveClass('grid-cols-1');
     expect(grid).not.toHaveClass('xl:grid-cols-6');
+  });
+
+  it('makes each configured KPI card invoke its own drill-down cohort', () => {
+    mockUseChartData.mockReturnValue({
+      data: { rows: [{ open_deals: 7 }], summary: {}, meta: { dimensions: [], metrics: [] } },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    const onDrillDown = vi.fn();
+    const drillDown = {
+      enabled: true,
+      action: 'navigate' as const,
+      targetPage: '/p/crm_opportunity_common',
+      filters: [{ targetField: 'crm_opp_stage', operator: 'ne' as const, value: 'closed_won' }],
+    };
+
+    render(
+      <SmartNumberCard
+        title="Forecast"
+        dataSource={aggregateSource}
+        cards={[{ field: 'open_deals', label: 'Open deals', drillDown }]}
+        onDrillDown={onDrillDown}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('number-card-open_deals-drilldown'));
+    expect(onDrillDown).toHaveBeenCalledWith(drillDown);
+  });
+
+  it('reads the configured metric field from a multi-metric response', () => {
+    mockUseChartData.mockReturnValue({
+      data: {
+        rows: [{ total_contacts: 18, open_opportunities: 4 }],
+        summary: {},
+        meta: { dimensions: [], metrics: ['total_contacts', 'open_opportunities'] },
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(
+      <SmartNumberCard
+        title="Open opportunities"
+        dataSource={aggregateSource}
+        metricField="open_opportunities"
+      />,
+    );
+
+    expect(screen.getByText('4')).toBeInTheDocument();
+    expect(screen.queryByText('18')).not.toBeInTheDocument();
   });
 });

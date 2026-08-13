@@ -145,6 +145,19 @@ function resolveCommandTargetRecordId(
   );
 }
 
+function resolveNavigationRecord(
+  candidates: Array<Record<string, any> | null | undefined>,
+  pageRecordPid: unknown,
+): Record<string, any> | undefined {
+  const recordWithPublicPid = candidates.find((candidate) =>
+    Boolean(getLegacyCompatibleRecordPid(candidate)),
+  );
+  if (recordWithPublicPid) return recordWithPublicPid;
+
+  const fallbackPid = toNonBlankString(pageRecordPid);
+  return fallbackPid ? { pid: fallbackPid } : undefined;
+}
+
 function resolveCommandRefreshIds(
   actionDef: Record<string, unknown>,
   button: Record<string, unknown>,
@@ -268,7 +281,7 @@ function notifyActionToast(
  */
 export function resolveCommandErrorMessage(result: unknown, commandCode: string): string {
   const body = (result || {}) as Record<string, any>;
-  return (
+  const resolved =
     firstNonBlankString(
       body.context?.detail,
       body.context?.error,
@@ -280,8 +293,17 @@ export function resolveCommandErrorMessage(result: unknown, commandCode: string)
       body.data?.message,
       body.message,
       body.desc,
-    ) || `Command ${commandCode} failed`
-  );
+    ) || `Command ${commandCode} failed`;
+
+  // PF4J/platform wrappers are implementation details, not business feedback. Keep
+  // the handler's actionable reason while removing the transport prefix from every
+  // DSL command surface (detail, form, workbench and list actions).
+  return resolved
+    .replace(
+      /^(?:plugin (?:extension )?handler execution failed|command handler execution failed)\s*:\s*/i,
+      '',
+    )
+    .trim();
 }
 
 export interface UseActionHandlerOptions {
@@ -599,7 +621,10 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
         switch (actionDef.type) {
           case 'command': {
-            if (confirmKey) {
+            const offboardingAction = toNonBlankString(
+              (actionDef as any).offboardingAction ?? (normalizedButton as any).offboardingAction,
+            );
+            if (confirmKey && !offboardingAction) {
               const confirmed = await showConfirmDialog(confirmKey);
               if (!confirmed) return;
             }
@@ -625,18 +650,61 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 actionRuntimeContext,
               ),
             };
-            const inputFields = Array.isArray((actionDef as any).inputFields)
+            let inputFields = Array.isArray((actionDef as any).inputFields)
               ? (actionDef as any).inputFields
               : Array.isArray((normalizedButton as any).inputFields)
                 ? (normalizedButton as any).inputFields
                 : [];
+            let inputFieldsTitle =
+              (actionDef as any).inputFieldsTitle ?? (normalizedButton as any).inputFieldsTitle;
+            let transferRequired = false;
+            if (offboardingAction && targetRecordPid) {
+              const impactResult = await fetchResult(
+                `/api/tenant/members/${encodeURIComponent(targetRecordPid)}/offboarding-impact`,
+                { method: 'get', params: { action: offboardingAction }, token },
+              );
+              if (!ResultHelper.isSuccess(impactResult)) {
+                throw new Error(resolveCommandErrorMessage(impactResult, offboardingAction));
+              }
+              const impact = impactResult.data as Record<string, any>;
+              transferRequired = impact?.transferRequired === true;
+              if (transferRequired) {
+                const ownedCount = Number(impact.ownedResourceCount || 0);
+                const isChinese = locale.toLowerCase().startsWith('zh');
+                inputFieldsTitle = isChinese
+                  ? `资源交接：该成员名下有 ${ownedCount} 项资源`
+                  : `Resource transfer: this member owns ${ownedCount} item${ownedCount === 1 ? '' : 's'}`;
+                inputFields = [
+                  {
+                    field: 'targetMemberPid',
+                    label: isChinese ? '资源接收人' : 'Resource recipient',
+                    type: 'select',
+                    required: true,
+                    dataSource: {
+                      type: 'api',
+                      endpoint: '/api/tenant/members/${record.pid}/offboarding-candidates',
+                      valueField: 'memberPid',
+                      labelField: 'displayName',
+                      descriptionField: 'email',
+                    },
+                  },
+                  ...inputFields,
+                ];
+              }
+            }
+            if (offboardingAction && inputFields.length === 0 && !transferRequired && confirmKey) {
+              const confirmed = await showConfirmDialog(confirmKey);
+              if (!confirmed) return;
+            }
             if (inputFields.length > 0) {
               let collectedInputs: Record<string, any>;
               try {
                 collectedInputs = await promptInputForm(
                   inputFields,
-                  (actionDef as any).inputFieldsTitle ?? (normalizedButton as any).inputFieldsTitle,
+                  inputFieldsTitle,
                   fetchResult,
+                  undefined,
+                  actionRuntimeContext,
                 );
               } catch {
                 return;
@@ -766,7 +834,38 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
           }
 
           case 'navigate': {
-            const path = resolveNavigateTo(actionDef.to, record);
+            const isEditAction =
+              normalizedButton.label === 'edit' ||
+              normalizedButton.label === 'update' ||
+              normalizedButton.code === 'edit' ||
+              normalizedButton.code === 'update';
+            // A navigate action carrying a non-edit command is a contextual
+            // create flow. The current record is the source object, not the
+            // target form record; passing it to a `*_form` page incorrectly
+            // resolves an edit route for the target model.
+            const isContextualCreate = Boolean(actionDef.command) && !isEditAction;
+            const runtimeContext = runtime?.getContext?.();
+            // Detail blocks can render before SchemaRuntime has synchronized the
+            // loaded record. In that frame `form` is an empty object, which must
+            // not hide the live record available by click time. Only a record
+            // carrying a public PID is valid navigation context; `$page.recordPid`
+            // remains a safe source-link fallback for contextual create actions.
+            const navigationRecord = resolveNavigationRecord(
+              [
+                record,
+                context.record,
+                context.data,
+                runtimeContext?.record,
+                runtimeContext?.row,
+                runtimeContext?.form,
+              ],
+              runtimeContext?.$page?.recordPid,
+            );
+            const target = String(actionDef.to ?? '');
+            const path = resolveNavigateTo(
+              actionDef.to,
+              isContextualCreate && !target.startsWith('/') ? undefined : navigationRecord,
+            );
             // Absolute backend/external URLs (e.g. a file-download endpoint) are
             // real browser navigations, not client-side routes — open them so the
             // browser handles the Content-Disposition download.
@@ -779,14 +878,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               return;
             }
             if (actionDef.command) {
-              const isEditAction =
-                normalizedButton.label === 'edit' ||
-                normalizedButton.label === 'update' ||
-                normalizedButton.code === 'edit' ||
-                normalizedButton.code === 'update';
               const sep = path.includes('?') ? '&' : '?';
               const params = [`commandCode=${encodeURIComponent(actionDef.command)}`];
-              const sourceRecordPid = record?.pid;
+              const sourceRecordPid = getLegacyCompatibleRecordPid(navigationRecord);
               if (!isEditAction && sourceRecordPid) {
                 params.push(`sourceRecordPid=${encodeURIComponent(sourceRecordPid)}`);
               }

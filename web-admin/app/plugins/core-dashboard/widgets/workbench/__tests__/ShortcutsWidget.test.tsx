@@ -24,7 +24,7 @@ vi.mock('~/contexts/I18nContext', () => ({
   useI18n: () => ({ t: (k: string) => k }),
 }));
 
-vi.mock('~/root', () => ({
+vi.mock('~/root-data', () => ({
   useRootLoaderData: () => rootLoaderData.value,
 }));
 

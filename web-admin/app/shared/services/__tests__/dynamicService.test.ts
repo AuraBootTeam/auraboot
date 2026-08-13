@@ -60,7 +60,9 @@ describe('dynamicService', () => {
     });
 
     it('appends optional keyword / sort params', async () => {
-      getMock.mockResolvedValue(ok({ records: [], total: 0, page: 0, pageSize: 10, totalPages: 0 }));
+      getMock.mockResolvedValue(
+        ok({ records: [], total: 0, page: 0, pageSize: 10, totalPages: 0 }),
+      );
 
       await dynamicService.findByPage('order', {
         page: 1,
@@ -89,7 +91,9 @@ describe('dynamicService', () => {
     it('throws on failure', async () => {
       getMock.mockResolvedValue(fail('DB error'));
 
-      await expect(dynamicService.findByPage('order', { page: 0, size: 20 })).rejects.toThrow('DB error');
+      await expect(dynamicService.findByPage('order', { page: 0, size: 20 })).rejects.toThrow(
+        'DB error',
+      );
     });
   });
 
@@ -213,8 +217,8 @@ describe('dynamicService', () => {
 
   describe('batchUpdate', () => {
     it('PUTs updates to /api/dynamic/:code/batch', async () => {
-      const entities = [{ id: 'b1', name: 'Updated A' }];
-      putMock.mockResolvedValue(ok(entities));
+      const batchResult = { total: 1, success: 1, failed: 0 };
+      putMock.mockResolvedValue(ok(batchResult));
 
       const updates = [{ id: 'b1', data: { name: 'Updated A' } }];
       const result = await dynamicService.batchUpdate('order', updates);
@@ -225,7 +229,7 @@ describe('dynamicService', () => {
         undefined,
         undefined,
       );
-      expect(result).toHaveLength(1);
+      expect(result).toEqual(batchResult);
     });
   });
 
@@ -235,9 +239,7 @@ describe('dynamicService', () => {
     it('DELs /api/dynamic/:code/batch with ids payload', async () => {
       delMock.mockResolvedValue(ok(null));
 
-      await expect(
-        dynamicService.batchDelete('order', ['b1', 'b2']),
-      ).resolves.toBeUndefined();
+      await expect(dynamicService.batchDelete('order', ['b1', 'b2'])).resolves.toBeUndefined();
 
       expect(delMock).toHaveBeenCalledWith(
         '/api/dynamic/order/batch',
@@ -365,7 +367,13 @@ describe('dynamicService', () => {
 
   describe('getRelatedData', () => {
     it('POSTs to /api/dynamic/:entity/relations/:field/:target', async () => {
-      const pageResult = { records: [{ id: 'r1' }], total: 1, page: 0, pageSize: 20, totalPages: 1 };
+      const pageResult = {
+        records: [{ id: 'r1' }],
+        total: 1,
+        page: 0,
+        pageSize: 20,
+        totalPages: 1,
+      };
       postMock.mockResolvedValue(ok(pageResult));
 
       const result = await dynamicService.getRelatedData({

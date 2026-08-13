@@ -24,6 +24,16 @@ describe('isBinaryDownloadPath', () => {
     expect(isBinaryDownloadPath('/api/reports/export/excel')).toBe(true);
     expect(isBinaryDownloadPath('/api/reports/export/excel?format=xlsx')).toBe(true);
     expect(isBinaryDownloadPath('/api/reports/export/pdf')).toBe(true);
+    expect(
+      isBinaryDownloadPath('/api/qr/label-templates/platform/productions/analytics.csv?dateFrom=2026-07-10'),
+    ).toBe(true);
+  });
+
+  it('detects generated Excel template endpoints before axios can decode OOXML as text', () => {
+    expect(
+      isBinaryDownloadPath('/api/meta/excel/template/crm_account_common?mode=insert'),
+    ).toBe(true);
+    expect(isBinaryDownloadPath('/api/meta/excel/template/crm_lead_common?mode=update')).toBe(true);
   });
 
   it('does not over-match paths that merely contain "download"', () => {

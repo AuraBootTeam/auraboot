@@ -1020,7 +1020,9 @@ public class ReleaseQdpHandler implements CommandHandlerExtension {
                 || !filePackagePid.equals(trimToNull(confirmation.get("crm_cc_file_package_id")))
                 || !packageHash.equals(trimToNull(confirmation.get("crm_cc_file_package_hash")))
                 || !"confirmed".equals(trimToNull(confirmation.get("crm_cc_status")))) {
-            throw new IllegalStateException("Customer Confirmation binding is stale or inconsistent");
+            throw new IllegalStateException(
+                    "客户确认与当前需求版本或文件包不一致；请重新确认当前文件后再编制 / "
+                            + "Customer Confirmation does not match the current requirement version or file package");
         }
     }
 

@@ -3,8 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 
 let mockPreferences: Record<string, unknown> | null = null;
+let mockIsAuthenticated = true;
 vi.mock('~/contexts/AuthContext', () => ({
-  useAuth: () => ({ preferences: mockPreferences }),
+  useAuth: () => ({ preferences: mockPreferences, isAuthenticated: mockIsAuthenticated }),
 }));
 
 const tenantGet = vi.fn();
@@ -35,10 +36,39 @@ function renderProbe() {
   );
 }
 
+function renderProbeWithSkipTenantPreferences() {
+  return render(
+    <TimezoneProvider skipTenantPreferences>
+      <Probe />
+    </TimezoneProvider>,
+  );
+}
+
 describe('TimezoneContext resolution chain', () => {
   beforeEach(() => {
     mockPreferences = null;
+    mockIsAuthenticated = true;
     tenantGet.mockReset();
+  });
+
+  it('does not fetch tenant preferences for anonymous public routes', async () => {
+    mockIsAuthenticated = false;
+    mockPreferences = null;
+
+    renderProbe();
+
+    await waitFor(() => expect(screen.getByTestId('tz').textContent).toBeTruthy());
+    expect(tenantGet).not.toHaveBeenCalled();
+  });
+
+  it('does not fetch tenant preferences when the root marks a public route as skipped', async () => {
+    mockIsAuthenticated = true;
+    mockPreferences = null;
+
+    renderProbeWithSkipTenantPreferences();
+
+    await waitFor(() => expect(screen.getByTestId('tz').textContent).toBeTruthy());
+    expect(tenantGet).not.toHaveBeenCalled();
   });
 
   it('falls back to the tenant ui.timezone preference when the user has none', async () => {

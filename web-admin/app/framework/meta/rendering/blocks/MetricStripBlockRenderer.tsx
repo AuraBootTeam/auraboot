@@ -44,6 +44,14 @@ function resolveTone(tone: string): ToneToken {
   return toneToken[key] || toneToken.default;
 }
 
+function configuredCardGridClass(columns: number | undefined): string {
+  if (!columns || columns <= 1) return 'grid-cols-1';
+  if (columns === 2) return 'grid-cols-1 sm:grid-cols-2';
+  if (columns === 3) return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+  if (columns === 4) return 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4';
+  return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6';
+}
+
 // Trend delta color follows the direction, not the metric tone: up is good
 // (green), down is bad (red), flat is neutral — same language as StatCard.
 const trendClass: Record<string, string> = {
@@ -77,6 +85,20 @@ function mappedMetricValue(
   if (value === null || value === undefined || value === '') return '-';
   const precision = Number(metric?.precision);
   const numericValue = typeof value === 'number' ? value : Number(String(value).trim());
+  if (
+    (metric?.valueType === 'currency' || metric?.format === 'currency') &&
+    Number.isFinite(numericValue)
+  ) {
+    const fractionDigits = Number.isInteger(precision) && precision >= 0 && precision <= 20
+      ? precision
+      : 2;
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: String(metric?.currencyCode || 'CNY').toUpperCase(),
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    }).format(numericValue);
+  }
   if (
     Number.isInteger(precision) &&
     precision >= 0 &&
@@ -170,7 +192,8 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
       const displaySubText = renderMetricAuxText(subText, locale, t);
       const tone = metric.tone || 'default';
       const tk = resolveTone(tone);
-      const iconName: string | undefined = typeof metric.icon === 'string' ? metric.icon : undefined;
+      const iconName: string | undefined =
+        typeof metric.icon === 'string' ? metric.icon : undefined;
       const showIcon = Boolean(iconName && hasIcon(iconName));
       const clickable = Boolean(metric.onClick);
       const active = metric.activeWhen
@@ -287,13 +310,8 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
           variant === 'chips'
             ? 'flex flex-wrap gap-2'
             : cardColumns
-              ? 'grid items-stretch gap-3'
+              ? `grid items-stretch gap-3 ${configuredCardGridClass(cardColumns)}`
               : 'grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6'
-        }
-        style={
-          variant === 'cards' && cardColumns
-            ? { gridTemplateColumns: `repeat(${cardColumns}, minmax(0, 1fr))` }
-            : undefined
         }
         data-testid="metric-strip"
       >

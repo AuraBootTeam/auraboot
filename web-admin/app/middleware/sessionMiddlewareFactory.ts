@@ -18,6 +18,7 @@ const PUBLIC_ROUTES = [
   '/auth/forgot-password',
   '/api/i18n',
   '/qr', // anonymous QR scan landing (public_read / public_submit) — backed by /api/public/qr/**
+  '/qr-gen', // anonymous AuraQR free generator station — pure frontend, no session required
   ...PLUGIN_PUBLIC_ROUTES,
 ];
 

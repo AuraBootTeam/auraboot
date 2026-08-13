@@ -74,12 +74,17 @@ export const SmartFunnelChart: React.FC<SmartFunnelChartProps> = ({
   });
 
   const handleChartClick = useCallback(
-    (params: { name?: string }) => {
+    (params: { name?: string; dataIndex?: number }) => {
       if (!data?.meta?.dimensions?.length || !params.name) return;
+      const dimension = data.meta.dimensions[0];
+      const clickedValue =
+        params.dataIndex == null
+          ? params.name
+          : (data.rows[params.dataIndex]?.[dimension] ?? params.name);
       const filter: FilterConfig = {
-        field: data.meta.dimensions[0],
+        field: dimension,
         operator: 'eq',
-        value: params.name,
+        value: clickedValue,
       };
       if (drillDown?.enabled && onDrillDown) onDrillDown([filter]);
       if (linkage?.enabled && linkage?.emitFilter && onLinkageEmit) onLinkageEmit([filter]);

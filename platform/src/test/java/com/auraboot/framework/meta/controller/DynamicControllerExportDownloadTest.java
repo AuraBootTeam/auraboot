@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,6 +56,45 @@ class DynamicControllerExportDownloadTest {
         assertThat(requestCaptor.getValue().getFormat()).isEqualTo(DataExportRequest.ExportFormat.CSV);
         assertThat(response.isSuccess()).isTrue();
         assertThat(response.getData().get("downloadUrl").toString()).contains("cr_crawled_document_export_1.csv");
+    }
+
+    @Test
+    void exportDataPreservesArrayConditionsAndKeyword() {
+        DynamicController controller = new DynamicController();
+        DynamicDataService dynamicDataService = mock(DynamicDataService.class);
+        MetaModelService metaModelService = mock(MetaModelService.class);
+        Path xlsx = tempDir.resolve("crm_opportunity_common_export.xlsx");
+
+        when(metaModelService.getModelDefinition("crm_opportunity_common")).thenReturn(Optional.empty());
+        when(dynamicDataService.exportData(eq("crm_opportunity_common"), any(DataExportRequest.class)))
+                .thenReturn(ExportResult.builder()
+                        .success(true)
+                        .filePath(xlsx.toString())
+                        .recordCount(2L)
+                        .build());
+        ReflectionTestUtils.setField(controller, "dynamicDataService", dynamicDataService);
+        ReflectionTestUtils.setField(controller, "metaModelService", metaModelService);
+
+        ApiResponse<Map<String, Object>> response = controller.exportData(
+                "crm_opportunity_common",
+                Map.of(
+                        "format", "excel",
+                        "keyword", "华东",
+                        "conditions", List.of(
+                                Map.of("field", "crm_opp_forecast_category", "operator", "IN",
+                                        "value", List.of("commit", "best_case")),
+                                Map.of("field", "crm_opp_expected_close_date", "operator", "BETWEEN",
+                                        "value", List.of("2026-08-01", "2026-08-31")))));
+
+        ArgumentCaptor<DataExportRequest> requestCaptor = ArgumentCaptor.forClass(DataExportRequest.class);
+        verify(dynamicDataService).exportData(eq("crm_opportunity_common"), requestCaptor.capture());
+        DataExportRequest request = requestCaptor.getValue();
+
+        assertThat(request.getKeyword()).isEqualTo("华东");
+        assertThat(request.getConditions()).hasSize(2);
+        assertThat(request.getConditions().get(0).getValues()).containsExactly("commit", "best_case");
+        assertThat(request.getConditions().get(1).getValues()).containsExactly("2026-08-01", "2026-08-31");
+        assertThat(response.getData().get("recordCount")).isEqualTo(2L);
     }
 
     @Test

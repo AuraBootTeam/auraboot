@@ -17,6 +17,8 @@ import { WorkbenchActionBarBlockRenderer } from '../WorkbenchActionBarBlockRende
 import { EvidencePanelBlockRenderer } from '../EvidencePanelBlockRenderer';
 import { ArtifactTimelineBlockRenderer } from '../ArtifactTimelineBlockRenderer';
 import { StatusBannerBlockRenderer } from '../StatusBannerBlockRenderer';
+import { StageRailBlockRenderer } from '../StageRailBlockRenderer';
+import { FiltersBlockRenderer } from '../FiltersBlockRenderer';
 import { useRuntimeStateSubscription } from '../workbenchBlockUtils';
 import { fetchResult } from '~/shared/services/http-client';
 
@@ -63,6 +65,29 @@ function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
   };
   return stub as unknown as SchemaRuntime;
 }
+
+describe('FiltersBlockRenderer', () => {
+  it('executes direct workbench search and reset actions without page-level handlers', async () => {
+    const runtime = makeRuntime() as any;
+    const block = {
+      id: 'queue_filters',
+      blockType: 'filters',
+      fields: [],
+      onSearch: { action: 'dataSource.reload', args: { dataSourceId: 'queue' } },
+      onReset: { action: 'state.set', args: { searchKeyword: '' } },
+    } as unknown as BlockConfig;
+
+    render(<FiltersBlockRenderer block={block} runtime={runtime} />);
+
+    fireEvent.click(screen.getByTestId('filter-btn-search'));
+    await waitFor(() => expect(runtime.__reload).toHaveBeenCalledWith('queue'));
+
+    fireEvent.click(screen.getByTestId('filter-btn-reset'));
+    await waitFor(() =>
+      expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'searchKeyword', ''),
+    );
+  });
+});
 
 describe('MetricStripBlockRenderer', () => {
   it('renders a stable empty state when no metrics are configured', () => {
@@ -178,6 +203,7 @@ describe('MetricStripBlockRenderer', () => {
         summary: {
           matchability: 68.23529411764706,
           complete: '100.0000',
+          revenue: 1234,
         },
       },
     }) as any;
@@ -201,6 +227,14 @@ describe('MetricStripBlockRenderer', () => {
           precision: 2,
           unit: '%',
         },
+        {
+          key: 'revenue',
+          label: 'Revenue',
+          valueField: 'revenue',
+          valueType: 'currency',
+          currencyCode: 'CNY',
+          precision: 0,
+        },
       ],
     };
 
@@ -208,6 +242,7 @@ describe('MetricStripBlockRenderer', () => {
 
     expect(screen.getByTestId('metric-strip-item-matchability')).toHaveTextContent('68.24 %');
     expect(screen.getByTestId('metric-strip-item-complete')).toHaveTextContent('100 %');
+    expect(screen.getByTestId('metric-strip-item-revenue')).toHaveTextContent('CN¥1,234');
   });
 
   it('surfaces metric cards on a white token surface, not a large tinted fill', () => {
@@ -522,9 +557,32 @@ describe('MetricStripBlockRenderer', () => {
 
     render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
 
-    expect(screen.getByTestId('metric-strip')).toHaveStyle({
-      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-    });
+    expect(screen.getByTestId('metric-strip')).toHaveClass(
+      'grid-cols-1',
+      'sm:grid-cols-2',
+      'lg:grid-cols-3',
+    );
+  });
+
+  it('keeps a configured four-card strip responsive before the desktop breakpoint', () => {
+    const runtime = makeRuntime({
+      data: { summary: { a: 1, b: 2, c: 3, d: 4 } },
+    }) as any;
+    const block: BlockConfig = {
+      id: 'forecast_metrics',
+      blockType: 'metric-strip',
+      dataSource: 'summary',
+      columns: 4,
+      metrics: ['a', 'b', 'c', 'd'].map((key) => ({ key, label: key, valueField: key })),
+    };
+
+    render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('metric-strip')).toHaveClass(
+      'grid-cols-1',
+      'sm:grid-cols-2',
+      'xl:grid-cols-4',
+    );
   });
 });
 
@@ -689,6 +747,64 @@ describe('WorkbenchActionBarBlockRenderer', () => {
       expect(showToast).toHaveBeenCalledWith('LLM 已复核格式，已重新解析 BOM', 'success');
     });
     expect(runtime.__reload).toHaveBeenCalledWith(['taskSummary']);
+  });
+
+  it('renders a command result receipt with links to created business records', async () => {
+    vi.mocked(fetchResult).mockResolvedValueOnce({
+      code: '0',
+      data: {
+        success: true,
+        accountId: 'ACC-1',
+        opportunityId: 'OPP-1',
+      },
+    } as any);
+    const navigateTo = vi.fn();
+    const runtime = makeRuntime({ navigateTo }) as any;
+    const block = {
+      id: 'lead_actions',
+      blockType: 'workbench-action-bar',
+      actions: [
+        {
+          code: 'convert_lead',
+          label: 'Convert',
+          resultReceipt: {
+            title: 'Conversion completed',
+            links: [
+              {
+                key: 'account',
+                label: 'Open account',
+                resultField: 'accountId',
+                to: '/p/crm_account_common/view/${value}',
+              },
+              {
+                key: 'opportunity',
+                label: 'Open opportunity',
+                resultField: 'opportunityId',
+                to: '/p/crm_opportunity_common/view/${value}',
+              },
+            ],
+          },
+          onClick: {
+            action: 'command.execute',
+            args: {
+              command: 'crm:convert_lead',
+              targetRecordPid: 'LEAD-1',
+            },
+          },
+        },
+      ],
+    } as unknown as BlockConfig;
+
+    render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+    fireEvent.click(screen.getByTestId('workbench-action-convert_lead'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workbench-result-receipt')).toHaveTextContent(
+        'Conversion completed',
+      );
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open opportunity' }));
+    expect(navigateTo).toHaveBeenCalledWith('/p/crm_opportunity_common/view/OPP-1');
   });
 
   it('shows configured rejected feedback when a command returns business failure', async () => {
@@ -931,6 +1047,57 @@ describe('WorkbenchActionBarBlockRenderer', () => {
 });
 
 describe('StatusBannerBlockRenderer', () => {
+  it('formats configured currency summary values as readable business amounts', () => {
+    const runtime = makeRuntime() as any;
+    runtime.getContext().state.selectedAccount = {
+      attention_reason: 'pipeline',
+      pipeline_amount: 1886000,
+    };
+    const block: BlockConfig = {
+      id: 'account_attention',
+      blockType: 'status-banner',
+      context: '${state.selectedAccount}',
+      statusField: 'attention_reason',
+      titleMap: { pipeline: 'Open pipeline' },
+      summaryFields: [
+        {
+          label: 'Pipeline',
+          field: 'pipeline_amount',
+          valueType: 'currency',
+          currencyCode: 'CNY',
+          precision: 0,
+        },
+      ],
+    };
+
+    render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('status-banner-account_attention')).toHaveTextContent(
+      'CN¥1,886,000',
+    );
+  });
+
+  it('renders directly from a runtime-state context without a duplicate detail query', () => {
+    const runtime = makeRuntime() as any;
+    runtime.getContext().state.selectedQdp = {
+      crm_qdp_code: 'QDP-001',
+      crm_qdp_status: 'superseded',
+    };
+    const block: BlockConfig = {
+      id: 'qdp_status',
+      blockType: 'status-banner',
+      context: '${state.selectedQdp}',
+      statusField: 'crm_qdp_status',
+      titleMap: { superseded: 'Historical revision' },
+      summaryFields: [{ label: 'QDP Code', field: 'crm_qdp_code' }],
+    };
+
+    render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('status-banner-qdp_status')).toHaveTextContent('Historical revision');
+    expect(screen.getByTestId('status-banner-qdp_status')).toHaveTextContent('QDP-001');
+  });
+
   it('renders a running task banner and polls configured data sources', () => {
     vi.useFakeTimers();
     const reload = vi.fn().mockResolvedValue(undefined);
@@ -1235,6 +1402,80 @@ describe('StatusBannerBlockRenderer', () => {
     render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
 
     expect(screen.queryByTestId('status-banner-task_status')).not.toBeInTheDocument();
+  });
+});
+
+describe('StageRailBlockRenderer', () => {
+  it('shows completed, current, upcoming, and lost outcome states from the detail record', () => {
+    const runtime = makeRuntime() as any;
+    runtime.getContext().record = { crm_opp_stage: 'proposal' };
+    const block = {
+      id: 'sales_stage',
+      blockType: 'stage-rail',
+      context: '${record}',
+      stageField: 'crm_opp_stage',
+      title: { 'zh-CN': '销售阶段', en: 'Sales stage' },
+      stages: [
+        { value: 'discovery', label: 'Discovery' },
+        { value: 'qualification', label: 'Qualification' },
+        { value: 'proposal', label: 'Proposal' },
+        { value: 'negotiation', label: 'Negotiation' },
+        { value: 'closed_won', label: 'Won' },
+      ],
+      terminalStages: [{ value: 'closed_lost', label: 'Lost', tone: 'red' }],
+    } as unknown as BlockConfig;
+
+    const { rerender } = render(<StageRailBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('stage-rail-sales_stage')).toHaveTextContent('Sales stage');
+    expect(screen.getByTestId('stage-rail-step-discovery')).toHaveAttribute(
+      'data-stage-state',
+      'complete',
+    );
+    expect(screen.getByTestId('stage-rail-step-proposal')).toHaveAttribute(
+      'data-stage-state',
+      'current',
+    );
+    expect(screen.getByTestId('stage-rail-step-negotiation')).toHaveAttribute(
+      'data-stage-state',
+      'upcoming',
+    );
+
+    runtime.getContext().record = { crm_opp_stage: 'closed_lost' };
+    rerender(<StageRailBlockRenderer block={block} runtime={runtime} />);
+    expect(screen.getByTestId('stage-rail-terminal-closed_lost')).toHaveAttribute(
+      'data-stage-state',
+      'current',
+    );
+  });
+
+  it('uses the detail page record binding before a stale runtime context', () => {
+    const runtime = makeRuntime() as any;
+    runtime.getContext().record = {};
+    const block = {
+      id: 'detail_stage',
+      blockType: 'stage-rail',
+      context: '${record}',
+      record: { crm_opp_stage: 'proposal' },
+      stageField: 'crm_opp_stage',
+      stages: [
+        { value: 'discovery', label: 'Discovery' },
+        { value: 'proposal', label: 'Proposal' },
+      ],
+      terminalStages: [{ value: 'closed_lost', label: 'Lost' }],
+    } as unknown as BlockConfig;
+
+    render(<StageRailBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('stage-rail-step-discovery')).toHaveAttribute(
+      'data-stage-state',
+      'complete',
+    );
+    expect(screen.getByTestId('stage-rail-step-proposal')).toHaveAttribute(
+      'data-stage-state',
+      'current',
+    );
+    expect(screen.queryByTestId('stage-rail-terminal-closed_lost')).not.toBeInTheDocument();
   });
 });
 

@@ -9,10 +9,16 @@
     "extension": {
       "icon": "Building",
       "category": "crm",
+      "activityTimelineEnabled": true,
       "titleField": "crm_acc_name",
       "subtitleField": "crm_acc_code",
+      "importPolicy": {
+        "enabled": true,
+        "modes": ["insert", "update"],
+        "updateKeys": ["crm_acc_code"]
+      },
       "dataScope": {
-        "ownerField": "created_by",
+        "ownerField": "crm_acc_owner",
         "departmentField": null
       }
     },
@@ -31,8 +37,13 @@
     "extension": {
       "icon": "User",
       "category": "crm",
+      "activityTimelineEnabled": true,
       "titleField": "crm_ct_name",
-      "subtitleField": "crm_ct_email"
+      "subtitleField": "crm_ct_email",
+      "importPolicy": {
+        "enabled": true,
+        "modes": ["insert"]
+      }
     },
     "semantic_description": "An individual person at a customer organization. Contacts are reference entities linked to an account and may participate in multiple opportunities and activities. LLM need to understand: primary contact flag, contact title, communication channels.",
     "domain_category": "crm",
@@ -49,8 +60,14 @@
     "extension": {
       "icon": "Radar",
       "category": "crm",
+      "activityTimelineEnabled": true,
       "titleField": "crm_lead_company",
       "subtitleField": "crm_lead_code",
+      "importPolicy": {
+        "enabled": true,
+        "modes": ["insert", "update"],
+        "updateKeys": ["crm_lead_code"]
+      },
       "dataScope": {
         "ownerField": "crm_lead_assigned_to",
         "departmentField": null
@@ -107,11 +124,18 @@
     "extension": {
       "icon": "TrendingUp",
       "category": "crm",
+      "activityTimelineEnabled": true,
       "titleField": "crm_opp_name",
       "subtitleField": "crm_opp_code",
+      "importPolicy": {
+        "enabled": true,
+        "modes": ["insert", "update"],
+        "updateKeys": ["crm_opp_code"]
+      },
       "dataScope": {
         "ownerField": "crm_opp_owner",
-        "departmentField": null
+        "departmentField": null,
+        "departmentOwnerField": "crm_opp_owner"
       }
     },
     "semantic_description": "A sales deal opportunity representing a qualified prospect progressing through the sales pipeline. Tracked from discovery through proposal, negotiation, and close (won or lost). LLM need to understand: probability %, expected amount, close date, pipeline stage signals.",
@@ -205,6 +229,7 @@
     "extension": {
       "icon": "AlertTriangle",
       "category": "crm",
+      "activityTimelineEnabled": true,
       "titleField": "crm_cmp_code",
       "subtitleField": "crm_cmp_status"
     },
@@ -223,6 +248,7 @@
     "extension": {
       "icon": "Megaphone",
       "category": "crm",
+      "activityTimelineEnabled": true,
       "titleField": "crm_cpn_name",
       "subtitleField": "crm_cpn_code",
       "dataScope": {
@@ -582,7 +608,7 @@
     "semantic_description": "A generic quote/proposal summary synchronized from a quote fact source such as QuoteOps PCBA quote. It exposes account, opportunity, customer request, amount, status and result to Customer 360 and pipeline reports while keeping line-level pricing facts in the industry quote package.",
     "domain_category": "crm",
     "data_sensitivity": "confidential",
-    "lifecycle_description": "draft / pricing / approval / sent / accepted / rejected / expired, synchronized from source quote"
+    "lifecycle_description": "draft / pricing / approval / sent / accepted / ordered / rejected / expired; ordered is recorded only through the released-QDP order-commitment command"
   },
   {
     "code": "crm_approval_case_common",
@@ -684,6 +710,7 @@
     "extension": {
       "icon": "FileArchive",
       "category": "crm",
+      "skipDetailPage": true,
       "titleField": "crm_fp_code",
       "subtitleField": "crm_fp_package_hash",
       "dataScope": { "ownerField": "created_by", "departmentField": null }
@@ -705,6 +732,7 @@
     "extension": {
       "icon": "FileCheck",
       "category": "crm",
+      "skipDetailPage": true,
       "titleField": "crm_reqv_code",
       "subtitleField": "crm_reqv_version_label",
       "dataScope": { "ownerField": "created_by", "departmentField": null }
@@ -726,6 +754,7 @@
     "extension": {
       "icon": "BadgeCheck",
       "category": "crm",
+      "skipDetailPage": true,
       "titleField": "crm_cc_code",
       "subtitleField": "crm_cc_confirmation_ref",
       "dataScope": { "ownerField": "created_by", "departmentField": null }

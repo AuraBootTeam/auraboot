@@ -5,6 +5,13 @@
   "modelCode": "crm_contact_common",
   "kind": "list",
   "schemaVersion": 4,
+  "extension": {
+    "import": {
+      "enabled": true,
+      "permissionCode": "model.crm_contact_common.import",
+      "modes": ["insert"]
+    }
+  },
   "layout": {
     "type": "grid",
     "cols": 12

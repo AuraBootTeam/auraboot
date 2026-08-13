@@ -10,6 +10,7 @@ import type { ButtonConfig } from '~/framework/meta/schemas/types';
 import type { ToolbarActionConfig, SavedView, ViewType } from '~/framework/smart/types/savedView';
 import { ViewSelector } from '~/framework/smart/components/view/ViewSelector';
 import { ToolbarActionGroup } from './ToolbarActionGroup';
+import { ViewModeSwitcher } from './ViewModeSwitcher';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 
 export interface ListPageHeaderProps {
@@ -27,6 +28,8 @@ export interface ListPageHeaderProps {
   onCreateView: (viewType?: ViewType) => void;
   onManageViews: () => void;
   onViewTypeChange: (vt: ViewType) => void;
+  enableMultiView?: boolean;
+  availableViewTypes?: ViewType[];
   /** Action buttons from DSL toolbar/form-buttons block */
   buttons: ButtonConfig[];
   /** Toolbar action config from SavedView */
@@ -35,7 +38,7 @@ export interface ListPageHeaderProps {
   onAction: (button: ButtonConfig) => void;
   onToolbarConfigChange: (config: ToolbarActionConfig[]) => void;
   resolveLabel: (button: ButtonConfig) => string;
-  t?: (key: string) => string;
+  t?: (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   evaluateVisible: (button: ButtonConfig) => boolean;
   onImport: () => void;
   onExport: (format: 'xlsx' | 'csv') => void;
@@ -63,6 +66,8 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   onCreateView,
   onManageViews,
   onViewTypeChange,
+  enableMultiView,
+  availableViewTypes = ['table'],
   buttons,
   toolbarActions,
   onAction,
@@ -85,7 +90,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
     <div className="border-border bg-panel border-b px-6 py-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h2 className="text-text flex-shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight">
+          <h2 className="text-text flex-shrink-0 text-xl font-semibold tracking-tight whitespace-nowrap">
             {title}
           </h2>
           {!hideSavedViews && (
@@ -99,6 +104,13 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
               loading={viewsLoading}
               activeViewType={activeViewType}
               onViewTypeChange={onViewTypeChange}
+            />
+          )}
+          {enableMultiView && (
+            <ViewModeSwitcher
+              activeType={activeViewType}
+              availableTypes={availableViewTypes}
+              onChange={onViewTypeChange}
             />
           )}
         </div>

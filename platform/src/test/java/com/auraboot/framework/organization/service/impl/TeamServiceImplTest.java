@@ -1,15 +1,18 @@
 package com.auraboot.framework.organization.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.organization.dto.*;
 import com.auraboot.framework.organization.entity.Team;
 import com.auraboot.framework.organization.entity.TeamMember;
 import com.auraboot.framework.organization.mapper.TeamMapper;
 import com.auraboot.framework.organization.mapper.TeamMemberMapper;
+import com.auraboot.framework.organization.service.TeamGovernanceService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +34,7 @@ class TeamServiceImplTest {
     @Mock private TeamMapper teamMapper;
     @Mock private TeamMemberMapper teamMemberMapper;
     @Mock private UserService userService;
+    @Mock private TeamGovernanceService teamGovernanceService;
 
     private TeamServiceImpl service;
     private TeamServiceImpl spyService;
@@ -42,7 +46,20 @@ class TeamServiceImplTest {
         injectField(service, "teamMapper", teamMapper);
         injectField(service, "teamMemberMapper", teamMemberMapper);
         injectField(service, "userService", userService);
+        injectField(service, "teamGovernanceService", teamGovernanceService);
         spyService = spy(service);
+        MetaContext.setContext(1L, 5L, "user-pid", "alice");
+        lenient().when(teamGovernanceService.requireTeam(any(), anyString())).thenAnswer(invocation -> {
+            String pid = invocation.getArgument(1);
+            Team found = teamMapper.findByPid(pid);
+            if (found == null) throw new BusinessException("Team not found: " + pid);
+            return found;
+        });
+    }
+
+    @AfterEach
+    void tearDown() {
+        MetaContext.clear();
     }
 
     static void injectField(Object target, String name, Object value) throws Exception {

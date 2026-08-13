@@ -18,6 +18,7 @@ import type {
 import { cn } from '~/utils/cn';
 import { ChartEmptyState } from './ChartEmptyState';
 import { dimensionLabel } from '~/framework/smart/utils/chartLabels';
+import { enrichDrillDownFilters } from '~/framework/smart/utils/drillDownFilters';
 
 /**
  * Props for SmartPieChart component
@@ -139,11 +140,12 @@ export const SmartPieChart: React.FC<SmartPieChartProps> = ({
    * Handle chart click events for drill-down and linkage
    */
   const handleChartClick = useCallback(
-    (params: { name?: string; data?: { name?: string; value?: number } }) => {
+    (params: { name?: string; data?: { name?: string; value?: number }; dataIndex?: number }) => {
       if (!data?.meta?.dimensions?.length) return;
 
       const dimension = data.meta.dimensions[0];
-      const clickedValue = params.name || params.data?.name;
+      const clickedRow = params.dataIndex == null ? undefined : data.rows[params.dataIndex];
+      const clickedValue = clickedRow?.[dimension] ?? params.name ?? params.data?.name;
 
       if (!clickedValue) return;
 
@@ -155,7 +157,9 @@ export const SmartPieChart: React.FC<SmartPieChartProps> = ({
 
       // Handle drill-down
       if (drillDown?.enabled && onDrillDown) {
-        onDrillDown([filter]);
+        const row =
+          clickedRow ?? data.rows.find((candidate) => candidate[dimension] === clickedValue);
+        onDrillDown(enrichDrillDownFilters(filter, row, drillDown));
       }
 
       // Handle linkage

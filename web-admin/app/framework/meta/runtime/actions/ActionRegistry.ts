@@ -633,6 +633,7 @@ export async function promptInputForm(
   title: any,
   fetchResult?: (url: string, opts: any) => Promise<any>,
   submitLabel?: any,
+  runtimeContext: Record<string, unknown> = {},
 ): Promise<Record<string, any>> {
   const fieldOptions: Record<
     string,
@@ -641,7 +642,11 @@ export async function promptInputForm(
   for (const field of fields) {
     if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
       try {
-        const result = await fetchResult(field.dataSource.endpoint, {
+        const endpoint = String(field.dataSource.endpoint).replace(
+          /\$\{([^}]+)\}/g,
+          (_match, path) => String(readInputPath(runtimeContext, path) ?? ''),
+        );
+        const result = await fetchResult(endpoint, {
           method: 'get',
           ...(field.dataSource.params ? { params: field.dataSource.params } : {}),
         });
@@ -723,6 +728,14 @@ export async function promptInputForm(
     });
     window.dispatchEvent(event);
   });
+}
+
+function readInputPath(source: unknown, path: string): unknown {
+  if (!source || typeof source !== 'object') return undefined;
+  return path.split('.').reduce<unknown>((current, segment) => {
+    if (!current || typeof current !== 'object') return undefined;
+    return (current as Record<string, unknown>)[segment];
+  }, source);
 }
 
 /**

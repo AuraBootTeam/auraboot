@@ -25,7 +25,8 @@ import java.util.stream.Collectors;
 
 /**
  * Listens for CommandCompletedEvent and auto-records activity timeline entries
- * for DOCUMENT and MASTER model categories.
+ * for DOCUMENT and MASTER model categories, plus models that explicitly opt in
+ * through {@code extension.activityTimelineEnabled=true}.
  *
  * Runs async after commit (same pattern as AuditTrailEventListener).
  * Activity timeline is user-facing (unlike audit trail which is for compliance).
@@ -41,6 +42,7 @@ public class ActivityEventListener {
     private final DynamicDataMapper dynamicDataMapper;
 
     private static final Set<String> TRACKABLE_CATEGORIES = Set.of("document", "master");
+    private static final String ACTIVITY_TIMELINE_ENABLED = "activityTimelineEnabled";
 
     @Async("eventTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -101,8 +103,17 @@ public class ActivityEventListener {
         try {
             Optional<ModelDefinition> modelDef = metaModelService.getModelDefinition(modelCode);
             if (modelDef.isEmpty()) return false;
-            String category = modelDef.get().getModelCategory();
-            return category != null && TRACKABLE_CATEGORIES.contains(category);
+            ModelDefinition definition = modelDef.get();
+            String category = definition.getModelCategory();
+            if (category != null && TRACKABLE_CATEGORIES.contains(category)) {
+                return true;
+            }
+
+            Map<String, Object> extension = definition.getExtension();
+            Object enabled = extension == null ? null : extension.get(ACTIVITY_TIMELINE_ENABLED);
+            return enabled instanceof Boolean value
+                    ? value
+                    : enabled != null && Boolean.parseBoolean(enabled.toString());
         } catch (Exception e) {
             log.debug("Could not check model category for {}: {}", modelCode, e.getMessage());
             return false;

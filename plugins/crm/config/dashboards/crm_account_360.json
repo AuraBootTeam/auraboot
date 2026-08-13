@@ -1,7 +1,7 @@
 {
   "code": "crm_account_360",
-  "title": "crm_account_360",
-  "description": "Account 360-degree dashboard with key metrics, recent opportunities, and activity timeline",
+  "title": "$i18n:page.crm_account_360.title",
+  "description": "$i18n:page.crm_account_360.description",
   "scope": "global",
   "status": "published",
   "sortOrder": 0,
@@ -32,19 +32,27 @@
         "dataSource": {
           "type": "namedQuery",
           "queryCode": "crm_account_stats",
-          "params": {
+          "parameters": {
             "accountId": "${recordPid}"
           }
         },
-        "valueField": "total_contacts",
-        "color": "#1890ff"
+        "metricField": "total_contacts",
+        "color": "#1890ff",
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_contact_common",
+          "filters": [
+            { "targetField": "crm_ct_account_id", "value": "${recordPid}" }
+          ]
+        }
       }
     },
     {
       "id": "stats_opportunities",
       "type": "smart-number-card",
-      "x": 0,
-      "y": 1,
+      "x": 2,
+      "y": 0,
       "w": 2,
       "h": 1,
       "title": {
@@ -60,19 +68,32 @@
         "dataSource": {
           "type": "namedQuery",
           "queryCode": "crm_account_stats",
-          "params": {
+          "parameters": {
             "accountId": "${recordPid}"
           }
         },
-        "valueField": "open_opportunities",
-        "color": "#52c41a"
+        "metricField": "open_opportunities",
+        "color": "#52c41a",
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_opportunity_common",
+          "filters": [
+            { "targetField": "crm_opp_account_id", "value": "${recordPid}" },
+            {
+              "targetField": "crm_opp_stage",
+              "operator": "in",
+              "value": ["discovery", "qualification", "proposal", "negotiation"]
+            }
+          ]
+        }
       }
     },
     {
       "id": "stats_revenue",
       "type": "smart-number-card",
-      "x": 0,
-      "y": 2,
+      "x": 4,
+      "y": 0,
       "w": 3,
       "h": 1,
       "title": {
@@ -88,20 +109,29 @@
         "dataSource": {
           "type": "namedQuery",
           "queryCode": "crm_account_stats",
-          "params": {
+          "parameters": {
             "accountId": "${recordPid}"
           }
         },
-        "valueField": "won_revenue",
+        "metricField": "won_revenue",
         "prefix": "¥",
-        "color": "#faad14"
+        "color": "#faad14",
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_opportunity_common",
+          "filters": [
+            { "targetField": "crm_opp_account_id", "value": "${recordPid}" },
+            { "targetField": "crm_opp_stage", "value": "closed_won" }
+          ]
+        }
       }
     },
     {
       "id": "stats_quotes",
       "type": "smart-number-card",
-      "x": 0,
-      "y": 3,
+      "x": 7,
+      "y": 0,
       "w": 2,
       "h": 1,
       "title": {
@@ -117,19 +147,27 @@
         "dataSource": {
           "type": "namedQuery",
           "queryCode": "crm_account_stats",
-          "params": {
+          "parameters": {
             "accountId": "${recordPid}"
           }
         },
-        "valueField": "total_quotes",
-        "color": "#722ed1"
+        "metricField": "total_quotes",
+        "color": "#722ed1",
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_quote_summary_common",
+          "filters": [
+            { "targetField": "crm_qs_account_id", "value": "${recordPid}" }
+          ]
+        }
       }
     },
     {
       "id": "stats_complaints",
       "type": "smart-number-card",
-      "x": 0,
-      "y": 4,
+      "x": 9,
+      "y": 0,
       "w": 3,
       "h": 1,
       "title": {
@@ -145,21 +183,29 @@
         "dataSource": {
           "type": "namedQuery",
           "queryCode": "crm_account_stats",
-          "params": {
+          "parameters": {
             "accountId": "${recordPid}"
           }
         },
-        "valueField": "total_complaints",
-        "color": "#ff4d4f"
+        "metricField": "total_complaints",
+        "color": "#ff4d4f",
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_complaint",
+          "filters": [
+            { "targetField": "crm_cmp_account_id", "value": "${recordPid}" }
+          ]
+        }
       }
     },
     {
       "id": "recent_opportunities",
       "type": "smart-table-chart",
       "x": 0,
-      "y": 5,
+      "y": 1,
       "w": 12,
-      "h": 1,
+      "h": 3,
       "title": {
         "zh-CN": "近期商机",
         "en": "Recent Opportunities"
@@ -172,56 +218,63 @@
         "modelCode": "crm_opportunity_common",
         "filters": [
           {
-            "fieldName": "crm_opp_account_id",
-            "operator": "EQ",
+            "field": "crm_opp_account_id",
+            "operator": "eq",
             "value": "${recordPid}"
           }
         ],
-        "columns": [
-          {
-            "field": "crm_opp_code",
-            "width": 140
-          },
-          {
-            "field": "crm_opp_name",
-            "width": 200
-          },
-          {
-            "field": "crm_opp_stage",
-            "width": 120,
-            "renderType": "tag"
-          },
-          {
-            "field": "crm_opp_expected_amount",
-            "width": 140,
-            "align": "right"
-          },
-          {
-            "field": "crm_opp_expected_close_date",
-            "width": 140
-          },
-          {
-            "field": "crm_opp_probability",
-            "width": 100,
-            "align": "right"
-          },
-          {
-            "field": "crm_opp_owner",
-            "width": 120
-          }
-        ],
-        "sortField": "created_at",
-        "sortOrder": "desc",
-        "pageSize": 5
+        "defaultSort": {
+          "field": "created_at",
+          "order": "desc"
+        },
+        "pageSize": 5,
+        "showPagination": false,
+        "table": {
+          "columns": [
+            {
+              "field": "crm_opp_name",
+              "width": 300,
+              "label": { "zh-CN": "商机名称", "en": "Opportunity" }
+            },
+            {
+              "field": "crm_opp_stage",
+              "width": 120,
+              "renderType": "tag",
+              "dictCode": "crm_opportunity_stage",
+              "label": { "zh-CN": "阶段", "en": "Stage" }
+            },
+            {
+              "field": "crm_opp_expected_amount",
+              "width": 140,
+              "align": "right",
+              "format": "currency",
+              "currency": "CNY",
+              "label": { "zh-CN": "预期金额", "en": "Expected Amount" }
+            },
+            {
+              "field": "crm_opp_expected_close_date",
+              "width": 140,
+              "format": "date",
+              "label": { "zh-CN": "预计成交日", "en": "Expected Close" }
+            },
+            {
+              "field": "crm_opp_probability",
+              "width": 100,
+              "align": "right",
+              "format": "percent",
+              "label": { "zh-CN": "赢率", "en": "Probability" }
+            }
+          ]
+        }
       }
     },
     {
       "id": "recent_activities",
       "type": "smart-table-chart",
       "x": 0,
-      "y": 6,
+      "y": 4,
       "w": 12,
-      "h": 1,
+      "h": 3,
       "title": {
         "zh-CN": "近期活动",
         "en": "Recent Activities"
@@ -241,31 +294,41 @@
             "maxItems": "10"
           }
         },
-        "columns": [
-          {
-            "field": "crm_act_type",
-            "width": 100,
-            "renderType": "tag"
-          },
-          {
-            "field": "crm_act_subject",
-            "width": 250
-          },
-          {
-            "field": "crm_act_date",
-            "width": 160,
-            "format": "YYYY-MM-DD HH:mm"
-          },
-          {
-            "field": "crm_act_owner",
-            "width": 120
-          },
-          {
-            "field": "crm_ar_object_type",
-            "width": 100,
-            "renderType": "tag"
-          }
-        ]
+        "pageSize": 5,
+        "showPagination": false,
+        "table": {
+          "columns": [
+            {
+              "field": "crm_act_type",
+              "width": 100,
+              "renderType": "tag",
+              "dictCode": "crm_activity_type",
+              "label": { "zh-CN": "类型", "en": "Type" }
+            },
+            {
+              "field": "crm_act_subject",
+              "width": 250,
+              "label": { "zh-CN": "主题", "en": "Subject" }
+            },
+            {
+              "field": "crm_act_date",
+              "width": 160,
+              "format": "datetime",
+              "label": { "zh-CN": "发生时间", "en": "Activity Time" }
+            },
+            {
+              "field": "owner_name",
+              "width": 120,
+              "label": { "zh-CN": "负责人", "en": "Owner" }
+            },
+            {
+              "field": "crm_ar_object_type",
+              "width": 100,
+              "renderType": "tag",
+              "label": { "zh-CN": "关联对象", "en": "Related To" }
+            }
+          ]
+        }
       }
     }
   ]

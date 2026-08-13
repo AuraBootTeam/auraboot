@@ -274,14 +274,36 @@ describe('permissionService', () => {
   // ── addRoleMembers ───────────────────────────────────────────────────────────
 
   describe('addRoleMembers', () => {
-    it('calls fetchResult POST /api/roles/:rolePid/members', async () => {
+    it('calls the structured role assignment endpoint for permanent access', async () => {
       fetchResultMock.mockResolvedValue(ok(null));
 
       await permissionService.addRoleMembers('role-1', ['user-1', 'user-2']);
 
       expect(fetchResultMock).toHaveBeenCalledWith(
-        '/api/roles/role-1/members',
-        expect.objectContaining({ method: 'post' }),
+        '/api/roles/role-1/members/assign',
+        { method: 'post', params: { memberPids: ['user-1', 'user-2'] } },
+        undefined,
+      );
+    });
+
+    it('forwards a time-bounded role window', async () => {
+      fetchResultMock.mockResolvedValue(ok(null));
+
+      await permissionService.addRoleMembers('role-1', ['user-1'], {
+        effectiveDate: '2026-08-13',
+        expiryDate: '2026-08-20',
+      });
+
+      expect(fetchResultMock).toHaveBeenCalledWith(
+        '/api/roles/role-1/members/assign',
+        {
+          method: 'post',
+          params: {
+            memberPids: ['user-1'],
+            effectiveDate: '2026-08-13',
+            expiryDate: '2026-08-20',
+          },
+        },
         undefined,
       );
     });

@@ -547,6 +547,79 @@ describe('SubTableViewer', () => {
     });
   });
 
+  it('accepts legacy rowActions and collects command input fields before execution', async () => {
+    fetchResultMock
+      .mockResolvedValueOnce({
+        code: '0',
+        data: {
+          records: [
+            {
+              pid: 'pick-line-1',
+              inv_pkl_status: 'pending',
+              inv_pkl_picked_qty: 0,
+            },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({ code: '0', data: {} })
+      .mockResolvedValueOnce({ code: '0', data: { records: [] } });
+
+    const submitDialog = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      expect(detail.fields[0].helpText['zh-CN']).toContain('累计数量');
+      detail.onSubmit({ quantity: 2 });
+    };
+    window.addEventListener('dialog:form', submitDialog, { once: true });
+
+    render(
+      <SubTableViewer
+        config={{
+          ...buildConfig(),
+          rowActions: [
+            {
+              code: 'record_pick',
+              label: '记录拣货',
+              visibleWhen:
+                "form.inv_pick_source_type === 'production_issue' && row.inv_pkl_status === 'pending'",
+              action: {
+                type: 'command',
+                command: 'inv:record_issue_pick',
+                inputFieldsTitle: '记录本次实物拣货',
+                inputFields: [
+                  {
+                    field: 'quantity',
+                    type: 'number',
+                    required: true,
+                    helpText: { 'zh-CN': '累计数量不得超过需求量。' },
+                  },
+                ],
+              },
+            },
+          ],
+          columns: [{ field: 'inv_pkl_status', label: '状态' }],
+        }}
+        parentRecordPid="pick-1"
+        parentRecordData={{ inv_pick_source_type: 'production_issue' }}
+      />,
+    );
+
+    await expect(screen.findByTestId('sortable-row-pick-line-1')).resolves.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('subtable-row-action-record_pick-0'));
+
+    await waitFor(() => {
+      expect(fetchResultMock).toHaveBeenCalledWith(
+        '/api/meta/commands/execute/inv:record_issue_pick',
+        expect.objectContaining({
+          method: 'post',
+          params: expect.objectContaining({
+            targetRecordPid: 'pick-line-1',
+            payload: expect.objectContaining({ quantity: 2 }),
+          }),
+        }),
+      );
+    });
+  });
+
   it('navigates row actions with row field path templates', async () => {
     fetchResultMock.mockResolvedValue({
       code: '0',

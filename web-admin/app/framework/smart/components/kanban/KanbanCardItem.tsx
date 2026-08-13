@@ -10,12 +10,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { Check, X } from 'lucide-react';
 import { cn } from '~/utils/cn';
 import type { KanbanCard, KanbanCardField } from '~/framework/smart/types/kanban';
-import {
-  AvatarField,
-  CurrencyField,
-  DateRelativeField,
-  ProgressField,
-} from './cardFields';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
+import { AvatarField, CurrencyField, DateRelativeField, ProgressField } from './cardFields';
 
 /**
  * Props for KanbanCardItem component
@@ -54,16 +51,9 @@ function renderFieldValue(field: KanbanCardField, value: unknown): React.ReactNo
     case 'avatar':
       return <AvatarField value={value === null || value === undefined ? null : String(value)} />;
     case 'progress':
-      return (
-        <ProgressField
-          value={value as number | string | null | undefined}
-          max={field.max}
-        />
-      );
+      return <ProgressField value={value as number | string | null | undefined} max={field.max} />;
     case 'date-relative':
-      return (
-        <DateRelativeField value={value as string | Date | null | undefined} />
-      );
+      return <DateRelativeField value={value as string | Date | null | undefined} />;
     case 'date': {
       if (value === null || value === undefined) return '-';
       const date = value instanceof Date ? value : new Date(String(value));
@@ -89,6 +79,19 @@ function renderFieldValue(field: KanbanCardField, value: unknown): React.ReactNo
 }
 
 /**
+ * Dynamic list APIs expose reference labels beside their stored ids using the
+ * `<field>_display` convention. Cards must prefer that business label so a
+ * customer or owner reference never degrades into an internal public id.
+ */
+export function resolveKanbanCardFieldValue(card: KanbanCard, field: KanbanCardField): unknown {
+  const displayValue = card[`${field.field}_display`];
+  if (displayValue !== undefined && displayValue !== null && displayValue !== '') {
+    return displayValue;
+  }
+  return card[field.field];
+}
+
+/**
  * KanbanCardItem - A draggable card for the Kanban board
  */
 export function KanbanCardItem({
@@ -100,6 +103,7 @@ export function KanbanCardItem({
   terminal,
   onClick,
 }: KanbanCardItemProps) {
+  const { locale, t } = useI18n();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     disabled: !draggable,
@@ -149,13 +153,13 @@ export function KanbanCardItem({
       {/* Terminal corner badge */}
       {terminal === 'won' && (
         <Check
-          className="absolute right-1 top-1 h-3 w-3 text-green-500"
+          className="absolute top-1 right-1 h-3 w-3 text-green-500"
           data-testid="card-terminal-icon-won"
         />
       )}
       {terminal === 'lost' && (
         <X
-          className="absolute right-1 top-1 h-3 w-3 text-gray-400"
+          className="absolute top-1 right-1 h-3 w-3 text-gray-400"
           data-testid="card-terminal-icon-lost"
         />
       )}
@@ -174,7 +178,8 @@ export function KanbanCardItem({
       {cardFields && cardFields.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
           {cardFields.map((field) => {
-            const value = card[field.field];
+            const value = resolveKanbanCardFieldValue(card, field);
+            const label = field.label ? getLocalizedText(field.label as any, locale, t) : '';
             const isNewFieldType =
               field.type === 'currency' ||
               field.type === 'avatar' ||
@@ -187,7 +192,7 @@ export function KanbanCardItem({
 
             return (
               <div key={field.field} className="flex items-center gap-1 text-xs text-gray-600">
-                {field.label && <span className="text-gray-400">{field.label}:</span>}
+                {label && <span className="text-gray-400">{label}:</span>}
                 <span>{renderFieldValue(field, value)}</span>
               </div>
             );

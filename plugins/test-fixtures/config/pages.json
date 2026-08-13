@@ -294,6 +294,11 @@
       }
     ],
     "extension": {
+      "import": {
+        "enabled": true,
+        "permissionCode": "model.e2et_order.import",
+        "modes": ["insert"]
+      },
       "options": {
         "detailNavigation": "page"
       },
@@ -807,6 +812,13 @@
     "description": "Customer list with search fields and data table",
     "kind": "list",
     "schemaVersion": 4,
+    "extension": {
+      "import": {
+        "enabled": true,
+        "permissionCode": "model.e2et_customer.import",
+        "modes": ["insert"]
+      }
+    },
     "layout": {
       "type": "grid",
       "cols": 12

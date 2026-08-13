@@ -17,6 +17,7 @@ import { register, proxyDurationHistogram } from './metrics.server';
 import { buildLoginFailureRedirect } from './login-failure';
 import { sessionStorage } from '~/shared/services/session';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
+import { resolveDeploymentBranding } from '~/config/branding.server';
 
 // ============================================================
 // CRITICAL: Bypass system proxy for ALL axios requests in BFF.
@@ -288,6 +289,19 @@ app.post('/login', express.urlencoded({ extended: true, limit: '100kb' }), async
 app.get('/metrics', async (_req, res) => {
   res.set('Content-Type', register.contentType);
   res.end(await register.metrics());
+});
+
+// Root route modules are also compiled into the browser graph. Keep License
+// verification and deployment file access behind this BFF-only boundary and
+// return only the public, serialized branding contract.
+app.get('/api/runtime/branding', async (_req, res, next) => {
+  try {
+    const branding = await resolveDeploymentBranding(process.env);
+    res.set('Cache-Control', 'no-store');
+    res.json({ branding });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Proxy timing middleware — measure BFF→backend latency

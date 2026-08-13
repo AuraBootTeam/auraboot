@@ -372,6 +372,13 @@ STATUS_OUTPUT_FROM_OTHER_CWD="$(
 )"
 assert_contains "env status anchors env file to script project root" "$STATUS_OUTPUT_FROM_OTHER_CWD" '"slug":"scriptcheck-r2"'
 
+SCHEMA_VERIFY_OUTPUT="$(
+    cd "$PROJECT_ROOT" &&
+    AURA_ENV_REGISTRY_ROOT="$REGISTRY_ROOT" scripts/dev/env.sh verify --mode=bugfix --product=enterprise --slug=scriptcheck-r2 --level=schema --dry-run
+)"
+assert_contains "env schema verify dry-run names schema readiness" "$SCHEMA_VERIFY_OUTPUT" "Schema readiness targets"
+assert_contains "env schema verify dry-run checks QR enterprise table" "$SCHEMA_VERIFY_OUTPUT" "required table: ab_qr_label_template"
+
 echo "Scenario 13: unified env reset dry-run is explicit and does not stop host processes"
 RESET_OUTPUT="$(
     cd "$PROJECT_ROOT" &&
@@ -382,6 +389,9 @@ assert_contains "env reset dry-run uses registered enterprise root" "$RESET_OUTP
 assert_contains "env reset dry-run names isolated database" "$RESET_OUTPUT" "localhost:15432/aura_boot"
 assert_contains "env reset dry-run documents no global process cleanup" "$RESET_OUTPUT" "no global pkill"
 assert_contains "env reset dry-run documents bootstrap setup" "$RESET_OUTPUT" "/api/bootstrap/setup"
+ENV_SH_SOURCE="$(cat "$PROJECT_ROOT/scripts/dev/env.sh")"
+assert_contains "env reset implementation invokes shared bootstrap helper" "$ENV_SH_SOURCE" "aura_bootstrap_setup_if_needed"
+assert_contains "env reset implementation waits for backend recovery" "$ENV_SH_SOURCE" "backend did not recover after database reset"
 
 echo "Scenario 14: unified env stop dry-run uses exact tmux sessions and ports"
 STOP_OUTPUT="$(
@@ -419,6 +429,7 @@ DEMO_OUTPUT="$(
     AURA_ENV_REGISTRY_ROOT="$REGISTRY_ROOT" scripts/dev/env.sh demo --mode=bugfix --product=oss --slug=scriptcheck-r2 --dry-run
 )"
 assert_contains "env demo dry-run names scenario" "$DEMO_OUTPUT" "scenario:        bugfix-oss-demo"
+assert_contains "env demo dry-run reuses host web server" "$DEMO_OUTPUT" "export PW_SKIP_WEBSERVER=1"
 assert_contains "env demo dry-run uses e2e plugin profile" "$DEMO_OUTPUT" "plugin profile:  e2e"
 assert_contains "env demo dry-run includes workflow data" "$DEMO_OUTPUT" "workflow data:"
 assert_contains "env demo dry-run includes invariants" "$DEMO_OUTPUT" "node scripts/oss-demo-invariants.mjs"

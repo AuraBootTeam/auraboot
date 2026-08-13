@@ -2236,7 +2236,20 @@
             "confirm": "suspend.confirm",
             "action": {
               "type": "command",
-              "command": "admin:suspend_member"
+              "command": "admin:suspend_member",
+              "offboardingAction": "suspend",
+              "inputFieldsTitle": {
+                "zh-CN": "暂停成员",
+                "en-US": "Suspend member"
+              },
+              "inputFields": [
+                {
+                  "field": "reason",
+                  "label": { "zh-CN": "暂停原因", "en-US": "Reason" },
+                  "type": "textarea",
+                  "required": true
+                }
+              ]
             }
           },
           {
@@ -2250,7 +2263,19 @@
             "confirm": "leave.confirm",
             "action": {
               "type": "command",
-              "command": "admin:leave_member"
+              "command": "admin:leave_member",
+              "offboardingAction": "deactivate",
+              "inputFieldsTitle": {
+                "zh-CN": "办理离职",
+                "en-US": "Offboard member"
+              },
+              "inputFields": [
+                {
+                  "field": "reason",
+                  "label": { "zh-CN": "离职说明", "en-US": "Reason" },
+                  "type": "textarea"
+                }
+              ]
             }
           },
           {
@@ -2294,7 +2319,13 @@
             "confirm": "delete.confirm",
             "action": {
               "type": "command",
-              "command": "admin:delete_member"
+              "command": "admin:delete_member",
+              "offboardingAction": "remove",
+              "inputFieldsTitle": {
+                "zh-CN": "移除成员并交接资源",
+                "en-US": "Remove member and transfer resources"
+              },
+              "inputFields": []
             }
           }
         ],

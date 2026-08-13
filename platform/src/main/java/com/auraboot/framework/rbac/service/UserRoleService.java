@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDate;
 
 /**
  * User-role association service interface.
@@ -24,10 +25,16 @@ public interface UserRoleService extends IService<UserRole> {
      */
     boolean assignRolesToMemberByRolePids(String memberPid, List<String> rolePids, Long tenantId, Long operatorId);
 
+    boolean assignRolesToMemberByRolePids(String memberPid, List<String> rolePids, LocalDate effectiveDate,
+                                          LocalDate expiryDate, Long tenantId, Long operatorId);
+
     /**
      * Assign roles to a member using a public member PID and stable role codes.
      */
     boolean assignRolesToMemberByRoleCodes(String memberPid, List<String> roleCodes, Long tenantId, Long operatorId);
+
+    boolean assignRolesToMemberByRoleCodes(String memberPid, List<String> roleCodes, LocalDate effectiveDate,
+                                           LocalDate expiryDate, Long tenantId, Long operatorId);
 
     /**
      * Remove roles from a member

@@ -7,6 +7,7 @@ import com.auraboot.framework.bi.service.impl.ReportExportServiceImpl;
 import com.auraboot.framework.bi.service.impl.ReportRenderClient;
 import com.auraboot.framework.bi.service.impl.ReportRenderProperties;
 import com.auraboot.framework.bi.service.ReportStorageService;
+import com.auraboot.framework.branding.BrandingIdentity;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
@@ -38,7 +39,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 /**
@@ -96,7 +96,7 @@ class ReportDeliveryLiveIT {
 
     @Test
     @EnabledIf("rendererAvailable")
-    void scheduledDelivery_attachesRealWysiwygPdf() throws Exception {
+    void scheduledDeliveryAttachesRealWysiwygPdf() throws Exception {
         ReportRenderProperties props = new ReportRenderProperties();
         props.setEnabled(true);
         props.setCommand(List.of(tsx().toString(), cli().toString()));
@@ -105,7 +105,7 @@ class ReportDeliveryLiveIT {
 
         ReportExportServiceImpl exportService = new ReportExportServiceImpl(
                 pageSchemaMapper, new ObjectMapper(), dynamicDataService, namedQueryService,
-                reportStorageService, auditTrailService, renderClient);
+                reportStorageService, auditTrailService, renderClient, BrandingIdentity::community);
 
         ReportDeliveryServiceImpl deliveryService = new ReportDeliveryServiceImpl(exportService);
         ReflectionTestUtils.setField(deliveryService, "mailSender", mailSender);

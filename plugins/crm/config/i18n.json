@@ -2303,6 +2303,13 @@
     "refType": "page"
   },
   {
+    "key": "page.crm_account_360.description",
+    "zh-CN": "客户关键指标、近期商机与活动全景",
+    "en-US": "Account metrics, recent opportunities, and activity overview",
+    "source": "import",
+    "refType": "page"
+  },
+  {
     "key": "crm.stat.contacts",
     "zh-CN": "联系人",
     "en-US": "Contacts",
@@ -2513,6 +2520,27 @@
     "refType": "page"
   },
   {
+    "key": "page.crm_dashboard.description",
+    "zh-CN": "销售全景、商机管道、线索来源与客户行动的一体化经营视图",
+    "en-US": "An integrated operating view of sales, pipeline, lead sources and customer actions",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_sales_forecast.title",
+    "zh-CN": "销售预测",
+    "en-US": "Sales Forecast",
+    "source": "import",
+    "refType": "page"
+  },
+  {
+    "key": "page.crm_sales_forecast.description",
+    "zh-CN": "按阶段、月份、负责人和预测类别统一核对管道与加权预测",
+    "en-US": "Review pipeline and weighted forecasts by stage, month, owner and category",
+    "source": "import",
+    "refType": "page"
+  },
+  {
     "key": "menu.CRM_DASHBOARD.label",
     "zh-CN": "驾驶舱",
     "en-US": "Dashboard",
@@ -2537,6 +2565,111 @@
     "key": "dashboard.crm.kpi.pipeline_value",
     "zh-CN": "管道总额",
     "en-US": "Pipeline Value",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.kanban.count",
+    "zh-CN": "数量",
+    "en-US": "Count",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.all_accounts",
+    "zh-CN": "全部客户",
+    "en-US": "All Accounts",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.all_accounts_description",
+    "zh-CN": "按最近更新时间查看可访问的全部客户",
+    "en-US": "All accessible accounts ordered by latest update",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.collaborative_accounts",
+    "zh-CN": "协作客户",
+    "en-US": "Collaborative Accounts",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.collaborative_accounts_description",
+    "zh-CN": "其他负责人邀请我查看或共同维护的客户",
+    "en-US": "Accounts another owner invited me to view or maintain",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.all_opportunities",
+    "zh-CN": "全部商机",
+    "en-US": "All Opportunities",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.all_opportunities_description",
+    "zh-CN": "按最近更新时间查看全部商机",
+    "en-US": "All opportunities ordered by latest update",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.my_opportunities",
+    "zh-CN": "我的商机",
+    "en-US": "My Opportunities",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.my_opportunities_description",
+    "zh-CN": "仅显示当前用户负责的商机",
+    "en-US": "Opportunities owned by the current user",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.department_opportunities",
+    "zh-CN": "部门商机",
+    "en-US": "Department Opportunities",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.department_opportunities_description",
+    "zh-CN": "当前部门及其下级部门成员负责的商机",
+    "en-US": "Opportunities owned by members of the current department and its descendants",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.won_opportunities",
+    "zh-CN": "赢单商机",
+    "en-US": "Won Opportunities",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.won_opportunities_description",
+    "zh-CN": "已完成赢单的商机",
+    "en-US": "Opportunities completed as won",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.pipeline_board",
+    "zh-CN": "销售管道看板",
+    "en-US": "Pipeline Board",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "crm.saved_view.pipeline_board_description",
+    "zh-CN": "按销售阶段分组的商机管道看板",
+    "en-US": "Opportunity pipeline kanban board grouped by sales stage",
     "source": "import",
     "refType": "ui"
   },

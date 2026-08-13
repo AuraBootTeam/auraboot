@@ -127,7 +127,7 @@ function renderLinkCell(
       target={target}
       rel={target === '_blank' ? 'noreferrer' : undefined}
       onClick={(event) => event.stopPropagation()}
-      className="text-accent font-medium underline decoration-border underline-offset-2 hover:text-accent-hover"
+      className="text-accent decoration-border hover:text-accent-hover font-medium underline underline-offset-2"
     >
       {label}
     </a>
@@ -261,8 +261,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
           command: inlineEditCommand,
           targetRecordPid: pid,
           payload: { [writeField]: value },
-          reload:
-            inlineEditConfig?.reload ?? (dataSourceId ? [dataSourceId] : []),
+          reload: inlineEditConfig?.reload ?? (dataSourceId ? [dataSourceId] : []),
         },
       });
     },
@@ -338,7 +337,21 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       Boolean(currentKey) &&
       data.some((row: any, index: number) => getRowIdentity(row, index) === currentKey);
 
-    if (data.length > 0 && !currentStillVisible) {
+    // A data-source reload can replace the selected row with a newer snapshot while
+    // preserving the same public id. Keep the bound workbench context current so
+    // sibling status banners and lifecycle actions do not evaluate stale fields.
+    if (currentStillVisible) {
+      const refreshedCurrent = data.find(
+        (row: any, index: number) => getRowIdentity(row, index) === currentKey,
+      );
+      if (refreshedCurrent && refreshedCurrent !== current) {
+        writeRuntimeState(runtime, selectionConfig.bind, refreshedCurrent);
+        setLocalSelectedRowKey(currentKey);
+      }
+      return;
+    }
+
+    if (data.length > 0) {
       const firstRow = data[0];
       writeRuntimeState(runtime, selectionConfig.bind, firstRow);
       setLocalSelectedRowKey(getRowIdentity(firstRow, 0));
@@ -432,9 +445,22 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     }
 
     const value = row[column.field];
+    const enrichedDisplayValue = row?.[`${column.field}_display`];
 
     if (column.valueType === 'link' || column.valueType === 'url') {
       return renderLinkCell(column, row, value, locale, t);
+    }
+
+    // Dynamic list APIs enrich reference fields as `<field>_display`. A table
+    // block must prefer that business label; rendering the raw pid leaks an
+    // implementation identifier even though the backend already supplied the
+    // user-facing value.
+    if (
+      enrichedDisplayValue !== undefined &&
+      enrichedDisplayValue !== null &&
+      String(enrichedDisplayValue).trim() !== ''
+    ) {
+      return String(enrichedDisplayValue);
     }
 
     // Null/undefined 处理
@@ -503,10 +529,10 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     // valueType 渲染
     switch (column.valueType) {
       case 'date':
-        return new Date(value).toLocaleDateString();
+        return new Date(value).toLocaleDateString(locale);
 
       case 'datetime':
-        return new Date(value).toLocaleString();
+        return new Date(value).toLocaleString(locale);
 
       case 'currency':
         return new Intl.NumberFormat(locale, {
@@ -538,7 +564,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   const getCellTitle = (column: ColumnConfig, row: any): string | undefined => {
     if (!column.ellipsis) return undefined;
-    const value = row[column.field];
+    const value = row[`${column.field}_display`] ?? row[column.field];
     if (value === null || value === undefined) return undefined;
     return typeof value === 'string' ? value : String(value);
   };
@@ -720,7 +746,11 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                     data-testid="table-select-all"
                     checked={allVisibleRowsSelected}
                     onChange={toggleAllVisibleRows}
-                    aria-label="Select all rows"
+                    aria-label={getLocalizedText(
+                      { 'zh-CN': '选择全部行', en: 'Select all rows' },
+                      locale,
+                      t,
+                    )}
                   />
                 </th>
               )}

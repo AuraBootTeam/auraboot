@@ -67,6 +67,22 @@ class CommandPermitDataAccessTest {
     }
 
     @Test
+    @DisplayName("TARGET permits only the public PID named by this model's command")
+    void targetPermitsOnlyTheNamedPublicRecord() {
+        MetaContext.runWithCommandPermitPlan("TARGET", 3L, "crm_account_common", "account-1", () -> {
+            assertThat(CommandPermitDataAccess.rowFilter("crm_account_common", 100L))
+                    .isEqualTo("AND pid = 'account-1'");
+            assertThat(CommandPermitDataAccess.permitsRecord(
+                    "crm_account_common", Map.of("pid", "account-1", "created_by", 200L), 100L))
+                    .isTrue();
+            assertThat(CommandPermitDataAccess.permitsRecord(
+                    "crm_account_common", Map.of("pid", "account-2", "created_by", 100L), 100L))
+                    .isFalse();
+            assertThat(CommandPermitDataAccess.rowFilter("crm_contact_common", 100L)).isNull();
+        });
+    }
+
+    @Test
     @DisplayName("missing, unknown, or unusable scope never manufactures authority")
     void unresolvedScopeNeverManufacturesAuthority() {
         assertThat(CommandPermitDataAccess.permitsRecord(Map.of("created_by", 100L), 100L)).isFalse();

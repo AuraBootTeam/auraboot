@@ -60,6 +60,8 @@ function validateDashboard(obj, filePath) {
   }
 
   if (Array.isArray(obj.widgets)) {
+    const columns = Number.isInteger(obj.layoutConfig?.columns) ? obj.layoutConfig.columns : 12;
+    const widgetIds = new Set();
     obj.widgets.forEach((w, i) => {
       if (!w || typeof w !== 'object') {
         errors.push(`widgets[${i}] must be an object`);
@@ -70,6 +72,10 @@ function validateDashboard(obj, filePath) {
         if (typeof w[field] !== 'string' || w[field].length === 0) {
           errors.push(`widgets[${i}].${field} is required and must be a non-empty string`);
         }
+      }
+      if (typeof w.id === 'string') {
+        if (widgetIds.has(w.id)) errors.push(`widgets[${i}].id duplicates ${JSON.stringify(w.id)}`);
+        widgetIds.add(w.id);
       }
       // Required integer fields per schema
       for (const field of ['x', 'y', 'w', 'h']) {
@@ -84,7 +90,50 @@ function validateDashboard(obj, filePath) {
       if (typeof w.h === 'number' && w.h < 1) {
         errors.push(`widgets[${i}].h must be >= 1`);
       }
+      if (typeof w.x === 'number' && w.x < 0) {
+        errors.push(`widgets[${i}].x must be >= 0`);
+      }
+      if (typeof w.y === 'number' && w.y < 0) {
+        errors.push(`widgets[${i}].y must be >= 0`);
+      }
+      if (
+        typeof w.x === 'number' &&
+        typeof w.w === 'number' &&
+        w.x + w.w > columns
+      ) {
+        errors.push(`widgets[${i}] exceeds the ${columns}-column layout (x=${w.x}, w=${w.w})`);
+      }
+
+      const dataSource = w.config?.dataSource;
+      if (dataSource?.type === 'namedQuery' && Object.hasOwn(dataSource, 'params')) {
+        errors.push(
+          `widgets[${i}].config.dataSource namedQuery must use parameters (params is only for api data sources)`,
+        );
+      }
+      if (dataSource?.type === 'api' && Object.hasOwn(dataSource, 'parameters')) {
+        errors.push(
+          `widgets[${i}].config.dataSource api must use params (parameters is only for namedQuery data sources)`,
+        );
+      }
     });
+    for (let i = 0; i < obj.widgets.length; i += 1) {
+      const left = obj.widgets[i];
+      if (![left?.x, left?.y, left?.w, left?.h].every(Number.isInteger)) continue;
+      for (let j = i + 1; j < obj.widgets.length; j += 1) {
+        const right = obj.widgets[j];
+        if (![right?.x, right?.y, right?.w, right?.h].every(Number.isInteger)) continue;
+        const overlaps =
+          left.x < right.x + right.w &&
+          left.x + left.w > right.x &&
+          left.y < right.y + right.h &&
+          left.y + left.h > right.y;
+        if (overlaps) {
+          errors.push(
+            `widgets[${i}] ${JSON.stringify(left.id)} overlaps widgets[${j}] ${JSON.stringify(right.id)}`,
+          );
+        }
+      }
+    }
   }
 
   if (obj.scope !== undefined && !['personal', 'team', 'global', 'workbench'].includes(obj.scope)) {

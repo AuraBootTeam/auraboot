@@ -7,16 +7,26 @@
  * Behavior-preserving extraction — no functional changes.
  */
 
-import type { ColumnConfig } from '~/framework/meta/schemas/types';
-import { ImportModal } from '~/framework/smart/components/data-tools/ImportModal';
+import type { ColumnConfig, FieldConfig } from '~/framework/meta/schemas/types';
+import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
+import {
+  ImportModal,
+  type ImportConfiguration,
+} from '~/framework/smart/components/data-tools/ImportModal';
 import FormDialog from '~/framework/meta/runtime/actions/FormDialog';
 import { ViewManagePanel } from '~/framework/smart/components/view/ViewManagePanel';
-import { ColumnSettingsPanel } from '~/framework/smart/components/view/ColumnSettingsPanel';
+import {
+  ColumnSettingsPanel,
+  type ColumnSettingsDefinition,
+  type ColumnSettingsSavePayload,
+} from '~/framework/smart/components/view/ColumnSettingsPanel';
 import { FilterFieldPicker } from '~/framework/smart/components/view/FilterFieldPicker';
 import { FilterValuePopover } from '~/framework/smart/components/view/FilterValuePopover';
 import { BulkEditModal } from '~/framework/smart/components/bulk/BulkEditModal';
+import { BulkFieldCommandModal } from '~/framework/smart/components/bulk/BulkFieldCommandModal';
 import { RecordPreviewDrawer } from '~/framework/smart/components/preview/RecordPreviewDrawer';
 import { ColumnContextMenu } from './ColumnContextMenu';
+import type { ListFilterFieldMetadata } from '../ListPageContent';
 import type {
   SavedViewCreateRequest,
   ColumnConfig as ViewColumnConfig,
@@ -34,9 +44,21 @@ export interface ListModalsProps {
   modelCode: string;
   bulkEditFields: Array<{ code: string; name: string; dataType: string }>;
   onBulkEditComplete: () => void;
+  locale: string;
+
+  // BulkFieldCommandModal
+  bulkFieldCommand: {
+    actionLabel: string;
+    selectedCount: number;
+    field: FieldConfig;
+  } | null;
+  bulkFieldCommandContext: ExpressionContext;
+  onBulkFieldCommandClose: () => void;
+  onBulkFieldCommandSubmit: (value: unknown) => Promise<void>;
 
   // ImportModal
   importOpen: boolean;
+  importConfig?: ImportConfiguration;
   onImportClose: () => void;
   onImportComplete: () => void;
 
@@ -71,20 +93,16 @@ export interface ListModalsProps {
   // ColumnSettingsPanel
   columnSettingsOpen: boolean;
   onColumnSettingsClose: () => void;
-  allColumnDefs: Array<{ field: string; label: string; mandatory?: boolean }>;
+  allColumnDefs: ColumnSettingsDefinition[];
   viewColumns?: ViewColumnConfig[];
-  onColumnSettingsSave: (columns: ViewColumnConfig[]) => Promise<void>;
+  columnSettingsRowHeight?: import('~/framework/smart/types/savedView').RowHeight;
+  onColumnSettingsSave: (payload: ColumnSettingsSavePayload) => Promise<void>;
   t: (key: string) => string;
 
   // FilterFieldPicker
   fieldPickerOpen: boolean;
   fieldPickerAnchor?: { x: number; y: number };
-  fieldPickerFields: Array<{
-    fieldCode: string;
-    label: string;
-    fieldType: string;
-    dictCode?: string;
-  }>;
+  filterFieldMetadata: ListFilterFieldMetadata[];
   chipFilterFieldCodes: string[];
   onFieldPickerSelect: (fieldCode: string) => void;
   onFieldPickerClose: () => void;
@@ -96,7 +114,7 @@ export interface ListModalsProps {
   tableColumns: ColumnConfig[];
   schema: any;
   tableName: string;
-  onFilterApply: (operator: string, value: string) => void;
+  onFilterApply: (operator: string, value: unknown) => void;
   onFilterCancel: () => void;
 
   // ColumnContextMenu
@@ -125,9 +143,17 @@ export function ListModals({
   modelCode,
   bulkEditFields,
   onBulkEditComplete,
+  locale,
+
+  // BulkFieldCommandModal
+  bulkFieldCommand,
+  bulkFieldCommandContext,
+  onBulkFieldCommandClose,
+  onBulkFieldCommandSubmit,
 
   // ImportModal
   importOpen,
+  importConfig,
   onImportClose,
   onImportComplete,
 
@@ -164,13 +190,14 @@ export function ListModals({
   onColumnSettingsClose,
   allColumnDefs,
   viewColumns,
+  columnSettingsRowHeight,
   onColumnSettingsSave,
   t,
 
   // FilterFieldPicker
   fieldPickerOpen,
   fieldPickerAnchor,
-  fieldPickerFields,
+  filterFieldMetadata,
   chipFilterFieldCodes,
   onFieldPickerSelect,
   onFieldPickerClose,
@@ -211,7 +238,23 @@ export function ListModals({
           selectedIds={selectedIds}
           modelCode={modelCode}
           fields={bulkEditFields}
+          locale={locale}
+          t={t}
           onUpdateComplete={onBulkEditComplete}
+        />
+      )}
+
+      {bulkFieldCommand && (
+        <BulkFieldCommandModal
+          open
+          actionLabel={bulkFieldCommand.actionLabel}
+          selectedCount={bulkFieldCommand.selectedCount}
+          field={bulkFieldCommand.field}
+          context={bulkFieldCommandContext}
+          locale={locale}
+          t={t}
+          onClose={onBulkFieldCommandClose}
+          onSubmit={onBulkFieldCommandSubmit}
         />
       )}
 
@@ -219,6 +262,7 @@ export function ListModals({
         open={importOpen}
         onClose={onImportClose}
         modelCode={modelCode}
+        config={importConfig}
         onImportComplete={onImportComplete}
       />
 
@@ -265,6 +309,7 @@ export function ListModals({
         onClose={onColumnSettingsClose}
         allColumns={allColumnDefs}
         viewColumns={viewColumns}
+        rowHeight={columnSettingsRowHeight}
         onSave={onColumnSettingsSave}
         t={t}
       />
@@ -273,7 +318,7 @@ export function ListModals({
       <FilterFieldPicker
         open={fieldPickerOpen}
         anchorEl={fieldPickerAnchor}
-        fields={fieldPickerFields}
+        fields={filterFieldMetadata}
         activeFieldCodes={chipFilterFieldCodes}
         onSelect={onFieldPickerSelect}
         onClose={onFieldPickerClose}
@@ -284,7 +329,8 @@ export function ListModals({
         chipFilters[editingChipIdx] &&
         (() => {
           const cf = chipFilters[editingChipIdx];
-          const fieldMeta = tableColumns.find((c: ColumnConfig) => c.field === cf.fieldCode) as any;
+          const column = tableColumns.find((c: ColumnConfig) => c.field === cf.fieldCode) as any;
+          const fieldMeta = filterFieldMetadata.find((field) => field.fieldCode === cf.fieldCode);
           return (
             <FilterValuePopover
               open
@@ -292,21 +338,26 @@ export function ListModals({
               fieldCode={cf.fieldCode}
               fieldLabel={
                 fieldMeta?.label
-                  ? typeof fieldMeta.label === 'string'
-                    ? fieldMeta.label
-                    : fieldMeta.label?.['zh-CN'] || cf.fieldCode
-                  : (() => {
-                      const mc = schema?.modelCode || tableName;
-                      const key = `model.${mc}.${cf.fieldCode}.label`;
-                      const resolved = t(key);
-                      return resolved !== key ? resolved : cf.fieldCode;
-                    })()
+                  ? fieldMeta.label
+                  : column?.label
+                    ? typeof column.label === 'string'
+                      ? column.label
+                      : column.label?.['zh-CN'] || cf.fieldCode
+                    : (() => {
+                        const mc = schema?.modelCode || tableName;
+                        const key = `model.${mc}.${cf.fieldCode}.label`;
+                        const resolved = t(key);
+                        return resolved !== key ? resolved : cf.fieldCode;
+                      })()
               }
-              fieldType={fieldMeta?.valueType || fieldMeta?.sorter || 'text'}
+              fieldType={fieldMeta?.fieldType || 'text'}
               dictCode={fieldMeta?.dictCode}
+              referenceModelCode={fieldMeta?.referenceModelCode}
+              referenceValueField={fieldMeta?.referenceValueField}
+              referenceDisplayField={fieldMeta?.referenceDisplayField}
               operator={cf.operator}
               value={cf.value}
-              onApply={(operator, value) => onFilterApply(String(operator), String(value))}
+              onApply={(operator, value) => onFilterApply(String(operator), value)}
               onCancel={onFilterCancel}
             />
           );

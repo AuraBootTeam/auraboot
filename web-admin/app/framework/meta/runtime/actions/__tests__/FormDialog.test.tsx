@@ -32,6 +32,28 @@ describe('FormDialog choice fields', () => {
     expect(screen.queryByText(/common\.(?:select|cancel|confirm)/)).not.toBeInTheDocument();
   });
 
+  it('renders localized business help text below an action input', () => {
+    renderDialog({
+      fields: [{
+        field: 'quantity',
+        label: { 'zh-CN': '本次上架数量', en: 'Putaway Quantity' },
+        placeholder: { 'zh-CN': '例如：20', en: 'e.g. 20' },
+        helpText: {
+          'zh-CN': '不得超过当前剩余量；确认后才移动库存。',
+          en: 'Must not exceed the remainder; inventory moves only after confirmation.',
+        },
+        type: 'number',
+      }],
+      fieldOptions: {},
+      defaults: {},
+    });
+
+    expect(screen.getByPlaceholderText('例如：20')).toBeInTheDocument();
+    expect(screen.getByTestId('form-dialog-help-quantity')).toHaveTextContent(
+      '不得超过当前剩余量；确认后才移动库存。',
+    );
+  });
+
   it('switches mode-specific fields and submits only visible values', () => {
     const onSubmit = vi.fn();
     renderDialog({

@@ -1052,6 +1052,13 @@
     "en-US": "AI Modeling Wizard"
   },
   {
+    "key": "aurabot.chat.send",
+    "zh-CN": "发送 (Cmd+Enter)",
+    "en-US": "Send (Cmd+Enter)",
+    "ja-JP": "送信 (Cmd+Enter)",
+    "ko-KR": "보내기 (Cmd+Enter)"
+  },
+  {
     "key": "aurabot.thinking.label",
     "zh-CN": "推理过程",
     "en-US": "Reasoning"
@@ -1378,6 +1385,13 @@
     "key": "auth.compliance.welcomeSub",
     "zh-CN": "登录以继续使用 AuraBoot",
     "en-US": "Sign in to continue to AuraBoot"
+  },
+  {
+    "key": "auth.commercialBranding.welcomeSub",
+    "zh-CN": "登录以继续使用 {productName} 工作台",
+    "en-US": "Sign in to continue to the {productName} workspace",
+    "ja-JP": "{productName} ワークスペースに進むにはサインインしてください",
+    "ko-KR": "{productName} 작업 공간을 계속하려면 로그인하세요"
   },
   {
     "key": "auth.compliance.identifier",
@@ -3048,6 +3062,11 @@
     "en-US": "Overview"
   },
   {
+    "key": "workbench.openInDashboard",
+    "zh-CN": "在仪表盘中打开",
+    "en-US": "Open in dashboard"
+  },
+  {
     "key": "workbench.export",
     "zh-CN": "导出",
     "en-US": "Export"
@@ -3126,5 +3145,267 @@
     "key": "flow.availability.reasonFallback",
     "zh-CN": "当前环境未提供该动作的可用服务。",
     "en-US": "The action provider is not available in the current environment."
+  },
+  {
+    "key": "data_tools.export_excel",
+    "zh-CN": "导出 Excel",
+    "en-US": "Export Excel"
+  },
+  {
+    "key": "data_tools.export_csv",
+    "zh-CN": "导出 CSV",
+    "en-US": "Export CSV"
+  },
+  {
+    "key": "data_tools.configure_buttons",
+    "zh-CN": "配置按钮…",
+    "en-US": "Configure buttons…"
+  },
+  {
+    "key": "data_tools.loading_reports",
+    "zh-CN": "正在加载报表…",
+    "en-US": "Loading reports…"
+  },
+  {
+    "key": "data_tools.report_generated",
+    "zh-CN": "报表已生成：{name}",
+    "en-US": "Report generated: {name}"
+  },
+  {
+    "key": "data_tools.report_generation_failed",
+    "zh-CN": "报表生成失败",
+    "en-US": "Report generation failed"
+  },
+  {
+    "key": "action_config.title",
+    "zh-CN": "配置按钮",
+    "en-US": "Configure Buttons"
+  },
+  {
+    "key": "action_config.builtin",
+    "zh-CN": "内置",
+    "en-US": "built-in"
+  },
+  {
+    "key": "action_config.toolbar",
+    "zh-CN": "工具栏",
+    "en-US": "Toolbar"
+  },
+  {
+    "key": "action_config.more_menu",
+    "zh-CN": "更多菜单",
+    "en-US": "More Menu"
+  },
+  {
+    "key": "action_config.no_pinned",
+    "zh-CN": "没有固定按钮",
+    "en-US": "No pinned buttons"
+  },
+  {
+    "key": "action_config.no_overflow",
+    "zh-CN": "没有更多按钮",
+    "en-US": "No overflow buttons"
+  },
+  {
+    "key": "action_config.divider",
+    "zh-CN": "此线以下显示在 ··· 菜单",
+    "en-US": "Below this line: in ··· menu"
+  },
+  {
+    "key": "action_config.move_to_menu",
+    "zh-CN": "移到更多菜单",
+    "en-US": "Move to menu"
+  },
+  {
+    "key": "action_config.pin_to_toolbar",
+    "zh-CN": "固定到工具栏",
+    "en-US": "Pin to toolbar"
+  },
+  {
+    "key": "action_config.hide_button",
+    "zh-CN": "隐藏按钮",
+    "en-US": "Hide button"
+  },
+  {
+    "key": "action_config.show_button",
+    "zh-CN": "显示按钮",
+    "en-US": "Show button"
+  },
+  {
+    "key": "import.title",
+    "zh-CN": "Excel 数据导入",
+    "en-US": "Import Excel Data"
+  },
+  {
+    "key": "import.subtitle",
+    "zh-CN": "下载模板、上传预检，再执行导入。更新导入不会新增记录。",
+    "en-US": "Download a template, upload and validate it, then run the import. Update mode never creates records."
+  },
+  {
+    "key": "import.mode.label",
+    "zh-CN": "导入方式",
+    "en-US": "Import mode"
+  },
+  {
+    "key": "import.mode.insert",
+    "zh-CN": "新增导入",
+    "en-US": "Insert"
+  },
+  {
+    "key": "import.mode.update",
+    "zh-CN": "更新导入",
+    "en-US": "Update"
+  },
+  {
+    "key": "import.match_key",
+    "zh-CN": "匹配字段",
+    "en-US": "Match field"
+  },
+  {
+    "key": "import.download_template",
+    "zh-CN": "下载{mode}模板",
+    "en-US": "Download {mode} template"
+  },
+  {
+    "key": "import.drop_hint",
+    "zh-CN": "拖放 .xlsx 文件到这里，或选择文件",
+    "en-US": "Drop an .xlsx file here or choose a file"
+  },
+  {
+    "key": "import.choose_file",
+    "zh-CN": "选择文件",
+    "en-US": "Choose file"
+  },
+  {
+    "key": "import.file_limit",
+    "zh-CN": "仅支持 .xlsx，最大 10 MB",
+    "en-US": ".xlsx only, up to 10 MB"
+  },
+  {
+    "key": "import.validating",
+    "zh-CN": "正在预检字段、类型和重复值…",
+    "en-US": "Validating fields, types, and duplicate values…"
+  },
+  {
+    "key": "import.importing",
+    "zh-CN": "正在执行导入，请勿关闭窗口…",
+    "en-US": "Importing. Keep this window open…"
+  },
+  {
+    "key": "import.preview_rows",
+    "zh-CN": "预览前 {count} 行",
+    "en-US": "Previewing the first {count} rows"
+  },
+  {
+    "key": "import.change_file",
+    "zh-CN": "更换文件",
+    "en-US": "Change file"
+  },
+  {
+    "key": "import.validation.passed",
+    "zh-CN": "预检通过，可以导入",
+    "en-US": "Validation passed. Ready to import"
+  },
+  {
+    "key": "import.validation.failed",
+    "zh-CN": "预检未通过，请修正文件",
+    "en-US": "Validation failed. Fix the file before importing"
+  },
+  {
+    "key": "import.validation.summary",
+    "zh-CN": "总计 {total} · 有效 {valid} · 错误 {errors}",
+    "en-US": "Total {total} · Valid {valid} · Errors {errors}"
+  },
+  {
+    "key": "import.validation.required",
+    "zh-CN": "必填字段缺失",
+    "en-US": "Required field is missing"
+  },
+  {
+    "key": "import.validation.type",
+    "zh-CN": "值无法解析为 {type}",
+    "en-US": "Value cannot be parsed as {type}"
+  },
+  {
+    "key": "import.validation.field_not_allowed",
+    "zh-CN": "当前导入方式不允许此字段",
+    "en-US": "This field is not allowed in the selected import mode"
+  },
+  {
+    "key": "import.validation.duplicate",
+    "zh-CN": "唯一字段存在重复值",
+    "en-US": "A unique field contains a duplicate value"
+  },
+  {
+    "key": "import.validation.duplicate_header",
+    "zh-CN": "存在重复列头",
+    "en-US": "The workbook contains a duplicate column header"
+  },
+  {
+    "key": "import.validation.reference",
+    "zh-CN": "关联记录不存在或无权访问",
+    "en-US": "The referenced record does not exist or is not accessible"
+  },
+  {
+    "key": "import.row",
+    "zh-CN": "第 {row} 行",
+    "en-US": "Row {row}"
+  },
+  {
+    "key": "import.result.completed",
+    "zh-CN": "导入完成",
+    "en-US": "Import complete"
+  },
+  {
+    "key": "import.result.partial",
+    "zh-CN": "导入完成，部分行失败",
+    "en-US": "Import complete with row errors"
+  },
+  {
+    "key": "import.result.created",
+    "zh-CN": "新增",
+    "en-US": "Created"
+  },
+  {
+    "key": "import.result.updated",
+    "zh-CN": "更新",
+    "en-US": "Updated"
+  },
+  {
+    "key": "import.result.failed",
+    "zh-CN": "失败",
+    "en-US": "Failed"
+  },
+  {
+    "key": "import.result.total",
+    "zh-CN": "总计",
+    "en-US": "Total"
+  },
+  {
+    "key": "import.start",
+    "zh-CN": "开始{mode}",
+    "en-US": "Start {mode}"
+  },
+  {
+    "key": "import.error.xlsx_only",
+    "zh-CN": "仅支持 Excel .xlsx 文件。",
+    "en-US": "Only Excel .xlsx files are supported."
+  },
+  {
+    "key": "import.error.too_large",
+    "zh-CN": "文件不能超过 10 MB。",
+    "en-US": "The file must be 10 MB or smaller."
+  },
+  {
+    "key": "import.error.match_key",
+    "zh-CN": "更新导入必须选择匹配字段。",
+    "en-US": "Choose a match field for update mode."
+  },
+  {
+    "key": "action.close",
+    "zh-CN": "关闭",
+    "en-US": "Close",
+    "ja-JP": "閉じる",
+    "ko-KR": "닫기"
   }
 ]

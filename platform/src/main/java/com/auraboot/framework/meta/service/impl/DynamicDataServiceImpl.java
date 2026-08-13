@@ -828,6 +828,87 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     private static final Set<String> NUMERIC_DATA_TYPES = Set.of(
             "integer", "int", "long", "bigint", "decimal", "numeric", "float", "double");
 
+    @Override
+    @Transactional
+    public boolean compareAndSet(String modelCode,
+                                 String recordId,
+                                 String fieldCode,
+                                 Object expectedValue,
+                                 Object nextValue) {
+        validateModelCode(modelCode);
+        assertWritable(modelCode);
+        if (recordId == null || recordId.isBlank()) {
+            throw new MetaServiceException("Record ID cannot be null or empty");
+        }
+        if (fieldCode == null || fieldCode.isBlank()) {
+            throw new MetaServiceException("Field code cannot be null or empty");
+        }
+
+        ModelDefinition model = getModelDefinition(modelCode);
+        ModelMutationGuard.assertMutable(model, "updated");
+        FieldDefinition field = findFieldDefinition(model, fieldCode);
+        if (field.isPrimaryKey() || field.isJsonbVirtual() || field.isVirtual()) {
+            throw new MetaServiceException(
+                    "compareAndSet requires a writable stored field: " + fieldCode);
+        }
+        if (field.isImmutable() || field.getImmutableWhen() != null) {
+            throw new MetaServiceException(
+                    "compareAndSet cannot bypass immutable field rules: " + fieldCode);
+        }
+        Map<String, Object> requested = new LinkedHashMap<>();
+        requested.put(fieldCode, nextValue);
+        Map<String, Object> data = new LinkedHashMap<>(requested);
+        stripNonWritableFields(modelCode, data);
+        if (!data.containsKey(fieldCode)) {
+            throw new MetaServiceException("Field is not writable: " + fieldCode);
+        }
+        // CAS never needs a pre-read: the expected value and every scope predicate are part of
+        // the UPDATE itself. Exact-command provenance can be checked conservatively from the
+        // field definition; conditional immutability was rejected above because it needs a row.
+        FieldWriterGuard.assertFieldsAllowed(model, List.of(fieldCode));
+
+        payloadTemporalNormalizer.normalize(data, model);
+        validationService.validateAndThrow(model, data, ValidationContext.UPDATE);
+        data = convertDataTypes(model, data);
+
+        Map<String, Object> expectedData = new LinkedHashMap<>();
+        expectedData.put(fieldCode, expectedValue);
+        payloadTemporalNormalizer.normalize(expectedData, model);
+        expectedData = convertDataTypes(model, expectedData);
+
+        Map<String, Object> enriched = new HashMap<>(data);
+        enriched.put("updated_at", java.sql.Timestamp.from(java.time.Instant.now()));
+        enriched.put("updated_by", getCurrentUserId());
+        filterVirtualFields(model, enriched);
+        Map<String, Object> columnData = toColumnData(model, enriched);
+
+        FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
+        String primaryKeyColumn = primaryKey.getColumnName() != null
+                ? primaryKey.getColumnName()
+                : primaryKey.getCode();
+        String compareColumn = field.getColumnName() != null
+                ? field.getColumnName()
+                : field.getCode();
+        Long planExpectedVersion = MetaContext.getCommandExpectedVersion(modelCode, recordId);
+        int updated = executeScopedUpdate(
+                model,
+                modelCode,
+                primaryKeyColumn,
+                recordId,
+                columnData,
+                JsonbFieldHelper.getJsonbHostColumns(model),
+                planExpectedVersion,
+                compareColumn,
+                expectedData.get(fieldCode));
+        if (updated > 1) {
+            throw new MetaServiceException("compareAndSet updated more than one record");
+        }
+        if (updated == 1 && planExpectedVersion != null) {
+            MetaContext.advanceCommandExpectedVersion(modelCode, recordId);
+        }
+        return updated == 1;
+    }
+
     /**
      * Resolve a field code to its physical column name, asserting it is numeric.
      * Throws {@link IllegalArgumentException} (NOT {@link MetaServiceException}) so the
@@ -1603,7 +1684,19 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             payloadTemporalNormalizer.normalize(data, model);
             // 使用验证服务的严格模式进行验证
             // 验证失败会抛出异常并触发事务回滚
-            validationService.validateAndThrow(model, data, ValidationContext.UPDATE);
+            // Uniqueness validation needs the current public identity so the existing row does
+            // not conflict with itself when a handler resubmits an unchanged unique field.
+            Map<String, Object> validationData = new LinkedHashMap<>(data);
+            Object existingInternalId = existingRecord.get("id");
+            Object existingPid = existingRecord.get("pid");
+            if (existingInternalId != null) {
+                validationData.put("id", existingInternalId);
+            } else if (existingPid != null) {
+                validationData.put("pid", existingPid);
+            } else {
+                validationData.put("pid", recordId);
+            }
+            validationService.validateAndThrow(model, validationData, ValidationContext.UPDATE);
             // Field-level domain invariants (immutable / immutableWhen). These are decided
             // against the row as it currently stands, which is why they need existingRecord
             // and cannot live in the payload-only validation above. They are invariants, not
@@ -1787,6 +1880,28 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             Map<String, Object> columnData,
             Set<String> jsonbColumns,
             Object expectedVersion) {
+        return executeScopedUpdate(
+                model,
+                modelCode,
+                primaryKeyColumn,
+                recordId,
+                columnData,
+                jsonbColumns,
+                expectedVersion,
+                null,
+                null);
+    }
+
+    private int executeScopedUpdate(
+            ModelDefinition model,
+            String modelCode,
+            String primaryKeyColumn,
+            String recordId,
+            Map<String, Object> columnData,
+            Set<String> jsonbColumns,
+            Object expectedVersion,
+            String compareColumn,
+            Object compareValue) {
         if (columnData == null || columnData.isEmpty()) {
             throw new MetaServiceException("Update data cannot be empty");
         }
@@ -1845,6 +1960,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (expectedVersion != null) {
             params.put("expectedVersion", expectedVersion);
             sql.append(" AND row_version = #{params.expectedVersion}");
+        }
+        if (compareColumn != null) {
+            String guardedColumn = SqlSafetyUtils.requireIdentifier(
+                    compareColumn, "compare-and-set column");
+            params.put("compareValue", compareValue);
+            sql.append(" AND ")
+                    .append(guardedColumn)
+                    .append(" IS NOT DISTINCT FROM #{params.compareValue}");
         }
         appendAggregateBindingGuard(sql, params, model);
         appendScopedWriteGuards(sql, tenantId, modelCode, userId, "update");
@@ -2953,6 +3076,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             List<QueryCondition> conditions = exportRequest.getConditions() != null
                     ? exportRequest.getConditions() : Collections.emptyList();
             QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(model, conditions);
+            if (exportRequest.getKeyword() != null && !exportRequest.getKeyword().isBlank()) {
+                queryBuilder = queryBuilderService.buildKeywordSearch(
+                        queryBuilder,
+                        exportRequest.getKeyword().trim(),
+                        model);
+            }
             queryBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
 
             // Apply row-level permission filter

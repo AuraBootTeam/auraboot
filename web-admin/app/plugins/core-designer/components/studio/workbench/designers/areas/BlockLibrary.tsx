@@ -169,6 +169,15 @@ const BLOCK_TYPES: BlockTypeInfo[] = [
     keywords: ['metric', 'strip', 'kpi', 'filter'],
   },
   {
+    type: 'stage-rail',
+    name: '销售阶段轨道',
+    icon: 'STG',
+    description: '展示当前业务阶段、已完成阶段与终态',
+    availableIn: ['detail'],
+    category: 'workbench',
+    keywords: ['stage', 'pipeline', 'sales', '阶段', '销售'],
+  },
+  {
     type: 'record-inspector',
     name: '记录检查器',
     icon: 'ROW',
@@ -254,6 +263,7 @@ const BLOCK_TYPE_EN: Record<BlockType, { name: string; description: string }> = 
   tabs: { name: 'Tabs', description: 'Tabbed views and filter conditions' },
   'stat-card': { name: 'Stat Card', description: 'Metric summary card' },
   'metric-strip': { name: 'Metric Strip', description: 'Horizontal metrics and filter entry' },
+  'stage-rail': { name: 'Stage Rail', description: 'Current, completed, upcoming, and terminal stages' },
   'record-inspector': { name: 'Record Inspector', description: 'Selection-bound detail panel' },
   'candidate-list': { name: 'Candidate List', description: 'Selectable candidate records' },
   'workbench-action-bar': { name: 'Workbench Action Bar', description: 'Workbench action group' },

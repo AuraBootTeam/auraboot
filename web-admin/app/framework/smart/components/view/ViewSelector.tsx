@@ -2,11 +2,21 @@
  * ViewSelector Component
  *
  * A dropdown component for selecting saved views.
- * This release exposes personal saved views only; team/global scopes remain roadmap.
+ * Lists every server-authorized SavedView, grouped by personal, team and global scope.
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { AlertTriangle, Check, ChevronDown, Lock, Plus, Settings, User } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  Globe2,
+  Lock,
+  Plus,
+  Settings,
+  User,
+  Users,
+} from 'lucide-react';
 import { type SavedView, type ViewScope, type ViewType } from '~/framework/smart/types/savedView';
 import type { ViewRecommendation } from '~/framework/smart/hooks/useViewRecommendations';
 import {
@@ -14,6 +24,7 @@ import {
   isSavedViewLockedPreset,
 } from '~/framework/smart/utils/savedViewPersistence';
 import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { cn } from '~/utils/cn';
 
 /**
@@ -59,7 +70,8 @@ interface ScopeConfig {
 /**
  * Ordered scope configurations for grouping views.
  *
- * Personal-only release rule: do not render team/global groups from this selector.
+ * The backend accessible-views endpoint remains authoritative for which entries
+ * may be shown; grouping here never widens access.
  */
 const SCOPE_CONFIGS: ScopeConfig[] = [
   {
@@ -69,6 +81,22 @@ const SCOPE_CONFIGS: ScopeConfig[] = [
     shortLabelKey: 'common.saved_view_scope_personal',
     shortFallback: '我的',
     Icon: User,
+  },
+  {
+    scope: 'team',
+    labelKey: 'common.saved_view_team_group',
+    fallback: '团队共享',
+    shortLabelKey: 'common.saved_view_scope_team',
+    shortFallback: '团队',
+    Icon: Users,
+  },
+  {
+    scope: 'global',
+    labelKey: 'common.saved_view_global_group',
+    fallback: '全员视图',
+    shortLabelKey: 'common.saved_view_scope_global',
+    shortFallback: '全员',
+    Icon: Globe2,
   },
 ];
 
@@ -218,7 +246,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
   loading = false,
   className,
 }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -231,18 +259,23 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
   const searchPlaceholder = t('common.saved_view_search_placeholder', undefined, '搜索我的视图...');
   const lockedPresetLabel = t('common.saved_view_locked_preset', undefined, '预置');
   const capabilityBlockedLabel = t('common.saved_view_capability_blocked', undefined, '需配置');
-  const displayCurrentView =
-    currentView?.scope === 'personal' && !isImplicitSavedView(currentView) ? currentView : null;
+  const localizeViewText = useCallback(
+    (value?: string): string => getLocalizedText(value, locale, t),
+    [locale, t],
+  );
+  // Shared plugin presets remain read-only in this release, but the active preset
+  // must still be named in the trigger. Hiding it behind “Default View” made the
+  // table/kanban state impossible to understand on CRM pipeline pages.
+  const displayCurrentView = currentView && !isImplicitSavedView(currentView) ? currentView : null;
   const isDefaultBaselineActive = !displayCurrentView;
   const currentScopeConfig = getScopeConfig(displayCurrentView?.scope ?? 'personal');
-  const CurrentScopeIcon = currentScopeConfig.Icon;
+  const isSharedPreset = displayCurrentView?.scope !== 'personal';
+  const CurrentScopeIcon = isSharedPreset ? Lock : currentScopeConfig.Icon;
   const isCurrentViewLockedPreset = isSavedViewLockedPreset(displayCurrentView);
   const isCurrentViewCapabilityBlocked = isSavedViewCapabilityBlocked(displayCurrentView);
-  const currentScopeLabel = t(
-    currentScopeConfig.shortLabelKey,
-    undefined,
-    currentScopeConfig.shortFallback,
-  );
+  const currentScopeLabel = isSharedPreset
+    ? lockedPresetLabel
+    : t(currentScopeConfig.shortLabelKey, undefined, currentScopeConfig.shortFallback);
 
   /**
    * Close dropdown when clicking outside
@@ -321,24 +354,24 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
     setIsOpen(false);
   }, [onManageViews]);
 
-  /**
-   * Group personal views only. Team/global views may exist in API responses for
-   * historical data, but they are not part of the current user-facing release.
-   */
+  /** Group every view already authorized by the accessible-views endpoint. */
   const groupedViews = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
     return SCOPE_CONFIGS.map((config) => ({
       ...config,
       label: t(config.labelKey, undefined, config.fallback),
       views: views
-        .filter((v) => v.scope === 'personal' && !isImplicitSavedView(v))
+        .filter((v) => v.scope === config.scope && !isImplicitSavedView(v))
         .filter((v) => {
           if (!normalizedSearch) return true;
-          const haystack = `${v.name} ${v.description ?? ''} ${v.viewType ?? ''}`.toLowerCase();
+          const haystack =
+            `${localizeViewText(v.name)} ${localizeViewText(v.description)} ${v.viewType ?? ''}`.toLowerCase();
           return haystack.includes(normalizedSearch);
         }),
     })).filter((group) => group.views.length > 0);
-  }, [searchTerm, t, views]);
+  }, [localizeViewText, searchTerm, t, views]);
+
+  const currentViewName = localizeViewText(displayCurrentView?.name);
 
   const hasActions = onCreateView || onManageViews;
 
@@ -360,7 +393,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         data-testid="view-selector-trigger"
-        data-current-view-name={displayCurrentView?.name || ''}
+        data-current-view-name={currentViewName}
         data-current-view-type={displayCurrentView?.viewType || ''}
       >
         {loading ? (
@@ -380,7 +413,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
             >
               {currentScopeLabel}
             </span>
-            <span className="text-text flex-1 truncate text-left">{displayCurrentView.name}</span>
+            <span className="text-text flex-1 truncate text-left">{currentViewName}</span>
             {displayCurrentView.isDefault && (
               <span className="text-accent flex-shrink-0 text-xs font-medium" title={defaultLabel}>
                 *
@@ -490,7 +523,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
                         type="button"
                         onClick={() => handleSelectView(view.pid)}
                         data-testid={`view-option-${view.pid}`}
-                        data-view-name={view.name}
+                        data-view-name={localizeViewText(view.name)}
                         data-view-type={view.viewType}
                         className={cn(
                           'text-text-2 flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
@@ -505,7 +538,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
                           type={getViewTypeIcon(view.viewType)}
                           className="text-text-3 h-3.5 w-3.5 flex-shrink-0"
                         />
-                        <span className="flex-1 truncate">{view.name}</span>
+                        <span className="flex-1 truncate">{localizeViewText(view.name)}</span>
                         {view.isDefault && (
                           <span
                             className="bg-accent-weak text-accent flex-shrink-0 rounded px-1.5 py-0.5 text-xs"

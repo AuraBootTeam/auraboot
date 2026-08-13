@@ -36,6 +36,7 @@ public class RecordShareServiceImpl implements RecordShareService {
     public void shareRecord(Long tenantId, String resourceCode, Long recordId,
                             String subjectType, Long subjectId,
                             String permissionMask, Instant expiresAt) {
+        validateFutureExpiry(expiresAt);
         RecordShare share = new RecordShare();
         share.setPid(UniqueIdGenerator.generate());
         share.setTenantId(tenantId);
@@ -63,6 +64,7 @@ public class RecordShareServiceImpl implements RecordShareService {
         if (subjectId == null && !StringUtils.hasText(subjectPid)) {
             throw new RootUnCheckedException(BadParam, "subjectId or subjectPid is required");
         }
+        validateFutureExpiry(expiresAt);
 
         RecordShare share = new RecordShare();
         share.setPid(UniqueIdGenerator.generate());
@@ -77,7 +79,7 @@ public class RecordShareServiceImpl implements RecordShareService {
         share.setCreatedAt(Instant.now());
         share.setCreatedBy(MetaContext.getCurrentUserId());
 
-        recordShareMapper.insert(share);
+        recordShareMapper.upsertByPublicPids(share);
         log.info("Shared record {}/{} with {}:{} (mask={}, expires={})",
                 resourceCode, recordPid, subjectType,
                 StringUtils.hasText(subjectPid) ? subjectPid : subjectId,
@@ -203,28 +205,54 @@ public class RecordShareServiceImpl implements RecordShareService {
     }
 
     @Override
-    public void removeById(Long tenantId, Long shareId) {
-        RecordShare share = recordShareMapper.selectById(shareId);
-        if (share == null) {
-            throw new RootUnCheckedException(BadParam, "Share not found: " + shareId);
+    public List<RecordShare> listByRecordPidForManagement(
+            Long tenantId, String resourceCode, String recordPid) {
+        if (!StringUtils.hasText(recordPid)) {
+            throw new RootUnCheckedException(BadParam, "recordPid is required");
         }
-        if (!tenantId.equals(share.getTenantId())) {
-            throw new RootUnCheckedException(BadParam, "Share not found: " + shareId);
-        }
-        recordShareMapper.deleteById(shareId);
-        log.info("Removed share id={} for resource={} record={}", shareId, share.getResourceCode(), share.getRecordId());
+        return recordShareMapper.findByRecordPidForManagement(
+                tenantId, resourceCode, recordPid.trim(), Instant.now());
     }
 
     @Override
-    public RecordShare getByIdInTenant(Long tenantId, Long shareId) {
-        if (tenantId == null || shareId == null) {
+    public void updateByPid(
+            Long tenantId,
+            String sharePid,
+            String permissionMask,
+            Instant expiresAt) {
+        if (tenantId == null || !StringUtils.hasText(sharePid)) {
+            throw new RootUnCheckedException(BadParam, "sharePid is required");
+        }
+        validateFutureExpiry(expiresAt);
+        int changed = recordShareMapper.updatePolicyByPidInTenant(
+                tenantId,
+                sharePid.trim(),
+                normalizePermissionMask(permissionMask),
+                expiresAt);
+        if (changed != 1) {
+            throw new RootUnCheckedException(BadParam, "Share not found");
+        }
+        log.info("Updated record share pid={} (mask={}, expires={})",
+                sharePid, permissionMask, expiresAt);
+    }
+
+    @Override
+    public void removeByPid(Long tenantId, String sharePid) {
+        RecordShare share = getByPidInTenant(tenantId, sharePid);
+        if (share == null) {
+            throw new RootUnCheckedException(BadParam, "Share not found");
+        }
+        recordShareMapper.deleteByPidInTenant(tenantId, sharePid.trim());
+        log.info("Removed share pid={} for resource={} record={}",
+                sharePid, share.getResourceCode(), share.getRecordPid());
+    }
+
+    @Override
+    public RecordShare getByPidInTenant(Long tenantId, String sharePid) {
+        if (tenantId == null || !StringUtils.hasText(sharePid)) {
             return null;
         }
-        RecordShare share = recordShareMapper.selectById(shareId);
-        if (share == null || !tenantId.equals(share.getTenantId())) {
-            return null;
-        }
-        return share;
+        return recordShareMapper.findByPidInTenant(tenantId, sharePid.trim());
     }
 
     private String normalizePid(String pid) {
@@ -240,5 +268,11 @@ public class RecordShareServiceImpl implements RecordShareService {
             return "read";
         }
         return permissionMask.trim().toLowerCase(Locale.ROOT).replace(" ", "");
+    }
+
+    private void validateFutureExpiry(Instant expiresAt) {
+        if (expiresAt != null && !expiresAt.isAfter(Instant.now())) {
+            throw new RootUnCheckedException(BadParam, "expiresAt must be in the future");
+        }
     }
 }

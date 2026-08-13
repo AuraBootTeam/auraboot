@@ -422,14 +422,31 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
             if (condition.deptPids() == null || condition.deptPids().isEmpty()) {
                 return "1 = 0";
             }
-            if (!SqlSafetyUtils.isValidIdentifier(condition.deptField())) {
-                log.warn("Invalid dept field in DEPT data scope: {}", condition.deptField());
-                return "1 = 0";
-            }
             // Department PIDs are strings, need quoting for SQL
             String pidList = condition.deptPids().stream()
                     .map(pid -> "'" + pid.replace("'", "''") + "'")
                     .collect(Collectors.joining(","));
+            if (condition.deptOwnerField() != null && !condition.deptOwnerField().isBlank()) {
+                if (!SqlSafetyUtils.isValidIdentifier(condition.deptOwnerField())) {
+                    log.warn("Invalid department-owner field in DEPT data scope: {}",
+                            condition.deptOwnerField());
+                    return "1 = 0";
+                }
+                Long tenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+                if (tenantId == null) {
+                    log.warn("Owner-derived DEPT data scope has no tenant context; failing secure");
+                    return "1 = 0";
+                }
+                return condition.deptOwnerField()
+                        + " IN (SELECT org_emp_user_id FROM mt_org_employee"
+                        + " WHERE tenant_id = " + tenantId
+                        + " AND deleted_flag = FALSE"
+                        + " AND org_emp_dept_id IN (" + pidList + "))";
+            }
+            if (!SqlSafetyUtils.isValidIdentifier(condition.deptField())) {
+                log.warn("Invalid dept field in DEPT data scope: {}", condition.deptField());
+                return "1 = 0";
+            }
             return condition.deptField() + " IN (" + pidList + ")";
         }
         return null;

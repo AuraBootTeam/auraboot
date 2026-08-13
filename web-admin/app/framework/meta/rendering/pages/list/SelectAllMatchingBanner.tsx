@@ -28,6 +28,8 @@ export interface SelectAllMatchingBannerProps {
   onClearSelection: () => void;
   /** i18n translator (key, params, fallback). */
   t: (key: string, params?: Record<string, any>, fallback?: string) => string;
+  /** Active UI locale, used to keep fallbacks consistent when a key is absent. */
+  locale: string;
 }
 
 export function SelectAllMatchingBanner({
@@ -39,8 +41,10 @@ export function SelectAllMatchingBanner({
   onSelectAllMatching,
   onClearSelection,
   t,
+  locale,
 }: SelectAllMatchingBannerProps) {
   if (!enabled) return null;
+  const isZhLocale = locale.toLowerCase().startsWith('zh');
 
   // All-matching mode: summarise the full-set selection + offer to clear.
   if (allMatchingSelected) {
@@ -51,7 +55,20 @@ export function SelectAllMatchingBanner({
         role="status"
       >
         <span data-testid="select-all-matching-summary">
-          {t('list.select.allMatchingSelected', { count: total }, `All ${total} records selected`)}
+          {t(
+            'list.select.allMatchingSelected',
+            { count: total },
+            isZhLocale ? `已选择全部 ${total} 条记录` : `All ${total} records selected`,
+          )}
+        </span>
+        <span className="text-text-2" data-testid="select-all-matching-safety-note">
+          {t(
+            'list.select.allMatchingExportOnly',
+            undefined,
+            isZhLocale
+              ? '导出将覆盖全部匹配记录；写操作仍需逐条明确选择'
+              : 'Export applies to all matching records; write actions require explicit selection',
+          )}
         </span>
         <button
           type="button"
@@ -59,7 +76,7 @@ export function SelectAllMatchingBanner({
           className="focus-visible:shadow-focus rounded-card font-medium underline underline-offset-2 hover:no-underline focus:outline-none"
           data-testid="select-all-matching-clear"
         >
-          {t('list.select.clearSelection', undefined, 'Clear selection')}
+          {t('list.select.clearSelection', undefined, isZhLocale ? '清除选择' : 'Clear selection')}
         </button>
       </div>
     );
@@ -80,7 +97,9 @@ export function SelectAllMatchingBanner({
         {t(
           'list.select.pageSelected',
           { count: pageSelectedCount },
-          `${pageSelectedCount} on this page selected`,
+          isZhLocale
+            ? `已选择本页 ${pageSelectedCount} 条记录`
+            : `${pageSelectedCount} on this page selected`,
         )}
       </span>
       <button
@@ -89,7 +108,11 @@ export function SelectAllMatchingBanner({
         className="text-accent focus-visible:shadow-focus rounded-card font-medium underline underline-offset-2 hover:no-underline focus:outline-none"
         data-testid="select-all-matching-action"
       >
-        {t('list.select.selectAllMatching', { count: total }, `Select all ${total} matching`)}
+        {t(
+          'list.select.selectAllMatching',
+          { count: total },
+          isZhLocale ? `选择全部 ${total} 条匹配记录` : `Select all ${total} matching`,
+        )}
       </button>
     </div>
   );

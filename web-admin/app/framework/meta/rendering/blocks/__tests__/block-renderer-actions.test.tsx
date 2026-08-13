@@ -220,6 +220,54 @@ describe('ToolbarBlockRenderer', () => {
     expect(passedRecord).toBeUndefined();
   });
 
+  it('passes the current detail record to the shared action context', () => {
+    const detailRecord = { pid: 'DETAIL-1', account_id: 'ACCOUNT-1' };
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (key: string) => key,
+        record: detailRecord,
+        row: detailRecord,
+        form: detailRecord,
+        state: {},
+        global: {},
+      }),
+    });
+
+    render(
+      <ToolbarBlockRenderer block={{ type: 'toolbar', buttons: [] } as any} runtime={runtime} />,
+    );
+
+    const options = useActionHandlerOptionsSpy.mock.calls.at(-1)?.[0];
+    expect(options?.context?.record).toBe(detailRecord);
+  });
+
+  it('does not pass an empty early form as a detail record', () => {
+    const runtime = makeRuntime();
+
+    render(
+      <ToolbarBlockRenderer block={{ type: 'toolbar', buttons: [] } as any} runtime={runtime} />,
+    );
+
+    const options = useActionHandlerOptionsSpy.mock.calls.at(-1)?.[0];
+    expect(options?.context?.record).toBeUndefined();
+  });
+
+  it('prefers a detail-bound toolbar record over unsynchronized runtime context', () => {
+    const detailRecord = { pid: 'DETAIL-BOUND-1', crm_opp_account_id: 'ACCOUNT-BOUND-1' };
+    const runtime = makeRuntime();
+
+    render(
+      <ToolbarBlockRenderer
+        block={{ type: 'toolbar', record: detailRecord, buttons: [] } as any}
+        runtime={runtime}
+      />,
+    );
+
+    const options = useActionHandlerOptionsSpy.mock.calls.at(-1)?.[0];
+    expect(options?.context?.record).toBe(detailRecord);
+  });
+
   it('disables the button while its action is in flight and ignores re-entrant double-clicks', async () => {
     const runtime = makeRuntime();
     let resolveAction: () => void = () => {};
@@ -443,7 +491,9 @@ describe('TableBlockRenderer', () => {
       ],
     };
 
-    const { getByTestId, queryByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    const { getByTestId, queryByTestId } = render(
+      <TableBlockRenderer block={block as any} runtime={runtime} />,
+    );
 
     expect(queryByTestId('row-action-ack')).toBeNull();
     expect(getByTestId('row-action-simulate')).toBeInTheDocument();
@@ -674,6 +724,38 @@ describe('TableBlockRenderer', () => {
 
     await waitFor(() => {
       expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', baseRow);
+    });
+  });
+
+  it('refreshes the bound selected row when the data source returns a newer snapshot', async () => {
+    const rows = {
+      current: [{ id: 'row-1', pid: 'row-1', name: 'Alpha', status: 'draft' }],
+    };
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => rows.current,
+        has: () => true,
+        register: vi.fn(),
+      }),
+    }) as any;
+    runtime.getContext().state.selectedLine = rows.current[0];
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: { mode: 'single', bind: 'selectedLine', defaultFirst: true },
+        columns: baseColumns,
+      },
+    };
+
+    const { rerender } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    const refreshedRow = { id: 'row-1', pid: 'row-1', name: 'Alpha', status: 'released' };
+    rows.current = [refreshedRow];
+    rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+    await waitFor(() => {
+      expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', refreshedRow);
     });
   });
 

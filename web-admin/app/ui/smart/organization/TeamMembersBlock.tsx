@@ -209,7 +209,6 @@ function AddMemberModal({
 }) {
   const [tenantMembers, setTenantMembers] = useState<TenantMemberOption[]>([]);
   const [selectedMemberPid, setSelectedMemberPid] = useState('');
-  const [role, setRole] = useState('member');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -266,7 +265,7 @@ function AddMemberModal({
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (selectedMemberPid) onAdd(selectedMemberPid, role);
+    if (selectedMemberPid) onAdd(selectedMemberPid, 'member');
   };
 
   return (
@@ -298,19 +297,6 @@ function AddMemberModal({
                 ))}
               </select>
             )}
-          </label>
-
-          <label className="block">
-            <span className="text-text-2 mb-1 block text-sm font-medium">团队角色</span>
-            <select
-              value={role}
-              onChange={(event) => setRole(event.target.value)}
-              className="border-border-strong bg-panel text-text focus:border-accent focus-visible:shadow-focus w-full rounded-control border px-3 py-2 text-sm focus:outline-none"
-              data-testid="team-members-role"
-            >
-              <option value="member">成员</option>
-              <option value="leader">负责人</option>
-            </select>
           </label>
 
           <div className="flex justify-end gap-3 pt-2">

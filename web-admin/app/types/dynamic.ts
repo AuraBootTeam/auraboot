@@ -307,6 +307,15 @@ export interface ApiState<T> {
   error: string | null;
 }
 
+export interface DynamicBatchResult {
+  total: number;
+  success: number;
+  failed: number;
+  skipped?: number;
+  errors?: string[];
+  failedItems?: Array<{ index?: number; error?: string; errorCode?: string }>;
+}
+
 /**
  * 动态API Hook返回类型
  */
@@ -326,7 +335,7 @@ export interface UseDynamicApiReturn {
   batchUpdate: (
     entityCode: string,
     updates: { id: string; data: Record<string, any> }[],
-  ) => Promise<DynamicEntity[]>;
+  ) => Promise<DynamicBatchResult>;
   batchDelete: (entityCode: string, ids: string[]) => Promise<void>;
 
   // 扩展功能

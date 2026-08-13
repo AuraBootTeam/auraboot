@@ -4,7 +4,7 @@ import { ColumnSettingsPanel } from '../ColumnSettingsPanel';
 import { ActionConfigPanel } from '~/framework/meta/rendering/pages/list/ActionConfigPanel';
 
 describe('runtime personalization mandatory controls', () => {
-  it('keeps a mandatory field visible through legacy config and deselect-all', () => {
+  it('keeps a mandatory field visible through legacy config and view changes', () => {
     const onSave = vi.fn();
     render(
       <ColumnSettingsPanel
@@ -25,12 +25,16 @@ describe('runtime personalization mandatory controls', () => {
     const mandatory = screen.getByTestId('column-settings-visible-orderNo');
     expect(mandatory).toBeChecked();
     expect(mandatory).toBeDisabled();
-    fireEvent.click(screen.getByText('Deselect All'));
+    fireEvent.click(screen.getByTestId('column-settings-visible-remark'));
     expect(mandatory).toBeChecked();
     expect(screen.getByTestId('column-settings-visible-remark')).not.toBeChecked();
     fireEvent.click(screen.getByTestId('column-settings-save'));
     expect(onSave).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.objectContaining({ fieldCode: 'orderNo', visible: true })]),
+      expect.objectContaining({
+        columns: expect.arrayContaining([
+          expect.objectContaining({ fieldCode: 'orderNo', visible: true }),
+        ]),
+      }),
     );
   });
 

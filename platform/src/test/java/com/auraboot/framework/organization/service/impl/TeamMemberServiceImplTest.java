@@ -8,6 +8,7 @@ import com.auraboot.framework.organization.entity.Team;
 import com.auraboot.framework.organization.entity.TeamMember;
 import com.auraboot.framework.organization.mapper.TeamMapper;
 import com.auraboot.framework.organization.mapper.TeamMemberMapper;
+import com.auraboot.framework.organization.service.TeamGovernanceService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.dao.entity.User;
@@ -38,6 +39,7 @@ class TeamMemberServiceImplTest {
     @Mock private TeamMemberMapper teamMemberMapper;
     @Mock private UserService userService;
     @Mock private TenantMemberService tenantMemberService;
+    @Mock private TeamGovernanceService teamGovernanceService;
 
     private TeamMemberServiceImpl service;
     private TeamMemberServiceImpl spyService;
@@ -50,7 +52,14 @@ class TeamMemberServiceImplTest {
         injectField(service, "teamMapper", teamMapper);
         injectField(service, "userService", userService);
         injectField(service, "tenantMemberService", tenantMemberService);
+        injectField(service, "teamGovernanceService", teamGovernanceService);
         spyService = spy(service);
+        lenient().when(teamGovernanceService.requireTeam(any(), anyString())).thenAnswer(invocation -> {
+            String pid = invocation.getArgument(1);
+            Team found = teamMapper.findByPid(pid);
+            if (found == null) throw new BusinessException("Team not found: " + pid);
+            return found;
+        });
         MetaContext.setContext(1L, 5L, "user-pid", "alice");
     }
 

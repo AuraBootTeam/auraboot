@@ -2,6 +2,7 @@ package com.auraboot.framework.tenant.dao.mapper;
 
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -19,6 +20,41 @@ public interface TenantMemberMapper extends BaseMapper<TenantMember> {
      */
     @Select("SELECT * FROM ab_tenant_member WHERE tenant_id = #{tenantId} AND deleted_flag = FALSE ORDER BY created_at DESC")
     List<TenantMember> findByTenantId(@Param("tenantId") Long tenantId);
+
+    /**
+     * Page tenant members through their associated user projection. Keyword filtering belongs in
+     * this query (rather than after pagination), otherwise the member picker can return unrelated
+     * recent members and miss an exact email outside the first page.
+     */
+    @Select("""
+            <script>
+            SELECT tm.*
+            FROM ab_tenant_member tm
+            INNER JOIN ab_user u ON u.id = tm.user_id AND u.deleted_flag = FALSE
+            WHERE tm.tenant_id = #{tenantId}
+              AND tm.deleted_flag = FALSE
+            <if test="status != null and status != ''">
+              AND tm.status = #{status}
+            </if>
+            <if test="memberType != null and memberType != ''">
+              AND COALESCE(u.user_type, 'human') = #{memberType}
+            </if>
+            <if test="keyword != null and keyword != ''">
+              AND (
+                LOWER(COALESCE(u.nick_name, '')) LIKE CONCAT('%', LOWER(#{keyword}), '%')
+                OR LOWER(COALESCE(u.user_name, '')) LIKE CONCAT('%', LOWER(#{keyword}), '%')
+                OR LOWER(COALESCE(u.email, '')) LIKE CONCAT('%', LOWER(#{keyword}), '%')
+              )
+            </if>
+            ORDER BY tm.created_at DESC
+            </script>
+            """)
+    Page<TenantMember> searchMembersPage(
+            Page<TenantMember> page,
+            @Param("tenantId") Long tenantId,
+            @Param("keyword") String keyword,
+            @Param("memberType") String memberType,
+            @Param("status") String status);
 
     /**
      * 根据用户ID查询所有租户ID
@@ -106,6 +142,40 @@ public interface TenantMemberMapper extends BaseMapper<TenantMember> {
               AND (deleted_flag = FALSE OR deleted_flag IS NULL)
             """)
     long countUserRolesInTenant(@Param("userId") Long userId, @Param("tenantId") Long tenantId);
+
+    @Select("""
+            SELECT COUNT(DISTINCT tm.id)
+            FROM ab_tenant_member tm
+            JOIN ab_user_role ur ON ur.member_id = tm.id
+            WHERE tm.tenant_id = #{tenantId}
+              AND tm.id <> #{excludedMemberId}
+              AND LOWER(tm.status) = 'active'
+              AND tm.deleted_flag = FALSE
+              AND ur.role_id = #{roleId}
+              AND LOWER(ur.status) = 'active'
+              AND ur.deleted_flag = FALSE
+            """)
+    long countOtherActiveMembersWithRole(
+            @Param("tenantId") Long tenantId,
+            @Param("excludedMemberId") Long excludedMemberId,
+            @Param("roleId") Long roleId);
+
+    @Select("""
+            SELECT tm.pid AS "memberPid",
+                   COALESCE(NULLIF(u.nick_name, ''), NULLIF(u.user_name, ''), u.email) AS "displayName",
+                   u.email
+            FROM ab_tenant_member tm
+            JOIN ab_user u ON u.id = tm.user_id
+            WHERE tm.tenant_id = #{tenantId}
+              AND tm.pid <> #{excludedMemberPid}
+              AND LOWER(tm.status) = 'active'
+              AND tm.deleted_flag = FALSE
+              AND u.deleted_flag = FALSE
+            ORDER BY "displayName", tm.pid
+            """)
+    List<java.util.Map<String, Object>> findActiveOffboardingCandidates(
+            @Param("tenantId") Long tenantId,
+            @Param("excludedMemberPid") String excludedMemberPid);
 
 //    /**
 //     * 查询成员详情(包含用户信息)

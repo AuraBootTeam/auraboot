@@ -12,6 +12,7 @@ import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dto.MemberQueryRequest;
 import com.auraboot.framework.tenant.dto.MemberResponse;
 import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.tenant.offboarding.TenantMemberOffboardingCoordinator;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -58,6 +59,7 @@ class TenantMemberApplicationServiceImplTest {
     @Mock private TeamMemberService teamMemberService;
     @Mock private DynamicDataService dynamicDataService;
     @Mock private JdbcTemplate jdbcTemplate;
+    @Mock private TenantMemberOffboardingCoordinator offboardingCoordinator;
 
     @InjectMocks
     private TenantMemberApplicationServiceImpl service;
@@ -89,6 +91,7 @@ class TenantMemberApplicationServiceImplTest {
         u.setId(id);
         u.setPid("up-" + id);
         u.setEmail(email);
+        u.setNickName("用户 " + id);
         return u;
     }
 
@@ -123,6 +126,7 @@ class TenantMemberApplicationServiceImplTest {
         var result = service.searchMembers(req, 7L);
         assertNotNull(result);
         assertEquals(1, result.getRecords().size());
+        assertEquals("用户 7", result.getRecords().get(0).getUser().getRealName());
     }
 
     @Test
@@ -214,6 +218,10 @@ class TenantMemberApplicationServiceImplTest {
         verify(tenantMemberService).activateMember(1L);
         verify(tenantMemberService).deactivateMember(1L);
         verify(tenantMemberService).suspendMember(1L, "r");
+        verify(offboardingCoordinator).prepare(m, null, 7L,
+                com.auraboot.framework.tenant.offboarding.TenantMemberOffboardingAction.DEACTIVATE);
+        verify(offboardingCoordinator).prepare(m, null, 7L,
+                com.auraboot.framework.tenant.offboarding.TenantMemberOffboardingAction.SUSPEND);
         verify(jdbcTemplate).update(
                 "UPDATE mt_org_employee SET org_emp_status = ?, updated_at = NOW() WHERE id = ?",
                 "resigned", 88L);
@@ -267,6 +275,8 @@ class TenantMemberApplicationServiceImplTest {
         when(tenantMemberService.removeMember(1L)).thenReturn(true);
 
         assertTrue(service.removeMember("p", 7L));
+        verify(offboardingCoordinator).prepare(m, null, 7L,
+                com.auraboot.framework.tenant.offboarding.TenantMemberOffboardingAction.REMOVE);
     }
 
     @Test
@@ -330,17 +340,14 @@ class TenantMemberApplicationServiceImplTest {
     }
 
     @Test
-    @DisplayName("batchRemoveMembers skips self / cross-tenant / missing")
+    @DisplayName("batchRemoveMembers fails atomically before deleting when any member is invalid")
     void batchRemoveFiltering() {
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
         when(tenantMemberService.findByPid("p1")).thenReturn(member(1L, 99L, 5L, StatusConstants.ACTIVE));
         when(tenantMemberService.findByPid("p2")).thenReturn(member(2L, 99L, 7L, StatusConstants.ACTIVE)); // self
-        when(tenantMemberService.findByPid("p3")).thenReturn(member(3L, 100L, 8L, StatusConstants.ACTIVE)); // cross
-        when(tenantMemberService.findByPid("p4")).thenReturn(null); // missing
-        when(tenantMemberService.removeMember(1L)).thenReturn(true);
-
-        assertTrue(service.batchRemoveMembers(List.of("p1", "p2", "p3", "p4"), 7L));
-        verify(tenantMemberService).removeMember(1L);
+        assertThrows(BusinessException.class,
+                () -> service.batchRemoveMembers(List.of("p1", "p2"), 7L));
+        verify(tenantMemberService, never()).removeMember(1L);
         verify(tenantMemberService, never()).removeMember(2L);
         verify(tenantMemberService, never()).removeMember(3L);
     }

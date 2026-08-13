@@ -68,7 +68,7 @@ export default function AdminLayout() {
       <div className="flex h-screen pt-14">
         <LeftSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-        <div className="flex flex-1 flex-col overflow-hidden" data-print="content">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden" data-print="content">
           <PageContent />
         </div>
 

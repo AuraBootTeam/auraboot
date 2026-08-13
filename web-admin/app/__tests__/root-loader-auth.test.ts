@@ -111,6 +111,7 @@ describe('root loader authentication guard', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it('redirects anonymous private routes even when route middleware is bypassed', async () => {
@@ -147,6 +148,14 @@ describe('root loader authentication guard', () => {
         enabled: false,
         siteDisplayName: 'AuraBoot',
       },
+      branding: {
+        productName: 'AuraBoot',
+        poweredByText: 'Powered by AuraBoot',
+      },
+      buildIdentity: {
+        version: 'development',
+        revision: 'local',
+      },
     });
     expect(mocks.getUserInfo).not.toHaveBeenCalled();
     expect(mocks.getUserMenus).not.toHaveBeenCalled();
@@ -171,6 +180,84 @@ describe('root loader authentication guard', () => {
         siteDisplayName: 'AuraBoot Runtime title',
       },
     });
+  });
+
+  it('loads commercial branding through the BFF-only runtime boundary', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          branding: {
+            mode: 'commercial',
+            productName: 'Northstar',
+            poweredByText: 'Powered by Northstar',
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { resolveDeploymentBrandingFromBff } = await import('~/root');
+    await expect(
+      resolveDeploymentBrandingFromBff({
+        EDITION: 'standard',
+        BFF_INTERNAL_URL: 'http://bff.internal:4000',
+      }),
+    ).resolves.toMatchObject({
+      mode: 'commercial',
+      productName: 'Northstar',
+    });
+    expect(fetchMock).toHaveBeenCalledWith('http://bff.internal:4000/api/runtime/branding');
+  });
+
+  it('fails closed when commercial branding cannot be resolved by the BFF', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
+
+    const { resolveDeploymentBrandingFromBff } = await import('~/root');
+    await expect(
+      resolveDeploymentBrandingFromBff({ EDITION: 'standard', BFF_PORT: '4001' }),
+    ).rejects.toThrow('Unable to resolve deployment branding from BFF (503).');
+  });
+
+  it('always emits a stable product title when ICP mode is disabled', async () => {
+    const { COMMUNITY_BRANDING } = await import('~/config/branding');
+    const { meta } = await import('~/root');
+
+    expect(
+      meta({
+        data: {
+          branding: COMMUNITY_BRANDING,
+          icpCompliance: { enabled: false },
+        } as any,
+      }),
+    ).toEqual([{ title: 'AuraBoot' }]);
+  });
+
+  it('keeps commercial branding in the title when ICP records are enabled', async () => {
+    const { COMMUNITY_BRANDING } = await import('~/config/branding');
+    const { meta } = await import('~/root');
+
+    expect(
+      meta({
+        data: {
+          branding: { ...COMMUNITY_BRANDING, mode: 'commercial', productName: 'Northstar' },
+          icpCompliance: { enabled: true, siteDisplayName: 'AuraBoot Filed Site' },
+        } as any,
+      }),
+    ).toEqual([{ title: 'Northstar' }]);
+  });
+
+  it('declares browser identity links from the resolved branding contract', async () => {
+    const { COMMUNITY_BRANDING } = await import('~/config/branding');
+    const { resolveBrandingDocumentLinks } = await import('~/root');
+
+    expect(resolveBrandingDocumentLinks(COMMUNITY_BRANDING)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rel: 'manifest', href: '/manifest.json' }),
+        expect.objectContaining({ rel: 'icon', href: '/favicon.ico' }),
+        expect.objectContaining({ rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }),
+      ]),
+    );
   });
 
   it('keeps storefront runtime public even when an admin token exists', async () => {

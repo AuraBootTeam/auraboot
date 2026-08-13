@@ -46,7 +46,6 @@ PREPARE = "crm:prepare_qdp_draft"
 COMPILE = "crm:compile_qdp_revision"
 REVIEW = "crm:submit_qdp_review"
 RELEASE = "crm:publish_qdp_revision"
-LEGACY_RELEASE = "crm:release_qdp"
 
 
 def row_version(record: dict[str, Any], label: str) -> int:
@@ -287,7 +286,7 @@ def provision_release_manager(admin_jwt: str, tag: str) -> tuple[str, str, str]:
             "email": email,
             "displayName": f"QDP release manager {tag}",
             "initialPassword": PASSWORD,
-            "roleCodes": ["crm_admin", "pe_qdp_release_manager"],
+            "roleCodes": ["crm_qdp_release_manager", "pe_qdp_release_manager"],
             "sendInviteEmail": False,
         },
         admin_jwt,
@@ -657,50 +656,6 @@ def main() -> int:
     checks.append({"id": "EXTERNAL-FAIL-CLOSED-RECOVERY", "result": "pass"})
     checks.append({"id": "LIFECYCLE-RELEASE-SUPERSEDE", "result": "pass", "released": qdp3, "superseded": qdp1})
 
-    legacy_request_pid, legacy_sidecar_pid = create_request_and_sidecar(
-        admin_jwt, f"{tag}-legacy")
-    require_ok(command("pe:request_dfm_pcba_rfq", admin_jwt, target=legacy_sidecar_pid),
-               "start legacy PCBA DFM")
-    require_ok(command("pe:pass_dfm_pcba_rfq", admin_jwt, target=legacy_sidecar_pid),
-               "pass legacy PCBA DFM")
-    legacy_bytes = f"Legacy QDP release compatibility\nrequest={legacy_request_pid}\ntag={tag}\n".encode()
-    legacy_file_pid = upload(
-        jwt, f"qdp-release-center-{tag}-legacy.txt", legacy_bytes, "text/plain")
-    legacy_request_version = row_version(
-        dynamic_get("crm_customer_request_common", legacy_request_pid, jwt),
-        "legacy Customer Request",
-    )
-    legacy_release = command(
-        LEGACY_RELEASE,
-        jwt,
-        target=legacy_request_pid,
-        expected_version=legacy_request_version,
-        client_request_id=f"qdp-legacy-release-{tag}",
-        payload={
-            "crm_qdp_customer_request_id": legacy_request_pid,
-            "crm_qdp_pcba_rfq_id": legacy_sidecar_pid,
-            "crm_qdp_primary_file_id": legacy_file_pid,
-            "crm_qdp_file_manifest": [
-                {"filePid": legacy_file_pid, "purpose": "customer_release"}
-            ],
-            "crm_qdp_release_note": "ce55 direct-release compatibility probe",
-        },
-    )
-    require_ok(legacy_release, "legacy direct QDP release")
-    legacy_release_data = release_result(legacy_release)
-    legacy_qdp_pid = str(legacy_release_data.get("qdpRevisionId") or "")
-    assert PID_RE.fullmatch(legacy_qdp_pid), legacy_release_data
-    legacy_qdp = dynamic_get("crm_qdp_revision_common", legacy_qdp_pid, jwt)
-    assert legacy_qdp.get("crm_qdp_status") == "released", legacy_qdp
-    assert legacy_qdp.get("crm_qdp_customer_request_id") == legacy_request_pid, legacy_qdp
-    assert dynamic_get("crm_customer_request_pcba_rfq", legacy_sidecar_pid, jwt).get(
-        "crm_crq_qdp_revision_id") == legacy_qdp_pid
-    checks.append({
-        "id": "LEGACY-DIRECT-RELEASE-COMPATIBILITY",
-        "result": "pass",
-        "qdpPid": legacy_qdp_pid,
-    })
-
     tenant_b = seed_equivalent_second_tenant(actor_id, tenant_id, tag)
     selected = http(
         "POST",
@@ -723,28 +678,21 @@ def main() -> int:
     ) == "0"
     checks.append({"id": "NEG-CROSS-TENANT", "result": "pass", "tenantB": tenant_b})
 
-    legacy_writer_count = psql(
-        "SELECT count(*) FROM ab_meta_field WHERE code IN ("
-        + ",".join(sql_literal(code) for code in [
-            "crm_qdp_code", "crm_qdp_customer_request_id", "crm_qdp_revision_no",
-            "crm_qdp_schema_version", "crm_qdp_expected_request_version", "crm_qdp_source_revision",
-            "crm_qdp_qualification_verdict", "crm_qdp_qualification_evidence_refs",
-            "crm_qdp_content_hash", "crm_qdp_request_snapshot", "crm_qdp_file_manifest",
-            "crm_qdp_primary_file_id", "crm_qdp_primary_filename", "crm_qdp_file_names",
-            "crm_qdp_client_request_id", "crm_qdp_owner_scope", "crm_qdp_status",
-            "crm_qdp_release_note", "crm_qdp_released_at", "crm_qdp_released_by",
-        ])
-        + ") AND extension->'extension'->'allowedWriterCommands' ? 'crm:release_qdp'"
+    retired_writer_count = psql(
+        "SELECT count(*) FROM ab_meta_field "
+        "WHERE extension->'extension'->'allowedWriterCommands' ? 'crm:release_qdp'"
     )
-    assert legacy_writer_count == "20", f"legacy writer compatibility count is {legacy_writer_count!r}"
+    assert retired_writer_count == "0", (
+        f"retired one-step QDP writer remains on {retired_writer_count!r} field(s)"
+    )
     audit_count = int(psql(
         "SELECT count(*) FROM ab_command_audit_log WHERE tenant_id=" + tenant_id
         + " AND command_code IN ('crm:prepare_qdp_draft','crm:compile_qdp_revision','crm:submit_qdp_review',"
-        + "'crm:publish_qdp_revision','crm:release_qdp')"
+        + "'crm:publish_qdp_revision')"
     ) or 0)
     assert audit_count >= 9, f"lifecycle command audit rows missing: {audit_count}"
     checks.append({"id": "AUDIT-AND-METADATA", "result": "pass", "auditRows": audit_count,
-                   "legacyWriterFields": int(legacy_writer_count)})
+                   "retiredWriterFields": int(retired_writer_count)})
 
     evidence = {
         "schemaVersion": 1,
@@ -760,7 +708,6 @@ def main() -> int:
         "staleReviewQdpPid": qdp2,
         "releasedQdpPid": qdp3,
         "supersededQdpPid": qdp1,
-        "legacyQdpPid": legacy_qdp_pid,
         "checks": checks,
         "verdict": "pass",
     }

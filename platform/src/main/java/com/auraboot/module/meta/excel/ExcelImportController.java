@@ -2,10 +2,10 @@ package com.auraboot.module.meta.excel;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
-import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Files;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -35,18 +37,27 @@ public class ExcelImportController {
 
     private final ExcelImportService importService;
     private final ExcelValidationEngine validationEngine;
+    private final ExcelImportPolicyResolver policyResolver;
+
+    private static final long MAX_IMPORT_BYTES = 10L * 1024L * 1024L;
 
     /**
      * Download an import template for the specified model.
      * Template includes displayName headers with required field markers.
      */
     @GetMapping("/template/{modelCode}")
-    @RequirePermission(MetaPermission.MODEL_MANAGE)
-    public ResponseEntity<Resource> downloadTemplate(@PathVariable String modelCode) {
+    @RequirePermission("model.{modelCode}.import")
+    public ResponseEntity<Resource> downloadTemplate(
+            @PathVariable String modelCode,
+            @RequestParam(defaultValue = "insert") String mode) {
+        Path templatePath = null;
         try {
-            Path templatePath = importService.generateImportTemplate(modelCode);
+            ExcelImportPolicy policy = policyResolver.requireEnabled(modelCode);
+            policyResolver.validateMode(policy, mode, "update".equalsIgnoreCase(mode)
+                    ? policy.getUpdateKeys().stream().findFirst().orElse(null) : null);
+            templatePath = importService.generateImportTemplate(modelCode, mode);
             String fileName = URLEncoder.encode(modelCode + "-import-template.xlsx", StandardCharsets.UTF_8);
-            Resource resource = new FileSystemResource(templatePath.toFile());
+            Resource resource = new ByteArrayResource(Files.readAllBytes(templatePath));
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
@@ -55,6 +66,14 @@ public class ExcelImportController {
         } catch (IOException e) {
             log.error("Failed to generate import template for model {}: {}", modelCode, e.getMessage());
             return ResponseEntity.internalServerError().build();
+        } finally {
+            if (templatePath != null) {
+                try {
+                    Files.deleteIfExists(templatePath);
+                } catch (IOException cleanupError) {
+                    log.warn("Failed to delete generated import template {}", templatePath, cleanupError);
+                }
+            }
         }
     }
 
@@ -68,27 +87,43 @@ public class ExcelImportController {
      * @return import result with success/error counts
      */
     @PostMapping("/import/{modelCode}")
-    @RequirePermission(MetaPermission.MODEL_MANAGE)
+    @RequirePermission("model.{modelCode}.import")
     public ApiResponse<ExcelImportResult> importExcel(
             @PathVariable String modelCode,
             @RequestParam MultipartFile file,
             @RequestParam(defaultValue = "false") boolean skipErrors,
             @RequestParam(defaultValue = "false") boolean dryRun,
-            @RequestParam(required = false) String upsertKey) {
+            @RequestParam(defaultValue = "insert") String mode,
+            @RequestParam(required = false) String matchKey) {
 
+        validateUpload(file);
+        ExcelImportPolicy policy = policyResolver.requireEnabled(modelCode);
+        policyResolver.validateMode(policy, mode, matchKey);
         ImportOptions options = new ImportOptions();
         options.setSkipErrors(skipErrors);
         options.setDryRun(dryRun);
-        options.setUpsertKey(upsertKey);
+        options.setImportMode(mode);
+        options.setMatchKey(matchKey);
 
         try {
-            // Check row count — if > ASYNC_THRESHOLD, run asynchronously
+            // Check row count — larger files run asynchronously. The default is 1000;
+            // isolated acceptance stacks may lower it to exercise the durable job path.
             byte[] fileBytes = file.getInputStream().readAllBytes();
-            int rowCount = importService.countRows(new java.io.ByteArrayInputStream(fileBytes));
+            ValidationReport validation = validationEngine.validate(
+                    modelCode, new java.io.ByteArrayInputStream(fileBytes), mode, matchKey);
+            if (!validation.isValid()) {
+                List<ImportValidationError> errors = validation.getErrors().stream()
+                        .map(error -> new ImportValidationError(
+                                error.getRowNumber(), error.getFieldCode(), error.getMessage()))
+                        .toList();
+                return ApiResponse.success("Validation failed",
+                        ExcelImportResult.withErrors(errors, validation.getTotalRows()));
+            }
+            int rowCount = validation.getTotalRows();
 
-            if (rowCount > ExcelImportService.ASYNC_THRESHOLD) {
+            if (rowCount > importService.getAsyncThreshold()) {
                 String taskId = importService.importExcelAsync(modelCode,
-                        new java.io.ByteArrayInputStream(fileBytes), options);
+                        new java.io.ByteArrayInputStream(fileBytes), options, file.getOriginalFilename());
                 ExcelImportResult asyncResult = ExcelImportResult.builder()
                         .totalRows(rowCount).taskId(taskId).build();
                 return ApiResponse.success("Import started asynchronously", asyncResult);
@@ -106,28 +141,33 @@ public class ExcelImportController {
     /**
      * Poll async import task status.
      */
-    @GetMapping("/import-status/{taskId}")
-    @RequirePermission(MetaPermission.MODEL_MANAGE)
+    @GetMapping("/import/{modelCode}/status/{taskId}")
+    @RequirePermission("model.{modelCode}.import")
     public ApiResponse<ExcelImportService.AsyncImportStatus> getImportStatus(
+            @PathVariable String modelCode,
             @PathVariable String taskId) {
-        ExcelImportService.AsyncImportStatus status = importService.getImportStatus(taskId);
-        if (status == null) {
-            return ApiResponse.error("Task not found: " + taskId);
-        }
-        return ApiResponse.success(status);
+        ExcelImportService.AsyncImportStatus status = importService.requireImportStatus(modelCode, taskId);
+        return status == null
+                ? ApiResponse.error("Task not found: " + taskId)
+                : ApiResponse.success(status);
     }
 
     /**
      * Validate an Excel file against the model's field definitions without importing.
      * Returns a detailed validation report with errors and warnings.
      */
-    @PostMapping("/validate")
-    @RequirePermission(MetaPermission.MODEL_MANAGE)
+    @PostMapping("/validate/{modelCode}")
+    @RequirePermission("model.{modelCode}.import")
     public ApiResponse<ValidationReport> validateFile(
-            @RequestParam String modelCode,
-            @RequestParam MultipartFile file) {
+            @PathVariable String modelCode,
+            @RequestParam MultipartFile file,
+            @RequestParam(defaultValue = "insert") String mode,
+            @RequestParam(required = false) String matchKey) {
+        validateUpload(file);
+        ExcelImportPolicy policy = policyResolver.requireEnabled(modelCode);
+        policyResolver.validateMode(policy, mode, matchKey);
         try {
-            ValidationReport report = validationEngine.validate(modelCode, file.getInputStream());
+            ValidationReport report = validationEngine.validate(modelCode, file.getInputStream(), mode, matchKey);
             return ApiResponse.success(report);
         } catch (IOException e) {
             log.error("Failed to validate Excel file for model {}: {}", modelCode, e.getMessage());
@@ -146,7 +186,7 @@ public class ExcelImportController {
      * @param file            multi-sheet .xlsx file
      */
     @PostMapping("/chain-import")
-    @RequirePermission(MetaPermission.MODEL_MANAGE)
+    @RequirePermission("meta.model.update")
     public ApiResponse<ExcelImportResult> chainImport(
             @RequestParam String parentModelCode,
             @RequestParam String childModelCode,
@@ -167,8 +207,26 @@ public class ExcelImportController {
     /**
      * SSE endpoint for streaming import progress of an async task.
      */
-    @GetMapping(value = "/import/{taskId}/progress", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamProgress(@PathVariable String taskId) {
-        return importService.subscribeProgress(taskId);
+    @GetMapping(value = "/import/{modelCode}/{taskId}/progress", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @RequirePermission("model.{modelCode}.import")
+    public SseEmitter streamProgress(@PathVariable String modelCode, @PathVariable String taskId) {
+        ExcelImportService.AsyncImportStatus status = importService.requireImportStatus(modelCode, taskId);
+        if (status == null) {
+            throw new BusinessException("Import task not found: " + taskId);
+        }
+        return importService.subscribeProgress(taskId, status);
+    }
+
+    private void validateUpload(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException("An .xlsx file is required");
+        }
+        String fileName = file.getOriginalFilename();
+        if (fileName == null || !fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".xlsx")) {
+            throw new BusinessException("Only .xlsx files are supported");
+        }
+        if (file.getSize() > MAX_IMPORT_BYTES) {
+            throw new BusinessException("Import file exceeds the 10 MB limit");
+        }
     }
 }

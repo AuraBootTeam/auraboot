@@ -24,15 +24,33 @@ public final class CommandPermitDataAccess {
 
     /** Whether the command plan grade for {@code modelCode} permits this already-loaded record. */
     public static boolean permitsRecord(String modelCode, Map<String, Object> record, Long userId) {
-        return permitsRecordForScope(MetaContext.getCommandPermitScopeFor(modelCode), record, userId);
+        return permitsRecordForScope(
+                MetaContext.getCommandPermitScopeFor(modelCode),
+                MetaContext.getCommandPermitTargetFor(modelCode),
+                record,
+                userId);
     }
 
     private static boolean permitsRecordForScope(
             String scope,
             Map<String, Object> record,
             Long userId) {
+        return permitsRecordForScope(scope, null, record, userId);
+    }
+
+    private static boolean permitsRecordForScope(
+            String scope,
+            String targetRecordPid,
+            Map<String, Object> record,
+            Long userId) {
         if ("ALL".equals(scope)) {
             return true;
+        }
+        if ("TARGET".equals(scope)) {
+            Object recordPid = record != null ? record.get("pid") : null;
+            return targetRecordPid != null
+                    && recordPid != null
+                    && targetRecordPid.equals(String.valueOf(recordPid));
         }
         if (!"SELF".equals(scope) || record == null || userId == null) {
             return false;
@@ -54,10 +72,17 @@ public final class CommandPermitDataAccess {
      * when that model must use its own policy.
      */
     public static String rowFilter(String modelCode, Long userId) {
-        return rowFilterForScope(MetaContext.getCommandPermitScopeFor(modelCode), userId);
+        return rowFilterForScope(
+                MetaContext.getCommandPermitScopeFor(modelCode),
+                MetaContext.getCommandPermitTargetFor(modelCode),
+                userId);
     }
 
     private static String rowFilterForScope(String scope, Long userId) {
+        return rowFilterForScope(scope, null, userId);
+    }
+
+    private static String rowFilterForScope(String scope, String targetRecordPid, Long userId) {
         if (scope == null) {
             return null;
         }
@@ -66,6 +91,9 @@ public final class CommandPermitDataAccess {
         }
         if ("SELF".equals(scope) && userId != null) {
             return "AND created_by = " + userId;
+        }
+        if ("TARGET".equals(scope) && targetRecordPid != null && !targetRecordPid.isBlank()) {
+            return "AND pid = '" + targetRecordPid.replace("'", "''") + "'";
         }
         return "AND 1 = 0";
     }
