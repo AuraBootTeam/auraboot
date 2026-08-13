@@ -31,9 +31,9 @@
     "07-lead-2000-result.png"
   ],
   "residualGaps": [
-    "error-report workbook download and correction workflow",
-    "cancel/retry and restart-during-running recovery",
-    "separately budgeted 10k+/100k performance benchmark",
+    "at s143: error-report workbook download and correction workflow; later closed by s144/s147/s148, see recovery-scale-manifest.json",
+    "outside this s143 adoption manifest: cancel/retry and restart-during-running recovery",
+    "outside this s143 adoption manifest: separately budgeted 10k/100k performance benchmark",
     "independent product-owner and mobile/channel sign-off"
   ],
   "dataMigration": "out_of_scope_during_development"

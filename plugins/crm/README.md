@@ -118,6 +118,17 @@ evidence manifest lives in
 `docs/e2e/evidence/crm-multimodel-import-2026-08-13/`; the full Playwright traces stay
 in the workspace evidence directory to avoid adding large binaries to clone history.
 
+Correction workbooks are private storage objects exposed only through the scoped import API.
+The assembled platform ships the local, MinIO, S3 and OSS implementations and refuses to
+silently fall back to local disk when a non-local provider is configured. If a provider upload
+fails, the UI retains row-level errors and clearly states that the correction workbook is
+unavailable; it does not show a false download action. Reports expire after the configured
+retention period (seven days by default). Scheduled cleanup deletes the object and clears only
+its download pointer; import status and row counts remain available. The committed recovery
+and lifecycle denominator is `14 pass / 1 deferred / 5 untested`: multi-node behavior is
+deferred, while cancellation, explicit retry, restart recovery and 10k/100k benchmarks remain
+untested. These development-stage checks use fresh databases and require no data migration.
+
 ## First use in the browser
 
 Open the Vite URL printed by `start-isolated.sh` and sign in as

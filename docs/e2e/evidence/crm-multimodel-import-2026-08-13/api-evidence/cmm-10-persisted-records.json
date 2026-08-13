@@ -1,0 +1,14 @@
+{
+  "partialRecord": {
+    "pid": "01KZXNJV783EM5BH01541D32D8",
+    "code": "LEAD-20260813-2009",
+    "company": "异步部分成功线索-1786628368943-irjin-已更新",
+    "requirement": "异步部分成功后必须保留的需求"
+  },
+  "recoveryRecord": {
+    "pid": "01KZXNJV9K2K2CRFSQ2FAQ8E04",
+    "code": "LEAD-20260813-2010",
+    "company": "异步纠错线索-1786628368943-irjin-已修正",
+    "requirement": "纠错重传后必须保留的需求"
+  }
+}

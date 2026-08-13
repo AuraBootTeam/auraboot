@@ -28,6 +28,7 @@ import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -204,6 +205,7 @@ public class ExcelImportErrorReportService {
             initialDelayString = "${auraboot.excel-import.error-report-cleanup-initial-delay-ms:300000}",
             fixedDelayString = "${auraboot.excel-import.error-report-cleanup-delay-ms:3600000}"
     )
+    @Transactional
     public int cleanupExpiredReports() {
         List<ImportJob> expired = importJobMapper.findExpiredReports(
                 retentionCutoff(), Math.max(1, cleanupBatchSize));
