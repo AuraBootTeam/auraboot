@@ -197,6 +197,15 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
   assert.equal(quota.extension?.dataScope?.ownerField, 'crm_lpq_user_id');
 });
 
+test('PAR-04 workbench search fields request import-managed trigram indexes', async () => {
+  const bindings = await json('config/bindings/crm_lead_pool_item.json');
+  for (const fieldCode of ['crm_lpi_lead_code', 'crm_lpi_company', 'crm_lpi_contact_name']) {
+    const binding = bindings.find((candidate) => candidate.fieldCode === fieldCode);
+    assert.ok(binding, `${fieldCode} binding must exist`);
+    assert.equal(binding.displayConfig?.searchable, true, `${fieldCode} must drive schema search indexing`);
+  }
+});
+
 test('PAR-04 config mutation proves missing claim permission turns the contract red', async () => {
   const commands = await json('config/commands/crm_lead_pool.json');
   const mutant = structuredClone(commands);

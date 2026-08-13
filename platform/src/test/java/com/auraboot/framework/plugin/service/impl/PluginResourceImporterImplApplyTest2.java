@@ -76,6 +76,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -354,23 +355,28 @@ class PluginResourceImporterImplApplyTest2 {
 
     @Test
     @DisplayName("importModelFieldBinding UPDATE branch evicts model projection caches")
-    void importModelFieldBinding_update_evictsModelProjectionCaches() {
+    void importModelFieldBinding_update_evictsModelProjectionCaches() throws Exception {
         MetaModelDTO model = MetaModelDTO.builder()
                 .id(10L)
                 .pid("model-pid")
                 .code("m1")
+                .status("published")
                 .build();
         MetaFieldDTO field = new MetaFieldDTO();
         field.setId(20L);
         field.setPid("field-pid");
         field.setCode("f1");
         ModelFieldBinding existing = new ModelFieldBinding();
+        existing.setSearchable(false);
 
         when(metaModelService.findByCode("m1")).thenReturn(model);
         when(metaFieldService.findCurrentByCode("f1")).thenReturn(Optional.of(field));
         when(metaModelService.isFieldBoundToModel(10L, 20L)).thenReturn(true);
         when(fieldBindingMapper.getPidByModelAndField(10L, 20L)).thenReturn("binding-pid");
         when(metaModelService.getFieldBinding(10L, 20L)).thenReturn(Optional.of(existing));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{\"searchable\":true}");
+        when(schemaManagementService.updateTableByModel("m1"))
+                .thenReturn(SchemaOperationResult.builder().success(true).build());
 
         ModelFieldBindingDTO dto = ModelFieldBindingDTO.builder()
                 .modelCode("m1")
@@ -379,6 +385,7 @@ class PluginResourceImporterImplApplyTest2 {
                 .required(true)
                 .visible(true)
                 .editable(true)
+                .displayConfig(Map.of("searchable", true))
                 .build();
 
         PluginResource result = importer.importModelFieldBinding(dto, "plg", "imp", 1L,
@@ -388,6 +395,49 @@ class PluginResourceImporterImplApplyTest2 {
         assertThat(result.getResourcePid()).isEqualTo("binding-pid");
         verify(metaModelService).updateFieldBinding(existing);
         verify(metaModelService).clearAllCache();
+        verify(schemaManagementService).updateTableByModel("m1");
+        assertThat(existing.getSearchable()).isTrue();
+        assertThat(existing.getDisplayConfig()).isEqualTo("{\"searchable\":true}");
+    }
+
+    @Test
+    @DisplayName("importModelFieldBinding UPDATE fails closed when searchable index sync fails")
+    void importModelFieldBindingSearchableSchemaSyncFailureThrows() throws Exception {
+        MetaModelDTO model = MetaModelDTO.builder()
+                .id(10L)
+                .pid("model-pid")
+                .code("m1")
+                .status("published")
+                .build();
+        MetaFieldDTO field = new MetaFieldDTO();
+        field.setId(20L);
+        field.setPid("field-pid");
+        field.setCode("f1");
+        ModelFieldBinding existing = new ModelFieldBinding();
+        existing.setSearchable(false);
+
+        when(metaModelService.findByCode("m1")).thenReturn(model);
+        when(metaFieldService.findCurrentByCode("f1")).thenReturn(Optional.of(field));
+        when(metaModelService.isFieldBoundToModel(10L, 20L)).thenReturn(true);
+        when(fieldBindingMapper.getPidByModelAndField(10L, 20L)).thenReturn("binding-pid");
+        when(metaModelService.getFieldBinding(10L, 20L)).thenReturn(Optional.of(existing));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{\"searchable\":true}");
+        when(schemaManagementService.updateTableByModel("m1"))
+                .thenReturn(SchemaOperationResult.builder()
+                        .success(false)
+                        .errorMessage("index DDL rejected")
+                        .build());
+
+        ModelFieldBindingDTO dto = ModelFieldBindingDTO.builder()
+                .modelCode("m1")
+                .fieldCode("f1")
+                .displayConfig(Map.of("searchable", true))
+                .build();
+
+        assertThatThrownBy(() -> importer.importModelFieldBinding(dto, "plg", "imp", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE))
+                .isInstanceOf(PluginException.class)
+                .hasMessageContaining("index DDL rejected");
     }
 
     @Test

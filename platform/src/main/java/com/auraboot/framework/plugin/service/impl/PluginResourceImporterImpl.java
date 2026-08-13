@@ -30,6 +30,7 @@ import com.auraboot.framework.meta.dto.NamedQueryUpdateRequest;
 import com.auraboot.framework.meta.dto.PageSchemaCreateRequest;
 import com.auraboot.framework.meta.dto.PageSchemaUpdateRequest;
 import com.auraboot.framework.meta.entity.Field;
+import com.auraboot.framework.meta.entity.ModelFieldBinding;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.mapper.BindingRuleMapper;
 import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
@@ -801,6 +802,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         if (exists) {
             // Update existing binding (may be soft-deleted, so also clear deleted_flag)
             var existingBinding = metaModelService.getFieldBinding(modelId, fieldId).orElse(null);
+            boolean searchabilityChanged = false;
             if (existingBinding != null) {
                 existingBinding.setFieldOrder(dto.getSequence());
                 existingBinding.setRequired(dto.getRequired());
@@ -811,12 +813,14 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 existingBinding.setDictOverrideCode(dto.getDictOverrideCode());
                 existingBinding.setUiHint(dto.getUiHint());
                 existingBinding.setIsSystemBinding(dto.getIsSystemBinding());
+                searchabilityChanged = applyBindingDisplayConfig(existingBinding, dto);
                 // Clear soft-delete flag (entity doesn't have deletedFlag to avoid MyBatis Plus global logical delete)
                 fieldBindingMapper.clearDeletedFlag(modelId, fieldId);
 
                 metaModelService.updateFieldBinding(existingBinding);
                 metaModelService.clearAllCache();
             }
+            syncBindingIndexesWhenRequired(model, dto.getModelCode(), searchabilityChanged);
 
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MODEL_FIELD_BINDING,
                     bindingPid, null, bindingCode, bindingCode, ResourceAction.UPDATE, null, null);
@@ -831,30 +835,44 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                         dto.getDefaultValue(), modelId, fieldId);
 
                 if (dto.getAliasCode() != null || dto.getDictOverrideCode() != null ||
-                    dto.getUiHint() != null || dto.getIsSystemBinding() != null) {
+                        dto.getUiHint() != null || dto.getIsSystemBinding() != null) {
                     fieldBindingMapper.updateExtraFields(modelId, fieldId,
                             dto.getAliasCode(), dto.getDictOverrideCode(),
                             dto.getUiHint(), dto.getIsSystemBinding());
                 }
 
+                boolean searchabilityChanged = metaModelService.getFieldBinding(modelId, fieldId)
+                        .map(binding -> {
+                            boolean changed = applyBindingDisplayConfig(binding, dto);
+                            metaModelService.updateFieldBinding(binding);
+                            return changed;
+                        })
+                        .orElse(false);
+
                 bindingPid = fieldBindingMapper.getPidByModelAndField(modelId, fieldId);
                 log.info("Resurrected soft-deleted binding: {}", logSafe(bindingCode));
                 metaModelService.clearAllCache();
+                syncBindingIndexesWhenRequired(model, dto.getModelCode(), searchabilityChanged);
 
                 return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MODEL_FIELD_BINDING,
                         bindingPid, null, bindingCode, bindingCode, ResourceAction.CREATE, null, null);
             }
 
             // Create new binding via service
-            metaModelService.bindFieldToModel(
-                modelId, fieldId, dto.getSequence(), dto.getRequired(),
-                dto.getVisible(), dto.getEditable(), dto.getDefaultValue(),
-                null, null, null  // validationRules, displayConfig, remarks
+            ModelFieldBinding createdBinding = metaModelService.bindFieldToModel(
+                    modelId, fieldId, dto.getSequence(), dto.getRequired(),
+                    dto.getVisible(), dto.getEditable(), dto.getDefaultValue(),
+                    dto.getValidationOverride(), bindingDisplayConfig(dto), dto.getRemarks()
             );
+
+            if (createdBinding != null) {
+                applyBindingDisplayConfig(createdBinding, dto);
+                metaModelService.updateFieldBinding(createdBinding);
+            }
 
             // Update additional fields via Mapper
             if (dto.getAliasCode() != null || dto.getDictOverrideCode() != null ||
-                dto.getUiHint() != null || dto.getIsSystemBinding() != null) {
+                    dto.getUiHint() != null || dto.getIsSystemBinding() != null) {
                 fieldBindingMapper.updateExtraFields(modelId, fieldId,
                         dto.getAliasCode(), dto.getDictOverrideCode(),
                         dto.getUiHint(), dto.getIsSystemBinding());
@@ -876,18 +894,68 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     }
                 }
 
-                SchemaOperationResult schemaResult = schemaManagementService.updateTableByModel(dto.getModelCode());
-                if (schemaResult == null || !schemaResult.isSuccess()) {
-                    String errorMessage = schemaResult != null && schemaResult.getErrorMessage() != null
-                            ? schemaResult.getErrorMessage()
-                            : "unknown schema sync error";
-                    throw new PluginException("Failed to sync schema after binding field " + dto.getFieldCode()
-                            + " to model " + dto.getModelCode() + ": " + errorMessage);
-                }
+                syncBindingSchema(dto.getModelCode(), dto.getFieldCode());
+            } else {
+                syncBindingIndexesWhenRequired(model, dto.getModelCode(),
+                        Boolean.TRUE.equals(bindingSearchable(dto)));
             }
 
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MODEL_FIELD_BINDING,
                     bindingPid, null, bindingCode, bindingCode, ResourceAction.CREATE, null, null);
+        }
+    }
+
+    private boolean applyBindingDisplayConfig(ModelFieldBinding binding, ModelFieldBindingDTO dto) {
+        if (dto.getDisplayConfig() != null) {
+            binding.setDisplayConfig(bindingDisplayConfig(dto));
+        }
+        if (dto.getValidationOverride() != null) {
+            binding.setValidationRules(dto.getValidationOverride());
+        }
+        if (dto.getRemarks() != null) {
+            binding.setRemarks(dto.getRemarks());
+        }
+
+        Boolean configuredSearchable = bindingSearchable(dto);
+        if (configuredSearchable == null || Objects.equals(binding.getSearchable(), configuredSearchable)) {
+            return false;
+        }
+        binding.setSearchable(configuredSearchable);
+        return true;
+    }
+
+    private String bindingDisplayConfig(ModelFieldBindingDTO dto) {
+        return dto.getDisplayConfig() == null ? null : toJson(dto.getDisplayConfig());
+    }
+
+    private Boolean bindingSearchable(ModelFieldBindingDTO dto) {
+        if (dto.getDisplayConfig() == null || !dto.getDisplayConfig().containsKey("searchable")) {
+            return null;
+        }
+        Object value = dto.getDisplayConfig().get("searchable");
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        throw new PluginException("Binding displayConfig.searchable must be boolean for "
+                + dto.getModelCode() + "." + dto.getFieldCode());
+    }
+
+    private void syncBindingIndexesWhenRequired(MetaModelDTO model, String modelCode,
+                                                 boolean searchabilityChanged) {
+        if (searchabilityChanged && StatusConstants.PUBLISHED.equals(model.getStatus())) {
+            syncBindingSchema(modelCode, null);
+        }
+    }
+
+    private void syncBindingSchema(String modelCode, String fieldCode) {
+        SchemaOperationResult schemaResult = schemaManagementService.updateTableByModel(modelCode);
+        if (schemaResult == null || !schemaResult.isSuccess()) {
+            String errorMessage = schemaResult != null && schemaResult.getErrorMessage() != null
+                    ? schemaResult.getErrorMessage()
+                    : "unknown schema sync error";
+            String fieldContext = fieldCode == null ? "searchable binding" : "field " + fieldCode;
+            throw new PluginException("Failed to sync schema after binding " + fieldContext
+                    + " to model " + modelCode + ": " + errorMessage);
         }
     }
 
