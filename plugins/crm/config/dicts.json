@@ -4149,7 +4149,23 @@
       { "value": "available", "label": "Available", "label:zh-CN": "待领取", "sortNo": 10, "status": "enabled", "extension": { "color": "blue" } },
       { "value": "claiming", "label": "Claiming", "label:zh-CN": "领取中", "sortNo": 20, "status": "enabled", "extension": { "color": "amber" } },
       { "value": "claimed", "label": "Claimed", "label:zh-CN": "已领取", "sortNo": 30, "status": "enabled", "extension": { "color": "green" } },
-      { "value": "assigned", "label": "Assigned", "label:zh-CN": "已分配", "sortNo": 40, "status": "enabled", "extension": { "color": "green" } }
+      { "value": "assigned", "label": "Assigned", "label:zh-CN": "已分配", "sortNo": 40, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "recycling", "label": "Recycling", "label:zh-CN": "回收处理中", "sortNo": 50, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "recycling_retry", "label": "Recovering Recycle", "label:zh-CN": "回收恢复中", "sortNo": 60, "status": "enabled", "extension": { "color": "orange" } }
+    ]
+  },
+  {
+    "code": "crm_lead_pool_operational_state",
+    "name": "Lead Pool Operational State",
+    "name:zh-CN": "线索池运营状态",
+    "dictType": "static",
+    "items": [
+      { "value": "ready", "label": "Ready", "label:zh-CN": "现在可领", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "cooldown", "label": "Cooling Down", "label:zh-CN": "冷却中", "sortNo": 20, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "claimed", "label": "Claimed", "label:zh-CN": "已领取", "sortNo": 30, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "assigned", "label": "Assigned", "label:zh-CN": "已分配", "sortNo": 40, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "recycling", "label": "Recycling", "label:zh-CN": "回收处理中", "sortNo": 50, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "recycling_retry", "label": "Recovering Recycle", "label:zh-CN": "回收恢复中", "sortNo": 60, "status": "enabled", "extension": { "color": "orange" } }
     ]
   },
   {

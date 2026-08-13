@@ -1,6 +1,8 @@
 package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.meta.dto.ValidationResult;
+import com.auraboot.framework.meta.exception.ValidationException;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.service.DynamicDataService;
@@ -77,6 +79,36 @@ class BackgroundDataAccessorImplTest {
     }
 
     @Test
+    void tryCreate_returnsEmpty_onPreInsertUniqueValidation() {
+        ValidationResult result = ValidationResult.builder()
+                .valid(false)
+                .errors(List.of("Field 'Operation key' value 'op-1' already exists"))
+                .build();
+        when(dds.create(anyString(), any()))
+                .thenThrow(new ValidationException("Validation failed", result));
+
+        assertThat(accessor.tryCreate(42L, "crm_lead_owner_history", Map.of("operation_key", "op-1")))
+                .isEmpty();
+        assertThat(MetaContext.exists()).isFalse();
+    }
+
+    @Test
+    void tryCreate_propagatesMixedValidationFailures() {
+        ValidationResult result = ValidationResult.builder()
+                .valid(false)
+                .errors(List.of(
+                        "Field 'Operation key' value 'op-1' already exists",
+                        "Field 'Lead' is required"))
+                .build();
+        ValidationException error = new ValidationException("Validation failed", result);
+        when(dds.create(anyString(), any())).thenThrow(error);
+
+        assertThatThrownBy(() -> accessor.tryCreate(42L, "crm_lead_owner_history", Map.of()))
+                .isSameAs(error);
+        assertThat(MetaContext.exists()).isFalse();
+    }
+
+    @Test
     void tryCreate_letsOtherExceptionsPropagate() {
         when(dds.create(anyString(), any())).thenThrow(new IllegalStateException("validation"));
 
@@ -84,6 +116,38 @@ class BackgroundDataAccessorImplTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("validation");
         assertThat(MetaContext.exists()).isFalse();
+    }
+
+    @Test
+    void compareAndSet_bindsTenantAndDelegatesOneAtomicTransition() {
+        when(dds.compareAndSet("m", "row-1", "status", "claimed", "recycling"))
+                .thenAnswer(invocation -> {
+                    assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);
+                    assertThat(MetaContext.getCurrentUserId()).isEqualTo(0L);
+                    return true;
+                });
+
+        assertThat(accessor.compareAndSet(42L, "m", "row-1", "status", "claimed", "recycling"))
+                .isTrue();
+        assertThat(MetaContext.exists()).isFalse();
+        verify(dds).compareAndSet("m", "row-1", "status", "claimed", "recycling");
+    }
+
+    @Test
+    void compareAndSet_bindsTenantAndDelegatesAtomicMultiFieldTransition() {
+        Map<String, Object> nextValues = new java.util.HashMap<>();
+        nextValues.put("status", "available");
+        nextValues.put("lease_token", null);
+        when(dds.compareAndSet("m", "row-1", "lease_token", "op:commit", nextValues))
+                .thenAnswer(invocation -> {
+                    assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);
+                    return true;
+                });
+
+        assertThat(accessor.compareAndSet(
+                42L, "m", "row-1", "lease_token", "op:commit", nextValues)).isTrue();
+        assertThat(MetaContext.exists()).isFalse();
+        verify(dds).compareAndSet("m", "row-1", "lease_token", "op:commit", nextValues);
     }
 
     @Test

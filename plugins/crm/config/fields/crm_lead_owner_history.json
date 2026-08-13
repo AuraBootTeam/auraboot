@@ -6,5 +6,6 @@
   { "code": "crm_loh_next_owner", "displayName:zh-CN": "新负责人", "displayName:en": "Next Owner", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } },
   { "code": "crm_loh_actor", "displayName:zh-CN": "操作人", "displayName:en": "Actor", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } },
   { "code": "crm_loh_reason", "displayName:zh-CN": "原因", "displayName:en": "Reason", "dataType": "text", "feature": { "readonly": true } },
-  { "code": "crm_loh_occurred_at", "displayName:zh-CN": "发生时间", "displayName:en": "Occurred At", "dataType": "datetime", "constraints": { "required": true }, "feature": { "readonly": true, "sortable": true } }
+  { "code": "crm_loh_occurred_at", "displayName:zh-CN": "发生时间", "displayName:en": "Occurred At", "dataType": "datetime", "constraints": { "required": true }, "feature": { "readonly": true, "sortable": true } },
+  { "code": "crm_loh_operation_key", "displayName:zh-CN": "幂等操作键", "displayName:en": "Idempotency Operation Key", "dataType": "string", "constraints": { "unique": true, "maxLength": 80 }, "feature": { "readonly": true } }
 ]

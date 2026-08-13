@@ -1,10 +1,12 @@
 package com.auraboot.framework.plugin.pf4j;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.permission.entity.RecordShare;
 import com.auraboot.framework.permission.service.RecordShareService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -23,6 +25,11 @@ class RecordShareAccessorImplTest {
 
     @Mock RecordShareService recordShareService;
     @Mock TenantMemberMapper tenantMemberMapper;
+
+    @AfterEach
+    void clearContext() {
+        MetaContext.clear();
+    }
 
     @Test
     void replacesMemberSharesUsingTenantResolvedUserPids() {
@@ -72,6 +79,50 @@ class RecordShareAccessorImplTest {
         verify(recordShareService).shareRecordByPid(
                 7L, "crm_lead_pool_item", "item-1", "member",
                 member.getId(), "member-a", "read,update", null);
+        org.junit.jupiter.api.Assertions.assertFalse(MetaContext.exists());
+    }
+
+    @Test
+    void backgroundCallBindsSystemContextForShareAudit_thenClearsIt() {
+        TenantMember member = member("member-a");
+        when(tenantMemberMapper.findActiveByTenantIdAndUserPid(7L, "user-a")).thenReturn(member);
+        when(recordShareService.listByRecordPidForManagement(7L, "crm_lead_pool_item", "item-1"))
+                .thenReturn(List.of());
+        doAnswer(invocation -> {
+            assertEquals(7L, MetaContext.getCurrentTenantId());
+            assertEquals(0L, MetaContext.getCurrentUserId());
+            return null;
+        }).when(recordShareService).shareRecordByPid(
+                anyLong(), anyString(), anyString(), anyString(), anyLong(), anyString(), anyString(), isNull());
+
+        new RecordShareAccessorImpl(recordShareService, tenantMemberMapper)
+                .replaceReadUpdateSharesForUsers(
+                        7L, "crm_lead_pool_item", "item-1", Set.of("user-a"));
+
+        org.junit.jupiter.api.Assertions.assertFalse(MetaContext.exists());
+    }
+
+    @Test
+    void foregroundCallPreservesMatchingActorContext() {
+        MetaContext.setContext(7L, 99L, "user-a", "alice");
+        when(recordShareService.listByRecordPidForManagement(7L, "crm_lead_pool_item", "item-1"))
+                .thenReturn(List.of());
+
+        new RecordShareAccessorImpl(recordShareService, tenantMemberMapper)
+                .replaceReadSharesForUsers(7L, "crm_lead_pool_item", "item-1", Set.of());
+
+        assertEquals(7L, MetaContext.getCurrentTenantId());
+        assertEquals(99L, MetaContext.getCurrentUserId());
+    }
+
+    @Test
+    void rejectsCrossTenantCallFromExistingContext() {
+        MetaContext.setContext(8L, 99L, "user-a", "alice");
+
+        assertThrows(RuntimeException.class, () ->
+                new RecordShareAccessorImpl(recordShareService, tenantMemberMapper)
+                        .replaceReadSharesForUsers(7L, "crm_lead_pool_item", "item-1", Set.of()));
+        verifyNoInteractions(recordShareService, tenantMemberMapper);
     }
 
     private static TenantMember member(String pid) {

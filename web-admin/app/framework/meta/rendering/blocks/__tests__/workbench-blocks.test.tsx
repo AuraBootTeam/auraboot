@@ -584,6 +584,28 @@ describe('MetricStripBlockRenderer', () => {
       'xl:grid-cols-4',
     );
   });
+
+  it('keeps a configured five-card strip on one row at wide desktop widths', () => {
+    const runtime = makeRuntime({
+      data: { summary: { a: 1, b: 2, c: 3, d: 4, e: 5 } },
+    }) as any;
+    const block: BlockConfig = {
+      id: 'lead_pool_metrics',
+      blockType: 'metric-strip',
+      dataSource: 'summary',
+      columns: 5,
+      metrics: ['a', 'b', 'c', 'd', 'e'].map((key) => ({ key, label: key, valueField: key })),
+    };
+
+    render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('metric-strip')).toHaveClass(
+      'grid-cols-1',
+      'sm:grid-cols-2',
+      'lg:grid-cols-3',
+      'xl:grid-cols-5',
+    );
+  });
 });
 
 describe('WorkbenchActionBarBlockRenderer', () => {

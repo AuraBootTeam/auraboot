@@ -843,7 +843,7 @@
     "semantic_description": "Concurrency-safe pool projection. The unique lead key and available-to-claim compare-and-set prevent two users claiming the same lead. Snapshot fields keep the shared queue readable without weakening ordinary lead owner data scope.",
     "domain_category": "crm",
     "data_sensitivity": "confidential",
-    "lifecycle_description": "Available -> Claiming -> Claimed / Assigned; re-entry returns the same item to Available."
+    "lifecycle_description": "Available -> Claiming -> Claimed / Assigned. Automatic recycle acquires Recycling, stale recovery alternates Recycling <-> Recycling Retry as a fenced lease, and only a fully completed re-entry returns the same item to Available."
   },
   {
     "code": "crm_lead_pool_quota",

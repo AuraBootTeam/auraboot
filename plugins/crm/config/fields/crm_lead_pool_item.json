@@ -15,5 +15,6 @@
   { "code": "crm_lpi_reason", "displayName:zh-CN": "入池原因", "displayName:en": "Entry Reason", "dataType": "text", "feature": { "readonly": true } },
   { "code": "crm_lpi_claim_release_at", "displayName:zh-CN": "可领取时间", "displayName:en": "Claim Release At", "dataType": "datetime", "feature": { "readonly": true, "sortable": true } },
   { "code": "crm_lpi_claimed_at", "displayName:zh-CN": "领取/分配时间", "displayName:en": "Claimed or Assigned At", "dataType": "datetime", "feature": { "readonly": true, "sortable": true } },
-  { "code": "crm_lpi_claimed_by", "displayName:zh-CN": "领取/获配用户", "displayName:en": "Claimed or Assigned User", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } }
+  { "code": "crm_lpi_claimed_by", "displayName:zh-CN": "领取/获配用户", "displayName:en": "Claimed or Assigned User", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } },
+  { "code": "crm_lpi_recycle_token", "displayName:zh-CN": "回收操作键", "displayName:en": "Recycle Operation Key", "dataType": "string", "constraints": { "maxLength": 80 }, "feature": { "readonly": true } }
 ]

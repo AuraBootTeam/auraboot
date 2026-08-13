@@ -34,7 +34,7 @@
       "blockType": "metric-strip",
       "dataSource": "poolStats",
       "variant": "cards",
-      "columns": 4,
+      "columns": 5,
       "metrics": [
         {
           "key": "available",
@@ -75,6 +75,16 @@
           "icon": "UserCheck",
           "activeWhen": "state.viewFilter == 'owned'",
           "onClick": { "action": "state.set", "args": { "viewFilter": "owned" } }
+        },
+        {
+          "key": "processing",
+          "label": { "zh-CN": "回收处理中", "en": "Recycling" },
+          "valueField": "processing_count",
+          "subText": { "zh-CN": "含自动恢复中的任务", "en": "Includes automatic recovery" },
+          "tone": "amber",
+          "icon": "RefreshCw",
+          "activeWhen": "state.viewFilter == 'processing'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "processing" } }
         }
       ]
     },
@@ -145,7 +155,7 @@
         { "field": "crm_lpi_contact_name", "width": 125, "label": { "zh-CN": "联系人", "en": "Contact" } },
         { "field": "crm_lpi_source", "width": 105, "dictCode": "crm_lead_source", "label": { "zh-CN": "来源", "en": "Source" } },
         { "field": "crm_lpi_score", "width": 80, "align": "right", "label": { "zh-CN": "评分", "en": "Score" } },
-        { "field": "operational_state", "width": 105, "label": { "zh-CN": "领取状态", "en": "Claim State" } },
+        { "field": "operational_state", "width": 115, "renderType": "tag", "dictCode": "crm_lead_pool_operational_state", "label": { "zh-CN": "领取状态", "en": "Claim State" } },
         { "field": "crm_lpi_claim_release_at", "width": 155, "valueType": "datetime", "label": { "zh-CN": "可领取时间", "en": "Available At" } },
         { "field": "owner_name", "width": 125, "label": { "zh-CN": "当前获配人", "en": "Current Owner" } }
       ],
@@ -163,18 +173,22 @@
       "blockType": "status-banner",
       "context": "${state.selectedPoolItem}",
       "statusField": "operational_state",
-      "toneMap": { "ready": "green", "cooldown": "amber", "claimed": "blue", "assigned": "blue" },
+      "toneMap": { "ready": "green", "cooldown": "amber", "claimed": "blue", "assigned": "blue", "recycling": "amber", "recycling_retry": "amber" },
       "titleMap": {
         "ready": { "zh-CN": "该线索现在可以领取或分配", "en": "This lead is ready to claim or assign" },
         "cooldown": { "zh-CN": "线索仍在领取冷却期", "en": "This lead is still cooling down" },
         "claimed": { "zh-CN": "线索已由成员领取", "en": "This lead was claimed by a member" },
-        "assigned": { "zh-CN": "线索已由管理员分配", "en": "This lead was assigned by an administrator" }
+        "assigned": { "zh-CN": "线索已由管理员分配", "en": "This lead was assigned by an administrator" },
+        "recycling": { "zh-CN": "系统正在自动回收该线索", "en": "The system is recycling this lead" },
+        "recycling_retry": { "zh-CN": "系统正在恢复未完成的回收任务", "en": "The system is recovering an incomplete recycle" }
       },
       "descriptionMap": {
         "ready": { "zh-CN": "领取时会再次校验成员资格、每日上限、人员库容和并发状态。", "en": "Membership, daily quota, capacity, and concurrency are rechecked on claim." },
         "cooldown": { "zh-CN": "管理员可分配；普通成员需等待可领取时间，前负责人还要满足专属冷却规则。", "en": "Administrators may assign; members must wait for release and previous-owner cooldown." },
         "claimed": { "zh-CN": "责任和数据权限已经切换到领取人，可从线索档案继续推进。", "en": "Ownership and record access now belong to the claimant." },
-        "assigned": { "zh-CN": "管理员分配结果已经写入责任历史，可从线索档案继续推进。", "en": "The assignment is recorded in ownership history." }
+        "assigned": { "zh-CN": "管理员分配结果已经写入责任历史，可从线索档案继续推进。", "en": "The assignment is recorded in ownership history." },
+        "recycling": { "zh-CN": "租约生效期间不会被重复领取或重复回收；完成后自动回到待领取队列。", "en": "An active lease prevents duplicate claims or recycles; the lead returns to the available queue when complete." },
+        "recycling_retry": { "zh-CN": "上一次回收未完整结束，系统已由唯一恢复者续跑，归属历史不会重复。", "en": "A single recovery worker resumed the incomplete recycle without duplicating ownership history." }
       },
       "summaryFields": [
         { "field": "crm_lpi_lead_code", "label": { "zh-CN": "线索编号", "en": "Lead Code" } },

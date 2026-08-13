@@ -116,6 +116,19 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     }
 
     @Override
+    public Optional<Map<String, Object>> tryCreate(String modelCode, Map<String, Object> data) {
+        log.debug("Plugin DataAccessor: tryCreate({}, {} fields)", modelCode, data != null ? data.size() : 0);
+        try {
+            return Optional.of(withCommandAuthority(
+                    () -> dynamicDataService.create(modelCode, mutableCopy(data))));
+        } catch (RuntimeException error) {
+            if (!IdempotentCreateSupport.isUniqueViolation(error)) throw error;
+            log.debug("Plugin DataAccessor: tryCreate hit unique violation for model={}", modelCode);
+            return Optional.empty();
+        }
+    }
+
+    @Override
     public Map<String, Object> update(String modelCode, String recordId, Map<String, Object> data) {
         log.debug("Plugin DataAccessor: update({}, {})", modelCode, recordId);
         return withCommandAuthority(() -> dynamicDataService.update(modelCode, recordId, mutableCopy(data)));
@@ -130,6 +143,17 @@ public class DynamicDataAccessorImpl implements DataAccessor {
         log.debug("Plugin DataAccessor: compareAndSet({}, {}, {})", modelCode, recordId, fieldCode);
         return withCommandAuthority(() -> dynamicDataService.compareAndSet(
                 modelCode, recordId, fieldCode, expectedValue, nextValue));
+    }
+
+    @Override
+    public boolean compareAndSet(String modelCode,
+                                 String recordId,
+                                 String fieldCode,
+                                 Object expectedValue,
+                                 Map<String, Object> nextValues) {
+        log.debug("Plugin DataAccessor: compareAndSet({}, {}, {})", modelCode, recordId, fieldCode);
+        return withCommandAuthority(() -> dynamicDataService.compareAndSet(
+                modelCode, recordId, fieldCode, expectedValue, mutableCopy(nextValues)));
     }
 
     @Override

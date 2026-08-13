@@ -71,6 +71,26 @@ public interface BackgroundDataAccessor {
     /** Update fields of an existing record. */
     Map<String, Object> update(long tenantId, String modelCode, String recordId, Map<String, Object> data);
 
+    /**
+     * Atomically replace one field only when its stored value still equals {@code expectedValue}.
+     * The tenant, record identity, data scope, and expected value must be guarded by one write.
+     *
+     * @since 2.8.0
+     */
+    boolean compareAndSet(long tenantId,
+                          String modelCode,
+                          String recordId,
+                          String fieldCode,
+                          Object expectedValue,
+                          Object nextValue);
+
+    boolean compareAndSet(long tenantId,
+                          String modelCode,
+                          String recordId,
+                          String fieldCode,
+                          Object expectedValue,
+                          Map<String, Object> nextValues);
+
     /** Delete a record by primary key. */
     void delete(long tenantId, String modelCode, String recordId);
 

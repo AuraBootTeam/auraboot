@@ -7,7 +7,6 @@ import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.BackgroundDataAccessor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -45,9 +44,10 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
         return withTenant(tenantId, () -> {
             try {
                 return Optional.of(dynamicDataService.create(modelCode, data));
-            } catch (DuplicateKeyException e) {
+            } catch (RuntimeException error) {
+                if (!IdempotentCreateSupport.isUniqueViolation(error)) throw error;
                 log.debug("tryCreate hit unique violation (idempotent skip): tenant={} model={} cause={}",
-                        tenantId, modelCode, e.getMostSpecificCause().getMessage());
+                        tenantId, modelCode, error.getMessage());
                 return Optional.<Map<String, Object>>empty();
             }
         });
@@ -84,6 +84,28 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
     @Override
     public Map<String, Object> update(long tenantId, String modelCode, String recordId, Map<String, Object> data) {
         return withTenant(tenantId, () -> dynamicDataService.update(modelCode, recordId, data));
+    }
+
+    @Override
+    public boolean compareAndSet(long tenantId,
+                                 String modelCode,
+                                 String recordId,
+                                 String fieldCode,
+                                 Object expectedValue,
+                                 Object nextValue) {
+        return withTenant(tenantId, () -> dynamicDataService.compareAndSet(
+                modelCode, recordId, fieldCode, expectedValue, nextValue));
+    }
+
+    @Override
+    public boolean compareAndSet(long tenantId,
+                                 String modelCode,
+                                 String recordId,
+                                 String fieldCode,
+                                 Object expectedValue,
+                                 Map<String, Object> nextValues) {
+        return withTenant(tenantId, () -> dynamicDataService.compareAndSet(
+                modelCode, recordId, fieldCode, expectedValue, nextValues));
     }
 
     @Override

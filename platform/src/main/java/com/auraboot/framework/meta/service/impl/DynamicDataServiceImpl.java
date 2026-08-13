@@ -916,6 +916,18 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                                  String fieldCode,
                                  Object expectedValue,
                                  Object nextValue) {
+        Map<String, Object> nextValues = new LinkedHashMap<>();
+        nextValues.put(fieldCode, nextValue);
+        return compareAndSet(modelCode, recordId, fieldCode, expectedValue, nextValues);
+    }
+
+    @Override
+    @Transactional
+    public boolean compareAndSet(String modelCode,
+                                 String recordId,
+                                 String fieldCode,
+                                 Object expectedValue,
+                                 Map<String, Object> nextValues) {
         validateModelCode(modelCode);
         assertWritable(modelCode);
         if (recordId == null || recordId.isBlank()) {
@@ -927,26 +939,35 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         ModelDefinition model = getModelDefinition(modelCode);
         ModelMutationGuard.assertMutable(model, "updated");
-        FieldDefinition field = findFieldDefinition(model, fieldCode);
-        if (field.isPrimaryKey() || field.isJsonbVirtual() || field.isVirtual()) {
+        FieldDefinition compareField = findFieldDefinition(model, fieldCode);
+        if (compareField.isPrimaryKey() || compareField.isJsonbVirtual() || compareField.isVirtual()) {
             throw new MetaServiceException(
                     "compareAndSet requires a writable stored field: " + fieldCode);
         }
-        if (field.isImmutable() || field.getImmutableWhen() != null) {
+        if (compareField.isImmutable() || compareField.getImmutableWhen() != null) {
             throw new MetaServiceException(
                     "compareAndSet cannot bypass immutable field rules: " + fieldCode);
         }
-        Map<String, Object> requested = new LinkedHashMap<>();
-        requested.put(fieldCode, nextValue);
-        Map<String, Object> data = new LinkedHashMap<>(requested);
+        if (nextValues == null || nextValues.isEmpty()) {
+            throw new MetaServiceException("compareAndSet next values cannot be empty");
+        }
+        Map<String, Object> data = new LinkedHashMap<>(nextValues);
         stripNonWritableFields(modelCode, data);
-        if (!data.containsKey(fieldCode)) {
-            throw new MetaServiceException("Field is not writable: " + fieldCode);
+        if (data.size() != nextValues.size()) {
+            throw new MetaServiceException("compareAndSet contains a non-writable field");
+        }
+        for (String nextFieldCode : data.keySet()) {
+            FieldDefinition nextField = findFieldDefinition(model, nextFieldCode);
+            if (nextField.isPrimaryKey() || nextField.isJsonbVirtual() || nextField.isVirtual()
+                    || nextField.isImmutable() || nextField.getImmutableWhen() != null) {
+                throw new MetaServiceException(
+                        "compareAndSet requires writable mutable stored fields: " + nextFieldCode);
+            }
         }
         // CAS never needs a pre-read: the expected value and every scope predicate are part of
         // the UPDATE itself. Exact-command provenance can be checked conservatively from the
         // field definition; conditional immutability was rejected above because it needs a row.
-        FieldWriterGuard.assertFieldsAllowed(model, List.of(fieldCode));
+        FieldWriterGuard.assertFieldsAllowed(model, new ArrayList<>(data.keySet()));
 
         payloadTemporalNormalizer.normalize(data, model);
         validationService.validateAndThrow(model, data, ValidationContext.UPDATE);
@@ -967,9 +988,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         String primaryKeyColumn = primaryKey.getColumnName() != null
                 ? primaryKey.getColumnName()
                 : primaryKey.getCode();
-        String compareColumn = field.getColumnName() != null
-                ? field.getColumnName()
-                : field.getCode();
+        String compareColumn = compareField.getColumnName() != null
+                ? compareField.getColumnName()
+                : compareField.getCode();
         Long planExpectedVersion = MetaContext.getCommandExpectedVersion(modelCode, recordId);
         int updated = executeScopedUpdate(
                 model,

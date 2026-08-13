@@ -21,6 +21,8 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
   ].map((file) => json(`config/pages/${file}`)));
   const poolFields = await json('config/fields/crm_lead_pool.json');
   const itemFields = await json('config/fields/crm_lead_pool_item.json');
+  const historyFields = await json('config/fields/crm_lead_owner_history.json');
+  const dictionaries = await json('config/dicts.json');
   const handler = await readFile(
     new URL('backend/src/main/java/com/auraboot/plugins/crm/handler/LeadPoolCommandHandler.java', root),
     'utf8',
@@ -64,6 +66,12 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
     itemFields.find((field) => field.code === 'crm_lpi_lead_key')?.constraints?.unique,
     true,
     'one lead must have one concurrency-control pool projection',
+  );
+  assert.ok(itemFields.some((field) => field.code === 'crm_lpi_recycle_token'));
+  assert.equal(
+    historyFields.find((field) => field.code === 'crm_loh_operation_key')?.constraints?.unique,
+    true,
+    'one recycle operation must create at most one ownership-history record',
   );
 
   const commandCodes = new Set(commands.map((command) => command.code));
@@ -109,12 +117,18 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
   assert.equal(operations.dataSources.poolQueue.queryCode, 'crm_lead_pool_ops_queue');
   assert.deepEqual(
     operations.blocks.find((block) => block.id === 'crm_lead_pool_metrics').metrics.map((metric) => metric.key),
-    ['available', 'ready', 'cooldown', 'owned'],
+    ['available', 'ready', 'cooldown', 'owned', 'processing'],
   );
   const poolQueue = operations.blocks.find((block) => block.id === 'crm_lead_pool_queue');
   assert.equal(poolQueue.density, 'compact');
   assert.equal(poolQueue.selection.defaultFirst, true);
-  assert.ok(poolQueue.columns.some((column) => column.field === 'operational_state'));
+  const operationalStateColumn = poolQueue.columns.find((column) => column.field === 'operational_state');
+  assert.equal(operationalStateColumn?.dictCode, 'crm_lead_pool_operational_state');
+  assert.deepEqual(
+    dictionaries.find((dictionary) => dictionary.code === 'crm_lead_pool_operational_state')
+      ?.items.map((item) => item.value),
+    ['ready', 'cooldown', 'claimed', 'assigned', 'recycling', 'recycling_retry'],
+  );
   const poolActions = operations.blocks.find((block) => block.id === 'crm_lead_pool_actions').actions;
   assert.deepEqual(poolActions.map((action) => action.code), ['claim', 'assign']);
   const claimAction = poolActions.find((action) => action.code === 'claim');
@@ -151,12 +165,13 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
   assert.match(statsQuery.fromSql, /crm_lpi_claim_release_at <= now\(\)/);
   assert.deepEqual(
     statsQuery.outputFields.map((field) => field.code),
-    ['available_count', 'ready_count', 'cooldown_count', 'owned_count'],
+    ['available_count', 'ready_count', 'cooldown_count', 'owned_count', 'processing_count'],
   );
   assert.equal(queueQuery.resourceCode, 'crm.lead_pool');
   assert.match(queueQuery.fromSql, /i\.tenant_id = #\{params\.tenantId\}/);
   assert.match(queueQuery.fromSql, /params\.currentUserId/);
   assert.match(queueQuery.fromSql, /CAST\(#\{params\.viewFilter\} AS text\) = 'ready'/);
+  assert.match(queueQuery.fromSql, /CAST\(#\{params\.viewFilter\} AS text\) = 'processing'/);
   assert.ok(queueQuery.outputFields.some((field) => field.code === 'operational_state'));
 
   const permissionCodes = new Set(permissions.map((permission) => permission.code));
@@ -177,6 +192,8 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
   for (const proof of [
     'incrementWithinCap',
     'compareAndSet',
+    'recycling_retry',
+    'tryCreate',
     'Previous owner cooldown',
     'Lead capacity reached',
     'available leads and cannot be deleted',

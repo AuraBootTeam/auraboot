@@ -1,5 +1,7 @@
 package com.auraboot.framework.plugin.pf4j;
 
+import com.auraboot.framework.meta.dto.ValidationResult;
+import com.auraboot.framework.meta.exception.ValidationException;
 import com.auraboot.framework.meta.dto.DynamicBatchResponse;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
@@ -7,6 +9,7 @@ import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.dao.DuplicateKeyException;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -23,6 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 
 @ExtendWith(MockitoExtension.class)
 class DynamicDataAccessorImplTest {
@@ -126,6 +130,26 @@ class DynamicDataAccessorImplTest {
     }
 
     @Test
+    void tryCreate_returnsEmptyOnlyForUniqueViolation() {
+        doThrow(new DuplicateKeyException("duplicate"))
+                .when(dynamicDataService).create(eq("m"), any());
+
+        assertThat(accessor.tryCreate("m", Map.of("operation_key", "op-1"))).isEmpty();
+    }
+
+    @Test
+    void tryCreate_returnsEmptyForStructuredUniqueValidation() {
+        ValidationResult result = ValidationResult.builder()
+                .valid(false)
+                .errors(List.of("Field 'Operation key' value 'op-1' already exists"))
+                .build();
+        doThrow(new ValidationException("Validation failed", result))
+                .when(dynamicDataService).create(eq("m"), any());
+
+        assertThat(accessor.tryCreate("m", Map.of("operation_key", "op-1"))).isEmpty();
+    }
+
+    @Test
     void update_delegates() {
         when(dynamicDataService.update("m", "1", Map.of("a", 2))).thenReturn(Map.of("id", "1", "a", 2));
         assertThat(accessor.update("m", "1", Map.of("a", 2))).containsEntry("a", 2);
@@ -153,6 +177,20 @@ class DynamicDataAccessorImplTest {
                 .isTrue();
         verify(dynamicDataService)
                 .compareAndSet("m", "1", "status", "accepted", "superseded");
+    }
+
+    @Test
+    void compareAndSet_delegatesAtomicMultiFieldTransition() {
+        Map<String, Object> nextValues = new java.util.HashMap<>();
+        nextValues.put("status", "available");
+        nextValues.put("lease_token", null);
+        when(dynamicDataService.compareAndSet("m", "1", "lease_token", "op:commit", nextValues))
+                .thenReturn(true);
+
+        assertThat(accessor.compareAndSet("m", "1", "lease_token", "op:commit", nextValues))
+                .isTrue();
+        verify(dynamicDataService)
+                .compareAndSet("m", "1", "lease_token", "op:commit", nextValues);
     }
 
     @Test

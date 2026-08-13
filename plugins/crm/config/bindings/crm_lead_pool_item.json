@@ -15,5 +15,6 @@
   { "modelCode": "crm_lead_pool_item", "fieldCode": "crm_lpi_reason", "sequence": 14, "required": false, "visible": false, "editable": false },
   { "modelCode": "crm_lead_pool_item", "fieldCode": "crm_lpi_claim_release_at", "sequence": 15, "required": false, "visible": true, "editable": false },
   { "modelCode": "crm_lead_pool_item", "fieldCode": "crm_lpi_claimed_at", "sequence": 16, "required": false, "visible": true, "editable": false },
-  { "modelCode": "crm_lead_pool_item", "fieldCode": "crm_lpi_claimed_by", "sequence": 17, "required": false, "visible": true, "editable": false }
+  { "modelCode": "crm_lead_pool_item", "fieldCode": "crm_lpi_claimed_by", "sequence": 17, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_pool_item", "fieldCode": "crm_lpi_recycle_token", "sequence": 18, "required": false, "visible": false, "editable": false }
 ]
