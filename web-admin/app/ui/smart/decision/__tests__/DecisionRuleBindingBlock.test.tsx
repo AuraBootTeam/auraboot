@@ -770,9 +770,11 @@ describe('DecisionRuleBindingBlock', () => {
     );
 
     await waitFor(() => expect(api.getFactCatalog).toHaveBeenCalledWith('wd_leave_request'));
-    fireEvent.click(screen.getByRole('button', { name: '添加映射' }));
+    const addMappingButton = screen.getByRole('button', { name: '添加映射' });
+    await waitFor(() => expect(addMappingButton).toBeEnabled());
+    fireEvent.click(addMappingButton);
 
-    const fieldPicker = screen.getByLabelText('mapping-field-0') as HTMLSelectElement;
+    const fieldPicker = (await screen.findByLabelText('mapping-field-0')) as HTMLSelectElement;
     expect(fieldPicker).toHaveValue('record:data.wd_req_days');
     const maskedOption = Array.from(fieldPicker.querySelectorAll('option')).find(
       (option) => option.textContent === '敏感工资 · 字段已脱敏',
