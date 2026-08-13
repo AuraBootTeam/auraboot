@@ -10,6 +10,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { BASE_URL } from '../../helpers/playwright-env';
 import { loginViaUI } from '../../helpers/wd-fixtures';
 
 const SOURCE_PAGE_KEY = 'e2et_record_list';
@@ -1631,7 +1632,7 @@ async function openPersistentProfile(
   email: string,
 ): Promise<OpenedActor> {
   const context = await browser.browserType().launchPersistentContext(userDataDir, {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5173',
+    baseURL: BASE_URL,
     headless: true,
     viewport: { width: 1440, height: 900 },
     args: ['--no-proxy-server'],

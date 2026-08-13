@@ -57,6 +57,8 @@ public class AuthoringGovernanceService {
     private static final Duration WRITER_LEASE = Duration.ofMinutes(5);
     private static final Duration SESSION_TTL = Duration.ofHours(8);
     private static final String REVIEW_WORKSPACE_MODE = "REVIEW";
+    private static final int MAX_RELEASE_HISTORY_PAGE = 100_000;
+    private static final int MAX_RELEASE_HISTORY_SIZE = 100;
 
     private final AuthoringGovernanceRepository governanceRepository;
     private final AuthoringWorkspaceRepository workspaceRepository;
@@ -363,7 +365,7 @@ public class AuthoringGovernanceService {
     public ReleaseHistoryView releaseHistory(String changeSetPid, int page, int size) {
         Identity identity = identity();
         GovernanceRow row = requireChangeSet(identity, changeSetPid, false);
-        int offset = (page - 1) * size;
+        int offset = releaseHistoryOffset(page, size);
         ReleaseHistorySnapshot history = governanceRepository.findReleaseHistory(
                 row, offset, size);
         ReleaseChannelHistory channel = history.channel();
@@ -376,6 +378,17 @@ public class AuthoringGovernanceService {
                 eligibility,
                 history.releases().stream().map(this::releaseHistoryItemView).toList(),
                 page, size, history.total());
+    }
+
+    static int releaseHistoryOffset(int page, int size) {
+        // This service is also invoked outside the validated HTTP controller.
+        // Bound both operands before arithmetic so hostile callers cannot cause
+        // integer underflow/overflow or an unbounded database offset.
+        if (page < 1 || page > MAX_RELEASE_HISTORY_PAGE
+                || size < 1 || size > MAX_RELEASE_HISTORY_SIZE) {
+            throw new IllegalArgumentException("authoring.release-history.invalid-pagination");
+        }
+        return Math.toIntExact(Math.multiplyExact((long) page - 1L, (long) size));
     }
 
     @Transactional

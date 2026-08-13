@@ -13403,6 +13403,8 @@ CREATE TABLE public.ab_promotion (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_by bigint,
     deleted_flag boolean DEFAULT false NOT NULL,
+    parent_promotion_pid character varying(26),
+    origin_drift_decision_pid character varying(26),
     CONSTRAINT chk_promotion_envs_distinct CHECK ((source_env_id <> target_env_id)),
     CONSTRAINT chk_promotion_status CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'VALIDATED'::character varying, 'APPLIED'::character varying, 'REJECTED'::character varying, 'FAILED'::character varying])::text[])))
 );
@@ -13444,6 +13446,20 @@ COMMENT ON COLUMN public.ab_promotion.dry_run_at IS 'When dry_run_result was com
 
 
 --
+-- Name: COLUMN ab_promotion.parent_promotion_pid; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_promotion.parent_promotion_pid IS 'Promotion whose governed BACKPORT decision created this reverse plan';
+
+
+--
+-- Name: COLUMN ab_promotion.origin_drift_decision_pid; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_promotion.origin_drift_decision_pid IS 'Append-only decision identity that authorized creation of this plan';
+
+
+--
 -- Name: ab_promotion_drift_event; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -13465,7 +13481,7 @@ CREATE TABLE public.ab_promotion_drift_event (
     CONSTRAINT chk_promotion_drift_event_decision CHECK (((decision IS NULL) OR ((decision)::text = ANY ((ARRAY['REBASE'::character varying, 'BACKPORT'::character varying, 'KEEP_OVERRIDE'::character varying, 'OVERWRITE'::character varying])::text[])))),
     CONSTRAINT chk_promotion_drift_event_evidence CHECK ((jsonb_typeof(evidence) = 'object'::text)),
     CONSTRAINT chk_promotion_drift_event_reason CHECK (((reason IS NULL) OR ((char_length(btrim((reason)::text)) >= 1) AND (char_length(btrim((reason)::text)) <= 500)))),
-    CONSTRAINT chk_promotion_drift_event_type CHECK (((event_type)::text = ANY ((ARRAY['DETECTED'::character varying, 'DECIDED'::character varying, 'STALE'::character varying, 'APPLIED'::character varying])::text[])))
+    CONSTRAINT chk_promotion_drift_event_type CHECK (((event_type)::text = ANY ((ARRAY['DETECTED'::character varying, 'DECIDED'::character varying, 'EXECUTED'::character varying, 'STALE'::character varying, 'APPLIED'::character varying])::text[])))
 );
 
 
@@ -13530,7 +13546,12 @@ CREATE TABLE public.ab_promotion_unit (
     drift_fingerprint character varying(64),
     drift_decision character varying(24),
     drift_decision_pid character varying(26),
+    drift_execution_status character varying(24) DEFAULT 'NONE'::character varying NOT NULL,
+    drift_execution_pid character varying(26),
+    drift_execution_payload jsonb,
     CONSTRAINT chk_promotion_unit_drift_decision CHECK (((drift_decision IS NULL) OR ((drift_decision)::text = ANY ((ARRAY['REBASE'::character varying, 'BACKPORT'::character varying, 'KEEP_OVERRIDE'::character varying, 'OVERWRITE'::character varying])::text[])))),
+    CONSTRAINT chk_promotion_unit_drift_execution_payload CHECK (((drift_execution_payload IS NULL) OR (jsonb_typeof(drift_execution_payload) = 'object'::text))),
+    CONSTRAINT chk_promotion_unit_drift_execution_status CHECK (((drift_execution_status)::text = ANY ((ARRAY['NONE'::character varying, 'PREPARED'::character varying, 'DEFERRED'::character varying, 'BACKPORTED'::character varying, 'APPLIED'::character varying])::text[]))),
     CONSTRAINT chk_promotion_unit_drift_resolution CHECK (((((drift_status)::text = ANY ((ARRAY['NONE'::character varying, 'PENDING'::character varying, 'STALE'::character varying])::text[])) AND (drift_decision IS NULL) AND (drift_decision_pid IS NULL)) OR (((drift_status)::text = ANY ((ARRAY['RESOLVED'::character varying, 'APPLIED'::character varying])::text[])) AND (drift_fingerprint IS NOT NULL) AND (drift_decision IS NOT NULL) AND (drift_decision_pid IS NOT NULL)))),
     CONSTRAINT chk_promotion_unit_drift_status CHECK (((drift_status)::text = ANY ((ARRAY['NONE'::character varying, 'PENDING'::character varying, 'RESOLVED'::character varying, 'STALE'::character varying, 'APPLIED'::character varying])::text[]))),
     CONSTRAINT chk_promotion_unit_resource_type CHECK (((resource_type)::text = 'PAGE_SCHEMA'::text))
@@ -13577,6 +13598,27 @@ COMMENT ON COLUMN public.ab_promotion_unit.drift_fingerprint IS 'Hash of incomin
 --
 
 COMMENT ON COLUMN public.ab_promotion_unit.drift_decision IS 'Explicit fate: REBASE, BACKPORT, KEEP_OVERRIDE, or OVERWRITE';
+
+
+--
+-- Name: COLUMN ab_promotion_unit.drift_execution_status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_promotion_unit.drift_execution_status IS 'Durable executor state for REBASE, BACKPORT, KEEP_OVERRIDE, or OVERWRITE';
+
+
+--
+-- Name: COLUMN ab_promotion_unit.drift_execution_pid; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_promotion_unit.drift_execution_pid IS 'Execution identity or generated reverse-promotion identity';
+
+
+--
+-- Name: COLUMN ab_promotion_unit.drift_execution_payload; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_promotion_unit.drift_execution_payload IS 'Server-owned metadata or prepared rebase snapshot; never supplied by the browser';
 
 
 --
@@ -14475,7 +14517,9 @@ CREATE TABLE public.ab_saved_view (
     created_by character varying(26),
     updated_by character varying(26),
     view_type character varying(20) DEFAULT 'table'::character varying NOT NULL,
-    CONSTRAINT chk_saved_view_scope CHECK (((scope)::text = ANY ((ARRAY['personal'::character varying, 'team'::character varying, 'global'::character varying])::text[])))
+    role_id character varying(26),
+    CONSTRAINT chk_saved_view_scope CHECK (((scope)::text = ANY ((ARRAY['personal'::character varying, 'team'::character varying, 'role'::character varying, 'global'::character varying])::text[]))),
+    CONSTRAINT chk_saved_view_scope_owner CHECK (((((scope)::text = 'personal'::text) AND (owner_id IS NOT NULL)) OR (((scope)::text = 'team'::text) AND (team_id IS NOT NULL)) OR (((scope)::text = 'role'::text) AND (role_id IS NOT NULL)) OR ((scope)::text = 'global'::text)))
 );
 
 
@@ -14490,7 +14534,7 @@ COMMENT ON TABLE public.ab_saved_view IS 'User-defined view configurations for t
 -- Name: COLUMN ab_saved_view.scope; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.ab_saved_view.scope IS 'View visibility: PERSONAL (owner only), TEAM (team members), GLOBAL (all users)';
+COMMENT ON COLUMN public.ab_saved_view.scope IS 'Overlay scope: personal, team, role, or tenant-wide global';
 
 
 --
@@ -14512,6 +14556,13 @@ COMMENT ON COLUMN public.ab_saved_view.allow_full_model IS 'When true, allows ac
 --
 
 COMMENT ON COLUMN public.ab_saved_view.view_type IS 'View type: TABLE, KANBAN, CALENDAR, GALLERY, GANTT, TREE';
+
+
+--
+-- Name: COLUMN ab_saved_view.role_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_saved_view.role_id IS 'Role PID for role-scoped view overlays';
 
 
 --
@@ -27591,6 +27642,13 @@ CREATE INDEX idx_saved_view_page_key ON public.ab_saved_view USING btree (model_
 
 
 --
+-- Name: idx_saved_view_role; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_saved_view_role ON public.ab_saved_view USING btree (tenant_id, role_id) WHERE (((scope)::text = 'role'::text) AND (deleted_flag = false));
+
+
+--
 -- Name: idx_saved_view_team; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -28687,6 +28745,20 @@ CREATE UNIQUE INDEX uq_ot_device ON public.ab_ot_device USING btree (tenant_id, 
 --
 
 CREATE UNIQUE INDEX uq_plugin_resource_unique ON public.ab_plugin_resource USING btree (tenant_id, plugin_pid, resource_type, resource_code);
+
+
+--
+-- Name: uq_promotion_origin_drift_decision; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_promotion_origin_drift_decision ON public.ab_promotion USING btree (tenant_id, origin_drift_decision_pid) WHERE ((origin_drift_decision_pid IS NOT NULL) AND (deleted_flag = false));
+
+
+--
+-- Name: INDEX uq_promotion_origin_drift_decision; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON INDEX public.uq_promotion_origin_drift_decision IS 'Exactly-once reverse promotion creation for a governed BACKPORT decision';
 
 
 --
