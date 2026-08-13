@@ -1,32 +1,265 @@
 {
   "pageKey": "crm_lead_pool_item_list",
-  "name:zh-CN": "线索池",
-  "name:en": "Lead Pool",
+  "name:zh-CN": "线索池运营台",
+  "name:en": "Lead Pool Operations",
   "modelCode": "crm_lead_pool_item",
-  "kind": "list",
+  "description": "Task-first workspace for lead-pool availability, cooldown, claim, assignment and ownership evidence.",
+  "kind": "detail",
   "schemaVersion": 4,
-  "layout": { "type": "grid", "cols": 12 },
+  "layout": { "type": "stack" },
+  "extension": { "showShare": false, "showReport": false, "showPrint": false, "showEdit": false },
+  "dataSources": {
+    "poolStats": {
+      "type": "namedQuery",
+      "queryCode": "crm_lead_pool_ops_stats",
+      "params": {},
+      "adaptor": "table",
+      "format": "records"
+    },
+    "poolQueue": {
+      "type": "namedQuery",
+      "queryCode": "crm_lead_pool_ops_queue",
+      "params": {
+        "leadKeyword": "${state.searchKeyword}",
+        "viewFilter": "${state.viewFilter}"
+      },
+      "dependOn": ["state.searchKeyword", "state.viewFilter"],
+      "adaptor": "table",
+      "format": "records"
+    }
+  },
   "blocks": [
-    { "id": "pool_tabs", "blockType": "tabs", "tabs": [
-      { "key": "available", "label": { "zh-CN": "待领取", "en": "Available" }, "filter": { "field": "crm_lpi_status", "value": "available", "operator": "EQ" } },
-      { "key": "claimed", "label": { "zh-CN": "已领取", "en": "Claimed" }, "filter": { "field": "crm_lpi_status", "value": "claimed", "operator": "EQ" } },
-      { "key": "assigned", "label": { "zh-CN": "已分配", "en": "Assigned" }, "filter": { "field": "crm_lpi_status", "value": "assigned", "operator": "EQ" } }
-    ] },
-    { "id": "pool_queue", "blockType": "table", "table": {
-      "selection": { "mode": "multiple", "bind": "{{state.selectedIds}}" },
-      "bulkCapabilities": { "edit": false, "delete": false, "export": { "permissionCode": "crm.lead_pool.read" } },
-      "bulkActions": [
-        { "code": "batch_claim", "permissionCode": "crm.lead_pool.pick", "label": { "zh-CN": "批量领取", "en": "Claim Selected" }, "confirm": { "zh-CN": "容量、每日上限与冷却规则将逐条校验。确认领取？", "en": "Capacity, daily limit and cooldown rules will be enforced. Continue?" }, "action": { "type": "bulk_state_transition", "command": "crm:claim_pool_lead" } },
-        { "code": "batch_assign", "permissionCode": "crm.lead_pool.assign", "label": { "zh-CN": "批量分配", "en": "Assign Selected" }, "action": { "type": "bulk_field_command", "command": "crm:assign_pool_lead", "input": { "field": "crm_lpi_claimed_by", "label": { "zh-CN": "分配给", "en": "Assign To" }, "type": "reference", "component": "MemberPicker", "required": true, "props": { "multiple": false } } } }
+    {
+      "id": "crm_lead_pool_metrics",
+      "blockType": "metric-strip",
+      "dataSource": "poolStats",
+      "variant": "cards",
+      "columns": 4,
+      "metrics": [
+        {
+          "key": "available",
+          "label": { "zh-CN": "待领取", "en": "Available" },
+          "valueField": "available_count",
+          "subText": { "zh-CN": "仍在线索池中", "en": "Still in the pool" },
+          "tone": "blue",
+          "icon": "Inbox",
+          "activeWhen": "state.viewFilter == null || state.viewFilter == '' || state.viewFilter == 'available'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "available" } }
+        },
+        {
+          "key": "ready",
+          "label": { "zh-CN": "现在可领", "en": "Ready Now" },
+          "valueField": "ready_count",
+          "subText": { "zh-CN": "已满足新线索冷却期", "en": "Cooldown has elapsed" },
+          "tone": "green",
+          "icon": "BadgeCheck",
+          "activeWhen": "state.viewFilter == 'ready'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "ready" } }
+        },
+        {
+          "key": "cooldown",
+          "label": { "zh-CN": "冷却中", "en": "Cooling Down" },
+          "valueField": "cooldown_count",
+          "subText": { "zh-CN": "到期后自动进入可领队列", "en": "Unlocks automatically" },
+          "tone": "amber",
+          "icon": "Clock3",
+          "activeWhen": "state.viewFilter == 'cooldown'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "cooldown" } }
+        },
+        {
+          "key": "owned",
+          "label": { "zh-CN": "本轮已获配", "en": "Owned" },
+          "valueField": "owned_count",
+          "subText": { "zh-CN": "已领取或管理员分配", "en": "Claimed or assigned" },
+          "tone": "default",
+          "icon": "UserCheck",
+          "activeWhen": "state.viewFilter == 'owned'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "owned" } }
+        }
       ]
-    }, "columns": [
-      { "field": "crm_lpi_pool_id", "width": 180 }, { "field": "crm_lpi_company", "width": 220, "sortable": true }, { "field": "crm_lpi_contact_name", "width": 130 }, { "field": "crm_lpi_contact_phone", "width": 150 }, { "field": "crm_lpi_source", "width": 120, "renderType": "tag", "dictCode": "crm_lead_source" }, { "field": "crm_lpi_score", "width": 90, "align": "right", "sortable": true }, { "field": "crm_lpi_previous_owner", "width": 140 }, { "field": "crm_lpi_entered_at", "width": 170, "sortable": true }, { "field": "crm_lpi_claim_release_at", "width": 170 },
-      { "field": "actions", "isActionColumn": true, "label": "$i18n:common.actions", "buttons": [
-        { "code": "view_pool_evidence", "label": { "zh-CN": "池内详情", "en": "Pool Detail" }, "action": { "type": "navigate", "to": "crm_lead_pool_item_detail" } },
-        { "code": "open_lead", "label": { "zh-CN": "查看线索", "en": "View Lead" }, "action": { "type": "navigate", "to": "/p/crm_lead_common/view/${row.crm_lpi_lead_id}" } },
-        { "code": "claim", "permissionCode": "crm.lead_pool.pick", "label": { "zh-CN": "领取", "en": "Claim" }, "visibleWhen": "row.crm_lpi_status == 'available'", "action": { "type": "command", "command": "crm:claim_pool_lead" } },
-        { "code": "assign", "permissionCode": "crm.lead_pool.assign", "label": { "zh-CN": "分配", "en": "Assign" }, "visibleWhen": "row.crm_lpi_status == 'available'", "action": { "type": "command", "command": "crm:assign_pool_lead", "operationType": "update", "inputFieldsTitle": { "zh-CN": "分配线索", "en": "Assign Lead" }, "inputFields": [ { "field": "crm_lpi_claimed_by", "label": { "zh-CN": "分配给", "en": "Assign To" }, "type": "reference", "component": "MemberPicker", "required": true, "props": { "multiple": false } } ] } }
-      ] }
-    ], "searchFields": ["crm_lpi_company", "crm_lpi_contact_name", "crm_lpi_lead_code"], "defaultSort": { "field": "crm_lpi_entered_at", "order": "desc" } }
+    },
+    {
+      "id": "crm_lead_pool_search",
+      "blockType": "filters",
+      "onSearch": { "action": "dataSource.reload", "args": { "dataSourceId": "poolQueue" } },
+      "onReset": { "action": "state.set", "args": { "searchKeyword": "" } },
+      "fields": [
+        {
+          "field": "crm_lpi_company",
+          "component": "SmartInput",
+          "bindState": "searchKeyword",
+          "label": { "zh-CN": "搜索池内线索", "en": "Search pooled leads" },
+          "placeholder": { "zh-CN": "输入公司、联系人或线索编号", "en": "Search company, contact, or lead code" }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_pool_header_actions",
+      "blockType": "workbench-action-bar",
+      "surface": "bare",
+      "density": "compact",
+      "align": "end",
+      "actions": [
+        {
+          "code": "open_lead",
+          "permissionCode": "crm.lead.read",
+          "label": { "zh-CN": "打开线索档案", "en": "Open Lead Record" },
+          "variant": "secondary",
+          "visibleWhen": "state.selectedPoolItem != null",
+          "onClick": { "action": "navigate", "args": { "to": "/p/crm_lead_common/view/${state.selectedPoolItem.crm_lpi_lead_id}" } }
+        },
+        {
+          "code": "batch_operations",
+          "permissionCode": "crm.lead_pool.pick",
+          "label": { "zh-CN": "批量处理", "en": "Batch Operations" },
+          "variant": "secondary",
+          "onClick": { "action": "navigate", "args": { "to": "/p/c/crm_lead_pool_batch_list" } }
+        },
+        {
+          "code": "pool_policy",
+          "permissionCode": "crm.lead_pool.manage",
+          "label": { "zh-CN": "线索池策略", "en": "Pool Policies" },
+          "variant": "secondary",
+          "onClick": { "action": "navigate", "args": { "to": "/p/crm_lead_pool" } }
+        },
+        {
+          "code": "capacity_policy",
+          "permissionCode": "crm.lead_pool.manage",
+          "label": { "zh-CN": "人员库容", "en": "User Capacity" },
+          "variant": "secondary",
+          "onClick": { "action": "navigate", "args": { "to": "/p/crm_lead_capacity" } }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_pool_queue",
+      "blockType": "table",
+      "title": { "zh-CN": "领取与分配队列", "en": "Claim and Assignment Queue" },
+      "dataSource": "poolQueue",
+      "density": "compact",
+      "maxHeight": 430,
+      "selection": { "mode": "single", "bind": "selectedPoolItem", "defaultFirst": true },
+      "columns": [
+        { "field": "pool_name", "width": 145, "label": { "zh-CN": "线索池", "en": "Pool" } },
+        { "field": "crm_lpi_company", "width": 210, "label": { "zh-CN": "公司", "en": "Company" } },
+        { "field": "crm_lpi_contact_name", "width": 125, "label": { "zh-CN": "联系人", "en": "Contact" } },
+        { "field": "crm_lpi_source", "width": 105, "dictCode": "crm_lead_source", "label": { "zh-CN": "来源", "en": "Source" } },
+        { "field": "crm_lpi_score", "width": 80, "align": "right", "label": { "zh-CN": "评分", "en": "Score" } },
+        { "field": "operational_state", "width": 105, "label": { "zh-CN": "领取状态", "en": "Claim State" } },
+        { "field": "crm_lpi_claim_release_at", "width": 155, "valueType": "datetime", "label": { "zh-CN": "可领取时间", "en": "Available At" } },
+        { "field": "owner_name", "width": 125, "label": { "zh-CN": "当前获配人", "en": "Current Owner" } }
+      ],
+      "rowActions": [
+        {
+          "code": "view_pool_evidence",
+          "label": { "zh-CN": "查看池内证据", "en": "View Pool Evidence" },
+          "permissionCode": "crm.lead_pool.read",
+          "action": { "type": "navigate", "to": "crm_lead_pool_item_detail" }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_pool_status",
+      "blockType": "status-banner",
+      "context": "${state.selectedPoolItem}",
+      "statusField": "operational_state",
+      "toneMap": { "ready": "green", "cooldown": "amber", "claimed": "blue", "assigned": "blue" },
+      "titleMap": {
+        "ready": { "zh-CN": "该线索现在可以领取或分配", "en": "This lead is ready to claim or assign" },
+        "cooldown": { "zh-CN": "线索仍在领取冷却期", "en": "This lead is still cooling down" },
+        "claimed": { "zh-CN": "线索已由成员领取", "en": "This lead was claimed by a member" },
+        "assigned": { "zh-CN": "线索已由管理员分配", "en": "This lead was assigned by an administrator" }
+      },
+      "descriptionMap": {
+        "ready": { "zh-CN": "领取时会再次校验成员资格、每日上限、人员库容和并发状态。", "en": "Membership, daily quota, capacity, and concurrency are rechecked on claim." },
+        "cooldown": { "zh-CN": "管理员可分配；普通成员需等待可领取时间，前负责人还要满足专属冷却规则。", "en": "Administrators may assign; members must wait for release and previous-owner cooldown." },
+        "claimed": { "zh-CN": "责任和数据权限已经切换到领取人，可从线索档案继续推进。", "en": "Ownership and record access now belong to the claimant." },
+        "assigned": { "zh-CN": "管理员分配结果已经写入责任历史，可从线索档案继续推进。", "en": "The assignment is recorded in ownership history." }
+      },
+      "summaryFields": [
+        { "field": "crm_lpi_lead_code", "label": { "zh-CN": "线索编号", "en": "Lead Code" } },
+        { "field": "pool_name", "label": { "zh-CN": "所属线索池", "en": "Pool" } },
+        { "field": "previous_owner_name", "label": { "zh-CN": "前负责人", "en": "Previous Owner" } },
+        { "field": "crm_lpi_claim_release_at", "label": { "zh-CN": "可领取时间", "en": "Available At" } }
+      ]
+    },
+    {
+      "id": "crm_lead_pool_actions",
+      "blockType": "workbench-action-bar",
+      "title": { "zh-CN": "下一步动作", "en": "Next Action" },
+      "surface": "card",
+      "density": "compact",
+      "actions": [
+        {
+          "code": "claim",
+          "permissionCode": "crm.lead_pool.pick",
+          "label": { "zh-CN": "领取此线索", "en": "Claim Lead" },
+          "variant": "primary",
+          "visibleWhen": "state.selectedPoolItem != null && state.selectedPoolItem.operational_state == 'ready'",
+          "confirm": { "zh-CN": "系统将再次校验领取资格并原子切换责任人。确认领取？", "en": "Eligibility will be rechecked before ownership changes atomically. Continue?" },
+          "onClick": {
+            "action": "command.execute",
+            "args": {
+              "command": "crm:claim_pool_lead",
+              "operationType": "update",
+              "targetRecordPid": "${state.selectedPoolItem.pid}",
+              "reload": ["poolStats", "poolQueue"],
+              "feedback": {
+                "successMessage": { "zh-CN": "领取成功，责任和数据权限已更新", "en": "Lead claimed; ownership and access updated" },
+                "errorMessage": { "zh-CN": "领取失败，请按提示检查冷却、上限、库容或并发状态", "en": "Claim failed; check cooldown, quota, capacity, or concurrent ownership" }
+              }
+            }
+          }
+        },
+        {
+          "code": "assign",
+          "permissionCode": "crm.lead_pool.assign",
+          "label": { "zh-CN": "分配给成员", "en": "Assign to Member" },
+          "variant": "primary",
+          "visibleWhen": "state.selectedPoolItem != null && (state.selectedPoolItem.operational_state == 'ready' || state.selectedPoolItem.operational_state == 'cooldown')",
+          "onClick": {
+            "action": "command.execute",
+            "args": {
+              "command": "crm:assign_pool_lead",
+              "operationType": "update",
+              "targetRecordPid": "${state.selectedPoolItem.pid}",
+              "inputFieldsTitle": { "zh-CN": "分配池内线索", "en": "Assign Pooled Lead" },
+              "inputFieldsSubmitLabel": { "zh-CN": "确认分配", "en": "Confirm Assignment" },
+              "inputFields": [
+                {
+                  "field": "crm_lpi_claimed_by",
+                  "label": { "zh-CN": "分配给", "en": "Assign To" },
+                  "type": "reference",
+                  "component": "MemberPicker",
+                  "required": true,
+                  "props": { "multiple": false }
+                }
+              ],
+              "reload": ["poolStats", "poolQueue"],
+              "feedback": {
+                "successMessage": { "zh-CN": "分配成功，责任和数据权限已更新", "en": "Lead assigned; ownership and access updated" },
+                "errorMessage": { "zh-CN": "分配失败，请检查管理员资格、人员库容或并发状态", "en": "Assignment failed; check admin role, capacity, or concurrent ownership" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_lead_pool_evidence",
+      "blockType": "evidence-panel",
+      "context": "${state.selectedPoolItem}",
+      "title": { "zh-CN": "领取与责任证据", "en": "Claim and Ownership Evidence" },
+      "description": { "zh-CN": "入池原因、冷却、前负责人和当前获配结果使用同一选中上下文。", "en": "Entry reason, cooldown, previous owner, and ownership share one selected context." },
+      "sections": [
+        { "key": "company", "label": { "zh-CN": "公司", "en": "Company" }, "field": "crm_lpi_company" },
+        { "key": "contact", "label": { "zh-CN": "联系人", "en": "Contact" }, "field": "crm_lpi_contact_name" },
+        { "key": "entered", "label": { "zh-CN": "入池时间", "en": "Entered At" }, "field": "crm_lpi_entered_at" },
+        { "key": "reason", "label": { "zh-CN": "入池原因", "en": "Entry Reason" }, "field": "crm_lpi_reason" },
+        { "key": "previous", "label": { "zh-CN": "前负责人", "en": "Previous Owner" }, "field": "previous_owner_name" },
+        { "key": "owner", "label": { "zh-CN": "当前获配人", "en": "Current Owner" }, "field": "owner_name" }
+      ],
+      "empty": { "title": { "zh-CN": "选择一条池内线索，查看领取规则和责任证据", "en": "Select a pooled lead to review eligibility and ownership evidence" } }
+    }
   ]
 }

@@ -10,10 +10,12 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
   const commands = await json('config/commands/crm_lead_pool.json');
   const permissions = await json('config/permissions.json');
   const roles = await json('config/roles.json');
+  const namedQueries = await json('config/named-queries.json');
   const pages = await Promise.all([
     'crm_lead_pool_list.json',
     'crm_lead_pool_form.json',
     'crm_lead_pool_item_list.json',
+    'crm_lead_pool_batch_list.json',
     'crm_lead_capacity_list.json',
     'crm_lead_owner_history_list.json',
   ].map((file) => json(`config/pages/${file}`)));
@@ -96,21 +98,66 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
       'crm_lead_pool_list',
       'crm_lead_pool_form',
       'crm_lead_pool_item_list',
+      'crm_lead_pool_batch_list',
       'crm_lead_capacity_list',
       'crm_lead_owner_history_list',
     ],
   );
-  const poolQueue = pages[2].blocks.find((block) => block.id === 'pool_queue');
+  const operations = pages[2];
+  assert.equal(operations.kind, 'detail');
+  assert.equal(operations.dataSources.poolStats.queryCode, 'crm_lead_pool_ops_stats');
+  assert.equal(operations.dataSources.poolQueue.queryCode, 'crm_lead_pool_ops_queue');
   assert.deepEqual(
-    poolQueue.table.bulkActions.map((action) => action.code),
+    operations.blocks.find((block) => block.id === 'crm_lead_pool_metrics').metrics.map((metric) => metric.key),
+    ['available', 'ready', 'cooldown', 'owned'],
+  );
+  const poolQueue = operations.blocks.find((block) => block.id === 'crm_lead_pool_queue');
+  assert.equal(poolQueue.density, 'compact');
+  assert.equal(poolQueue.selection.defaultFirst, true);
+  assert.ok(poolQueue.columns.some((column) => column.field === 'operational_state'));
+  const poolActions = operations.blocks.find((block) => block.id === 'crm_lead_pool_actions').actions;
+  assert.deepEqual(poolActions.map((action) => action.code), ['claim', 'assign']);
+  const claimAction = poolActions.find((action) => action.code === 'claim');
+  assert.equal(claimAction.permissionCode, 'crm.lead_pool.pick');
+  assert.match(claimAction.onClick.args.targetRecordPid, /selectedPoolItem\.pid/);
+  assert.deepEqual(claimAction.onClick.args.reload, ['poolStats', 'poolQueue']);
+  const assignAction = poolActions.find((action) => action.code === 'assign');
+  assert.equal(assignAction.permissionCode, 'crm.lead_pool.assign');
+  assert.equal(assignAction.onClick.args.inputFields?.[0]?.field, 'crm_lpi_claimed_by');
+  assert.equal(assignAction.onClick.args.inputFields?.[0]?.component, 'MemberPicker');
+  assert.ok(operations.blocks.some((block) => block.blockType === 'status-banner'));
+  assert.ok(operations.blocks.some((block) => block.blockType === 'evidence-panel'));
+  const batchPage = pages[3];
+  const batchQueue = batchPage.blocks.find((block) => block.id === 'pool_queue');
+  assert.deepEqual(
+    batchQueue.table.bulkActions.map((action) => action.code),
     ['batch_claim', 'batch_assign'],
   );
-  const assignRowAction = poolQueue.columns
-    .find((column) => column.isActionColumn)
-    .buttons.find((action) => action.code === 'assign');
-  assert.equal(assignRowAction.action?.operationType, 'update');
-  assert.equal(assignRowAction.action?.inputFields?.[0]?.field, 'crm_lpi_claimed_by');
-  assert.equal(assignRowAction.action?.inputFields?.[0]?.component, 'MemberPicker');
+  const batchAssign = batchQueue.table.bulkActions.find((action) => action.code === 'batch_assign');
+  assert.equal(batchAssign.action.input.component, 'MemberPicker');
+  assert.ok(
+    operations.blocks
+      .find((block) => block.id === 'crm_lead_pool_header_actions')
+      .actions.some((action) => action.code === 'batch_operations'),
+  );
+
+  const statsQuery = namedQueries.find((query) => query.code === 'crm_lead_pool_ops_stats');
+  const queueQuery = namedQueries.find((query) => query.code === 'crm_lead_pool_ops_queue');
+  assert.equal(statsQuery.resourceCode, 'crm.lead_pool');
+  assert.match(statsQuery.fromSql, /tenant_id = #\{params\.tenantId\}/);
+  assert.match(statsQuery.fromSql, /params\.currentUserId/);
+  assert.match(statsQuery.fromSql, /crm_lp_member_user_ids/);
+  assert.match(statsQuery.fromSql, /crm_lp_admin_user_ids/);
+  assert.match(statsQuery.fromSql, /crm_lpi_claim_release_at <= now\(\)/);
+  assert.deepEqual(
+    statsQuery.outputFields.map((field) => field.code),
+    ['available_count', 'ready_count', 'cooldown_count', 'owned_count'],
+  );
+  assert.equal(queueQuery.resourceCode, 'crm.lead_pool');
+  assert.match(queueQuery.fromSql, /i\.tenant_id = #\{params\.tenantId\}/);
+  assert.match(queueQuery.fromSql, /params\.currentUserId/);
+  assert.match(queueQuery.fromSql, /CAST\(#\{params\.viewFilter\} AS text\) = 'ready'/);
+  assert.ok(queueQuery.outputFields.some((field) => field.code === 'operational_state'));
 
   const permissionCodes = new Set(permissions.map((permission) => permission.code));
   for (const code of [

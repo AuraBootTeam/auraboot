@@ -628,7 +628,7 @@
     "parentCode": "crm_records",
     "name:zh-CN": "线索池",
     "name:en": "Lead Pool",
-    "path": "/p/crm_lead_pool_item",
+    "path": "/p/c/crm_lead_pool_item_list",
     "component": null,
     "icon": "IconInbox",
     "type": 1,
