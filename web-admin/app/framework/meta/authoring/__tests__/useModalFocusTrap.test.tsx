@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { useModalFocusTrap } from '../useModalFocusTrap';
 
 function Harness() {
@@ -87,6 +87,7 @@ function OverlappingHarness() {
 
 describe('useModalFocusTrap', () => {
   it('focuses the modal, wraps Tab in both directions, closes on Escape and restores focus', async () => {
+    const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus');
     render(<Harness />);
     const trigger = screen.getByRole('button', { name: '打开' });
     trigger.focus();
@@ -95,6 +96,7 @@ describe('useModalFocusTrap', () => {
     const first = screen.getByRole('button', { name: '首项' });
     const last = screen.getByRole('button', { name: '尾项' });
     await waitFor(() => expect(first).toHaveFocus());
+    expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true });
     expect(trigger).toHaveProperty('inert', true);
 
     last.focus();

@@ -1,6 +1,6 @@
 import { test, expect, type Browser, type Locator, type Page } from '@playwright/test';
-import { mkdir, readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import { Client as PgClient } from 'pg';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { PG_CONN } from '../../helpers/environments';
@@ -10,6 +10,7 @@ const SOURCE_PAGE_KEY = 'e2et_record_list';
 const SCREENSHOT_DIR = resolve(
   process.env.CONTEXTUAL_AUTHORING_SCREENSHOT_DIR ?? 'test-results/contextual-authoring',
 );
+const PHYSICAL_FIXTURE_PATH = process.env.CONTEXTUAL_AUTHORING_PHYSICAL_FIXTURE_PATH?.trim();
 
 type ApiEnvelope<T> = {
   code?: number | string;
@@ -189,7 +190,11 @@ test.describe('Contextual authoring release PC golden', () => {
 
   test.afterAll(async ({ browser }) => {
     try {
-      if (gatePage) await cleanupGatePage(browser, gatePage);
+      if (gatePage && PHYSICAL_FIXTURE_PATH) {
+        await retainPhysicalFixture(browser, gatePage, resolve(PHYSICAL_FIXTURE_PATH));
+      } else if (gatePage) {
+        await cleanupGatePage(browser, gatePage);
+      }
     } finally {
       if (adminPermissionSnapshot) {
         await restoreTenantAdminPermissions(browser, adminPermissionSnapshot);
@@ -1238,16 +1243,31 @@ test.describe('Contextual authoring release PC golden', () => {
       expect(
         (firstSummary.blocks as Array<Record<string, unknown>>).map((block) => block.id),
       ).toEqual([fieldBlockId]);
+      await expect(page.getByTestId('designer-save')).toBeDisabled({ timeout: 15_000 });
+      await expect(page.getByTestId('designer-save-error')).toHaveCount(0);
 
       await authoringDragCanvasBlockBefore(page, addedSectionId, summaryId);
       await expectAuthoringBlockBefore(page, addedSectionId, summaryId);
+      const saveButton = page.getByTestId('designer-save');
+      await expect(saveButton).toBeEnabled();
+      const secondSaveRequest = page.waitForRequest(
+        (request) =>
+          request.method() === 'POST' &&
+          apiPath(request.url()) === `/api/authoring/sessions/${created.sessionPid}/studio-batches`,
+        { timeout: 15_000 },
+      );
       const secondSaveResponse = page.waitForResponse(
         (response) =>
           response.request().method() === 'POST' &&
           apiPath(response.url()) ===
             `/api/authoring/sessions/${created.sessionPid}/studio-batches`,
+        { timeout: 15_000 },
       );
-      await page.getByTestId('designer-save').click();
+      await saveButton.click();
+      await expect(page.getByTestId('designer-dirty-state')).toContainText('保存中', {
+        timeout: 15_000,
+      });
+      await secondSaveRequest;
       const secondSaved = await expectApiData<PatchResult>(
         await secondSaveResponse,
         'save pointer reorder as semantic MOVE',
@@ -1486,7 +1506,12 @@ test.describe('Contextual authoring release PC golden', () => {
         response.request().method() === 'POST' &&
         apiPath(response.url()) === '/api/authoring/sessions',
     );
-    await page.getByTestId('contextual-authoring-enter').click();
+    const authoringEntry = page.getByTestId('contextual-authoring-enter');
+    await expect(authoringEntry).toBeVisible();
+    const entryBox = await authoringEntry.boundingBox();
+    expect(entryBox, 'fixed contextual entry pointer target').not.toBeNull();
+    expect(await pageScroll.evaluate((container) => container.scrollTop)).toBe(sourceScrollY);
+    await page.mouse.click(entryBox!.x + entryBox!.width / 2, entryBox!.y + entryBox!.height / 2);
     const opened = await expectApiData<AuthoringSession>(
       await sessionResponse,
       'open detail authoring with interaction context',
@@ -1546,7 +1571,8 @@ test.describe('Contextual authoring release PC golden', () => {
     expect((await returnCapabilitiesResponse).status(), 'return capability reload').toBe(200);
     await expect(page.getByTestId('contextual-authoring-surface')).toBeVisible({ timeout: 10_000 });
     const restoredOutline = page.getByTestId(`authoring-outline-${selectedBlockId}`);
-    await expect(restoredOutline).toBeVisible();
+    await expect(page.getByRole('dialog', { name: '页面大纲' })).toBeHidden();
+    await expect(restoredOutline).toBeHidden();
     await expect(restoredOutline).toHaveClass(/bg-blue-50/);
     await expect(page.getByTestId('authoring-inspector')).toBeVisible();
     await expect
@@ -2544,6 +2570,109 @@ async function cleanupGatePage(browser: Browser, target: GatePage): Promise<void
   }
 }
 
+async function retainPhysicalFixture(
+  browser: Browser,
+  target: GatePage,
+  fixturePath: string,
+): Promise<void> {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  try {
+    await login(page);
+    const mobilePage = await expectApiData<Record<string, unknown>>(
+      await page.request.get(`/api/mobile/pages/${encodeURIComponent(target.pageKey)}`),
+      'load retained physical-device mobile page',
+    );
+    const runtime = mobilePage.runtime as Record<string, unknown> | undefined;
+    expect(runtime?.source, 'physical fixture must resolve through immutable release').toBe(
+      'AUTHORING_RELEASE',
+    );
+    expect(await countGateRecord(target.recordMarker), 'physical fixture real record').toBe(1);
+
+    const auth = await loadAuthSnapshot(page);
+    const tenantSpaces = await expectApiData<
+      Array<{ tenantId: string | number; tenantName?: string; tenantDisplayName?: string }>
+    >(
+      await page.request.get('/api/tenant-selection/my-spaces'),
+      'load retained physical fixture tenant',
+    );
+    const tenantSpace = tenantSpaces.find(
+      (candidate) => String(candidate.tenantId) === String(auth.user.tenantId),
+    );
+    expect(tenantSpace, 'retained physical fixture tenant space').toBeTruthy();
+    const client = new PgClient(PG_CONN);
+    await client.connect();
+    try {
+      const release = await client.query<{
+        release_pid: string;
+        channel_version: string;
+        source_version: string;
+      }>(
+        `SELECT release.pid AS release_pid,
+                channel.row_version::text AS channel_version,
+                item.source_version::text AS source_version
+           FROM ab_page_schema page_schema
+           JOIN ab_authoring_release_channel channel
+             ON channel.tenant_id = page_schema.tenant_id
+            AND channel.env_id = page_schema.env_id
+            AND channel.resource_type = 'PAGE_SCHEMA'
+            AND channel.resource_pid = page_schema.pid
+           JOIN ab_authoring_release release
+             ON release.id = channel.active_release_id
+            AND release.status = 'ACTIVE'
+           JOIN ab_authoring_release_item item
+             ON item.release_id = release.id
+            AND item.resource_type = 'PAGE_SCHEMA'
+            AND item.resource_pid = page_schema.pid
+          WHERE page_schema.page_key = $1
+            AND page_schema.is_current = TRUE
+            AND page_schema.deleted_flag = FALSE`,
+        [target.pageKey],
+      );
+      expect(release.rows, 'one active retained physical fixture release').toHaveLength(1);
+      const active = release.rows[0];
+      expect(String(runtime?.releasePid)).toBe(active.release_pid);
+      expect(String(runtime?.channelVersion)).toBe(active.channel_version);
+      expect(String(runtime?.sourceVersion)).toBe(active.source_version);
+
+      await mkdir(dirname(fixturePath), { recursive: true });
+      await writeFile(
+        fixturePath,
+        `${JSON.stringify(
+          {
+            schemaVersion: 1,
+            generatedAt: new Date().toISOString(),
+            pagePid: target.pid,
+            pageKey: target.pageKey,
+            pageTitle: target.title,
+            route: target.route,
+            menuId: String(target.menuId),
+            modelCode: 'e2et_record',
+            recordMarker: target.recordMarker,
+            rawFieldCode: 'e2et_name',
+            tenantId: String(auth.user.tenantId),
+            tenantName:
+              tenantSpace!.tenantDisplayName?.trim() || tenantSpace!.tenantName?.trim() || '',
+            runtime: {
+              source: 'AUTHORING_RELEASE',
+              releasePid: active.release_pid,
+              channelVersion: Number(active.channel_version),
+              sourceVersion: Number(active.source_version),
+            },
+          },
+          null,
+          2,
+        )}\n`,
+        'utf8',
+      );
+    } finally {
+      await client.end();
+    }
+  } finally {
+    await context.close();
+  }
+}
+
 async function ensureTenantAdminPermissions(
   browser: Browser,
   permissionCodes: string[],
@@ -3163,6 +3292,11 @@ async function settleAuthoringDrag(page: Page): Promise<void> {
         requestAnimationFrame(() => requestAnimationFrame(() => resolveFrame())),
       ),
   );
+  // @dnd-kit intentionally keeps its capture-phase ghost-click suppressor for
+  // 50 ms after pointer-up. Playwright can teleport from the canvas to a toolbar
+  // action faster than a person can, so wait out that documented sensor cleanup
+  // window before the next independent pointer action.
+  await page.waitForTimeout(75);
 }
 
 async function authoringPointerDragTo(

@@ -34,7 +34,7 @@ export function useModalFocusTrap(
     const returnTarget =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frame = window.requestAnimationFrame(() => {
-      if (isTopmostModal(container)) firstFocusable(container)?.focus();
+      if (isTopmostModal(container)) focusWithoutScrolling(firstFocusable(container));
     });
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -49,17 +49,17 @@ export function useModalFocusTrap(
       const focusable = focusableElements(container);
       if (focusable.length === 0) {
         event.preventDefault();
-        container.focus();
+        focusWithoutScrolling(container);
         return;
       }
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
-        last.focus();
+        focusWithoutScrolling(last);
       } else if (!event.shiftKey && document.activeElement === last) {
         event.preventDefault();
-        first.focus();
+        focusWithoutScrolling(first);
       }
     };
 
@@ -73,17 +73,21 @@ export function useModalFocusTrap(
       window.requestAnimationFrame(() => {
         const topmost = activeModalStack[activeModalStack.length - 1];
         if (!topmost) {
-          if (returnTarget?.isConnected) returnTarget.focus();
+          if (returnTarget?.isConnected) focusWithoutScrolling(returnTarget);
           return;
         }
         if (returnTarget?.isConnected && topmost.contains(returnTarget)) {
-          returnTarget.focus();
+          focusWithoutScrolling(returnTarget);
           return;
         }
-        firstFocusable(topmost)?.focus();
+        focusWithoutScrolling(firstFocusable(topmost));
       });
     };
   }, [containerRef, open]);
+}
+
+function focusWithoutScrolling(element: HTMLElement | null): void {
+  element?.focus({ preventScroll: true });
 }
 
 function isTopmostModal(container: HTMLElement): boolean {

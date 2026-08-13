@@ -1099,6 +1099,8 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
       '浏览器无法建立本地恢复副本',
     );
     expect(await recoveryKeys(page)).toEqual([]);
+    await closeInlineInspector(page);
+    await expect(page.getByRole('dialog', { name: '属性检查器' })).toBeHidden();
     page.once('dialog', async (dialog) => {
       expect(dialog.message()).toContain('退出会丢失当前未保存变更');
       await dialog.dismiss();
@@ -1135,6 +1137,8 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
         '企业安全策略已禁止浏览器保存恢复副本',
       );
       expect(await recoveryKeys(page)).toEqual([]);
+      await closeInlineInspector(page);
+      await expect(page.getByRole('dialog', { name: '属性检查器' })).toBeHidden();
       page.once('dialog', async (dialog) => {
         expect(dialog.message()).toContain('退出会丢失当前未保存变更');
         await dialog.dismiss();
