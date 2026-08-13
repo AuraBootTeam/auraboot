@@ -1,0 +1,46 @@
+{
+  "scope": "crm-receivables-lifecycle-2026-08-13",
+  "runtime": "crm-invoice-allocation-refund-20260813-s137",
+  "salesJarSha256Prefix": "7ef24fef749c",
+  "verdict": {
+    "pass": 22,
+    "untested": 4,
+    "fail": 0,
+    "skipped": 0
+  },
+  "items": [
+    { "kind": "page", "code": "sl_customer_invoice_common_list", "status": "pass" },
+    { "kind": "page", "code": "sl_customer_invoice_common_form", "status": "pass" },
+    { "kind": "page", "code": "sl_customer_invoice_common_detail", "status": "pass" },
+    { "kind": "page", "code": "sl_invoice_allocation_common_list", "status": "pass" },
+    { "kind": "page", "code": "sl_invoice_allocation_common_form", "status": "pass" },
+    { "kind": "page", "code": "sl_invoice_allocation_common_detail", "status": "pass" },
+    { "kind": "page", "code": "sl_customer_refund_common_list", "status": "pass" },
+    { "kind": "page", "code": "sl_customer_refund_common_form", "status": "pass" },
+    { "kind": "page", "code": "sl_customer_refund_common_detail", "status": "pass" },
+    { "kind": "page", "code": "sl_credit_memo_common_list", "status": "pass" },
+    { "kind": "page", "code": "sl_credit_memo_common_form", "status": "pass" },
+    { "kind": "command", "code": "sl:create_customer_invoice", "status": "pass" },
+    { "kind": "command", "code": "sl:issue_customer_invoice", "status": "pass" },
+    { "kind": "command", "code": "sl:create_invoice_allocation", "status": "pass" },
+    { "kind": "command", "code": "sl:post_invoice_allocation", "status": "pass" },
+    { "kind": "command", "code": "sl:reverse_invoice_allocation", "status": "pass" },
+    { "kind": "command", "code": "sl:create_credit_memo", "status": "pass" },
+    { "kind": "command", "code": "sl:approve_credit_memo", "status": "pass" },
+    { "kind": "command", "code": "sl:apply_credit_memo", "status": "pass" },
+    { "kind": "command", "code": "sl:approve_customer_refund", "status": "pass" },
+    { "kind": "command", "code": "sl:update_customer_refund", "status": "pass" },
+    { "kind": "command", "code": "sl:pay_customer_refund", "status": "pass" },
+    { "kind": "command", "code": "sl:update_customer_invoice", "status": "untested" },
+    { "kind": "command", "code": "sl:cancel_customer_invoice", "status": "untested" },
+    { "kind": "command", "code": "sl:update_invoice_allocation", "status": "untested" },
+    { "kind": "command", "code": "sl:cancel_customer_refund", "status": "untested" }
+  ],
+  "residualGaps": [
+    "statutory tax invoice issuance and tax-platform integration",
+    "cross-currency settlement and exchange gains or losses",
+    "high-density batch allocation and refund operations",
+    "compact/mobile write journey"
+  ],
+  "dataMigration": "out_of_scope_during_development"
+}
