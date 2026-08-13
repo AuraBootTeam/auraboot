@@ -5,6 +5,7 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
+  type Response,
 } from '@playwright/test';
 import { ensureSidebarExpanded } from '../helpers';
 
@@ -33,7 +34,11 @@ async function navigateToCrmMenu(page: Page, section: RegExp, href: string): Pro
   await expect(page).toHaveURL(new RegExp(href.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 }
 
-function assertSqlCount(rawCount: string | undefined, label: string, budget: number): number {
+function assertSqlCount(
+  rawCount: string | null | undefined,
+  label: string,
+  budget: number,
+): number {
   expect(rawCount, `${label} must expose X-SQL-Count from the real backend`).toBeTruthy();
   const count = Number(rawCount);
   expect(Number.isInteger(count) && count >= 0, `${label} invalid X-SQL-Count=${rawCount}`).toBe(
@@ -74,8 +79,8 @@ async function captureUiCommandSqlCounts(
   budget: number,
   action: () => Promise<void>,
 ): Promise<number[]> {
-  const responses: APIResponse[] = [];
-  const listener = (response: APIResponse): void => {
+  const responses: Response[] = [];
+  const listener = (response: Response): void => {
     if (
       response.request().method() === 'POST' &&
       response.url().includes(`/api/meta/commands/execute/${commandCode}`)
