@@ -28,4 +28,22 @@ describe('authoring save reconciliation', () => {
       }),
     ).toBe('CONFLICT');
   });
+
+  it('ignores JSON object insertion order while preserving array order', () => {
+    const base = { blocks: [{ id: 'table', columns: ['name', 'status'] }] };
+    const mine = {
+      blocks: [{ id: 'table', title: 'Production exceptions', columns: ['name', 'status'] }],
+    };
+    const committedWithCanonicalKeyOrder = {
+      blocks: [{ columns: ['name', 'status'], id: 'table', title: 'Production exceptions' }],
+    };
+    const reorderedColumns = {
+      blocks: [{ columns: ['status', 'name'], id: 'table', title: 'Production exceptions' }],
+    };
+
+    expect(
+      reconcileAuthoringStudioDocument(base, mine, committedWithCanonicalKeyOrder),
+    ).toBe('COMMITTED');
+    expect(reconcileAuthoringStudioDocument(base, mine, reorderedColumns)).toBe('CONFLICT');
+  });
 });

@@ -72,7 +72,7 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
     const patchResponse = page.waitForResponse((response) =>
       response.url().includes('/authoring/'),
     );
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await saveInlineAuthoring(page);
     const rawPatchResponse = await patchResponse;
     expect({
       method: rawPatchResponse.request().method(),
@@ -111,7 +111,7 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
         response.request().method() === 'GET' &&
         apiPath(response.url()) === `/api/authoring/sessions/${session.sessionPid}`,
     );
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await saveInlineAuthoring(page);
 
     const latestAfterFailure = await expectApiData<AuthoringSession>(
       await latestRevisionProbe,
@@ -131,7 +131,7 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
         response.request().method().toUpperCase() === 'PATCH' &&
         apiPath(response.url()).endsWith('/patches'),
     );
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await saveInlineAuthoring(page);
     const retried = await expectApiData<PatchResult>(await retryResponse, 'retry inline edit');
 
     expect(retried.session.revision).toBe(session.revision + 1);
@@ -175,7 +175,7 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
         response.request().method().toUpperCase() === 'PATCH' &&
         apiPath(response.url()) === patchPath,
     );
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await saveInlineAuthoring(page);
     const saved = await expectApiData<PatchResult>(
       await remainingPatchResponse,
       'save remaining inline edit after authoritative reconciliation',
@@ -246,7 +246,7 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
       await route.continue();
     });
 
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await saveInlineAuthoring(page);
 
     await expect(page.getByRole('alert')).toContainText(
       '保存结果暂时无法确认；无法读取权威草稿，请联网后重试',
@@ -271,7 +271,7 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
         response.request().method().toUpperCase() === 'PATCH' &&
         apiPath(response.url()) === patchPath,
     );
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await saveInlineAuthoring(page);
     expect((await staleRetry).status()).toBe(409);
 
     await expect(page.getByText('0 项未保存')).toBeVisible();
@@ -313,7 +313,7 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
       await route.continue();
     });
 
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await saveInlineAuthoring(page);
     await expect(page.getByRole('alert')).toContainText('保存结果暂时无法确认');
     await expect(page.getByText('1 项未保存')).toBeVisible();
     expect(patchRequests).toBe(1);
@@ -403,7 +403,7 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
         await route.abort('failed');
       });
 
-      await page.getByRole('button', { name: '保存', exact: true }).click();
+      await saveInlineAuthoring(page);
 
       await expect(page.getByTestId('authoring-save-reconciliation-feedback')).toHaveAttribute(
         'data-tone',
@@ -1058,7 +1058,7 @@ test.describe('Contextual authoring PC save, move and failure golden', () => {
         fullPage: true,
       });
 
-      await reopenedPage.getByRole('button', { name: '保存', exact: true }).click();
+      await saveInlineAuthoring(reopenedPage);
       await expect(reopenedPage.getByText('0 项未保存')).toBeVisible();
       expect(await loadChangeItems(reopenedPage, session.sessionPid)).toHaveLength(
         itemsBefore.length + 1,
@@ -1354,8 +1354,20 @@ async function stageTitleEdit(page: Page, session: AuthoringSession) {
 async function openTableInspector(page: Page, tableId: string): Promise<void> {
   await page.getByTestId('authoring-outline-open').click();
   await page.getByTestId(`authoring-outline-${tableId}`).click();
-  await page.getByRole('button', { name: '关闭页面大纲' }).click();
-  await page.getByTestId('authoring-inspector-open').click();
+  await expect(page.getByRole('dialog', { name: '页面大纲' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: '属性检查器' })).toBeVisible();
+}
+
+async function saveInlineAuthoring(page: Page): Promise<void> {
+  await closeInlineInspector(page);
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+}
+
+async function closeInlineInspector(page: Page): Promise<void> {
+  const inspector = page.getByRole('dialog', { name: '属性检查器' });
+  if (!(await inspector.isVisible())) return;
+  await inspector.getByRole('button', { name: '关闭属性检查器' }).click();
+  await expect(inspector).toBeHidden();
 }
 
 function conflictCard(page: Page, label: string) {

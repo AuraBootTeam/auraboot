@@ -52,6 +52,39 @@ function NestedHarness() {
   );
 }
 
+function OverlappingHarness() {
+  const [parentOpen, setParentOpen] = useState(false);
+  const [childOpen, setChildOpen] = useState(false);
+  const parentRef = useRef<HTMLDivElement>(null);
+  const childRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(parentOpen, parentRef, () => setParentOpen(false));
+  useModalFocusTrap(childOpen, childRef, () => setChildOpen(false));
+  return (
+    <>
+      <button type="button" onClick={() => setParentOpen(true)}>
+        打开交叠父层
+      </button>
+      {parentOpen ? (
+        <div ref={parentRef} role="dialog" aria-label="交叠父层">
+          <button type="button" onClick={() => setChildOpen(true)}>
+            打开常驻子层
+          </button>
+        </div>
+      ) : null}
+      {childOpen ? (
+        <div ref={childRef} role="dialog" aria-label="常驻子层">
+          <button type="button" onClick={() => setParentOpen(false)}>
+            先关闭父层
+          </button>
+          <button type="button" onClick={() => setChildOpen(false)}>
+            再关闭子层
+          </button>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 describe('useModalFocusTrap', () => {
   it('focuses the modal, wraps Tab in both directions, closes on Escape and restores focus', async () => {
     render(<Harness />);
@@ -95,5 +128,25 @@ describe('useModalFocusTrap', () => {
     expect(screen.getByRole('dialog', { name: '父层' })).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: '父层' }).inert).not.toBe(true);
     await waitFor(() => expect(childTrigger).toHaveFocus());
+  });
+
+  it('keeps shared background inert when overlapping modals close out of order', async () => {
+    render(<OverlappingHarness />);
+    const backgroundTrigger = screen.getByRole('button', { name: '打开交叠父层' });
+    fireEvent.click(backgroundTrigger);
+    const childTrigger = screen.getByRole('button', { name: '打开常驻子层' });
+    await waitFor(() => expect(childTrigger).toHaveFocus());
+    fireEvent.click(childTrigger);
+
+    const closeParent = screen.getByRole('button', { name: '先关闭父层' });
+    await waitFor(() => expect(closeParent).toHaveFocus());
+    fireEvent.click(closeParent);
+    expect(screen.queryByRole('dialog', { name: '交叠父层' })).not.toBeInTheDocument();
+    expect(backgroundTrigger).toHaveProperty('inert', true);
+    await waitFor(() => expect(closeParent).toHaveFocus());
+
+    fireEvent.click(screen.getByRole('button', { name: '再关闭子层' }));
+    expect(screen.queryByRole('dialog', { name: '常驻子层' })).not.toBeInTheDocument();
+    await waitFor(() => expect(backgroundTrigger.inert).not.toBe(true));
   });
 });

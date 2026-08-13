@@ -1307,7 +1307,7 @@ test.describe('Contextual authoring PC collaboration golden', () => {
         await route.abort('failed');
       });
 
-      await author.page.getByRole('button', { name: '保存', exact: true }).click();
+      await saveInlineAuthoring(author.page);
 
       await expect(
         author.page.getByTestId('authoring-save-reconciliation-feedback'),
@@ -1363,7 +1363,7 @@ test.describe('Contextual authoring PC collaboration golden', () => {
           response.request().method().toUpperCase() === 'PATCH' &&
           apiPath(response.url()) === patchPath,
       );
-      await author.page.getByRole('button', { name: '保存', exact: true }).click();
+      await saveInlineAuthoring(author.page);
       expect((await staleRetry).status()).toBe(409);
       await expect(author.page.getByText('0 项未保存')).toBeVisible();
       await expect(author.page.getByTestId('authoring-save-reconciliation-feedback')).toContainText(
@@ -1711,6 +1711,15 @@ async function stageLocalDensityEdit(page: Page, session: AuthoringSession) {
   await expect(editor).toBeVisible();
   await editor.fill(value);
   return { editor, value };
+}
+
+async function saveInlineAuthoring(page: Page): Promise<void> {
+  const inspector = page.getByRole('dialog', { name: '属性检查器' });
+  if (await inspector.isVisible()) {
+    await inspector.getByRole('button', { name: '关闭属性检查器' }).click();
+    await expect(inspector).toBeHidden();
+  }
+  await page.getByRole('button', { name: '保存', exact: true }).click();
 }
 
 async function stageLocalTitleAndSpanEdits(

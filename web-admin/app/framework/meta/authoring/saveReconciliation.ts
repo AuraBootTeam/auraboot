@@ -27,5 +27,27 @@ export function reconcileAuthoringStudioDocument(
 }
 
 function authoringValuesEqual(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return stableJsonValue(left) === stableJsonValue(right);
+}
+
+/**
+ * Authoring documents are JSON values, so object member insertion order is not semantic.
+ * Workbench edits can reinsert a previously absent property at the end of an object while
+ * the authoritative snapshot materializer restores its canonical field order. Comparing raw
+ * JSON.stringify output would therefore report a false conflict after a committed write.
+ */
+function stableJsonValue(value: unknown): string | undefined {
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined) return undefined;
+  return JSON.stringify(sortJsonObjectKeys(JSON.parse(serialized)));
+}
+
+function sortJsonObjectKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortJsonObjectKeys);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => [key, sortJsonObjectKeys(child)]),
+  );
 }

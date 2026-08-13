@@ -207,7 +207,9 @@ test.describe('Contextual authoring release PC golden', () => {
     await page.getByTestId('studio-governance-close').click();
     const sourceMenuLink = page.locator('nav').locator(`a[href="${gatePage.route}"]`).first();
     await expect(sourceMenuLink).toBeVisible();
-    await sourceMenuLink.click();
+    await sourceMenuLink.focus();
+    await expect(sourceMenuLink).toBeFocused();
+    await sourceMenuLink.press('Enter');
     await expect(page).toHaveURL(new RegExp(`${gatePage.route}$`));
     await expect(page.getByRole('main').first().getByText(gatePage.recordMarker)).toBeVisible();
 
@@ -307,7 +309,7 @@ test.describe('Contextual authoring release PC golden', () => {
         response.request().method() === 'PATCH' &&
         apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/patches`,
     );
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await saveInlineAuthoring(page);
     const invalidSaved = await expectApiData<PatchResult>(await invalidSave, 'save invalid filter');
     expect(invalidSaved.session.riskLevel).toBe('L2');
     expect(invalidSaved.session.publishPolicy).toBe('REQUIRED_REVIEW');
@@ -342,13 +344,15 @@ test.describe('Contextual authoring release PC golden', () => {
     );
     await expect(page.getByRole('button', { name: '提交评审', exact: true })).toHaveCount(0);
 
+    await page.getByTestId('authoring-inspector-open').click();
+    await expect(page.getByRole('dialog', { name: '属性检查器' })).toBeVisible();
     await filterEditor.fill(JSON.stringify({ status: 'OPEN' }));
     const validSave = page.waitForResponse(
       (response) =>
         response.request().method() === 'PATCH' &&
         apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/patches`,
     );
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await saveInlineAuthoring(page);
     const fixed = await expectApiData<PatchResult>(await validSave, 'save structured filter');
     expect(fixed.session.validationState).toBe('UNVALIDATED');
     const validPrepare = page.waitForResponse(
@@ -449,7 +453,7 @@ test.describe('Contextual authoring release PC golden', () => {
         response.request().method() === 'PATCH' &&
         apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/patches`,
     );
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await saveInlineAuthoring(page);
     await expectApiData<PatchResult>(await saveResponse, 'save timeout gate revision');
     await enterStudioFromContextual(page);
 
@@ -553,7 +557,7 @@ test.describe('Contextual authoring release PC golden', () => {
         response.request().method() === 'PATCH' &&
         apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/patches`,
     );
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await saveInlineAuthoring(page);
     const lowRisk = await expectApiData<PatchResult>(await lowRiskSave, 'save L0 density change');
     expect(lowRisk.session.riskLevel).toBe('L0');
     await enterStudioFromContextual(page);
@@ -652,7 +656,7 @@ test.describe('Contextual authoring release PC golden', () => {
         response.request().method() === 'PATCH' &&
         apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/patches`,
     );
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await saveInlineAuthoring(page);
     await expectApiData<PatchResult>(await saveResponse, 'save review lifecycle filter');
     await enterStudioFromContextual(page);
     const firstPrepared = await prepareAndSubmitInStudio(page, opened.sessionPid);
@@ -2689,7 +2693,12 @@ async function openReviewer(browser: Browser): Promise<Page> {
 }
 
 async function enterStudioFromContextual(page: Page): Promise<void> {
-  await page.getByRole('button', { name: '高级设置', exact: true }).click();
+  const inspector = page.getByRole('dialog', { name: '属性检查器' });
+  if (!(await inspector.isVisible())) {
+    await page.getByTestId('authoring-inspector-open').click();
+    await expect(inspector).toBeVisible();
+  }
+  await inspector.getByRole('button', { name: '高级设置', exact: true }).click();
   const explain = page.getByRole('dialog', { name: '进入应用设计中心' });
   await expect(explain).toContainText('当前 ChangeSet、选择对象、返回位置');
   await explain.getByRole('button', { name: '继续到应用设计中心' }).click();
@@ -2705,8 +2714,8 @@ async function selectTableInContextualInspector(
   expect(table?.id, 'table block in contextual authoring gate').toBeTruthy();
   await page.getByTestId('authoring-outline-open').click();
   await page.getByTestId(`authoring-outline-${String(table!.id)}`).click();
-  await page.getByRole('button', { name: '关闭页面大纲' }).click();
-  await page.getByTestId('authoring-inspector-open').click();
+  await expect(page.getByRole('dialog', { name: '页面大纲' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: '属性检查器' })).toBeVisible();
   return table!;
 }
 
@@ -3028,11 +3037,14 @@ async function publishDensityRevisionViaUi(
       response.request().method() === 'PATCH' &&
       apiPath(response.url()) === `/api/authoring/sessions/${opened.sessionPid}/patches`,
   );
-  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await saveInlineAuthoring(page);
   const saved = await expectApiData<PatchResult>(await saveResponse, 'save density revision');
   await expect(page.getByText('0 项未保存')).toBeVisible();
 
-  await page.getByRole('button', { name: '高级设置', exact: true }).click();
+  const inspector = page.getByRole('dialog', { name: '属性检查器' });
+  await page.getByTestId('authoring-inspector-open').click();
+  await expect(inspector).toBeVisible();
+  await inspector.getByRole('button', { name: '高级设置', exact: true }).click();
   const explain = page.getByRole('dialog', { name: '进入应用设计中心' });
   await expect(explain).toContainText('系统不会猜测影响范围');
   await expect(explain).toContainText('当前 ChangeSet、选择对象、返回位置');
@@ -3330,13 +3342,25 @@ async function stageDensityEdit(
   const density = current === 'compact' ? 'comfortable' : 'compact';
   await page.getByTestId('authoring-outline-open').click();
   await page.getByTestId(`authoring-outline-${String(table!.id)}`).click();
-  await page.getByRole('button', { name: '关闭页面大纲' }).click();
-  await page.getByTestId('authoring-inspector-open').click();
+  await expect(page.getByRole('dialog', { name: '页面大纲' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: '属性检查器' })).toBeVisible();
   const editor = page.getByTestId('authoring-property-/props/density').locator('input');
   await expect(editor).toBeVisible();
   await editor.fill(density);
   await expect(page.getByText('1 项未保存')).toBeVisible();
   return { density };
+}
+
+async function saveInlineAuthoring(page: Page): Promise<void> {
+  await closeInlineInspector(page);
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+}
+
+async function closeInlineInspector(page: Page): Promise<void> {
+  const inspector = page.getByRole('dialog', { name: '属性检查器' });
+  if (!(await inspector.isVisible())) return;
+  await inspector.getByRole('button', { name: '关闭属性检查器' }).click();
+  await expect(inspector).toBeHidden();
 }
 
 async function loadRuntimeTuple(page: Page): Promise<RuntimeTuple> {

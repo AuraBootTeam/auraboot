@@ -10,6 +10,10 @@ const FOCUSABLE_SELECTOR = [
 ].join(',');
 
 const activeModalStack: HTMLElement[] = [];
+const inertOwnership = new Map<
+  HTMLElement,
+  { originalInert: boolean; owners: Set<HTMLElement> }
+>();
 
 export function useModalFocusTrap(
   open: boolean,
@@ -67,7 +71,16 @@ export function useModalFocusTrap(
       if (stackIndex >= 0) activeModalStack.splice(stackIndex, 1);
       restoreBackground();
       window.requestAnimationFrame(() => {
-        if (returnTarget?.isConnected) returnTarget.focus();
+        const topmost = activeModalStack[activeModalStack.length - 1];
+        if (!topmost) {
+          if (returnTarget?.isConnected) returnTarget.focus();
+          return;
+        }
+        if (returnTarget?.isConnected && topmost.contains(returnTarget)) {
+          returnTarget.focus();
+          return;
+        }
+        firstFocusable(topmost)?.focus();
       });
     };
   }, [containerRef, open]);
@@ -78,22 +91,37 @@ function isTopmostModal(container: HTMLElement): boolean {
 }
 
 function makeBackgroundInert(container: HTMLElement): () => void {
-  const previous = new Map<HTMLElement, boolean>();
+  const owned = new Set<HTMLElement>();
   let current: HTMLElement = container;
   let parent = current.parentElement;
   while (parent) {
     for (const child of parent.children) {
       if (!(child instanceof HTMLElement) || child === current) continue;
-      previous.set(child, child.inert);
-      child.inert = true;
+      const ownership = inertOwnership.get(child);
+      if (ownership) {
+        ownership.owners.add(container);
+      } else {
+        inertOwnership.set(child, {
+          originalInert: child.inert,
+          owners: new Set([container]),
+        });
+        child.inert = true;
+      }
+      owned.add(child);
     }
     if (parent === document.body) break;
     current = parent;
     parent = current.parentElement;
   }
   return () => {
-    for (const [element, inert] of previous) {
-      if (element.isConnected) element.inert = inert;
+    for (const element of owned) {
+      const ownership = inertOwnership.get(element);
+      if (!ownership) continue;
+      ownership.owners.delete(container);
+      if (ownership.owners.size === 0) {
+        element.inert = ownership.originalInert;
+        inertOwnership.delete(element);
+      }
     }
   };
 }
