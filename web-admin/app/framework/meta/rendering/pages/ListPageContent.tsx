@@ -685,7 +685,7 @@ export function queryConditionToExportCondition(condition: ListQueryFilterCondit
   };
 }
 
-export function resolveUrlFilterSyncAction(
+export function resolveUrlStateSyncAction(
   pendingLocalEncoding: string | null | undefined,
   currentUrlEncoding: string | null,
 ): 'apply-url' | 'ack-local' | 'wait-for-local' {
@@ -1078,6 +1078,7 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Active sort state — initialized from URL > SavedView > DSL defaultSort
   const [activeSorts, setActiveSorts] = useState<SortConfig[]>(() => urlSorts);
+  const pendingSortUrlSyncRef = useRef<string | null | undefined>(undefined);
   // Active filter chips — user-added filters via chip bar (separate from filters)
   const [chipFilters, setChipFilters] = useState<ViewFilterConfig[]>(() => urlChipFilters);
   const pendingChipFilterUrlSyncRef = useRef<string | null | undefined>(undefined);
@@ -1272,7 +1273,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Sync URL chip filters -> local state (supports refresh and browser back/forward).
   useEffect(() => {
     const currentUrlEncoding = searchParams.get('filters');
-    const syncAction = resolveUrlFilterSyncAction(
+    const syncAction = resolveUrlStateSyncAction(
       pendingChipFilterUrlSyncRef.current,
       currentUrlEncoding,
     );
@@ -1286,8 +1287,18 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Sync URL sorts -> local state (supports refresh and browser back/forward).
   useEffect(() => {
+    const currentUrlEncoding = searchParams.get('sort');
+    const syncAction = resolveUrlStateSyncAction(
+      pendingSortUrlSyncRef.current,
+      currentUrlEncoding,
+    );
+    if (syncAction === 'wait-for-local') return;
+    if (syncAction === 'ack-local') {
+      pendingSortUrlSyncRef.current = undefined;
+      return;
+    }
     setActiveSorts((prev) => (areSortsEqual(prev, urlSorts) ? prev : urlSorts));
-  }, [urlSorts]);
+  }, [searchParams, urlSorts]);
 
   // Sync local pagination state -> URL query params (preserve existing filter_* params).
   useEffect(() => {
@@ -2548,6 +2559,7 @@ function ListPageContentInner(props: PageContentProps) {
     const encoded = encodeSorts(activeSorts);
     const currentEncoded = searchParams.get('sort');
     if ((encoded ?? null) !== (currentEncoded ?? null)) {
+      pendingSortUrlSyncRef.current = encoded;
       setSearchParams(
         (prev) => {
           const p = new URLSearchParams(prev);
