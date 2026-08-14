@@ -46,27 +46,171 @@ describe('block schema workbench block types', () => {
         columns: [{ field: 'action', label: 'Action' }],
       },
     };
-    expect(blockSchema.safeParse({
-      ...base,
-      table: {
-        ...base.table,
-        selection: {
-          mode: 'multiple',
-          bind: 'selectedDecisions',
-          exclusiveBy: 'issueId',
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        table: {
+          ...base.table,
+          selection: {
+            mode: 'multiple',
+            bind: 'selectedDecisions',
+            exclusiveBy: 'issueId',
+          },
         },
-      },
-    }).success).toBe(true);
-    expect(blockSchema.safeParse({
-      ...base,
-      table: {
-        ...base.table,
-        selection: {
-          mode: 'single',
-          bind: 'selectedDecision',
-          exclusiveBy: 'issueId',
+      }).success,
+    ).toBe(true);
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        table: {
+          ...base.table,
+          selection: {
+            mode: 'single',
+            bind: 'selectedDecision',
+            exclusiveBy: 'issueId',
+          },
         },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires a complete and non-defaulting grouped-radio contract', () => {
+    const base = {
+      id: 'grouped_decisions',
+      blockType: 'table',
+      table: {
+        rowKey: 'pid',
+        columns: [
+          { field: 'issue', label: 'Issue' },
+          { field: 'actionLabel', label: 'Action' },
+        ],
       },
-    }).success).toBe(false);
+    };
+    const validSelection = {
+      mode: 'multiple',
+      bind: 'selectedDecisions',
+      presentation: 'grouped-radio',
+      exclusiveBy: 'issueId',
+      optionLabelField: 'actionLabel',
+    };
+
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        table: { ...base.table, selection: validSelection },
+      }).success,
+    ).toBe(true);
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        table: {
+          ...base.table,
+          selection: { ...validSelection, exclusiveBy: undefined },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        table: {
+          ...base.table,
+          rowKey: undefined,
+          selection: validSelection,
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        table: {
+          ...base.table,
+          rowKey: undefined,
+          selection: { ...validSelection, keyField: 'pid' },
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        table: {
+          ...base.table,
+          selection: {
+            ...validSelection,
+            exclusiveBy: 'actionLabel',
+          },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        table: {
+          ...base.table,
+          selection: { ...validSelection, optionLabelField: undefined },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        table: {
+          ...base.table,
+          selection: { ...validSelection, optionLabelField: 'missingColumn' },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        table: {
+          ...base.table,
+          selection: { ...validSelection, defaultFirst: true },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        table: {
+          ...base.table,
+          selection: {
+            ...validSelection,
+            recommendedField: 'recommended',
+            safeField: 'safe',
+          },
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        table: {
+          ...base.table,
+          selection: { ...validSelection, recommendedField: 'recommended' },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        table: {
+          ...base.table,
+          selection: { ...validSelection, safeField: 'safe' },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        table: {
+          ...base.table,
+          selection: {
+            ...validSelection,
+            recommendedField: 'sameFlag',
+            safeField: 'sameFlag',
+          },
+        },
+      }).success,
+    ).toBe(false);
   });
 });

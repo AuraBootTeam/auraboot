@@ -62,8 +62,12 @@ const selectionConfigSchema = z
     mode: z.enum(['single', 'multiple']),
     bind: z.string(),
     defaultFirst: z.boolean().optional(),
-    keyField: z.string().optional(),
+    keyField: z.string().min(1).optional(),
+    presentation: z.enum(['table', 'grouped-radio']).optional(),
     exclusiveBy: z.string().min(1).optional(),
+    optionLabelField: z.string().min(1).optional(),
+    recommendedField: z.string().min(1).optional(),
+    safeField: z.string().min(1).optional(),
     detailBind: z.string().optional(),
     idsBind: z.string().optional(),
     idField: z.string().optional(),
@@ -76,6 +80,74 @@ const selectionConfigSchema = z
         message: 'exclusiveBy requires selection.mode=multiple',
       });
     }
+    if (selection.presentation === 'grouped-radio') {
+      if (selection.mode !== 'multiple') {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['presentation'],
+          message: 'grouped-radio requires selection.mode=multiple',
+        });
+      }
+      if (!selection.exclusiveBy) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['exclusiveBy'],
+          message: 'grouped-radio requires exclusiveBy',
+        });
+      }
+      if (!selection.optionLabelField) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['optionLabelField'],
+          message: 'grouped-radio requires optionLabelField',
+        });
+      }
+      if (
+        selection.exclusiveBy &&
+        selection.optionLabelField &&
+        selection.exclusiveBy === selection.optionLabelField
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['optionLabelField'],
+          message: 'optionLabelField must differ from exclusiveBy',
+        });
+      }
+      if (selection.defaultFirst) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['defaultFirst'],
+          message: 'grouped-radio does not allow an implicit default selection',
+        });
+      }
+      if (Boolean(selection.recommendedField) !== Boolean(selection.safeField)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [selection.recommendedField ? 'safeField' : 'recommendedField'],
+          message: 'grouped-radio safe defaults require both recommendedField and safeField',
+        });
+      }
+      if (
+        selection.recommendedField &&
+        selection.safeField &&
+        selection.recommendedField === selection.safeField
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['safeField'],
+          message: 'safeField must differ from recommendedField',
+        });
+      }
+    } else {
+      for (const field of ['optionLabelField', 'recommendedField', 'safeField'] as const) {
+        if (!selection[field]) continue;
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field],
+          message: `${field} requires presentation=grouped-radio`,
+        });
+      }
+    }
   });
 
 const paginationConfigSchema = z.object({
@@ -86,22 +158,44 @@ const paginationConfigSchema = z.object({
   showQuickJumper: z.boolean().optional(),
 });
 
-const tableConfigSchema = z.object({
-  rowKey: z.string().optional(),
-  dataSource: z.string().optional(),
-  maxHeight: z.union([z.number(), z.string()]).optional(),
-  density: z.enum(['default', 'compact']).optional(),
-  pagination: paginationConfigSchema.optional(),
-  selection: selectionConfigSchema.optional(),
-  treeConfig: z
-    .object({
-      parentField: z.string(),
-      maxDepth: z.number().optional(),
-      defaultExpanded: z.boolean().optional(),
-    })
-    .optional(),
-  columns: z.array(columnSchema),
-});
+const tableConfigSchema = z
+  .object({
+    rowKey: z.string().min(1).optional(),
+    dataSource: z.string().optional(),
+    maxHeight: z.union([z.number(), z.string()]).optional(),
+    density: z.enum(['default', 'compact']).optional(),
+    pagination: paginationConfigSchema.optional(),
+    selection: selectionConfigSchema.optional(),
+    treeConfig: z
+      .object({
+        parentField: z.string(),
+        maxDepth: z.number().optional(),
+        defaultExpanded: z.boolean().optional(),
+      })
+      .optional(),
+    columns: z.array(columnSchema),
+  })
+  .superRefine((table, context) => {
+    if (
+      table.selection?.presentation === 'grouped-radio' &&
+      !table.rowKey &&
+      !table.selection.keyField
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['selection', 'keyField'],
+        message: 'grouped-radio requires table.rowKey or selection.keyField for stable identity',
+      });
+    }
+    const optionLabelField = table.selection?.optionLabelField;
+    if (optionLabelField && !table.columns.some((column) => column.field === optionLabelField)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['selection', 'optionLabelField'],
+        message: 'optionLabelField must reference a configured table column',
+      });
+    }
+  });
 
 const tabFilterExpressionSchema = z.object({
   field: z.string(),
@@ -109,18 +203,22 @@ const tabFilterExpressionSchema = z.object({
   value: z.any(),
 });
 
-const listTabConfigSchema = z.object({
-  key: z.string(),
-  label: localizedTextSchema,
-  filter: tabFilterExpressionSchema.nullable().optional(),
-}).passthrough();
+const listTabConfigSchema = z
+  .object({
+    key: z.string(),
+    label: localizedTextSchema,
+    filter: tabFilterExpressionSchema.nullable().optional(),
+  })
+  .passthrough();
 
-const detailTabConfigSchema = z.object({
-  key: z.string(),
-  label: localizedTextSchema,
-  blocks: z.array(z.lazy(() => blockSchema)),
-  filter: tabFilterExpressionSchema.nullable().optional(),
-}).passthrough();
+const detailTabConfigSchema = z
+  .object({
+    key: z.string(),
+    label: localizedTextSchema,
+    blocks: z.array(z.lazy(() => blockSchema)),
+    filter: tabFilterExpressionSchema.nullable().optional(),
+  })
+  .passthrough();
 
 const defaultSortSchema = z.object({
   field: z.string(),

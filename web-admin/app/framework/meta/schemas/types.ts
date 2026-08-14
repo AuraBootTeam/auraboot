@@ -448,10 +448,27 @@ export interface SelectionConfig {
   defaultFirst?: boolean;
   keyField?: string;
   /**
+   * Renders exclusive multiple-selection rows as one decision card per group.
+   * The bound value remains an array containing at most one row per group.
+   */
+  presentation?: 'table' | 'grouped-radio';
+  /**
    * Field whose value defines an exclusive selection group. In multiple mode,
    * selecting another row with the same value replaces the previous row.
    */
   exclusiveBy?: string;
+  /** Field rendered as the radio option label in grouped-radio presentation. */
+  optionLabelField?: string;
+  /**
+   * Explicit boolean field marking a business recommendation. Automatic grouped
+   * selection is enabled only when `safeField` is configured as well.
+   */
+  recommendedField?: string;
+  /**
+   * Explicit boolean field proving that the recommendation is safe and reversible.
+   * A row is preselected only when both configured fields are strictly `true`.
+   */
+  safeField?: string;
   detailBind?: string;
   idsBind?: string;
   idField?: string;
