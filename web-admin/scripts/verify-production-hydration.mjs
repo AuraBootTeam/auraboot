@@ -151,7 +151,16 @@ if (isMain) {
       evidenceDir,
       timeoutMs: Number(args['timeout-ms'] || 20_000),
     });
-    console.log(JSON.stringify(summary));
+    console.log(
+      JSON.stringify({
+        status: summary.status,
+        baseUrl: summary.baseUrl,
+        httpStatus: summary.httpStatus,
+        interaction: 'login-password-visibility-toggle',
+        pageErrorCount: summary.pageErrors.length,
+        consoleErrorCount: summary.consoleErrors.length,
+      }),
+    );
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
