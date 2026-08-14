@@ -466,18 +466,34 @@ aura_reset_lock_exit_handler() {
 }
 
 aura_reset_install_lock_trap() {
+    local exit_trap
+    local int_trap
+    local term_trap
     if [ "${AURA_RESET_OWNER_LOCK_TRAP_INSTALLED:-0}" = "1" ]; then
         return 0
     fi
-    if [ -n "$(trap -p EXIT)" ] \
-        || [ -n "$(trap -p INT)" ] \
-        || [ -n "$(trap -p TERM)" ]; then
+    exit_trap="$(trap -p EXIT)"
+    int_trap="$(trap -p INT)"
+    term_trap="$(trap -p TERM)"
+    # On Linux, Bash starts an asynchronous child with SIGINT ignored.  That
+    # inherited shell disposition is not a caller-owned cleanup handler and
+    # cannot be reset by the child.  Preserve it, while continuing to reject
+    # every executable EXIT/INT/TERM trap that we would otherwise overwrite.
+    case "$int_trap" in
+        ""|"trap -- '' SIGINT"|"trap -- '' INT") ;;
+        *)
+            aura_reset_owner_error \
+                "refusing to replace an existing EXIT/INT/TERM trap; use AURA_RESET_OWNER_EXIT_HOOK"
+            return 1
+            ;;
+    esac
+    if [ -n "$exit_trap" ] || [ -n "$term_trap" ]; then
         aura_reset_owner_error \
             "refusing to replace an existing EXIT/INT/TERM trap; use AURA_RESET_OWNER_EXIT_HOOK"
         return 1
     fi
     trap aura_reset_lock_exit_handler EXIT
-    trap 'exit 130' INT
+    [ -n "$int_trap" ] || trap 'exit 130' INT
     trap 'exit 143' TERM
     AURA_RESET_OWNER_LOCK_TRAP_INSTALLED=1
 }
