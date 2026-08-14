@@ -1676,6 +1676,26 @@
     "en-US": "View"
   },
   {
+    "key": "message.accountCredentials.clipboard",
+    "zh-CN": "登录名：{userName}\n临时密码：{tempPassword}",
+    "en-US": "Login name: {userName}\nTemporary password: {tempPassword}"
+  },
+  {
+    "key": "message.accountCredentials.generated.content",
+    "zh-CN": "请立即保存并交付给用户。登录名：{userName}；临时密码（仅显示一次）：{tempPassword}",
+    "en-US": "Save and deliver these credentials now. Login name: {userName}; temporary password (shown once): {tempPassword}"
+  },
+  {
+    "key": "message.accountCredentials.generated.title",
+    "zh-CN": "登录凭据已生成",
+    "en-US": "Account credentials generated"
+  },
+  {
+    "key": "message.accountCredentials.generated.toast",
+    "zh-CN": "登录凭据已生成，并已在浏览器允许时复制",
+    "en-US": "Account credentials generated and copied when permitted"
+  },
+  {
     "key": "message.create.failed",
     "zh-CN": "创建失败",
     "en-US": "Create failed"
@@ -1771,6 +1791,21 @@
     "key": "message.submitting",
     "zh-CN": "提交中...",
     "en-US": "Submitting..."
+  },
+  {
+    "key": "message.temporaryPassword.generated.content",
+    "zh-CN": "请立即保存并交付给用户。临时密码仅显示一次：{tempPassword}",
+    "en-US": "Save and deliver this temporary password now. It is shown once: {tempPassword}"
+  },
+  {
+    "key": "message.temporaryPassword.generated.title",
+    "zh-CN": "临时密码已生成",
+    "en-US": "Temporary password generated"
+  },
+  {
+    "key": "message.temporaryPassword.generated.toast",
+    "zh-CN": "临时密码已生成，并已在浏览器允许时复制",
+    "en-US": "Temporary password generated and copied when permitted"
   },
   {
     "key": "message.update.failed",

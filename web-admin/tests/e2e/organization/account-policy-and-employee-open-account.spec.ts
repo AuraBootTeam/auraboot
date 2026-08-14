@@ -9,6 +9,16 @@ import {
 } from '../helpers';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
+/**
+ * Targeted account-opening coverage:
+ * - D1: menu-driven entry to employee/member lists
+ * - D14: confirmation and one-time credential feedback
+ * - S9: browser command paired with employee/user API linkage and credential verification
+ *
+ * CRUD-only dimensions (D3-D13 except D14) are covered by the organization lifecycle specs and
+ * are not part of this focused cross-model account-opening journey.
+ */
+
 const EMPLOYEE_PAGE_KEY = 'org_employee';
 const MEMBER_PAGE_KEY = 'tenant_member';
 const evidenceDir = join(
@@ -21,12 +31,23 @@ function unwrapCommandPayload(body: any) {
   return body?.data?.data && typeof body.data.data === 'object' ? body.data.data : body?.data;
 }
 
-async function createEmployeeForOpenAccount(page: import('@playwright/test').Page) {
+type CreateEmployeeOptions = {
+  email?: string | null;
+  positionLabel?: string;
+};
+
+async function createEmployeeForOpenAccount(
+  page: import('@playwright/test').Page,
+  options: CreateEmployeeOptions = {},
+) {
   const suffix = uniqueId('OPEN');
   const deptName = `Open Account Dept ${suffix}`;
-  const positionName = `Open Account Position ${suffix}`;
+  const positionName = `${options.positionLabel ?? 'Open Account Position'} ${suffix}`;
   const employeeName = `Open Account Employee ${suffix}`;
-  const employeeEmail = `open-account-${suffix.toLowerCase()}@example.test`;
+  const employeeEmail =
+    options.email === undefined
+      ? `open-account-${suffix.toLowerCase()}@example.test`
+      : options.email;
 
   const deptResult = await executeCommandViaApi(page, 'org:create_department', {
     org_dept_name: deptName,
@@ -42,17 +63,34 @@ async function createEmployeeForOpenAccount(page: import('@playwright/test').Pag
   });
   expect(positionResult.code).toBe(ErrorCodes.SUCCESS);
 
-  const employeeResult = await executeCommandViaApi(page, 'org:create_employee', {
+  const employeePayload: Record<string, unknown> = {
     org_emp_name: employeeName,
-    org_emp_email: employeeEmail,
     org_emp_phone: `139${Date.now().toString().slice(-8)}`,
     org_emp_dept_id: deptResult.recordId,
     org_emp_position_id: positionResult.recordId,
-  });
+  };
+  if (employeeEmail) {
+    employeePayload.org_emp_email = employeeEmail;
+  }
+  const employeeResult = await executeCommandViaApi(
+    page,
+    'org:create_employee',
+    employeePayload,
+  );
   expect(employeeResult.code).toBe(ErrorCodes.SUCCESS);
   expect(employeeResult.recordId).toBeTruthy();
 
-  return { employeeName, employeeEmail, employeePid: employeeResult.recordId };
+  return {
+    employeeName,
+    employeeEmail,
+    employeePid: employeeResult.recordId,
+    positionName,
+    positionPid: positionResult.recordId,
+  };
+}
+
+function generatedEmployeeUserName(employeePid: string): string {
+  return `emp_${employeePid.replace(/[^A-Za-z0-9]/g, '').slice(0, 40)}`;
 }
 
 test.describe('Account policy and employee account opening', () => {
@@ -111,24 +149,32 @@ test.describe('Account policy and employee account opening', () => {
     expect(body?.data?.data?.adminManaged).toBe(true);
     expect(body?.data?.data?.createdMember).toBe(true);
     expect(typeof body?.data?.data?.memberPid).toBe('string');
+    expect(typeof body?.data?.data?.userName).toBe('string');
     expect(typeof body?.data?.data?.tempPassword).toBe('string');
     expect(body.data.data.tempPassword.length).toBeGreaterThanOrEqual(8);
 
-    await expect(page.getByRole('heading', { name: '临时密码已生成' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: '登录凭据已生成' })).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByText(/临时密码只显示一次：/)).toBeVisible();
+    await expect(page.getByText(/登录名：.*临时密码（仅显示一次）：/)).toBeVisible();
     await page.screenshot({
       path: join(evidenceDir, 'ui-15-employee-open-account-temp-password.png'),
       fullPage: true,
     });
   });
 
-  test('MEM-04: admin provisions a tenant member from the account page @smoke', async ({
+  test('MEM-04: admin provisions a no-email sales employee from the account page @smoke', async ({
     page,
   }) => {
     test.setTimeout(45_000);
-    const { employeeName } = await createEmployeeForOpenAccount(page);
+    const { employeeName, employeeEmail, employeePid, positionName, positionPid } =
+      await createEmployeeForOpenAccount(page, {
+        email: null,
+        positionLabel: 'Sales Position',
+      });
+    expect(employeeEmail).toBeNull();
+    expect(positionName).toContain('Sales Position');
+    const expectedUserName = generatedEmployeeUserName(employeePid);
 
     await navigateToDynamicPage(page, MEMBER_PAGE_KEY);
     const provisionButton = page.getByTestId('toolbar-btn-provision_from_employee');
@@ -162,18 +208,55 @@ test.describe('Account policy and employee account opening', () => {
     expect(data?.action).toBe('provision_member_from_employee');
     expect(data?.adminManaged).toBe(true);
     expect(data?.createdMember).toBe(true);
-    expect(typeof data?.employeePid).toBe('string');
+    expect(data?.employeePid).toBe(employeePid);
     expect(typeof data?.memberPid).toBe('string');
+    expect(typeof data?.userPid).toBe('string');
+    expect(data?.email).toBeNull();
+    expect(data?.userName).toBe(expectedUserName);
+    expect(data?.displayName).toBe(employeeName);
     expect(typeof data?.tempPassword).toBe('string');
     expect(data.tempPassword.length).toBeGreaterThanOrEqual(8);
 
-    await expect(page.getByRole('heading', { name: '临时密码已生成' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: '登录凭据已生成' })).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByText(/临时密码只显示一次：/)).toBeVisible();
+    await expect(page.getByText(new RegExp(`登录名：${expectedUserName}`))).toBeVisible();
+    await expect(page.getByText(/临时密码（仅显示一次）：/)).toBeVisible();
     await page.screenshot({
       path: join(evidenceDir, 'ui-16-account-provision-from-employee-temp-password.png'),
       fullPage: true,
     });
+
+    const employeeDetailResponse = await page.request.get(
+      `/api/dynamic/${EMPLOYEE_PAGE_KEY}/${employeePid}`,
+    );
+    expect(employeeDetailResponse.ok()).toBe(true);
+    const employeeDetailBody = await employeeDetailResponse.json();
+    const employeeDetail = employeeDetailBody?.data ?? employeeDetailBody;
+    expect(employeeDetail?.org_emp_email ?? null).toBeNull();
+    expect(employeeDetail?.org_emp_position_id).toBe(positionPid);
+    expect(employeeDetail?.org_emp_user_id).toBe(data.userPid);
+    expect(employeeDetail?.org_emp_member_id).toBe(data.memberPid);
+
+    const userResponse = await page.request.get(
+      `/api/admin/users/${encodeURIComponent(data.userPid)}`,
+    );
+    expect(userResponse.ok()).toBe(true);
+    const userBody = await userResponse.json();
+    expect(userBody?.code).toBe(ErrorCodes.SUCCESS);
+    expect(userBody?.data?.pid).toBe(data.userPid);
+    expect(userBody?.data?.displayName).toBe(employeeName);
+    expect(userBody?.data?.email).toBeNull();
+
+    const loginResponse = await page.request.post('/api/auth/login', {
+      data: {
+        identifier: expectedUserName,
+        password: data.tempPassword,
+      },
+    });
+    expect(loginResponse.ok()).toBe(true);
+    const loginBody = await loginResponse.json();
+    expect(loginBody?.code).toBe(ErrorCodes.SUCCESS);
+    expect(loginBody?.data?.userPid).toBe(data.userPid);
   });
 });

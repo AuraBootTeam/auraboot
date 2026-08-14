@@ -107,6 +107,49 @@ class OrgEmployeeServiceImplTest {
     }
 
     @Test
+    @DisplayName("openAccount creates a username-only account when employee email is absent")
+    void openAccountCreatesUserWithoutEmail() {
+        Map<String, Object> employee = new HashMap<>();
+        employee.put("id", 202L);
+        employee.put("pid", "emp-no-email");
+        employee.put("org_emp_name", "No Email Employee");
+        when(dynamicDataService.getById("org_employee", "emp-no-email")).thenReturn(employee);
+        when(userService.findByUserName("emp_empnoemail")).thenReturn(null);
+        when(passwordPolicyService.validate(anyString())).thenReturn(List.of());
+
+        User user = new User();
+        user.setId(101L);
+        user.setPid("user-no-email");
+        user.setEmail(null);
+        user.setUserName("emp_empnoemail");
+        when(userService.signUp(
+                isNull(), anyString(), eq("No Email Employee"), eq("emp_empnoemail")))
+                .thenReturn(user);
+        when(tenantMemberService.findByTenantIdAndUserId(1L, 101L)).thenReturn(null);
+
+        TenantMember member = new TenantMember();
+        member.setId(52L);
+        member.setPid("mem-no-email");
+        when(tenantMemberService.addMember(101L, 1L, "active")).thenReturn(member);
+
+        EmployeeAccountProvisionResponse response = service.openAccount("emp-no-email");
+
+        assertTrue(response.isCreatedUser());
+        assertTrue(response.isCreatedMember());
+        assertNull(response.getEmail());
+        assertEquals("emp_empnoemail", response.getUserName());
+        assertEquals("No Email Employee", response.getDisplayName());
+        assertNotNull(response.getTemporaryPassword());
+        assertEquals(202L, member.getEmployeeId());
+        verify(userService, never()).findByEmail(anyString());
+        verify(userService).signUp(
+                isNull(), anyString(), eq("No Email Employee"), eq("emp_empnoemail"));
+        verify(dynamicDataService).update(eq("org_employee"), eq("emp-no-email"), argThat(data ->
+                "user-no-email".equals(data.get("org_emp_user_id"))
+                        && "mem-no-email".equals(data.get("org_emp_member_id"))));
+    }
+
+    @Test
     @DisplayName("openAccount reuses existing user and member without resetting password or roles")
     void openAccountReusesExistingUserAndMember() {
         Map<String, Object> employee = new HashMap<>();
