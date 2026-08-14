@@ -129,13 +129,21 @@ wait_for_port() {
 
 wait_for_file() {
     local file="$1"
+    local owner_pid="${2:-}"
+    local owner_log="${3:-}"
     local attempts=0
-    while [ "$attempts" -lt 100 ]; do
+    while [ "$attempts" -lt 400 ]; do
         [ -f "$file" ] && return 0
+        if [ -n "$owner_pid" ] && ! kill -0 "$owner_pid" 2>/dev/null; then
+            echo "owner process exited before file appeared: pid=$owner_pid file=$file" >&2
+            [ -n "$owner_log" ] && [ -f "$owner_log" ] && cat "$owner_log" >&2
+            return 1
+        fi
         sleep 0.05
         attempts=$((attempts + 1))
     done
     echo "file did not appear: $file" >&2
+    [ -n "$owner_log" ] && [ -f "$owner_log" ] && cat "$owner_log" >&2
     return 1
 }
 
@@ -272,7 +280,7 @@ bash "$0" hold-lock "$TEST_ROOT/source-lock" lock-a shared_lock_db \
     > "$TEST_ROOT/lock-holder.log" 2>&1 &
 lock_holder_pid=$!
 FIXTURE_PIDS="$FIXTURE_PIDS $lock_holder_pid"
-wait_for_file "$lock_ready"
+wait_for_file "$lock_ready" "$lock_holder_pid" "$TEST_ROOT/lock-holder.log"
 
 init_fixture_runtime "$TEST_ROOT/source-lock" lock-a shared_lock_db \
     "$lock_be" "$lock_web" "$lock_bff"
@@ -311,8 +319,8 @@ bash "$0" hold-lock "$TEST_ROOT/source-lock" parallel-b parallel_db_b \
     > "$TEST_ROOT/p2.log" 2>&1 &
 p2_pid=$!
 FIXTURE_PIDS="$FIXTURE_PIDS $p2_pid"
-wait_for_file "$p1_ready"
-wait_for_file "$p2_ready"
+wait_for_file "$p1_ready" "$p1_pid" "$TEST_ROOT/p1.log"
+wait_for_file "$p2_ready" "$p2_pid" "$TEST_ROOT/p2.log"
 assert_alive "$p1_pid"
 assert_alive "$p2_pid"
 touch "$p1_release" "$p2_release"
@@ -328,7 +336,7 @@ bash "$0" hold-lock "$TEST_ROOT/source-a" port-owner-a port_db_a \
     > "$TEST_ROOT/port-holder.log" 2>&1 &
 port_holder_pid=$!
 FIXTURE_PIDS="$FIXTURE_PIDS $port_holder_pid"
-wait_for_file "$port_ready"
+wait_for_file "$port_ready" "$port_holder_pid" "$TEST_ROOT/port-holder.log"
 init_fixture_runtime "$TEST_ROOT/source-b" port-owner-b port_db_b \
     "$shared_be" "$shared_web" "$shared_bff"
 if aura_reset_acquire_locks 2> "$TEST_ROOT/port-lock.err"; then
@@ -349,7 +357,7 @@ TZ=UTC bash "$0" hold-lock "$TEST_ROOT/source-lock" timezone-owner timezone_db \
     > "$TEST_ROOT/tz-holder.log" 2>&1 &
 tz_holder_pid=$!
 FIXTURE_PIDS="$FIXTURE_PIDS $tz_holder_pid"
-wait_for_file "$tz_ready"
+wait_for_file "$tz_ready" "$tz_holder_pid" "$TEST_ROOT/tz-holder.log"
 if TZ=Asia/Shanghai bash "$0" try-lock "$TEST_ROOT/source-lock" \
     timezone-owner timezone_db "$tz_be" "$tz_web" "$tz_bff" \
     > "$TEST_ROOT/tz-contender.log" 2>&1; then
