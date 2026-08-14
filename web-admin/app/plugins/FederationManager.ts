@@ -1,3 +1,5 @@
+import * as React from 'react';
+import * as ReactDOM from 'react-dom';
 import { create } from 'zustand';
 import type {
   FederationStore,
@@ -34,50 +36,96 @@ export function isSlotEnabledForRuntime(
   return isRuntimeProfileAllowed(slot.runtimeProfiles, runtimeProfile);
 }
 
-/**
- * Dynamic import for federated modules.
- * This is the core mechanism for loading remote plugins at runtime.
- */
-async function loadRemoteEntry(remoteEntry: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = remoteEntry;
-    script.type = 'module';
-    script.async = true;
+type SharedModule = Record<string, unknown>;
 
-    script.onload = () => {
-      resolve();
-    };
-
-    script.onerror = (error) => {
-      console.error(`[Federation] Failed to load remote entry: ${remoteEntry}`, error);
-      reject(new Error(`Failed to load remote entry: ${remoteEntry}`));
-    };
-
-    document.head.appendChild(script);
-  });
+interface FederationShareEntry {
+  get: () => Promise<() => SharedModule>;
+  loaded: boolean;
+  from: string;
+  shareConfig: {
+    singleton: boolean;
+    requiredVersion: string;
+  };
 }
 
-/**
- * Get a module from a loaded remote container.
- */
-async function getRemoteModule(
-  containerName: string,
-  moduleName: string
-): Promise<{ default: React.ComponentType<unknown> }> {
-  // @ts-expect-error - Dynamic federation module access
-  const container = window[containerName];
-  if (!container) {
-    throw new Error(`Container ${containerName} not found`);
+export interface FederationContainer {
+  init: (shareScope: FederationShareScope) => Promise<void> | void;
+  get: (moduleName: string) => Promise<() => unknown>;
+}
+
+export type FederationShareScope = Record<
+  string,
+  Record<string, FederationShareEntry>
+>;
+
+const remoteContainers = new Map<string, Promise<FederationContainer>>();
+
+function sharedEntry(
+  version: string,
+  module: SharedModule,
+): Record<string, FederationShareEntry> {
+  return {
+    [version]: {
+      get: async () => () => module,
+      loaded: true,
+      from: 'aura-host',
+      shareConfig: {
+        singleton: true,
+        requiredVersion: version,
+      },
+    },
+  };
+}
+
+export function createHostFederationShareScope(): FederationShareScope {
+  const reactVersion = React.version;
+  const reactDomVersion =
+    (ReactDOM as SharedModule & { version?: string }).version || reactVersion;
+  return {
+    react: sharedEntry(reactVersion, React),
+    'react-dom': sharedEntry(reactDomVersion, ReactDOM),
+  };
+}
+
+export async function initializeFederationContainer(
+  container: FederationContainer,
+): Promise<FederationContainer> {
+  await container.init(createHostFederationShareScope());
+  return container;
+}
+
+/** Import a Vite federation ESM container and initialize it with host React. */
+async function loadRemoteEntry(
+  remoteEntry: string,
+): Promise<FederationContainer> {
+  const existing = remoteContainers.get(remoteEntry);
+  if (existing) return existing;
+
+  const pending = import(/* @vite-ignore */ remoteEntry).then((candidate) => {
+    const container = candidate as Partial<FederationContainer>;
+    if (typeof container.init !== 'function' || typeof container.get !== 'function') {
+      throw new Error(
+        `Remote entry ${remoteEntry} does not export the ESM federation get/init contract`,
+      );
+    }
+    return initializeFederationContainer(container as FederationContainer);
+  });
+  remoteContainers.set(remoteEntry, pending);
+  try {
+    return await pending;
+  } catch (error) {
+    remoteContainers.delete(remoteEntry);
+    throw error;
   }
+}
 
-  // Initialize the container if needed
-  // @ts-expect-error - Dynamic federation initialization
-  await container.init(__webpack_share_scopes__.default);
-
-  // Get the module
+async function getRemoteModule(
+  remoteEntry: string,
+  moduleName: string,
+): Promise<{ default: React.ComponentType<unknown> }> {
+  const container = await loadRemoteEntry(remoteEntry);
   const factory = await container.get(moduleName);
-  return factory();
+  return factory() as { default: React.ComponentType<unknown> };
 }
 
 /**
@@ -130,7 +178,7 @@ export const useFederationStore = create<FederationStore>((set, get) => ({
     }));
 
     try {
-      // Load the remote entry script
+      // Import and initialize the ESM federation container.
       await loadRemoteEntry(clientConfig.remoteEntry);
 
       // Update plugin state to loaded
@@ -190,21 +238,7 @@ export const useFederationStore = create<FederationStore>((set, get) => ({
         plugin.modules = new Map(); // Clear cached modules
         newPlugins.set(pluginId, plugin);
 
-        // Try to remove the script element to allow reload
-        const scriptElements = document.querySelectorAll(`script[src*="${plugin.namespace}"]`);
-        scriptElements.forEach((el) => el.remove());
-
-        // Clear from webpack container cache if possible
-        try {
-          const containerName = plugin.namespace.replace(/-/g, '_');
-          // @ts-expect-error - Dynamic federation cleanup
-          if (window[containerName]) {
-            // @ts-expect-error - Dynamic federation cleanup
-            delete window[containerName];
-          }
-        } catch (e) {
-          console.warn(`[Federation] Could not clear container for ${pluginId}`, e);
-        }
+        remoteContainers.delete(plugin.remoteEntry);
       }
 
       // Remove slot contributions from this plugin
@@ -259,9 +293,10 @@ export const useFederationStore = create<FederationStore>((set, get) => ({
     plugin.modules.set(moduleName, moduleEntry);
 
     try {
-      // Container name is typically the plugin namespace
-      const containerName = plugin.namespace.replace(/-/g, '_');
-      const remoteModule = await getRemoteModule(containerName, `./${moduleName}`);
+      const remoteModule = await getRemoteModule(
+        plugin.remoteEntry,
+        `./${moduleName}`,
+      );
 
       moduleEntry.component = remoteModule.default;
       moduleEntry.state = 'loaded';
