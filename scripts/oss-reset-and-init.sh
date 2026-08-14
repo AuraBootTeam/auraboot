@@ -165,6 +165,33 @@ esac
 source "$SCRIPT_DIR/lib/multi-worktree-guard.sh"
 aura_multi_worktree_guard "oss-reset-and-init.sh"
 
+# shellcheck source=lib/runtime-process-owner.sh
+source "$SCRIPT_DIR/lib/runtime-process-owner.sh"
+
+RESET_RUNTIME_LABEL_RAW="${AURA_RESET_RUNTIME_LABEL:-${AURA_RUNTIME_NAME:-}}"
+RESET_RUNTIME_LABEL="$(aura_reset_sanitize_label "$RESET_RUNTIME_LABEL_RAW")"
+if [ -n "$RESET_RUNTIME_LABEL_RAW" ] && [ -z "$RESET_RUNTIME_LABEL" ]; then
+    echo "Invalid AURA_RESET_RUNTIME_LABEL=$RESET_RUNTIME_LABEL_RAW" >&2
+    exit 1
+fi
+if [ -n "$RESET_RUNTIME_LABEL" ]; then
+    BACKEND_LOG="${AURA_RESET_BACKEND_LOG:-/tmp/aura-${RESET_RUNTIME_LABEL}-backend.log}"
+    FRONTEND_LOG="${AURA_RESET_FRONTEND_LOG:-/tmp/aura-${RESET_RUNTIME_LABEL}-web.log}"
+    BFF_LOG="${AURA_RESET_BFF_LOG:-/tmp/aura-${RESET_RUNTIME_LABEL}-bff.log}"
+    SYNC_PLUGINS_LOG="${AURA_RESET_SYNC_PLUGINS_LOG:-/tmp/aura-${RESET_RUNTIME_LABEL}-sync-plugins.log}"
+else
+    BACKEND_LOG="${AURA_RESET_BACKEND_LOG:-/tmp/aura-backend.log}"
+    FRONTEND_LOG="${AURA_RESET_FRONTEND_LOG:-/tmp/aura-web.log}"
+    BFF_LOG="${AURA_RESET_BFF_LOG:-/tmp/aura-bff.log}"
+    SYNC_PLUGINS_LOG="${AURA_RESET_SYNC_PLUGINS_LOG:-/tmp/aura-sync-plugins.log}"
+fi
+RESET_STOP_PROCESSES="${AURA_RESET_STOP_PROCESSES:-1}"
+
+aura_reset_owner_init \
+    "oss" "$PROJECT_ROOT" "$RESET_RUNTIME_LABEL_RAW" \
+    "$PG_HOST" "$PG_PORT" "$PG_DB" "$BE_PORT" "$VITE_PORT" "$BFF_PORT"
+aura_reset_acquire_locks
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -173,6 +200,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}=== AuraBoot Environment Reset & Initialization ===${NC}"
+echo ""
+echo "Runtime owner: $AURA_RESET_OWNER_RUNTIME_ID"
+echo "Owner state:   $AURA_RESET_OWNER_STATE_DIR"
 echo ""
 
 if [ "$NO_BOOTSTRAP" != "1" ] && [ "$PLUGIN_IMPORT_PROFILE" = "core" ] && [ "${SKIP_SEED:-0}" != "1" ]; then
@@ -279,21 +309,25 @@ echo -e "${GREEN}   Redis ready${NC}"
 
 # Step 1: Stop backend service
 echo -e "${YELLOW}Step 1: Stopping backend service...${NC}"
-pkill -f "com.auraboot.framework.application.MetaApplication" 2>/dev/null || true
-sleep 2
-echo -e "${GREEN}   Backend service stopped${NC}"
+if [ "$RESET_STOP_PROCESSES" = "0" ]; then
+    echo -e "${YELLOW}   Ownership-scoped backend stop disabled; the target port must be free${NC}"
+    aura_reset_assert_service_absent "backend" "$BE_PORT"
+else
+    aura_reset_stop_service "backend" "$BE_PORT" "$PLATFORM_DIR" "bootRun"
+    echo -e "${GREEN}   Owned backend service stopped${NC}"
+fi
 
 # Step 2: Stop BFF server if running
 echo -e "${YELLOW}Step 2: Stopping BFF server...${NC}"
-pkill -f "concurrently" 2>/dev/null || true
-pkill -f "pnpm dev:web" 2>/dev/null || true
-pkill -f "pnpm dev:bff" 2>/dev/null || true
-pkill -f "pnpm dev" 2>/dev/null || true
-pkill -f "bff.server" 2>/dev/null || true
-pkill -f "react-router dev" 2>/dev/null || true
-pkill -f "vite" 2>/dev/null || true
-sleep 1
-echo -e "${GREEN}   Frontend/BFF dev processes stopped${NC}"
+if [ "$RESET_STOP_PROCESSES" = "0" ]; then
+    echo -e "${YELLOW}   Ownership-scoped frontend/BFF stop disabled; target ports must be free${NC}"
+    aura_reset_assert_service_absent "web" "$VITE_PORT"
+    aura_reset_assert_service_absent "bff" "$BFF_PORT"
+else
+    aura_reset_stop_service "web" "$VITE_PORT" "$WEB_ADMIN_DIR" "pnpm dev:web"
+    aura_reset_stop_service "bff" "$BFF_PORT" "$WEB_ADMIN_DIR" "pnpm dev:bff"
+    echo -e "${GREEN}   Owned frontend/BFF dev processes stopped${NC}"
+fi
 
 # Step 3: Reset database
 echo -e "${YELLOW}Step 3: Resetting database...${NC}"
@@ -312,8 +346,9 @@ else
 fi
 
 # Start backend in background as a single long-running process
-nohup ./gradlew bootRun > /tmp/aura-backend.log 2>&1 &
-BACKEND_PID=$!
+aura_reset_assert_port_available "backend" "$BE_PORT"
+BACKEND_PID="$(aura_reset_spawn_detached "$PLATFORM_DIR" "$BACKEND_LOG" ./gradlew --no-daemon bootRun)"
+aura_reset_register_process "backend" "$BACKEND_PID" "$BE_PORT" "$PLATFORM_DIR" "bootRun"
 
 echo "   Backend starting (PID: $BACKEND_PID)..."
 echo "   Waiting for backend to be ready..."
@@ -325,6 +360,8 @@ while [ $WAITED -lt $MAX_WAIT ]; do
     HTTP_CODE=$(NO_PROXY=localhost curl -s -o /dev/null -w "%{http_code}" ${AURA_BE_BASE}/actuator/health 2>/dev/null || echo "000")
 
     if [ "$HTTP_CODE" = "200" ]; then
+        aura_reset_assert_service_owned \
+            "backend" "$BE_PORT" "$PLATFORM_DIR" "bootRun"
         echo -e "${GREEN}   Backend is ready (took ${WAITED}s)${NC}"
         break
     fi
@@ -336,7 +373,7 @@ done
 
 if [ $WAITED -ge $MAX_WAIT ]; then
     echo -e "${RED}   Backend failed to start within ${MAX_WAIT} seconds${NC}"
-    echo "   Check logs at /tmp/aura-backend.log"
+    echo "   Check logs at $BACKEND_LOG"
     exit 1
 fi
 
@@ -461,12 +498,14 @@ if [ ! -d "$WEB_ADMIN_DIR/node_modules" ] || [ ! -d "$PROJECT_ROOT/node_modules"
 fi
 
 echo "   Running plugin sync before starting dev servers..."
-pnpm sync-plugins > /tmp/aura-sync-plugins.log 2>&1
+pnpm sync-plugins > "$SYNC_PLUGINS_LOG" 2>&1
 
-nohup pnpm dev:web > /tmp/aura-web.log 2>&1 &
-WEB_PID=$!
-nohup pnpm dev:bff > /tmp/aura-bff.log 2>&1 &
-BFF_PID=$!
+aura_reset_assert_port_available "web" "$VITE_PORT"
+aura_reset_assert_port_available "bff" "$BFF_PORT"
+WEB_PID="$(aura_reset_spawn_detached "$WEB_ADMIN_DIR" "$FRONTEND_LOG" pnpm dev:web)"
+aura_reset_register_process "web" "$WEB_PID" "$VITE_PORT" "$WEB_ADMIN_DIR" "pnpm dev:web"
+BFF_PID="$(aura_reset_spawn_detached "$WEB_ADMIN_DIR" "$BFF_LOG" pnpm dev:bff)"
+aura_reset_register_process "bff" "$BFF_PID" "$BFF_PORT" "$WEB_ADMIN_DIR" "pnpm dev:bff"
 
 echo "   Frontend starting (web PID: $WEB_PID, bff PID: $BFF_PID)..."
 echo "   Waiting for frontend and BFF to be ready..."
@@ -479,6 +518,10 @@ while [ $WAITED_FE -lt $MAX_WAIT_FE ]; do
     BFF_HTTP_CODE=$(NO_PROXY=localhost curl -s -o /dev/null -w "%{http_code}" ${AURA_BFF_BASE}/health 2>/dev/null || echo "000")
 
     if { [ "$FRONTEND_HTTP_CODE" = "200" ] || [ "$FRONTEND_HTTP_CODE" = "302" ] || [ "$FRONTEND_HTTP_CODE" = "304" ]; } && [ "$BFF_HTTP_CODE" = "200" ]; then
+        aura_reset_assert_service_owned \
+            "web" "$VITE_PORT" "$WEB_ADMIN_DIR" "pnpm dev:web"
+        aura_reset_assert_service_owned \
+            "bff" "$BFF_PORT" "$WEB_ADMIN_DIR" "pnpm dev:bff"
         echo -e "${GREEN}   Frontend+BFF are ready (took ${WAITED_FE}s)${NC}"
         break
     fi
@@ -490,7 +533,7 @@ done
 
 if [ $WAITED_FE -ge $MAX_WAIT_FE ]; then
     echo -e "${RED}   Frontend/BFF failed to start within ${MAX_WAIT_FE} seconds${NC}"
-    echo "   Check logs at /tmp/aura-web.log and /tmp/aura-bff.log"
+    echo "   Check logs at $FRONTEND_LOG and $BFF_LOG"
     exit 1
 fi
 
@@ -693,8 +736,8 @@ echo "  - Backend: ${AURA_BE_BASE}"
 echo "  - Frontend: ${AURA_VITE_BASE}"
 echo ""
 echo -e "${BLUE}Logs:${NC}"
-echo "  - Backend: /tmp/aura-backend.log"
-echo "  - Frontend web: /tmp/aura-web.log"
-echo "  - Frontend bff: /tmp/aura-bff.log"
-echo "  - Plugin sync: /tmp/aura-sync-plugins.log"
+echo "  - Backend: $BACKEND_LOG"
+echo "  - Frontend web: $FRONTEND_LOG"
+echo "  - Frontend bff: $BFF_LOG"
+echo "  - Plugin sync: $SYNC_PLUGINS_LOG"
 echo ""

@@ -10,6 +10,8 @@ bash -n scripts/reset-db.sh
 bash -n scripts/db/cleanup-scheduler-residue.sh
 bash -n scripts/import-plugins.sh
 bash -n scripts/lib/reset-init-common.sh
+bash -n scripts/lib/runtime-process-owner.sh
+bash -n scripts/lib/test-runtime-process-owner.sh
 bash -n scripts/seed-marketplace.sh
 bash -n scripts/sync-marketplace-catalog.sh
 bash -n scripts/docker-ga-e2e-bootstrap.sh
@@ -28,5 +30,8 @@ node --test scripts/db/cleanup-scheduler-residue.test.mjs
 node --test scripts/audit-oss-plugins.test.mjs
 node --test scripts/oss-test-fixture-gate.test.mjs
 node web-admin/scripts/run-showcase-seed-sequence.test.mjs
+
+echo "[reset-init-contracts] process ownership fixture integration"
+bash scripts/lib/test-runtime-process-owner.sh
 
 echo "[reset-init-contracts] OK"
