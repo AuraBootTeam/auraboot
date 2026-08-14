@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import * as React from 'react';
 import {
+  createHostFederationShareScope,
+  initializeFederationContainer,
   isPluginEnabledForRuntime,
   isSlotEnabledForRuntime,
+  type FederationContainer,
 } from '../FederationManager';
 import type { PluginManifest, SlotContribution } from '../types';
 
@@ -56,5 +60,34 @@ describe('Federation runtime filtering', () => {
 
     expect(isSlotEnabledForRuntime(slot, 'storefront')).toBe(true);
     expect(isSlotEnabledForRuntime(slot, 'admin')).toBe(false);
+  });
+});
+
+describe('Federation ESM runtime', () => {
+  it('shares the exact React instance used by the host renderer', async () => {
+    const shareScope = createHostFederationShareScope();
+    const sharedReactFactory = await shareScope.react[React.version].get();
+
+    expect(sharedReactFactory()).toBe(React);
+  });
+
+  it('initializes an ESM remote with the host React share scope', async () => {
+    let receivedShareScope: Parameters<FederationContainer['init']>[0] | null =
+      null;
+    const container: FederationContainer = {
+      init: async (shareScope) => {
+        receivedShareScope = shareScope;
+      },
+      get: async () => () => ({ default: () => null }),
+    };
+
+    await expect(initializeFederationContainer(container)).resolves.toBe(
+      container,
+    );
+    expect(receivedShareScope).not.toBeNull();
+    const sharedReactFactory = await receivedShareScope!.react[
+      React.version
+    ].get();
+    expect(sharedReactFactory()).toBe(React);
   });
 });
