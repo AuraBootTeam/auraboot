@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import Ajv from 'ajv';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -90,13 +91,7 @@ describe('DSL Generated Schema', () => {
     const kindProp = defs.DslSchema.properties?.kind;
     expect(kindProp?.type).toBe('string');
     expect(kindProp?.enum).toEqual(
-      expect.arrayContaining([
-        'page',
-        'list',
-        'form',
-        'detail',
-        'page_layout',
-      ]),
+      expect.arrayContaining(['page', 'list', 'form', 'detail', 'page_layout']),
     );
   });
 
@@ -149,6 +144,72 @@ describe('DSL Generated Schema', () => {
         expect.objectContaining({ $ref: '#/definitions/DataSourceConfig' }),
       ]),
     );
+  });
+
+  it('SelectionConfig should publish the grouped-radio contract', () => {
+    const selectionDefinition = defs.SelectionConfig;
+    const selection = selectionDefinition.properties;
+    expect(selection?.presentation?.enum).toEqual(['table', 'grouped-radio']);
+    expect(selection?.exclusiveBy?.type).toBe('string');
+    expect(selection?.optionLabelField?.type).toBe('string');
+    expect(selection?.recommendedField?.type).toBe('string');
+    expect(selection?.safeField?.type).toBe('string');
+    expect(selectionDefinition?.['x-distinct-properties']).toContainEqual([
+      'recommendedField',
+      'safeField',
+    ]);
+
+    const validateTable = new Ajv({ strict: false }).compile({
+      ...defs.TableConfig,
+      definitions: defs,
+    });
+    const selectionBase = {
+      mode: 'multiple',
+      bind: 'selected',
+      presentation: 'grouped-radio',
+      exclusiveBy: 'groupId',
+      optionLabelField: 'label',
+    };
+    const tableBase = {
+      rowKey: 'pid',
+      columns: [{ field: 'label', label: 'Option' }],
+    };
+
+    expect(
+      validateTable({
+        ...tableBase,
+        selection: {
+          ...selectionBase,
+          recommendedField: 'recommended',
+          safeField: 'safe',
+        },
+      }),
+    ).toBe(true);
+    expect(
+      validateTable({
+        ...tableBase,
+        selection: { ...selectionBase, recommendedField: 'recommended' },
+      }),
+    ).toBe(false);
+    expect(
+      validateTable({
+        ...tableBase,
+        selection: { ...selectionBase, defaultFirst: true },
+      }),
+    ).toBe(false);
+    expect(validateTable({ columns: tableBase.columns, selection: selectionBase })).toBe(false);
+    expect(
+      validateTable({
+        columns: tableBase.columns,
+        selection: { ...selectionBase, keyField: 'pid' },
+      }),
+    ).toBe(true);
+    expect(
+      validateTable({
+        columns: tableBase.columns,
+        selection: { ...selectionBase, keyField: '' },
+      }),
+    ).toBe(false);
   });
 
   it('ColumnConfig.field should be required', () => {

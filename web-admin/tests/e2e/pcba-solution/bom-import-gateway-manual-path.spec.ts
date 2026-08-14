@@ -4,18 +4,17 @@ import { cleanupRows, dynamicCreate, type CreatedRows } from './quote-e2e-helper
 const WORKBENCH = '/p/bom_conversion_task_pcba_workbench';
 
 /**
- * Browser ownership for the manual import path stops at the interaction seam:
- * an adjustment-required task exposes its evidence panel and requires an
- * explicit confirmation before dispatch.
+ * Browser ownership for this synthetic task stops at the presentation seam:
+ * an adjustment-required task exposes its evidence panel, but a task with no
+ * executable issue-decision rows must not invent a confirmation action.
  *
  * Route selection and command execution are deterministic backend contracts
  * owned by BomImportPreAnalyzerTest, BomImportGatewayDecisionTest and
- * BomImportGatewayHandlersTest. Re-running several customer workbooks until one
- * happened to park made this browser test depend on the current material
- * library and LLM quality, duplicated those backend tests, and cost minutes.
+ * BomImportGatewayHandlersTest. The real E15 browser smoke owns the complete
+ * atomic-decision journey with persisted issue rows.
  */
 test.describe('BOM import gateway manual path @smoke', () => {
-  test('an adjustment-required task exposes evidence and guards confirmation', async ({ page }) => {
+  test('a task without issue decisions exposes evidence but no fake confirmation', async ({ page }) => {
     const created: CreatedRows = { quoteId: '', quoteCode: '', rows: [] };
     const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
     const taskNo = `E2E-GATEWAY-MANUAL-${suffix}`;
@@ -63,29 +62,16 @@ test.describe('BOM import gateway manual path @smoke', () => {
         'evidence panel toggles to its open state',
       ).toBeVisible({ timeout: 20_000 });
 
-      const confirmButton = page
-        .getByRole('button', {
-          name: /确认并开始匹配|Confirm and Start Matching/i,
-        })
-        .first();
-      await expect(confirmButton, 'manual confirmation remains reachable').toBeVisible({
-        timeout: 20_000,
-      });
-      await confirmButton.click();
-
-      const dialog = page.getByRole('dialog').last();
       await expect(
-        dialog,
-        'the operator must explicitly accept the identified field sources',
-      ).toContainText(
-        /确认系统识别的字段来源，并开始匹配物料|Confirm the identified field sources/i,
-        { timeout: 15_000 },
-      );
-      await dialog
-        .getByRole('button', { name: /取消|Cancel/i })
-        .last()
-        .click();
-      await expect(dialog).toHaveCount(0);
+        page.getByRole('button', {
+          name: /确认并开始匹配|Confirm and Start Matching/i,
+        }),
+        'a header-only synthetic task must not expose a non-executable confirmation action',
+      ).toHaveCount(0);
+      await expect(
+        page.getByText(/确认字段来源|Confirm the source column/i),
+        'a task with zero projected questions must not invent source questions',
+      ).toHaveCount(0);
     } finally {
       await cleanupRows(page, created);
     }
