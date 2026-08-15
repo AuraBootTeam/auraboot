@@ -250,23 +250,26 @@ cmd_up() {
   local sd; sd="$(state_dir "$name")"; mkdir -p "$sd"
 
   log "1/9 allocate runtime '$name' (slot $slot) + ensure infra"
-  # Re-running `up` after a mid-way failure (a plugin the validator rejects, say) must not
-  # trip over its own allocation from the first attempt — every later step here is already
-  # idempotent. Reuse an existing allocation only when it is on the slot being asked for;
-  # a name pinned to a different slot is a real conflict and still stops the run.
-  # Read the slot straight off the env file rather than through runtime_env(), which die()s
-  # when the file is absent — and absent is the normal case on a first run.
-  local allocated_slot=""
-  local env_file="$WORKSPACE/.workspace/env/$name.env"
-  if [ -f "$env_file" ]; then
-    allocated_slot="$(grep -E '^AURA_WORKSPACE_SLOT=' "$env_file" | head -1 | cut -d= -f2- || true)"
-  fi
-  if [ -n "$allocated_slot" ]; then
-    [ "$allocated_slot" = "$slot" ] \
-      || die "runtime '$name' is already allocated on slot $allocated_slot, not $slot — pick another name, or: $DEV runtime destroy $name"
-    log "    reusing existing allocation (slot $slot)"
+  # `runtime ensure` is the idempotent allocation contract: the same stable name + slot +
+  # source worktree is reused, while a different slot/worktree/branch is rejected. Keep a
+  # compatibility branch for workspaces that have not yet upgraded the root dispatcher.
+  if "$DEV" runtime 2>/dev/null | grep -q 'runtime ensure'; then
+    "$DEV" runtime ensure auraboot "$name" --slot "$slot" \
+      --purpose "OSS host-first golden stack" --ttl "$ttl" --source-root "$REPO_ROOT" >/dev/null
+    log "    ensured stable allocation (slot $slot, source=$REPO_ROOT)"
   else
-    "$DEV" runtime allocate auraboot "$name" --slot "$slot" --purpose "OSS host-first golden stack" --ttl "$ttl" >/dev/null
+    local allocated_slot=""
+    local env_file="$WORKSPACE/.workspace/env/$name.env"
+    if [ -f "$env_file" ]; then
+      allocated_slot="$(grep -E '^AURA_WORKSPACE_SLOT=' "$env_file" | head -1 | cut -d= -f2- || true)"
+    fi
+    if [ -n "$allocated_slot" ]; then
+      [ "$allocated_slot" = "$slot" ] \
+        || die "runtime '$name' is already allocated on slot $allocated_slot, not $slot — pick another name, or: $DEV runtime destroy $name"
+      log "    reusing existing allocation (slot $slot; legacy dispatcher)"
+    else
+      "$DEV" runtime allocate auraboot "$name" --slot "$slot" --purpose "OSS host-first golden stack" --ttl "$ttl" >/dev/null
+    fi
   fi
   "$DEV" infra ensure "$name" --yes >/dev/null
 

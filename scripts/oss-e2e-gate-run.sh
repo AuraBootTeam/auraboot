@@ -183,12 +183,25 @@ slot_in_use() {
   lsof -nP -iTCP:"$bff" -sTCP:LISTEN -t >/dev/null 2>&1 && return 0
   return 1
 }
+registered_slot_for_name() {
+  "$DEV" runtime list 2>/dev/null | awk -v name="$NAME" 'NR > 1 && $1 == name { print $3; exit }'
+}
+registered_slot="$(registered_slot_for_name)"
 if [[ -z "$SLOT" ]]; then
-  for cand in 73 74 75 76 77 80 81 82 83 84 85 86 87 90 91 92 93 94 95 96 97; do
-    if ! slot_in_use "$cand"; then SLOT="$cand"; break; fi
-  done
+  if [[ -n "$registered_slot" ]]; then
+    SLOT="$registered_slot"
+    log "reusing prior slot $SLOT for runtime name '$NAME' before the fresh rebuild"
+  else
+    for cand in 73 74 75 76 77 80 81 82 83 84 85 86 87 90 91 92 93 94 95 96 97; do
+      if ! slot_in_use "$cand"; then SLOT="$cand"; break; fi
+    done
+  fi
   [[ -n "$SLOT" ]] || die "could not auto-pick a free slot in 73..97 — pass --slot N explicitly"
-  log "auto-picked free slot $SLOT"
+  [[ -n "$registered_slot" ]] || log "auto-picked free slot $SLOT"
+elif [[ -n "$registered_slot" && "$registered_slot" != "$SLOT" ]]; then
+  die "runtime '$NAME' is registered on slot $registered_slot, not requested slot $SLOT"
+elif [[ -n "$registered_slot" ]]; then
+  log "reusing requested slot $SLOT owned by runtime name '$NAME' before the fresh rebuild"
 elif slot_in_use "$SLOT"; then
   die "slot $SLOT is already in use (a runtime claims it, or a port is bound) — pick another with --slot"
 fi
