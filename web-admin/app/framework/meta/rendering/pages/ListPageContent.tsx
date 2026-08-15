@@ -9,7 +9,13 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { createSearchParams, useSearchParams } from 'react-router';
+import {
+  createSearchParams,
+  useSearchParams,
+  type NavigateFunction,
+  type NavigateOptions,
+  type To,
+} from 'react-router';
 import { BlockRenderer, type PageContentProps } from '@auraboot/runtime-kernel';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -445,6 +451,7 @@ type SearchParamsSetter = ReturnType<typeof useSearchParams>[1];
 export function useSerializedSearchParamsUpdater(
   searchParams: URLSearchParams,
   setSearchParams: SearchParamsSetter,
+  writesEnabledRef?: { current: boolean },
 ): SearchParamsSetter {
   const latestSearchParamsRef = useRef(new URLSearchParams(searchParams));
 
@@ -454,6 +461,7 @@ export function useSerializedSearchParamsUpdater(
 
   return useCallback<SearchParamsSetter>(
     (nextInit, options) => {
+      if (writesEnabledRef?.current === false) return;
       const resolvedInit =
         typeof nextInit === 'function'
           ? nextInit(new URLSearchParams(latestSearchParamsRef.current))
@@ -462,7 +470,7 @@ export function useSerializedSearchParamsUpdater(
       latestSearchParamsRef.current = new URLSearchParams(next);
       setSearchParams(next, options);
     },
-    [setSearchParams],
+    [setSearchParams, writesEnabledRef],
   );
 }
 
@@ -975,7 +983,12 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Parse filter_* params from URL for drill-down navigation
   const [searchParams, routerSetSearchParams] = useSearchParams();
-  const setSearchParams = useSerializedSearchParamsUpdater(searchParams, routerSetSearchParams);
+  const listUrlWritesEnabledRef = useRef(true);
+  const setSearchParams = useSerializedSearchParamsUpdater(
+    searchParams,
+    routerSetSearchParams,
+    listUrlWritesEnabledRef,
+  );
   const urlFilters = useMemo(() => {
     const filters: Record<string, any> = {};
     searchParams.forEach((value, key) => {
@@ -1337,6 +1350,16 @@ function ListPageContentInner(props: PageContentProps) {
       filters,
     },
   });
+  const navigateAwayFromList = useCallback(
+    ((toOrDelta: To | number, options?: NavigateOptions) => {
+      // List URL state effects (SavedView sorts, filters and pagination) can still be queued
+      // when a user clicks Create/View/Edit. Once an outgoing navigation starts, those stale
+      // effects must never replace the destination route with the list's query-string URL.
+      listUrlWritesEnabledRef.current = false;
+      return typeof toOrDelta === 'number' ? navigate(toOrDelta) : navigate(toOrDelta, options);
+    }) as NavigateFunction,
+    [navigate],
+  );
 
   const appendListSearch = useCallback(
     (path: string) => {
@@ -1352,9 +1375,9 @@ function ListPageContentInner(props: PageContentProps) {
       if (recordPid == null || recordPid === '') {
         return;
       }
-      navigate(appendListSearch(`/p/${tableName}/view/${String(recordPid)}`));
+      navigateAwayFromList(appendListSearch(`/p/${tableName}/view/${String(recordPid)}`));
     },
-    [appendListSearch, navigate, tableName],
+    [appendListSearch, navigateAwayFromList, tableName],
   );
 
   // Tab state for tabs
@@ -2158,7 +2181,7 @@ function ListPageContentInner(props: PageContentProps) {
   // to avoid temporal dead zone ("Cannot access 'handleAction' before initialization").
   const { handleAction } = useActionHandler({
     runtime,
-    navigate,
+    navigate: navigateAwayFromList,
     tableName,
     context: {
       loadData,
@@ -3606,7 +3629,7 @@ function ListPageContentInner(props: PageContentProps) {
         const resolved = detailUrl.replace(/\{(\w+)\}/g, (_: string, key: string) =>
           String(record[key] ?? ''),
         );
-        navigate(appendListSearch(resolved));
+        navigateAwayFromList(appendListSearch(resolved));
         return;
       }
 
@@ -3620,16 +3643,23 @@ function ListPageContentInner(props: PageContentProps) {
         const optionDetailPageKey = (schema as any)?.options?.detailPageKey;
         const resolvedDetailPageKey = relatedDetailPageKey || optionDetailPageKey;
         if (resolvedDetailPageKey) {
-          navigate(appendListSearch(`/p/${resolvedDetailPageKey}/view/${pid}`));
+          navigateAwayFromList(appendListSearch(`/p/${resolvedDetailPageKey}/view/${pid}`));
         } else {
-          navigate(appendListSearch(`/p/${tableName}/view/${pid}`));
+          navigateAwayFromList(appendListSearch(`/p/${tableName}/view/${pid}`));
         }
         return;
       }
 
       setPreviewRecordId(pid);
     },
-    [appendListSearch, schema, tableBlock, tableName, navigate, listExtensions?.disableRowClick],
+    [
+      appendListSearch,
+      schema,
+      tableBlock,
+      tableName,
+      navigateAwayFromList,
+      listExtensions?.disableRowClick,
+    ],
   );
 
   // All model-backed column definitions for ColumnSettingsPanel. DSL columns
