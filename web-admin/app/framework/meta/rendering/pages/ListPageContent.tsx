@@ -693,6 +693,16 @@ export function resolveUrlStateSyncAction(
   return pendingLocalEncoding === currentUrlEncoding ? 'ack-local' : 'wait-for-local';
 }
 
+export function applyLocalSortUpdate(
+  previous: SortConfig[],
+  update: SortConfig[] | ((previous: SortConfig[]) => SortConfig[]),
+  pendingUrlSync: { current: string | null | undefined },
+): SortConfig[] {
+  const next = typeof update === 'function' ? update(previous) : update;
+  pendingUrlSync.current = encodeSorts(next);
+  return next;
+}
+
 export interface ViewManageFieldOption {
   code: string;
   name: string;
@@ -1079,6 +1089,12 @@ function ListPageContentInner(props: PageContentProps) {
   // Active sort state — initialized from URL > SavedView > DSL defaultSort
   const [activeSorts, setActiveSorts] = useState<SortConfig[]>(() => urlSorts);
   const pendingSortUrlSyncRef = useRef<string | null | undefined>(undefined);
+  const setLocalActiveSorts = useCallback(
+    (update: SortConfig[] | ((previous: SortConfig[]) => SortConfig[])) => {
+      setActiveSorts((previous) => applyLocalSortUpdate(previous, update, pendingSortUrlSyncRef));
+    },
+    [],
+  );
   // Active filter chips — user-added filters via chip bar (separate from filters)
   const [chipFilters, setChipFilters] = useState<ViewFilterConfig[]>(() => urlChipFilters);
   const pendingChipFilterUrlSyncRef = useRef<string | null | undefined>(undefined);
@@ -1695,12 +1711,12 @@ function ListPageContentInner(props: PageContentProps) {
       pendingSavedViewFiltersRef.current = restoredFilters;
       setFilters(restoredFilters);
       chipFiltersRef.current = restoredViewFilters;
-      setChipFilters((prev) =>
+      setLocalChipFilters((prev) =>
         areFiltersEqual(prev, restoredViewFilters) ? prev : restoredViewFilters,
       );
 
       const restoredSorts = vc.sorts ?? [];
-      setActiveSorts((prev) => (areSortsEqual(prev, restoredSorts) ? prev : restoredSorts));
+      setLocalActiveSorts((prev) => (areSortsEqual(prev, restoredSorts) ? prev : restoredSorts));
 
       if (vc.pagination?.pageSize && vc.pagination.pageSize > 0) {
         setPagination((prev: typeof pagination) => ({
@@ -1711,7 +1727,7 @@ function ListPageContentInner(props: PageContentProps) {
 
       return restoredFilters;
     },
-    [setFilters, setPagination, user?.pid],
+    [setFilters, setLocalActiveSorts, setLocalChipFilters, setPagination, user?.pid],
   );
 
   // Apply SavedView viewConfig (pagination + filters + sorts) when view changes.
@@ -2513,7 +2529,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Column header sort toggle: none → asc → desc → none
   // Shift+click appends to multi-sort, regular click replaces
   const toggleSort = useCallback((fieldCode: string, multiSort = false) => {
-    setActiveSorts((prev) => {
+    setLocalActiveSorts((prev) => {
       const existing = prev.find((s) => s.fieldCode === fieldCode);
       let next: SortConfig[];
       if (!existing) {
@@ -2531,7 +2547,7 @@ function ListPageContentInner(props: PageContentProps) {
       }
       return next;
     });
-  }, []);
+  }, [setLocalActiveSorts]);
 
   // Debounced re-fetch when sorts or chip filters change (150ms).
   // Prevents multiple rapid API calls when users adjust multiple filters
@@ -5259,7 +5275,7 @@ function ListPageContentInner(props: PageContentProps) {
                 onActivateChip={handleActivateChip}
                 onSaveActivePreset={handleSaveActivePreset}
                 activeSorts={activeSorts}
-                onSortsChange={setActiveSorts}
+                onSortsChange={setLocalActiveSorts}
                 sortableColumns={tableColumns
                   .filter((c: ColumnConfig) => !c.isActionColumn && c.field && c.sortable !== false)
                   .map((c: ColumnConfig) => ({
@@ -5340,7 +5356,7 @@ function ListPageContentInner(props: PageContentProps) {
                 onClearAll={() => {
                   chipFiltersRef.current = [];
                   setLocalChipFilters([]);
-                  setActiveSorts([]);
+                  setLocalActiveSorts([]);
                   void loadData({
                     page: 0,
                     size: pagination.pageSize,
@@ -5668,11 +5684,11 @@ function ListPageContentInner(props: PageContentProps) {
             onSort={(dir) => {
               if (!contextMenu) return;
               if (dir === 'clear') {
-                setActiveSorts((prev) =>
+                setLocalActiveSorts((prev) =>
                   prev.filter((s) => s.fieldCode !== contextMenu.column.field),
                 );
               } else {
-                setActiveSorts([
+                setLocalActiveSorts([
                   { fieldCode: contextMenu.column.field, direction: dir, priority: 0 },
                 ]);
               }

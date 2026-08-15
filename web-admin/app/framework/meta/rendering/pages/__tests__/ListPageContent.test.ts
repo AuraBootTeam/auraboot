@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  applyLocalSortUpdate,
   buildListReferenceDisplayCacheKey,
   buildBulkFieldCommandPayload,
   buildViewManageFieldOptions,
@@ -811,6 +812,20 @@ describe('resolveSavedViewFilterExpressions', () => {
 });
 
 describe('resolveUrlStateSyncAction', () => {
+  it('marks a restored local sort before the URL effect can reapply stale search params', () => {
+    const pending = { current: undefined as string | null | undefined };
+    const restored = applyLocalSortUpdate(
+      [],
+      [{ fieldCode: 'updated_at', direction: 'desc', priority: 0 }],
+      pending,
+    );
+
+    expect(restored).toEqual([{ fieldCode: 'updated_at', direction: 'desc', priority: 0 }]);
+    expect(pending.current).toBe('updated_at:desc');
+    expect(resolveUrlStateSyncAction(pending.current, null)).toBe('wait-for-local');
+    expect(resolveUrlStateSyncAction(pending.current, 'updated_at:desc')).toBe('ack-local');
+  });
+
   it('does not let a stale URL write clobber newer local list state', () => {
     expect(resolveUrlStateSyncAction('new-filter-state', 'older-filter-state')).toBe(
       'wait-for-local',
