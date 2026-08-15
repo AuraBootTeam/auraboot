@@ -19,7 +19,7 @@ import {
  *   | role            | BOM 转化 (view rules/library) | 报价全套 | 物料/规则写 + 金蝶同步 |
  *   | qo_sales        | ✓                             | ✓        | ✗ (admin-tier)        |
  *   | qo_procurement  | ✓ (= sales)                   | ✓        | ✗                     |
- *   | bom_engineering | ✓ (+ intake upload)           | ✓        | ✗                     |
+ *   | bom_engineering | ✓ (+ material library manage) | ✓        | library ✓ / rules ✗   |
  *   | no business role| ✗                             | ✗        | ✗                     |
  *
  * The retired 5-role model (qo_quoter / bom_operator / bom_admin) no longer exists on
@@ -62,8 +62,10 @@ const BOM_BUSINESS_PERMISSIONS = [
   'bom.rule.read',
 ];
 
-// admin-tier writes no business role may hold
+// Privileged BOM writes. Engineering has the owner-approved material-library exception;
+// sales/procurement remain view-only and no business role may manage validation rules.
 const BOM_ADMIN_PERMISSIONS = ['bom.library.manage', 'bom.rule.manage'];
+const BOM_ENGINEERING_MANAGE_PERMISSIONS = ['bom.library.manage'];
 
 const BUSINESS_MENU_PATHS = [
   BOM_PROJECTS_PATH,
@@ -270,22 +272,23 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       expectIncludes(snapshot.roleCodes, ['bom_engineering'], 'bom_engineering roles');
       expectIncludes(
         snapshot.permissionCodes,
-        [COMMAND_EXECUTE_PERMISSION, ...QUOTE_PERMISSIONS, ...BOM_BUSINESS_PERMISSIONS],
+        [
+          COMMAND_EXECUTE_PERMISSION,
+          ...QUOTE_PERMISSIONS,
+          ...BOM_BUSINESS_PERMISSIONS,
+          ...BOM_ENGINEERING_MANAGE_PERMISSIONS,
+        ],
         'bom_engineering permissions',
       );
-      expectExcludes(snapshot.permissionCodes, BOM_ADMIN_PERMISSIONS, 'bom_engineering permissions');
+      expectExcludes(snapshot.permissionCodes, ['bom.rule.manage'], 'bom_engineering permissions');
       expectIncludes(
         snapshot.menuPaths,
-        [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS],
+        [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS, BOM_MATERIAL_LIBRARY_PATH],
         'bom_engineering menu paths',
       );
       expectExcludes(
         snapshot.menuPaths,
-        [
-          BOM_REVIEW_QUEUE_PATH,
-          BOM_MATERIAL_LIBRARY_PATH,
-          BOM_FORMAT_PROFILE_PATH,
-        ],
+        [BOM_REVIEW_QUEUE_PATH, BOM_FORMAT_PROFILE_PATH],
         'bom_engineering menu paths',
       );
     });
@@ -325,12 +328,11 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     }
 
     await withRolePage(browser, users.bomEngineering, async (page) => {
-      await assertSidebarLinks(page, [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS], [
-        BOM_REVIEW_QUEUE_PATH,
-        BOM_MATERIAL_LIBRARY_PATH,
-        BOM_FORMAT_PROFILE_PATH,
-      ]);
-      await expectUnavailableByDirectUrl(page, BOM_MATERIAL_LIBRARY_PATH);
+      await assertSidebarLinks(
+        page,
+        [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS, BOM_MATERIAL_LIBRARY_PATH],
+        [BOM_REVIEW_QUEUE_PATH, BOM_FORMAT_PROFILE_PATH],
+      );
     });
 
     await withRolePage(browser, users.noBusinessRole, async (page) => {
@@ -371,8 +373,12 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       await expectCommandNotDenied(page, 'qo_offline_material_price_common:import_excel', {});
       await expectCommandNotDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-eng`));
       await expectCommandNotDenied(page, 'qo_quote_common:import_corrected_bom', {}, 'quote-id', 'update');
-      await expectCommandDenied(page, BOM_MATERIAL_SYNC_COMMAND, BOM_MATERIAL_SYNC_DRY_RUN);
-      await expectCommandDenied(page, 'bom:create_material', { bom_mm_material_code: `X-${uid}-eng` });
+      // bom.library.manage is already proven by the permission snapshot and create-material gate.
+      // Do not invoke even a dry-run Kingdee command from this role-boundary test.
+      await expectCommandNotDenied(page, 'bom:create_material', {
+        bom_mm_material_code: `X-${uid}-eng`,
+      });
+      await expectCommandDenied(page, 'bom:create_validation_rule', {});
     });
 
     await withRolePage(browser, users.noBusinessRole, async (page) => {

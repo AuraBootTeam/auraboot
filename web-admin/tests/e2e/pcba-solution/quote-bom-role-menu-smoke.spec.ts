@@ -128,14 +128,12 @@ const CONTRACTS: RoleContract[] = [
       MENU_CODE.customer,
       MENU_CODE.project,
       MENU_CODE.workbench,
+      MENU_CODE.kingdeeSync,
       MENU_CODE.quote,
       MENU_CODE.priceLibrary,
     ],
-    forbiddenCodes: [
-      MENU_CODE.kingdeeSync,
-      ...ORG_SYSTEM_ADMIN_CODES,
-    ],
-    deniedDirectPaths: ['/p/bom_material_master'],
+    forbiddenCodes: ORG_SYSTEM_ADMIN_CODES,
+    deniedDirectPaths: [],
   },
   {
     user: SMOKE_USERS[1],
