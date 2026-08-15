@@ -8,9 +8,13 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class EmployeeAccountWorkbookParserTest {
     private static final String SAX_FACTORY_PROPERTY = "javax.xml.parsers.SAXParserFactory";
@@ -190,5 +194,26 @@ class EmployeeAccountWorkbookParserTest {
                 System.setProperty(SAX_FACTORY_PROPERTY, previous);
             }
         }
+    }
+
+    @Test
+    void parse_rejectsExternalEntityDeclarations() throws Exception {
+        String maliciousSheet = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE worksheet [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+                <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+                  <sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>&xxe;</t></is></c></row></sheetData>
+                </worksheet>
+                """;
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(out)) {
+            zip.putNextEntry(new ZipEntry("xl/worksheets/sheet1.xml"));
+            zip.write(maliciousSheet.getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+        }
+
+        assertThatThrownBy(() -> parser.parse(new ByteArrayInputStream(out.toByteArray())))
+                .hasMessageContaining("Failed to parse employee account workbook")
+                .hasMessageNotContaining("root:");
     }
 }

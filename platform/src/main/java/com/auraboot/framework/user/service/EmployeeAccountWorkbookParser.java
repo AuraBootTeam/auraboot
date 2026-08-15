@@ -17,6 +17,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -426,23 +427,16 @@ public class EmployeeAccountWorkbookParser {
     }
 
     private Document parseXml(byte[] bytes) throws Exception {
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance(
-                "com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl",
-                EmployeeAccountWorkbookParser.class.getClassLoader());
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setNamespaceAware(true);
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        factory.setXIncludeAware(false);
         factory.setExpandEntityReferences(false);
-        trySetFeature(factory, "http://apache.org/xml/features/disallow-doctype-decl");
-        trySetFeature(factory, "http://xml.org/sax/features/external-general-entities");
-        trySetFeature(factory, "http://xml.org/sax/features/external-parameter-entities");
         return factory.newDocumentBuilder().parse(new ByteArrayInputStream(bytes));
-    }
-
-    private void trySetFeature(DocumentBuilderFactory factory, String feature) {
-        try {
-            boolean value = !feature.toLowerCase(Locale.ROOT).contains("external-");
-            factory.setFeature(feature, value);
-        } catch (Exception ignored) {
-            // XML parser hardening is best-effort because JDK vendors expose different feature sets.
-        }
     }
 }
