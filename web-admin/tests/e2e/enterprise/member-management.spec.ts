@@ -551,6 +551,11 @@ test.describe('Member Management — DSL Page', () => {
         response.url().endsWith('/api/admin/users/employee-accounts/import') &&
         response.request().method() === 'POST',
     );
+    const memberListReloadPromise = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/dynamic/tenant_member/list') &&
+        response.request().method() === 'GET',
+    );
     await page.getByTestId('member-import-confirm').click();
     const importResponse = await importResponsePromise;
     expect(importResponse.ok()).toBe(true);
@@ -564,6 +569,8 @@ test.describe('Member Management — DSL Page', () => {
     expect(account?.organizationAction).toBe('CREATED');
     expect(account?.memberPid).toBeTruthy();
     expect(account?.employeePid).toBeTruthy();
+    const memberListReload = await memberListReloadPromise;
+    expect(memberListReload.ok()).toBe(true);
     await expect(page.getByTestId('member-import-credential-row')).toContainText(loginName);
     await expect(page.getByTestId('member-import-credential-row')).toContainText(
       account.initialPassword,
@@ -587,9 +594,11 @@ test.describe('Member Management — DSL Page', () => {
     expect(employees[0]?.org_emp_dept_id).toBe(departmentPid);
     expect(employees[0]?.org_emp_position_id).toBe(positionPid);
 
-    await page.screenshot({
+    const credentialDialog = page.getByTestId('member-import-dialog');
+    await expect(credentialDialog).toBeVisible();
+    await expect(page.getByTestId('member-import-credential-row')).toContainText(loginName);
+    await credentialDialog.screenshot({
       path: testInfo.outputPath('member-import-credentials.png'),
-      fullPage: true,
     });
 
     const accountContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
@@ -603,9 +612,7 @@ test.describe('Member Management — DSL Page', () => {
     }
   });
 
-  test('MM-08: blocks import when an organization code cannot be resolved', async ({
-    page,
-  }) => {
+  test('MM-08: blocks import when an organization code cannot be resolved', async ({ page }) => {
     const suffix = uniqueId('MM08')
       .replace(/[^A-Za-z0-9]/g, '')
       .slice(-14);
@@ -662,11 +669,22 @@ async function loginWithIdentifier(
   if (await passwordTab.isVisible().catch(() => false)) {
     await passwordTab.click();
   }
-  await page.locator('#identifier').fill(identifier);
-  await page.locator('#password').fill(password);
-  await page.locator('form button[type="submit"]').first().click();
-  await page.waitForURL((url) => !url.pathname.includes('/login'), {
+  const identifierInput = page.locator('#identifier');
+  await identifierInput.fill(identifier);
+  await expect(identifierInput).toHaveValue(identifier);
+  const passwordInput = page.locator('#password');
+  await passwordInput.fill(password);
+  await expect(passwordInput).toHaveValue(password);
+
+  const loginResponsePromise = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/login' && response.request().method() === 'POST',
+  );
+  const loginNavigationPromise = page.waitForURL((url) => !url.pathname.includes('/login'), {
     timeout: 20_000,
     waitUntil: 'domcontentloaded',
   });
+  await passwordInput.press('Enter');
+  const [loginResponse] = await Promise.all([loginResponsePromise, loginNavigationPromise]);
+  expect(loginResponse.status()).toBe(302);
 }
