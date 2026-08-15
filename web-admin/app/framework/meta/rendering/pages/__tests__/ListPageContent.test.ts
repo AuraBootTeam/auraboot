@@ -101,6 +101,25 @@ describe('useSerializedSearchParamsUpdater', () => {
 
     expect(committed.at(-1)).toBe('sort=updated_at%3Adesc&view=personal-view&pageNum=1');
   });
+
+  it('drops queued list URL writes after an outgoing page navigation begins', () => {
+    const routerSetter = vi.fn();
+    const writesEnabledRef = { current: true };
+    const { result } = renderHook(() =>
+      useSerializedSearchParamsUpdater(
+        new URLSearchParams('sort=updated_at%3Adesc'),
+        routerSetter as any,
+        writesEnabledRef,
+      ),
+    );
+
+    act(() => {
+      writesEnabledRef.current = false;
+      result.current(new URLSearchParams('sort=created_at%3Aasc'), { replace: true });
+    });
+
+    expect(routerSetter).not.toHaveBeenCalled();
+  });
 });
 
 describe('renderComponentToValueType', () => {
