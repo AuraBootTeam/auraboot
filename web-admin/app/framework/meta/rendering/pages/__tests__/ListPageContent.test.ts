@@ -21,7 +21,7 @@ import {
   resolveListMiscBlocksPosition,
   resolveTableBlockRowActions,
   queryConditionToExportCondition,
-  resolveUrlFilterSyncAction,
+  resolveUrlStateSyncAction,
   shouldSkipListData,
   shouldSkipModelFieldMeta,
   useRestoreSavedViewFromUrl,
@@ -810,13 +810,26 @@ describe('resolveSavedViewFilterExpressions', () => {
   });
 });
 
-describe('resolveUrlFilterSyncAction', () => {
-  it('does not let a stale URL write clobber a newer local filter edit', () => {
-    expect(resolveUrlFilterSyncAction('new-filter-state', 'older-filter-state')).toBe(
+describe('resolveUrlStateSyncAction', () => {
+  it('does not let a stale URL write clobber newer local list state', () => {
+    expect(resolveUrlStateSyncAction('new-filter-state', 'older-filter-state')).toBe(
       'wait-for-local',
     );
-    expect(resolveUrlFilterSyncAction('new-filter-state', 'new-filter-state')).toBe('ack-local');
-    expect(resolveUrlFilterSyncAction(undefined, 'browser-history-state')).toBe('apply-url');
+    expect(resolveUrlStateSyncAction('new-filter-state', 'new-filter-state')).toBe('ack-local');
+    expect(resolveUrlStateSyncAction(undefined, 'browser-history-state')).toBe('apply-url');
+  });
+
+  it('keeps a restored default sort until React Router acknowledges the local URL write', () => {
+    const restoredSort = 'updated_at:desc';
+
+    expect(resolveUrlStateSyncAction(restoredSort, null)).toBe('wait-for-local');
+    expect(resolveUrlStateSyncAction(restoredSort, restoredSort)).toBe('ack-local');
+    expect(resolveUrlStateSyncAction(undefined, restoredSort)).toBe('apply-url');
+  });
+
+  it('acknowledges clearing a sort without reapplying the stale sorted URL', () => {
+    expect(resolveUrlStateSyncAction(null, 'updated_at:desc')).toBe('wait-for-local');
+    expect(resolveUrlStateSyncAction(null, null)).toBe('ack-local');
   });
 });
 
