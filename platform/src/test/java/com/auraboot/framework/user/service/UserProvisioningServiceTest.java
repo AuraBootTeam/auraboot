@@ -7,6 +7,7 @@ import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.dto.RoleAssignmentMode;
 import com.auraboot.framework.user.dto.UserProvisionRequest;
 import com.auraboot.framework.user.dto.UserProvisionResponse;
 import org.junit.jupiter.api.Test;
@@ -54,6 +55,7 @@ class UserProvisioningServiceTest {
     private TenantMember member(Long id) {
         TenantMember m = new TenantMember();
         m.setId(id);
+        m.setPid("member-pid-" + id);
         return m;
     }
 
@@ -78,6 +80,7 @@ class UserProvisioningServiceTest {
         assertFalse(resp.isMustChangePassword());
         assertNull(resp.getTemporaryPassword());
         assertEquals(List.of("default"), resp.getAssignedRoles());
+        assertEquals("member-pid-50", resp.getMemberPid());
         verify(userService, never()).update(any());
     }
 
@@ -203,5 +206,37 @@ class UserProvisioningServiceTest {
         when(roleService.findDefaultRole(7L)).thenReturn(role(9L, "viewer"));
         UserProvisionResponse resp = service.provision(req, 7L, 100L);
         assertEquals(List.of("viewer"), resp.getAssignedRoles());
+    }
+
+    @Test
+    void provision_roleModeNoneCreatesMemberWithoutDefaultRole() throws Exception {
+        UserProvisionRequest req = req();
+        req.setInitialPassword("p");
+        req.setRoleCodes(List.of());
+        req.setRoleAssignmentMode(RoleAssignmentMode.NONE);
+        when(userService.signUp(any(), any(), any(), any())).thenReturn(user(1L));
+        when(tenantMemberService.findByTenantIdAndUserId(7L, 1L)).thenReturn(member(50L));
+
+        UserProvisionResponse resp = service.provision(req, 7L, 100L);
+
+        assertTrue(resp.getAssignedRoles().isEmpty());
+        verify(roleService, never()).findDefaultRole(anyLong());
+        verify(roleService, never()).assignRoleToMember(any(), any(), any());
+    }
+
+    @Test
+    void provision_persistsOptionalMobileOnCreatedUser() throws Exception {
+        UserProvisionRequest req = req();
+        req.setInitialPassword("p");
+        req.setMobile(" 13800000000 ");
+        User created = user(1L);
+        when(userService.signUp(any(), any(), any(), any())).thenReturn(created);
+        when(tenantMemberService.findByTenantIdAndUserId(7L, 1L)).thenReturn(member(50L));
+        when(roleService.findDefaultRole(7L)).thenReturn(null);
+
+        service.provision(req, 7L, 100L);
+
+        assertEquals("13800000000", created.getMobile());
+        verify(userService).update(created);
     }
 }

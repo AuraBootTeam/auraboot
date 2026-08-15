@@ -18,11 +18,17 @@
  */
 
 import { test, expect } from '../../fixtures';
+import { readFile } from 'node:fs/promises';
+import AdmZip from 'adm-zip';
+import * as XLSX from 'xlsx';
 import {
   navigateToDynamicPage,
   waitForDynamicPageLoad,
   clickTabAndWaitForLoad,
   findRowInPaginatedList,
+  ensureSidebarExpanded,
+  queryFilteredList,
+  uniqueId,
 } from '../helpers/index';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { BACKEND_URL } from '../../helpers/environments';
@@ -285,7 +291,9 @@ test.describe('Member Management — DSL Page', () => {
         await dropdown.waitFor({ state: 'visible', timeout: 5000 });
         const deleteInDropdown = dropdown.locator('[data-testid="row-action-delete"]').first();
         await expect(deleteInDropdown).toBeVisible({ timeout: 3000 });
-        await expect(dropdown.locator('[data-testid="row-action-reset-password"]').first()).toBeVisible({
+        await expect(
+          dropdown.locator('[data-testid="row-action-reset-password"]').first(),
+        ).toBeVisible({
           timeout: 3000,
         });
         // Close dropdown
@@ -295,8 +303,12 @@ test.describe('Member Management — DSL Page', () => {
       await expect(directDelete).toBeVisible();
       const moreBtn = firstRow.locator('[data-testid="row-action-more"]').first();
       const hasMore = await moreBtn.isVisible({ timeout: 3000 }).catch(() => false);
-      const directResetAction = firstRow.locator('[data-testid="row-action-reset-password"]').first();
-      const hasDirectReset = await directResetAction.isVisible({ timeout: 1000 }).catch(() => false);
+      const directResetAction = firstRow
+        .locator('[data-testid="row-action-reset-password"]')
+        .first();
+      const hasDirectReset = await directResetAction
+        .isVisible({ timeout: 1000 })
+        .catch(() => false);
       expect(
         hasDirectReset || hasMore,
         'Reset password action should be available directly or in the more menu',
@@ -305,7 +317,9 @@ test.describe('Member Management — DSL Page', () => {
         await moreBtn.evaluate((el: HTMLElement) => el.click());
         const dropdown = page.locator('[data-testid="row-action-dropdown"]');
         await dropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await expect(dropdown.locator('[data-testid="row-action-reset-password"]').first()).toBeVisible({
+        await expect(
+          dropdown.locator('[data-testid="row-action-reset-password"]').first(),
+        ).toBeVisible({
           timeout: 3000,
         });
         await page.keyboard.press('Escape');
@@ -325,7 +339,10 @@ test.describe('Member Management — DSL Page', () => {
    */
   test('MM-05: should complete suspend-restore cycle', async ({ page }) => {
     test.setTimeout(60000);
-    test.skip(!testMemberPid, 'Seeded operator member is not attached to the current tenant in this environment');
+    test.skip(
+      !testMemberPid,
+      'Seeded operator member is not attached to the current tenant in this environment',
+    );
     await navigateToDynamicPage(page, 'tenant_member');
 
     // Switch to active tab
@@ -415,24 +432,241 @@ test.describe('Member Management — DSL Page', () => {
     }
   });
 
-  test('MM-07: should import members through tenant member import API', async ({ page }) => {
-    await navigateToDynamicPage(page, 'tenant_member');
-    const email = `e2e-import-${Date.now()}@test.com`;
-    const resp = await page.request.post('/api/tenant/members/import-rows', {
-      data: [
-        {
-          name: '导入成员',
-          email,
-          phone: '13800138000',
-          department: '',
-          position: '',
-        },
-      ],
+  test('MM-07: imports a no-email account through the visible workbook flow', async ({
+    page,
+    browser,
+  }, testInfo) => {
+    testInfo.setTimeout(90_000);
+    const suffix = uniqueId('MM07')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .slice(-14);
+    const name = `导入成员${suffix}`;
+    const loginName = `mm07_${suffix}`;
+    const employeeCode = `EMP-${suffix}`;
+    const departmentCode = `DEPT-${suffix}`;
+    const positionCode = `POS-${suffix}`;
+
+    const departmentResponse = await page.request.post('/api/org/departments', {
+      data: {
+        org_dept_name: `导入销售部${suffix}`,
+        org_dept_code: departmentCode,
+        org_dept_status: 'active',
+        org_dept_order: 1,
+      },
     });
-    expect(resp.ok()).toBe(true);
-    const body = await resp.json();
-    expect(body?.code).toBe('0');
-    expect(body?.data?.successCount).toBe(1);
-    expect(body?.data?.invitedCount).toBe(1);
+    expect(departmentResponse.ok()).toBe(true);
+    const departmentPid = String((await departmentResponse.json())?.data?.pid ?? '');
+    expect(departmentPid).toBeTruthy();
+
+    const positionResponse = await page.request.post('/api/dynamic/org_position/create', {
+      data: {
+        org_pos_name: `销售岗位${suffix}`,
+        org_pos_code: positionCode,
+        org_pos_level: 'P1',
+        org_pos_status: 'active',
+        org_pos_dept_id: departmentPid,
+      },
+    });
+    expect(positionResponse.ok()).toBe(true);
+    const positionBody = await positionResponse.json();
+    const positionPid = String(positionBody?.data?.pid ?? positionBody?.data?.data?.pid ?? '');
+    expect(positionPid).toBeTruthy();
+
+    await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+    await ensureSidebarExpanded(page);
+    const memberLink = page.locator('nav a[href="/p/tenant_member"]').first();
+    if (!(await memberLink.isVisible({ timeout: 2_000 }).catch(() => false))) {
+      await page
+        .locator('nav button')
+        .filter({ hasText: /组织管理|Organization/ })
+        .first()
+        .click();
+    }
+    await expect(memberLink).toBeVisible({ timeout: 10_000 });
+    await memberLink.click();
+    await expect(page).toHaveURL(/\/p\/tenant_member/);
+    await waitForDynamicPageLoad(page);
+
+    await page.getByTestId('member-import-entry').click();
+    await expect(page.getByTestId('member-import-dialog')).toBeVisible();
+
+    const templateDownloadPromise = page.waitForEvent('download');
+    await page.getByTestId('member-import-download-template').click();
+    const templateDownload = await templateDownloadPromise;
+    expect(templateDownload.suggestedFilename()).toMatch(/\.xlsx$/);
+    const templatePath = testInfo.outputPath('用户导入模板.xlsx');
+    await templateDownload.saveAs(templatePath);
+    const templateBytes = await readFile(templatePath);
+    expect(Array.from(templateBytes.subarray(0, 2))).toEqual([0x50, 0x4b]);
+    const templateEntries = new Set(
+      new AdmZip(templateBytes).getEntries().map((entry) => entry.entryName),
+    );
+    expect(templateEntries).toContain('xl/workbook.xml');
+    expect(templateEntries).toContain('xl/worksheets/sheet1.xml');
+
+    const workbook = XLSX.read(templateBytes, { type: 'buffer' });
+    expect(workbook.SheetNames).toContain('账号导入');
+    const templateRows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets['账号导入'], {
+      header: 1,
+      raw: false,
+    });
+    expect(templateRows[1]?.slice(0, 6)).toEqual([
+      '姓名*',
+      '登录名',
+      '手机号',
+      '工号',
+      '部门编码',
+      '岗位编码',
+    ]);
+
+    workbook.Sheets['账号导入'] = XLSX.utils.aoa_to_sheet([
+      ['填写说明：姓名必填；登录名为空时默认使用姓名。'],
+      ['姓名*', '登录名', '手机号', '工号', '部门编码', '岗位编码'],
+      [name, loginName, '13800138000', employeeCode, departmentCode, positionCode],
+    ]);
+    const uploadBytes = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+    await page.getByTestId('member-import-file-input').setInputFiles({
+      name: 'employee-account-import.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer: uploadBytes,
+    });
+
+    const previewResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/admin/users/employee-accounts/import/preview') &&
+        response.request().method() === 'POST',
+    );
+    await page.getByTestId('member-import-preview').click();
+    const previewResponse = await previewResponsePromise;
+    expect(previewResponse.ok()).toBe(true);
+    const previewBody = await previewResponse.json();
+    expect(previewBody?.code).toBe('0');
+    expect(previewBody?.data?.errorCount).toBe(0);
+    expect(previewBody?.data?.rows?.[0]?.action).toBe('CREATE_EMPLOYEE');
+    await expect(page.getByTestId('member-import-preview-result')).toContainText(employeeCode);
+    await expect(page.getByTestId('member-import-confirm')).toBeEnabled();
+
+    const importResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/admin/users/employee-accounts/import') &&
+        response.request().method() === 'POST',
+    );
+    await page.getByTestId('member-import-confirm').click();
+    const importResponse = await importResponsePromise;
+    expect(importResponse.ok()).toBe(true);
+    const importBody = await importResponse.json();
+    expect(importBody?.code).toBe('0');
+    const account = importBody?.data?.accounts?.[0];
+    expect(account?.userName).toBe(loginName);
+    expect(account?.initialPassword).toMatch(/^jjzz@\d{4}$/);
+    expect(account?.assignedRoles).toEqual([]);
+    expect(account?.mustChangePassword).toBe(false);
+    expect(account?.organizationAction).toBe('CREATED');
+    expect(account?.memberPid).toBeTruthy();
+    expect(account?.employeePid).toBeTruthy();
+    await expect(page.getByTestId('member-import-credential-row')).toContainText(loginName);
+    await expect(page.getByTestId('member-import-credential-row')).toContainText(
+      account.initialPassword,
+    );
+
+    const credentialDownloadPromise = page.waitForEvent('download');
+    await page.getByTestId('member-import-download-credentials').click();
+    const credentialDownload = await credentialDownloadPromise;
+    const credentialPath = testInfo.outputPath('employee-account-credentials.csv');
+    await credentialDownload.saveAs(credentialPath);
+    const credentialCsv = await readFile(credentialPath, 'utf8');
+    expect(credentialCsv).toContain(loginName);
+    expect(credentialCsv).toContain(account.initialPassword);
+
+    const employees = await queryFilteredList(page, 'org_employee', 'org_emp_code', employeeCode, {
+      operator: 'EQ',
+    });
+    expect(employees).toHaveLength(1);
+    expect(employees[0]?.pid).toBe(account.employeePid);
+    expect(employees[0]?.org_emp_member_id).toBe(account.memberPid);
+    expect(employees[0]?.org_emp_dept_id).toBe(departmentPid);
+    expect(employees[0]?.org_emp_position_id).toBe(positionPid);
+
+    await page.screenshot({
+      path: testInfo.outputPath('member-import-credentials.png'),
+      fullPage: true,
+    });
+
+    const accountContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const accountPage = await accountContext.newPage();
+    try {
+      await loginWithIdentifier(accountPage, loginName, account.initialPassword);
+      await expect(accountPage).not.toHaveURL(/\/login/);
+      expect(accountPage.url()).not.toContain('forceChangePassword=true');
+    } finally {
+      await accountContext.close();
+    }
+  });
+
+  test('MM-08: blocks import when an organization code cannot be resolved', async ({
+    page,
+  }) => {
+    const suffix = uniqueId('MM08')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .slice(-14);
+    const missingDepartmentCode = `MISSING-${suffix}`;
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['填写说明：姓名必填；登录名为空时默认使用姓名。'],
+        ['姓名*', '登录名', '手机号', '工号', '部门编码', '岗位编码'],
+        [`错误成员${suffix}`, `mm08_${suffix}`, '', '', missingDepartmentCode, ''],
+      ]),
+      '账号导入',
+    );
+    const uploadBytes = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+
+    await navigateToDynamicPage(page, 'tenant_member');
+    await page.getByTestId('member-import-entry').click();
+    await page.getByTestId('member-import-file-input').setInputFiles({
+      name: 'employee-account-import-invalid.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer: uploadBytes,
+    });
+
+    const previewResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/admin/users/employee-accounts/import/preview') &&
+        response.request().method() === 'POST',
+    );
+    await page.getByTestId('member-import-preview').click();
+    const previewResponse = await previewResponsePromise;
+    expect(previewResponse.ok()).toBe(true);
+    const previewBody = await previewResponse.json();
+    expect(previewBody?.code).toBe('0');
+    expect(previewBody?.data?.errorCount).toBe(1);
+    expect(previewBody?.data?.rows?.[0]?.action).toBe('ERROR');
+    await expect(page.getByTestId('member-import-preview-result')).toContainText(
+      missingDepartmentCode,
+    );
+    await expect(page.getByTestId('member-import-confirm')).toBeDisabled();
   });
 });
+
+async function loginWithIdentifier(
+  page: import('@playwright/test').Page,
+  identifier: string,
+  password: string,
+) {
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true', {
+    timeout: 5_000,
+  });
+  const passwordTab = page.getByTestId('login-tab-email_password');
+  if (await passwordTab.isVisible().catch(() => false)) {
+    await passwordTab.click();
+  }
+  await page.locator('#identifier').fill(identifier);
+  await page.locator('#password').fill(password);
+  await page.locator('form button[type="submit"]').first().click();
+  await page.waitForURL((url) => !url.pathname.includes('/login'), {
+    timeout: 20_000,
+    waitUntil: 'domcontentloaded',
+  });
+}

@@ -7,6 +7,7 @@ import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.dto.RoleAssignmentMode;
 import com.auraboot.framework.user.dto.UserProvisionRequest;
 import com.auraboot.framework.user.dto.UserProvisionResponse;
 import lombok.RequiredArgsConstructor;
@@ -88,6 +89,12 @@ public class UserProvisioningService {
             throw e;
         }
 
+        String mobile = normalizeBlankToNull(request.getMobile());
+        if (mobile != null) {
+            user.setMobile(mobile);
+            userService.update(user);
+        }
+
         // 3. Add to tenant as active member
         try {
             tenantMemberService.addMember(user.getId(), tenantId, "active");
@@ -109,6 +116,7 @@ public class UserProvisioningService {
         return UserProvisionResponse.builder()
                 .userId(user.getId())
                 .userPid(user.getPid())
+                .memberPid(tenantMember != null ? tenantMember.getPid() : null)
                 .email(user.getEmail())
                 .displayName(request.getDisplayName())
                 .tenantId(tenantId)
@@ -126,14 +134,27 @@ public class UserProvisioningService {
         }
 
         List<String> roleCodes = request.getRoleCodes();
+        RoleAssignmentMode assignmentMode = request.getRoleAssignmentMode();
+        if (assignmentMode == null) {
+            assignmentMode = roleCodes == null || roleCodes.isEmpty()
+                    ? RoleAssignmentMode.DEFAULT
+                    : RoleAssignmentMode.EXPLICIT;
+        }
 
-        if (roleCodes == null || roleCodes.isEmpty()) {
+        if (assignmentMode == RoleAssignmentMode.NONE) {
+            return assigned;
+        }
+
+        if (assignmentMode == RoleAssignmentMode.DEFAULT) {
             Role defaultRole = roleService.findDefaultRole(tenantId);
             if (defaultRole != null) {
                 roleService.assignRoleToMember(memberId, defaultRole.getId(), tenantId);
                 assigned.add(defaultRole.getCode());
             }
         } else {
+            if (roleCodes == null || roleCodes.isEmpty()) {
+                return assigned;
+            }
             List<Role> tenantRoles = roleService.findByTenantId(tenantId);
             for (String code : roleCodes) {
                 Role role = tenantRoles.stream()

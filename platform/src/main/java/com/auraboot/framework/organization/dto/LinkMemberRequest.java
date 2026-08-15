@@ -12,6 +12,9 @@ public class LinkMemberRequest {
     @NotBlank(message = "Member PID is required")
     private String memberPid;
 
+    /** Optional stable employee number for the newly created record. */
+    private String employeeCode;
+
     @NotBlank(message = "Department is required")
     private String deptPid;
 

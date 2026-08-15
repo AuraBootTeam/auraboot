@@ -19,10 +19,17 @@ public class EmployeeAccountProvisionResponse {
     public static class Account {
         private Long userId;
         private String userPid;
+        private String memberPid;
+        private String employeePid;
         private String name;
         private String type;
         private String userName;
         private String email;
+        private String mobile;
+        private String employeeCode;
+        private String departmentCode;
+        private String positionCode;
+        private String organizationAction;
         private String initialPassword;
         private List<String> assignedRoles;
         private boolean mustChangePassword;

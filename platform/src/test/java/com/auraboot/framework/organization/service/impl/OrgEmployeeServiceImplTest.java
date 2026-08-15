@@ -283,6 +283,7 @@ class OrgEmployeeServiceImplTest {
         User user = new User();
         user.setNickName("Alice");
         user.setEmail("alice@x");
+        user.setMobile("13800000000");
         user.setPid("u-pid");
         when(userService.findByUserId(99L)).thenReturn(user);
 
@@ -294,11 +295,52 @@ class OrgEmployeeServiceImplTest {
 
         LinkMemberRequest req = new LinkMemberRequest();
         req.setMemberPid("mem-50");
+        req.setEmployeeCode("EMP001");
         req.setDeptPid("d1");
         req.setPositionPid("p1");
 
         service.linkMember(req);
         assertEquals(200L, member.getEmployeeId());
+        verify(tenantMemberService).updateMember(member);
+        verify(dynamicDataService).create(eq("org_employee"), argThat(data ->
+                "EMP001".equals(data.get("org_emp_code"))
+                        && "13800000000".equals(data.get("org_emp_phone"))));
+    }
+
+    @Test
+    @DisplayName("linkExistingMember links an unbound employee and member bidirectionally")
+    void linkExistingMemberHappy() {
+        Map<String, Object> employee = new HashMap<>();
+        employee.put("id", 200L);
+        employee.put("pid", "emp-existing");
+        when(dynamicDataService.getById("org_employee", "emp-existing")).thenReturn(employee);
+
+        TenantMember member = new TenantMember();
+        member.setId(50L);
+        member.setPid("mem-50");
+        member.setUserId(99L);
+        when(tenantMemberService.findByPid("mem-50")).thenReturn(member);
+        User user = new User();
+        user.setPid("user-pid");
+        when(userService.findByUserId(99L)).thenReturn(user);
+        when(dynamicDataService.update(eq("org_employee"), eq("emp-existing"), anyMap()))
+                .thenReturn(employee);
+        OrgEmployeeDTO expected = new OrgEmployeeDTO(
+                "emp-existing", "Alice", "EMP001", null, null, null,
+                "d1", "Sales", "p1", "Sales", "active", "human", "mem-50", "user-pid");
+        when(organizationService.toEmployeeDTO(anyMap())).thenReturn(expected);
+
+        OrgEmployeeDTO result = service.linkExistingMember("emp-existing", "mem-50");
+
+        assertEquals("emp-existing", result.pid());
+        assertEquals(200L, member.getEmployeeId());
+        verify(dynamicDataService).update(eq("org_employee"), eq("emp-existing"), argThat(data ->
+                "user-pid".equals(data.get("org_emp_user_id"))
+                        && "mem-50".equals(data.get("org_emp_member_id"))));
+        verify(organizationService).toEmployeeDTO(argThat(data ->
+                "emp-existing".equals(data.get("pid"))
+                        && "user-pid".equals(data.get("org_emp_user_id"))
+                        && "mem-50".equals(data.get("org_emp_member_id"))));
         verify(tenantMemberService).updateMember(member);
     }
 

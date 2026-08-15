@@ -18,6 +18,69 @@ class EmployeeAccountWorkbookParserTest {
     private final EmployeeAccountWorkbookParser parser = new EmployeeAccountWorkbookParser();
 
     @Test
+    void writeTemplate_createsOpenableSixColumnWorkbook() throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        parser.writeTemplate(out);
+
+        byte[] bytes = out.toByteArray();
+        assertThat(bytes).hasSizeGreaterThan(1000);
+        assertThat(bytes[0]).isEqualTo((byte) 'P');
+        assertThat(bytes[1]).isEqualTo((byte) 'K');
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+            Sheet sheet = workbook.getSheet("账号导入");
+            assertThat(sheet).isNotNull();
+            Row header = sheet.getRow(1);
+            assertThat(List.of(
+                    header.getCell(0).getStringCellValue(),
+                    header.getCell(1).getStringCellValue(),
+                    header.getCell(2).getStringCellValue(),
+                    header.getCell(3).getStringCellValue(),
+                    header.getCell(4).getStringCellValue(),
+                    header.getCell(5).getStringCellValue()))
+                    .containsExactly("姓名*", "登录名", "手机号", "工号", "部门编码", "岗位编码");
+        }
+    }
+
+    @Test
+    void parse_readsCanonicalTemplateBelowInstructionRowAndSkipsExample() throws Exception {
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("账号导入");
+        sheet.createRow(0).createCell(0).setCellValue("填写须知");
+        Row header = sheet.createRow(1);
+        header.createCell(0).setCellValue("姓名*");
+        header.createCell(1).setCellValue("登录名");
+        header.createCell(2).setCellValue("手机号");
+        header.createCell(3).setCellValue("工号");
+        header.createCell(4).setCellValue("部门编码");
+        header.createCell(5).setCellValue("岗位编码");
+        Row example = sheet.createRow(2);
+        example.createCell(0).setCellValue("张三（示例，请删除此行）");
+        Row row = sheet.createRow(3);
+        row.createCell(0).setCellValue("王佳霞");
+        row.createCell(1).setCellValue("wjx");
+        row.createCell(2).setCellValue("13800000000");
+        row.createCell(3).setCellValue("EMP001");
+        row.createCell(4).setCellValue("SALES");
+        row.createCell(5).setCellValue("SALES_REP");
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        workbook.close();
+
+        List<EmployeeAccountRow> rows = parser.parse(new ByteArrayInputStream(out.toByteArray()));
+
+        assertThat(rows).hasSize(1);
+        EmployeeAccountRow parsed = rows.get(0);
+        assertThat(parsed.getName()).isEqualTo("王佳霞");
+        assertThat(parsed.getUserName()).isEqualTo("wjx");
+        assertThat(parsed.getMobile()).isEqualTo("13800000000");
+        assertThat(parsed.getEmployeeCode()).isEqualTo("EMP001");
+        assertThat(parsed.getDepartmentCode()).isEqualTo("SALES");
+        assertThat(parsed.getPositionCode()).isEqualTo("SALES_REP");
+        assertThat(parsed.getSourceRowNumber()).isEqualTo(4);
+    }
+
+    @Test
     void parse_readsNameTypeMobileAndEmailFromFirstSheet() throws Exception {
         XSSFWorkbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("在职人员信息");

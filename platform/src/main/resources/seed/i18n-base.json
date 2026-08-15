@@ -3517,6 +3517,171 @@
     "en-US": "Issue"
   },
   {
+    "key": "memberImport.title",
+    "zh-CN": "批量开通员工账号",
+    "en-US": "Import employee accounts"
+  },
+  {
+    "key": "memberImport.subtitle",
+    "zh-CN": "无需邮箱，账号立即激活；不自动分配业务角色，权限由管理员手工维护。",
+    "en-US": "Create active accounts without email. Roles remain unassigned for manual administration."
+  },
+  {
+    "key": "memberImport.file.title",
+    "zh-CN": "员工账号工作簿",
+    "en-US": "Employee account workbook"
+  },
+  {
+    "key": "memberImport.file.help",
+    "zh-CN": "字段：姓名、登录名、手机号、工号、部门编码、岗位编码。",
+    "en-US": "Columns: Name, login name, mobile, employee code, department code, and position code."
+  },
+  {
+    "key": "memberImport.template.download",
+    "zh-CN": "下载模板",
+    "en-US": "Download template"
+  },
+  {
+    "key": "memberImport.template.downloading",
+    "zh-CN": "正在下载…",
+    "en-US": "Downloading…"
+  },
+  {
+    "key": "memberImport.preview.action",
+    "zh-CN": "预检文件",
+    "en-US": "Validate workbook"
+  },
+  {
+    "key": "memberImport.preview.running",
+    "zh-CN": "正在预检…",
+    "en-US": "Validating…"
+  },
+  {
+    "key": "memberImport.preview.total",
+    "zh-CN": "总行数",
+    "en-US": "Total"
+  },
+  {
+    "key": "memberImport.preview.valid",
+    "zh-CN": "可导入",
+    "en-US": "Valid"
+  },
+  {
+    "key": "memberImport.preview.errors",
+    "zh-CN": "错误",
+    "en-US": "Errors"
+  },
+  {
+    "key": "memberImport.commit.action",
+    "zh-CN": "确认开通",
+    "en-US": "Confirm import"
+  },
+  {
+    "key": "memberImport.commit.running",
+    "zh-CN": "正在创建账号…",
+    "en-US": "Creating accounts…"
+  },
+  {
+    "key": "memberImport.action.createAccount",
+    "zh-CN": "只创建账号",
+    "en-US": "Create account"
+  },
+  {
+    "key": "memberImport.action.createEmployee",
+    "zh-CN": "创建账号和组织人员",
+    "en-US": "Create account and employee"
+  },
+  {
+    "key": "memberImport.action.linkEmployee",
+    "zh-CN": "关联已有组织人员",
+    "en-US": "Link existing employee"
+  },
+  {
+    "key": "memberImport.action.error",
+    "zh-CN": "错误",
+    "en-US": "Error"
+  },
+  {
+    "key": "memberImport.field.name",
+    "zh-CN": "姓名",
+    "en-US": "Name"
+  },
+  {
+    "key": "memberImport.field.loginName",
+    "zh-CN": "登录名",
+    "en-US": "Login name"
+  },
+  {
+    "key": "memberImport.field.employeeCode",
+    "zh-CN": "工号",
+    "en-US": "Employee code"
+  },
+  {
+    "key": "memberImport.field.departmentCode",
+    "zh-CN": "部门编码",
+    "en-US": "Department code"
+  },
+  {
+    "key": "memberImport.field.positionCode",
+    "zh-CN": "岗位编码",
+    "en-US": "Position code"
+  },
+  {
+    "key": "memberImport.field.initialPassword",
+    "zh-CN": "初始密码",
+    "en-US": "Initial password"
+  },
+  {
+    "key": "memberImport.field.action",
+    "zh-CN": "处理动作",
+    "en-US": "Action"
+  },
+  {
+    "key": "memberImport.field.issue",
+    "zh-CN": "问题",
+    "en-US": "Issue"
+  },
+  {
+    "key": "memberImport.result.title",
+    "zh-CN": "账号已创建",
+    "en-US": "Accounts created"
+  },
+  {
+    "key": "memberImport.result.secretHint",
+    "zh-CN": "请立即保存凭据；关闭本弹窗后系统不会再次提供明文密码。",
+    "en-US": "Save these credentials now. Plaintext passwords are not available after this dialog closes."
+  },
+  {
+    "key": "memberImport.result.downloadCredentials",
+    "zh-CN": "下载账号凭据",
+    "en-US": "Download credentials"
+  },
+  {
+    "key": "memberImport.error.selectFile",
+    "zh-CN": "请先选择 Excel 文件。",
+    "en-US": "Select an Excel file first."
+  },
+  {
+    "key": "memberImport.error.invalidTemplate",
+    "zh-CN": "服务端未返回有效的 Excel 模板。",
+    "en-US": "The server did not return a valid Excel template."
+  },
+  {
+    "key": "memberImport.error.download",
+    "zh-CN": "模板下载失败。",
+    "en-US": "Template download failed."
+  },
+  {
+    "key": "memberImport.error.preview",
+    "zh-CN": "文件预检失败。",
+    "en-US": "Workbook validation failed."
+  },
+  {
+    "key": "memberImport.error.commit",
+    "zh-CN": "账号导入失败。",
+    "en-US": "Account import failed."
+  },
+  {
     "key": "action.close",
     "zh-CN": "关闭",
     "en-US": "Close",
