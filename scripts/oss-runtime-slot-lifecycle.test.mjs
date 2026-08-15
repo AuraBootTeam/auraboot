@@ -24,4 +24,13 @@ test('golden stack uses idempotent runtime identity with source worktree metadat
   assert.match(source, /--source-root "\$REPO_ROOT"/u);
   assert.match(source, /runtime allocate auraboot "\$name"/u);
   assert.match(source, /legacy dispatcher/u);
+  assert.match(source, /--mode "\$runtime_mode"/u);
+});
+
+test('fresh gate marks its runtime as verification evidence rather than feature development', () => {
+  const source = readFileSync(gatePath, 'utf8');
+  const stack = readFileSync(stackPath, 'utf8');
+  assert.match(source, /--runtime-mode verification/u);
+  assert.match(source, /SEED_LOG_DIR="\$AURA_EVIDENCE_ROOT/u);
+  assert.match(stack, /export PW_ARTIFACT_DIR=\$evidence_root/u);
 });

@@ -15,7 +15,7 @@
 # need the full showcase data, run scripts/oss-reset-and-init.sh separately (dormancy-guarded).
 #
 # Usage:
-#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--no-frontend] [--no-warm] [--fresh-db] [--ttl 6h] [--plugin-profile P|--plugin X]
+#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--runtime-mode development|verification|control|performance] [--no-frontend] [--no-warm] [--fresh-db] [--ttl 6h] [--plugin-profile P|--plugin X]
 #       --no-warm : keep the frontend but skip the setup/auth/pre-warm step — for goldens
 #                   that self-provision accounts and run with --no-deps (no storageState).
 #       --fresh-db: drop + recreate the slot's database before applying the snapshot. `up`
@@ -226,11 +226,12 @@ PY
 # ---- up ------------------------------------------------------------------------------
 cmd_up() {
   local name="$1"; shift
-  local slot="" ttl="6h" frontend=1 warm=1 fresh_db=0
+  local slot="" ttl="6h" runtime_mode="development" frontend=1 warm=1 fresh_db=0
   local plugin_profile="" import_plugins=()
   while [ $# -gt 0 ]; do case "$1" in
     --slot) slot="$2"; shift 2;;
     --ttl) ttl="$2"; shift 2;;
+    --runtime-mode) runtime_mode="$2"; shift 2;;
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
     --fresh-db) fresh_db=1; shift;;
@@ -246,6 +247,10 @@ cmd_up() {
     *) die "unknown arg: $1";;
   esac; done
   [ -n "$slot" ] || die "--slot N is required for 'up' (pick a free slot: $DEV runtime list)"
+  case "$runtime_mode" in
+    development|verification|control|performance) ;;
+    *) die "--runtime-mode must be development|verification|control|performance" ;;
+  esac
 
   local sd; sd="$(state_dir "$name")"; mkdir -p "$sd"
 
@@ -255,8 +260,9 @@ cmd_up() {
   # compatibility branch for workspaces that have not yet upgraded the root dispatcher.
   if "$DEV" runtime 2>/dev/null | grep -q 'runtime ensure'; then
     "$DEV" runtime ensure auraboot "$name" --slot "$slot" \
-      --purpose "OSS host-first golden stack" --ttl "$ttl" --source-root "$REPO_ROOT" >/dev/null
-    log "    ensured stable allocation (slot $slot, source=$REPO_ROOT)"
+      --purpose "OSS host-first golden stack" --ttl "$ttl" --source-root "$REPO_ROOT" \
+      --mode "$runtime_mode" >/dev/null
+    log "    ensured stable allocation (slot $slot, source=$REPO_ROOT, mode=$runtime_mode)"
   else
     local allocated_slot=""
     local env_file="$WORKSPACE/.workspace/env/$name.env"
@@ -593,10 +599,12 @@ cmd_env() {
   local name="$1" sd; sd="$(state_dir "$name")"
   [ -f "$sd/ports" ] || die "no running stack for '$name' (run 'up' first)"
   read -r server_port vite_port bff_port <"$sd/ports"
-  local pg_host pg_port pg_user pg_db pg_pass
+  local pg_host pg_port pg_user pg_db pg_pass evidence_root
   if [ -f "$sd/pgenv" ]; then
     read -r pg_host pg_port pg_user pg_db pg_pass <"$sd/pgenv"
   fi
+  evidence_root="$(runtime_env "$name" AURA_EVIDENCE_ROOT)"
+  [ -n "$evidence_root" ] || die "runtime env lacks AURA_EVIDENCE_ROOT; deploy the workspace runtime lifecycle before running this gate"
   cat <<EOF
 # Playwright env contract for golden specs against '$name' (run from web-admin/):
 export PLAYWRIGHT_BASE_URL=http://127.0.0.1:$vite_port
@@ -605,6 +613,10 @@ export BE_PORT=$server_port
 export BFF_PORT=$bff_port
 export PW_SKIP_WEBSERVER=1
 export NO_PROXY=localhost,127.0.0.1
+export AURA_EVIDENCE_ROOT=$evidence_root
+export PW_ARTIFACT_DIR=$evidence_root/playwright/artifacts
+export PW_REPORT_DIR=$evidence_root/playwright/report
+export PW_RESULTS_JSON=$evidence_root/playwright/report/results.json
 # Isolated-DB coordinates for the Playwright 'setup' project (00-bootstrap's
 # node-postgres invariant checks read PG* / PGHOST etc.); harmless for golden specs.
 export PGHOST=${pg_host:-127.0.0.1}

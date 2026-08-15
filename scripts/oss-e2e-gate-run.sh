@@ -236,7 +236,7 @@ log "1/5 fresh stack: destroy any prior '$NAME' + up --fresh-db --plugin-profile
 # Default `up` runs the warm step (setup -> auth storageState -> pre-warm), which
 # is what produces tests/storage/admin.json — both the seed and the `oss` project
 # need that storageState, so warm is required here (do NOT pass --no-warm).
-"$GS" up "$NAME" --slot "$SLOT" --ttl 3h --fresh-db --plugin-profile demo \
+"$GS" up "$NAME" --slot "$SLOT" --ttl 3h --runtime-mode verification --fresh-db --plugin-profile demo \
   || die_env "stack bring-up failed — see the golden-stack logs under $WORKSPACE/.workspace/golden/$NAME/"
 
 # The demo profile does not carry the internal test-fixtures plugin, and ~60 OSS
@@ -251,6 +251,8 @@ log "1b/5 import internal test-fixtures plugin (e2et_* models)"
 # --- 2. resolve the stack env (base URL + backend + PG*) ---------------------
 log "2/5 resolve stack env"
 eval "$("$GS" env "$NAME")" || die_env "could not resolve stack env for '$NAME'"
+mkdir -p "$AURA_EVIDENCE_ROOT/logs" "$AURA_EVIDENCE_ROOT/seed"
+LOG="$AURA_EVIDENCE_ROOT/logs/oss-e2e-gate-$(date +%Y%m%d-%H%M%S).log"
 log "    base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL bff=$BFF_PORT (AGENT_LLM_STUB_MODE=$AGENT_LLM_STUB_MODE)"
 
 # Resolve the demo default dashboard BEFORE seeding (the finalization phase reads
@@ -264,7 +266,7 @@ log "    default dashboard target: $SHOWCASE_DEFAULT_DASHBOARD_CODE"
 # The gate's default scope includes seed-data-dependent specs; a minimal
 # bootstrap alone leaves ~28 of them red. Seed loudly-or-die.
 log "3/5 seed: full showcase sequence + workflow-demo (loud on failure)"
-SEED_LOG_DIR="$REPO_ROOT/web-admin/test-results/seed/oss-e2e-gate"
+SEED_LOG_DIR="$AURA_EVIDENCE_ROOT/seed/oss-e2e-gate"
 mkdir -p "$SEED_LOG_DIR"
 (
   cd "$REPO_ROOT/web-admin" || exit 90
@@ -310,7 +312,7 @@ else
   printf '%s[oss-e2e-gate]   OSS E2E GATE: FAIL (test-failure, rc=%s)%s\n' "$C_ERR" "$GATE_RC" "$C_OFF"
   [[ -n "$SUMMARY" ]] && log "  $SUMMARY"
   log "  full log:    $LOG"
-  log "  artifacts:   $REPO_ROOT/web-admin/test-results/"
+  log "  artifacts:   $AURA_EVIDENCE_ROOT"
   log "  (re-run with --keep to inspect the live stack)"
 fi
 echo "=============================================================="
