@@ -31,7 +31,9 @@ type AuthenticationResponse = {
   tenantId?: number | string;
 };
 
-const RUN_ID = uniqueId('acct').replace(/[^a-zA-Z0-9]/g, '').slice(-10);
+const RUN_ID = uniqueId('acct')
+  .replace(/[^a-zA-Z0-9]/g, '')
+  .slice(-10);
 const JSON_EMPLOYEE_NAME = `端到端甲${RUN_ID}`;
 const XLSX_EMPLOYEE_NAME = `端到端乙${RUN_ID}`;
 const RESET_EMPLOYEE_NAME = `端到端丙${RUN_ID}`;
@@ -54,7 +56,9 @@ test.describe.serial('Employee Account Login Policy @auth @critical', () => {
     }
   });
 
-  test('EAL-001: JSON employee account uses name login and jjzz random password', async ({ browser }) => {
+  test('EAL-001: JSON employee account uses name login and jjzz random password', async ({
+    browser,
+  }) => {
     assertGeneratedEmployee(jsonEmployee, JSON_EMPLOYEE_NAME);
 
     const page = await newPublicPage(browser);
@@ -71,7 +75,9 @@ test.describe.serial('Employee Account Login Policy @auth @critical', () => {
     }
   });
 
-  test('EAL-002: Excel employee import provisions a loginable name account', async ({ browser }) => {
+  test('EAL-002: Excel employee import provisions a loginable name account', async ({
+    browser,
+  }) => {
     assertGeneratedEmployee(xlsxEmployee, XLSX_EMPLOYEE_NAME);
 
     const page = await newPublicPage(browser);
@@ -84,7 +90,9 @@ test.describe.serial('Employee Account Login Policy @auth @critical', () => {
     }
   });
 
-  test('EAL-003: admin reset keeps password admin-managed and does not force user change', async ({ browser }) => {
+  test('EAL-003: admin reset keeps password admin-managed and does not force user change', async ({
+    browser,
+  }) => {
     const adminPage = await newPublicPage(browser);
     let resetPassword: string;
     try {
@@ -149,7 +157,9 @@ test.describe.serial('Employee Account Login Policy @auth @critical', () => {
     }
   });
 
-  test('EAL-005: authenticated users cannot call self-service change-password API', async ({ browser }) => {
+  test('EAL-005: authenticated users cannot call self-service change-password API', async ({
+    browser,
+  }) => {
     const page = await newPublicPage(browser);
     try {
       await loginWithIdentifier(page, jsonEmployee.userName, jsonEmployee.initialPassword);
@@ -203,10 +213,11 @@ async function importEmployeeWorkbook(
 ): Promise<EmployeeAccount> {
   const workbook = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet([
-    ['序号', '姓名', '类型', '手机'],
-    [1, name, '管理员', 18600001234],
+    ['填写说明：姓名必填；登录名为空时默认使用姓名。'],
+    ['姓名*', '登录名', '手机号', '工号', '部门编码', '岗位编码'],
+    [name, name, '18600001234', '', '', ''],
   ]);
-  XLSX.utils.book_append_sheet(workbook, sheet, '在职人员信息');
+  XLSX.utils.book_append_sheet(workbook, sheet, '账号导入');
   const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
 
   const response = await page.request.post('/api/admin/users/employee-accounts/import', {
@@ -245,14 +256,17 @@ async function loginAdminHeaders(page: Page): Promise<Record<string, string>> {
     const spacesResp = await page.request.get('/api/tenant-selection/my-spaces', {
       headers: bearerHeaders(jwt),
     });
-    const spaces = await expectApiSuccess<Array<{ tenantId: number | string; tenantName?: string; spaceType?: string }>>(
-      spacesResp,
-      'admin tenant spaces for employee-account E2E setup',
-    );
+    const spaces = await expectApiSuccess<
+      Array<{ tenantId: number | string; tenantName?: string; spaceType?: string }>
+    >(spacesResp, 'admin tenant spaces for employee-account E2E setup');
     const businessSpace =
-      spaces.find((space) => space.spaceType === 'business' && space.tenantName === 'AuraBoot Demo') ??
-      spaces.find((space) => space.spaceType === 'business');
-    expect(businessSpace, 'admin should have a business tenant for employee-account E2E').toBeTruthy();
+      spaces.find(
+        (space) => space.spaceType === 'business' && space.tenantName === 'AuraBoot Demo',
+      ) ?? spaces.find((space) => space.spaceType === 'business');
+    expect(
+      businessSpace,
+      'admin should have a business tenant for employee-account E2E',
+    ).toBeTruthy();
 
     const selectResp = await page.request.post('/api/tenant-selection/process', {
       headers: bearerHeaders(jwt),
@@ -284,9 +298,10 @@ async function ensureEmailPasswordLoginChannel(page: Page, headers: Record<strin
   } catch {
     body = { code: String(response.status()), message: raw };
   }
-  expect(response.ok(), `ensure account/password login channel: HTTP ${response.status()} ${body.message ?? ''}`).toBe(
-    true,
-  );
+  expect(
+    response.ok(),
+    `ensure account/password login channel: HTTP ${response.status()} ${body.message ?? ''}`,
+  ).toBe(true);
   expect(body.code, 'ensure account/password login channel: business code').toBe('0');
 }
 
@@ -313,9 +328,8 @@ async function expectApiSuccess<T>(response: APIResponse, message: string): Prom
 function assertGeneratedEmployee(account: EmployeeAccount, expectedName: string) {
   expect(account.name).toBe(expectedName);
   expect(account.userName).toBe(expectedName);
-  expect(account.type).toBe('管理员');
   expect(account.initialPassword).toMatch(/^jjzz@\d{4}$/);
-  expect(account.assignedRoles).toContain('tenant_admin');
+  expect(account.assignedRoles).toEqual([]);
   expect(account.mustChangePassword).toBe(false);
 }
 

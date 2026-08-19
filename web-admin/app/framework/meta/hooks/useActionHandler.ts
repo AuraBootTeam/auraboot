@@ -597,16 +597,60 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       const tempPassword = (data as Record<string, unknown>).tempPassword;
       if (typeof tempPassword !== 'string' || tempPassword.length === 0) return;
 
-      void navigator.clipboard?.writeText(tempPassword).catch(() => undefined);
+      const userName = toNonBlankString((data as Record<string, unknown>).userName);
+      const hasCompleteCredentials = userName !== undefined;
+      const title = t(
+        hasCompleteCredentials
+          ? 'message.accountCredentials.generated.title'
+          : 'message.temporaryPassword.generated.title',
+        undefined,
+        hasCompleteCredentials
+          ? 'Account credentials generated'
+          : 'Temporary password generated',
+      );
+      const contentParams = { userName: userName ?? '', tempPassword };
+      const content = formatMessage(
+        contentParams,
+        t(
+          hasCompleteCredentials
+            ? 'message.accountCredentials.generated.content'
+            : 'message.temporaryPassword.generated.content',
+          contentParams,
+          hasCompleteCredentials
+            ? 'Save and deliver these credentials now. Login name: {userName}; temporary password (shown once): {tempPassword}'
+            : 'Save and deliver this temporary password now. It is shown once: {tempPassword}',
+        ),
+      );
+      const clipboardText = hasCompleteCredentials
+        ? formatMessage(
+            contentParams,
+            t(
+              'message.accountCredentials.clipboard',
+              contentParams,
+              'Login name: {userName}\nTemporary password: {tempPassword}',
+            ),
+          )
+        : tempPassword;
+      const toastMessage = t(
+        hasCompleteCredentials
+          ? 'message.accountCredentials.generated.toast'
+          : 'message.temporaryPassword.generated.toast',
+        undefined,
+        hasCompleteCredentials
+          ? 'Account credentials generated and copied when permitted'
+          : 'Temporary password generated and copied when permitted',
+      );
+
+      void navigator.clipboard?.writeText(clipboardText).catch(() => undefined);
       void confirmDialog({
-        title: '临时密码已生成',
-        content: `请立即保存并交付给用户，临时密码只显示一次：${tempPassword}`,
-        confirmText: '我已保存',
-        cancelText: '关闭',
+        title,
+        content,
+        confirmText: t('action.confirm', undefined, 'Confirm'),
+        cancelText: t('action.close', undefined, 'Close'),
       });
-      notifyToast(`临时密码已生成并尝试复制: ${tempPassword}`, 'success');
+      notifyToast(toastMessage, 'success');
     },
-    [notifyToast],
+    [notifyToast, t],
   );
 
   const handleAction = useCallback(

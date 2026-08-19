@@ -171,6 +171,9 @@ class TenantMemberCommandHandlerTest {
                 .employeePid("emp-001")
                 .userPid("user-001")
                 .memberPid("member-001")
+                .email(null)
+                .userName("emp_emp001")
+                .displayName("No Email Employee")
                 .createdUser(true)
                 .createdMember(true)
                 .adminManaged(true)
@@ -184,6 +187,9 @@ class TenantMemberCommandHandlerTest {
         assertThat(result.get("employeePid")).isEqualTo("emp-001");
         assertThat(result.get("memberPid")).isEqualTo("member-001");
         assertThat(result.get("userPid")).isEqualTo("user-001");
+        assertThat(result.get("email")).isNull();
+        assertThat(result.get("userName")).isEqualTo("emp_emp001");
+        assertThat(result.get("displayName")).isEqualTo("No Email Employee");
         assertThat(result.get("createdUser")).isEqualTo(true);
         assertThat(result.get("createdMember")).isEqualTo(true);
         assertThat(result.get("adminManaged")).isEqualTo(true);

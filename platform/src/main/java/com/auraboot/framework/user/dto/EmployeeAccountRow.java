@@ -17,6 +17,10 @@ public class EmployeeAccountRow {
     @Size(max = 64)
     private String name;
 
+    /** Optional login name. Defaults to {@link #name} when blank. */
+    @Size(max = 64)
+    private String userName;
+
     /**
      * Optional business label (销售/采购/工程/…). Metadata only — it is echoed
      * back in the response and does not derive any roles. Roles come from
@@ -37,4 +41,19 @@ public class EmployeeAccountRow {
 
     @Size(max = 64)
     private String mobile;
+
+    /** Stable employee number used to create or link an organization employee. */
+    @Size(max = 50)
+    private String employeeCode;
+
+    /** Unique organization department code. */
+    @Size(max = 50)
+    private String departmentCode;
+
+    /** Unique organization position code. */
+    @Size(max = 50)
+    private String positionCode;
+
+    /** Original one-based workbook row number; not accepted from public JSON. */
+    private transient Integer sourceRowNumber;
 }

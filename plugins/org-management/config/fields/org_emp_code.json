@@ -3,7 +3,7 @@
   "displayName:zh-CN": "员工编码",
   "displayName:en": "Employee Code",
   "dataType": "string",
-  "constraints": { "maxLength": 50 },
+  "constraints": { "unique": true, "maxLength": 50 },
   "feature": { "searchable": true, "sortable": true },
   "extension": { "readOnly": true, "placeholder:zh-CN": "自动生成" }
 }

@@ -11,6 +11,8 @@ import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.user.dto.EmployeeAccountProvisionRequest;
 import com.auraboot.framework.user.dto.EmployeeAccountProvisionResponse;
+import com.auraboot.framework.user.dto.EmployeeAccountImportPreviewResponse;
+import com.auraboot.framework.user.dto.EmployeeAccountRow;
 import com.auraboot.framework.user.dto.UserProvisionRequest;
 import com.auraboot.framework.user.dto.UserProvisionResponse;
 import com.auraboot.framework.user.dto.UserSearchDTO;
@@ -21,6 +23,7 @@ import com.auraboot.framework.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -28,6 +31,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.List;
 import java.util.Map;
@@ -88,8 +94,41 @@ public class AdminUserController {
     }
 
     /**
+     * Download the canonical employee account workbook.
+     */
+    @GetMapping(value = "/employee-accounts/import/template",
+            produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    @Operation(summary = "Download the employee account import template")
+    @RequirePermission(MetaPermission.ROLE_MANAGE)
+    public void downloadEmployeeAccountTemplate(HttpServletResponse response) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        employeeAccountWorkbookParser.writeTemplate(output);
+        byte[] bytes = output.toByteArray();
+        String encodedName = URLEncoder.encode("用户导入模板.xlsx", StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition",
+                "attachment; filename=\"user-import-template.xlsx\"; filename*=UTF-8''" + encodedName);
+        response.setContentLength(bytes.length);
+        response.getOutputStream().write(bytes);
+    }
+
+    /**
+     * Parse and validate an employee account workbook without writing data.
+     */
+    @PostMapping(value = "/employee-accounts/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Preview an employee account workbook in the current tenant")
+    @RequirePermission(MetaPermission.ROLE_MANAGE)
+    public ApiResponse<EmployeeAccountImportPreviewResponse> previewEmployeeAccounts(
+            @RequestParam("file") MultipartFile file) {
+        Long tenantId = requireTenantId();
+        List<EmployeeAccountRow> rows = parseEmployeeWorkbook(file);
+        return ApiResponse.success(employeeAccountProvisioningService.preview(rows, tenantId));
+    }
+
+    /**
      * Customer employee account provisioning from Excel.
-     * Expected headers: 姓名, 类型, optional 手机/邮箱.
+     * Canonical headers: 姓名*, 登录名, 手机号, 工号, 部门编码, 岗位编码.
      */
     @PostMapping(value = "/employee-accounts/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Import customer employee accounts from Excel in the current tenant")
@@ -99,28 +138,43 @@ public class AdminUserController {
             @RequestParam(required = false) String passwordPrefix,
             @RequestParam(required = false) Integer randomDigitCount,
             @CurrentUserId Long currentUserId) {
+        Long tenantId = requireTenantId();
+        EmployeeAccountProvisionRequest request = new EmployeeAccountProvisionRequest();
+        request.setEmployees(parseEmployeeWorkbook(file));
+        if (passwordPrefix != null && !passwordPrefix.isBlank()) {
+            request.setPasswordPrefix(passwordPrefix);
+        }
+        if (randomDigitCount != null) {
+            request.setRandomDigitCount(randomDigitCount);
+        }
+        EmployeeAccountProvisionResponse response =
+                employeeAccountProvisioningService.provision(request, tenantId, currentUserId);
+        return ApiResponse.success(response);
+    }
+
+    private Long requireTenantId() {
         Long tenantId = MetaContext.getCurrentTenantId();
         if (tenantId == null) {
-            throw new RootUnCheckedException(ResponseCode.BadParam, "No tenant context — admin must be in a tenant");
+            throw new RootUnCheckedException(ResponseCode.BadParam,
+                    "No tenant context — admin must be in a tenant");
         }
-        if (file == null || file.isEmpty()) {
-            throw new RootUnCheckedException(ResponseCode.BadParam, "Employee account import file is required");
-        }
+        return tenantId;
+    }
 
+    private List<EmployeeAccountRow> parseEmployeeWorkbook(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new RootUnCheckedException(ResponseCode.BadParam,
+                    "Employee account import file is required");
+        }
+        String fileName = file.getOriginalFilename();
+        if (fileName == null || !fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".xlsx")) {
+            throw new RootUnCheckedException(ResponseCode.BadParam, "Only .xlsx files are supported");
+        }
         try {
-            EmployeeAccountProvisionRequest request = new EmployeeAccountProvisionRequest();
-            request.setEmployees(employeeAccountWorkbookParser.parse(file.getInputStream()));
-            if (passwordPrefix != null && !passwordPrefix.isBlank()) {
-                request.setPasswordPrefix(passwordPrefix);
-            }
-            if (randomDigitCount != null) {
-                request.setRandomDigitCount(randomDigitCount);
-            }
-            EmployeeAccountProvisionResponse response =
-                    employeeAccountProvisioningService.provision(request, tenantId, currentUserId);
-            return ApiResponse.success(response);
+            return employeeAccountWorkbookParser.parse(file.getInputStream());
         } catch (IOException e) {
-            throw new RootUnCheckedException(ResponseCode.BadParam, "Failed to read employee account import file", e);
+            throw new RootUnCheckedException(ResponseCode.BadParam,
+                    "Failed to read employee account import file", e);
         }
     }
 

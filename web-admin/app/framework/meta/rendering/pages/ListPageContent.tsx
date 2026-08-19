@@ -132,6 +132,7 @@ import {
 import { savedViewService, type ChipPin } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
+import { TenantMemberAccountImportDialog } from './list/TenantMemberAccountImportDialog';
 import {
   buildCommandTargetParams,
   getLegacyCompatibleRecordPid,
@@ -934,23 +935,6 @@ interface InviteCodeData {
   createdAt?: string;
 }
 
-interface TenantMemberImportError {
-  rowNumber: number;
-  name?: string | null;
-  email?: string | null;
-  reason: string;
-}
-
-interface TenantMemberImportResult {
-  totalRows: number;
-  successCount: number;
-  errorCount: number;
-  existingUserBoundCount: number;
-  invitedCount: number;
-  employeeCreatedCount: number;
-  errors: TenantMemberImportError[];
-}
-
 // Quick filter chip definitions — preset views (T8). Keys + filter logic live
 // in ./list/quickFilterPresets so the toolbar and the view switcher share one
 // source of truth.
@@ -1317,10 +1301,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Sync URL sorts -> local state (supports refresh and browser back/forward).
   useEffect(() => {
     const currentUrlEncoding = searchParams.get('sort');
-    const syncAction = resolveUrlStateSyncAction(
-      pendingSortUrlSyncRef.current,
-      currentUrlEncoding,
-    );
+    const syncAction = resolveUrlStateSyncAction(pendingSortUrlSyncRef.current, currentUrlEncoding);
     if (syncAction === 'wait-for-local') return;
     if (syncAction === 'ack-local') {
       pendingSortUrlSyncRef.current = undefined;
@@ -1418,12 +1399,6 @@ function ListPageContentInner(props: PageContentProps) {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteCodeData, setInviteCodeData] = useState<InviteCodeData | null>(null);
   const [memberImportDialogOpen, setMemberImportDialogOpen] = useState(false);
-  const [memberImportFile, setMemberImportFile] = useState<File | null>(null);
-  const [memberImportLoading, setMemberImportLoading] = useState(false);
-  const [memberImportError, setMemberImportError] = useState<string | null>(null);
-  const [memberImportResult, setMemberImportResult] = useState<TenantMemberImportResult | null>(
-    null,
-  );
   const [bulkActionResult, setBulkActionResult] = useState<BulkActionResult | null>(null);
   const { formats: dateTimeFormats, timezone: effectiveTimezone } = useTimezone();
   const pendingSavedViewFiltersRef = useRef<Record<string, any> | null>(null);
@@ -4490,80 +4465,6 @@ function ListPageContentInner(props: PageContentProps) {
     }
   }, [inviteCodeData?.code, showErrorToast, showSuccessToast, token]);
 
-  const resetMemberImportState = useCallback(() => {
-    setMemberImportFile(null);
-    setMemberImportLoading(false);
-    setMemberImportError(null);
-    setMemberImportResult(null);
-  }, []);
-
-  const handleTenantMemberImport = useCallback(async () => {
-    if (!memberImportFile) {
-      setMemberImportError('请先选择 Excel 文件');
-      return;
-    }
-
-    setMemberImportLoading(true);
-    setMemberImportError(null);
-    try {
-      const XLSX = await import('xlsx');
-      const workbook = XLSX.read(await memberImportFile.arrayBuffer(), { type: 'array' });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      if (!firstSheet) {
-        throw new Error('Excel 文件缺少可读取的工作表');
-      }
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: '' });
-      const payload = rows.map((row) => ({
-        name: String(row['姓名*'] ?? row['姓名'] ?? row['name'] ?? '').trim(),
-        email: String(row['邮箱*'] ?? row['邮箱'] ?? row['email'] ?? '').trim(),
-        phone: String(row['手机号'] ?? row['手机'] ?? row['phone'] ?? '').trim(),
-        department: String(row['部门'] ?? row['department'] ?? '').trim(),
-        position: String(row['职位'] ?? row['position'] ?? '').trim(),
-      }));
-
-      const response = await fetch('/api/tenant/members/import-rows', {
-        method: 'post',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(payload),
-      });
-      const body = await response.json().catch(() => null);
-      if (!response.ok || !body || !ResultHelper.isSuccess(body)) {
-        throw new Error(body?.message || body?.desc || '批量导入失败');
-      }
-
-      const result = body.data as TenantMemberImportResult;
-      setMemberImportResult(result);
-      if (result.successCount > 0) {
-        showSuccessToast(`已导入 ${result.successCount} 条成员记录`);
-        await loadDataRef.current?.({
-          page: 0,
-          size: pagination.pageSize,
-          filters,
-        });
-      }
-      if (result.errorCount > 0) {
-        showWarningToast(`有 ${result.errorCount} 条记录导入失败，请检查错误列表`);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '批量导入失败';
-      setMemberImportError(message);
-      showErrorToast(message);
-    } finally {
-      setMemberImportLoading(false);
-    }
-  }, [
-    filters,
-    memberImportFile,
-    pagination.pageSize,
-    showErrorToast,
-    showSuccessToast,
-    showWarningToast,
-    token,
-  ]);
-
   const listTabsBlock = useMemo(() => {
     const found = allBlocks.find((block: any) => block.blockType === 'tabs');
     return found;
@@ -4747,10 +4648,7 @@ function ListPageContentInner(props: PageContentProps) {
             exportFilters={exportFilterConditions}
             isTenantMemberPage={isTenantMemberPage}
             onInvite={() => setInviteDialogOpen(true)}
-            onImportMembers={() => {
-              resetMemberImportState();
-              setMemberImportDialogOpen(true);
-            }}
+            onImportMembers={() => setMemberImportDialogOpen(true)}
             hideSavedViews={hideSavedViews}
             hideBuiltInImport={
               skipListData ? true : (listExtensions?.hideBuiltInImport ?? !canImport)
@@ -4771,227 +4669,19 @@ function ListPageContentInner(props: PageContentProps) {
             }
           />
 
-          {isTenantMemberPage && memberImportDialogOpen && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              data-testid="member-import-dialog"
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-            >
-              <div className="rounded-card bg-panel w-full max-w-2xl p-6 shadow-xl">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-text text-lg font-semibold">批量导入成员</h3>
-                    <p className="text-text-2 mt-1 text-sm">
-                      入口归属 tenant_member。导入的主语义是批量准入，不是直接维护组织树。
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMemberImportDialogOpen(false);
-                      resetMemberImportState();
-                    }}
-                    className="text-text-2 hover:text-text-2 text-sm"
-                  >
-                    关闭
-                  </button>
-                </div>
-
-                <div className="text-text-2 space-y-4 text-sm">
-                  <div className="rounded-control bg-accent-weak border border-blue-200 p-3">
-                    <p className="font-medium text-blue-900">推荐流程</p>
-                    <p className="mt-1 text-blue-800">
-                      Excel 导入先处理租户成员准入，再按邮箱复用已有 User
-                      或创建待激活账号，最后再建立组织关系。
-                    </p>
-                  </div>
-
-                  <div className="rounded-control border-border bg-subtle border p-4">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="text-text font-medium">1. 下载模板</p>
-                        <p className="text-text-2 mt-1 text-xs">
-                          支持 `.xlsx`。必填列是姓名、邮箱；部门和职位用于补全组织关系。
-                        </p>
-                      </div>
-                      <a
-                        href="/api/tenant/members/import/template"
-                        className="rounded-control bg-panel text-accent hover:bg-accent-weak inline-flex items-center justify-center border border-blue-200 px-3 py-2 text-sm font-medium"
-                      >
-                        下载模板
-                      </a>
-                    </div>
-
-                    <div className="mt-4">
-                      <p className="text-text font-medium">2. 选择文件</p>
-                      <input
-                        data-testid="member-import-file-input"
-                        type="file"
-                        accept=".xlsx,.xls"
-                        onChange={(event) => {
-                          const selectedFile = event.target.files?.[0] ?? null;
-                          setMemberImportFile(selectedFile);
-                          setMemberImportError(null);
-                        }}
-                        className="rounded-control border-border-strong text-text-2 file:rounded-control file:bg-accent hover:file:bg-accent-hover mt-2 block w-full border px-3 py-2 text-sm file:mr-3 file:border-0 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
-                      />
-                      {memberImportFile && (
-                        <p className="text-text-2 mt-2 text-xs">已选择: {memberImportFile.name}</p>
-                      )}
-                    </div>
-
-                    {memberImportError && (
-                      <div className="rounded-control bg-status-red-bg mt-3 border border-red-200 px-3 py-2 text-sm text-red-700">
-                        {memberImportError}
-                      </div>
-                    )}
-
-                    <div className="mt-4 flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMemberImportDialogOpen(false);
-                          resetMemberImportState();
-                        }}
-                        className="rounded-control border-border-strong text-text-2 hover:bg-hover border px-4 py-2 text-sm font-medium"
-                      >
-                        取消
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="member-import-submit"
-                        disabled={!memberImportFile || memberImportLoading}
-                        onClick={() => void handleTenantMemberImport()}
-                        className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-blue-300"
-                      >
-                        {memberImportLoading ? '导入中...' : '开始导入'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-text font-medium">导入结果分三类</p>
-                    <ul className="mt-2 list-disc space-y-1 pl-5">
-                      <li>已绑定已有用户：复用现有 User，创建 TenantMember，并建立组织关系</li>
-                      <li>待激活成员：创建准入记录，发送邀请，等首次设置密码后启用登录</li>
-                      <li>冲突项：邮箱重复、同租户已存在成员、部门不存在、职位不存在</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <p className="text-text font-medium">建议模板字段</p>
-                    <div className="rounded-control border-border mt-2 overflow-hidden border">
-                      <table className="divide-border min-w-full divide-y text-sm">
-                        <thead className="bg-subtle">
-                          <tr>
-                            <th className="text-text-2 px-3 py-2 text-left font-medium">字段</th>
-                            <th className="text-text-2 px-3 py-2 text-left font-medium">必填</th>
-                            <th className="text-text-2 px-3 py-2 text-left font-medium">说明</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-border bg-panel divide-y">
-                          <tr>
-                            <td className="px-3 py-2">姓名</td>
-                            <td className="px-3 py-2">是</td>
-                            <td className="px-3 py-2">员工显示名称</td>
-                          </tr>
-                          <tr>
-                            <td className="px-3 py-2">邮箱</td>
-                            <td className="px-3 py-2">是</td>
-                            <td className="px-3 py-2">作为账号识别键；优先用于复用已有 User</td>
-                          </tr>
-                          <tr>
-                            <td className="px-3 py-2">手机号</td>
-                            <td className="px-3 py-2">否</td>
-                            <td className="px-3 py-2">补充联系方式</td>
-                          </tr>
-                          <tr>
-                            <td className="px-3 py-2">部门</td>
-                            <td className="px-3 py-2">否</td>
-                            <td className="px-3 py-2">
-                              用于自动建立组织关系；不存在时进入冲突列表
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="px-3 py-2">职位</td>
-                            <td className="px-3 py-2">否</td>
-                            <td className="px-3 py-2">依赖部门/职位主数据匹配</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div className="rounded-control bg-status-amber-bg border border-amber-200 p-3 text-amber-900">
-                    第一版实现先固定入口和规则，不默认给新导入人员生成可直接登录的密码。新用户应走邀请激活链路。
-                  </div>
-
-                  {memberImportResult && (
-                    <div
-                      data-testid="member-import-result"
-                      className="rounded-card border border-emerald-200 bg-emerald-50 p-4"
-                    >
-                      <p className="font-medium text-emerald-900">导入结果</p>
-                      <div className="mt-2 grid gap-2 text-sm text-emerald-900 md:grid-cols-2">
-                        <div>总行数: {memberImportResult.totalRows}</div>
-                        <div>成功: {memberImportResult.successCount}</div>
-                        <div>复用已有用户: {memberImportResult.existingUserBoundCount}</div>
-                        <div>待激活邀请: {memberImportResult.invitedCount}</div>
-                        <div>建立组织关系: {memberImportResult.employeeCreatedCount}</div>
-                        <div>失败: {memberImportResult.errorCount}</div>
-                      </div>
-
-                      {memberImportResult.errors.length > 0 && (
-                        <div className="rounded-control bg-panel mt-4 overflow-hidden border border-amber-200">
-                          <table className="min-w-full divide-y divide-amber-100 text-sm">
-                            <thead className="bg-status-amber-bg">
-                              <tr>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">
-                                  行号
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">
-                                  姓名
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">
-                                  邮箱
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">
-                                  原因
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-amber-100">
-                              {memberImportResult.errors.slice(0, 10).map((item) => (
-                                <tr key={`${item.rowNumber}-${item.email ?? item.name ?? 'row'}`}>
-                                  <td className="px-3 py-2">{item.rowNumber}</td>
-                                  <td className="px-3 py-2">{item.name || '-'}</td>
-                                  <td className="px-3 py-2">{item.email || '-'}</td>
-                                  <td className="px-3 py-2 text-amber-900">{item.reason}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-6 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMemberImportDialogOpen(false);
-                      resetMemberImportState();
-                    }}
-                    className="rounded-control border-border-strong text-text-2 hover:bg-hover border px-4 py-2 text-sm font-medium"
-                  >
-                    关闭
-                  </button>
-                </div>
-              </div>
-            </div>
+          {isTenantMemberPage && (
+            <TenantMemberAccountImportDialog
+              open={memberImportDialogOpen}
+              token={token}
+              onClose={() => setMemberImportDialogOpen(false)}
+              onImported={async () => {
+                await loadDataRef.current?.({
+                  page: pagination.current - 1,
+                  size: pagination.pageSize,
+                  filters,
+                });
+              }}
+            />
           )}
 
           {isTenantMemberPage && inviteDialogOpen && (

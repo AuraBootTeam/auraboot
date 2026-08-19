@@ -31,6 +31,9 @@ describe('isBinaryDownloadPath', () => {
 
   it('detects generated Excel template endpoints before axios can decode OOXML as text', () => {
     expect(
+      isBinaryDownloadPath('/api/admin/users/employee-accounts/import/template'),
+    ).toBe(true);
+    expect(
       isBinaryDownloadPath('/api/meta/excel/template/crm_account_common?mode=insert'),
     ).toBe(true);
     expect(isBinaryDownloadPath('/api/meta/excel/template/crm_lead_common?mode=update')).toBe(true);

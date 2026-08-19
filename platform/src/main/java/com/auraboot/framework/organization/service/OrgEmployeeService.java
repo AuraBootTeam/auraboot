@@ -45,6 +45,11 @@ public interface OrgEmployeeService {
     OrgEmployeeDTO linkMember(LinkMemberRequest request);
 
     /**
+     * Link an existing organization employee record to an existing tenant member.
+     */
+    OrgEmployeeDTO linkExistingMember(String employeePid, String memberPid);
+
+    /**
      * Clear bidirectional link between member and employee.
      *
      * @param employeePid employee PID to unlink
