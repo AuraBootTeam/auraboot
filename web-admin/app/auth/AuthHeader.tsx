@@ -5,13 +5,16 @@ import { useTheme } from '~/contexts/ThemeContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { useHydrated } from '~/hooks/useHydrated';
 import { useAuth } from '~/contexts/AuthContext';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData } from '~/root-data';
+import { COMMUNITY_BRANDING, resolveBrandDisplayName } from '~/config/branding';
 import { isPublicRegistrationOpen } from '~/services/accessPolicy';
 
 export default function AuthHeader() {
-  const rootData = useRootLoaderData()!;
-  const compliance = rootData.icpCompliance;
-  const registrationOpen = isPublicRegistrationOpen(rootData.accessPolicy);
+  const rootData = useRootLoaderData();
+  const compliance = rootData!.icpCompliance;
+  const branding = rootData?.branding ?? COMMUNITY_BRANDING;
+  const displayName = resolveBrandDisplayName(branding, compliance);
+  const registrationOpen = isPublicRegistrationOpen(rootData!.accessPolicy);
   const { theme, setTheme, isDark } = useTheme();
   const { t, locale, setLocale } = useI18n();
   const isHydrated = useHydrated();
@@ -62,12 +65,12 @@ export default function AuthHeader() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left: Logo */}
         <Link to="/" className="flex items-center">
-          <img className="h-8 w-8 rounded-lg" src="/android-chrome-192x192.png" alt="AuraBoot" />
+          <img className="h-8 w-8 rounded-lg" src={branding.logoUrl} alt={branding.productName} />
           <span
             data-testid="auth-site-title"
             className="ml-3 text-xl font-bold text-gray-900 dark:text-white"
           >
-            {compliance.siteDisplayName}
+            {displayName}
           </span>
         </Link>
 

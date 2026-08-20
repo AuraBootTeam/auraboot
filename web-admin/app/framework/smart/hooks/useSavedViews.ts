@@ -48,6 +48,8 @@ export interface GroupedViews {
 export interface UseSavedViewsResult {
   /** All accessible views */
   views: SavedView[];
+  /** All views returned by the backend before the optional scope filter is applied. */
+  accessibleViews: SavedView[];
   /** Currently selected view */
   currentView: SavedView | null;
   /** Loading state */
@@ -104,6 +106,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
   const { modelCode, pageKey, scopeFilter = 'all', autoLoad = true } = options;
 
   const [views, setViews] = useState<SavedView[]>([]);
+  const [accessibleViews, setAccessibleViews] = useState<SavedView[]>([]);
   const [currentView, setCurrentView] = useState<SavedView | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -135,6 +138,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
       const scopedDefaultView =
         scopeFilter === 'all' || defaultView?.scope === scopeFilter ? defaultView : null;
 
+      setAccessibleViews(accessibleViews);
       setViews(scopedViews);
 
       const preservedView = selectedViewPidRef.current
@@ -145,8 +149,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
       // applies — so a personal view still wins under scopeFilter='personal', but a list
       // page with only a global default (e.g. a plugin's kanban preset) renders it instead
       // of silently falling back to the implicit table view.
-      const nextView =
-        preservedView ?? scopedDefaultView ?? scopedViews[0] ?? defaultView ?? null;
+      const nextView = preservedView ?? scopedDefaultView ?? scopedViews[0] ?? defaultView ?? null;
       selectedViewPidRef.current = nextView?.pid ?? null;
       setCurrentView(nextView);
     } catch (err) {
@@ -165,13 +168,13 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
    */
   const selectView = useCallback(
     (pid: string) => {
-      const view = views.find((v) => v.pid === pid);
+      const view = accessibleViews.find((v) => v.pid === pid);
       if (view) {
         selectedViewPidRef.current = view.pid;
         setCurrentView(view);
       }
     },
-    [views],
+    [accessibleViews],
   );
 
   const selectDefaultView = useCallback(() => {
@@ -185,6 +188,15 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
       if (!mountedRef.current) {
         return;
       }
+      setAccessibleViews((prev) => {
+        const existingIndex = prev.findIndex((item) => item.pid === view.pid);
+        if (existingIndex < 0) {
+          return [...prev, view];
+        }
+        const next = [...prev];
+        next[existingIndex] = view;
+        return next;
+      });
       if (scopeFilter !== 'all' && view.scope !== scopeFilter) {
         return;
       }
@@ -211,6 +223,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
     const newView = await savedViewService.createView(request);
 
     if (mountedRef.current) {
+      setAccessibleViews((prev) => [...prev, newView]);
       setViews((prev) => [...prev, newView]);
       selectedViewPidRef.current = newView.pid;
       setCurrentView(newView);
@@ -231,6 +244,9 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
       const updatedView = await savedViewService.updateView(currentView.pid, request);
 
       if (mountedRef.current) {
+        setAccessibleViews((prev) =>
+          prev.map((v) => (v.pid === updatedView.pid ? updatedView : v)),
+        );
         setViews((prev) => prev.map((v) => (v.pid === updatedView.pid ? updatedView : v)));
         selectedViewPidRef.current = updatedView.pid;
         setCurrentView(updatedView);
@@ -269,6 +285,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
       await savedViewService.deleteView(pid);
 
       if (mountedRef.current) {
+        setAccessibleViews((prev) => prev.filter((v) => v.pid !== pid));
         setViews((prev) => {
           const remaining = prev.filter((v) => v.pid !== pid);
 
@@ -294,6 +311,12 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
       await savedViewService.setDefaultView(pid);
 
       if (mountedRef.current) {
+        setAccessibleViews((prev) =>
+          prev.map((v) => ({
+            ...v,
+            isDefault: v.pid === pid,
+          })),
+        );
         // Update isDefault flag for all views
         setViews((prev) =>
           prev.map((v) => ({
@@ -318,6 +341,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
     const duplicatedView = await savedViewService.duplicateView(pid, newName);
 
     if (mountedRef.current) {
+      setAccessibleViews((prev) => [...prev, duplicatedView]);
       setViews((prev) => [...prev, duplicatedView]);
     }
 
@@ -332,6 +356,10 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
       const copiedView = await savedViewService.copyToPersonal(pid, request);
 
       if (mountedRef.current) {
+        setAccessibleViews((prev) => {
+          const withoutExisting = prev.filter((view) => view.pid !== copiedView.pid);
+          return [...withoutExisting, copiedView];
+        });
         setViews((prev) => {
           const withoutExisting = prev.filter((view) => view.pid !== copiedView.pid);
           return [...withoutExisting, copiedView];
@@ -390,6 +418,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
 
   return {
     views,
+    accessibleViews,
     currentView,
     loading,
     error,

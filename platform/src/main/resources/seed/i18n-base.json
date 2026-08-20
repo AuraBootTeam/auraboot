@@ -1052,6 +1052,13 @@
     "en-US": "AI Modeling Wizard"
   },
   {
+    "key": "aurabot.chat.send",
+    "zh-CN": "发送 (Cmd+Enter)",
+    "en-US": "Send (Cmd+Enter)",
+    "ja-JP": "送信 (Cmd+Enter)",
+    "ko-KR": "보내기 (Cmd+Enter)"
+  },
+  {
     "key": "aurabot.thinking.label",
     "zh-CN": "推理过程",
     "en-US": "Reasoning"
@@ -1380,6 +1387,13 @@
     "en-US": "Sign in to continue to AuraBoot"
   },
   {
+    "key": "auth.commercialBranding.welcomeSub",
+    "zh-CN": "登录以继续使用 {productName} 工作台",
+    "en-US": "Sign in to continue to the {productName} workspace",
+    "ja-JP": "{productName} ワークスペースに進むにはサインインしてください",
+    "ko-KR": "{productName} 작업 공간을 계속하려면 로그인하세요"
+  },
+  {
     "key": "auth.compliance.identifier",
     "zh-CN": "账号或邮箱",
     "en-US": "Account or email"
@@ -1662,6 +1676,26 @@
     "en-US": "View"
   },
   {
+    "key": "message.accountCredentials.clipboard",
+    "zh-CN": "登录名：{userName}\n临时密码：{tempPassword}",
+    "en-US": "Login name: {userName}\nTemporary password: {tempPassword}"
+  },
+  {
+    "key": "message.accountCredentials.generated.content",
+    "zh-CN": "请立即保存并交付给用户。登录名：{userName}；临时密码（仅显示一次）：{tempPassword}",
+    "en-US": "Save and deliver these credentials now. Login name: {userName}; temporary password (shown once): {tempPassword}"
+  },
+  {
+    "key": "message.accountCredentials.generated.title",
+    "zh-CN": "登录凭据已生成",
+    "en-US": "Account credentials generated"
+  },
+  {
+    "key": "message.accountCredentials.generated.toast",
+    "zh-CN": "登录凭据已生成，并已在浏览器允许时复制",
+    "en-US": "Account credentials generated and copied when permitted"
+  },
+  {
     "key": "message.create.failed",
     "zh-CN": "创建失败",
     "en-US": "Create failed"
@@ -1757,6 +1791,21 @@
     "key": "message.submitting",
     "zh-CN": "提交中...",
     "en-US": "Submitting..."
+  },
+  {
+    "key": "message.temporaryPassword.generated.content",
+    "zh-CN": "请立即保存并交付给用户。临时密码仅显示一次：{tempPassword}",
+    "en-US": "Save and deliver this temporary password now. It is shown once: {tempPassword}"
+  },
+  {
+    "key": "message.temporaryPassword.generated.title",
+    "zh-CN": "临时密码已生成",
+    "en-US": "Temporary password generated"
+  },
+  {
+    "key": "message.temporaryPassword.generated.toast",
+    "zh-CN": "临时密码已生成，并已在浏览器允许时复制",
+    "en-US": "Temporary password generated and copied when permitted"
   },
   {
     "key": "message.update.failed",
@@ -3048,6 +3097,11 @@
     "en-US": "Overview"
   },
   {
+    "key": "workbench.openInDashboard",
+    "zh-CN": "在仪表盘中打开",
+    "en-US": "Open in dashboard"
+  },
+  {
     "key": "workbench.export",
     "zh-CN": "导出",
     "en-US": "Export"
@@ -3126,5 +3180,512 @@
     "key": "flow.availability.reasonFallback",
     "zh-CN": "当前环境未提供该动作的可用服务。",
     "en-US": "The action provider is not available in the current environment."
+  },
+  {
+    "key": "data_tools.export_excel",
+    "zh-CN": "导出 Excel",
+    "en-US": "Export Excel"
+  },
+  {
+    "key": "data_tools.export_csv",
+    "zh-CN": "导出 CSV",
+    "en-US": "Export CSV"
+  },
+  {
+    "key": "data_tools.configure_buttons",
+    "zh-CN": "配置按钮…",
+    "en-US": "Configure buttons…"
+  },
+  {
+    "key": "data_tools.loading_reports",
+    "zh-CN": "正在加载报表…",
+    "en-US": "Loading reports…"
+  },
+  {
+    "key": "data_tools.report_generated",
+    "zh-CN": "报表已生成：{name}",
+    "en-US": "Report generated: {name}"
+  },
+  {
+    "key": "data_tools.report_generation_failed",
+    "zh-CN": "报表生成失败",
+    "en-US": "Report generation failed"
+  },
+  {
+    "key": "action_config.title",
+    "zh-CN": "配置按钮",
+    "en-US": "Configure Buttons"
+  },
+  {
+    "key": "action_config.builtin",
+    "zh-CN": "内置",
+    "en-US": "built-in"
+  },
+  {
+    "key": "action_config.toolbar",
+    "zh-CN": "工具栏",
+    "en-US": "Toolbar"
+  },
+  {
+    "key": "action_config.more_menu",
+    "zh-CN": "更多菜单",
+    "en-US": "More Menu"
+  },
+  {
+    "key": "action_config.no_pinned",
+    "zh-CN": "没有固定按钮",
+    "en-US": "No pinned buttons"
+  },
+  {
+    "key": "action_config.no_overflow",
+    "zh-CN": "没有更多按钮",
+    "en-US": "No overflow buttons"
+  },
+  {
+    "key": "action_config.divider",
+    "zh-CN": "此线以下显示在 ··· 菜单",
+    "en-US": "Below this line: in ··· menu"
+  },
+  {
+    "key": "action_config.move_to_menu",
+    "zh-CN": "移到更多菜单",
+    "en-US": "Move to menu"
+  },
+  {
+    "key": "action_config.pin_to_toolbar",
+    "zh-CN": "固定到工具栏",
+    "en-US": "Pin to toolbar"
+  },
+  {
+    "key": "action_config.hide_button",
+    "zh-CN": "隐藏按钮",
+    "en-US": "Hide button"
+  },
+  {
+    "key": "action_config.show_button",
+    "zh-CN": "显示按钮",
+    "en-US": "Show button"
+  },
+  {
+    "key": "import.title",
+    "zh-CN": "Excel 数据导入",
+    "en-US": "Import Excel Data"
+  },
+  {
+    "key": "import.subtitle",
+    "zh-CN": "下载模板、上传预检，再执行导入。更新导入不会新增记录。",
+    "en-US": "Download a template, upload and validate it, then run the import. Update mode never creates records."
+  },
+  {
+    "key": "import.mode.label",
+    "zh-CN": "导入方式",
+    "en-US": "Import mode"
+  },
+  {
+    "key": "import.mode.insert",
+    "zh-CN": "新增导入",
+    "en-US": "Insert"
+  },
+  {
+    "key": "import.mode.update",
+    "zh-CN": "更新导入",
+    "en-US": "Update"
+  },
+  {
+    "key": "import.match_key",
+    "zh-CN": "匹配字段",
+    "en-US": "Match field"
+  },
+  {
+    "key": "import.download_template",
+    "zh-CN": "下载{mode}模板",
+    "en-US": "Download {mode} template"
+  },
+  {
+    "key": "import.drop_hint",
+    "zh-CN": "拖放 .xlsx 文件到这里，或选择文件",
+    "en-US": "Drop an .xlsx file here or choose a file"
+  },
+  {
+    "key": "import.choose_file",
+    "zh-CN": "选择文件",
+    "en-US": "Choose file"
+  },
+  {
+    "key": "import.file_limit",
+    "zh-CN": "仅支持 .xlsx，最大 10 MB",
+    "en-US": ".xlsx only, up to 10 MB"
+  },
+  {
+    "key": "import.validating",
+    "zh-CN": "正在预检字段、类型和重复值…",
+    "en-US": "Validating fields, types, and duplicate values…"
+  },
+  {
+    "key": "import.importing",
+    "zh-CN": "正在执行导入，请勿关闭窗口…",
+    "en-US": "Importing. Keep this window open…"
+  },
+  {
+    "key": "import.preview_rows",
+    "zh-CN": "预览前 {count} 行",
+    "en-US": "Previewing the first {count} rows"
+  },
+  {
+    "key": "import.change_file",
+    "zh-CN": "更换文件",
+    "en-US": "Change file"
+  },
+  {
+    "key": "import.validation.passed",
+    "zh-CN": "预检通过，可以导入",
+    "en-US": "Validation passed. Ready to import"
+  },
+  {
+    "key": "import.validation.failed",
+    "zh-CN": "预检未通过，请修正文件",
+    "en-US": "Validation failed. Fix the file before importing"
+  },
+  {
+    "key": "import.validation.summary",
+    "zh-CN": "总计 {total} · 有效 {valid} · 错误 {errors}",
+    "en-US": "Total {total} · Valid {valid} · Errors {errors}"
+  },
+  {
+    "key": "import.validation.required",
+    "zh-CN": "必填字段缺失",
+    "en-US": "Required field is missing"
+  },
+  {
+    "key": "import.validation.type",
+    "zh-CN": "值无法解析为 {type}",
+    "en-US": "Value cannot be parsed as {type}"
+  },
+  {
+    "key": "import.validation.field_not_allowed",
+    "zh-CN": "当前导入方式不允许此字段",
+    "en-US": "This field is not allowed in the selected import mode"
+  },
+  {
+    "key": "import.validation.duplicate",
+    "zh-CN": "唯一字段存在重复值",
+    "en-US": "A unique field contains a duplicate value"
+  },
+  {
+    "key": "import.validation.duplicate_header",
+    "zh-CN": "存在重复列头",
+    "en-US": "The workbook contains a duplicate column header"
+  },
+  {
+    "key": "import.validation.reference",
+    "zh-CN": "关联记录不存在或无权访问",
+    "en-US": "The referenced record does not exist or is not accessible"
+  },
+  {
+    "key": "import.validation.reference_ambiguous",
+    "zh-CN": "关联值不唯一，请改用唯一业务编码或 PID",
+    "en-US": "The reference value is ambiguous. Use a unique business key or PID."
+  },
+  {
+    "key": "import.validation.row_write_failed",
+    "zh-CN": "该行无法保存，请检查字段值与模板要求后重试",
+    "en-US": "This row could not be saved. Check its values against the template and try again."
+  },
+  {
+    "key": "import.validation.update_record_missing",
+    "zh-CN": "未找到与“{field}”匹配的现有记录，请修正匹配值后重试",
+    "en-US": "No existing record matches “{field}”. Correct the match value and try again."
+  },
+  {
+    "key": "import.validation.update_match_ambiguous",
+    "zh-CN": "匹配字段“{field}”对应多条记录，请改用唯一业务值后重试",
+    "en-US": "The match field “{field}” resolves to multiple records. Use a unique business value and try again."
+  },
+  {
+    "key": "import.validation.named_required",
+    "zh-CN": "字段“{field}”为必填项",
+    "en-US": "Field “{field}” is required"
+  },
+  {
+    "key": "import.row",
+    "zh-CN": "第 {row} 行",
+    "en-US": "Row {row}"
+  },
+  {
+    "key": "import.result.completed",
+    "zh-CN": "导入完成",
+    "en-US": "Import complete"
+  },
+  {
+    "key": "import.result.partial",
+    "zh-CN": "导入完成，部分行失败",
+    "en-US": "Import complete with row errors"
+  },
+  {
+    "key": "import.result.created",
+    "zh-CN": "新增",
+    "en-US": "Created"
+  },
+  {
+    "key": "import.result.updated",
+    "zh-CN": "更新",
+    "en-US": "Updated"
+  },
+  {
+    "key": "import.result.failed",
+    "zh-CN": "失败",
+    "en-US": "Failed"
+  },
+  {
+    "key": "import.result.total",
+    "zh-CN": "总计",
+    "en-US": "Total"
+  },
+  {
+    "key": "import.start",
+    "zh-CN": "开始{mode}",
+    "en-US": "Start {mode}"
+  },
+  {
+    "key": "import.error.xlsx_only",
+    "zh-CN": "仅支持 Excel .xlsx 文件。",
+    "en-US": "Only Excel .xlsx files are supported."
+  },
+  {
+    "key": "import.error.too_large",
+    "zh-CN": "文件不能超过 10 MB。",
+    "en-US": "The file must be 10 MB or smaller."
+  },
+  {
+    "key": "import.error.match_key",
+    "zh-CN": "更新导入必须选择匹配字段。",
+    "en-US": "Choose a match field for update mode."
+  },
+  {
+    "key": "import.correction.pending_hint",
+    "zh-CN": "下载包含全部待导入行的修正工作簿，修正标记单元格后直接重新上传。",
+    "en-US": "Download the correction workbook with every row still pending import, fix the marked cells, and upload it again."
+  },
+  {
+    "key": "import.correction.partial_hint",
+    "zh-CN": "已成功的记录不会出现在修正工作簿中。修正失败行后可直接再次上传。",
+    "en-US": "Successful records are excluded from the correction workbook. Fix the failed rows and upload it again."
+  },
+  {
+    "key": "import.correction.download",
+    "zh-CN": "下载修正工作簿",
+    "en-US": "Download correction workbook"
+  },
+  {
+    "key": "import.correction.downloading",
+    "zh-CN": "正在下载修正工作簿…",
+    "en-US": "Downloading correction workbook…"
+  },
+  {
+    "key": "import.correction.upload",
+    "zh-CN": "上传修正工作簿",
+    "en-US": "Upload corrected workbook"
+  },
+  {
+    "key": "import.error.error_report",
+    "zh-CN": "修正工作簿下载失败，请重试。",
+    "en-US": "The correction workbook could not be downloaded. Try again."
+  },
+  {
+    "key": "import.error.error_report_unavailable",
+    "zh-CN": "错误明细已保留在当前页面，但修正工作簿暂时无法生成。请修正原文件后重新上传。",
+    "en-US": "The row errors remain visible here, but the correction workbook is unavailable. Fix the original file and upload it again."
+  },
+  {
+    "key": "import.error.error_report_expired",
+    "zh-CN": "修正工作簿已超过保留期。请基于原文件重新执行预检。",
+    "en-US": "The correction workbook has expired. Validate the original file again to create a new one."
+  },
+  {
+    "key": "import.report.original_row",
+    "zh-CN": "原文件行号",
+    "en-US": "Original row"
+  },
+  {
+    "key": "import.report.field",
+    "zh-CN": "字段",
+    "en-US": "Field"
+  },
+  {
+    "key": "import.report.issue",
+    "zh-CN": "问题说明",
+    "en-US": "Issue"
+  },
+  {
+    "key": "memberImport.title",
+    "zh-CN": "批量开通员工账号",
+    "en-US": "Import employee accounts"
+  },
+  {
+    "key": "memberImport.subtitle",
+    "zh-CN": "无需邮箱，账号立即激活；不自动分配业务角色，权限由管理员手工维护。",
+    "en-US": "Create active accounts without email. Roles remain unassigned for manual administration."
+  },
+  {
+    "key": "memberImport.file.title",
+    "zh-CN": "员工账号工作簿",
+    "en-US": "Employee account workbook"
+  },
+  {
+    "key": "memberImport.file.help",
+    "zh-CN": "字段：姓名、登录名、手机号、工号、部门编码、岗位编码。",
+    "en-US": "Columns: Name, login name, mobile, employee code, department code, and position code."
+  },
+  {
+    "key": "memberImport.template.download",
+    "zh-CN": "下载模板",
+    "en-US": "Download template"
+  },
+  {
+    "key": "memberImport.template.downloading",
+    "zh-CN": "正在下载…",
+    "en-US": "Downloading…"
+  },
+  {
+    "key": "memberImport.preview.action",
+    "zh-CN": "预检文件",
+    "en-US": "Validate workbook"
+  },
+  {
+    "key": "memberImport.preview.running",
+    "zh-CN": "正在预检…",
+    "en-US": "Validating…"
+  },
+  {
+    "key": "memberImport.preview.total",
+    "zh-CN": "总行数",
+    "en-US": "Total"
+  },
+  {
+    "key": "memberImport.preview.valid",
+    "zh-CN": "可导入",
+    "en-US": "Valid"
+  },
+  {
+    "key": "memberImport.preview.errors",
+    "zh-CN": "错误",
+    "en-US": "Errors"
+  },
+  {
+    "key": "memberImport.commit.action",
+    "zh-CN": "确认开通",
+    "en-US": "Confirm import"
+  },
+  {
+    "key": "memberImport.commit.running",
+    "zh-CN": "正在创建账号…",
+    "en-US": "Creating accounts…"
+  },
+  {
+    "key": "memberImport.action.createAccount",
+    "zh-CN": "只创建账号",
+    "en-US": "Create account"
+  },
+  {
+    "key": "memberImport.action.createEmployee",
+    "zh-CN": "创建账号和组织人员",
+    "en-US": "Create account and employee"
+  },
+  {
+    "key": "memberImport.action.linkEmployee",
+    "zh-CN": "关联已有组织人员",
+    "en-US": "Link existing employee"
+  },
+  {
+    "key": "memberImport.action.error",
+    "zh-CN": "错误",
+    "en-US": "Error"
+  },
+  {
+    "key": "memberImport.field.name",
+    "zh-CN": "姓名",
+    "en-US": "Name"
+  },
+  {
+    "key": "memberImport.field.loginName",
+    "zh-CN": "登录名",
+    "en-US": "Login name"
+  },
+  {
+    "key": "memberImport.field.employeeCode",
+    "zh-CN": "工号",
+    "en-US": "Employee code"
+  },
+  {
+    "key": "memberImport.field.departmentCode",
+    "zh-CN": "部门编码",
+    "en-US": "Department code"
+  },
+  {
+    "key": "memberImport.field.positionCode",
+    "zh-CN": "岗位编码",
+    "en-US": "Position code"
+  },
+  {
+    "key": "memberImport.field.initialPassword",
+    "zh-CN": "初始密码",
+    "en-US": "Initial password"
+  },
+  {
+    "key": "memberImport.field.action",
+    "zh-CN": "处理动作",
+    "en-US": "Action"
+  },
+  {
+    "key": "memberImport.field.issue",
+    "zh-CN": "问题",
+    "en-US": "Issue"
+  },
+  {
+    "key": "memberImport.result.title",
+    "zh-CN": "账号已创建",
+    "en-US": "Accounts created"
+  },
+  {
+    "key": "memberImport.result.secretHint",
+    "zh-CN": "请立即保存凭据；关闭本弹窗后系统不会再次提供明文密码。",
+    "en-US": "Save these credentials now. Plaintext passwords are not available after this dialog closes."
+  },
+  {
+    "key": "memberImport.result.downloadCredentials",
+    "zh-CN": "下载账号凭据",
+    "en-US": "Download credentials"
+  },
+  {
+    "key": "memberImport.error.selectFile",
+    "zh-CN": "请先选择 Excel 文件。",
+    "en-US": "Select an Excel file first."
+  },
+  {
+    "key": "memberImport.error.invalidTemplate",
+    "zh-CN": "服务端未返回有效的 Excel 模板。",
+    "en-US": "The server did not return a valid Excel template."
+  },
+  {
+    "key": "memberImport.error.download",
+    "zh-CN": "模板下载失败。",
+    "en-US": "Template download failed."
+  },
+  {
+    "key": "memberImport.error.preview",
+    "zh-CN": "文件预检失败。",
+    "en-US": "Workbook validation failed."
+  },
+  {
+    "key": "memberImport.error.commit",
+    "zh-CN": "账号导入失败。",
+    "en-US": "Account import failed."
+  },
+  {
+    "key": "action.close",
+    "zh-CN": "关闭",
+    "en-US": "Close",
+    "ja-JP": "閉じる",
+    "ko-KR": "닫기"
   }
 ]

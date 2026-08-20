@@ -26,11 +26,13 @@ const TimezoneContext = createContext<TimezoneContextValue>({
 export function TimezoneProvider({
   children,
   initialTimezone,
+  skipTenantPreferences = false,
 }: {
   children: ReactNode;
   initialTimezone?: string;
+  skipTenantPreferences?: boolean;
 }) {
-  const { preferences } = useAuth();
+  const { preferences, isAuthenticated } = useAuth();
 
   const [timezone, setTimezone] = useState<string>(() => {
     if (initialTimezone) return initialTimezone;
@@ -49,6 +51,12 @@ export function TimezoneProvider({
 
   useEffect(() => {
     let cancelled = false;
+    if (skipTenantPreferences || !isAuthenticated) {
+      setTenantPrefs({});
+      return () => {
+        cancelled = true;
+      };
+    }
     Promise.all([
       tenantPreferenceService.get<string>('ui.timezone'),
       tenantPreferenceService.get<string>('ui.datetime.format'),
@@ -66,7 +74,7 @@ export function TimezoneProvider({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isAuthenticated, skipTenantPreferences]);
 
   useEffect(() => {
     const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;

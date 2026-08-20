@@ -1,0 +1,10 @@
+{
+  "pageKey": "crm_lead_capacity_detail", "name:zh-CN": "线索库容详情", "name:en": "Lead Capacity Detail", "modelCode": "crm_lead_capacity", "kind": "detail", "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "blocks": [
+    { "id": "capacity_detail", "blockType": "form-section", "title": { "zh-CN": "用户库容", "en": "User Capacity" }, "columns": 2, "fields": [
+      { "field": "crm_lcap_user_id", "readOnly": true }, { "field": "crm_lcap_capacity", "readOnly": true }, { "field": "crm_lcap_status", "readOnly": true }, { "field": "crm_lcap_remark", "readOnly": true }
+    ] },
+    { "id": "actions", "blockType": "toolbar", "buttons": [ { "code": "edit", "permissionCode": "crm.lead_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_lead_capacity_form" } } ] }
+  ]
+}

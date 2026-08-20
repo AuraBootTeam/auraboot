@@ -142,6 +142,42 @@ describe('SchemaRuntime', () => {
     runtime.destroy();
   });
 
+  it('restores bindState filter fields from carried page state', () => {
+    const manager = createManager();
+    const runtime = new SchemaRuntime({
+      schema: {
+        ...minimalSchema,
+        blocks: [
+          {
+            id: 'opportunity_filters',
+            blockType: 'filters',
+            fields: [
+              {
+                field: 'crm_opp_name',
+                component: 'SmartInput',
+                bindState: 'searchKeyword',
+              },
+            ],
+          },
+        ],
+      } as UnifiedSchema,
+      globalState: createGlobalState(),
+      dataSourceManager: manager,
+      disableAutoFetch: true,
+      initialContext: {
+        state: { searchKeyword: '华东智造云' },
+      },
+    });
+
+    expect(runtime.getContext().state.searchKeyword).toBe('华东智造云');
+    expect(runtime.getContext().form?.crm_opp_name).toBe('华东智造云');
+
+    runtime.syncContext({ state: { searchKeyword: '重新筛选' } });
+    expect(runtime.getContext().form?.crm_opp_name).toBe('重新筛选');
+
+    runtime.destroy();
+  });
+
   it('delegates flow actions to the ActionRegistry', async () => {
     const manager = createManager();
     const actionName = '__test.action__';

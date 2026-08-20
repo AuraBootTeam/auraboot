@@ -33,6 +33,12 @@ public class ExcelImportResult {
     private boolean hasErrors;
     /** Task ID for async imports. Null for synchronous imports. */
     private String taskId;
+    /** Authorized API URL for downloading a failed-row correction workbook. */
+    private String errorReportUrl;
+    /** True when row errors exist but the correction workbook could not be generated. */
+    private boolean errorReportFailed;
+    /** True when the correction workbook existed but passed its configured retention window. */
+    private boolean errorReportExpired;
 
     /**
      * Factory for a completed import (may have partial errors).

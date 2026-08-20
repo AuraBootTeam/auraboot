@@ -1,6 +1,7 @@
 package com.auraboot.framework.auth.dto;
 
 import lombok.Data;
+import lombok.ToString;
 
 /**
  * Unified request DTO for multi-channel authentication.
@@ -24,12 +25,14 @@ public class AuthStrategyRequest {
     private String email;
 
     /** Password (used by EMAIL_PASSWORD channel) */
+    @ToString.Exclude
     private String password;
 
     /** Mobile phone number (used by SMS channel) */
     private String mobile;
 
     /** Verification code (used by SMS and EMAIL_CODE channels) */
+    @ToString.Exclude
     private String code;
 
     /** Login channel identifier: EMAIL_PASSWORD | SMS | EMAIL_CODE */

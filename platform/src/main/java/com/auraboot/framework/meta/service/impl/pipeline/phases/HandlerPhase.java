@@ -39,6 +39,7 @@ import com.auraboot.framework.plugin.pf4j.AsyncTaskAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.IndependentTransactionAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.FileAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.LlmProviderAccessorImpl;
+import com.auraboot.framework.plugin.extension.RecordShareAccessor;
 import com.auraboot.module.bitemporal.service.BiTemporalService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -88,6 +90,9 @@ public class HandlerPhase implements CommandPhase {
 
     @Autowired(required = false)
     private org.springframework.transaction.PlatformTransactionManager platformTransactionManager;
+
+    @Autowired(required = false)
+    private RecordShareAccessor recordShareAccessor;
 
     @Override public String name() { return "handler"; }
 
@@ -212,7 +217,12 @@ public class HandlerPhase implements CommandPhase {
         Map<String, Object> persistable = new HashMap<>();
         for (Map.Entry<String, Object> entry : handlerResults.entrySet()) {
             String key = entry.getKey();
-            if (!StringUtils.hasText(key) || !modelFieldCodes.contains(key)) {
+            // A handler result's pid/id identify the record the handler created or returned to
+            // the caller. They are response metadata, never fields to copy onto the command's
+            // target record. Persisting a successor fact's pid onto its predecessor corrupts the
+            // aggregate identity and normally trips the table's unique pid constraint.
+            if (!StringUtils.hasText(key) || Set.of("id", "pid").contains(key)
+                    || !modelFieldCodes.contains(key)) {
                 continue;
             }
             Object value = entry.getValue();
@@ -544,6 +554,10 @@ public class HandlerPhase implements CommandPhase {
             if (userId != null) {
                 pluginSettings.put("__currentUser", userId.toString());
             }
+            if (StringUtils.hasText(MetaContext.getCurrentUserPid())) {
+                pluginSettings.put(CommandHandlerExtension.CURRENT_USER_PID_KEY,
+                        MetaContext.getCurrentUserPid().trim());
+            }
             if (StringUtils.hasText(request.getClientRequestId())) {
                 pluginSettings.put(CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
                         request.getClientRequestId().trim());
@@ -575,6 +589,9 @@ public class HandlerPhase implements CommandPhase {
                 pluginSettings.put(CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY,
                         new IndependentTransactionAccessorImpl(
                                 platformTransactionManager, dynamicDataService));
+            }
+            if (recordShareAccessor != null) {
+                pluginSettings.put(RecordShareAccessor.SETTINGS_KEY, recordShareAccessor);
             }
             CommandHandlerExtension.CommandContext pluginContext = CommandHandlerExtension.CommandContext.builder()
                     .tenantId(tenantId)
@@ -632,6 +649,9 @@ public class HandlerPhase implements CommandPhase {
         } catch (Exception e) {
             log.error("Plugin command handler execution failed for {} (command={}): {}",
                     handlerCode, commandCode, e.getMessage(), e);
+            if (e instanceof AccessDeniedException accessDeniedException) {
+                throw accessDeniedException;
+            }
             // Plugin handlers use stable, transport-neutral error keys because
             // the plugin API must not depend on host web exceptions. Preserve
             // the optimistic-concurrency semantic at the host boundary so DSL

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router';
 import { QrCodeIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { useRootLoaderData } from '~/root-data';
+import { COMMUNITY_BRANDING } from '~/config/branding';
 
 interface AuthSidebarProps {
   sidebarOpen: boolean;
@@ -17,6 +19,7 @@ const authRoutes = [
 
 export default function AuthSidebar({ sidebarOpen, setSidebarOpen }: AuthSidebarProps) {
   const location = useLocation();
+  const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
 
   return (
     <>
@@ -37,8 +40,10 @@ export default function AuthSidebar({ sidebarOpen, setSidebarOpen }: AuthSidebar
         {/* 侧边栏头部 */}
         <div className="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
           <div className="flex items-center">
-            <img className="h-8 w-8 rounded-lg" src="/android-chrome-192x192.png" alt="AuraBoot" />
-            <span className="ml-3 text-lg font-bold text-gray-900 dark:text-white">AuraBoot</span>
+            <img className="h-8 w-8 rounded-lg" src={branding.logoUrl} alt={branding.productName} />
+            <span className="ml-3 text-lg font-bold text-gray-900 dark:text-white">
+              {branding.productName}
+            </span>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -75,7 +80,9 @@ export default function AuthSidebar({ sidebarOpen, setSidebarOpen }: AuthSidebar
         {/* 底部信息 */}
         <div className="absolute right-0 bottom-0 left-0 border-t border-gray-200 p-4 dark:border-gray-700">
           <div className="text-center text-xs text-gray-500 dark:text-gray-400">
-            <p>© {new Date().getFullYear()} AuraBoot</p>
+            <p>
+              © {new Date().getFullYear()} {branding.productName}
+            </p>
             <p className="mt-1">认证页面导航</p>
           </div>
         </div>

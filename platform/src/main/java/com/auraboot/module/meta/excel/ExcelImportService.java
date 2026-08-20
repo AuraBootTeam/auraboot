@@ -1,9 +1,15 @@
 package com.auraboot.module.meta.excel;
 
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.FieldDefinition;
+import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.TypeSystemManager;
 import com.auraboot.module.meta.excel.entity.ImportJob;
 import com.auraboot.module.meta.excel.mapper.ImportJobMapper;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -29,6 +36,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import com.auraboot.framework.common.constant.StatusConstants;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PreDestroy;
 
 /**
  * Reusable Excel import service that parses .xlsx files, validates rows,
@@ -50,18 +63,45 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @RequiredArgsConstructor
 public class ExcelImportService {
 
+    static final String ROW_WRITE_FAILED_MESSAGE =
+            "Import row could not be saved. Check the field values and try again.";
+
     /** Number of rows per batch for import insert operations. */
     static final int BATCH_SIZE = 500;
     /** Row count threshold above which import runs asynchronously. */
-    static final int ASYNC_THRESHOLD = 1000;
+    static final int DEFAULT_ASYNC_THRESHOLD = 1000;
+    static final int MAX_PERSISTED_ROW_ERRORS = 100;
+    private static final TypeReference<List<ImportValidationError>> IMPORT_ERRORS_TYPE =
+            new TypeReference<>() { };
 
     private final DynamicDataService dynamicDataService;
     private final MetaModelService metaModelService;
     private final ImportJobMapper importJobMapper;
+    private final ExcelImportPolicyResolver policyResolver;
+    private final CommandExecutor commandExecutor;
+    private final ExcelReferenceResolver referenceResolver;
+    private final TypeSystemManager typeSystemManager;
+    private final ExcelImportErrorReportService errorReportService;
+    private final ObjectMapper objectMapper;
+
+    @Value("${auraboot.excel-import.async-threshold:1000}")
+    private int asyncThreshold = DEFAULT_ASYNC_THRESHOLD;
 
     private final ExecutorService asyncExecutor = Executors.newFixedThreadPool(2);
     private final Map<String, AsyncImportStatus> asyncTasks = new ConcurrentHashMap<>();
     private final Map<String, CopyOnWriteArrayList<SseEmitter>> importEmitters = new ConcurrentHashMap<>();
+
+    public int getAsyncThreshold() {
+        return Math.max(1, asyncThreshold);
+    }
+
+    @PreDestroy
+    void shutdownAsyncResources() {
+        asyncExecutor.shutdownNow();
+        for (String taskId : List.copyOf(importEmitters.keySet())) {
+            closeEmitters(taskId);
+        }
+    }
 
     /**
      * Status of an async import task.
@@ -71,6 +111,11 @@ public class ExcelImportService {
     @lombok.NoArgsConstructor
     public static class AsyncImportStatus {
         private String taskId;
+        private String modelCode;
+        @JsonIgnore
+        private Long tenantId;
+        @JsonIgnore
+        private Long createdBy;
         private String status; // RUNNING, COMPLETED, FAILED
         private int totalRows;
         private int processedRows;
@@ -121,6 +166,11 @@ public class ExcelImportService {
             mappedRows.add(mapped);
         }
 
+        List<ImportValidationError> referenceErrors = resolveReferenceValues(fieldDefs, mappedRows);
+        if (!referenceErrors.isEmpty()) {
+            return ExcelImportResult.withErrors(referenceErrors, mappedRows.size());
+        }
+
         // 3. Validate
         List<ImportValidationError> errors = new ArrayList<>(validate(mappedRows));
         if (!errors.isEmpty() && !options.isSkipErrors()) {
@@ -138,39 +188,62 @@ public class ExcelImportService {
                     .build();
         }
 
-        // 5. Insert/Upsert rows
+        // 5. Execute the model's explicit INSERT / UPDATE import policy.
         int success = 0;
         int errorCount = 0;
         int createdCount = 0;
         int updatedCount = 0;
-        String upsertKey = options.getUpsertKey();
+        ExcelImportPolicy policy = policyResolver.requireEnabled(modelCode);
+        String mode = normalizeMode(options);
+        String matchKey = options.getMatchKey();
+        policyResolver.validateMode(policy, mode, matchKey);
+        String importRunId = UniqueIdGenerator.generate();
 
-        if (upsertKey != null && !upsertKey.isBlank()) {
-            // UPSERT mode: per-row lookup + create or update
+        if ("update".equals(mode)) {
+            // UPDATE never creates a missing record. This matches the Cordys import contract.
             for (int i = 0; i < mappedRows.size(); i++) {
                 try {
-                    Map<String, Object> rowData = new HashMap<>(mappedRows.get(i));
-                    Object keyValue = rowData.get(upsertKey);
-                    String existingId = findExistingRecordId(modelCode, upsertKey, keyValue);
+                    Map<String, Object> rowData = convertRowValues(fieldDefs, mappedRows.get(i));
+                    Object keyValue = rowData.get(matchKey);
+                    String existingId = findExistingRecordId(modelCode, matchKey, keyValue);
 
-                    if (existingId != null) {
-                        dynamicDataService.update(modelCode, existingId, rowData);
-                        updatedCount++;
-                    } else {
-                        dynamicDataService.create(modelCode, rowData);
-                        createdCount++;
+                    if (existingId == null) {
+                        throw new BusinessException("No existing record matches " + matchKey + "=" + keyValue);
                     }
+                    executeUpdate(policy, modelCode, existingId, rowData, i + 2, importRunId);
+                    updatedCount++;
                     success++;
                 } catch (Exception e) {
+                    // CATCH: per-row import tolerance — report this row and keep processing only
+                    // when skipErrors is enabled; retain the full cause in server logs.
+                    log.warn("Excel update row failed: model={}, row={}", modelCode, i + 2, e);
                     errorCount++;
-                    errors.add(new ImportValidationError(i + 2, null, e.getMessage()));
+                    errors.add(new ImportValidationError(i + 2, null, safeMessage(e)));
+                    if (!options.isSkipErrors()) {
+                        break;
+                    }
+                }
+            }
+        } else if (policy.getCreateCommand() != null) {
+            for (int i = 0; i < mappedRows.size(); i++) {
+                try {
+                    executeCreate(policy, modelCode, convertRowValues(fieldDefs, mappedRows.get(i)),
+                            i + 2, importRunId);
+                    success++;
+                    createdCount++;
+                } catch (Exception e) {
+                    // CATCH: per-row import tolerance — report this row and keep processing only
+                    // when skipErrors is enabled; retain the full cause in server logs.
+                    log.warn("Excel create row failed: model={}, row={}", modelCode, i + 2, e);
+                    errorCount++;
+                    errors.add(new ImportValidationError(i + 2, null, safeMessage(e)));
                     if (!options.isSkipErrors()) {
                         break;
                     }
                 }
             }
         } else {
-            // INSERT mode: batch insert
+            // Pure CRUD models without a command keep the existing batch fast path.
             for (int batchStart = 0; batchStart < mappedRows.size(); batchStart += BATCH_SIZE) {
                 int batchEnd = Math.min(batchStart + BATCH_SIZE, mappedRows.size());
                 List<Map<String, String>> batch = mappedRows.subList(batchStart, batchEnd);
@@ -178,22 +251,29 @@ public class ExcelImportService {
                 try {
                     List<Map<String, Object>> batchData = new ArrayList<>();
                     for (Map<String, String> row : batch) {
-                        batchData.add(new HashMap<>(row));
+                        batchData.add(allowedPayload(convertRowValues(fieldDefs, row),
+                                policy.getCreateFields()));
                     }
                     dynamicDataService.batchCreate(modelCode, batchData);
                     success += batch.size();
                     createdCount += batch.size();
                 } catch (Exception batchError) {
                     // Batch failed — fall back to per-row for error isolation
-                    log.warn("Batch insert failed, falling back to per-row: {}", batchError.getMessage());
+                    log.warn("Batch insert failed for model {}; falling back to per-row",
+                            modelCode, batchError);
                     for (int i = 0; i < batch.size(); i++) {
                         try {
-                            dynamicDataService.create(modelCode, new HashMap<>(batch.get(i)));
+                            dynamicDataService.create(modelCode,
+                                    allowedPayload(convertRowValues(fieldDefs, batch.get(i)),
+                                            policy.getCreateFields()));
                             success++;
                             createdCount++;
                         } catch (Exception e) {
+                            // CATCH: per-row fallback isolates a bad row after the batch failed.
+                            log.warn("Excel CRUD row failed: model={}, row={}",
+                                    modelCode, batchStart + i + 2, e);
                             errorCount++;
-                            errors.add(new ImportValidationError(batchStart + i + 2, null, e.getMessage()));
+                            errors.add(new ImportValidationError(batchStart + i + 2, null, safeMessage(e)));
                             if (!options.isSkipErrors()) {
                                 return ExcelImportResult.builder()
                                         .totalRows(success + errorCount)
@@ -216,7 +296,7 @@ public class ExcelImportService {
 
     /**
      * Find the pid of an existing record matching the given field value.
-     * Returns null if no match found.
+     * Returns null if no match is found; ambiguous or failed lookups fail closed.
      */
     private String findExistingRecordId(String modelCode, String fieldCode, Object fieldValue) {
         if (fieldValue == null || fieldValue.toString().isBlank()) return null;
@@ -227,29 +307,26 @@ public class ExcelImportService {
                     .value(fieldValue)
                     .build();
             var request = com.auraboot.framework.meta.dto.DynamicQueryRequest.builder()
-                    .pageNum(1).pageSize(1)
+                    .pageNum(1).pageSize(2)
                     .conditions(List.of(condition))
                     .build();
             var result = dynamicDataService.list(modelCode, request);
+            if (result != null && result.getRecords() != null && result.getRecords().size() > 1) {
+                throw new BusinessException("Import match key is not unique: " + fieldCode + "=" + fieldValue);
+            }
             if (result != null && result.getRecords() != null && !result.getRecords().isEmpty()) {
                 Object pid = result.getRecords().get(0).get("pid");
                 return pid != null ? pid.toString() : null;
             }
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
-            log.debug("Upsert lookup failed for {}={}: {}", fieldCode, fieldValue, e.getMessage());
+            throw new BusinessException(
+                    ResponseCode.BUSINESS_ERROR,
+                    "Import match lookup failed for " + fieldCode + ": " + safeMessage(e),
+                    e);
         }
         return null;
-    }
-
-    /**
-     * Count data rows in an Excel stream (excluding header).
-     */
-    public int countRows(InputStream stream) throws IOException {
-        try (Workbook workbook = new XSSFWorkbook(stream)) {
-            Sheet sheet = workbook.getSheetAt(0);
-            if (sheet == null) return 0;
-            return Math.max(0, sheet.getLastRowNum()); // row 0 is header
-        }
     }
 
     /**
@@ -257,26 +334,67 @@ public class ExcelImportService {
      * Creates an ImportJob record and emits SSE progress events during processing.
      */
     public String importExcelAsync(String modelCode, InputStream excelStream, ImportOptions options) throws IOException {
-        String taskId = UUID.randomUUID().toString().substring(0, 8);
+        return importExcelAsync(modelCode, excelStream, options, null);
+    }
+
+    public String importExcelAsync(String modelCode, InputStream excelStream, ImportOptions options,
+                                   String fileName) throws IOException {
+        String taskId = UniqueIdGenerator.generate();
         byte[] bytes = excelStream.readAllBytes();
+        ExcelImportPolicy policy = policyResolver.requireEnabled(modelCode);
+        String mode = normalizeMode(options);
+        policyResolver.validateMode(policy, mode, options.getMatchKey());
+        MetaContext.Snapshot contextSnapshot = MetaContext.snapshot();
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
 
         // Create import job record
         ImportJob job = new ImportJob();
+        job.setPid(taskId);
+        job.setTenantId(tenantId);
         job.setModelCode(modelCode);
+        job.setFileName(fileName);
         job.setStatus(StatusConstants.RUNNING);
-        job.setImportMode(options.getUpsertKey() != null ? "upsert" : "insert");
-        importJobMapper.insert(job);
+        job.setImportMode(mode);
+        job.setCreatedBy(userId);
+        LocalDateTime now = utcNow();
+        job.setCreatedAt(now);
+        job.setUpdatedAt(now);
+        job.setDeletedFlag(false);
+        if (importJobMapper.insert(job) != 1 || job.getId() == null) {
+            throw new BusinessException("Failed to persist import task before execution");
+        }
         Long jobId = job.getId();
 
         AsyncImportStatus status = new AsyncImportStatus();
         status.setTaskId(taskId);
+        status.setModelCode(modelCode);
+        status.setTenantId(tenantId);
+        status.setCreatedBy(userId);
         status.setStatus(StatusConstants.RUNNING);
         asyncTasks.put(taskId, status);
 
         asyncExecutor.submit(() -> {
             try {
+                MetaContext.restore(contextSnapshot);
                 ExcelImportResult result = importExcelWithProgress(modelCode,
                         new java.io.ByteArrayInputStream(bytes), options, taskId, jobId);
+                if (result.isHasErrors() && result.getErrors() != null && !result.getErrors().isEmpty()) {
+                    result.setTaskId(taskId);
+                    try {
+                        String reportUrl = errorReportService.attachReport(
+                                jobId, taskId, modelCode, bytes, result.getErrors(),
+                                options.getReportLocale(), reportSelection(result, options));
+                        result.setErrorReportUrl(reportUrl);
+                    } catch (RuntimeException reportError) {
+                        // CATCH: report storage is non-transactional and must not overwrite the
+                        // truthful result of rows that may already have been committed.
+                        log.error("Async import completed with row errors but its correction "
+                                + "workbook could not be created: task={}, model={}",
+                                taskId, modelCode, reportError);
+                        result.setErrorReportFailed(true);
+                    }
+                }
                 status.setResult(result);
                 status.setProcessedRows(result.getTotalRows());
                 status.setTotalRows(result.getTotalRows());
@@ -289,18 +407,24 @@ public class ExcelImportService {
                 emitProgress(taskId, result.getTotalRows(), result.getTotalRows(),
                         result.getErrorCount(), "completed");
             } catch (Exception e) {
-                log.error("Async import failed for task {}: {}", taskId, e.getMessage());
+                // CATCH: top-level async boundary — no caller can observe this failure, so keep
+                // the complete cause chain alongside the durable failed task state.
+                log.error("Async import failed for task {}: {}", taskId, e.getMessage(), e);
                 status.setStatus(StatusConstants.FAILED);
                 status.setResult(ExcelImportResult.builder()
                         .hasErrors(true)
-                        .errors(List.of(new ImportValidationError(0, null, e.getMessage())))
+                        .errors(List.of(new ImportValidationError(0, null, safeMessage(e))))
                         .build());
 
                 updateImportJobStatus(jobId, "failed");
                 emitProgress(taskId, 0, 0, 0, "failed");
             } finally {
+                MetaContext.clear();
                 // Close all SSE emitters for this task
                 closeEmitters(taskId);
+                // Completed tasks are reconstructed from the durable job row. Keeping every
+                // terminal result in memory would grow without bound on a long-lived node.
+                asyncTasks.remove(taskId);
             }
         });
 
@@ -348,37 +472,54 @@ public class ExcelImportService {
             mappedRows.add(mapped);
         }
 
+        List<ImportValidationError> referenceErrors = resolveReferenceValues(fieldDefs, mappedRows);
+        if (!referenceErrors.isEmpty()) {
+            return ExcelImportResult.withErrors(referenceErrors, mappedRows.size());
+        }
+
         List<ImportValidationError> errors = new ArrayList<>(validate(mappedRows));
         int success = 0;
         int errorCount = 0;
         int createdCount = 0;
         int updatedCount = 0;
-        String upsertKey = options.getUpsertKey();
+        ExcelImportPolicy policy = policyResolver.requireEnabled(modelCode);
+        String mode = normalizeMode(options);
+        String matchKey = options.getMatchKey();
+        policyResolver.validateMode(policy, mode, matchKey);
 
-        // INSERT mode with progress
+        // Async uses the same command-aware semantics as the synchronous path.
         for (int batchStart = 0; batchStart < mappedRows.size(); batchStart += BATCH_SIZE) {
             int batchEnd = Math.min(batchStart + BATCH_SIZE, mappedRows.size());
             List<Map<String, String>> batch = mappedRows.subList(batchStart, batchEnd);
 
-            try {
-                List<Map<String, Object>> batchData = new ArrayList<>();
-                for (Map<String, String> row : batch) {
-                    batchData.add(new HashMap<>(row));
-                }
-                dynamicDataService.batchCreate(modelCode, batchData);
-                success += batch.size();
-                createdCount += batch.size();
-            } catch (Exception batchError) {
-                log.warn("Batch insert failed, falling back to per-row: {}", batchError.getMessage());
-                for (int i = 0; i < batch.size(); i++) {
-                    try {
-                        dynamicDataService.create(modelCode, new HashMap<>(batch.get(i)));
-                        success++;
+            boolean stop = false;
+            for (int i = 0; i < batch.size(); i++) {
+                int rowNumber = batchStart + i + 2;
+                try {
+                    Map<String, Object> rowData = convertRowValues(fieldDefs, batch.get(i));
+                    if ("update".equals(mode)) {
+                        Object keyValue = rowData.get(matchKey);
+                        String existingId = findExistingRecordId(modelCode, matchKey, keyValue);
+                        if (existingId == null) {
+                            throw new BusinessException("No existing record matches " + matchKey + "=" + keyValue);
+                        }
+                        executeUpdate(policy, modelCode, existingId, rowData, rowNumber, taskId);
+                        updatedCount++;
+                    } else {
+                        executeCreate(policy, modelCode, rowData, rowNumber, taskId);
                         createdCount++;
-                    } catch (Exception e) {
-                        errorCount++;
-                        errors.add(new ImportValidationError(batchStart + i + 2, null, e.getMessage()));
-                        if (!options.isSkipErrors()) break;
+                    }
+                    success++;
+                } catch (Exception e) {
+                    // CATCH: per-row import tolerance — the async task must persist a truthful
+                    // partial result instead of terminating without row-level evidence.
+                    log.warn("Async Excel import row failed: task={}, model={}, row={}",
+                            taskId, modelCode, rowNumber, e);
+                    errorCount++;
+                    errors.add(new ImportValidationError(rowNumber, null, safeMessage(e)));
+                    if (!options.isSkipErrors()) {
+                        stop = true;
+                        break;
                     }
                 }
             }
@@ -386,6 +527,7 @@ public class ExcelImportService {
             // Emit progress after each batch
             emitProgress(taskId, success + errorCount, mappedRows.size(), errorCount, "running");
             updateImportJobProgress(jobId, success + errorCount, success, errorCount);
+            if (stop) break;
         }
 
         return ExcelImportResult.builder()
@@ -399,7 +541,235 @@ public class ExcelImportService {
      * Get the status of an async import task.
      */
     public AsyncImportStatus getImportStatus(String taskId) {
-        return asyncTasks.get(taskId);
+        AsyncImportStatus status = asyncTasks.get(taskId);
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        if (status != null) {
+            return Objects.equals(status.getTenantId(), tenantId)
+                    && Objects.equals(status.getCreatedBy(), userId) ? status : null;
+        }
+
+        ImportJob job = importJobMapper.selectOne(
+                com.baomidou.mybatisplus.core.toolkit.Wrappers.<ImportJob>lambdaQuery()
+                        .eq(ImportJob::getPid, taskId)
+                        .eq(ImportJob::getTenantId, tenantId)
+                        .eq(ImportJob::getCreatedBy, userId));
+        if (job == null) return null;
+
+        AsyncImportStatus restored = new AsyncImportStatus();
+        restored.setTaskId(job.getPid());
+        restored.setModelCode(job.getModelCode());
+        restored.setTenantId(job.getTenantId());
+        restored.setCreatedBy(job.getCreatedBy());
+        restored.setTotalRows(valueOrZero(job.getTotalRows()));
+        restored.setProcessedRows(valueOrZero(job.getProcessedRows()));
+        String persistedStatus = job.getStatus() == null ? "failed" : job.getStatus().toLowerCase(Locale.ROOT);
+        if (StatusConstants.RUNNING.equalsIgnoreCase(persistedStatus)) {
+            // The executor is process-local. If a task is absent from memory after a restart,
+            // it cannot still be running; fail closed instead of polling forever.
+            persistedStatus = StatusConstants.FAILED;
+            updateImportJobStatus(job.getId(), "failed");
+            restored.setResult(ExcelImportResult.builder()
+                    .totalRows(valueOrZero(job.getTotalRows()))
+                    .successCount(valueOrZero(job.getSuccessRows()))
+                    .errorCount(valueOrZero(job.getErrorRows()))
+                    .errors(List.of(new ImportValidationError(
+                            0, null, "Import was interrupted by a service restart")))
+                    .hasErrors(true)
+                    .build());
+        } else {
+            int successRows = valueOrZero(job.getSuccessRows());
+            int errorRows = valueOrZero(job.getErrorRows());
+            boolean updateMode = "update".equalsIgnoreCase(job.getImportMode());
+            boolean reportExpired = errorRows > 0 && errorReportService.isReportExpired(job);
+            restored.setResult(ExcelImportResult.builder()
+                    .totalRows(valueOrZero(job.getTotalRows()))
+                    .successCount(successRows)
+                    .errorCount(errorRows)
+                    .createdCount(updateMode ? 0 : successRows)
+                    .updatedCount(updateMode ? successRows : 0)
+                    .errors(readPersistedErrors(job))
+                    .taskId(job.getPid())
+                    .errorReportUrl(reportExpired ? null : job.getErrorReportUrl())
+                    .errorReportFailed(errorRows > 0
+                            && job.getErrorReportUrl() == null && !reportExpired)
+                    .errorReportExpired(reportExpired)
+                    .hasErrors(errorRows > 0 || StatusConstants.FAILED.equalsIgnoreCase(persistedStatus))
+                    .build());
+        }
+        restored.setStatus(persistedStatus);
+        return restored;
+    }
+
+    public AsyncImportStatus requireImportStatus(String modelCode, String taskId) {
+        AsyncImportStatus status = getImportStatus(taskId);
+        if (status == null || !Objects.equals(status.getModelCode(), modelCode)) {
+            return null;
+        }
+        return status;
+    }
+
+    private String normalizeMode(ImportOptions options) {
+        String mode = options == null ? null : options.getImportMode();
+        return mode == null || mode.isBlank() ? "insert" : mode.toLowerCase(Locale.ROOT);
+    }
+
+    private ExcelImportErrorReportService.RowSelection reportSelection(
+            ExcelImportResult result, ImportOptions options) {
+        if (result.getSuccessCount() == 0
+                && result.getErrorCount() < result.getTotalRows()) {
+            return ExcelImportErrorReportService.RowSelection.ALL_ROWS;
+        }
+        return options.isSkipErrors()
+                ? ExcelImportErrorReportService.RowSelection.ERROR_ROWS
+                : ExcelImportErrorReportService.RowSelection.FROM_FIRST_ERROR;
+    }
+
+    private static int valueOrZero(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private static LocalDateTime utcNow() {
+        return LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+    }
+
+    private void executeCreate(ExcelImportPolicy policy, String modelCode,
+                               Map<String, Object> rowData, int rowNumber, String importRunId) {
+        Map<String, Object> payload = allowedPayload(rowData, policy.getCreateFields());
+        if (policy.getCreateCommand() == null) {
+            dynamicDataService.create(modelCode, payload);
+            return;
+        }
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setPayload(payload);
+        request.setOperationType("create");
+        request.setClientRequestId(importRequestId(modelCode, "insert", rowNumber, importRunId));
+        request.setAuditContext(Map.of("source", "excel_import", "rowNumber", rowNumber));
+        commandExecutor.execute(policy.getCreateCommand(), request);
+    }
+
+    private void executeUpdate(ExcelImportPolicy policy, String modelCode, String recordPid,
+                               Map<String, Object> rowData, int rowNumber, String importRunId) {
+        Map<String, Object> payload = allowedPayload(rowData, policy.getUpdateFields());
+        if (policy.getUpdateCommand() == null) {
+            dynamicDataService.update(modelCode, recordPid, payload);
+            return;
+        }
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setPayload(payload);
+        request.setOperationType("update");
+        request.setTargetRecordPid(recordPid);
+        request.setClientRequestId(importRequestId(modelCode, "update", rowNumber, importRunId));
+        request.setAuditContext(Map.of("source", "excel_import", "rowNumber", rowNumber));
+        commandExecutor.execute(policy.getUpdateCommand(), request);
+    }
+
+    private Map<String, Object> allowedPayload(Map<String, Object> rowData, Set<String> allowedFields) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : rowData.entrySet()) {
+            Object value = entry.getValue();
+            // Empty template cells mean "omitted" for INSERT and "preserve" for UPDATE.
+            // Passing "" to numeric/date/reference fields leaks spreadsheet representation
+            // into the command/DB layer and can suppress command defaults or cause type errors.
+            if (allowedFields.contains(entry.getKey())
+                    && value != null
+                    && (!(value instanceof String text) || !text.isBlank())) {
+                payload.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return payload;
+    }
+
+    /** Convert validated spreadsheet strings to the Java types required by commands and SQL. */
+    Map<String, Object> convertRowValues(List<FieldDefinition> fieldDefs, Map<String, String> row) {
+        if (row == null || row.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, FieldDefinition> fieldsByCode = new HashMap<>();
+        if (fieldDefs != null) {
+            for (FieldDefinition field : fieldDefs) {
+                if (field != null && field.getCode() != null) {
+                    fieldsByCode.put(field.getCode(), field);
+                }
+            }
+        }
+        Map<String, Object> converted = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : row.entrySet()) {
+            String value = entry.getValue();
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            FieldDefinition field = fieldsByCode.get(entry.getKey());
+            // Older models and compatibility fixtures can omit dataType. In that case the
+            // import contract remains pass-through; conversion is only authoritative when
+            // metadata explicitly declares a type.
+            converted.put(entry.getKey(), field == null
+                    || field.getDataType() == null
+                    || field.getDataType().isBlank()
+                    ? value : typeSystemManager.convertValue(value, field));
+        }
+        return converted;
+    }
+
+    private String importRequestId(String modelCode, String mode, int rowNumber, String importRunId) {
+        return "excel:" + MetaContext.getCurrentTenantId() + ":" + modelCode + ":" + mode
+                + ":" + importRunId + ":" + rowNumber;
+    }
+
+    private static String safeMessage(Exception error) {
+        String message = error.getMessage();
+        if (error instanceof BusinessException && message != null && !message.isBlank()
+                && !looksLikeInfrastructureFailure(message)) {
+            return message;
+        }
+        return ROW_WRITE_FAILED_MESSAGE;
+    }
+
+    private static boolean looksLikeInfrastructureFailure(String message) {
+        String normalized = message.toLowerCase(Locale.ROOT);
+        return normalized.contains("org.postgresql")
+                || normalized.contains("bad sql grammar")
+                || normalized.contains("error updating database")
+                || normalized.contains("dynamicdatamapper")
+                || normalized.contains("mybatis")
+                || normalized.contains("java.sql")
+                || normalized.contains("sqlstate")
+                || normalized.contains("###");
+    }
+
+    /** Resolve uploaded business reference values to their configured stored value. */
+    List<ImportValidationError> resolveReferenceValues(List<FieldDefinition> fieldDefs,
+                                                       List<Map<String, String>> rows) {
+        if (fieldDefs == null || fieldDefs.isEmpty() || rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        Map<String, FieldDefinition> references = new LinkedHashMap<>();
+        for (FieldDefinition field : fieldDefs) {
+            if ("reference".equalsIgnoreCase(field.getDataType())
+                    && field.getRefTarget() != null
+                    && field.getRefTarget().getTargetEntity() != null
+                    && !field.getRefTarget().getTargetEntity().isBlank()) {
+                references.put(field.getCode(), field);
+            }
+        }
+
+        List<ImportValidationError> errors = new ArrayList<>();
+        for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
+            Map<String, String> row = rows.get(rowIndex);
+            for (Map.Entry<String, FieldDefinition> reference : references.entrySet()) {
+                String uploaded = row.get(reference.getKey());
+                if (uploaded == null || uploaded.isBlank()) {
+                    continue;
+                }
+                try {
+                    row.put(reference.getKey(), referenceResolver.resolve(reference.getValue(), uploaded));
+                } catch (Exception error) {
+                    errors.add(new ImportValidationError(
+                            rowIndex + 2, reference.getKey(), safeMessage(error)));
+                }
+            }
+        }
+        return errors;
     }
 
     /**
@@ -502,6 +872,18 @@ public class ExcelImportService {
      * @return path to the generated temp file
      */
     public Path generateImportTemplate(String modelCode) throws IOException {
+        return generateImportTemplate(modelCode, "insert");
+    }
+
+    public Path generateImportTemplate(String modelCode, String mode) throws IOException {
+        ExcelImportPolicy policy = policyResolver.requireEnabled(modelCode);
+        String normalizedMode = mode == null ? "insert" : mode.toLowerCase(Locale.ROOT);
+        Set<String> permittedFields = "update".equals(normalizedMode)
+                ? new LinkedHashSet<>(policy.getUpdateFields())
+                : new LinkedHashSet<>(policy.getCreateFields());
+        if ("update".equals(normalizedMode)) {
+            permittedFields.addAll(policy.getUpdateKeys());
+        }
         List<FieldDefinition> allFields = metaModelService.getModelFields(modelCode);
 
         // Filter out auto-generated, virtual, and primary key fields
@@ -510,6 +892,7 @@ public class ExcelImportService {
             if (TEMPLATE_EXCLUDED_FIELDS.contains(fd.getCode())) continue;
             if (fd.isPrimaryKey()) continue;
             if (fd.isComputedReadonly()) continue;
+            if (!permittedFields.contains(fd.getCode())) continue;
             importableFields.add(fd);
         }
 
@@ -537,17 +920,36 @@ public class ExcelImportService {
 
             // Write header row
             var headerRow = sheet.createRow(0);
+            var commentDrawing = sheet.createDrawingPatriarch();
+            List<Map.Entry<FieldDefinition, String>> referenceHints = new ArrayList<>();
             for (int i = 0; i < importableFields.size(); i++) {
                 FieldDefinition fd = importableFields.get(i);
                 var cell = headerRow.createCell(i);
 
                 String label = (fd.getDisplayName() != null && !fd.getDisplayName().isBlank())
                         ? fd.getDisplayName() : fd.getCode();
-                if (fd.isRequired()) {
+                boolean required = fd.isRequired()
+                        && !("insert".equals(normalizedMode)
+                        && policy.getCreateAutoSetFields().contains(fd.getCode()));
+                if (required) {
                     label = "* " + label;
                 }
                 cell.setCellValue(label);
-                cell.setCellStyle(fd.isRequired() ? requiredStyle : normalStyle);
+                cell.setCellStyle(required ? requiredStyle : normalStyle);
+
+                String referenceHint = referenceResolver.importHint(fd);
+                if (referenceHint != null) {
+                    var anchor = workbook.getCreationHelper().createClientAnchor();
+                    anchor.setCol1(i);
+                    anchor.setCol2(Math.min(i + 4, importableFields.size()));
+                    anchor.setRow1(0);
+                    anchor.setRow2(5);
+                    var comment = commentDrawing.createCellComment(anchor);
+                    comment.setString(workbook.getCreationHelper().createRichTextString(referenceHint));
+                    comment.setAuthor("AuraBoot");
+                    cell.setCellComment(comment);
+                    referenceHints.add(Map.entry(fd, referenceHint));
+                }
             }
 
             // Auto-size columns with minimum width
@@ -556,6 +958,26 @@ public class ExcelImportService {
                 if (sheet.getColumnWidth(i) < 4000) {
                     sheet.setColumnWidth(i, 4000);
                 }
+            }
+
+            if (!referenceHints.isEmpty()) {
+                var instructions = workbook.createSheet("填写说明");
+                var instructionHeader = instructions.createRow(0);
+                instructionHeader.createCell(0).setCellValue("字段");
+                instructionHeader.createCell(1).setCellValue("填写规则");
+                instructionHeader.getCell(0).setCellStyle(normalStyle);
+                instructionHeader.getCell(1).setCellStyle(normalStyle);
+                for (int i = 0; i < referenceHints.size(); i++) {
+                    var hintRow = instructions.createRow(i + 1);
+                    FieldDefinition field = referenceHints.get(i).getKey();
+                    hintRow.createCell(0).setCellValue(
+                            field.getDisplayName() == null || field.getDisplayName().isBlank()
+                                    ? field.getCode() : field.getDisplayName());
+                    hintRow.createCell(1).setCellValue(referenceHints.get(i).getValue());
+                }
+                instructions.setColumnWidth(0, 6000);
+                instructions.setColumnWidth(1, 24000);
+                instructions.createFreezePane(0, 1);
             }
 
             try (OutputStream os = Files.newOutputStream(tempFile)) {
@@ -760,6 +1182,13 @@ public class ExcelImportService {
      * @return SseEmitter that streams progress events
      */
     public SseEmitter subscribeProgress(String taskId) {
+        return subscribeProgress(taskId, getImportStatus(taskId));
+    }
+
+    public SseEmitter subscribeProgress(String taskId, AsyncImportStatus initialStatus) {
+        if (initialStatus == null) {
+            throw new BusinessException("Import task not found: " + taskId);
+        }
         SseEmitter emitter = new SseEmitter(300_000L); // 5-minute timeout
 
         importEmitters.computeIfAbsent(taskId, k -> new CopyOnWriteArrayList<>()).add(emitter);
@@ -770,22 +1199,25 @@ public class ExcelImportService {
         emitter.onError(e -> removeEmitter(taskId, emitter));
 
         // Send initial status if task already exists
-        AsyncImportStatus status = asyncTasks.get(taskId);
-        if (status != null) {
-            try {
-                emitter.send(SseEmitter.event()
-                        .name("progress")
-                        .data(Map.of(
-                                "taskId", taskId,
-                                "status", status.getStatus(),
-                                "processed", status.getProcessedRows(),
-                                "total", status.getTotalRows(),
-                                "errors", 0
-                        )));
-            } catch (IOException e) {
-                log.debug("Failed to send initial SSE event for task {}: {}", taskId, e.getMessage());
-                removeEmitter(taskId, emitter);
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("progress")
+                    .data(Map.of(
+                            "taskId", taskId,
+                            "status", initialStatus.getStatus(),
+                            "processed", initialStatus.getProcessedRows(),
+                            "total", initialStatus.getTotalRows(),
+                            "errors", initialStatus.getResult() == null
+                                    ? 0 : initialStatus.getResult().getErrorCount()
+                    )));
+            // A terminal task restored from the database has no worker left to close this
+            // subscription. Complete it after the initial event instead of leaking for 5 minutes.
+            if (!StatusConstants.RUNNING.equalsIgnoreCase(initialStatus.getStatus())) {
+                emitter.complete();
             }
+        } catch (IOException e) {
+            log.debug("Failed to send initial SSE event for task {}: {}", taskId, e.getMessage());
+            removeEmitter(taskId, emitter);
         }
 
         return emitter;
@@ -852,22 +1284,22 @@ public class ExcelImportService {
     // ==================== Import Job persistence ====================
 
     private void updateImportJob(Long jobId, String status, ExcelImportResult result) {
-        try {
-            ImportJob job = importJobMapper.selectById(jobId);
-            if (job != null) {
-                job.setStatus(status);
-                job.setTotalRows(result.getTotalRows());
-                job.setProcessedRows(result.getSuccessCount() + result.getErrorCount());
-                job.setSuccessRows(result.getSuccessCount());
-                job.setErrorRows(result.getErrorCount());
-                // TODO: [timezone-unification] Change to Instant once ImportJob entity fields are migrated.
-                LocalDateTime now = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
-                job.setCompletedAt(now);
-                job.setUpdatedAt(now);
-                importJobMapper.updateById(job);
-            }
-        } catch (Exception e) {
-            log.warn("Failed to update import job {}: {}", jobId, e.getMessage());
+        ImportJob job = importJobMapper.selectById(jobId);
+        if (job == null) {
+            throw new BusinessException("Import task disappeared before completion: " + jobId);
+        }
+        job.setStatus(status);
+        job.setTotalRows(result.getTotalRows());
+        job.setProcessedRows(result.getSuccessCount() + result.getErrorCount());
+        job.setSuccessRows(result.getSuccessCount());
+        job.setErrorRows(result.getErrorCount());
+        job.setErrorDetails(serializeErrors(result.getErrors()));
+        // TODO: [timezone-unification] Change to Instant once ImportJob entity fields are migrated.
+        LocalDateTime now = utcNow();
+        job.setCompletedAt(now);
+        job.setUpdatedAt(now);
+        if (importJobMapper.updateById(job) != 1) {
+            throw new BusinessException("Failed to persist import task completion: " + jobId);
         }
     }
 
@@ -877,7 +1309,7 @@ public class ExcelImportService {
             if (job != null) {
                 job.setStatus(status);
                 // TODO: [timezone-unification] Change to Instant once ImportJob entity fields are migrated.
-                LocalDateTime now = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+                LocalDateTime now = utcNow();
                 job.setCompletedAt(now);
                 job.setUpdatedAt(now);
                 importJobMapper.updateById(job);
@@ -887,13 +1319,39 @@ public class ExcelImportService {
         }
     }
 
+    private String serializeErrors(List<ImportValidationError> errors) {
+        if (errors == null || errors.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(
+                    errors.stream().limit(MAX_PERSISTED_ROW_ERRORS).toList());
+        } catch (JsonProcessingException serializationError) {
+            log.error("Failed to serialize durable import row errors", serializationError);
+            return null;
+        }
+    }
+
+    private List<ImportValidationError> readPersistedErrors(ImportJob job) {
+        if (job.getErrorDetails() == null || job.getErrorDetails().isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(job.getErrorDetails(), IMPORT_ERRORS_TYPE);
+        } catch (JsonProcessingException parseError) {
+            log.error("Failed to restore durable row errors for import task {}", job.getPid(),
+                    parseError);
+            return List.of();
+        }
+    }
+
     private void updateImportJobTotalRows(Long jobId, int totalRows) {
         try {
             ImportJob job = importJobMapper.selectById(jobId);
             if (job != null) {
                 job.setTotalRows(totalRows);
                 // TODO: [timezone-unification] Change to Instant once ImportJob entity fields are migrated.
-                job.setUpdatedAt(LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC));
+                job.setUpdatedAt(utcNow());
                 importJobMapper.updateById(job);
             }
         } catch (Exception e) {
@@ -909,7 +1367,7 @@ public class ExcelImportService {
                 job.setSuccessRows(success);
                 job.setErrorRows(errors);
                 // TODO: [timezone-unification] Change to Instant once ImportJob entity fields are migrated.
-                job.setUpdatedAt(LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC));
+                job.setUpdatedAt(utcNow());
                 importJobMapper.updateById(job);
             }
         } catch (Exception e) {

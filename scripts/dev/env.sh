@@ -19,6 +19,8 @@ source "$SCRIPT_DIR/lib/env-loader.sh"
 source "$SCRIPT_DIR/lib/process-manager.sh"
 # shellcheck source=scripts/dev/lib/health.sh
 source "$SCRIPT_DIR/lib/health.sh"
+# shellcheck source=../lib/reset-init-common.sh
+source "$PROJECT_ROOT/scripts/lib/reset-init-common.sh"
 
 COMMAND="${1:-}"
 if [ -n "$COMMAND" ]; then
@@ -43,7 +45,7 @@ Options:
   --product=oss|enterprise
   --slug=<name>           Isolated stack slug
   --service=<name>        logs service: backend|frontend|bff|docker|all
-  --level=health          verify level
+  --level=health|schema   verify level
   --with-storage          start optional storage infra
   --purge                 stop docker volumes when stopping isolated infra
   --dry-run               Print plan, do not mutate
@@ -323,6 +325,111 @@ start_infra_from_existing_env() {
         up -d "${services[@]}"
 }
 
+apply_schema_for_new_env() {
+    local core_root
+    core_root="$(registered_core_root)"
+    local flyway_migrate="$core_root/scripts/db/flyway-migrate.sh"
+    local edition="$PRODUCT"
+    local enterprise_root=""
+
+    if [ "$PRODUCT" = "enterprise" ]; then
+        enterprise_root="$(resolve_enterprise_root)"
+    fi
+
+    if [ ! -x "$flyway_migrate" ]; then
+        echo "ERROR: Flyway runner not found or not executable: $flyway_migrate" >&2
+        exit 1
+    fi
+
+    if [ "$PRODUCT" = "enterprise" ] && schema_table_exists_by_name "ab_user" && ! schema_table_exists_by_name "ab_flyway_schema_history"; then
+        apply_enterprise_migrations_to_core_schema "$enterprise_root"
+        return 0
+    fi
+
+    echo "applying schema for new $PRODUCT env via Flyway"
+    if [ "$PRODUCT" = "enterprise" ]; then
+        env \
+            AURA_CORE_ROOT="$core_root" \
+            PG_HOST="$PG_HOST" \
+            PG_PORT="$PG_PORT" \
+            PG_USER="$PG_USER" \
+            PG_PASSWORD="$PGPASSWORD" \
+            PG_DB="$PG_DB" \
+            "$flyway_migrate" --edition "$edition" --enterprise-root "$enterprise_root"
+    else
+        env \
+            AURA_CORE_ROOT="$core_root" \
+            PG_HOST="$PG_HOST" \
+            PG_PORT="$PG_PORT" \
+            PG_USER="$PG_USER" \
+            PG_PASSWORD="$PGPASSWORD" \
+            PG_DB="$PG_DB" \
+            "$flyway_migrate" --edition "$edition"
+    fi
+}
+
+required_schema_table() {
+    if [ "$PRODUCT" = "enterprise" ]; then
+        echo "ab_qr_label_template"
+    else
+        echo "ab_user"
+    fi
+}
+
+wait_for_postgres() {
+    local attempt
+    for attempt in $(seq 1 30); do
+        if PGPASSWORD="$PGPASSWORD" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -t -A -c "select 1;" >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+    done
+    echo "ERROR: postgres not ready at $PG_HOST:$PG_PORT/$PG_DB" >&2
+    return 1
+}
+
+schema_table_exists() {
+    local table
+    table="$(required_schema_table)"
+    schema_table_exists_by_name "$table"
+}
+
+schema_table_exists_by_name() {
+    local table="$1"
+    local exists
+    exists="$(
+        PGPASSWORD="$PGPASSWORD" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -t -A \
+            -c "select to_regclass('public.${table}') is not null;" 2>/dev/null || true
+    )"
+    [ "$exists" = "t" ]
+}
+
+apply_enterprise_migrations_to_core_schema() {
+    local enterprise_root="$1"
+    local migration_dir="$enterprise_root/platform/src/main/resources/db/migration/enterprise"
+    if [ ! -d "$migration_dir" ]; then
+        echo "ERROR: enterprise migration dir not found: $migration_dir" >&2
+        exit 1
+    fi
+
+    echo "applying enterprise migrations onto host-mode core schema"
+    local migration
+    while IFS= read -r migration; do
+        [ -n "$migration" ] || continue
+        echo "  psql -f $migration"
+        PGPASSWORD="$PGPASSWORD" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -v ON_ERROR_STOP=1 -f "$migration"
+    done < <(find "$migration_dir" -maxdepth 1 -type f -name 'V*.sql' | sort)
+}
+
+ensure_schema_ready_before_host_apps() {
+    wait_for_postgres
+    if schema_table_exists; then
+        echo "schema already ready: $(required_schema_table)"
+        return 0
+    fi
+    apply_schema_for_new_env
+}
+
 start_backend_host() {
     local backend_root
     backend_root="$(backend_root_for_product)"
@@ -416,6 +523,7 @@ command_start() {
             "$SCRIPT_DIR/start-dev-infra.sh" "${infra_args[@]}"
         load_bugfix_env
     fi
+    ensure_schema_ready_before_host_apps
     registry_upsert_current running >/dev/null
     start_backend_host
     start_frontend_host
@@ -477,6 +585,36 @@ PLAN
         PG_DB="$PG_DB" \
         PGPASSWORD="$PGPASSWORD" \
         "$reset_script"
+
+    # The reset plan has always promised a usable, bootstrapped environment.
+    # Keep that contract executable: Flyway only recreates schema; the explicit
+    # bootstrap endpoint creates the default tenant/admin required by plugin
+    # import and Playwright auth. Give the already-running host backend a short
+    # reconnect window after its database connections were terminated.
+    local health_url="$BACKEND_URL/actuator/health"
+    local backend_ready=0
+    local attempt
+    for attempt in $(seq 1 30); do
+        if NO_PROXY=localhost,127.0.0.1 curl -fsS --max-time 2 "$health_url" >/dev/null 2>&1; then
+            backend_ready=1
+            break
+        fi
+        sleep 1
+    done
+    if [ "$backend_ready" != "1" ]; then
+        echo "ERROR: backend did not recover after database reset: $health_url" >&2
+        echo "       start it with scripts/dev/env.sh start --slug=$SLUG, then retry reset" >&2
+        return 1
+    fi
+
+    aura_bootstrap_setup_if_needed \
+        "$BACKEND_URL" \
+        "AuraBoot Dev" \
+        "admin@auraboot.com" \
+        "Test2026x" \
+        "Admin User" \
+        "single" \
+        "[env reset:$SLUG]"
 }
 
 command_stop() {
@@ -525,9 +663,36 @@ command_stop() {
 
 command_verify() {
     load_bugfix_env
-    if [ "$LEVEL" != "health" ]; then
-        echo "ERROR: verify currently supports --level=health" >&2
+    if [ "$LEVEL" != "health" ] && [ "$LEVEL" != "schema" ]; then
+        echo "ERROR: verify currently supports --level=health|schema" >&2
         exit 2
+    fi
+    if [ "$LEVEL" = "schema" ]; then
+        if [ "$DRY_RUN" = "1" ]; then
+            echo "Schema readiness targets"
+            echo "  database: $PG_HOST:$PG_PORT/$PG_DB"
+            if [ "$PRODUCT" = "enterprise" ]; then
+                echo "  required table: ab_qr_label_template"
+            else
+                echo "  required table: ab_user"
+            fi
+            return 0
+        fi
+        local required_table="ab_user"
+        if [ "$PRODUCT" = "enterprise" ]; then
+            required_table="ab_qr_label_template"
+        fi
+        local exists
+        exists="$(
+            PGPASSWORD="$PGPASSWORD" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -t -A \
+                -c "select to_regclass('public.${required_table}') is not null;" 2>/dev/null || true
+        )"
+        if [ "$exists" = "t" ]; then
+            echo "schema ok: $required_table exists in $PG_HOST:$PG_PORT/$PG_DB"
+            return 0
+        fi
+        echo "schema missing: $required_table in $PG_HOST:$PG_PORT/$PG_DB" >&2
+        return 1
     fi
     if [ "$DRY_RUN" = "1" ]; then
         echo "Health targets"

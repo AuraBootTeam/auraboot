@@ -153,10 +153,15 @@ describe('useActionHandler - handlerParams.async polling', () => {
     });
 
     expect(writeText).toHaveBeenCalledWith('TempPass1!');
-    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('TempPass1!'), 'success');
+    expect(showToast).toHaveBeenCalledWith(
+      'Temporary password generated and copied when permitted',
+      'success',
+    );
   });
 
   it('collects command inputFields and merges them into the command payload', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
     fetchResultMock.mockResolvedValueOnce({
       code: '0',
       data: {
@@ -166,6 +171,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
           action: 'provision_member_from_employee',
           employeePid: 'emp-001',
           memberPid: 'member-001',
+          userName: 'emp_emp001',
           tempPassword: 'TempPass1!',
         },
       },
@@ -227,7 +233,13 @@ describe('useActionHandler - handlerParams.async polling', () => {
       }),
     );
     expect(loadData).toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('TempPass1!'), 'success');
+    expect(writeText).toHaveBeenCalledWith(
+      'Login name: emp_emp001\nTemporary password: TempPass1!',
+    );
+    expect(showToast).toHaveBeenCalledWith(
+      'Account credentials generated and copied when permitted',
+      'success',
+    );
   });
 
   it('surfaces a failed async task in the modal instead of throwing to the page', async () => {
@@ -573,6 +585,150 @@ describe('useActionHandler - handlerParams.async polling', () => {
     );
     expect(navigate).not.toHaveBeenCalled();
     openSpy.mockRestore();
+  });
+
+  it('opens a contextual command form in create mode and carries the source record pid', async () => {
+    const navigate = vi.fn();
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: navigate as any,
+        tableName: 'crm_opportunity_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: {} as any,
+      }),
+    );
+
+    const button = {
+      code: 'log_activity',
+      label: 'Log Activity',
+      action: {
+        type: 'navigate',
+        to: 'crm_activity_common_form',
+        command: 'crm:log_opp_activity',
+      },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button, { pid: 'OPP-123' });
+    });
+
+    expect(navigate).toHaveBeenCalledWith(
+      '/p/crm_activity_common/new?commandCode=crm%3Alog_opp_activity&sourceRecordPid=OPP-123',
+    );
+  });
+
+  it('uses detail-page context for contextual create actions rendered inside tabs', async () => {
+    const navigate = vi.fn();
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: navigate as any,
+        tableName: 'crm_opportunity_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: {
+          data: {
+            pid: 'OPP-CONTEXT',
+            crm_opp_account_id: 'ACCOUNT-CONTEXT',
+          },
+        } as any,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleAction({
+        code: 'create_plan_task',
+        action: {
+          type: 'navigate',
+          to: 'crm_activity_common_form',
+          command: 'crm:create_opp_task',
+        },
+      } as unknown as ButtonConfig);
+    });
+    expect(navigate).toHaveBeenLastCalledWith(
+      '/p/crm_activity_common/new?commandCode=crm%3Acreate_opp_task&sourceRecordPid=OPP-CONTEXT',
+    );
+
+    await act(async () => {
+      await result.current.handleAction({
+        code: 'create_quote_summary',
+        action: {
+          type: 'navigate',
+          to: '/p/crm_quote_summary_common/new?dv.crm_qs_opportunity_id={pid}&dv.crm_qs_account_id={crm_opp_account_id}',
+          command: 'crm:create_quote_summary',
+        },
+      } as unknown as ButtonConfig);
+    });
+    expect(navigate).toHaveBeenLastCalledWith(
+      '/p/crm_quote_summary_common/new?dv.crm_qs_opportunity_id=OPP-CONTEXT&dv.crm_qs_account_id=ACCOUNT-CONTEXT&commandCode=crm%3Acreate_quote_summary&sourceRecordPid=OPP-CONTEXT',
+    );
+  });
+
+  it('ignores an early empty form and resolves the live detail record at click time', async () => {
+    const navigate = vi.fn();
+    const runtime = makeRuntime({
+      record: {
+        pid: 'OPP-LIVE',
+        crm_opp_account_id: 'ACCOUNT-LIVE',
+      },
+      $page: { recordPid: 'OPP-LIVE' },
+    });
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime,
+        navigate: navigate as any,
+        tableName: 'crm_opportunity_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: { record: {} } as any,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleAction({
+        code: 'create_quote_summary',
+        action: {
+          type: 'navigate',
+          to: '/p/crm_quote_summary_common/new?dv.crm_qs_opportunity_id={pid}&dv.crm_qs_account_id={crm_opp_account_id}',
+          command: 'crm:create_quote_summary',
+        },
+      } as unknown as ButtonConfig);
+    });
+
+    expect(navigate).toHaveBeenCalledWith(
+      '/p/crm_quote_summary_common/new?dv.crm_qs_opportunity_id=OPP-LIVE&dv.crm_qs_account_id=ACCOUNT-LIVE&commandCode=crm%3Acreate_quote_summary&sourceRecordPid=OPP-LIVE',
+    );
+  });
+
+  it('falls back to the detail route pid when the record has not synchronized yet', async () => {
+    const navigate = vi.fn();
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime({ $page: { recordPid: 'OPP-PAGE' } }),
+        navigate: navigate as any,
+        tableName: 'crm_opportunity_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: { record: {} } as any,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleAction({
+        code: 'create_plan_task',
+        action: {
+          type: 'navigate',
+          to: 'crm_activity_common_form',
+          command: 'crm:create_opp_task',
+        },
+      } as unknown as ButtonConfig);
+    });
+
+    expect(navigate).toHaveBeenCalledWith(
+      '/p/crm_activity_common/new?commandCode=crm%3Acreate_opp_task&sourceRecordPid=OPP-PAGE',
+    );
   });
 
   it('injects the original filename alongside promptUpload file ids', async () => {

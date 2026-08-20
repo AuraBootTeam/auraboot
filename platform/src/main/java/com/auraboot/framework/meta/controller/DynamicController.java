@@ -11,8 +11,10 @@ import com.auraboot.framework.meta.service.PageSchemaService;
 import com.auraboot.framework.meta.service.RecordCapabilityService;
 import com.auraboot.framework.meta.util.PageKeyConverter;
 import com.auraboot.framework.meta.util.PublicRecordSanitizer;
+import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.service.RecordShareService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,6 +22,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletResponse;
@@ -54,6 +57,8 @@ public class DynamicController {
 
     static final int MAX_BATCH_SIZE = 500;
     static final String RECORD_INTERNAL_ID_RESOLVER = "$recordInternalId";
+    static final String CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER = "$currentDepartmentOwnerPids";
+    static final String CURRENT_SHARED_RECORD_PIDS_RESOLVER = "$currentSharedRecordPids";
 
     private static String logSafe(Object value) {
         return LogSanitizer.safe(value);
@@ -76,6 +81,12 @@ public class DynamicController {
 
     @Autowired
     private RecordCapabilityService recordCapabilityService;
+
+    @Autowired
+    private OrganizationService organizationService;
+
+    @Autowired
+    private RecordShareService recordShareService;
 
     @Autowired
     private com.auraboot.framework.meta.service.ModelFieldBindingService modelFieldBindingService;
@@ -125,7 +136,8 @@ public class DynamicController {
             logSafe(pageKey), pageNum, pageSize, logSafe(keyword), logSafe(filters),
                 logSafe(sortFields), logSafe(queryCode), cursor);
 
-        List<QueryCondition> conditions = resolveRuntimeFilterValues(parseFilters(filters));
+        String modelCode = resolveModelCode(pageKey);
+        List<QueryCondition> conditions = resolveRuntimeFilterValues(parseFilters(filters), modelCode);
         List<SortField> parsedSortFields = parseSortFields(sortFields, sortField, sortOrder);
 
         DynamicQueryRequest queryRequest = DynamicQueryRequest.builder()
@@ -141,8 +153,6 @@ public class DynamicController {
         // Priority: if the raw pageKey is itself a valid model code, use it as-is.
         // This handles model codes that end in page-type suffixes (e.g. sl_price_list)
         // which would be incorrectly stripped by PageKeyConverter (to sl_price).
-        String modelCode = resolveModelCode(pageKey);
-
         // If queryCode is provided, delegate to NamedQuery execution.
         if (queryCode != null && !queryCode.isBlank()) {
             PaginationResult<Map<String, Object>> result = dynamicDataService.listByQueryCode(queryCode, queryRequest);
@@ -245,7 +255,8 @@ public class DynamicController {
         }
     }
 
-    private List<QueryCondition> resolveRuntimeFilterValues(List<QueryCondition> conditions) {
+    private List<QueryCondition> resolveRuntimeFilterValues(
+            List<QueryCondition> conditions, String modelCode) {
         if (conditions == null || conditions.isEmpty()) {
             return conditions;
         }
@@ -253,32 +264,71 @@ public class DynamicController {
             if (condition == null) {
                 continue;
             }
-            condition.setValue(resolveRuntimeFilterValue(condition.getValue()));
+            condition.setValue(resolveRuntimeFilterValue(condition.getValue(), modelCode));
             if (condition.getValues() != null && !condition.getValues().isEmpty()) {
                 List<Object> resolvedValues = new ArrayList<>(condition.getValues().size());
                 for (Object value : condition.getValues()) {
-                    resolvedValues.add(resolveRuntimeFilterValue(value));
+                    Object resolved = resolveRuntimeFilterValue(value, modelCode);
+                    if ((condition.getOperator() == QueryCondition.Operator.IN
+                            || condition.getOperator() == QueryCondition.Operator.NOT_IN)
+                            && resolved instanceof List<?> list) {
+                        resolvedValues.addAll(list);
+                    } else {
+                        resolvedValues.add(resolved);
+                    }
                 }
                 condition.setValues(resolvedValues);
             }
-            condition.setSubConditions(resolveRuntimeFilterValues(condition.getSubConditions()));
+            condition.setSubConditions(resolveRuntimeFilterValues(condition.getSubConditions(), modelCode));
         }
         return conditions;
     }
 
     @SuppressWarnings("unchecked")
-    private Object resolveRuntimeFilterValue(Object value) {
+    private Object resolveRuntimeFilterValue(Object value, String modelCode) {
         if (value instanceof Map<?, ?> map && map.containsKey(RECORD_INTERNAL_ID_RESOLVER)) {
             return resolveRecordInternalId(map.get(RECORD_INTERNAL_ID_RESOLVER));
+        }
+        if (value instanceof Map<?, ?> map && map.containsKey(CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER)) {
+            return resolveCurrentDepartmentOwnerPids(map.get(CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER));
+        }
+        if (value instanceof Map<?, ?> map && map.containsKey(CURRENT_SHARED_RECORD_PIDS_RESOLVER)) {
+            return resolveCurrentSharedRecordPids(map.get(CURRENT_SHARED_RECORD_PIDS_RESOLVER), modelCode);
         }
         if (value instanceof List<?> list) {
             List<Object> resolved = new ArrayList<>(list.size());
             for (Object item : list) {
-                resolved.add(resolveRuntimeFilterValue(item));
+                resolved.add(resolveRuntimeFilterValue(item, modelCode));
             }
             return resolved;
         }
         return value;
+    }
+
+    private List<String> resolveCurrentDepartmentOwnerPids(Object resolverSpec) {
+        boolean includeSubDepartments = true;
+        if (resolverSpec instanceof Map<?, ?> spec
+                && spec.get("includeSubDepartments") instanceof Boolean includeSub) {
+            includeSubDepartments = includeSub;
+        }
+        return organizationService.getCurrentDepartmentUserPids(includeSubDepartments);
+    }
+
+    private List<String> resolveCurrentSharedRecordPids(Object resolverSpec, String modelCode) {
+        String action = "read";
+        if (resolverSpec instanceof Map<?, ?> spec && StringUtils.hasText(stringValue(spec.get("action")))) {
+            action = stringValue(spec.get("action")).trim().toLowerCase();
+        }
+        if (!Set.of("read", "update").contains(action)) {
+            throw new com.auraboot.framework.meta.exception.MetaServiceException(
+                    CURRENT_SHARED_RECORD_PIDS_RESOLVER + " supports read or update only");
+        }
+        return recordShareService.getSharedRecordPids(
+                MetaContext.getCurrentTenantId(),
+                modelCode,
+                MetaContext.getCurrentUserId(),
+                MetaContext.getCurrentUserPid(),
+                action);
     }
 
     private Object resolveRecordInternalId(Object resolverSpec) {
@@ -662,6 +712,7 @@ public class DynamicController {
         String modelCode = resolveModelCode(pageKey);
         DataExportRequest.ExportFormat format = DataExportRequest.ExportFormat.EXCEL;
         List<QueryCondition> conditions = null;
+        String keyword = null;
 
         if (exportParams != null) {
             // Parse format
@@ -678,18 +729,24 @@ public class DynamicController {
                     if (item instanceof Map<?, ?> condMap) {
                         String field = condMap.get("field") != null ? condMap.get("field").toString() : null;
                         String op = condMap.get("operator") != null ? condMap.get("operator").toString() : null;
-                        Object val = condMap.get("value");
+                        Object val = resolveRuntimeFilterValue(condMap.get("value"), modelCode);
                         if (field != null && op != null) {
                             try {
                                 QueryCondition.Operator operator = QueryCondition.Operator.fromCode(op);
                                 if (operator == null) {
                                     throw new IllegalArgumentException("Unsupported operator: " + op);
                                 }
-                                conditions.add(QueryCondition.builder()
+                                QueryCondition.QueryConditionBuilder conditionBuilder = QueryCondition.builder()
                                         .fieldName(field)
                                         .operator(operator)
-                                        .value(val)
-                                        .build());
+                                        .value(val);
+                                if ((operator == QueryCondition.Operator.IN
+                                        || operator == QueryCondition.Operator.NOT_IN
+                                        || operator == QueryCondition.Operator.BETWEEN)
+                                        && val instanceof List<?> values) {
+                                    conditionBuilder.values(flattenResolvedValues(values));
+                                }
+                                conditions.add(conditionBuilder.build());
                             } catch (IllegalArgumentException e) {
                                 log.warn("Invalid operator in export condition: {}", logSafe(op));
                             }
@@ -698,11 +755,16 @@ public class DynamicController {
                 }
                 if (conditions.isEmpty()) conditions = null;
             }
+            Object keywordObj = exportParams.get("keyword");
+            if (keywordObj != null && !keywordObj.toString().isBlank()) {
+                keyword = keywordObj.toString().trim();
+            }
         }
 
         DataExportRequest request = DataExportRequest.builder()
                 .format(format)
                 .conditions(conditions)
+                .keyword(keyword)
                 .includeHeader(true)
                 .build();
 
@@ -733,6 +795,18 @@ public class DynamicController {
             case "xlsx", "excel" -> DataExportRequest.ExportFormat.EXCEL;
             default -> DataExportRequest.ExportFormat.EXCEL;
         };
+    }
+
+    private static List<Object> flattenResolvedValues(List<?> values) {
+        List<Object> flattened = new ArrayList<>();
+        for (Object value : values) {
+            if (value instanceof List<?> nested) {
+                flattened.addAll(flattenResolvedValues(nested));
+            } else {
+                flattened.add(value);
+            }
+        }
+        return flattened;
     }
 
     /**

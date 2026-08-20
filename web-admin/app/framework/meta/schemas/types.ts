@@ -298,12 +298,41 @@ export interface ColumnConfig {
   tagConfig?: Record<string, unknown>;
 }
 
+export interface CommandInputFieldConfig {
+  field: string;
+  label?: string | LocalizedText;
+  helpText?: string | LocalizedText;
+  placeholder?: string | LocalizedText;
+  type?: string;
+  required?: boolean;
+  [key: string]: unknown;
+}
+
+export interface CommandInputFormConfig {
+  inputFields?: CommandInputFieldConfig[];
+  inputFieldsTitle?: string | LocalizedText;
+  inputFieldsSubmitLabel?: string | LocalizedText;
+}
+
 // Action definition — unified button behavior
 export type ActionDef =
-  | { type: 'command'; command: string }
-  | { type: 'state_transition'; command: string }
-  | { type: 'bulk_command'; command: string }
-  | { type: 'bulk_state_transition'; command: string }
+  | ({ type: 'command'; command: string } & CommandInputFormConfig)
+  | ({ type: 'state_transition'; command: string } & CommandInputFormConfig)
+  | ({ type: 'bulk_command'; command: string } & CommandInputFormConfig)
+  | ({ type: 'bulk_state_transition'; command: string } & CommandInputFormConfig)
+  | {
+      /** Execute the same command once per selected record with an exact target PID. */
+      type: 'bulk_record_command';
+      command: string;
+      operationType?: 'UPDATE' | 'DELETE';
+    }
+  | {
+      /** Collect one DSL field value, then execute the command once per exact target PID. */
+      type: 'bulk_field_command';
+      command: string;
+      input: FieldConfig;
+      operationType?: 'UPDATE' | 'DELETE';
+    }
   | { type: 'navigate'; to: string; command?: string; hardReload?: boolean }
   | { type: 'builtin'; name: string }
   | { type: 'flow'; steps: FlowStep[] }
@@ -383,6 +412,14 @@ export interface TableConfig {
   density?: 'default' | 'compact';
   pagination?: PaginationConfig;
   selection?: SelectionConfig;
+  /** Permission-aware controls for the generic edit/delete/export bulk bar. */
+  bulkCapabilities?: {
+    edit?: boolean | { enabled?: boolean; permissionCode?: string };
+    delete?: boolean | { enabled?: boolean; permissionCode?: string };
+    export?: boolean | { enabled?: boolean; permissionCode?: string };
+  };
+  /** DSL-configured business bulk actions, executed through commands. */
+  bulkActions?: ButtonConfig[];
   columns: ColumnConfig[];
   /** Row-level action buttons (displayed in each row) */
   rowActions?: ButtonConfig[];
@@ -410,6 +447,28 @@ export interface SelectionConfig {
   bind: string;
   defaultFirst?: boolean;
   keyField?: string;
+  /**
+   * Renders exclusive multiple-selection rows as one decision card per group.
+   * The bound value remains an array containing at most one row per group.
+   */
+  presentation?: 'table' | 'grouped-radio';
+  /**
+   * Field whose value defines an exclusive selection group. In multiple mode,
+   * selecting another row with the same value replaces the previous row.
+   */
+  exclusiveBy?: string;
+  /** Field rendered as the radio option label in grouped-radio presentation. */
+  optionLabelField?: string;
+  /**
+   * Explicit boolean field marking a business recommendation. Automatic grouped
+   * selection is enabled only when `safeField` is configured as well.
+   */
+  recommendedField?: string;
+  /**
+   * Explicit boolean field proving that the recommendation is safe and reversible.
+   * A row is preselected only when both configured fields are strictly `true`.
+   */
+  safeField?: string;
   detailBind?: string;
   idsBind?: string;
   idField?: string;
@@ -456,6 +515,8 @@ export interface SubTableConfig {
   editableWhen?: string;
   columns: ColumnConfig[];
   actions?: ButtonConfig[];
+  /** @deprecated Use actions. Kept for imported DSL compatibility. */
+  rowActions?: ButtonConfig[];
   summary?: SummaryConfig;
   resolveVia?: ResolveViaConfig;
   /**

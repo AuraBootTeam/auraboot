@@ -15,6 +15,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
+import MemberPicker from '~/ui/smart/picker/MemberPicker';
 
 interface VisibilityRule {
   field: string;
@@ -34,7 +35,10 @@ interface FormOptionConfig {
 interface FormFieldConfig {
   field: string;
   label?: string | Record<string, string>;
-  type?: 'text' | 'select' | 'number' | 'textarea' | 'multiselect' | 'segmented' | 'checkbox' | 'file';
+  helpText?: string | Record<string, string>;
+  type?: 'text' | 'select' | 'number' | 'textarea' | 'multiselect' | 'segmented' | 'checkbox' | 'file' | 'reference';
+  component?: string;
+  props?: Record<string, any>;
   required?: boolean;
   mustBeTrue?: boolean;
   placeholder?: string | Record<string, string>;
@@ -251,6 +255,9 @@ export default function FormDialog() {
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center"
       data-testid="form-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="form-dialog-title"
     >
       {/* Backdrop */}
       <div
@@ -262,7 +269,7 @@ export default function FormDialog() {
       <div className="relative mx-4 flex max-h-[calc(100vh-2rem)] w-full max-w-lg scale-100 transform flex-col rounded-lg bg-white opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800">
         {/* Header */}
         <div className="shrink-0 border-b border-gray-200 px-6 pt-6 pb-4 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{dialogTitle}</h3>
+          <h3 id="form-dialog-title" className="text-lg font-semibold text-gray-900 dark:text-white">{dialogTitle}</h3>
         </div>
 
         {/* Body - Form Fields */}
@@ -276,7 +283,11 @@ export default function FormDialog() {
             const placeholder = field.placeholder
               ? getLocalizedText(field.placeholder, locale, t)
               : '';
+            const helpText = field.helpText
+              ? getLocalizedText(field.helpText, locale, t)
+              : '';
             const fieldType = field.type || 'text';
+            const component = field.component?.toLocaleLowerCase();
             const options = visibleOptions(field, state.fieldOptions, formData);
             const error = errors[field.field];
             const isFirst = index === 0;
@@ -299,7 +310,16 @@ export default function FormDialog() {
                   {field.required && <span className="ml-1 text-red-500">*</span>}
                 </label>
 
-                {fieldType === 'select' ? (
+                {component === 'memberpicker' ? (
+                  <MemberPicker
+                    name={field.field}
+                    required={field.required}
+                    value={formData[field.field]}
+                    onChange={(value) => updateField(field.field, value)}
+                    multiple={field.props?.multiple === true}
+                    placeholder={placeholder || undefined}
+                  />
+                ) : fieldType === 'select' ? (
                   <select
                     ref={
                       isFirst ? (firstInputRef as React.RefObject<HTMLSelectElement>) : undefined
@@ -527,6 +547,14 @@ export default function FormDialog() {
                 )}
 
                 {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+                {helpText && (
+                  <p
+                    className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400"
+                    data-testid={`form-dialog-help-${field.field}`}
+                  >
+                    {helpText}
+                  </p>
+                )}
               </div>
             );
           })}

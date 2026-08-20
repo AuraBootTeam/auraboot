@@ -1,0 +1,710 @@
+{
+  "pageKey": "crm_qdp_release_workbench",
+  "name:zh-CN": "QDP 发布工作台",
+  "name:en": "QDP Release Workbench",
+  "modelCode": "crm_qdp_revision_common",
+  "description": "Task-oriented release workbench for prioritizing QDP revisions, reading the gate verdict and evidence, and executing the next valid lifecycle action.",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "extension": {
+    "showShare": false,
+    "showReport": false,
+    "showPrint": false,
+    "showEdit": false
+  },
+  "dataSources": {
+    "qdpStats": {
+      "type": "namedQuery",
+      "queryCode": "crm_qdp_release_stats",
+      "params": {},
+      "adaptor": "table",
+      "format": "records"
+    },
+    "qdpList": {
+      "type": "api",
+      "method": "get",
+      "endpoint": "/api/dynamic/crm_qdp_revision_common/list",
+      "adaptor": "table",
+      "params": {
+        "pageNum": 1,
+        "pageSize": 50,
+        "filters": [
+          {
+            "fieldName": "crm_qdp_status",
+            "operator": "IN",
+            "value": "${state.statusFilter}"
+          }
+        ],
+        "keyword": "${state.searchKeyword}",
+        "sortField": "crm_qdp_prepared_at",
+        "sortOrder": "desc"
+      },
+      "dependOn": [
+        "state.statusFilter",
+        "state.searchKeyword"
+      ]
+    }
+  },
+  "blocks": [
+    {
+      "id": "crm_qdp_queue_metrics",
+      "blockType": "metric-strip",
+      "dataSource": "qdpStats",
+      "variant": "cards",
+      "columns": 4,
+      "metrics": [
+        {
+          "key": "action_required",
+          "label": {
+            "zh-CN": "待处理",
+            "en": "Action Required"
+          },
+          "valueField": "action_required_count",
+          "subText": {
+            "zh-CN": "草稿或校验失败",
+            "en": "Draft or validation failed"
+          },
+          "tone": "amber",
+          "icon": "ListChecks",
+          "activeWhen": "state.statusFilter != null && state.statusFilter.includes('draft')",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": [
+                "draft",
+                "validation_failed"
+              ]
+            }
+          }
+        },
+        {
+          "key": "ready_for_release",
+          "label": {
+            "zh-CN": "待发布",
+            "en": "Ready to Release"
+          },
+          "valueField": "ready_for_release_count",
+          "subText": {
+            "zh-CN": "门禁已通过",
+            "en": "Release gate passed"
+          },
+          "tone": "green",
+          "icon": "PackageCheck",
+          "activeWhen": "state.statusFilter != null && state.statusFilter.includes('ready_for_review')",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": [
+                "ready_for_review"
+              ]
+            }
+          }
+        },
+        {
+          "key": "compiling",
+          "label": {
+            "zh-CN": "编制中",
+            "en": "Compiling"
+          },
+          "valueField": "compiling_count",
+          "subText": {
+            "zh-CN": "自动刷新结果",
+            "en": "Results refresh automatically"
+          },
+          "tone": "blue",
+          "icon": "LoaderCircle",
+          "activeWhen": "state.statusFilter != null && state.statusFilter.includes('compiling')",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": [
+                "compiling"
+              ]
+            }
+          }
+        },
+        {
+          "key": "released",
+          "label": {
+            "zh-CN": "已发布",
+            "en": "Released"
+          },
+          "valueField": "released_count",
+          "subText": {
+            "zh-CN": "当前有效版本",
+            "en": "Current effective revisions"
+          },
+          "tone": "gray",
+          "icon": "Archive",
+          "activeWhen": "state.statusFilter != null && state.statusFilter.includes('released')",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": [
+                "released"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_qdp_queue_search",
+      "blockType": "filters",
+      "onSearch": {
+        "action": "dataSource.reload",
+        "args": {
+          "dataSourceId": "qdpList"
+        }
+      },
+      "onReset": {
+        "action": "state.set",
+        "args": {
+          "searchKeyword": ""
+        }
+      },
+      "fields": [
+        {
+          "field": "crm_qdp_code",
+          "component": "SmartInput",
+          "bindState": "searchKeyword",
+          "label": {
+            "zh-CN": "搜索发布队列",
+            "en": "Search release queue"
+          },
+          "placeholder": {
+            "zh-CN": "输入 QDP 编号、需求版本或文件名",
+            "en": "Search by QDP code, requirement version, or filename"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_qdp_queue_filters",
+      "blockType": "workbench-action-bar",
+      "surface": "bare",
+      "density": "compact",
+      "align": "start",
+      "actions": [
+        {
+          "code": "filter_all",
+          "label": {
+            "zh-CN": "全部版本",
+            "en": "All Revisions"
+          },
+          "variant": "ghost",
+          "activeWhen": "state.statusFilter == null || state.statusFilter.length == 0",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": []
+            }
+          }
+        },
+        {
+          "code": "filter_action_required",
+          "label": {
+            "zh-CN": "仅待处理",
+            "en": "Action Required"
+          },
+          "variant": "ghost",
+          "activeWhen": "state.statusFilter != null && state.statusFilter.includes('draft')",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": [
+                "draft",
+                "validation_failed"
+              ]
+            }
+          }
+        },
+        {
+          "code": "filter_ready",
+          "label": {
+            "zh-CN": "仅待发布",
+            "en": "Ready to Release"
+          },
+          "variant": "ghost",
+          "activeWhen": "state.statusFilter != null && state.statusFilter.includes('ready_for_review')",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": [
+                "ready_for_review"
+              ]
+            }
+          }
+        },
+        {
+          "code": "filter_history",
+          "label": {
+            "zh-CN": "发布历史",
+            "en": "Release History"
+          },
+          "variant": "ghost",
+          "activeWhen": "state.statusFilter != null && state.statusFilter.includes('released')",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": [
+                "released",
+                "superseded"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_qdp_release_queue",
+      "blockType": "table",
+      "title": {
+        "zh-CN": "发布队列",
+        "en": "Release Queue"
+      },
+      "dataSource": "qdpList",
+      "density": "compact",
+      "maxHeight": 430,
+      "selection": {
+        "mode": "single",
+        "bind": "selectedQdp",
+        "defaultFirst": true
+      },
+      "columns": [
+        {
+          "field": "crm_qdp_code",
+          "width": 160,
+          "label": {
+            "zh-CN": "QDP 编号",
+            "en": "QDP Code"
+          }
+        },
+        {
+          "field": "crm_qdp_requirement_version",
+          "width": 130,
+          "label": {
+            "zh-CN": "需求版本",
+            "en": "Requirement Version"
+          }
+        },
+        {
+          "field": "crm_qdp_primary_filename",
+          "width": 180,
+          "ellipsis": true,
+          "label": {
+            "zh-CN": "主文件",
+            "en": "Primary File"
+          }
+        },
+        {
+          "field": "crm_qdp_status",
+          "width": 110,
+          "renderType": "tag",
+          "dictCode": "crm_qdp_lifecycle",
+          "label": {
+            "zh-CN": "当前阶段",
+            "en": "Stage"
+          }
+        },
+        {
+          "field": "crm_qdp_gate_verdict",
+          "width": 130,
+          "renderType": "tag",
+          "dictCode": "crm_qdp_gate_verdict",
+          "label": {
+            "zh-CN": "发布门禁",
+            "en": "Release Gate"
+          }
+        },
+        {
+          "field": "crm_qdp_prepared_at",
+          "width": 150,
+          "valueType": "datetime",
+          "label": {
+            "zh-CN": "草稿时间",
+            "en": "Prepared At"
+          }
+        }
+      ],
+      "rowActions": [
+        {
+          "code": "open_qdp_record",
+          "label": {
+            "zh-CN": "打开档案",
+            "en": "Open Record"
+          },
+          "permissionCode": "crm.qdp.read",
+          "action": {
+            "type": "navigate",
+            "to": "crm_qdp_revision_common_detail"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_qdp_selected_status",
+      "blockType": "status-banner",
+      "context": "${state.selectedQdp}",
+      "statusField": "crm_qdp_status",
+      "errorField": "crm_qdp_validation_failure_summary",
+      "failedStatuses": [
+        "validation_failed"
+      ],
+      "toneMap": {
+        "draft": "gray",
+        "compiling": "blue",
+        "validation_failed": "red",
+        "ready_for_review": "amber",
+        "released": "green",
+        "superseded": "gray"
+      },
+      "titleMap": {
+        "draft": {
+          "zh-CN": "待编制与校验",
+          "en": "Compilation and validation required"
+        },
+        "compiling": {
+          "zh-CN": "正在编制 QDP",
+          "en": "Compiling QDP"
+        },
+        "validation_failed": {
+          "zh-CN": "发布门禁未通过",
+          "en": "Release gate failed"
+        },
+        "ready_for_review": {
+          "zh-CN": "已具备发布条件",
+          "en": "Ready for release"
+        },
+        "released": {
+          "zh-CN": "当前版本已发布",
+          "en": "Current revision released"
+        },
+        "superseded": {
+          "zh-CN": "历史版本，已被新版本取代",
+          "en": "Historical revision superseded by a newer release"
+        }
+      },
+      "descriptionMap": {
+        "draft": {
+          "zh-CN": "先执行编制与校验；系统会核对客户确认、文件留存和 GT-D04 完整性。",
+          "en": "Compile and validate first; customer confirmation, retained files, and GT-D04 completeness are checked automatically."
+        },
+        "compiling": {
+          "zh-CN": "当前进度 ${record.crm_qdp_compilation_progress}%，结果会自动刷新。",
+          "en": "Progress is ${record.crm_qdp_compilation_progress}%; results refresh automatically."
+        },
+        "ready_for_review": {
+          "zh-CN": "确认下方发布证据和影响范围后，填写发布说明并正式发布。",
+          "en": "Review the evidence and downstream impact below, then add a release note and publish."
+        },
+        "released": {
+          "zh-CN": "该版本是当前有效 QDP，可在完整档案中查看审计信息。",
+          "en": "This is the current effective QDP revision; open the full record for audit details."
+        }
+      },
+      "summaryFields": [
+        {
+          "field": "crm_qdp_code",
+          "label": {
+            "zh-CN": "QDP 编号",
+            "en": "QDP Code"
+          }
+        },
+        {
+          "field": "crm_qdp_requirement_version",
+          "label": {
+            "zh-CN": "需求版本",
+            "en": "Requirement Version"
+          }
+        },
+        {
+          "field": "crm_qdp_gate_verdict",
+          "label": {
+            "zh-CN": "门禁判定",
+            "en": "Gate Verdict"
+          },
+          "valueMap": {
+            "pending_review": {
+              "zh-CN": "待评审",
+              "en": "Pending review"
+            },
+            "ready": {
+              "zh-CN": "完整可发布",
+              "en": "Ready"
+            },
+            "ready_with_approved_exception": {
+              "zh-CN": "含批准例外可发布",
+              "en": "Ready with approved exception"
+            },
+            "blocked": {
+              "zh-CN": "已阻断",
+              "en": "Blocked"
+            }
+          }
+        },
+        {
+          "field": "crm_qdp_compilation_progress",
+          "label": {
+            "zh-CN": "编制进度",
+            "en": "Compilation Progress"
+          },
+          "unit": "%"
+        }
+      ],
+      "poll": {
+        "enabledWhenStatuses": [
+          "compiling"
+        ],
+        "intervalMs": 2500,
+        "reload": [
+          "qdpStats",
+          "qdpList"
+        ],
+        "reloadOnStatusChange": [
+          "qdpStats",
+          "qdpList"
+        ]
+      }
+    },
+    {
+      "id": "crm_qdp_next_actions",
+      "blockType": "workbench-action-bar",
+      "title": {
+        "zh-CN": "下一步动作",
+        "en": "Next Action"
+      },
+      "surface": "card",
+      "density": "compact",
+      "actions": [
+        {
+          "code": "compile_qdp_revision",
+          "label": {
+            "zh-CN": "编制并校验",
+            "en": "Compile and Validate"
+          },
+          "variant": "primary",
+          "permissionCode": "crm.qdp.review",
+          "visibleWhen": "state.selectedQdp != null && (state.selectedQdp.crm_qdp_status == 'draft' || state.selectedQdp.crm_qdp_status == 'validation_failed')",
+          "onClick": {
+            "action": "command.execute",
+            "args": {
+              "command": "crm:compile_qdp_revision",
+              "operationType": "update",
+              "targetRecordPid": "${state.selectedQdp.pid}",
+              "payload": {
+                "crm_qdp_revision_id": "${state.selectedQdp.pid}",
+                "crm_qdp_customer_request_id": "${state.selectedQdp.crm_qdp_customer_request_id}"
+              },
+              "reload": [
+                "qdpStats",
+                "qdpList"
+              ],
+              "feedback": {
+                "successMessage": {
+                  "zh-CN": "QDP 编制与校验已完成",
+                  "en": "QDP compilation and validation completed"
+                }
+              }
+            }
+          }
+        },
+        {
+          "code": "submit_qdp_review",
+          "label": {
+            "zh-CN": "提交评审",
+            "en": "Submit for Review"
+          },
+          "variant": "secondary",
+          "permissionCode": "crm.qdp.review",
+          "visibleWhen": "state.selectedQdp != null && (state.selectedQdp.crm_qdp_status == 'draft' || state.selectedQdp.crm_qdp_status == 'validation_failed')",
+          "onClick": {
+            "action": "command.execute",
+            "args": {
+              "command": "crm:submit_qdp_review",
+              "operationType": "update",
+              "targetRecordPid": "${state.selectedQdp.pid}",
+              "payload": {
+                "crm_qdp_revision_id": "${state.selectedQdp.pid}",
+                "crm_qdp_customer_request_id": "${state.selectedQdp.crm_qdp_customer_request_id}"
+              },
+              "reload": [
+                "qdpStats",
+                "qdpList"
+              ],
+              "feedback": {
+                "successMessage": {
+                  "zh-CN": "QDP 已进入待发布评审",
+                  "en": "QDP is ready for release review"
+                }
+              }
+            }
+          }
+        },
+        {
+          "code": "publish_qdp_revision",
+          "label": {
+            "zh-CN": "正式发布",
+            "en": "Publish QDP"
+          },
+          "variant": "primary",
+          "permissionCode": "crm.qdp.release",
+          "visibleWhen": "state.selectedQdp != null && state.selectedQdp.crm_qdp_status == 'ready_for_review'",
+          "confirm": {
+            "zh-CN": "发布后将成为当前有效版本，并自动取代上一发布版本。确认继续吗？",
+            "en": "This revision will become effective and supersede the previous release. Continue?"
+          },
+          "onClick": {
+            "action": "command.execute",
+            "args": {
+              "command": "crm:publish_qdp_revision",
+              "operationType": "update",
+              "targetRecordPid": "${state.selectedQdp.pid}",
+              "payload": {
+                "crm_qdp_revision_id": "${state.selectedQdp.pid}",
+                "crm_qdp_customer_request_id": "${state.selectedQdp.crm_qdp_customer_request_id}"
+              },
+              "inputFieldsTitle": {
+                "zh-CN": "发布说明",
+                "en": "Release Note"
+              },
+              "inputFieldsSubmitLabel": {
+                "zh-CN": "确认发布",
+                "en": "Confirm Release"
+              },
+              "inputFields": [
+                {
+                  "field": "crm_qdp_release_note",
+                  "label": {
+                    "zh-CN": "发布说明",
+                    "en-US": "Release Note"
+                  },
+                  "type": "textarea",
+                  "required": false,
+                  "placeholder": {
+                    "zh-CN": "说明本次发布范围、例外或注意事项",
+                    "en-US": "Describe the scope, exceptions, or operator notes"
+                  }
+                }
+              ],
+              "reload": [
+                "qdpStats",
+                "qdpList"
+              ],
+              "feedback": {
+                "successMessage": {
+                  "zh-CN": "QDP 已正式发布",
+                  "en": "QDP published"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_qdp_release_evidence",
+      "blockType": "evidence-panel",
+      "context": "${state.selectedQdp}",
+      "title": {
+        "zh-CN": "发布证据与影响范围",
+        "en": "Release Evidence and Impact"
+      },
+      "description": {
+        "zh-CN": "发布前核对客户确认、文件、制造范围和下游责任；技术指纹仅作为追溯证据，不参与人工录入。",
+        "en": "Before release, verify customer confirmation, files, manufacturing scope, and downstream ownership. Technical fingerprints remain read-only trace evidence."
+      },
+      "sections": [
+        {
+          "key": "confirmation",
+          "label": {
+            "zh-CN": "客户确认",
+            "en": "Customer Confirmation"
+          },
+          "field": "crm_qdp_customer_confirmation_ref"
+        },
+        {
+          "key": "confirmed_by",
+          "label": {
+            "zh-CN": "确认人与时间",
+            "en": "Confirmed By"
+          },
+          "field": "crm_qdp_customer_confirmed_by"
+        },
+        {
+          "key": "primary_file",
+          "label": {
+            "zh-CN": "主文件",
+            "en": "Primary File"
+          },
+          "field": "crm_qdp_primary_filename"
+        },
+        {
+          "key": "pack_set",
+          "label": {
+            "zh-CN": "制造包范围",
+            "en": "Manufacturing Pack Scope"
+          },
+          "field": "crm_qdp_pack_set_summary"
+        },
+        {
+          "key": "impact",
+          "label": {
+            "zh-CN": "下游影响",
+            "en": "Downstream Impact"
+          },
+          "field": "crm_qdp_downstream_impact_summary"
+        },
+        {
+          "key": "qualification",
+          "label": {
+            "zh-CN": "制造资格判定",
+            "en": "Manufacturing Qualification"
+          },
+          "field": "crm_qdp_qualification_verdict"
+        },
+        {
+          "key": "version_diff",
+          "label": {
+            "zh-CN": "版本差异",
+            "en": "Revision Difference"
+          },
+          "field": "crm_qdp_version_diff_summary"
+        },
+        {
+          "key": "compilation_result",
+          "label": {
+            "zh-CN": "编制结果",
+            "en": "Compilation Result"
+          },
+          "field": "crm_qdp_compilation_summary"
+        },
+        {
+          "key": "recovery",
+          "label": {
+            "zh-CN": "阻断原因与恢复建议",
+            "en": "Blocker and Recovery"
+          },
+          "field": "crm_qdp_validation_failure_summary"
+        },
+        {
+          "key": "fingerprint",
+          "label": {
+            "zh-CN": "文件追溯指纹",
+            "en": "File Trace Fingerprint"
+          },
+          "field": "crm_qdp_file_package_hash"
+        }
+      ],
+      "empty": {
+        "title": {
+          "zh-CN": "选择上方一条 QDP，查看发布证据和下一步动作",
+          "en": "Select a QDP above to review evidence and the next action"
+        }
+      }
+    }
+  ]
+}

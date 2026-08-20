@@ -47,6 +47,7 @@ const SHARED_WORKFLOW_BLOCKS = ['bpm-panel', 'activity-timeline', 'field-history
 // the two kinds that compose cockpit / workbench / reconciliation layouts.
 const SHARED_WORKBENCH_BLOCKS = [
   'metric-strip',
+  'stage-rail',
   'status-banner',
   'workbench-action-bar',
   'review-drawer',

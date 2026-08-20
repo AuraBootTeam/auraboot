@@ -1,0 +1,31 @@
+{
+  "pageKey": "crm_lead_pool_form",
+  "name:zh-CN": "线索池策略",
+  "name:en": "Lead Pool Policy",
+  "modelCode": "crm_lead_pool",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12, "gap": 16 },
+  "blocks": [
+    { "id": "identity", "blockType": "form-section", "title": { "zh-CN": "基本信息与成员", "en": "Identity and Membership" }, "fields": [
+      { "field": "crm_lp_name", "colSpan": 12, "required": true },
+      { "field": "crm_lp_member_user_ids", "colSpan": 6, "required": true },
+      { "field": "crm_lp_admin_user_ids", "colSpan": 6, "required": true },
+      { "field": "crm_lp_description", "colSpan": 12 }
+    ] },
+    { "id": "claim_policy", "blockType": "form-section", "title": { "zh-CN": "领取规则", "en": "Claim Policy" }, "fields": [
+      { "field": "crm_lp_daily_pick_limit", "colSpan": 4, "required": true },
+      { "field": "crm_lp_new_cooldown_days", "colSpan": 4, "required": true },
+      { "field": "crm_lp_previous_owner_cooldown_days", "colSpan": 4, "required": true }
+    ] },
+    { "id": "recycle_policy", "blockType": "form-section", "title": { "zh-CN": "自动回收规则", "en": "Automatic Recycle Policy" }, "fields": [
+      { "field": "crm_lp_auto_recycle", "colSpan": 4, "required": true },
+      { "field": "crm_lp_recycle_after_days", "colSpan": 4 },
+      { "field": "crm_lp_recycle_basis", "colSpan": 4 }
+    ] },
+    { "id": "buttons", "blockType": "form-buttons", "buttons": [
+      { "code": "submit", "primary": true, "label": "$i18n:common.button.save", "action": { "type": "command" } },
+      { "code": "cancel", "label": "$i18n:common.button.cancel" }
+    ] }
+  ]
+}

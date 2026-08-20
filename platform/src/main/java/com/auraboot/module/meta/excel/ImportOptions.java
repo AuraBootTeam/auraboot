@@ -20,10 +20,12 @@ public class ImportOptions {
     /** Date format pattern used when parsing date cells as strings. */
     private String dateFormat = "yyyy-MM-dd";
 
-    /**
-     * Field code used as the match key for UPSERT mode.
-     * When set, existing records with a matching key value are UPDATED;
-     * new records are CREATED. When null, all rows are INSERT only.
-     */
-    private String upsertKey;
+    /** INSERT creates new rows; UPDATE changes matching rows and never creates. */
+    private String importMode = "insert";
+
+    /** Server-whitelisted field used to find the row in UPDATE mode. */
+    private String matchKey;
+
+    /** Request locale captured before asynchronous work leaves the HTTP thread. */
+    private String reportLocale = "zh-CN";
 }

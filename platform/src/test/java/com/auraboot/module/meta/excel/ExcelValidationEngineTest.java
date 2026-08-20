@@ -1,7 +1,7 @@
 package com.auraboot.module.meta.excel;
 
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.FieldDefinition;
-import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import org.apache.poi.ss.usermodel.Row;
@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -34,13 +36,29 @@ class ExcelValidationEngineTest {
     private MetaFieldService metaFieldService;
 
     @Mock
-    private DynamicDataService dynamicDataService;
+    private ExcelImportPolicyResolver policyResolver;
+
+    @Mock
+    private ExcelReferenceResolver referenceResolver;
 
     private ExcelValidationEngine validationEngine;
 
     @BeforeEach
     void setUp() {
-        validationEngine = new ExcelValidationEngine(metaModelService, metaFieldService, dynamicDataService);
+        validationEngine = new ExcelValidationEngine(
+                metaModelService, metaFieldService, policyResolver, referenceResolver);
+        lenient().when(policyResolver.requireEnabled(anyString())).thenAnswer(invocation -> {
+            String modelCode = invocation.getArgument(0);
+            List<FieldDefinition> fields = metaModelService.getModelFields(modelCode);
+            java.util.Set<String> fieldCodes = fields == null ? java.util.Set.of() : fields.stream()
+                    .map(FieldDefinition::getCode)
+                    .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+            return ExcelImportPolicy.builder()
+                    .modelCode(modelCode).enabled(true)
+                    .modes(java.util.Set.of("insert", "update"))
+                    .updateKeys(List.of("code"))
+                    .createFields(fieldCodes).updateFields(fieldCodes).build();
+        });
     }
 
     /**
@@ -111,6 +129,43 @@ class ExcelValidationEngineTest {
         // Second error: row 3, field "code"
         assertEquals(3, report.getErrors().get(1).getRowNumber());
         assertEquals("code", report.getErrors().get(1).getFieldCode());
+    }
+
+    @Test
+    void validate_shouldNotRequireCreateFieldsPopulatedByCommandDefaults() throws IOException {
+        var fields = List.of(
+                FieldDefinition.builder().code("name").displayName("Name")
+                        .dataType("text").required(true).build(),
+                FieldDefinition.builder().code("status").displayName("Status")
+                        .dataType("text").required(true).build()
+        );
+        when(metaModelService.getModelFields("defaulted_model")).thenReturn(fields);
+        when(policyResolver.requireEnabled("defaulted_model")).thenReturn(ExcelImportPolicy.builder()
+                .modelCode("defaulted_model").enabled(true).modes(java.util.Set.of("insert"))
+                .createFields(java.util.Set.of("name", "status"))
+                .createAutoSetFields(java.util.Set.of("status"))
+                .build());
+
+        ValidationReport report = validationEngine.validate("defaulted_model",
+                createExcel(new String[]{"name", "status"}, new String[][]{{"Acme", ""}}));
+
+        assertTrue(report.isValid());
+        assertEquals(1, report.getValidRows());
+    }
+
+    @Test
+    void validate_shouldRejectDuplicateColumnHeadersAndCountNoValidRows() throws IOException {
+        var fields = List.of(FieldDefinition.builder().code("name").displayName("Name")
+                .dataType("text").build());
+        when(metaModelService.getModelFields("duplicate_header_model")).thenReturn(fields);
+
+        ValidationReport report = validationEngine.validate("duplicate_header_model",
+                createExcel(new String[]{"name", "Name"}, new String[][]{{"Acme", "Other"}}));
+
+        assertFalse(report.isValid());
+        assertEquals(0, report.getValidRows());
+        assertTrue(report.getErrors().stream()
+                .anyMatch(error -> "Duplicate column header".equals(error.getMessage())));
     }
 
     // ==================== Type mismatch tests ====================
@@ -244,6 +299,28 @@ class ExcelValidationEngineTest {
         assertTrue(report.isValid());
         assertTrue(report.getErrors().isEmpty());
         assertTrue(report.getWarnings().isEmpty());
+    }
+
+    @Test
+    void validate_referenceUsesBusinessKeyResolverAndReportsItsFailure() throws IOException {
+        FieldDefinition account = FieldDefinition.builder()
+                .code("account_id").displayName("Account").dataType("reference").required(true)
+                .refTarget(FieldDefinition.RefTarget.builder()
+                        .targetEntity("account").valueField("pid")
+                        .importMatchFields(List.of("account_code")).build())
+                .build();
+        when(metaModelService.getModelFields("contact")).thenReturn(List.of(account));
+        when(referenceResolver.resolve(account, "ACC-MISSING"))
+                .thenThrow(new BusinessException(
+                        "Referenced record does not exist or is not accessible for Account"));
+
+        ValidationReport report = validationEngine.validate("contact",
+                createExcel(new String[]{"Account"}, new String[][]{{"ACC-MISSING"}}));
+
+        assertFalse(report.isValid());
+        assertEquals(0, report.getValidRows());
+        assertEquals("account_id", report.getErrors().get(0).getFieldCode());
+        assertTrue(report.getErrors().get(0).getMessage().contains("does not exist"));
     }
 
     // ==================== isTypeValid unit tests ====================

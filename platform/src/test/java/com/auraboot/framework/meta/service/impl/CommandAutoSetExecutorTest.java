@@ -59,4 +59,21 @@ class CommandAutoSetExecutorTest {
                 autoSet("sum", Map.of("strategy", "expression", "expression", "#a + #b")), payload, 1L, 2L, null);
         assertEquals(5, payload.get("sum"));
     }
+
+    @Test
+    void preserveInputKeepsAnExplicitBusinessTimestamp() {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("activityAt", "2026-08-10T14:30:00+08:00");
+
+        executor.executeAutoSetPhase(
+                autoSet("activityAt", Map.of(
+                        "strategy", "current_datetime",
+                        "preserveInput", true)),
+                payload,
+                1L,
+                2L,
+                null);
+
+        assertEquals("2026-08-10T14:30:00+08:00", payload.get("activityAt"));
+    }
 }

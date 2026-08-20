@@ -6,6 +6,7 @@ import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import lombok.Data;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Data
 public class UserRoleResponse {
@@ -13,8 +14,8 @@ public class UserRoleResponse {
     private String memberPid;
     private String rolePid;
     private String assignType;
-    private Instant effectiveDate;
-    private Instant expiryDate;
+    private LocalDate effectiveDate;
+    private LocalDate expiryDate;
     private String status;
     private Instant createdAt;
     private Instant updatedAt;

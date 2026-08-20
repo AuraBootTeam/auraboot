@@ -349,6 +349,8 @@ dashboard:
   refresh: 更新
   refreshed: データを更新しました
   retry: リトライ
+  error:
+    access_forbidden: ダッシュボードにアクセスする権限がありません
 search:
   placeholder: 検索...
   title: グローバル検索

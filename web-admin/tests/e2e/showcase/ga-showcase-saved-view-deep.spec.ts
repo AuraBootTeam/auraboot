@@ -490,13 +490,13 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await page.getByTestId('action-config-pin-create').click();
     await expect(page.getByTestId('action-config-pin-create')).toHaveAttribute(
       'title',
-      'Pin to toolbar',
+      /^(固定到工具栏|Pin to toolbar)$/,
       { timeout: 5_000 },
     );
     await page.getByTestId('action-config-visible-_export_csv').click();
     await expect(page.getByTestId('action-config-visible-_export_csv')).toHaveAttribute(
       'title',
-      'Show button',
+      /^(显示按钮|Show button)$/,
       { timeout: 5_000 },
     );
     await toolbarUpdate;

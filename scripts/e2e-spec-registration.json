@@ -6,11 +6,25 @@
       "configFile": "web-admin/playwright.config.ts",
       "arrayName": "quoteOpsCurrentSpecNames",
       "project": "quoteops"
+    },
+    {
+      "dir": "plugins/crm/e2e",
+      "configFile": "plugins/crm/e2e/qdp-release-center.playwright.config.ts",
+      "arrayName": "qdpReleaseCenterSpecNames",
+      "project": "qdp-chromium"
     }
   ],
   "allow": {
     "web-admin/tests/e2e/pcba-solution": {
       "quote-bom-price-manual-adoption": "Temporarily excluded while the 录入人工价 UI entry is hidden; the current quoteops release gate asserts the hidden-entry contract instead."
+    },
+    "plugins/crm/e2e": {
+      "crm-dashboards.golden": "Selected by the dedicated crm-dashboards.playwright.config.ts project; intentionally excluded from the QDP-only project.",
+      "forecast-variance.golden": "Selected by the dedicated forecast-variance.playwright.config.ts project; intentionally excluded from the QDP-only project.",
+      "opportunity-department-scope.golden": "Selected by the dedicated opportunity-department-scope.playwright.config.ts project; intentionally excluded from the QDP-only project.",
+      "opportunity-efficiency.golden": "Selected by the dedicated opportunity-efficiency.playwright.config.ts project; intentionally excluded from the QDP-only project.",
+      "opportunity-bulk-operations.golden": "Selected by the dedicated opportunity-bulk-operations.playwright.config.ts project; intentionally excluded from the QDP-only project.",
+      "order-commitment.golden": "Selected by the dedicated order-commitment.playwright.config.ts project; intentionally excluded from the QDP-only project."
     }
   },
   "baseline": {}

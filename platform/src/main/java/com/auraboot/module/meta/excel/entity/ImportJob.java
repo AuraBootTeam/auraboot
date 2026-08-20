@@ -15,11 +15,15 @@ import java.time.LocalDateTime;
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
-@TableName("ab_import_job")
+@TableName(value = "ab_import_job", autoResultMap = true)
 public class ImportJob {
 
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
+
+    /** Public task identifier; database ids never cross the API boundary. */
+    @TableField("pid")
+    private String pid;
 
     @TableField("tenant_id")
     private Long tenantId;
@@ -46,12 +50,16 @@ public class ImportJob {
     @TableField("error_rows")
     private Integer errorRows;
 
-    /** INSERT, UPSERT, CHAIN */
+    /** INSERT or UPDATE. */
     @TableField("import_mode")
     private String importMode;
 
     @TableField("error_report_url")
     private String errorReportUrl;
+
+    /** JSON array of bounded row errors used to reconstruct terminal async status. */
+    @TableField("error_details")
+    private String errorDetails;
 
     @TableField("created_at")
     private LocalDateTime createdAt;

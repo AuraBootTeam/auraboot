@@ -16,6 +16,7 @@ test('CRM roles declare an explicit default data scope', async () => {
     crm_admin: 'all',
     crm_sales: 'self',
     crm_sales_manager: 'all',
+    crm_qdp_release_manager: 'all',
     crm_service: 'all',
     crm_viewer: 'all',
   });
@@ -25,9 +26,10 @@ test('sales-owned CRM models expose owner fields used by the self scope', async 
   const models = await readJson('models.json');
   const byCode = new Map(models.map((model) => [model.code, model]));
   const expectedOwnerFields = {
-    crm_account_common: 'created_by',
+    crm_account_common: 'crm_acc_owner',
     crm_lead_common: 'crm_lead_assigned_to',
     crm_opportunity_common: 'crm_opp_owner',
+    crm_forecast_submission: 'crm_fcst_owner',
     crm_activity_common: 'crm_act_owner',
   };
 
@@ -40,6 +42,17 @@ test('sales-owned CRM models expose owner fields used by the self scope', async 
   }
 });
 
+test('sales manager narrows opportunity reads to the current department hierarchy', async () => {
+  const roles = await readJson('roles.json');
+  const manager = roles.find((role) => role.code === 'crm_sales_manager');
+
+  assert.deepEqual(manager?.dataScopes, [{
+    permissionCode: 'model.crm_opportunity_common.read',
+    scopeType: 'dept_and_sub',
+    mergeStrategy: 'MAX',
+  }]);
+});
+
 test('sales role can read every core model governed by its self scope', async () => {
   const roles = await readJson('roles.json');
   const sales = roles.find((role) => role.code === 'crm_sales');
@@ -47,6 +60,7 @@ test('sales role can read every core model governed by its self scope', async ()
     'model.crm_account_common.read',
     'model.crm_lead_common.read',
     'model.crm_opportunity_common.read',
+    'model.crm_forecast_submission.read',
     'model.crm_activity_common.read',
   ];
 

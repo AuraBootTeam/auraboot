@@ -87,6 +87,18 @@ describe('workbenchBlockUtils action runner', () => {
     expect(navigateTo).toHaveBeenNthCalledWith(2, '/p/c/iot_remote_diagnosis_workbench');
   });
 
+  it('interpolates state references embedded in a workbench navigation path', async () => {
+    const navigateTo = vi.fn();
+    const runtime = makeRuntime({ navigateTo }) as any;
+
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'navigate',
+      args: { to: '/p/crm_account_common/view/${state.selectedLine.pid}' },
+    });
+
+    expect(navigateTo).toHaveBeenCalledWith('/p/crm_account_common/view/LINE-1');
+  });
+
   it('encodes resolved navigate context as routeContext query state', async () => {
     const navigateTo = vi.fn();
     const runtime = makeRuntime({ navigateTo }) as any;

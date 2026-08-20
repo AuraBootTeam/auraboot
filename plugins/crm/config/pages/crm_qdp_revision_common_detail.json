@@ -1,27 +1,78 @@
 {
   "pageKey": "crm_qdp_revision_common_detail",
-  "name:zh-CN": "QDP 发布中心",
-  "name:en": "QDP Release Center",
+  "name:zh-CN": "QDP 发布档案",
+  "name:en": "QDP Release Record",
   "modelCode": "crm_qdp_revision_common",
+  "description": "Release decision record organized around lifecycle status, gate evidence, manufacturing scope, downstream impact, and audit history.",
   "kind": "detail",
   "schemaVersion": 4,
-  "layout": { "type": "stack" },
-  "extension": { "showEdit": false },
+  "layout": {
+    "type": "stack"
+  },
+  "extension": {
+    "showShare": false,
+    "showReport": false,
+    "showPrint": false,
+    "showEdit": false,
+    "hiddenSystemTabs": [
+      "__comments__",
+      "__activity__",
+      "__approval_comments__",
+      "__field_history__"
+    ]
+  },
   "blocks": [
     {
       "id": "crm_qdp_release_actions",
       "blockType": "toolbar",
       "buttons": [
         {
+          "code": "back_to_release_workbench",
+          "icon": "ListChecks",
+          "permissionCode": "crm.qdp.read",
+          "label": {
+            "zh-CN": "返回发布工作台",
+            "en-US": "Back to Release Workbench"
+          },
+          "action": {
+            "type": "navigate",
+            "to": "/p/c/crm_qdp_release_workbench"
+          }
+        },
+        {
           "code": "compile_qdp_revision",
           "primary": true,
           "icon": "LoaderCircle",
           "permissionCode": "crm.qdp.review",
           "visibleWhen": "record.crm_qdp_status === 'draft' || record.crm_qdp_status === 'validation_failed'",
-          "label": { "zh-CN": "编制并校验", "en-US": "Compile and Validate" },
+          "label": {
+            "zh-CN": "编制并校验",
+            "en-US": "Compile and Validate"
+          },
           "action": {
             "type": "command",
             "command": "crm:compile_qdp_revision",
+            "operationType": "update",
+            "targetRecordPid": "${record.pid}",
+            "payload": {
+              "crm_qdp_revision_id": "${record.pid}",
+              "crm_qdp_customer_request_id": "${record.crm_qdp_customer_request_id}"
+            }
+          }
+        },
+        {
+          "code": "submit_qdp_review",
+          "primary": false,
+          "icon": "Send",
+          "permissionCode": "crm.qdp.review",
+          "visibleWhen": "record.crm_qdp_status === 'draft' || record.crm_qdp_status === 'validation_failed'",
+          "label": {
+            "zh-CN": "提交评审",
+            "en-US": "Submit for Review"
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:submit_qdp_review",
             "operationType": "update",
             "targetRecordPid": "${record.pid}",
             "payload": {
@@ -36,7 +87,10 @@
           "icon": "PackageCheck",
           "permissionCode": "crm.qdp.release",
           "visibleWhen": "record.crm_qdp_status === 'ready_for_review'",
-          "label": { "zh-CN": "发布 QDP", "en-US": "Release QDP" },
+          "label": {
+            "zh-CN": "发布 QDP",
+            "en-US": "Release QDP"
+          },
           "action": {
             "type": "command",
             "command": "crm:publish_qdp_revision",
@@ -46,14 +100,27 @@
               "crm_qdp_revision_id": "${record.pid}",
               "crm_qdp_customer_request_id": "${record.crm_qdp_customer_request_id}"
             },
-            "inputFieldsTitle": { "zh-CN": "发布确认", "en-US": "Release Confirmation" },
-            "inputFieldsSubmitLabel": { "zh-CN": "正式发布", "en-US": "Release" },
+            "inputFieldsTitle": {
+              "zh-CN": "发布确认",
+              "en-US": "Release Confirmation"
+            },
+            "inputFieldsSubmitLabel": {
+              "zh-CN": "正式发布",
+              "en-US": "Release"
+            },
             "inputFields": [
               {
                 "field": "crm_qdp_release_note",
-                "label": { "zh-CN": "发布说明", "en-US": "Release Note" },
+                "label": {
+                  "zh-CN": "发布说明",
+                  "en-US": "Release Note"
+                },
                 "type": "textarea",
-                "required": false
+                "required": false,
+                "placeholder": {
+                  "zh-CN": "说明本次发布范围、例外或注意事项",
+                  "en-US": "Describe the scope, exceptions, or operator notes"
+                }
               }
             ]
           }
@@ -61,79 +128,316 @@
       ]
     },
     {
-      "id": "crm_qdp_compilation",
-      "blockType": "form-section",
-      "title": { "zh-CN": "异步编制与校验", "en-US": "Async Compilation and Validation" },
-      "fields": [
-        { "field": "crm_qdp_compilation_outcome", "layout": { "colSpan": 4 }, "renderType": "tag", "dictCode": "crm_qdp_compilation_outcome" },
-        { "field": "crm_qdp_compilation_stage", "layout": { "colSpan": 4 }, "renderType": "tag", "dictCode": "crm_qdp_compilation_stage" },
-        { "field": "crm_qdp_compilation_progress", "layout": { "colSpan": 4 }, "suffix": "%" },
-        { "field": "crm_qdp_compilation_summary", "layout": { "colSpan": 12 } },
-        { "field": "crm_qdp_validation_failure_summary", "layout": { "colSpan": 12 } },
-        { "field": "crm_qdp_compilation_started_at", "layout": { "colSpan": 3 } },
-        { "field": "crm_qdp_compilation_started_by", "layout": { "colSpan": 3 } },
-        { "field": "crm_qdp_compiled_at", "layout": { "colSpan": 3 } },
-        { "field": "crm_qdp_compiled_by", "layout": { "colSpan": 3 } }
-      ]
-    },
-    {
-      "id": "crm_qdp_identity",
-      "blockType": "form-section",
-      "title": { "zh-CN": "版本与生命周期", "en-US": "Revision and Lifecycle" },
-      "fields": [
-        { "field": "crm_qdp_code", "layout": { "colSpan": 4 } },
-        { "field": "crm_qdp_status", "layout": { "colSpan": 4 }, "renderType": "tag", "dictCode": "crm_qdp_lifecycle" },
-        { "field": "crm_qdp_gate_verdict", "layout": { "colSpan": 4 }, "renderType": "tag", "dictCode": "crm_qdp_gate_verdict" },
-        { "field": "crm_qdp_customer_request_id", "layout": { "colSpan": 6 } },
-        { "field": "crm_qdp_revision_no", "layout": { "colSpan": 3 } },
-        { "field": "crm_qdp_schema_version", "layout": { "colSpan": 3 } },
-        { "field": "crm_qdp_content_hash", "layout": { "colSpan": 12 } },
-        { "field": "crm_qdp_version_diff_summary", "layout": { "colSpan": 12 } }
-      ]
-    },
-    {
-      "id": "crm_qdp_confirmation",
-      "blockType": "detail-section",
-      "title": { "zh-CN": "需求版本与客户确认", "en-US": "Requirement Version and Customer Confirmation" },
-      "fields": [
-        { "field": "crm_qdp_requirement_version_id", "layout": { "colSpan": 6 } },
-        { "field": "crm_qdp_requirement_version", "layout": { "colSpan": 6 } },
-        { "field": "crm_qdp_file_package_id", "layout": { "colSpan": 6 } },
-        { "field": "crm_qdp_file_package_hash", "layout": { "colSpan": 12 } },
-        { "field": "crm_qdp_customer_confirmation_id", "layout": { "colSpan": 6 } },
-        { "field": "crm_qdp_customer_confirmation_ref", "layout": { "colSpan": 6 } },
-        { "field": "crm_qdp_customer_confirmed_by", "layout": { "colSpan": 6 } },
-        { "field": "crm_qdp_customer_confirmed_at", "layout": { "colSpan": 6 } },
-        { "field": "crm_qdp_customer_confirmed_hash", "layout": { "colSpan": 12 } }
-      ]
-    },
-    {
-      "id": "crm_qdp_release_scope",
-      "blockType": "detail-section",
-      "title": { "zh-CN": "Pack Set 与下游影响", "en-US": "Pack Set and Downstream Impact" },
-      "fields": [
-        { "field": "crm_qdp_pack_set_summary", "layout": { "colSpan": 12 } },
-        { "field": "crm_qdp_downstream_impact_summary", "layout": { "colSpan": 12 } },
-        { "field": "crm_qdp_qualification_verdict", "layout": { "colSpan": 6 } },
-        { "field": "crm_qdp_file_names", "layout": { "colSpan": 12 } },
-        { "field": "crm_qdp_primary_filename", "layout": { "colSpan": 6 } },
-        { "field": "crm_qdp_release_note", "layout": { "colSpan": 12 } }
-      ]
-    },
-    {
-      "id": "crm_qdp_audit",
-      "blockType": "detail-section",
-      "title": { "zh-CN": "生命周期审计", "en-US": "Lifecycle Audit" },
-      "fields": [
-        { "field": "crm_qdp_prepared_by", "layout": { "colSpan": 3 } },
-        { "field": "crm_qdp_prepared_at", "layout": { "colSpan": 3 } },
-        { "field": "crm_qdp_review_submitted_by", "layout": { "colSpan": 3 } },
-        { "field": "crm_qdp_review_submitted_at", "layout": { "colSpan": 3 } },
-        { "field": "crm_qdp_released_by", "layout": { "colSpan": 3 } },
-        { "field": "crm_qdp_released_at", "layout": { "colSpan": 3 } },
-        { "field": "crm_qdp_superseded_by", "layout": { "colSpan": 3 } },
-        { "field": "crm_qdp_superseded_at", "layout": { "colSpan": 3 } },
-        { "field": "crm_qdp_superseded_by_revision_id", "layout": { "colSpan": 6 } }
+      "id": "crm_qdp_record_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "release_readiness",
+          "label": {
+            "zh-CN": "发布就绪度",
+            "en-US": "Release Readiness"
+          },
+          "blocks": [
+            {
+              "id": "crm_qdp_decision_summary",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "发布决策摘要",
+                "en-US": "Release Decision Summary"
+              },
+              "columns": 4,
+              "fields": [
+                {
+                  "field": "crm_qdp_code",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_qdp_status",
+                  "readOnly": true,
+                  "renderType": "tag",
+                  "dictCode": "crm_qdp_lifecycle"
+                },
+                {
+                  "field": "crm_qdp_gate_verdict",
+                  "readOnly": true,
+                  "renderType": "tag",
+                  "dictCode": "crm_qdp_gate_verdict"
+                },
+                {
+                  "field": "crm_qdp_requirement_version",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_qdp_primary_filename",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_qdp_prepared_at",
+                  "readOnly": true
+                }
+              ]
+            },
+            {
+              "id": "crm_qdp_compilation",
+              "blockType": "form-section",
+              "visibleWhen": "record.crm_qdp_compilation_stage != null || record.crm_qdp_compilation_outcome != null || record.crm_qdp_status === 'compiling' || record.crm_qdp_status === 'validation_failed'",
+              "title": {
+                "zh-CN": "编制与校验",
+                "en-US": "Compilation and Validation"
+              },
+              "columns": 4,
+              "fields": [
+                {
+                  "field": "crm_qdp_compilation_stage",
+                  "readOnly": true,
+                  "renderType": "tag",
+                  "dictCode": "crm_qdp_compilation_stage"
+                },
+                {
+                  "field": "crm_qdp_compilation_outcome",
+                  "readOnly": true,
+                  "renderType": "tag",
+                  "dictCode": "crm_qdp_compilation_outcome"
+                },
+                {
+                  "field": "crm_qdp_compilation_progress",
+                  "readOnly": true,
+                  "suffix": "%"
+                },
+                {
+                  "field": "crm_qdp_compilation_started_at",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_qdp_compiled_at",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_qdp_compilation_summary",
+                  "readOnly": true,
+                  "layout": {
+                    "colSpan": 12
+                  }
+                },
+                {
+                  "field": "crm_qdp_validation_failure_summary",
+                  "readOnly": true,
+                  "layout": {
+                    "colSpan": 12
+                  }
+                }
+              ]
+            },
+            {
+              "id": "crm_qdp_release_scope",
+              "blockType": "detail-section",
+              "title": {
+                "zh-CN": "制造范围与下游影响",
+                "en-US": "Manufacturing Scope and Downstream Impact"
+              },
+              "fields": [
+                {
+                  "field": "crm_qdp_pack_set_summary",
+                  "layout": {
+                    "colSpan": 12
+                  }
+                },
+                {
+                  "field": "crm_qdp_downstream_impact_summary",
+                  "layout": {
+                    "colSpan": 12
+                  }
+                },
+                {
+                  "field": "crm_qdp_qualification_verdict",
+                  "layout": {
+                    "colSpan": 6
+                  }
+                },
+                {
+                  "field": "crm_qdp_version_diff_summary",
+                  "layout": {
+                    "colSpan": 12
+                  }
+                },
+                {
+                  "field": "crm_qdp_file_names",
+                  "layout": {
+                    "colSpan": 12
+                  }
+                },
+                {
+                  "field": "crm_qdp_release_note",
+                  "layout": {
+                    "colSpan": 12
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "customer_evidence",
+          "label": {
+            "zh-CN": "客户确认与文件证据",
+            "en-US": "Customer and File Evidence"
+          },
+          "blocks": [
+            {
+              "id": "crm_qdp_confirmation",
+              "blockType": "detail-section",
+              "title": {
+                "zh-CN": "客户确认",
+                "en-US": "Customer Confirmation"
+              },
+              "fields": [
+                {
+                  "field": "crm_qdp_customer_confirmation_ref",
+                  "layout": {
+                    "colSpan": 6
+                  }
+                },
+                {
+                  "field": "crm_qdp_customer_confirmed_by",
+                  "layout": {
+                    "colSpan": 3
+                  }
+                },
+                {
+                  "field": "crm_qdp_customer_confirmed_at",
+                  "layout": {
+                    "colSpan": 3
+                  }
+                },
+                {
+                  "field": "crm_qdp_customer_confirmed_hash",
+                  "layout": {
+                    "colSpan": 12
+                  }
+                }
+              ]
+            },
+            {
+              "id": "crm_qdp_identity",
+              "blockType": "form-section",
+              "title": {
+                "zh-CN": "版本与追溯证据",
+                "en-US": "Revision and Trace Evidence"
+              },
+              "columns": 3,
+              "fields": [
+                {
+                  "field": "crm_qdp_revision_no",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_qdp_schema_version",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_qdp_expected_request_version",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_qdp_primary_filename",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_qdp_requirement_version",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_qdp_source_revision",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_qdp_content_hash",
+                  "readOnly": true,
+                  "layout": {
+                    "colSpan": 12
+                  }
+                },
+                {
+                  "field": "crm_qdp_file_package_hash",
+                  "readOnly": true,
+                  "layout": {
+                    "colSpan": 12
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "audit",
+          "label": {
+            "zh-CN": "生命周期审计",
+            "en-US": "Lifecycle Audit"
+          },
+          "blocks": [
+            {
+              "id": "crm_qdp_audit",
+              "blockType": "detail-section",
+              "title": {
+                "zh-CN": "关键操作记录",
+                "en-US": "Key Lifecycle Events"
+              },
+              "fields": [
+                {
+                  "field": "crm_qdp_prepared_at",
+                  "layout": {
+                    "colSpan": 3
+                  }
+                },
+                {
+                  "field": "crm_qdp_review_submitted_at",
+                  "layout": {
+                    "colSpan": 3
+                  }
+                },
+                {
+                  "field": "crm_qdp_released_at",
+                  "layout": {
+                    "colSpan": 3
+                  }
+                },
+                {
+                  "field": "crm_qdp_superseded_at",
+                  "layout": {
+                    "colSpan": 3
+                  }
+                },
+                {
+                  "field": "crm_qdp_superseded_by_revision_id",
+                  "layout": {
+                    "colSpan": 6
+                  }
+                }
+              ]
+            },
+            {
+              "id": "crm_qdp_order_commitments",
+              "blockType": "sub-table",
+              "title": {
+                "zh-CN": "采用此版本的订单承诺",
+                "en-US": "Order Commitments Using This Revision"
+              },
+              "subTable": {
+                "childModel": "crm_quote_summary_common",
+                "parentField": "crm_qs_committed_qdp_revision_id",
+                "readOnly": true,
+                "columns": [
+                  { "field": "crm_qs_code", "width": 160 },
+                  { "field": "crm_qs_status", "width": 120, "renderType": "tag", "dictCode": "crm_quote_summary_status" },
+                  { "field": "crm_qs_customer_request_id", "width": 180 },
+                  { "field": "crm_qs_customer_confirmation_id", "width": 180 },
+                  { "field": "crm_qs_order_committed_at", "width": 180 },
+                  { "field": "crm_qs_order_committed_by", "width": 160 }
+                ]
+              }
+            }
+          ]
+        }
       ]
     }
   ]

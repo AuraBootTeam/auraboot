@@ -1141,6 +1141,60 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "bulk_record_command",
+              "description": "Execute the same command once per selected record with an exact target PID."
+            },
+            "command": {
+              "type": "string"
+            },
+            "operationType": {
+              "type": "string",
+              "enum": [
+                "UPDATE",
+                "DELETE"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "command"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "bulk_field_command",
+              "description": "Collect one DSL field value, then execute the command once per exact target PID."
+            },
+            "command": {
+              "type": "string"
+            },
+            "input": {
+              "$ref": "#/definitions/FieldConfig"
+            },
+            "operationType": {
+              "type": "string",
+              "enum": [
+                "UPDATE",
+                "DELETE"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "command",
+            "input"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "navigate"
             },
             "to": {
@@ -1320,7 +1374,8 @@
       "type": "object",
       "properties": {
         "rowKey": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "dataSource": {
           "type": "string"
@@ -1343,6 +1398,77 @@
         },
         "selection": {
           "$ref": "#/definitions/SelectionConfig"
+        },
+        "bulkCapabilities": {
+          "type": "object",
+          "properties": {
+            "edit": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "permissionCode": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "delete": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "permissionCode": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "export": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "permissionCode": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "description": "Permission-aware controls for the generic edit/delete/export bulk bar."
+        },
+        "bulkActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ButtonConfig"
+          },
+          "description": "DSL-configured business bulk actions, executed through commands."
         },
         "columns": {
           "type": "array",
@@ -1369,7 +1495,46 @@
       "required": [
         "columns"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "selection"
+            ],
+            "properties": {
+              "selection": {
+                "required": [
+                  "presentation"
+                ],
+                "properties": {
+                  "presentation": {
+                    "const": "grouped-radio"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "rowKey"
+                ]
+              },
+              {
+                "properties": {
+                  "selection": {
+                    "required": [
+                      "keyField"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
     },
     "PaginationConfig": {
       "type": "object",
@@ -1412,7 +1577,36 @@
           "type": "boolean"
         },
         "keyField": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
+        },
+        "presentation": {
+          "type": "string",
+          "enum": [
+            "table",
+            "grouped-radio"
+          ],
+          "description": "Renders exclusive multiple-selection rows as one decision card per group. The bound value remains an array containing at most one row per group."
+        },
+        "exclusiveBy": {
+          "type": "string",
+          "description": "Field whose value defines an exclusive selection group. In multiple mode, selecting another row with the same value replaces the previous row.",
+          "minLength": 1
+        },
+        "optionLabelField": {
+          "type": "string",
+          "description": "Field rendered as the radio option label in grouped-radio presentation.",
+          "minLength": 1
+        },
+        "recommendedField": {
+          "type": "string",
+          "description": "Explicit boolean field marking a business recommendation. Automatic grouped selection is enabled only when `safeField` is configured as well.",
+          "minLength": 1
+        },
+        "safeField": {
+          "type": "string",
+          "description": "Explicit boolean field proving that the recommendation is safe and reversible. A row is preselected only when both configured fields are strictly `true`.",
+          "minLength": 1
         },
         "detailBind": {
           "type": "string"
@@ -1428,7 +1622,108 @@
         "mode",
         "bind"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "presentation"
+            ],
+            "properties": {
+              "presentation": {
+                "const": "grouped-radio"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "exclusiveBy",
+              "optionLabelField"
+            ],
+            "properties": {
+              "mode": {
+                "const": "multiple"
+              },
+              "defaultFirst": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "exclusiveBy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "mode": {
+                "const": "multiple"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "optionLabelField"
+            ]
+          },
+          "then": {
+            "required": [
+              "presentation"
+            ],
+            "properties": {
+              "presentation": {
+                "const": "grouped-radio"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "recommendedField"
+            ]
+          },
+          "then": {
+            "required": [
+              "safeField",
+              "presentation"
+            ],
+            "properties": {
+              "presentation": {
+                "const": "grouped-radio"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "safeField"
+            ]
+          },
+          "then": {
+            "required": [
+              "recommendedField",
+              "presentation"
+            ],
+            "properties": {
+              "presentation": {
+                "const": "grouped-radio"
+              }
+            }
+          }
+        }
+      ],
+      "x-distinct-properties": [
+        [
+          "recommendedField",
+          "safeField"
+        ]
+      ]
     },
     "ColumnConfig": {
       "type": "object",
@@ -2708,5 +3003,5 @@
       ]
     }
   },
-  "$comment": "Auto-generated from web-admin/app/meta/schemas/dsl-schema-types.ts — DO NOT EDIT MANUALLY. Run: cd web-admin && pnpm generate:dsl-schema"
+  "$comment": "Auto-generated from web-admin/app/framework/meta/schemas/dsl-schema-types.ts — DO NOT EDIT MANUALLY. Run: cd web-admin && pnpm generate:dsl-schema"
 }

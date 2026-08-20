@@ -3,6 +3,7 @@ package com.auraboot.framework.integration;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
+import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import org.junit.jupiter.api.*;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -28,6 +30,9 @@ class UserRoleServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private RoleService roleService;
+
+    @Autowired
+    private UserRoleMapper userRoleMapper;
 
     // Shared state
     private static Long roleAId;
@@ -375,6 +380,43 @@ class UserRoleServiceIntegrationTest extends BaseIntegrationTest {
     void cleanupInvalidUserRoles_returnsZero() {
         int cleaned = userRoleService.cleanupInvalidUserRoles();
         assertThat(cleaned).isEqualTo(0);
+    }
+
+    @Test
+    @Order(26)
+    void effectiveRoleQuery_excludesFutureAndExpiredBindings() {
+        Role currentRole = createRole("current_" + System.nanoTime());
+        Role futureRole = createRole("future_" + System.nanoTime());
+        Role expiredRole = createRole("expired_" + System.nanoTime());
+        LocalDate today = LocalDate.now();
+
+        userRoleService.assignRolesToMemberByRolePids(
+                testTenantMember.getPid(), List.of(currentRole.getPid()), today.minusDays(1),
+                today.plusDays(1), testTenant.getId(), testUser.getId());
+        userRoleService.assignRolesToMemberByRolePids(
+                testTenantMember.getPid(), List.of(futureRole.getPid()), today.plusDays(1),
+                today.plusDays(5), testTenant.getId(), testUser.getId());
+        userRoleService.assignRolesToMemberByRolePids(
+                testTenantMember.getPid(), List.of(expiredRole.getPid()), today.minusDays(5),
+                today.plusDays(1), testTenant.getId(), testUser.getId());
+        UserRole expiredBinding = userRoleService.findByMemberIdAndRoleIdAndTenantId(
+                testTenantMember.getId(), expiredRole.getId(), testTenant.getId());
+        expiredBinding.setExpiryDate(today.minusDays(1));
+        userRoleMapper.updateById(expiredBinding);
+
+        List<Long> effectiveRoleIds = userRoleMapper.findEffectiveByMemberIdAndTenantId(
+                        testTenantMember.getId(), testTenant.getId(), today).stream()
+                .map(UserRole::getRoleId)
+                .toList();
+
+        assertThat(effectiveRoleIds).contains(currentRole.getId());
+        assertThat(effectiveRoleIds).doesNotContain(futureRole.getId(), expiredRole.getId());
+
+        userRoleService.removeRolesFromMember(testTenantMember.getId(),
+                List.of(currentRole.getId(), futureRole.getId(), expiredRole.getId()), testTenant.getId());
+        roleService.deleteRole(currentRole.getId());
+        roleService.deleteRole(futureRole.getId());
+        roleService.deleteRole(expiredRole.getId());
     }
 
     // ======================================================================

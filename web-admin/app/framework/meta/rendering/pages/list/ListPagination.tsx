@@ -16,11 +16,12 @@ export interface ListPaginationProps {
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   t: (key: string) => string;
+  locale?: string;
   selectedCount: number;
   selectedIds: string[];
   modelCode: string;
-  onBulkEdit: () => void;
-  onBulkDelete: (ids: string[]) => Promise<void>;
+  onBulkEdit?: () => void;
+  onBulkDelete?: (ids: string[]) => Promise<void>;
   /** Export only the selected records (T9). */
   onBulkExport?: (ids: string[]) => void;
   bulkActions?: ButtonConfig[];
@@ -36,6 +37,7 @@ export function ListPagination({
   onPageChange,
   onPageSizeChange,
   t,
+  locale,
   selectedCount,
   selectedIds,
   modelCode,
@@ -73,6 +75,7 @@ export function ListPagination({
         onBulkAction={onBulkAction}
         resolveActionLabel={resolveBulkActionLabel}
         onClearSelection={onClearSelection}
+        locale={locale}
         t={t}
       />
     </>

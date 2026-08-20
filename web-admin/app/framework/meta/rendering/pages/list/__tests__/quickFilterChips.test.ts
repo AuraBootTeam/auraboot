@@ -55,6 +55,24 @@ describe('assembleQuickFilterChips', () => {
     expect(chips.findIndex((c) => c.kind === 'view')).toBe(presets.length);
   });
 
+  it('localizes i18n-backed plugin view names instead of leaking the resource key', () => {
+    const chips = assembleQuickFilterChips({
+      presets: [],
+      t: (key, _vars, fallback) =>
+        key === 'crm.saved_view.my_opportunities' ? '我的商机' : (fallback ?? key),
+      savedViews: [
+        view('v1', '$i18n:crm.saved_view.my_opportunities', {
+          pinnedAsQuickFilter: true,
+        }),
+      ],
+      pins: [],
+    });
+
+    expect(chips).toEqual([
+      expect.objectContaining({ kind: 'view', viewPid: 'v1', label: '我的商机' }),
+    ]);
+  });
+
   it('does not add a view chip for a non-pinned view', () => {
     const chips = assembleQuickFilterChips({
       presets,

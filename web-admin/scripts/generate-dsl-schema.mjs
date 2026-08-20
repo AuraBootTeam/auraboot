@@ -5,7 +5,7 @@
  * Usage:  node scripts/generate-dsl-schema.mjs          (from web-admin/)
  *    or:  pnpm generate:dsl-schema                    (from web-admin/)
  *
- * Reads:  app/meta/schemas/dsl-schema-types.ts
+ * Reads:  app/framework/meta/schemas/dsl-schema-types.ts
  * Writes: ../plugins/schemas/dsl-schema.generated.json
  */
 import { createGenerator } from 'ts-json-schema-generator';
@@ -18,7 +18,7 @@ const WEB_ADMIN = resolve(__dirname, '..');
 const ROOT = resolve(WEB_ADMIN, '..');
 
 const config = {
-  path: resolve(WEB_ADMIN, 'app/meta/schemas/dsl-schema-types.ts'),
+  path: resolve(WEB_ADMIN, 'app/framework/meta/schemas/dsl-schema-types.ts'),
   tsconfig: resolve(WEB_ADMIN, 'tsconfig.json'),
   type: 'DslSchema',
   additionalProperties: false,
@@ -176,9 +176,97 @@ function addPageTypeDiscriminator(schema) {
 
 addPageTypeDiscriminator(output);
 
+/**
+ * Preserve the runtime grouped-radio invariants in the publish-time JSON Schema.
+ * Safe defaults are explicit and opt-in: both producer fields must be named,
+ * defaultFirst can never substitute for them, and row identity must survive reloads.
+ */
+function addGroupedRadioSelectionContract(schema) {
+  const selection = schema.definitions?.SelectionConfig;
+  const table = schema.definitions?.TableConfig;
+  if (!selection || !table) return;
+
+  for (const field of [
+    'keyField',
+    'exclusiveBy',
+    'optionLabelField',
+    'recommendedField',
+    'safeField',
+  ]) {
+    if (selection.properties?.[field]) selection.properties[field].minLength = 1;
+  }
+  if (table.properties?.rowKey) table.properties.rowKey.minLength = 1;
+
+  selection.allOf = [
+    ...(selection.allOf || []),
+    {
+      if: {
+        required: ['presentation'],
+        properties: { presentation: { const: 'grouped-radio' } },
+      },
+      then: {
+        required: ['exclusiveBy', 'optionLabelField'],
+        properties: {
+          mode: { const: 'multiple' },
+          defaultFirst: { const: false },
+        },
+      },
+    },
+    {
+      if: { required: ['exclusiveBy'] },
+      then: { properties: { mode: { const: 'multiple' } } },
+    },
+    {
+      if: { required: ['optionLabelField'] },
+      then: {
+        required: ['presentation'],
+        properties: { presentation: { const: 'grouped-radio' } },
+      },
+    },
+    {
+      if: { required: ['recommendedField'] },
+      then: {
+        required: ['safeField', 'presentation'],
+        properties: { presentation: { const: 'grouped-radio' } },
+      },
+    },
+    {
+      if: { required: ['safeField'] },
+      then: {
+        required: ['recommendedField', 'presentation'],
+        properties: { presentation: { const: 'grouped-radio' } },
+      },
+    },
+  ];
+  selection['x-distinct-properties'] = [['recommendedField', 'safeField']];
+
+  table.allOf = [
+    ...(table.allOf || []),
+    {
+      if: {
+        required: ['selection'],
+        properties: {
+          selection: {
+            required: ['presentation'],
+            properties: { presentation: { const: 'grouped-radio' } },
+          },
+        },
+      },
+      then: {
+        anyOf: [
+          { required: ['rowKey'] },
+          { properties: { selection: { required: ['keyField'] } } },
+        ],
+      },
+    },
+  ];
+}
+
+addGroupedRadioSelectionContract(output);
+
 // Add metadata
 output.$comment =
-  'Auto-generated from web-admin/app/meta/schemas/dsl-schema-types.ts — DO NOT EDIT MANUALLY. Run: cd web-admin && pnpm generate:dsl-schema';
+  'Auto-generated from web-admin/app/framework/meta/schemas/dsl-schema-types.ts — DO NOT EDIT MANUALLY. Run: cd web-admin && pnpm generate:dsl-schema';
 
 const outPath = resolve(ROOT, 'plugins/schemas/dsl-schema.generated.json');
 writeFileSync(outPath, JSON.stringify(output, null, 2) + '\n');

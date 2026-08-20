@@ -3888,6 +3888,7 @@ public class PluginImportServiceImpl implements PluginImportService {
             // that exist in the tenant (checking via resourceImporter)
             Set<String> referencedModels = new HashSet<>();
             Set<String> referencedFields = new HashSet<>();
+            Set<String> referencedPermissions = new HashSet<>();
             if (manifest.getCommands() != null) {
                 manifest.getCommands().forEach(cmd -> {
                     if (cmd != null && cmd.getModelCode() != null) referencedModels.add(cmd.getModelCode());
@@ -3901,7 +3902,14 @@ public class PluginImportServiceImpl implements PluginImportService {
                     }
                 });
             }
-            // Only check external references (not in manifest's own models/fields)
+            if (manifest.getMenus() != null) {
+                manifest.getMenus().forEach(menu -> {
+                    if (menu != null && !isBlank(menu.getPermissionCode())) {
+                        referencedPermissions.add(menu.getPermissionCode());
+                    }
+                });
+            }
+            // Only check external references (not in the manifest's own resources)
             Set<String> manifestModelCodes = new HashSet<>();
             if (manifest.getModels() != null) {
                 manifest.getModels().forEach(m -> { if (m != null && m.getCode() != null) manifestModelCodes.add(m.getCode()); });
@@ -3909,6 +3917,12 @@ public class PluginImportServiceImpl implements PluginImportService {
             Set<String> manifestFieldCodes = new HashSet<>();
             if (manifest.getFields() != null) {
                 manifest.getFields().forEach(f -> { if (f != null && f.getCode() != null) manifestFieldCodes.add(f.getCode()); });
+            }
+            Set<String> manifestPermissionCodes = new HashSet<>();
+            if (manifest.getPermissions() != null) {
+                manifest.getPermissions().forEach(p -> {
+                    if (p != null && !isBlank(p.getCode())) manifestPermissionCodes.add(p.getCode());
+                });
             }
             for (String modelCode : referencedModels) {
                 if (!manifestModelCodes.contains(modelCode) && resourceImporter.checkModelExists(tenantId, modelCode)) {
@@ -3918,6 +3932,12 @@ public class PluginImportServiceImpl implements PluginImportService {
             for (String fieldCode : referencedFields) {
                 if (!manifestFieldCodes.contains(fieldCode) && resourceImporter.checkFieldExists(tenantId, fieldCode)) {
                     installedFieldCodes.add(fieldCode);
+                }
+            }
+            for (String permissionCode : referencedPermissions) {
+                if (!manifestPermissionCodes.contains(permissionCode)
+                        && resourceImporter.checkPermissionExists(tenantId, permissionCode)) {
+                    installedPermissionCodes.add(permissionCode);
                 }
             }
             // Collect installed command/NQ codes for capability dependency validation

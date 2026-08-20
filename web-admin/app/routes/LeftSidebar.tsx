@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { NavLink, useLocation, useRevalidator } from 'react-router';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData } from '~/root-data';
 import { useI18n } from '~/contexts/I18nContext';
 import SidebarSubmenu, { resolveMenuLabel } from '~/routes/SidebarSubmenu';
 import { XMarkIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
@@ -66,6 +66,8 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
 
   const widthClass = collapsed ? 'w-[68px]' : 'w-64';
 
+  if (menus.length === 0) return null;
+
   // In RTL mode the sidebar is anchored to the right edge; the hidden-state
   // translation must be inverted so it slides out to the right instead of left.
   const hiddenTranslate = isRTL ? 'translate-x-full' : '-translate-x-full';
@@ -111,8 +113,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
         ref={navRef}
         className={`min-h-0 flex-1 ${collapsed ? 'px-2' : 'px-4'} scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 dark:hover:scrollbar-thumb-gray-500 space-y-1 overflow-y-auto py-1`}
       >
-        {menus && menus.length > 0
-          ? menus.map((menu: any, index: number) => (
+        {menus.map((menu: any, index: number) => (
               <div key={menu.id || index}>
                 {collapsed ? (
                   <CollapsedMenuItem
@@ -149,12 +150,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
                   </NavLink>
                 )}
               </div>
-            ))
-          : !collapsed && (
-              <div className="py-8 text-center">
-                <p className="text-sm text-gray-500 dark:text-gray-400">{t('sidebar.noMenus')}</p>
-              </div>
-            )}
+            ))}
       </nav>
     </div>
   );

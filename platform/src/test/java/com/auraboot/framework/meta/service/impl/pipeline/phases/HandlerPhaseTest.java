@@ -32,6 +32,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.context.ApplicationContext;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -242,6 +243,25 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void execute_preservesPluginAccessDeniedSemantic() {
+        CommandHandlerExtension denied = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) {
+                throw new AccessDeniedException("record ownership required");
+            }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(denied));
+
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessage("record ownership required");
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test
     void execute_fallsBackToCommandCodeWhenNoConfiguredPluginHandler() throws Exception {
         RecordingPluginHandler handler = new RecordingPluginHandler(BUSINESS_COMMAND_CODE);
         when(extensionRegistry.getCommandHandler(BUSINESS_COMMAND_CODE)).thenReturn(Optional.of(handler));
@@ -403,6 +423,56 @@ class HandlerPhaseTest {
         verify(dynamicDataMapper).updateWithJsonb(eq(tableName), any(), any(), jsonbCaptor.capture());
         assertThat(jsonbCaptor.getValue()).contains("cr_cj_seed_urls");
         verify(dynamicDataMapper, never()).update(eq(tableName), any(), any());
+    }
+
+    @Test
+    void persistHandlerResults_neverCopiesReturnedIdentityOntoTargetRecord() throws Exception {
+        CommandHandlerExtension handler = new CommandHandlerExtension() {
+            @Override
+            public String getCommandType() {
+                return BUSINESS_COMMAND_CODE;
+            }
+
+            @Override
+            public Object execute(CommandContext context) {
+                return Map.of(
+                        "id", 99L,
+                        "pid", "successor-pid",
+                        "cr_cj_status", "PAUSED");
+            }
+        };
+        when(extensionRegistry.getCommandHandler(BUSINESS_COMMAND_CODE)).thenReturn(Optional.of(handler));
+
+        String modelCode = "cr_crawl_job";
+        String tableName = "mt_cr_crawl_job";
+        com.auraboot.framework.meta.dto.ModelDefinition model =
+                com.auraboot.framework.meta.dto.ModelDefinition.builder()
+                        .code(modelCode)
+                        .tableName(tableName)
+                        .fields(java.util.List.of(
+                                com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                                        .code("id").columnName("id").dataType("long").build(),
+                                com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                                        .code("pid").columnName("pid").dataType("string").build(),
+                                com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                                        .code("cr_cj_status").columnName("cr_cj_status")
+                                        .dataType("string").build()))
+                        .build();
+
+        when(metaModelService.getModelDefinition(modelCode)).thenReturn(Optional.of(model));
+        when(metaModelService.getTableName(modelCode)).thenReturn(tableName);
+        when(dynamicDataMapper.findJsonbColumns(tableName)).thenReturn(java.util.Set.of());
+        when(dynamicDataMapper.selectByQuery(any(), any()))
+                .thenReturn(java.util.List.of(Map.of("id", 42L)));
+
+        phase.execute(buildContext(BUSINESS_COMMAND_CODE, modelCode, Map.of("type", "custom")));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> dataCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).update(eq(tableName), dataCaptor.capture(), any());
+        assertThat(dataCaptor.getValue())
+                .containsEntry("cr_cj_status", "PAUSED")
+                .doesNotContainKeys("id", "pid");
     }
 
     @Test

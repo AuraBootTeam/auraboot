@@ -36,4 +36,7 @@ export AURA_SSRF_ALLOWED_PRIVATE_HOSTS="${AURA_SSRF_ALLOWED_PRIVATE_HOSTS:-127.0
 
 echo "[host-e2e-up] AGENT_LLM_STUB_MODE=$AGENT_LLM_STUB_MODE  AURA_SSRF_ALLOWED_PRIVATE_HOSTS=$AURA_SSRF_ALLOWED_PRIVATE_HOSTS"
 
-exec env FORCE_HOST="${FORCE_HOST:-1}" bash scripts/oss-reset-and-init.sh "$@"
+# The multi-worktree guard remains authoritative.  An operator may still export
+# FORCE_HOST=1 explicitly, but this wrapper must never opt into shared-host
+# mutation on their behalf.
+exec bash scripts/oss-reset-and-init.sh "$@"

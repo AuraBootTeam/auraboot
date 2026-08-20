@@ -44,10 +44,11 @@ public record CommandPermitPlan(
 
     /**
      * Row-level scope grade (D3) for the command's root model. {@code SELF} filters execution to the
-     * caller's own rows; {@code ALL} applies no row filter. The predicate itself (owner column,
-     * current user) is resolved by the data layer at execution — the plan carries only the grade.
+     * caller's own rows; {@code TARGET} pins execution to the public record PID named at the
+     * boundary; {@code ALL} applies no row filter. The predicate itself is resolved by the data
+     * layer at execution — the plan carries only the grade.
      */
-    public enum ScopeGrade { SELF, ALL }
+    public enum ScopeGrade { SELF, TARGET, ALL }
 
     /** One phase's authorization finding, before combination. */
     public record PhaseDecision(Decision decision, String reasonCode, String phaseName) {

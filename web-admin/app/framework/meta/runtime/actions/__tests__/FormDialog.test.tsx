@@ -17,6 +17,44 @@ function renderDialog(detail: Record<string, any>) {
 describe('FormDialog choice fields', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('renders a MemberPicker command input and submits the selected user pid', async () => {
+    const onSubmit = vi.fn();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: '0',
+        data: {
+          records: [{
+            displayName: 'Sales One',
+            user: { pid: 'user-sales-1', email: 'sales@example.com' },
+          }],
+        },
+      }),
+    }));
+    renderDialog({
+      title: '分配线索',
+      fields: [{
+        field: 'crm_lpi_claimed_by',
+        label: '分配给',
+        type: 'reference',
+        component: 'MemberPicker',
+        required: true,
+        props: { multiple: false },
+      }],
+      fieldOptions: {},
+      defaults: {},
+      onSubmit,
+    });
+
+    expect(screen.getByRole('dialog', { name: '分配线索' })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('member-picker-add'));
+    fireEvent.click(await screen.findByTestId('member-picker-option-user-sales-1'));
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+
+    expect(onSubmit).toHaveBeenCalledWith({ crm_lpi_claimed_by: 'user-sales-1' });
   });
 
   it('uses localized fallbacks instead of leaking missing i18n keys', () => {
@@ -30,6 +68,28 @@ describe('FormDialog choice fields', () => {
     expect(screen.getByTestId('form-dialog-cancel')).toHaveTextContent('取消');
     expect(screen.getByTestId('form-dialog-submit')).toHaveTextContent('确认');
     expect(screen.queryByText(/common\.(?:select|cancel|confirm)/)).not.toBeInTheDocument();
+  });
+
+  it('renders localized business help text below an action input', () => {
+    renderDialog({
+      fields: [{
+        field: 'quantity',
+        label: { 'zh-CN': '本次上架数量', en: 'Putaway Quantity' },
+        placeholder: { 'zh-CN': '例如：20', en: 'e.g. 20' },
+        helpText: {
+          'zh-CN': '不得超过当前剩余量；确认后才移动库存。',
+          en: 'Must not exceed the remainder; inventory moves only after confirmation.',
+        },
+        type: 'number',
+      }],
+      fieldOptions: {},
+      defaults: {},
+    });
+
+    expect(screen.getByPlaceholderText('例如：20')).toBeInTheDocument();
+    expect(screen.getByTestId('form-dialog-help-quantity')).toHaveTextContent(
+      '不得超过当前剩余量；确认后才移动库存。',
+    );
   });
 
   it('switches mode-specific fields and submits only visible values', () => {

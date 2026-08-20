@@ -24,6 +24,11 @@ const ZH = {
     saved_view_locked_preset: '预置',
     saved_view_capability_blocked: '需要配置',
   },
+  crm: {
+    saved_view: {
+      pipeline_board: '销售管道看板',
+    },
+  },
 };
 
 function makeView(overrides: Partial<SavedView> = {}): SavedView {
@@ -63,7 +68,7 @@ function renderSelector(
 }
 
 describe('ViewSelector', () => {
-  it('opens a personal-only dropdown from the title trigger without entering management', () => {
+  it('opens an authorized scope-grouped dropdown from the title trigger without entering management', () => {
     const onManageViews = vi.fn();
     renderSelector({ onManageViews });
 
@@ -73,10 +78,10 @@ describe('ViewSelector', () => {
     const listbox = screen.getByRole('listbox', { name: '选择视图' });
     expect(listbox).toHaveTextContent('个人视图');
     expect(listbox).toHaveTextContent('我的表格');
-    expect(listbox).not.toHaveTextContent('团队共享');
-    expect(listbox).not.toHaveTextContent('全员视图');
-    expect(listbox).not.toHaveTextContent('研发团队看板');
-    expect(listbox).not.toHaveTextContent('全员默认');
+    expect(listbox).toHaveTextContent('团队共享');
+    expect(listbox).toHaveTextContent('全员视图');
+    expect(listbox).toHaveTextContent('研发团队看板');
+    expect(listbox).toHaveTextContent('全员默认');
   });
 
   it('renders the implicit saved view as a default-view baseline instead of a personal view row', () => {
@@ -136,6 +141,47 @@ describe('ViewSelector', () => {
     expect(screen.getByLabelText('预置')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('view-selector-trigger'));
     expect(screen.getByTestId('view-option-plugin-view')).toHaveTextContent('预置');
+  });
+
+  it('names and lists an accessible global plugin preset', () => {
+    const pipelinePreset = makeView({
+      pid: 'pipeline-board',
+      name: 'Pipeline Board',
+      scope: 'global',
+      viewType: 'kanban',
+      isDefault: true,
+      viewConfig: { meta: { managedBy: 'plugin', locked: true, allowUserCopy: true } },
+    });
+    renderSelector({ views: [pipelinePreset], currentView: pipelinePreset });
+
+    const trigger = screen.getByTestId('view-selector-trigger');
+    expect(trigger).toHaveTextContent('Pipeline Board');
+    expect(screen.getByTestId('view-selector-scope-label')).toHaveTextContent('预置');
+    expect(trigger).toHaveAttribute('data-current-view-type', 'kanban');
+
+    fireEvent.click(trigger);
+    const listbox = screen.getByRole('listbox');
+    expect(listbox).toHaveTextContent('全员视图');
+    expect(listbox).toHaveTextContent('Pipeline Board');
+    expect(screen.getByTestId('view-option-pipeline-board')).toHaveTextContent('预置');
+    expect(screen.getByTestId('view-option-default')).toBeInTheDocument();
+  });
+
+  it('localizes an i18n-backed plugin preset name in the trigger', () => {
+    const pipelinePreset = makeView({
+      pid: 'pipeline-board',
+      name: '$i18n:crm.saved_view.pipeline_board',
+      scope: 'global',
+      viewType: 'kanban',
+      isDefault: true,
+      viewConfig: { meta: { managedBy: 'plugin', locked: true, allowUserCopy: true } },
+    });
+    renderSelector({ views: [], currentView: pipelinePreset });
+
+    const trigger = screen.getByTestId('view-selector-trigger');
+    expect(trigger).toHaveTextContent('销售管道看板');
+    expect(trigger).toHaveAttribute('data-current-view-name', '销售管道看板');
+    expect(trigger).not.toHaveTextContent('$i18n:');
   });
 
   it('marks imported advanced views that need capability setup', () => {

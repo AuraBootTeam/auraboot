@@ -1,6 +1,7 @@
 package com.auraboot.framework.rbac.dto;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 /**
  * DTO representing a member assigned to a role, enriched with org employee info.
@@ -12,5 +13,7 @@ public record RoleMemberDTO(
     String email,
     String departmentName,
     String positionName,
-    Instant assignedAt
+    Instant assignedAt,
+    LocalDate effectiveDate,
+    LocalDate expiryDate
 ) {}

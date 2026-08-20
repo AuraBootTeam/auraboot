@@ -179,7 +179,6 @@ class DynamicDataServiceImplReferenceEnrichmentTest {
                 .fields(List.of(owner))
                 .build();
         when(metadataService.getModelDefinition("crm_account_common")).thenReturn(Optional.of(source));
-        when(metadataService.getModelDefinition("sys_user")).thenReturn(Optional.empty());
         when(dataPermissionEngine.getFieldMaskRules(1L, "sys_user", 2L)).thenReturn(List.of());
         when(dynamicDataMapper.selectByQuery(argThat(sql ->
                         sql.contains("COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email) AS display_value")
@@ -194,6 +193,7 @@ class DynamicDataServiceImplReferenceEnrichmentTest {
 
         assertEquals("Alice", record.get("crm_acc_owner_display"));
         verify(dynamicDataMapper).selectByQuery(argThat(sql -> sql.contains(" AS display_value")), anyMap());
+        verify(metadataService, never()).getModelDefinition("sys_user");
     }
 
     @Test
@@ -221,6 +221,33 @@ class DynamicDataServiceImplReferenceEnrichmentTest {
                 "pcba_qdp_release", new ArrayList<>(List.of(record)));
 
         assertFalse(record.containsKey("crm_qdp_request_id_display"));
+        verify(dynamicDataMapper, never()).selectByQuery(argThat(sql -> true), anyMap());
+    }
+
+    @Test
+    @DisplayName("empty business references skip target authorization and metadata lookup")
+    void emptyBusinessReferenceSkipsTargetLookup() {
+        String targetModelCode = "crm_customer_request";
+        FieldDefinition requestRef = field("crm_qdp_request_id", "reference", Map.of(
+                "refTarget", Map.of(
+                        "targetEntity", targetModelCode,
+                        "valueField", "pid",
+                        "displayField", "crm_cr_title")));
+        requestRef.setColumnName("crm_qdp_request_id");
+        ModelDefinition source = ModelDefinition.builder()
+                .code("pcba_qdp_release")
+                .tableName("mt_pcba_qdp_release")
+                .fields(List.of(requestRef))
+                .build();
+        when(metadataService.getModelDefinition("pcba_qdp_release")).thenReturn(Optional.of(source));
+
+        ReflectionTestUtils.invokeMethod(service, "enrichReferenceDisplayFields",
+                "pcba_qdp_release", new ArrayList<>(List.of(new HashMap<>())));
+
+        verify(applicationContext, never()).getBean(PermissionFacade.class);
+        verify(metadataService, never()).getModelDefinition(targetModelCode);
+        verify(dataPermissionEngine, never()).buildRowFilter(1L, targetModelCode, 2L);
+        verify(dataPermissionEngine, never()).getFieldMaskRules(1L, targetModelCode, 2L);
         verify(dynamicDataMapper, never()).selectByQuery(argThat(sql -> true), anyMap());
     }
 

@@ -183,6 +183,15 @@
     "action": "read"
   },
   {
+    "code": "model.crm_forecast_submission.read",
+    "name:zh-CN": "查看销售预测模型",
+    "name:en": "Read Forecast Submission Model",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_forecast_submission",
+    "action": "read"
+  },
+  {
     "code": "model.crm_customer_request_common.read",
     "name:zh-CN": "查看客户需求模型",
     "name:en": "Read Customer Request Model",
@@ -495,6 +504,13 @@
     "module": "crm"
   },
   {
+    "code": "crm.order_commitment.manage",
+    "name:zh-CN": "登记订单承诺",
+    "name:en": "Record Order Commitment",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
     "code": "crm.approval_case.manage",
     "name:zh-CN": "审批事项管理",
     "name:en": "Approval Case Management",
@@ -648,6 +664,120 @@
     "resourceType": "model",
     "module": "crm",
     "resourceCode": "crm_customer_confirmation_common",
+    "action": "read"
+  },
+  {
+    "code": "model.crm_account_common.import",
+    "name:zh-CN": "导入客户",
+    "name:en": "Import Accounts",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_account_common",
+    "action": "import"
+  },
+  {
+    "code": "model.crm_contact_common.import",
+    "name:zh-CN": "导入联系人",
+    "name:en": "Import Contacts",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_contact_common",
+    "action": "import"
+  },
+  {
+    "code": "model.crm_lead_common.import",
+    "name:zh-CN": "导入线索",
+    "name:en": "Import Leads",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_lead_common",
+    "action": "import"
+  },
+  {
+    "code": "model.crm_opportunity_common.import",
+    "name:zh-CN": "导入商机",
+    "name:en": "Import Opportunities",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_opportunity_common",
+    "action": "import"
+  },
+  {
+    "code": "crm.lead_pool.read",
+    "name:zh-CN": "查看线索池",
+    "name:en": "View Lead Pools",
+    "resourceType": "data",
+    "module": "crm"
+  },
+  {
+    "code": "crm.lead_pool.pick",
+    "name:zh-CN": "领取线索池线索",
+    "name:en": "Claim Lead Pool Items",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
+    "code": "crm.lead_pool.move",
+    "name:zh-CN": "移入线索池",
+    "name:en": "Move Leads to Pool",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
+    "code": "crm.lead_pool.assign",
+    "name:zh-CN": "分配线索池线索",
+    "name:en": "Assign Lead Pool Items",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
+    "code": "crm.lead_pool.manage",
+    "name:zh-CN": "管理线索池策略",
+    "name:en": "Manage Lead Pool Policy",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
+    "code": "crm.lead_pool.recycle",
+    "name:zh-CN": "执行线索自动回收",
+    "name:en": "Run Lead Pool Recycle",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
+    "code": "model.crm_lead_pool.read",
+    "name:zh-CN": "查看线索池模型",
+    "name:en": "Read Lead Pool Model",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_lead_pool",
+    "action": "read"
+  },
+  {
+    "code": "model.crm_lead_capacity.read",
+    "name:zh-CN": "查看线索库容模型",
+    "name:en": "Read Lead Capacity Model",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_lead_capacity",
+    "action": "read"
+  },
+  {
+    "code": "model.crm_lead_pool_item.read",
+    "name:zh-CN": "查看线索池条目模型",
+    "name:en": "Read Lead Pool Item Model",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_lead_pool_item",
+    "action": "read"
+  },
+  {
+    "code": "model.crm_lead_owner_history.read",
+    "name:zh-CN": "查看线索归属历史",
+    "name:en": "Read Lead Ownership History",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_lead_owner_history",
     "action": "read"
   }
 ]

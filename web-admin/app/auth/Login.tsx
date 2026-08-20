@@ -16,7 +16,8 @@ import { post, fetchResult } from '~/shared/services/http-client';
 import { ResultHelper, type User } from '~/utils/type';
 import { getUserInfo } from '~/shared/services/userService';
 import { useI18n } from '~/contexts/I18nContext';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData } from '~/root-data';
+import { COMMUNITY_BRANDING, resolveBrandDisplayName } from '~/config/branding';
 import IcpComplianceFooter from './IcpComplianceFooter';
 import { getLoginFailureActionData } from './login-errors';
 import { fetchAccessPolicy, isPublicRegistrationOpen } from '~/services/accessPolicy';
@@ -184,7 +185,9 @@ async function handleLdapLogin(
 ) {
   const username = String(formData.get('username') || '').trim();
   const password = String(formData.get('password') || '');
-  const provider = String(formData.get('channelCode') || 'ldap').trim().toLowerCase();
+  const provider = String(formData.get('channelCode') || 'ldap')
+    .trim()
+    .toLowerCase();
   if (!username || !password) {
     return data(
       { channelCode: provider, errors: { general: 'auth.error.invalidCredentials' } },
@@ -401,8 +404,11 @@ interface CapabilityRow {
 }
 
 export default function LoginPage() {
-  const compliance = useRootLoaderData()!.icpCompliance;
-  const { t } = useI18n();
+  const rootData = useRootLoaderData();
+  const compliance = rootData!.icpCompliance;
+  const branding = rootData?.branding ?? COMMUNITY_BRANDING;
+  const displayName = resolveBrandDisplayName(branding, compliance);
+  const { t, locale } = useI18n();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
   const actionData = useActionData<typeof action>();
@@ -592,9 +598,17 @@ export default function LoginPage() {
           {t('auth.welcome') || '欢迎回来'}
         </h1>
         <p className="mt-2 text-[15px] text-[#8A8694] dark:text-gray-400">
-          {compliance.enabled
-            ? t('auth.compliance.welcomeSub', undefined, '登录以继续使用 AuraBoot')
-            : t('auth.welcomeSub', undefined, '登录以继续使用 AuraBoot 工作台')}
+          {branding.mode === 'commercial'
+            ? t(
+                'auth.commercialBranding.welcomeSub',
+                { productName: branding.productName },
+                locale.startsWith('zh')
+                  ? `登录以继续使用 ${branding.productName} 工作台`
+                  : `Sign in to continue to the ${branding.productName} workspace`,
+              )
+            : compliance.enabled
+              ? t('auth.compliance.welcomeSub', undefined, `登录以继续使用 ${branding.productName}`)
+              : t('auth.welcomeSub', undefined, `登录以继续使用 ${branding.productName} 工作台`)}
         </p>
       </div>
 
@@ -750,15 +764,15 @@ export default function LoginPage() {
           />
           <div className="relative mb-6 flex items-center gap-2.5">
             <img
-              src="/android-chrome-192x192.png"
-              alt="AuraBoot"
+              src={branding.logoUrl}
+              alt={branding.productName}
               className="h-9 w-9 rounded-lg shadow-sm"
             />
             <span
               data-testid="login-mobile-site-title"
               className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white"
             >
-              {compliance.siteDisplayName}
+              {displayName}
             </span>
           </div>
           <div className="relative w-full max-w-md rounded-2xl border border-gray-200/80 bg-white p-6 shadow-[0_24px_60px_-20px_rgba(30,40,80,0.18),0_6px_16px_rgba(30,40,80,0.06)] dark:border-gray-700 dark:bg-gray-800">
@@ -1462,9 +1476,7 @@ function SocialLoginButton({ option }: { option: LoginChannelOption }) {
   const normalizedCode = provider.toLowerCase();
   const normalizedType = option.providerType?.toLowerCase() || '';
   const knownLabelKey = SOCIAL_I18N_KEYS[normalizedCode];
-  const title = knownLabelKey
-    ? t(knownLabelKey)
-    : option.displayName || provider;
+  const title = knownLabelKey ? t(knownLabelKey) : option.displayName || provider;
   const icon = icons[normalizedCode] || icons[normalizedType];
 
   return (
@@ -1475,9 +1487,7 @@ function SocialLoginButton({ option }: { option: LoginChannelOption }) {
       title={title || provider}
       aria-label={title || provider}
     >
-      {icon || (
-        <span className="text-[10px] font-bold uppercase">{provider.substring(0, 2)}</span>
-      )}
+      {icon || <span className="text-[10px] font-bold uppercase">{provider.substring(0, 2)}</span>}
     </button>
   );
 }

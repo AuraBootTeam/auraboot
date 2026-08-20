@@ -109,6 +109,37 @@
     }
   },
   {
+    "code": "crm_lead_pool_state",
+    "displayName:zh-CN": "归属状态",
+    "displayName:en": "Ownership State",
+    "dataType": "enum",
+    "dictCode": "crm_lead_ownership_state",
+    "defaultValue": "owned",
+    "feature": { "readonly": true, "searchable": true }
+  },
+  {
+    "code": "crm_lead_last_pool_id",
+    "displayName:zh-CN": "最近线索池",
+    "displayName:en": "Last Lead Pool",
+    "dataType": "reference",
+    "referenceModelCode": "crm_lead_pool",
+    "feature": { "readonly": true, "searchable": true }
+  },
+  {
+    "code": "crm_lead_claimed_at",
+    "displayName:zh-CN": "最近领取时间",
+    "displayName:en": "Last Claimed At",
+    "dataType": "datetime",
+    "feature": { "readonly": true, "sortable": true }
+  },
+  {
+    "code": "crm_lead_last_activity_at",
+    "displayName:zh-CN": "最近跟进时间",
+    "displayName:en": "Last Activity At",
+    "dataType": "datetime",
+    "feature": { "readonly": true, "sortable": true }
+  },
+  {
     "code": "crm_lead_lost_reason",
     "displayName:zh-CN": "丢失原因",
     "displayName:en": "Lost Reason",

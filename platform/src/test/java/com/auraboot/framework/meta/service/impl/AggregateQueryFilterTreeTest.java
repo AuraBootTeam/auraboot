@@ -3,7 +3,9 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.AggregateQueryRequest;
 import com.auraboot.framework.meta.dto.AggregateQueryRequest.FilterConfig;
+import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.MetricConfig;
+import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.entity.NamedQueryField;
 import com.auraboot.framework.meta.exception.MetaServiceException;
@@ -32,6 +34,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -137,6 +140,34 @@ class AggregateQueryFilterTreeTest {
 
         assertThat(c.sql()).contains("status = #{params.f_0} AND region = #{params.f_1}");
         assertThat(c.params()).containsEntry("f_0", "PAID").containsEntry("f_1", "East");
+    }
+
+    @Test
+    @DisplayName("aggregate keyword uses searchable model fields and bound escaped pattern")
+    void keywordSearchMatchesDynamicListContract() {
+        lenient().when(metaModelService.getModelDefinition("orders")).thenReturn(Optional.of(
+                ModelDefinition.builder()
+                        .code("orders")
+                        .tableName("orders")
+                        .fields(List.of(
+                                FieldDefinition.builder().code("name").columnName("name")
+                                        .dataType("string").searchable(true).build(),
+                                FieldDefinition.builder().code("amount").columnName("amount")
+                                        .dataType("decimal").searchable(true).build(),
+                                FieldDefinition.builder().code("notes").columnName("notes")
+                                        .dataType("text").searchable(false).build()))
+                        .build()));
+        AggregateQueryRequest request = aggregate(List.of(leaf("status", "eq", "OPEN")));
+        request.setKeyword("north_50%");
+
+        Captured captured = runAggregate(request);
+
+        assertThat(captured.sql()).contains(
+                "status = #{params.f_0} AND (CAST(name AS TEXT) ILIKE #{params.keyword}",
+                "CAST(amount AS TEXT) ILIKE #{params.keyword}",
+                "ESCAPE '\\'");
+        assertThat(captured.sql()).doesNotContain("CAST(notes AS TEXT)");
+        assertThat(captured.params()).containsEntry("keyword", "%north\\_50\\%%");
     }
 
     @Test

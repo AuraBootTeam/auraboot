@@ -47,6 +47,38 @@
     },
     {
       "type": "model",
+      "code": "crm_lead_pool"
+    },
+    {
+      "type": "model",
+      "code": "crm_lead_capacity"
+    },
+    {
+      "type": "model",
+      "code": "crm_lead_pool_item"
+    },
+    {
+      "type": "model",
+      "code": "crm_lead_owner_history"
+    },
+    {
+      "type": "command",
+      "code": "crm:move_lead_to_pool"
+    },
+    {
+      "type": "command",
+      "code": "crm:claim_pool_lead"
+    },
+    {
+      "type": "command",
+      "code": "crm:assign_pool_lead"
+    },
+    {
+      "type": "page",
+      "code": "crm_lead_pool_item_list"
+    },
+    {
+      "type": "model",
       "code": "crm_opportunity_common"
     },
     {
@@ -134,8 +166,12 @@
       "code": "crm:publish_qdp_revision"
     },
     {
-      "type": "command",
-      "code": "crm:release_qdp"
+      "type": "query",
+      "code": "crm_qdp_release_stats"
+    },
+    {
+      "type": "page",
+      "code": "crm_qdp_release_workbench"
     }
   ],
   "requires": [],

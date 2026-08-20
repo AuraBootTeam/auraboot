@@ -1,10 +1,7 @@
 {
   "code": "crm_dashboard",
-  "title": {
-    "zh-CN": "CRM 驾驶舱",
-    "en": "CRM Dashboard"
-  },
-  "description": "CRM overview dashboard with KPI cards, chart visualizations, pipeline summary, recent leads and activities",
+  "title": "$i18n:page.crm_dashboard.title",
+  "description": "$i18n:page.crm_dashboard.description",
   "scope": "global",
   "status": "published",
   "sortOrder": 0,
@@ -48,7 +45,15 @@
               "en": "New Leads"
             },
             "icon": "IconRadar",
-            "color": "#3b82f6"
+            "color": "#3b82f6",
+            "drillDown": {
+              "enabled": true,
+              "action": "navigate",
+              "targetPage": "/p/crm_lead_common",
+              "filters": [
+                { "targetField": "crm_lead_status", "value": "new" }
+              ]
+            }
           },
           {
             "field": "open_opportunities",
@@ -57,7 +62,16 @@
               "en": "Open Opportunities"
             },
             "icon": "IconTrendingUp",
-            "color": "#f59e0b"
+            "color": "#f59e0b",
+            "drillDown": {
+              "enabled": true,
+              "action": "navigate",
+              "targetPage": "/p/crm_opportunity_common",
+              "filters": [
+                { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_won" },
+                { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_lost" }
+              ]
+            }
           },
           {
             "field": "pipeline_value",
@@ -67,7 +81,16 @@
             },
             "icon": "IconCurrencyDollar",
             "color": "#10b981",
-            "format": "currency"
+            "format": "currency",
+            "drillDown": {
+              "enabled": true,
+              "action": "navigate",
+              "targetPage": "/p/crm_opportunity_common",
+              "filters": [
+                { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_won" },
+                { "targetField": "crm_opp_stage", "operator": "ne", "value": "closed_lost" }
+              ]
+            }
           },
           {
             "field": "won_revenue",
@@ -77,7 +100,15 @@
             },
             "icon": "IconTrophy",
             "color": "#8b5cf6",
-            "format": "currency"
+            "format": "currency",
+            "drillDown": {
+              "enabled": true,
+              "action": "navigate",
+              "targetPage": "/p/crm_opportunity_common",
+              "filters": [
+                { "targetField": "crm_opp_stage", "value": "closed_won" }
+              ]
+            }
           },
           {
             "field": "active_accounts",
@@ -86,7 +117,15 @@
               "en": "Active Accounts"
             },
             "icon": "IconBuilding",
-            "color": "#06b6d4"
+            "color": "#06b6d4",
+            "drillDown": {
+              "enabled": true,
+              "action": "navigate",
+              "targetPage": "/p/crm_account_common",
+              "filters": [
+                { "targetField": "crm_acc_status", "value": "active" }
+              ]
+            }
           },
           {
             "field": "pending_complaints",
@@ -95,7 +134,19 @@
               "en": "Pending Complaints"
             },
             "icon": "IconAlertTriangle",
-            "color": "#ef4444"
+            "color": "#ef4444",
+            "drillDown": {
+              "enabled": true,
+              "action": "navigate",
+              "targetPage": "/p/crm_complaint",
+              "filters": [
+                {
+                  "targetField": "crm_cmp_status",
+                  "operator": "in",
+                  "value": ["open", "investigating"]
+                }
+              ]
+            }
           }
         ]
       }
@@ -106,7 +157,7 @@
       "x": 0,
       "y": 1,
       "w": 6,
-      "h": 1,
+      "h": 2,
       "title": {
         "zh-CN": "商机管道分布",
         "en": "Opportunity Pipeline Distribution"
@@ -139,22 +190,31 @@
         "title": {
           "zh-CN": "商机管道分布",
           "en": "Opportunity Pipeline Distribution"
+        },
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_opportunity_common",
+          "filters": [
+            { "sourceField": "stage", "targetField": "crm_opp_stage" }
+          ]
         }
       }
     },
     {
       "id": "chart_lead_source",
       "type": "smart-pie-chart",
-      "x": 0,
-      "y": 2,
+      "x": 6,
+      "y": 1,
       "w": 6,
-      "h": 1,
+      "h": 2,
       "title": {
         "zh-CN": "线索来源分布",
         "en": "Lead Source Distribution"
       },
       "config": {
-        "showLabel": true,
+        "ring": true,
+        "showLabel": false,
         "visualization": {
           "metricLabels": {
             "value": { "zh-CN": "线索数", "en": "Leads" }
@@ -163,6 +223,9 @@
         "dataSource": {
           "type": "namedQuery",
           "queryCode": "crm_lead_source_distribution",
+          "dimensionDicts": {
+            "label": "crm_lead_source"
+          },
           "dimensions": [
             "label"
           ],
@@ -177,6 +240,14 @@
         "title": {
           "zh-CN": "线索来源分布",
           "en": "Lead Source Distribution"
+        },
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_lead_common",
+          "filters": [
+            { "sourceField": "label", "targetField": "crm_lead_source" }
+          ]
         }
       }
     },
@@ -185,11 +256,11 @@
       "type": "smart-line-chart",
       "x": 0,
       "y": 3,
-      "w": 6,
-      "h": 1,
+      "w": 8,
+      "h": 2,
       "title": {
-        "zh-CN": "商机月度趋势",
-        "en": "Monthly Opportunity Trend"
+        "zh-CN": "商机金额月度趋势",
+        "en": "Monthly Pipeline Value Trend"
       },
       "config": {
         "smooth": true,
@@ -197,7 +268,6 @@
         "showLabel": false,
         "visualization": {
           "metricLabels": {
-            "count": { "zh-CN": "商机数", "en": "Opportunities" },
             "total_amount": { "zh-CN": "总金额", "en": "Total Amount" }
           }
         },
@@ -209,11 +279,6 @@
           ],
           "metrics": [
             {
-              "field": "count",
-              "aggregation": "sum",
-              "alias": "count"
-            },
-            {
               "field": "total_amount",
               "aggregation": "sum",
               "alias": "total_amount"
@@ -221,18 +286,30 @@
           ]
         },
         "title": {
-          "zh-CN": "商机月度趋势",
-          "en": "Monthly Opportunity Trend"
+          "zh-CN": "商机金额月度趋势",
+          "en": "Monthly Pipeline Value Trend"
+        },
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_opportunity_common",
+          "filters": [
+            {
+              "sourceField": "month",
+              "targetField": "created_at",
+              "transform": "month-range"
+            }
+          ]
         }
       }
     },
     {
       "id": "chart_win_loss",
       "type": "smart-bar-chart",
-      "x": 0,
-      "y": 4,
-      "w": 6,
-      "h": 1,
+      "x": 8,
+      "y": 3,
+      "w": 4,
+      "h": 2,
       "title": {
         "zh-CN": "赢单/丢单统计",
         "en": "Won/Lost Statistics"
@@ -265,6 +342,14 @@
         "title": {
           "zh-CN": "赢单/丢单统计",
           "en": "Won/Lost Statistics"
+        },
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_opportunity_common",
+          "filters": [
+            { "sourceField": "stage", "targetField": "crm_opp_stage" }
+          ]
         }
       }
     },
@@ -273,8 +358,8 @@
       "type": "smart-table-chart",
       "x": 0,
       "y": 5,
-      "w": 6,
-      "h": 1,
+      "w": 4,
+      "h": 2,
       "title": {
         "zh-CN": "线索状态分布",
         "en": "Lead Status Distribution"
@@ -291,6 +376,9 @@
             "datasourceId": "nq:crm_lead_pipeline_stats",
             "format": "records",
             "maxItems": "10"
+          },
+          "dimensionDicts": {
+            "status": "crm_lead_status"
           }
         },
         "table": {
@@ -315,29 +403,44 @@
               }
             }
           ]
+        },
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_lead_common",
+          "filters": [
+            { "sourceField": "status", "targetField": "crm_lead_status" }
+          ]
         }
       }
     },
     {
       "id": "block_recent_opportunities",
       "type": "smart-table-chart",
-      "x": 0,
-      "y": 6,
-      "w": 6,
-      "h": 1,
+      "x": 4,
+      "y": 5,
+      "w": 4,
+      "h": 2,
       "title": {
         "zh-CN": "最新商机",
         "en": "Latest Opportunities"
       },
       "config": {
-        "modelCode": "crm_opportunity_common",
         "title": {
           "zh-CN": "最新商机",
           "en": "Recent Opportunities"
         },
-        "defaultSort": {
-          "field": "created_at",
-          "order": "desc"
+        "dataSource": {
+          "type": "api",
+          "url": "/api/datasource/list",
+          "params": {
+            "datasourceId": "nq:crm_dashboard_recent_opportunities",
+            "format": "records",
+            "maxItems": "50"
+          },
+          "dimensionDicts": {
+            "crm_opp_stage": "crm_opp_stage"
+          }
         },
         "table": {
           "columns": [
@@ -350,7 +453,7 @@
               }
             },
             {
-              "field": "crm_opp_account_id",
+              "field": "account_name",
               "width": 140,
               "label": {
                 "zh-CN": "客户",
@@ -371,6 +474,7 @@
               "field": "crm_opp_expected_amount",
               "width": 120,
               "align": "right",
+              "format": "currency",
               "label": {
                 "zh-CN": "预期金额",
                 "en": "Amount"
@@ -396,7 +500,7 @@
       "x": 0,
       "y": 7,
       "w": 6,
-      "h": 1,
+      "h": 2,
       "title": {
         "zh-CN": "最近活动",
         "en": "Recent Activities"
@@ -413,6 +517,10 @@
             "datasourceId": "nq:crm_recent_activities",
             "format": "records",
             "maxItems": "20"
+          },
+          "dimensionDicts": {
+            "crm_act_type": "crm_activity_type",
+            "crm_ar_object_type": "crm_relatable_object_type"
           }
         },
         "table": {
@@ -437,7 +545,8 @@
             },
             {
               "field": "crm_act_date",
-              "width": 110,
+              "width": 150,
+              "format": "datetime",
               "label": {
                 "zh-CN": "日期",
                 "en": "Date"
@@ -458,10 +567,10 @@
     {
       "id": "block_recent_leads",
       "type": "smart-table-chart",
-      "x": 0,
-      "y": 8,
-      "w": 6,
-      "h": 1,
+      "x": 8,
+      "y": 5,
+      "w": 4,
+      "h": 2,
       "title": {
         "zh-CN": "最新线索",
         "en": "Latest Leads"
@@ -535,23 +644,31 @@
     {
       "id": "block_pending_quotes",
       "type": "smart-table-chart",
-      "x": 0,
-      "y": 9,
+      "x": 6,
+      "y": 7,
       "w": 6,
-      "h": 1,
+      "h": 2,
       "title": {
         "zh-CN": "待处理报价摘要",
         "en": "Pending Quote Summaries"
       },
       "config": {
-        "modelCode": "crm_quote_summary_common",
         "title": {
           "zh-CN": "待处理报价摘要",
           "en": "Pending Quote Summaries"
         },
-        "defaultSort": {
-          "field": "created_at",
-          "order": "desc"
+        "dataSource": {
+          "type": "api",
+          "url": "/api/datasource/list",
+          "params": {
+            "datasourceId": "nq:crm_dashboard_pending_quotes",
+            "format": "records",
+            "maxItems": "50"
+          },
+          "dimensionDicts": {
+            "crm_qs_source_quote_type": "crm_quote_summary_source_type",
+            "crm_qs_status": "crm_quote_summary_status"
+          }
         },
         "table": {
           "columns": [
@@ -564,7 +681,7 @@
               }
             },
             {
-              "field": "crm_qs_account_id",
+              "field": "account_name",
               "width": 160,
               "label": {
                 "zh-CN": "客户",
@@ -585,6 +702,7 @@
               "field": "crm_qs_quote_amount",
               "width": 120,
               "align": "right",
+              "format": "currency",
               "label": {
                 "zh-CN": "金额",
                 "en": "Amount"
@@ -611,26 +729,15 @@
               }
             }
           ]
-        },
-        "defaultFilters": [
-          {
-            "fieldName": "crm_qs_status",
-            "operator": "IN",
-            "value": [
-              "draft",
-              "pricing",
-              "approval"
-            ]
-          }
-        ]
+        }
       }
     },
     {
       "id": "block_stale_opportunities",
       "type": "smart-table-chart",
       "x": 0,
-      "y": 10,
-      "w": 6,
+      "y": 9,
+      "w": 8,
       "h": 2,
       "title": {
         "zh-CN": "停留预警商机",
@@ -713,9 +820,9 @@
     {
       "id": "chart_lost_reason_breakdown",
       "type": "smart-pie-chart",
-      "x": 6,
-      "y": 10,
-      "w": 6,
+      "x": 8,
+      "y": 9,
+      "w": 4,
       "h": 2,
       "title": {
         "zh-CN": "丢单原因分布",
@@ -746,6 +853,18 @@
               "aggregation": "sum",
               "alias": "lost_count"
             }
+          ]
+        },
+        "drillDown": {
+          "enabled": true,
+          "action": "navigate",
+          "targetPage": "/p/crm_opportunity_common",
+          "filters": [
+            {
+              "sourceField": "lost_reason",
+              "targetField": "crm_opp_lost_reason"
+            },
+            { "targetField": "crm_opp_stage", "value": "closed_lost" }
           ]
         }
       }

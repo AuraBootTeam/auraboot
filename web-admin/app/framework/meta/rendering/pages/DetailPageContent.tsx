@@ -29,7 +29,10 @@ import { PrintButton } from '~/framework/meta/rendering/components/PrintButton';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { RecordShareDialog } from '~/ui/shared/RecordShareDialog';
 import { BlockRenderer, type PageContentProps } from '@auraboot/runtime-kernel';
-import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
+import {
+  decodeRouteContextFromSearch,
+  usePageRuntime,
+} from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import {
   getLocalizedText,
   DynamicField,
@@ -70,6 +73,13 @@ import { getPublicRecordPid } from '~/framework/meta/utils/publicRecordId';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
 import { useRuntimeStateSubscription } from '~/framework/meta/rendering/blocks/workbenchBlockUtils';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import {
+  formatInTimezone,
+  resolveTemporalFormat,
+  resolveTemporalType,
+  type DateTimeFormatPreferences,
+} from '~/shared/services/dateTimeFormatService';
 
 interface RecordData {
   [key: string]: any;
@@ -79,6 +89,15 @@ interface RecordData {
 
 interface DetailListResult {
   records?: RecordData[];
+}
+
+export function resolveDetailReturnTarget(search: string): string | null {
+  const routeContext = decodeRouteContextFromSearch(search);
+  const returnTo = String(routeContext?.returnTo || '').trim();
+  if (!returnTo.startsWith('/') || returnTo.startsWith('//')) return null;
+  const separator = returnTo.includes('?') ? '&' : '?';
+  const carriedSearch = search.startsWith('?') ? search.slice(1) : search;
+  return carriedSearch ? `${returnTo}${separator}${carriedSearch}` : returnTo;
 }
 
 const DETAIL_SECTION_ICONS: Record<string, LucideIcon> = {
@@ -100,12 +119,12 @@ function resolveDetailSectionIcon(block: BlockConfig): LucideIcon {
 function getDetailValueTone(value: unknown): string {
   const text = String(value ?? '').toLowerCase();
   if (text.includes('已启用') || text.includes('enabled') || text.includes('管理员托管')) {
-    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    return 'border-status-green bg-status-green-bg text-status-green';
   }
   if (text.includes('已停用') || text.includes('disabled')) {
-    return 'border-slate-200 bg-slate-100 text-slate-600';
+    return 'border-border bg-subtle text-text-2';
   }
-  return 'border-blue-200 bg-blue-50 text-blue-700';
+  return 'border-status-blue bg-status-blue-bg text-status-blue';
 }
 
 export function resolveDetailFieldComponent(meta?: {
@@ -148,6 +167,10 @@ export function resolveDetailFieldComponent(meta?: {
       return 'datetime';
     case 'file':
       return 'fileattachment';
+    case 'money':
+    case 'decimal':
+    case 'integer':
+      return 'number';
     case 'reference':
       if (referenceModel === 'sys_user') return 'userselect';
       if (referenceModel === 'org_department') return 'organizationselect';
@@ -396,6 +419,55 @@ export function enrichDetailField(field: FieldConfig, meta?: Record<string, any>
   return enriched as FieldConfig;
 }
 
+export function resolveSettingsCardField(
+  field: FieldConfig,
+  resolveLabel: (fieldCode: string) => string,
+  enrichField?: (field: FieldConfig) => FieldConfig,
+): FieldConfig {
+  const fieldWithFallbackLabel = field.label
+    ? field
+    : { ...field, label: resolveLabel(field.field) };
+  return enrichField ? enrichField(fieldWithFallbackLabel) : fieldWithFallbackLabel;
+}
+
+export function resolveSettingsCardDisplayValue(
+  rawValue: unknown,
+  displayValue: unknown,
+  field: FieldConfig,
+  getDictItems?: (
+    code: string,
+  ) => Array<{ value: string; label: string; extension?: Record<string, any> }>,
+  timeZone?: string,
+  formats?: Partial<DateTimeFormatPreferences>,
+): string {
+  if (rawValue === null || rawValue === undefined || rawValue === '') return '—';
+  // List APIs may emit a `<field>_display` value that is identical to the raw enum
+  // token. Resolve the dictionary first so settings cards never leak values such as
+  // `draft`, `production_pick` or `reversal` when a business label is available.
+  if (field.dictCode && getDictItems) {
+    const item = (getDictItems(field.dictCode) || []).find(
+      (candidate) => String(candidate.value) === String(rawValue),
+    );
+    if (item?.label) return item.label;
+  }
+  const temporalType = resolveTemporalType(
+    field.field,
+    (field as FieldConfig & { dataType?: string }).dataType,
+    rawValue,
+  );
+  if (temporalType) {
+    return formatInTimezone(
+      rawValue as string | number | Date,
+      resolveTemporalFormat(temporalType, formats, (field as any).format),
+      timeZone,
+    );
+  }
+  if (displayValue !== null && displayValue !== undefined && displayValue !== '') {
+    return String(displayValue);
+  }
+  return String(rawValue);
+}
+
 export function collectDetailDictCodes(
   schema: { blocks?: BlockConfig[] } | undefined | null,
   modelFieldMap: Map<string, any>,
@@ -414,7 +486,10 @@ export function collectDetailDictCodes(
   };
   const walkBlocks = (blocks: BlockConfig[]) => {
     for (const block of blocks) {
-      if (block.blockType === 'form-section' && block.fields) {
+      if (
+        (block.blockType === 'form-section' || block.blockType === 'detail-section') &&
+        block.fields
+      ) {
         collectFromFields(block.fields);
       }
       if ((block as any).tabs) {
@@ -480,8 +555,7 @@ export function resolveVisibleDetailTabsFromBlocks(
     }))
     .filter(
       ({ block }) =>
-        block.blockType === 'tabs' &&
-        (!block.visibleWhen || isVisible(block.visibleWhen)),
+        block.blockType === 'tabs' && (!block.visibleWhen || isVisible(block.visibleWhen)),
     )
     .sort((left, right) => {
       const leftOrder = Number.isFinite(left.order) ? left.order : left.sourceIndex;
@@ -629,7 +703,9 @@ function DetailPageContentInner(props: PageContentProps) {
           setRawData(null);
           setRecordData({});
           setRecordError(
-            (result as any)?.desc || (result as any)?.message || 'The requested record was not found.',
+            (result as any)?.desc ||
+              (result as any)?.message ||
+              'The requested record was not found.',
           );
         }
       } catch (error) {
@@ -734,6 +810,36 @@ function DetailPageContentInner(props: PageContentProps) {
   );
 
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [canManageRecordShares, setCanManageRecordShares] = useState(false);
+
+  useEffect(() => {
+    if (schema?.extension?.showShare === false || !recordModelCode || !routeRecordPid) {
+      setCanManageRecordShares(false);
+      return;
+    }
+    let cancelled = false;
+    const params = new URLSearchParams({
+      resourceCode: recordModelCode,
+      recordPid: routeRecordPid,
+    });
+    fetchResult<{ canManage?: boolean }>(
+      `/api/record-share/manage-capability?${params.toString()}`,
+      { method: 'get', token: token || undefined },
+    )
+      .then((result) => {
+        if (!cancelled) {
+          setCanManageRecordShares(
+            ResultHelper.isSuccess(result) && result.data?.canManage === true,
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCanManageRecordShares(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [recordModelCode, routeRecordPid, schema?.extension?.showShare, token]);
 
   const runtimeContext = useMemo(
     () => ({
@@ -902,10 +1008,7 @@ function DetailPageContentInner(props: PageContentProps) {
   // visible group instead of silently dropping all but the first one.
   const allTabs = resolveVisibleDetailTabsFromBlocks(allBlocks, evaluateVisibleWhen);
   const tabs = resolveVisibleDetailTabs(allTabs, recordPid, schema);
-  const topLevelDetailBlocks = resolveVisibleTopLevelDetailBlocks(
-    allBlocks,
-    evaluateVisibleWhen,
-  );
+  const topLevelDetailBlocks = resolveVisibleTopLevelDetailBlocks(allBlocks, evaluateVisibleWhen);
   const [activeTab, setActiveTab] = useState(0);
 
   const tabHashKeys = useMemo(
@@ -991,6 +1094,35 @@ function DetailPageContentInner(props: PageContentProps) {
     );
   }
 
+  const headerTitleField = String(schema?.extension?.headerTitleField || '').trim();
+  const headerTitleValue = headerTitleField ? recordData?.[headerTitleField] : undefined;
+  const headerTitle =
+    headerTitleValue !== undefined && headerTitleValue !== null && headerTitleValue !== ''
+      ? String(headerTitleValue)
+      : getLocalizedText(schema.title, locale, t);
+  const headerSubtitleFields = Array.isArray(schema?.extension?.headerSubtitleFields)
+    ? schema.extension.headerSubtitleFields
+    : [];
+  const headerSubtitle = headerSubtitleFields
+    .map((field: unknown) => {
+      const key = String(field || '').trim();
+      if (!key) return '';
+      const value = recordData?.[`${key}_display`] ?? recordData?.[key];
+      return value === undefined || value === null || value === '' ? '' : String(value);
+    })
+    .filter(Boolean)
+    .join(' · ');
+  const preserveListContext = schema?.extension?.preserveListContext === true;
+  const preservedReturnTarget = preserveListContext
+    ? resolveDetailReturnTarget(location.search)
+    : null;
+  const backPath = `/p/${tableName}${location.search || ''}`;
+  const backIcon = (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+    </svg>
+  );
+
   return (
     <div
       className="mx-auto w-full px-2 py-3"
@@ -998,35 +1130,56 @@ function DetailPageContentInner(props: PageContentProps) {
     >
       <div className="rounded-card bg-panel shadow-sm">
         {/* Page Header with title + toolbar buttons (hidden in print) */}
-        <div className="print-hide border-border border-b px-6 py-4" data-print="hide">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              {schema.extension?.showBack !== false && (
-                <Link to={`/p/${tableName}`} className="text-text-3 hover:text-text-2">
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 19l-7-7 7-7"
-                    />
-                  </svg>
-                </Link>
-              )}
-              <h2 className="text-text text-lg font-medium">
-                {getLocalizedText(schema.title, locale, t)}
-              </h2>
+        <div className="print-hide border-border border-b px-4 py-4 sm:px-6" data-print="hide">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              {schema.extension?.showBack !== false &&
+                (preserveListContext && (preservedReturnTarget || location.key !== 'default') ? (
+                  <button
+                    type="button"
+                    aria-label={resolveTextFallback(t, 'action.back', 'Back')}
+                    onClick={() =>
+                      preservedReturnTarget
+                        ? routerNavigate(preservedReturnTarget)
+                        : routerNavigate(-1)
+                    }
+                    className="text-text-3 hover:text-text-2 mt-0.5 shrink-0"
+                  >
+                    {backIcon}
+                  </button>
+                ) : (
+                  <Link
+                    to={backPath}
+                    aria-label={resolveTextFallback(t, 'action.back', 'Back')}
+                    className="text-text-3 hover:text-text-2 mt-0.5 shrink-0"
+                  >
+                    {backIcon}
+                  </Link>
+                ))}
+              <div className="min-w-0">
+                <h2 className="text-text text-lg leading-tight font-semibold break-words">
+                  {headerTitle}
+                </h2>
+                {headerSubtitle ? (
+                  <p className="text-text-3 mt-1 truncate text-xs" title={headerSubtitle}>
+                    {headerSubtitle}
+                  </p>
+                ) : null}
+              </div>
             </div>
 
             {/* Header toolbar buttons */}
-            <div className="print-hide flex items-center space-x-2" data-print="hide">
-              {schema.extension?.showShare !== false && (
+            <div
+              className="print-hide flex max-w-full flex-wrap items-center justify-start gap-2 sm:justify-end"
+              data-print="hide"
+            >
+              {schema.extension?.showShare !== false && canManageRecordShares && (
                 <button
                   onClick={() => setShareDialogOpen(true)}
                   className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-3 py-1.5 text-sm font-medium"
                   data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'share-btn')}
                 >
-                  {t('action.share') || 'Share'}
+                  {t('action.share')}
                 </button>
               )}
               {schema.extension?.showReport !== false && recordData?.pid && (
@@ -1053,11 +1206,11 @@ function DetailPageContentInner(props: PageContentProps) {
                         )}
                         onClick={() => handleAction(button, recordData)}
                         disabled={actionLoading}
-                        className={`rounded-control px-3 py-1.5 text-sm font-medium ${
+                        className={`rounded-control px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
                           button.primary
                             ? 'bg-accent hover:bg-accent-hover text-white'
                             : button.danger
-                              ? 'bg-red-600 text-white hover:bg-red-700'
+                              ? 'bg-status-red hover:bg-status-red/90 text-white'
                               : 'border-border-strong bg-panel text-text-2 hover:bg-hover border'
                         } disabled:cursor-not-allowed disabled:opacity-50`}
                       >
@@ -1082,7 +1235,7 @@ function DetailPageContentInner(props: PageContentProps) {
 
         {actionError && (
           <div
-            className="print-hide rounded-control bg-status-red-bg mx-6 mt-4 border border-red-200 px-4 py-3 text-sm text-red-700"
+            className="print-hide rounded-control bg-status-red-bg text-status-red border-status-red mx-6 mt-4 border px-4 py-3 text-sm"
             role="alert"
             data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'action-error')}
             data-print="hide"
@@ -1094,7 +1247,7 @@ function DetailPageContentInner(props: PageContentProps) {
               </div>
               <button
                 type="button"
-                className="shrink-0 rounded px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                className="text-status-red hover:bg-status-red-bg shrink-0 rounded px-2 py-1 text-xs font-medium"
                 onClick={() => setError(null)}
               >
                 {closeLabel}
@@ -1138,7 +1291,7 @@ function DetailPageContentInner(props: PageContentProps) {
               <nav
                 className="-mb-px flex w-max min-w-full space-x-8 whitespace-nowrap"
                 role="tablist"
-                aria-label="Tabs"
+                aria-label={getLocalizedText({ 'zh-CN': '页签', en: 'Tabs' }, locale, t)}
               >
                 {tabs.map((tab, index) => (
                   <button
@@ -1501,7 +1654,11 @@ function prepareDetailRuntimeBlock(
   recordPid: string,
 ): BlockConfig {
   const valueBoundBlock = injectDetailRecordValueIntoCustomBlock(block, recordData);
-  return resolveChartBlockRecordParams(valueBoundBlock, recordData, recordPid);
+  const recordBoundBlock =
+    valueBoundBlock.blockType === 'stage-rail' || valueBoundBlock.blockType === 'toolbar'
+      ? ({ ...valueBoundBlock, record: recordData, recordPid } as BlockConfig)
+      : valueBoundBlock;
+  return resolveChartBlockRecordParams(recordBoundBlock, recordData, recordPid);
 }
 
 /**
@@ -1579,7 +1736,7 @@ function DataPathTable({
               ))}
             </tr>
           </thead>
-          <tbody className="bg-panel divide-y divide-gray-100">
+          <tbody className="bg-panel divide-border divide-y">
             {rows.length === 0 ? (
               <tr>
                 <td className="text-text-3 px-3 py-4 text-center" colSpan={columns.length || 1}>
@@ -1642,6 +1799,7 @@ function DetailBlockRenderer({
   schemaDataSources?: Record<string, DataSourceConfig>;
   dataSourceManager?: { getConfig: (id: string) => DataSourceConfig | undefined };
 }) {
+  const { timezone, formats } = useTimezone();
   const resolveModelFieldLabel = useCallback(
     (fieldCode: string): string => {
       if (modelCode) {
@@ -1679,14 +1837,14 @@ function DetailBlockRenderer({
         ? getLocalizedText((block as any).description, locale, t)
         : '';
       return (
-        <section className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-start gap-3 border-b border-slate-100 bg-slate-50 px-5 py-4">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-600 ring-1 ring-blue-100">
+        <section className="border-border bg-panel mb-4 overflow-hidden rounded-lg border shadow-sm">
+          <div className="border-border bg-subtle flex items-start gap-3 border-b px-5 py-4">
+            <div className="bg-status-blue-bg text-status-blue ring-status-blue/20 flex h-9 w-9 shrink-0 items-center justify-center rounded-md ring-1">
               <Icon className="h-4 w-4" aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-              {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
+              <h3 className="text-text text-base font-semibold">{title}</h3>
+              {description ? <p className="text-text-2 mt-1 text-sm">{description}</p> : null}
             </div>
           </div>
           {block.fields && block.fields.length > 0 && (
@@ -1694,9 +1852,11 @@ function DetailBlockRenderer({
               {block.fields.map((field: FieldConfig) => {
                 const colSpan = field.layout?.colSpan || (field.span === 2 ? 12 : 6);
                 const isFullWidth = colSpan >= 12 || field.span === 2;
-                const resolvedField: FieldConfig = field.label
-                  ? field
-                  : { ...field, label: resolveModelFieldLabel(field.field) };
+                const resolvedField = resolveSettingsCardField(
+                  field,
+                  resolveModelFieldLabel,
+                  enrichField,
+                );
                 const label = resolvedField.label
                   ? getLocalizedText(resolvedField.label as any, locale, t)
                   : field.field;
@@ -1706,21 +1866,24 @@ function DetailBlockRenderer({
                 const fieldDisplayValue = sectionRecord
                   ? readDetailRecordField(sectionRecord, `${field.field}_display`)
                   : undefined;
-                const displayValue = fieldDisplayValue !== undefined ? fieldDisplayValue : rawValue;
-                const valueText =
-                  displayValue === null || displayValue === undefined || displayValue === ''
-                    ? '—'
-                    : String(displayValue);
+                const valueText = resolveSettingsCardDisplayValue(
+                  rawValue,
+                  fieldDisplayValue,
+                  resolvedField,
+                  getDictItems,
+                  timezone,
+                  formats,
+                );
                 const isLongText = valueText.includes('\n') || valueText.length > 56;
                 return (
                   <div
                     key={field.field}
                     data-testid={`form-field-${field.field}`}
-                    className={`${isFullWidth ? 'md:col-span-2' : ''} min-w-0 rounded-md border border-slate-100 bg-white px-4 py-3 ring-1 ring-slate-50`}
+                    className={`${isFullWidth ? 'md:col-span-2' : ''} border-border bg-panel ring-border min-w-0 rounded-md border px-4 py-3 ring-1`}
                   >
-                    <div className="text-xs font-medium text-slate-500">{label}</div>
+                    <div className="text-text-2 text-xs font-medium">{label}</div>
                     {isLongText ? (
-                      <p className="mt-2 text-sm leading-6 whitespace-pre-line text-slate-700">
+                      <p className="text-text mt-2 text-sm leading-6 whitespace-pre-line">
                         {valueText}
                       </p>
                     ) : (
@@ -1759,7 +1922,7 @@ function DetailBlockRenderer({
                 <div
                   key={field.field}
                   data-testid={`form-field-${field.field}`}
-                  className={`${isFullWidth ? 'md:col-span-2' : ''} border-b border-gray-100 pb-4`}
+                  className={`${isFullWidth ? 'md:col-span-2' : ''} border-border border-b pb-4`}
                 >
                   <DynamicField
                     field={enrichedField}
@@ -1874,6 +2037,11 @@ function DetailBlockRenderer({
         token={token}
         locale={locale}
         t={t}
+        businessDataSource={
+          (block as any).businessDataSource ??
+          (block as any).dataSource ??
+          (block as any).subTable?.dataSource
+        }
       />
     );
   }
@@ -1946,10 +2114,10 @@ function DetailBlockRenderer({
   );
   return (
     <div
-      className="bg-status-amber-bg rounded border border-yellow-300 p-4"
+      className="bg-status-amber-bg border-status-amber rounded border p-4"
       data-testid="detail-block-unknown"
     >
-      <p className="text-yellow-800">
+      <p className="text-status-amber">
         Unknown block type on detail page: <code>{String(block.blockType)}</code>
       </p>
     </div>

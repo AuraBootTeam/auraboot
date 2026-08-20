@@ -187,7 +187,18 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
     return map;
   }, [fieldMetadata]);
 
-  const resolveLabel = useCallback((code: string) => labelMap.get(code) ?? code, [labelMap]);
+  const resolveLabel = useCallback(
+    (filter: ViewFilterConfig) => {
+      if (
+        filter.expression === '#currentSharedRecords' ||
+        filter.expression === '${system.currentSharedRecords}'
+      ) {
+        return t('common.collaborative_records', undefined, zh ? '协作记录' : 'Collaborative records');
+      }
+      return labelMap.get(filter.fieldCode) ?? filter.fieldCode;
+    },
+    [labelMap, t, zh],
+  );
 
   const handleRemoveFilter = useCallback(
     (index: number) => {
@@ -237,7 +248,7 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
         >
           <FilterChip
             filter={f}
-            label={resolveLabel(f.fieldCode)}
+            label={resolveLabel(f)}
             valueLabel={resolveValueLabel?.(f)}
             onRemove={() => handleRemoveFilter(idx)}
           />
@@ -252,7 +263,7 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
         <SortChip
           key={`sort-${s.fieldCode}-${idx}`}
           sort={s}
-          label={resolveLabel(s.fieldCode)}
+          label={labelMap.get(s.fieldCode) ?? s.fieldCode}
           onRemove={() => handleRemoveSort(idx)}
           onToggle={() => handleToggleSortDirection(idx)}
         />

@@ -1,5 +1,5 @@
 import { ICP_RECORD_LOOKUP_URL } from '~/config/icpCompliance';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData } from '~/root-data';
 
 export default function IcpComplianceFooter() {
   const compliance = useRootLoaderData()!.icpCompliance;

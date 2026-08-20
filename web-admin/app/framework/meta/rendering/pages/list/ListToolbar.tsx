@@ -44,6 +44,8 @@ export interface ListToolbarProps {
 
   /** Column settings */
   onColumnSettingsOpen: () => void;
+  /** Open current-view self-service analysis. */
+  onAnalysisOpen?: () => void;
 
   /** Filter chip bar */
   chipFilters: ViewFilterConfig[];
@@ -87,6 +89,7 @@ export function ListToolbar({
   rowHeight,
   onRowHeightChange,
   onColumnSettingsOpen,
+  onAnalysisOpen,
   chipFilters,
   onChipFiltersChange,
   fieldMetadata,
@@ -221,6 +224,31 @@ export function ListToolbar({
           </button>
         )}
 
+        {onAnalysisOpen && (
+          <button
+            type="button"
+            onClick={onAnalysisOpen}
+            className="rounded-control border-border text-text-2 hover:bg-hover hover:text-text-2 flex h-9 items-center gap-1.5 border px-3 text-sm font-medium transition-colors"
+            data-testid="view-analysis-open"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 19V9m6 10V5m6 14v-7m4 7H2"
+              />
+            </svg>
+            {t('common.view_analysis', undefined, 'Analyze')}
+          </button>
+        )}
+
         {/* Filter form toggle button — only shown when a filter block exists */}
         {hasFilterBlock && onFilterFormToggle && (
           <button
@@ -297,8 +325,7 @@ export function ListToolbar({
                 chip.kind === 'view'
                   ? `quick-filter-view-${chip.viewPid}`
                   : `quick-filter-${chip.key}`;
-              const reactKey =
-                chip.kind === 'view' ? `view-${chip.viewPid}` : `preset-${chip.key}`;
+              const reactKey = chip.kind === 'view' ? `view-${chip.viewPid}` : `preset-${chip.key}`;
               return (
                 <button
                   key={reactKey}

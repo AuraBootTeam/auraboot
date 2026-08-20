@@ -47,6 +47,17 @@ public class UserProvisionRequest {
     private List<String> roleCodes;
 
     /**
+     * Explicit role assignment contract. Generic admin provisioning keeps the
+     * historical DEFAULT behavior; employee account imports set NONE unless
+     * role codes were deliberately supplied.
+     */
+    private RoleAssignmentMode roleAssignmentMode;
+
+    /** Optional phone number stored on the user account. */
+    @Size(max = 64)
+    private String mobile;
+
+    /**
      * Whether to send an invite email with credentials.
      * Default: false (for script/API usage).
      */

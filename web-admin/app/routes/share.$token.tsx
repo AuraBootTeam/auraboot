@@ -5,8 +5,10 @@
  * Accessed via /share/{token} — fetches data from /api/views/shared/{token}.
  */
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
+import { useRootLoaderData } from '~/root-data';
+import { COMMUNITY_BRANDING } from '~/config/branding';
 
 interface SharedViewData {
   viewName: string;
@@ -17,6 +19,7 @@ interface SharedViewData {
 }
 
 export default function SharedViewPage() {
+  const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
   const { token } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
 
@@ -25,50 +28,53 @@ export default function SharedViewPage() {
   const [loading, setLoading] = useState(true);
   const [passwordRequired, setPasswordRequired] = useState(false);
   const [password, setPassword] = useState('');
+  const passwordParam = searchParams.get('password');
 
-  const fetchSharedView = async (pwd?: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const url = pwd
-        ? `/api/views/shared/${token}?password=${encodeURIComponent(pwd)}`
-        : `/api/views/shared/${token}`;
-      const resp = await fetch(url);
-      const json = await resp.json();
+  const fetchSharedView = useCallback(
+    async (pwd?: string) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const url = pwd
+          ? `/api/views/shared/${token}?password=${encodeURIComponent(pwd)}`
+          : `/api/views/shared/${token}`;
+        const resp = await fetch(url);
+        const json = await resp.json();
 
-      if (resp.status === 401 || json?.message?.includes('password')) {
-        setPasswordRequired(true);
+        if (resp.status === 401 || json?.message?.includes('password')) {
+          setPasswordRequired(true);
+          setLoading(false);
+          return;
+        }
+
+        if (resp.status === 404 || resp.status === 410) {
+          setError(json?.message || 'This shared link has expired or been revoked.');
+          setLoading(false);
+          return;
+        }
+
+        if (!resp.ok) {
+          setError(json?.message || 'Failed to load shared view.');
+          setLoading(false);
+          return;
+        }
+
+        setData(json.data);
+        setPasswordRequired(false);
+      } catch {
+        setError('Network error. Please try again.');
+      } finally {
         setLoading(false);
-        return;
       }
-
-      if (resp.status === 404 || resp.status === 410) {
-        setError(json?.message || 'This shared link has expired or been revoked.');
-        setLoading(false);
-        return;
-      }
-
-      if (!resp.ok) {
-        setError(json?.message || 'Failed to load shared view.');
-        setLoading(false);
-        return;
-      }
-
-      setData(json.data);
-      setPasswordRequired(false);
-    } catch {
-      setError('Network error. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [token],
+  );
 
   useEffect(() => {
     if (token) {
-      const pwd = searchParams.get('password');
-      fetchSharedView(pwd || undefined);
+      void fetchSharedView(passwordParam || undefined);
     }
-  }, [token]);
+  }, [fetchSharedView, passwordParam, token]);
 
   // Password prompt
   if (passwordRequired) {
@@ -204,7 +210,7 @@ export default function SharedViewPage() {
 
         {/* Footer */}
         <div className="mt-4 text-center text-xs text-gray-400">
-          Powered by AuraBoot · {data.records?.length || 0} records
+          {branding.poweredByText} · {data.records?.length || 0} records
         </div>
       </div>
     </div>

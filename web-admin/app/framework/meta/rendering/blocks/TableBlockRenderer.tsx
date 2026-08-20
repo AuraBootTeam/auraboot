@@ -44,6 +44,17 @@ interface DictItem {
   extension?: Record<string, any>;
 }
 
+interface GroupedSelectionItem {
+  row: any;
+  dataIndex: number;
+}
+
+interface GroupedSelectionGroup {
+  key: string;
+  hasExplicitKey: boolean;
+  items: GroupedSelectionItem[];
+}
+
 type StatusPillTone = 'gray' | 'blue' | 'amber' | 'green' | 'red';
 
 const FILE_PID_URL_PATTERN = /^\/?([0-9A-HJKMNP-TV-Z]{26})(?:\.[A-Za-z0-9]+)?$/;
@@ -81,6 +92,21 @@ function firstNonBlank(source: Record<string, any>, fields: string[]): unknown {
     if (value !== undefined && value !== null && String(value).trim() !== '') return value;
   }
   return undefined;
+}
+
+function comparableCellValue(row: any, field: string): string {
+  const value = row?.[`${field}_display`] ?? row?.[field];
+  if (value === undefined || value === null) return '';
+  if (typeof value !== 'object') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function domSafeValue(value: string): string {
+  return value.replace(/[^A-Za-z0-9_-]/g, '-');
 }
 
 function resolveLinkHref(column: ColumnConfig, row: any, value: unknown): string | undefined {
@@ -127,7 +153,7 @@ function renderLinkCell(
       target={target}
       rel={target === '_blank' ? 'noreferrer' : undefined}
       onClick={(event) => event.stopPropagation()}
-      className="text-accent font-medium underline decoration-border underline-offset-2 hover:text-accent-hover"
+      className="text-accent decoration-border hover:text-accent-hover font-medium underline underline-offset-2"
     >
       {label}
     </a>
@@ -261,8 +287,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
           command: inlineEditCommand,
           targetRecordPid: pid,
           payload: { [writeField]: value },
-          reload:
-            inlineEditConfig?.reload ?? (dataSourceId ? [dataSourceId] : []),
+          reload: inlineEditConfig?.reload ?? (dataSourceId ? [dataSourceId] : []),
         },
       });
     },
@@ -289,6 +314,26 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   const selectionMode = selectionConfig?.mode || 'single';
   const isMultipleSelection = selectionMode === 'multiple';
   const defaultFirstSelection = Boolean((selectionConfig as any)?.defaultFirst);
+  const exclusiveBy = String((selectionConfig as any)?.exclusiveBy || '').trim();
+  const selectionPresentation = String((selectionConfig as any)?.presentation || 'table');
+  const optionLabelField = String((selectionConfig as any)?.optionLabelField || '').trim();
+  const recommendedField = String((selectionConfig as any)?.recommendedField || '').trim();
+  const safeField = String((selectionConfig as any)?.safeField || '').trim();
+  const hasStableSelectionIdentity = Boolean(
+    block.table?.rowKey || (selectionConfig as any)?.keyField,
+  );
+  const hasSafeRecommendationContract = Boolean(
+    hasStableSelectionIdentity &&
+      recommendedField &&
+      safeField &&
+      recommendedField !== safeField,
+  );
+  const groupedRadioPresentation =
+    isMultipleSelection &&
+    selectionPresentation === 'grouped-radio' &&
+    Boolean(exclusiveBy) &&
+    Boolean(optionLabelField);
+  const groupedRadioDomPrefix = React.useId().replace(/:/g, '');
   const rowKeyField = block.table?.rowKey || (selectionConfig as any)?.keyField || 'pid';
   const selectionIdField = (selectionConfig as any)?.idField || rowKeyField;
   const [localSelectedRowKey, setLocalSelectedRowKey] = useState('');
@@ -310,6 +355,27 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   // Use tree-processed rows when treeConfig is set, otherwise flat data
   const data = treeConfig ? visibleRows : rawData;
+  const selectionGroups: GroupedSelectionGroup[] = groupedRadioPresentation
+    ? Array.from(
+        data
+          .reduce((groups: Map<string, GroupedSelectionGroup>, row: any, dataIndex: number) => {
+            const rawGroupValue = row?.[exclusiveBy];
+            const hasGroupValue =
+              rawGroupValue !== undefined &&
+              rawGroupValue !== null &&
+              String(rawGroupValue).trim() !== '';
+            // Missing group keys are isolated instead of being silently merged into
+            // one unrelated decision. Validated business projections should always
+            // provide the configured exclusiveBy field.
+            const key = hasGroupValue ? String(rawGroupValue) : `__ungrouped_${dataIndex}`;
+            const current = groups.get(key) || { key, hasExplicitKey: hasGroupValue, items: [] };
+            current.items.push({ row, dataIndex });
+            groups.set(key, current);
+            return groups;
+          }, new Map<string, GroupedSelectionGroup>())
+          .values(),
+      )
+    : [];
   const density = block.table?.density || (block as any).density || 'default';
   const isCompact = density === 'compact';
   const headerCellClass = isCompact ? 'px-3 py-2' : 'px-6 py-3';
@@ -338,7 +404,21 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       Boolean(currentKey) &&
       data.some((row: any, index: number) => getRowIdentity(row, index) === currentKey);
 
-    if (data.length > 0 && !currentStillVisible) {
+    // A data-source reload can replace the selected row with a newer snapshot while
+    // preserving the same public id. Keep the bound workbench context current so
+    // sibling status banners and lifecycle actions do not evaluate stale fields.
+    if (currentStillVisible) {
+      const refreshedCurrent = data.find(
+        (row: any, index: number) => getRowIdentity(row, index) === currentKey,
+      );
+      if (refreshedCurrent && refreshedCurrent !== current) {
+        writeRuntimeState(runtime, selectionConfig.bind, refreshedCurrent);
+        setLocalSelectedRowKey(currentKey);
+      }
+      return;
+    }
+
+    if (data.length > 0) {
       const firstRow = data[0];
       writeRuntimeState(runtime, selectionConfig.bind, firstRow);
       setLocalSelectedRowKey(getRowIdentity(firstRow, 0));
@@ -373,6 +453,92 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     setLocalSelectedRowKeys(rows.map((row, index) => getRowIdentity(row, index)));
   };
 
+  useEffect(() => {
+    if (!groupedRadioPresentation || !selectionConfig?.bind) return;
+
+    const currentRows = Array.isArray(selectedStateValue) ? selectedStateValue : [];
+    const visibleItemsByIdentity = new Map<string, GroupedSelectionItem>();
+    const groupKeyByIdentity = new Map<string, string>();
+    selectionGroups.forEach((group) => {
+      group.items.forEach((item) => {
+        const identity = getRowIdentity(item.row, item.dataIndex);
+        visibleItemsByIdentity.set(identity, item);
+        groupKeyByIdentity.set(identity, group.key);
+      });
+    });
+
+    // Existing user choices always win. At the same time, normalize stale rows,
+    // refreshed row snapshots, and malformed duplicate choices within one group.
+    const selectedByGroup = new Map<string, any>();
+    currentRows.forEach((row: any, index: number) => {
+      const identity = getRowIdentity(row, index);
+      const item = visibleItemsByIdentity.get(identity);
+      const groupKey = groupKeyByIdentity.get(identity);
+      if (item && groupKey && !selectedByGroup.has(groupKey)) {
+        selectedByGroup.set(groupKey, item.row);
+      }
+    });
+
+    const nextRows: any[] = [];
+    selectionGroups.forEach((group) => {
+      const existing = selectedByGroup.get(group.key);
+      if (existing) {
+        nextRows.push(existing);
+        return;
+      }
+      if (!hasSafeRecommendationContract || !group.hasExplicitKey) return;
+
+      const safeRecommendations = group.items.filter(
+        (item) => item.row?.[recommendedField] === true && item.row?.[safeField] === true,
+      );
+      // A duplicate recommendation is a broken producer contract, not a tie to
+      // guess through. Fail closed and leave that group for explicit user choice.
+      if (safeRecommendations.length === 1) {
+        nextRows.push(safeRecommendations[0].row);
+      }
+    });
+
+    const unchanged =
+      currentRows.length === nextRows.length &&
+      currentRows.every(
+        (row: any, index: number) =>
+          getRowIdentity(row, index) === getRowIdentity(nextRows[index], index) &&
+          row === nextRows[index],
+      );
+    const nextRowKeys = nextRows.map((row: any, index: number) => getRowIdentity(row, index));
+    const localSelectionUnchanged =
+      localSelectedRowKeys.length === nextRowKeys.length &&
+      localSelectedRowKeys.every((key, index) => key === nextRowKeys[index]);
+    if (unchanged || (selectedStateValue === undefined && nextRows.length === 0)) {
+      if (!localSelectionUnchanged) setLocalSelectedRowKeys(nextRowKeys);
+      return;
+    }
+
+    writeRuntimeState(runtime, selectionConfig.bind, nextRows);
+    if ((selectionConfig as any).idsBind) {
+      writeRuntimeState(
+        runtime,
+        (selectionConfig as any).idsBind,
+        nextRows
+          .map((row: any) => row?.[selectionIdField])
+          .filter((value: any) => value !== undefined && value !== null),
+      );
+    }
+    if (!localSelectionUnchanged) setLocalSelectedRowKeys(nextRowKeys);
+  }, [
+    data,
+    groupedRadioPresentation,
+    hasSafeRecommendationContract,
+    localSelectedRowKeys,
+    recommendedField,
+    rowKeyField,
+    runtime,
+    safeField,
+    selectedStateValue,
+    selectionConfig?.bind,
+    selectionIdField,
+  ]);
+
   const toggleMultipleSelection = (row: any, index: number) => {
     if (!selectionConfig?.bind) return;
     if ((selectionConfig as any).detailBind) {
@@ -384,25 +550,75 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       : data.filter((candidate: any, candidateIndex: number) =>
           effectiveSelectedRowKeySet.has(getRowIdentity(candidate, candidateIndex)),
         );
+    const exclusiveValue = exclusiveBy ? row?.[exclusiveBy] : undefined;
+    const rowsOutsideExclusiveGroup =
+      exclusiveBy &&
+      exclusiveValue !== undefined &&
+      exclusiveValue !== null &&
+      exclusiveValue !== ''
+        ? currentRows.filter((candidate: any) => candidate?.[exclusiveBy] !== exclusiveValue)
+        : currentRows;
     const nextRows = effectiveSelectedRowKeySet.has(identity)
       ? currentRows.filter((candidate: any, candidateIndex: number) => {
           const candidateIdentity =
             getRowIdentity(candidate) || getRowIdentity(candidate, candidateIndex);
           return candidateIdentity !== identity;
         })
-      : [...currentRows, row];
+      : [...rowsOutsideExclusiveGroup, row];
     writeMultipleSelection(nextRows);
   };
 
+  const chooseGroupedSelection = (row: any, groupItems: GroupedSelectionItem[]) => {
+    if (!selectionConfig?.bind) return;
+    if ((selectionConfig as any).detailBind) {
+      writeRuntimeState(runtime, (selectionConfig as any).detailBind, row);
+    }
+    const boundRows = (runtime.getContext().state as Record<string, any> | undefined)?.[
+      selectionConfig.bind
+    ];
+    const currentRows = Array.isArray(boundRows)
+      ? boundRows
+      : data.filter((candidate: any, candidateIndex: number) =>
+          effectiveSelectedRowKeySet.has(getRowIdentity(candidate, candidateIndex)),
+        );
+    const groupIdentities = new Set(
+      groupItems.map((item) => getRowIdentity(item.row, item.dataIndex)),
+    );
+    const nextRows = [
+      ...currentRows.filter(
+        (candidate: any, candidateIndex: number) =>
+          !groupIdentities.has(getRowIdentity(candidate, candidateIndex)),
+      ),
+      row,
+    ].sort((left, right) => {
+      const leftIndex = data.findIndex(
+        (candidate: any, candidateIndex: number) =>
+          getRowIdentity(candidate, candidateIndex) === getRowIdentity(left),
+      );
+      const rightIndex = data.findIndex(
+        (candidate: any, candidateIndex: number) =>
+          getRowIdentity(candidate, candidateIndex) === getRowIdentity(right),
+      );
+      return leftIndex - rightIndex;
+    });
+    // Radio choices are not toggleable: re-choosing the current option keeps it
+    // selected, while another option replaces only the row from this group.
+    writeMultipleSelection(nextRows);
+  };
+
+  // Choosing every action in an exclusive group would invent a business decision.
+  // Keep the selection column, but require an explicit row choice per group.
+  const supportsSelectAll =
+    isMultipleSelection && !exclusiveBy && selectionPresentation !== 'grouped-radio';
   const allVisibleRowsSelected =
-    isMultipleSelection &&
+    supportsSelectAll &&
     data.length > 0 &&
     data.every((row: any, index: number) =>
       effectiveSelectedRowKeySet.has(getRowIdentity(row, index)),
     );
 
   const toggleAllVisibleRows = () => {
-    if (!isMultipleSelection) return;
+    if (!supportsSelectAll) return;
     writeMultipleSelection(allVisibleRowsSelected ? [] : data);
   };
 
@@ -432,9 +648,22 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     }
 
     const value = row[column.field];
+    const enrichedDisplayValue = row?.[`${column.field}_display`];
 
     if (column.valueType === 'link' || column.valueType === 'url') {
       return renderLinkCell(column, row, value, locale, t);
+    }
+
+    // Dynamic list APIs enrich reference fields as `<field>_display`. A table
+    // block must prefer that business label; rendering the raw pid leaks an
+    // implementation identifier even though the backend already supplied the
+    // user-facing value.
+    if (
+      enrichedDisplayValue !== undefined &&
+      enrichedDisplayValue !== null &&
+      String(enrichedDisplayValue).trim() !== ''
+    ) {
+      return String(enrichedDisplayValue);
     }
 
     // Null/undefined 处理
@@ -503,10 +732,10 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     // valueType 渲染
     switch (column.valueType) {
       case 'date':
-        return new Date(value).toLocaleDateString();
+        return new Date(value).toLocaleDateString(locale);
 
       case 'datetime':
-        return new Date(value).toLocaleString();
+        return new Date(value).toLocaleString(locale);
 
       case 'currency':
         return new Intl.NumberFormat(locale, {
@@ -538,7 +767,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   const getCellTitle = (column: ColumnConfig, row: any): string | undefined => {
     if (!column.ellipsis) return undefined;
-    const value = row[column.field];
+    const value = row[`${column.field}_display`] ?? row[column.field];
     if (value === null || value === undefined) return undefined;
     return typeof value === 'string' ? value : String(value);
   };
@@ -611,6 +840,173 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       .map((rule) => rule.className || '')
       .filter(Boolean)
       .join(' ');
+
+  const renderGroupedRadioSelection = () => {
+    if (selectionGroups.length === 0) {
+      return (
+        <div className="text-text-2 px-6 py-4 text-center">
+          {(block as any).empty?.title
+            ? getLocalizedText((block as any).empty.title, locale, t)
+            : t('common.noData') !== 'common.noData'
+              ? t('common.noData')
+              : 'No data'}
+        </div>
+      );
+    }
+
+    const optionLabelColumn = columns.find((column) => column.field === optionLabelField);
+    if (!optionLabelColumn) return null;
+    const optionColumnLabel = getLocalizedText(optionLabelColumn.label, locale, t);
+
+    return (
+      <div className="grid gap-4" data-testid="table-grouped-radio">
+        {selectionGroups.map((group, groupIndex) => {
+          const firstRow = group.items[0].row;
+          const sharedColumns = columns.filter(
+            (column) =>
+              column.field !== optionLabelField &&
+              group.items.every(
+                (item) =>
+                  comparableCellValue(item.row, column.field) ===
+                  comparableCellValue(firstRow, column.field),
+              ),
+          );
+          const varyingColumns = columns.filter(
+            (column) => column.field !== optionLabelField && !sharedColumns.includes(column),
+          );
+          const safeGroupKey = `${groupIndex}-${domSafeValue(group.key)}`;
+          const groupLabelId = `${groupedRadioDomPrefix}-${safeGroupKey}-label`;
+          const groupLabel = `${optionColumnLabel} ${groupIndex + 1}`;
+
+          return (
+            <section
+              key={group.key}
+              data-testid={`table-selection-group-${safeGroupKey}`}
+              className="border-border bg-panel rounded-lg border p-4"
+            >
+              <h3 id={groupLabelId} className="sr-only">
+                {groupLabel}
+              </h3>
+              {sharedColumns.length > 0 && (
+                <dl className="border-border mb-4 grid gap-x-6 gap-y-3 border-b pb-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {sharedColumns.map((column) => (
+                    <div
+                      key={column.field}
+                      data-testid={`table-selection-group-${safeGroupKey}-field-${domSafeValue(column.field)}`}
+                      className="min-w-0"
+                    >
+                      <dt className="text-text-2 text-xs font-medium">
+                        {getLocalizedText(column.label, locale, t)}
+                      </dt>
+                      <dd className="text-text mt-1 text-sm">
+                        {renderCellContent(column, firstRow)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              <div
+                role="radiogroup"
+                aria-labelledby={groupLabelId}
+                data-testid={`table-selection-radiogroup-${safeGroupKey}`}
+                className="grid gap-2"
+              >
+                {group.items.map((item, optionIndex) => {
+                  const rowIdentity = getRowIdentity(item.row, item.dataIndex);
+                  const isSelected = effectiveSelectedRowKeySet.has(rowIdentity);
+                  const optionAccessibleLabel =
+                    comparableCellValue(item.row, optionLabelField) ||
+                    `${optionColumnLabel} ${optionIndex + 1}`;
+
+                  return (
+                    <div
+                      key={rowIdentity}
+                      className={`border-border rounded-md border px-3 py-3 ${
+                        isSelected ? 'border-accent bg-accent-weak' : 'hover:bg-hover'
+                      } ${rowClassName(item.row)}`}
+                    >
+                      <div
+                        className="flex cursor-pointer items-start gap-3"
+                        onClick={() => chooseGroupedSelection(item.row, group.items)}
+                      >
+                        <input
+                          type="radio"
+                          name={`${groupedRadioDomPrefix}-${safeGroupKey}`}
+                          data-testid={`table-select-row-${rowIdentity}`}
+                          checked={isSelected}
+                          onChange={() => chooseGroupedSelection(item.row, group.items)}
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              chooseGroupedSelection(item.row, group.items);
+                              return;
+                            }
+                            const movesForward =
+                              event.key === 'ArrowDown' || event.key === 'ArrowRight';
+                            const movesBackward =
+                              event.key === 'ArrowUp' || event.key === 'ArrowLeft';
+                            if (
+                              !movesForward &&
+                              !movesBackward &&
+                              event.key !== 'Home' &&
+                              event.key !== 'End'
+                            ) {
+                              return;
+                            }
+                            event.preventDefault();
+                            const nextOptionIndex =
+                              event.key === 'Home'
+                                ? 0
+                                : event.key === 'End'
+                                  ? group.items.length - 1
+                                  : (optionIndex + (movesForward ? 1 : -1) + group.items.length) %
+                                    group.items.length;
+                            const nextItem = group.items[nextOptionIndex];
+                            chooseGroupedSelection(nextItem.row, group.items);
+                            const groupElement = event.currentTarget.closest('[role="radiogroup"]');
+                            const radios =
+                              groupElement?.querySelectorAll<HTMLInputElement>(
+                                'input[type="radio"]',
+                              );
+                            radios?.[nextOptionIndex]?.focus();
+                          }}
+                          aria-label={optionAccessibleLabel}
+                          className="border-border text-accent focus:ring-accent mt-0.5 h-4 w-4"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-text text-sm font-medium">
+                            {renderCellContent(optionLabelColumn, item.row)}
+                          </div>
+                          {varyingColumns.length > 0 && (
+                            <div className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                              {varyingColumns.map((column) => (
+                                <div key={column.field} className="text-text-2 text-xs">
+                                  <span className="font-medium">
+                                    {getLocalizedText(column.label, locale, t)}:
+                                  </span>{' '}
+                                  {renderCellContent(column, item.row)}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {rowActions.length > 0 && (
+                        <div className="border-border mt-3 border-t pt-3">
+                          {renderRowActions(item.row)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    );
+  };
 
   // 处理操作按钮点击 - 委托给 useActionHandler
   // Legacy compatibility: bare `button.handler` (not wrapped in events.onClick) is
@@ -691,20 +1087,34 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     );
   }
 
+  const staleState = hasStaleRows ? (
+    <div
+      data-testid="table-stale-state"
+      role="status"
+      className="border-warning/30 bg-warning/5 text-text mb-2 rounded-lg border px-4 py-2 text-sm"
+    >
+      {stateTitle('stale', 'Showing preserved data because refresh failed. Retry before acting.')}
+    </div>
+  ) : null;
+
+  if (groupedRadioPresentation) {
+    return (
+      <>
+        {staleState}
+        <div
+          className={`table-block w-full max-w-full overflow-x-auto ${maxHeight ? 'overflow-y-auto' : ''}`}
+          data-testid="table-block"
+          style={tableContainerStyle}
+        >
+          {renderGroupedRadioSelection()}
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
-      {hasStaleRows && (
-        <div
-          data-testid="table-stale-state"
-          role="status"
-          className="border-warning/30 bg-warning/5 text-text mb-2 rounded-lg border px-4 py-2 text-sm"
-        >
-          {stateTitle(
-            'stale',
-            'Showing preserved data because refresh failed. Retry before acting.',
-          )}
-        </div>
-      )}
+      {staleState}
       <div
         className={`table-block w-full max-w-full overflow-x-auto ${maxHeight ? 'overflow-y-auto' : ''}`}
         data-testid="table-block"
@@ -715,13 +1125,19 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
             <tr>
               {isMultipleSelection && (
                 <th className={`${headerCellClass} w-12 text-left`}>
-                  <input
-                    type="checkbox"
-                    data-testid="table-select-all"
-                    checked={allVisibleRowsSelected}
-                    onChange={toggleAllVisibleRows}
-                    aria-label="Select all rows"
-                  />
+                  {supportsSelectAll && (
+                    <input
+                      type="checkbox"
+                      data-testid="table-select-all"
+                      checked={allVisibleRowsSelected}
+                      onChange={toggleAllVisibleRows}
+                      aria-label={getLocalizedText(
+                        { 'zh-CN': '选择全部行', en: 'Select all rows' },
+                        locale,
+                        t,
+                      )}
+                    />
+                  )}
                 </th>
               )}
               {columns.map(renderColumnHeader)}

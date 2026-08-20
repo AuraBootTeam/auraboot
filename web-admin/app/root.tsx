@@ -25,26 +25,18 @@ import {
   getRuntimeProfileFromPathname,
   isAnonymousRuntimeProfile,
   shouldBootCorePlugins,
-  type RuntimeProfile,
 } from '@auraboot/runtime-kernel';
 import { useFederationStore } from '~/plugins/FederationManager';
-import { resolveIcpComplianceConfig, type IcpComplianceConfig } from '~/config/icpCompliance';
-
-export interface RootLoaderData {
-  runtimeProfile: RuntimeProfile;
-  user: any;
-  permissions: any;
-  preferences: any;
-  menus: any[];
-  i18n: Record<string, string>;
-  locale: string;
-  initialTimezone?: string;
-  edition: string;
-  spaces: any[];
-  bootstrapStatus: BootstrapStatus | null;
-  icpCompliance: IcpComplianceConfig;
-  accessPolicy: AccessPolicy;
-}
+import { resolveIcpComplianceConfig } from '~/config/icpCompliance';
+import {
+  COMMUNITY_BRANDING,
+  isCommercialEdition,
+  resolveBrandDisplayName,
+  resolveBuildIdentity,
+  resolveCommunityBranding,
+  type BrandingConfig,
+} from '~/config/branding';
+import { useRootLoaderData, type RootLoaderData } from '~/root-data';
 
 import '~/app.css';
 import '~/styles/print.css';
@@ -66,8 +58,8 @@ import { EntitlementProvider, useEntitlement } from '~/contexts/EntitlementConte
 import { DslRegistryProvider } from '~/contexts/DslRegistryContext';
 import { AuraBotProvider } from '~/plugins/core-aurabot/components-shell';
 import { QueryProvider } from '~/providers/QueryProvider';
-import { fetchBootstrapStatus, type BootstrapStatus } from '~/services/bootstrapStatus';
-import { fetchAccessPolicy, type AccessPolicy } from '~/services/accessPolicy';
+import { fetchBootstrapStatus } from '~/services/bootstrapStatus';
+import { fetchAccessPolicy } from '~/services/accessPolicy';
 import { BootstrapBanner } from '~/components/BootstrapBanner';
 import { BootstrapNotReady } from '~/components/BootstrapNotReady';
 import { AuthSessionRevalidator } from '~/components/AuthSessionRevalidator';
@@ -98,12 +90,34 @@ function getTimezoneFromRequest(request: Request): string {
   }
 }
 
+export async function resolveDeploymentBrandingFromBff(
+  environment: Record<string, string | undefined>,
+): Promise<BrandingConfig> {
+  if (!isCommercialEdition(environment.EDITION)) {
+    return resolveCommunityBranding();
+  }
+
+  const bffUrl =
+    environment.BFF_INTERNAL_URL || `http://127.0.0.1:${environment.BFF_PORT || '3500'}`;
+  const response = await fetch(`${bffUrl}/api/runtime/branding`);
+  if (!response.ok) {
+    throw new Error(`Unable to resolve deployment branding from BFF (${response.status}).`);
+  }
+  const payload = (await response.json()) as { branding?: BrandingConfig };
+  if (!payload.branding) {
+    throw new Error('BFF deployment branding response is missing the branding contract.');
+  }
+  return payload.branding;
+}
+
 export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoaderData | Response> {
   const locale = getLocaleFromRequest(request);
   const initialTimezone = getTimezoneFromRequest(request);
   const { pathname } = new URL(request.url);
   const runtimeProfile = getRuntimeProfileFromPathname(pathname);
   const icpCompliance = resolveIcpComplianceConfig(process.env);
+  const branding = await resolveDeploymentBrandingFromBff(process.env);
+  const buildIdentity = resolveBuildIdentity(process.env);
 
   // Bootstrap status: never redirect; inject into loader data so the banner can render
   const bootstrapStatus = await fetchBootstrapStatus();
@@ -138,10 +152,13 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
       i18n: i18nData,
       locale,
       initialTimezone: initialTimezone ?? undefined,
+      skipTenantPreferences: true,
       edition,
       spaces: [],
       bootstrapStatus,
       icpCompliance,
+      branding,
+      buildIdentity,
       accessPolicy,
     };
     ssrLoaderCache.set(cacheKey, result);
@@ -211,22 +228,41 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     i18n: i18nData,
     locale,
     initialTimezone: initialTimezone ?? undefined,
+    skipTenantPreferences:
+      isAnonymousRuntimeProfile(runtimeProfile) || (isPublicRoute(pathname) && !user),
     edition,
     spaces,
     bootstrapStatus,
     icpCompliance,
+    branding,
+    buildIdentity,
     accessPolicy,
   };
 }
 
-export const meta = ({ data }: { data?: RootLoaderData }) =>
-  data?.icpCompliance.enabled ? [{ title: data.icpCompliance.siteDisplayName }] : [];
+export const meta = ({ data }: { data?: RootLoaderData }) => [
+  {
+    title: data
+      ? resolveBrandDisplayName(data.branding, data.icpCompliance)
+      : COMMUNITY_BRANDING.productName,
+  },
+];
 
-export function useRootLoaderData(): RootLoaderData | undefined {
-  return useRouteLoaderData<typeof loader>('root') as RootLoaderData | undefined;
+export function resolveBrandingDocumentLinks(branding: BrandingConfig) {
+  return [
+    { rel: 'icon', href: branding.faviconUrl },
+    { rel: 'icon', type: 'image/png', sizes: '32x32', href: branding.favicon32Url },
+    {
+      rel: 'apple-touch-icon',
+      sizes: '180x180',
+      href: branding.appleTouchIconUrl,
+    },
+    { rel: 'manifest', href: branding.manifestUrl },
+  ];
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
   return (
     <html lang="zh-CN" className="h-full" suppressHydrationWarning>
       <head>
@@ -235,6 +271,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="color-scheme" content="light dark" />
         <Meta />
         <Links />
+        {resolveBrandingDocumentLinks(branding).map((link) => (
+          <link key={`${link.rel}:${link.href}`} {...link} />
+        ))}
       </head>
       <body className="h-full bg-gray-50 transition-colors duration-200 dark:bg-gray-900">
         {children}
@@ -310,7 +349,10 @@ export default function App() {
     <RuntimeProfileProvider value={data.runtimeProfile}>
       <I18nProvider initialData={data.i18n || {}} initialLocale={data.locale}>
         <AppDirectionSync locale={data.locale} />
-        <TimezoneProvider initialTimezone={data.initialTimezone}>
+        <TimezoneProvider
+          initialTimezone={data.initialTimezone}
+          skipTenantPreferences={data.skipTenantPreferences}
+        >
           <ToastProvider>
             <ConfirmDialogProvider>
               {bootCoreRuntime ? <AuraBotProvider>{appFrame}</AuraBotProvider> : appFrame}

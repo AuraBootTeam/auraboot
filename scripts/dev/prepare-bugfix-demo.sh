@@ -86,6 +86,7 @@ if [ "$DRY_RUN" = "1" ]; then
 (dry-run mode: not preparing demo data)
 Would run:
   source scripts/dev/r2-env-export.sh $SLUG
+  export PW_SKIP_WEBSERVER=1
   scripts/import-plugins.sh --profile=e2e --edition=oss
   pnpm exec playwright test --project=setup --workers=1
   pnpm exec playwright test tests/auth.setup.ts --project=auth --no-deps
@@ -100,6 +101,7 @@ fi
 cd "$PROJECT_ROOT"
 # shellcheck disable=SC1090
 source "$PROJECT_ROOT/scripts/dev/r2-env-export.sh" "$SLUG"
+export PW_SKIP_WEBSERVER="${PW_SKIP_WEBSERVER:-1}"
 
 echo "[bugfix-oss-demo] verifying running services"
 "$PROJECT_ROOT/scripts/dev/env.sh" verify --level=health --slug="$SLUG"

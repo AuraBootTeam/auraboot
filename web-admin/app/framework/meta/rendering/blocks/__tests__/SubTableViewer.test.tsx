@@ -5,6 +5,8 @@ import type { SubTableConfig } from '~/framework/meta/schemas/types';
 
 const fetchResultMock = vi.fn();
 const navigateMock = vi.hoisted(() => vi.fn());
+const hasPermissionMock = vi.hoisted(() => vi.fn(() => true));
+const confirmDialogMock = vi.hoisted(() => vi.fn(async (_options?: unknown) => true));
 
 vi.mock('react-router', () => ({
   useNavigate: () => navigateMock,
@@ -12,6 +14,14 @@ vi.mock('react-router', () => ({
 
 vi.mock('~/shared/services/http-client', () => ({
   fetchResult: (...args: unknown[]) => fetchResultMock(...args),
+}));
+
+vi.mock('~/contexts/AuthContext', () => ({
+  useAuth: () => ({ token: undefined, hasPermission: hasPermissionMock }),
+}));
+
+vi.mock('~/utils/confirmDialog', () => ({
+  confirmDialog: (options: unknown) => confirmDialogMock(options),
 }));
 
 vi.mock('~/framework/meta/hooks/useTreeData', () => ({
@@ -65,6 +75,10 @@ describe('SubTableViewer', () => {
   beforeEach(() => {
     fetchResultMock.mockReset();
     navigateMock.mockReset();
+    hasPermissionMock.mockReset();
+    hasPermissionMock.mockReturnValue(true);
+    confirmDialogMock.mockReset();
+    confirmDialogMock.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -232,13 +246,16 @@ describe('SubTableViewer', () => {
     );
 
     await waitFor(() => {
-      expect(fetchResultMock).toHaveBeenCalledWith('/api/scheduled-tasks/01KR8WEQZ0EXXF28KMA2B06YEN/logs', {
-        method: 'get',
-        params: {
-          owner: '01KR8WEQZ0EXXF28KMA2B06YEN',
+      expect(fetchResultMock).toHaveBeenCalledWith(
+        '/api/scheduled-tasks/01KR8WEQZ0EXXF28KMA2B06YEN/logs',
+        {
+          method: 'get',
+          params: {
+            owner: '01KR8WEQZ0EXXF28KMA2B06YEN',
+          },
+          token: undefined,
         },
-        token: undefined,
-      });
+      );
     });
 
     await expect(screen.findByTestId('sortable-row-row-pid')).resolves.toBeInTheDocument();
@@ -541,6 +558,167 @@ describe('SubTableViewer', () => {
               pid: 'task-1',
               crm_act_status: 'open',
             }),
+          }),
+        }),
+      );
+    });
+  });
+
+  it('hides configured row actions when the current user lacks their permission', async () => {
+    hasPermissionMock.mockImplementation((code?: string) => code !== 'crm.activity.manage');
+    fetchResultMock.mockResolvedValue({
+      code: '0',
+      data: {
+        records: [{ pid: 'task-1', crm_act_subject: 'Review BOM risk', crm_act_status: 'open' }],
+      },
+    });
+
+    render(
+      <SubTableViewer
+        config={{
+          ...buildConfig(),
+          actions: [
+            {
+              code: 'view_task',
+              label: 'View',
+              permissionCode: 'crm.activity.read',
+              action: { type: 'navigate', to: 'crm_activity_common_detail' },
+            },
+            {
+              code: 'start_task',
+              label: 'Start',
+              permissionCode: 'crm.activity.manage',
+              action: { type: 'state_transition', command: 'crm:start_task' },
+            },
+          ],
+          columns: [{ field: 'crm_act_subject', label: 'Subject' }],
+        }}
+        parentRecordPid="opportunity-1"
+      />,
+    );
+
+    await expect(screen.findByTestId('sortable-row-task-1')).resolves.toBeInTheDocument();
+    expect(screen.getByTestId('subtable-row-action-view_task-0')).toBeInTheDocument();
+    expect(screen.queryByTestId('subtable-row-action-start_task-0')).not.toBeInTheDocument();
+  });
+
+  it('honors a destructive row action confirmation before executing its command', async () => {
+    confirmDialogMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    fetchResultMock
+      .mockResolvedValueOnce({
+        code: '0',
+        data: {
+          records: [{ pid: 'task-1', crm_act_subject: 'Review BOM risk', crm_act_status: 'open' }],
+        },
+      })
+      .mockResolvedValueOnce({ code: '0', data: {} })
+      .mockResolvedValueOnce({ code: '0', data: { records: [] } });
+
+    render(
+      <SubTableViewer
+        config={{
+          ...buildConfig(),
+          actions: [
+            {
+              code: 'cancel_task',
+              label: 'Cancel',
+              danger: true,
+              permissionCode: 'crm.activity.manage',
+              confirm: { 'zh-CN': '确定取消该任务？', 'en-US': 'Cancel this task?' },
+              action: { type: 'state_transition', command: 'crm:cancel_task' },
+            },
+          ],
+          columns: [{ field: 'crm_act_subject', label: 'Subject' }],
+        }}
+        parentRecordPid="opportunity-1"
+      />,
+    );
+
+    await expect(screen.findByTestId('sortable-row-task-1')).resolves.toBeInTheDocument();
+    const cancelButton = screen.getByTestId('subtable-row-action-cancel_task-0');
+    fireEvent.click(cancelButton);
+    await waitFor(() => expect(confirmDialogMock).toHaveBeenCalledTimes(1));
+    expect(fetchResultMock).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(cancelButton);
+    await waitFor(() => {
+      expect(fetchResultMock).toHaveBeenCalledWith(
+        '/api/meta/commands/execute/crm:cancel_task',
+        expect.objectContaining({
+          method: 'post',
+          params: expect.objectContaining({ targetRecordPid: 'task-1' }),
+        }),
+      );
+    });
+  });
+
+  it('accepts legacy rowActions and collects command input fields before execution', async () => {
+    fetchResultMock
+      .mockResolvedValueOnce({
+        code: '0',
+        data: {
+          records: [
+            {
+              pid: 'pick-line-1',
+              inv_pkl_status: 'pending',
+              inv_pkl_picked_qty: 0,
+            },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({ code: '0', data: {} })
+      .mockResolvedValueOnce({ code: '0', data: { records: [] } });
+
+    const submitDialog = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      expect(detail.fields[0].helpText['zh-CN']).toContain('累计数量');
+      detail.onSubmit({ quantity: 2 });
+    };
+    window.addEventListener('dialog:form', submitDialog, { once: true });
+
+    render(
+      <SubTableViewer
+        config={{
+          ...buildConfig(),
+          rowActions: [
+            {
+              code: 'record_pick',
+              label: '记录拣货',
+              visibleWhen:
+                "form.inv_pick_source_type === 'production_issue' && row.inv_pkl_status === 'pending'",
+              action: {
+                type: 'command',
+                command: 'inv:record_issue_pick',
+                inputFieldsTitle: '记录本次实物拣货',
+                inputFields: [
+                  {
+                    field: 'quantity',
+                    type: 'number',
+                    required: true,
+                    helpText: { 'zh-CN': '累计数量不得超过需求量。' },
+                  },
+                ],
+              },
+            },
+          ],
+          columns: [{ field: 'inv_pkl_status', label: '状态' }],
+        }}
+        parentRecordPid="pick-1"
+        parentRecordData={{ inv_pick_source_type: 'production_issue' }}
+      />,
+    );
+
+    await expect(screen.findByTestId('sortable-row-pick-line-1')).resolves.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('subtable-row-action-record_pick-0'));
+
+    await waitFor(() => {
+      expect(fetchResultMock).toHaveBeenCalledWith(
+        '/api/meta/commands/execute/inv:record_issue_pick',
+        expect.objectContaining({
+          method: 'post',
+          params: expect.objectContaining({
+            targetRecordPid: 'pick-line-1',
+            payload: expect.objectContaining({ quantity: 2 }),
           }),
         }),
       );

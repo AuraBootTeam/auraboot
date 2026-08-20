@@ -1,351 +1,751 @@
-/**
- * ImportModal Component
- *
- * Modal dialog for importing data from Excel or CSV files.
- * Supports file upload, field mapping preview, and execution.
- */
-
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '~/utils/cn';
 import { ResultHelper } from '~/utils/type';
 import { useI18n } from '~/contexts/I18nContext';
+import {
+  resolveImportFieldLabel,
+  resolveImportExecutionMessage,
+  resolveImportMessageFieldCodes,
+  resolveImportReferenceMessage,
+} from './importCapability';
+
+export type ImportMode = 'insert' | 'update';
+
+export interface ImportConfiguration {
+  enabled?: boolean;
+  permissionCode?: string;
+  modes?: ImportMode[];
+  updateKeys?: string[];
+}
 
 export interface ImportModalProps {
-  /** Whether the modal is open */
   open: boolean;
-  /** Callback to close the modal */
   onClose: () => void;
-  /** Model code for the import target */
   modelCode: string;
-  /** Callback after successful import */
+  config?: ImportConfiguration;
   onImportComplete?: (result: ImportResultData) => void;
 }
 
-interface ImportResultData {
+export interface ImportResultData {
   success: boolean;
   imported: number;
   failed: number;
   total: number;
+  created: number;
+  updated: number;
+  errors: ImportRowError[];
+  taskId?: string | null;
+  errorReportUrl?: string | null;
+  errorReportFailed?: boolean;
+  errorReportExpired?: boolean;
 }
 
-interface PreviewRow {
-  [key: string]: unknown;
+interface ImportRowError {
+  rowNumber: number;
+  fieldCode?: string | null;
+  message: string;
+  value?: string | null;
 }
 
-type ImportStep = 'upload' | 'preview' | 'importing' | 'result';
+interface ValidationReport {
+  totalRows: number;
+  validRows: number;
+  valid: boolean;
+  errors: ImportRowError[];
+  warnings: ImportRowError[];
+  taskId?: string | null;
+  errorReportUrl?: string | null;
+  errorReportFailed?: boolean;
+  errorReportExpired?: boolean;
+}
 
-/**
- * ImportModal - Modal for importing data from files
- */
+interface ApiEnvelope<T> {
+  code: string;
+  message?: string;
+  data?: T;
+  context?: unknown;
+}
+
+interface BackendImportResult {
+  totalRows: number;
+  successCount: number;
+  errorCount: number;
+  createdCount: number;
+  updatedCount: number;
+  errors?: ImportRowError[];
+  hasErrors: boolean;
+  taskId?: string | null;
+  errorReportUrl?: string | null;
+  errorReportFailed?: boolean;
+  errorReportExpired?: boolean;
+}
+
+interface AsyncImportStatus {
+  taskId: string;
+  status: string;
+  totalRows: number;
+  processedRows: number;
+  result?: BackendImportResult | null;
+}
+
+interface ImportFieldMeta {
+  code?: string;
+  displayName?: string;
+  extension?: { displayName?: string };
+}
+
+type ImportStep = 'upload' | 'preview' | 'validating' | 'importing' | 'result';
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+function apiError<T>(response: Response, body?: ApiEnvelope<T>): Error {
+  return new Error(body?.message || `Request failed (${response.status})`);
+}
+
 export const ImportModal: React.FC<ImportModalProps> = ({
   open,
   onClose,
   modelCode,
+  config,
   onImportComplete,
 }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const modes = useMemo<ImportMode[]>(
+    () => (config?.modes?.length ? config.modes : ['insert']),
+    [config?.modes],
+  );
+  const [mode, setMode] = useState<ImportMode>(modes[0]);
+  const [matchKey, setMatchKey] = useState(config?.updateKeys?.[0] || '');
   const [step, setStep] = useState<ImportStep>('upload');
   const [file, setFile] = useState<File | null>(null);
-  const [previewData, setPreviewData] = useState<PreviewRow[]>([]);
+  const [previewData, setPreviewData] = useState<Record<string, unknown>[]>([]);
   const [previewColumns, setPreviewColumns] = useState<string[]>([]);
+  const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({});
+  const [validation, setValidation] = useState<ValidationReport | null>(null);
   const [importResult, setImportResult] = useState<ImportResultData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+  const [downloadingErrorReport, setDownloadingErrorReport] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isBusy =
+    step === 'validating' || step === 'importing' || downloadingTemplate || downloadingErrorReport;
 
   const resetState = useCallback(() => {
+    if (fileInputRef.current) fileInputRef.current.value = '';
     setStep('upload');
     setFile(null);
     setPreviewData([]);
     setPreviewColumns([]);
+    setValidation(null);
     setImportResult(null);
     setError(null);
     setDragOver(false);
-  }, []);
+    setMode(modes[0]);
+    setMatchKey(config?.updateKeys?.[0] || '');
+  }, [config?.updateKeys, modes]);
 
   const handleClose = useCallback(() => {
+    if (isBusy) return;
+    if (importResult) onImportComplete?.(importResult);
     resetState();
     onClose();
-  }, [resetState, onClose]);
+  }, [importResult, isBusy, onClose, onImportComplete, resetState]);
 
-  const parseFileForPreview = useCallback(
-    async (selectedFile: File) => {
-      setFile(selectedFile);
-      setError(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') handleClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleClose, open]);
 
-      try {
-        const fileExt = selectedFile.name.split('.').pop()?.toLowerCase();
-
-        if (fileExt === 'csv') {
-          const text = await selectedFile.text();
-          const Papa = await import('papaparse');
-          const result = Papa.default.parse(text, { header: true, preview: 10 });
-          if (result.errors.length > 0) {
-            setError(
-              t(
-                'import.error.csv_parse',
-                { message: result.errors[0].message },
-                `CSV parsing error: ${result.errors[0].message}`,
-              ),
-            );
-            return;
-          }
-          const data = result.data as PreviewRow[];
-          setPreviewColumns(result.meta.fields || []);
-          setPreviewData(data);
-        } else if (fileExt === 'xlsx' || fileExt === 'xls') {
-          const XLSX = await import('xlsx');
-          const buffer = await selectedFile.arrayBuffer();
-          const workbook = XLSX.read(buffer, { type: 'array' });
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json<PreviewRow>(firstSheet, { defval: '' });
-          const preview = jsonData.slice(0, 10);
-          const cols = preview.length > 0 ? Object.keys(preview[0]) : [];
-          setPreviewColumns(cols);
-          setPreviewData(preview);
-        } else {
-          setError(
-            t(
-              'import.error.unsupported_format',
-              undefined,
-              'Unsupported file format. Please use .xlsx, .xls, or .csv files.',
-            ),
-          );
+  useEffect(() => {
+    if (!open) return undefined;
+    let cancelled = false;
+    void fetch(`/api/dynamic/${encodeURIComponent(modelCode)}/field-meta`)
+      .then(async (response) => {
+        const body = (await response.json().catch(() => undefined)) as
+          | ApiEnvelope<ImportFieldMeta[]>
+          | undefined;
+        if (!response.ok || !body || !ResultHelper.isSuccess(body) || !Array.isArray(body.data)) {
           return;
         }
+        const labels: Record<string, string> = {};
+        for (const field of body.data) {
+          const code = field.code?.trim();
+          const displayName = (field.displayName || field.extension?.displayName)?.trim();
+          if (code && displayName && displayName !== code) labels[code] = displayName;
+        }
+        if (!cancelled) setFieldLabels(labels);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [modelCode, open]);
 
-        setStep('preview');
-      } catch (err) {
+  const fieldLabel = useCallback(
+    (field: string) => resolveImportFieldLabel(field, fieldLabels),
+    [fieldLabels],
+  );
+
+  const requestParams = useCallback(
+    (nextMode: ImportMode, nextMatchKey: string) => {
+      const params = new URLSearchParams({ mode: nextMode, locale });
+      if (nextMode === 'update' && nextMatchKey) params.set('matchKey', nextMatchKey);
+      return params;
+    },
+    [locale],
+  );
+
+  const downloadTemplate = useCallback(async () => {
+    setDownloadingTemplate(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/meta/excel/template/${modelCode}?mode=${mode}`);
+      if (!response.ok) {
+        const body = (await response.json().catch(() => undefined)) as
+          | ApiEnvelope<unknown>
+          | undefined;
+        throw apiError(response, body);
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${modelCode}-${mode}-import-template.xlsx`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      // The download event fires before Chromium has necessarily consumed the blob.
+      // Revoking on the next tick leaves a download stuck forever with no bytes.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : t('import.error.template', undefined, '模板下载失败，请重试。'),
+      );
+    } finally {
+      setDownloadingTemplate(false);
+    }
+  }, [mode, modelCode, t]);
+
+  const downloadErrorReport = useCallback(
+    async (url: string) => {
+      setDownloadingErrorReport(true);
+      setError(null);
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          const body = (await response.json().catch(() => undefined)) as
+            | ApiEnvelope<unknown>
+            | undefined;
+          throw apiError(response, body);
+        }
+        const blobUrl = URL.createObjectURL(await response.blob());
+        const anchor = document.createElement('a');
+        anchor.href = blobUrl;
+        anchor.download = `${modelCode}-${mode}-import-errors.xlsx`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+      } catch (cause) {
         setError(
-          err instanceof Error
-            ? err.message
-            : t('import.error.parse_failed', undefined, 'Failed to parse file'),
+          cause instanceof Error
+            ? cause.message
+            : t('import.error.error_report', undefined, '修正工作簿下载失败，请重试。'),
         );
+      } finally {
+        setDownloadingErrorReport(false);
       }
     },
-    [t],
+    [mode, modelCode, t],
   );
 
-  const handleFileSelect = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const selectedFile = e.target.files?.[0];
-      if (selectedFile) parseFileForPreview(selectedFile);
+  const chooseCorrectionFile = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  }, []);
+
+  const validateFile = useCallback(
+    async (selectedFile: File, nextMode: ImportMode, nextMatchKey: string) => {
+      setStep('validating');
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      const response = await fetch(
+        `/api/meta/excel/validate/${modelCode}?${requestParams(nextMode, nextMatchKey)}`,
+        { method: 'post', body: formData },
+      );
+      const body = (await response.json().catch(() => undefined)) as
+        | ApiEnvelope<ValidationReport>
+        | undefined;
+      if (!response.ok || !body || !ResultHelper.isSuccess(body) || !body.data) {
+        throw apiError(response, body);
+      }
+      setValidation(body.data);
+      setStep('preview');
     },
-    [parseFileForPreview],
+    [modelCode, requestParams],
   );
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOver(false);
-      const droppedFile = e.dataTransfer.files?.[0];
-      if (droppedFile) parseFileForPreview(droppedFile);
+  const parseAndValidate = useCallback(
+    async (selectedFile: File, nextMode = mode, nextMatchKey = matchKey) => {
+      setError(null);
+      setValidation(null);
+      if (!selectedFile.name.toLowerCase().endsWith('.xlsx')) {
+        setError(t('import.error.xlsx_only', undefined, 'Only Excel .xlsx files are supported.'));
+        return;
+      }
+      if (selectedFile.size > MAX_FILE_BYTES) {
+        setError(t('import.error.too_large', undefined, 'The file must be 10 MB or smaller.'));
+        return;
+      }
+      if (nextMode === 'update' && !nextMatchKey) {
+        setError(t('import.error.match_key', undefined, 'Choose a match field for update mode.'));
+        return;
+      }
+
+      try {
+        const XLSX = await import('xlsx');
+        const workbook = XLSX.read(await selectedFile.arrayBuffer(), { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: '' });
+        const preview = rows.slice(0, 10);
+        setFile(selectedFile);
+        setPreviewData(preview);
+        setPreviewColumns(preview.length ? Object.keys(preview[0]) : []);
+        await validateFile(selectedFile, nextMode, nextMatchKey);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Failed to parse or validate the file');
+        setStep('upload');
+      }
     },
-    [parseFileForPreview],
+    [matchKey, mode, t, validateFile],
   );
+
+  const handleModeChange = useCallback(
+    async (nextMode: ImportMode) => {
+      const nextMatchKey = nextMode === 'update' ? config?.updateKeys?.[0] || '' : '';
+      setMode(nextMode);
+      setMatchKey(nextMatchKey);
+      if (file) await parseAndValidate(file, nextMode, nextMatchKey);
+    },
+    [config?.updateKeys, file, parseAndValidate],
+  );
+
+  const pollImport = useCallback(
+    async (taskId: string): Promise<BackendImportResult> => {
+      for (let attempt = 0; attempt < 300; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        const response = await fetch(`/api/meta/excel/import/${modelCode}/status/${taskId}`);
+        const body = (await response.json().catch(() => undefined)) as
+          | ApiEnvelope<AsyncImportStatus>
+          | undefined;
+        if (!response.ok || !body || !ResultHelper.isSuccess(body) || !body.data) {
+          throw apiError(response, body);
+        }
+        const status = body.data.status.toLowerCase();
+        if (status === 'completed' && body.data.result) return body.data.result;
+        if (status === 'failed') {
+          throw new Error(body.data.result?.errors?.[0]?.message || 'Import task failed');
+        }
+      }
+      throw new Error('Import is still running. Check the task status later.');
+    },
+    [modelCode],
+  );
+
+  const presentResult = useCallback((result: BackendImportResult) => {
+    const data: ImportResultData = {
+      success: !result.hasErrors,
+      imported: result.successCount,
+      failed: result.errorCount,
+      total: result.totalRows,
+      created: result.createdCount,
+      updated: result.updatedCount,
+      errors: result.errors || [],
+      taskId: result.taskId,
+      errorReportUrl: result.errorReportUrl,
+      errorReportFailed: result.errorReportFailed,
+      errorReportExpired: result.errorReportExpired,
+    };
+    setImportResult(data);
+    setStep('result');
+  }, []);
 
   const handleImport = useCallback(async () => {
-    if (!file) return;
-
+    if (!file || !validation?.valid) return;
     setStep('importing');
     setError(null);
-
     try {
       const formData = new FormData();
       formData.append('file', file);
-
-      const response = await fetch(`/api/dynamic/${modelCode}/import`, {
+      const params = requestParams(mode, matchKey);
+      params.set('skipErrors', 'true');
+      const response = await fetch(`/api/meta/excel/import/${modelCode}?${params}`, {
         method: 'post',
         body: formData,
       });
-
-      if (!response.ok) {
-        throw new Error(
-          t(
-            'import.error.failed_status',
-            { status: response.statusText },
-            `Import failed: ${response.statusText}`,
-          ),
-        );
+      const body = (await response.json().catch(() => undefined)) as
+        | ApiEnvelope<BackendImportResult>
+        | undefined;
+      if (!response.ok || !body || !ResultHelper.isSuccess(body) || !body.data) {
+        throw apiError(response, body);
       }
-
-      const result = await response.json();
-      if (!ResultHelper.isSuccess(result)) {
-        throw new Error(result.desc || t('import.error.failed', undefined, 'Import failed'));
-      }
-
-      const importData: ImportResultData = {
-        success: result.data?.success ?? true,
-        imported: result.data?.imported ?? 0,
-        failed: result.data?.failed ?? 0,
-        total: result.data?.total ?? 0,
-      };
-
-      setImportResult(importData);
-      setStep('result');
-      onImportComplete?.(importData);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t('import.error.failed', undefined, 'Import failed'),
-      );
+      const result = body.data.taskId ? await pollImport(body.data.taskId) : body.data;
+      presentResult(result);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Import failed');
       setStep('preview');
     }
-  }, [file, modelCode, onImportComplete, t]);
+  }, [
+    file,
+    matchKey,
+    mode,
+    modelCode,
+    pollImport,
+    presentResult,
+    requestParams,
+    validation?.valid,
+  ]);
+
+  const validationMessage = useCallback(
+    (message: string) => {
+      const namedRequired = /^Field '([^']+)' is required$/.exec(message);
+      if (namedRequired) {
+        const field = fieldLabel(namedRequired[1]);
+        return t('import.validation.named_required', { field }, `字段“${field}”为必填项`);
+      }
+      if (message === 'Required field is missing') {
+        return t('import.validation.required', undefined, '必填字段缺失');
+      }
+      if (message.startsWith('Value cannot be parsed as ')) {
+        return t(
+          'import.validation.type',
+          { type: message.slice('Value cannot be parsed as '.length) },
+          `值无法解析为 ${message.slice('Value cannot be parsed as '.length)}`,
+        );
+      }
+      if (message.startsWith('Field is not allowed for ')) {
+        return t('import.validation.field_not_allowed', undefined, '当前导入方式不允许此字段');
+      }
+      if (message.startsWith('Duplicate value on unique field')) {
+        return t('import.validation.duplicate', undefined, '唯一字段存在重复值');
+      }
+      if (message === 'Duplicate column header') {
+        return t('import.validation.duplicate_header', undefined, '存在重复列头');
+      }
+      const referenceMessage = resolveImportReferenceMessage(message);
+      if (referenceMessage === '关联记录不存在或无权访问') {
+        return t('import.validation.reference', undefined, referenceMessage);
+      }
+      if (referenceMessage === '关联值不唯一，请改用唯一业务编码或 PID') {
+        return t('import.validation.reference_ambiguous', undefined, referenceMessage);
+      }
+      const executionMessage = resolveImportExecutionMessage(message, fieldLabels);
+      if (executionMessage) {
+        return t(executionMessage.key, executionMessage.params, executionMessage.fallback);
+      }
+      return resolveImportMessageFieldCodes(message, fieldLabels);
+    },
+    [fieldLabel, fieldLabels, t],
+  );
 
   if (!open) return null;
 
+  const modeLabel =
+    mode === 'insert'
+      ? t('import.mode.insert', undefined, '新增导入')
+      : t('import.mode.update', undefined, '更新导入');
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-50 bg-black/50" onClick={handleClose} />
-
-      {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 bg-black/50" />
+      <div
+        data-testid="excel-import-backdrop"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        onClick={handleClose}
+      >
         <div
-          className="bg-panel rounded-card-lg flex max-h-[80vh] w-full max-w-2xl flex-col shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-busy={isBusy}
+          aria-labelledby="excel-import-title"
+          data-testid="excel-import-dialog"
+          className="bg-panel rounded-card-lg flex max-h-[88vh] w-full max-w-4xl flex-col shadow-2xl"
+          onClick={(event) => event.stopPropagation()}
         >
-          {/* Header */}
-          <div className="border-border flex items-center justify-between border-b px-6 py-4">
-            <h2 className="text-text text-lg font-semibold">
-              {t('import.title', undefined, 'Import Data')}
-            </h2>
+          <header className="border-border flex items-center justify-between border-b px-6 py-4">
+            <div>
+              <h2 id="excel-import-title" className="text-text text-lg font-semibold">
+                {t('import.title', undefined, 'Excel 数据导入')}
+              </h2>
+              <p className="text-text-3 mt-1 text-xs">
+                {t(
+                  'import.subtitle',
+                  undefined,
+                  '下载模板、上传预检，再执行导入。更新导入不会新增记录。',
+                )}
+              </p>
+            </div>
             <button
               type="button"
+              aria-label={t('action.close', undefined, '关闭')}
+              disabled={isBusy}
               onClick={handleClose}
-              aria-label={t('common.close', undefined, 'Close')}
-              className="text-text-3 hover:bg-hover hover:text-text-2 rounded-control focus-visible:shadow-focus p-2 focus:outline-none"
+              className="text-text-3 hover:bg-hover focus-visible:ring-accent rounded-control p-2 transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+              <span aria-hidden>✕</span>
+            </button>
+          </header>
+
+          <div className="border-border bg-subtle flex flex-wrap items-center gap-3 border-b px-6 py-3">
+            <span className="text-text-2 text-sm font-medium">
+              {t('import.mode.label', undefined, '导入方式')}
+            </span>
+            <div className="border-border bg-panel inline-flex rounded-lg border p-1">
+              {modes.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  data-testid={`import-mode-${item}`}
+                  disabled={isBusy}
+                  onClick={() => void handleModeChange(item)}
+                  className={cn(
+                    'rounded-md px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40',
+                    mode === item ? 'bg-accent text-white' : 'text-text-2 hover:bg-hover',
+                  )}
+                >
+                  {item === 'insert'
+                    ? t('import.mode.insert', undefined, '新增导入')
+                    : t('import.mode.update', undefined, '更新导入')}
+                </button>
+              ))}
+            </div>
+            {mode === 'update' && (
+              <label className="text-text-2 flex items-center gap-2 text-sm">
+                {t('import.match_key', undefined, '匹配字段')}
+                <select
+                  data-testid="import-match-key"
+                  disabled={isBusy}
+                  value={matchKey}
+                  onChange={(event) => {
+                    const key = event.target.value;
+                    setMatchKey(key);
+                    if (file) void parseAndValidate(file, mode, key);
+                  }}
+                  className="border-border bg-panel rounded-control border px-2 py-1.5"
+                >
+                  {(config?.updateKeys || []).map((key) => (
+                    <option key={key} value={key}>
+                      {fieldLabel(key)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <button
+              type="button"
+              data-testid="import-download-template"
+              disabled={isBusy}
+              onClick={() => void downloadTemplate()}
+              className="text-accent ml-auto text-sm hover:underline disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {downloadingTemplate
+                ? t('import.downloading_template', undefined, '正在下载模板…')
+                : t('import.download_template', { mode: modeLabel }, `下载${modeLabel}模板`)}
             </button>
           </div>
 
-          {/* Body */}
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            {/* Upload Step */}
+          <main className="flex-1 overflow-y-auto px-6 py-5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={(event) => {
+                const selected = event.target.files?.[0];
+                if (selected) void parseAndValidate(selected);
+              }}
+              className="hidden"
+            />
             {step === 'upload' && (
               <div
-                onDragOver={(e) => {
-                  e.preventDefault();
+                onDragOver={(event) => {
+                  event.preventDefault();
                   setDragOver(true);
                 }}
                 onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDragOver(false);
+                  const dropped = event.dataTransfer.files?.[0];
+                  if (dropped) void parseAndValidate(dropped);
+                }}
                 className={cn(
                   'rounded-card border-2 border-dashed p-12 text-center transition-colors',
                   dragOver ? 'border-accent bg-accent-weak' : 'border-border-strong bg-subtle',
                 )}
               >
-                <svg
-                  className="text-text-3 mx-auto mb-4 h-12 w-12"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                  />
-                </svg>
-                <p className="text-text-2 mb-2 text-sm">
-                  {t('import.upload.drag_hint', undefined, 'Drag and drop your file here, or')}
+                <div className="text-text-3 mb-4 text-4xl">⇧</div>
+                <p className="text-text-2 mb-3 text-sm">
+                  {t('import.drop_hint', undefined, '拖放 .xlsx 文件到这里，或选择文件')}
                 </p>
                 <button
                   type="button"
+                  data-testid="import-browse-file"
                   onClick={() => fileInputRef.current?.click()}
-                  className="bg-accent-weak text-accent rounded-control focus-visible:shadow-focus px-4 py-2 text-sm font-medium hover:brightness-95 focus:outline-none"
+                  className="bg-accent rounded-control px-4 py-2 text-sm font-medium text-white"
                 >
-                  {t('import.upload.browse', undefined, 'Browse Files')}
+                  {t('import.choose_file', undefined, '选择文件')}
                 </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                <p className="text-text-2 mt-3 text-xs">
-                  {t(
-                    'import.upload.supports',
-                    undefined,
-                    'Supports: Excel (.xlsx, .xls), CSV (.csv)',
-                  )}
+                <p className="text-text-3 mt-3 text-xs">
+                  {t('import.file_limit', undefined, '仅支持 .xlsx，最大 10 MB')}
                 </p>
-                <a
-                  href={`/api/meta/excel/template/${modelCode}`}
-                  download
-                  className="text-accent hover:text-accent-hover focus-visible:shadow-focus mt-3 inline-flex items-center gap-1 text-sm hover:underline focus:outline-none"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  {t('import.upload.download_template', undefined, 'Download Import Template')}
-                </a>
               </div>
             )}
 
-            {/* Preview Step */}
+            {(step === 'validating' || step === 'importing') && (
+              <div className="py-16 text-center">
+                <span className="border-accent-weak border-t-accent rounded-pill mb-4 inline-block h-10 w-10 animate-spin border-3" />
+                <p className="text-text-2 text-sm">
+                  {step === 'validating'
+                    ? t('import.validating', undefined, '正在预检字段、类型和重复值…')
+                    : t('import.importing', undefined, '正在执行导入，请勿关闭窗口…')}
+                </p>
+              </div>
+            )}
+
             {step === 'preview' && (
-              <div>
-                <div className="mb-4 flex items-center justify-between">
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-text-2 text-sm font-medium">
-                      {t('import.preview.title', undefined, 'Preview')}
-                    </h3>
-                    <p className="text-text-2 text-xs">
+                    <h3 className="text-text font-medium">{file?.name}</h3>
+                    <p className="text-text-3 text-xs">
                       {t(
-                        'import.preview.summary',
-                        { name: file?.name, count: previewData.length },
-                        `${file?.name} - Showing first ${previewData.length} rows`,
+                        'import.preview_rows',
+                        { count: previewData.length },
+                        `预览前 ${previewData.length} 行`,
                       )}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={resetState}
-                    className="text-accent hover:text-accent-hover focus-visible:shadow-focus text-sm focus:outline-none"
-                  >
-                    {t('import.preview.change_file', undefined, 'Change File')}
+                  <button type="button" onClick={resetState} className="text-accent text-sm">
+                    {t('import.change_file', undefined, '更换文件')}
                   </button>
                 </div>
+
+                {validation && (
+                  <div
+                    data-testid="import-validation-summary"
+                    className={cn(
+                      'rounded-card border p-4',
+                      validation.valid
+                        ? 'border-status-green bg-status-green-bg'
+                        : 'border-status-red bg-status-red-bg',
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <strong
+                        className={validation.valid ? 'text-status-green' : 'text-status-red'}
+                      >
+                        {validation.valid
+                          ? t('import.validation.passed', undefined, '预检通过，可以导入')
+                          : t('import.validation.failed', undefined, '预检未通过，请修正文件')}
+                      </strong>
+                      <span className="text-text-2 text-sm">
+                        {t(
+                          'import.validation.summary',
+                          {
+                            total: validation.totalRows,
+                            valid: validation.validRows,
+                            errors: validation.errors.length,
+                          },
+                          `总计 ${validation.totalRows} · 有效 ${validation.validRows} · 错误 ${validation.errors.length}`,
+                        )}
+                      </span>
+                    </div>
+                    {validation.errors.length > 0 && (
+                      <div className="mt-3 max-h-40 overflow-y-auto">
+                        {validation.errors.slice(0, 50).map((item, index) => (
+                          <p
+                            key={`${item.rowNumber}-${item.fieldCode}-${index}`}
+                            className="text-status-red py-0.5 text-xs"
+                          >
+                            {t('import.row', { row: item.rowNumber }, `第 ${item.rowNumber} 行`)}
+                            {item.fieldCode ? ` · ${fieldLabel(item.fieldCode)}` : ''}：
+                            {validationMessage(item.message)}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {!validation.valid && validation.errorReportUrl && (
+                      <div className="border-status-red/30 mt-4 flex flex-wrap items-center gap-3 border-t pt-3">
+                        <p className="text-text-2 mr-auto text-xs">
+                          {t(
+                            'import.correction.pending_hint',
+                            undefined,
+                            '下载包含全部待导入行的修正工作簿，修正标记单元格后直接重新上传。',
+                          )}
+                        </p>
+                        <button
+                          type="button"
+                          data-testid="import-download-error-report"
+                          disabled={isBusy}
+                          onClick={() => void downloadErrorReport(validation.errorReportUrl!)}
+                          className="border-accent text-accent hover:bg-accent-weak rounded-control border px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {downloadingErrorReport
+                            ? t('import.correction.downloading', undefined, '正在下载修正工作簿…')
+                            : t('import.correction.download', undefined, '下载修正工作簿')}
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="import-upload-correction"
+                          disabled={isBusy}
+                          onClick={chooseCorrectionFile}
+                          className="bg-accent rounded-control px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {t('import.correction.upload', undefined, '上传修正工作簿')}
+                        </button>
+                      </div>
+                    )}
+                    {!validation.valid && validation.errorReportFailed && (
+                      <p
+                        data-testid="import-error-report-unavailable"
+                        className="text-status-red mt-3 text-xs"
+                      >
+                        {t(
+                          'import.error.error_report_unavailable',
+                          undefined,
+                          '错误明细已保留在当前页面，但修正工作簿暂时无法生成。请修正原文件后重新上传。',
+                        )}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="border-border rounded-card overflow-x-auto border">
                   <table className="divide-border min-w-full divide-y text-sm">
                     <thead className="bg-subtle">
                       <tr>
-                        {previewColumns.map((col) => (
+                        {previewColumns.map((column) => (
                           <th
-                            key={col}
-                            className="text-text-2 px-3 py-2 text-left text-xs font-medium whitespace-nowrap uppercase"
+                            key={column}
+                            className="text-text-2 px-3 py-2 text-left text-xs whitespace-nowrap"
                           >
-                            {col}
+                            {fieldLabel(column)}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-border divide-y">
-                      {previewData.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-subtle">
-                          {previewColumns.map((col) => (
-                            <td
-                              key={col}
-                              className="text-text-2 max-w-[200px] truncate px-3 py-2 whitespace-nowrap"
-                            >
-                              {String(row[col] ?? '')}
+                      {previewData.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                          {previewColumns.map((column) => (
+                            <td key={column} className="text-text-2 max-w-48 truncate px-3 py-2">
+                              {String(row[column] ?? '')}
                             </td>
                           ))}
                         </tr>
@@ -356,116 +756,150 @@ export const ImportModal: React.FC<ImportModalProps> = ({
               </div>
             )}
 
-            {/* Importing Step */}
-            {step === 'importing' && (
-              <div className="py-12 text-center">
-                <span className="border-accent-weak border-t-accent rounded-pill mb-4 inline-block h-10 w-10 animate-spin border-3" />
-                <p className="text-text-2 text-sm">
-                  {t('import.importing', undefined, 'Importing data...')}
-                </p>
-              </div>
-            )}
-
-            {/* Result Step */}
             {step === 'result' && importResult && (
-              <div className="py-8 text-center">
-                {importResult.success ? (
-                  <>
-                    <svg
-                      className="text-status-green mx-auto mb-4 h-16 w-16"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <h3 className="text-text mb-2 text-lg font-semibold">
-                      {t('import.result.complete', undefined, 'Import Complete')}
-                    </h3>
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      className="text-status-amber mx-auto mb-4 h-16 w-16"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-                      />
-                    </svg>
-                    <h3 className="text-text mb-2 text-lg font-semibold">
-                      {t(
-                        'import.result.complete_with_errors',
-                        undefined,
-                        'Import Completed with Errors',
-                      )}
-                    </h3>
-                  </>
-                )}
-                <div className="mt-4 flex justify-center gap-8">
-                  <div className="text-center">
-                    <div className="text-status-green text-2xl font-bold">
-                      {importResult.imported}
-                    </div>
-                    <div className="text-text-2 text-xs">
-                      {t('import.result.imported', undefined, 'Imported')}
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-status-red text-2xl font-bold">{importResult.failed}</div>
-                    <div className="text-text-2 text-xs">
-                      {t('import.result.failed', undefined, 'Failed')}
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-text-2 text-2xl font-bold">{importResult.total}</div>
-                    <div className="text-text-2 text-xs">
-                      {t('import.result.total', undefined, 'Total')}
-                    </div>
-                  </div>
+              <div data-testid="import-result" className="py-8 text-center">
+                <div
+                  className={cn(
+                    'mb-3 text-5xl',
+                    importResult.success ? 'text-status-green' : 'text-status-amber',
+                  )}
+                >
+                  {importResult.success ? '✓' : '!'}
                 </div>
+                <h3 className="text-text text-lg font-semibold">
+                  {importResult.success
+                    ? t('import.result.completed', undefined, '导入完成')
+                    : t('import.result.partial', undefined, '导入完成，部分行失败')}
+                </h3>
+                <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {[
+                    [
+                      'created',
+                      t('import.result.created', undefined, '新增'),
+                      importResult.created,
+                    ],
+                    [
+                      'updated',
+                      t('import.result.updated', undefined, '更新'),
+                      importResult.updated,
+                    ],
+                    ['failed', t('import.result.failed', undefined, '失败'), importResult.failed],
+                    ['total', t('import.result.total', undefined, '总计'), importResult.total],
+                  ].map(([key, label, value]) => (
+                    <div key={String(key)} className="bg-subtle rounded-card p-3">
+                      <div
+                        data-testid={`import-result-${key}`}
+                        className="text-text text-2xl font-bold"
+                      >
+                        {value}
+                      </div>
+                      <div className="text-text-3 text-xs">{label}</div>
+                    </div>
+                  ))}
+                </div>
+                {importResult.errors.length > 0 && (
+                  <div className="border-status-red bg-status-red-bg mt-5 max-h-44 overflow-y-auto rounded-lg border p-3 text-left">
+                    {importResult.errors.slice(0, 100).map((item, index) => (
+                      <p key={index} className="text-status-red text-xs">
+                        {t('import.row', { row: item.rowNumber }, `第 ${item.rowNumber} 行`)}：
+                        {validationMessage(item.message)}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {!importResult.success && importResult.errorReportUrl && (
+                  <div className="border-border bg-subtle mt-5 rounded-lg border p-4 text-left">
+                    <p className="text-text-2 text-sm">
+                      {t(
+                        'import.correction.partial_hint',
+                        undefined,
+                        '已成功的记录不会出现在修正工作簿中。修正失败行后可直接再次上传。',
+                      )}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        data-testid="import-result-download-error-report"
+                        disabled={isBusy}
+                        onClick={() => void downloadErrorReport(importResult.errorReportUrl!)}
+                        className="border-accent text-accent hover:bg-accent-weak rounded-control border px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {downloadingErrorReport
+                          ? t('import.correction.downloading', undefined, '正在下载修正工作簿…')
+                          : t('import.correction.download', undefined, '下载修正工作簿')}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="import-result-upload-correction"
+                        disabled={isBusy}
+                        onClick={chooseCorrectionFile}
+                        className="bg-accent rounded-control px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {t('import.correction.upload', undefined, '上传修正工作簿')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {!importResult.success && importResult.errorReportFailed && (
+                  <p
+                    data-testid="import-result-error-report-unavailable"
+                    className="text-status-red mt-4 text-sm"
+                  >
+                    {t(
+                      'import.error.error_report_unavailable',
+                      undefined,
+                      '错误明细已保留在当前页面，但修正工作簿暂时无法生成。请修正原文件后重新上传。',
+                    )}
+                  </p>
+                )}
+                {!importResult.success && importResult.errorReportExpired && (
+                  <p
+                    data-testid="import-result-error-report-expired"
+                    className="text-text-3 mt-4 text-sm"
+                  >
+                    {t(
+                      'import.error.error_report_expired',
+                      undefined,
+                      '修正工作簿已超过保留期。请基于原文件重新执行预检。',
+                    )}
+                  </p>
+                )}
               </div>
             )}
 
-            {/* Error Display */}
             {error && (
-              <div className="border-status-red bg-status-red-bg rounded-control mt-4 border p-3">
-                <p className="text-status-red text-sm">{error}</p>
+              <div
+                role="alert"
+                className="border-status-red bg-status-red-bg text-status-red rounded-control mt-4 border p-3 text-sm"
+              >
+                {error}
               </div>
             )}
-          </div>
+          </main>
 
-          {/* Footer */}
-          <div className="border-border flex justify-end gap-3 border-t px-6 py-4">
+          <footer className="border-border flex justify-end gap-3 border-t px-6 py-4">
             <button
               type="button"
+              disabled={isBusy}
               onClick={handleClose}
-              className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded-control focus-visible:shadow-focus border px-4 py-2 text-sm font-medium focus:outline-none"
+              className="border-border bg-panel text-text-2 rounded-control border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
             >
               {step === 'result'
-                ? t('common.close', undefined, 'Close')
-                : t('common.cancel', undefined, 'Cancel')}
+                ? t('action.close', undefined, '关闭')
+                : t('action.cancel', undefined, '取消')}
             </button>
             {step === 'preview' && (
               <button
                 type="button"
-                onClick={handleImport}
-                className="bg-accent hover:bg-accent-hover rounded-control focus-visible:shadow-focus px-4 py-2 text-sm font-medium text-white focus:outline-none"
+                data-testid="import-submit"
+                disabled={!validation?.valid}
+                onClick={() => void handleImport()}
+                className="bg-accent rounded-control px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {t('import.start', undefined, 'Start Import')}
+                {t('import.start', { mode: modeLabel }, `开始${modeLabel}`)}
               </button>
             )}
-          </div>
+          </footer>
         </div>
       </div>
     </>

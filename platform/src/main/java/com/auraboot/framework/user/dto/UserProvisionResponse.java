@@ -15,6 +15,7 @@ import java.util.List;
 public class UserProvisionResponse {
     private Long userId;
     private String userPid;
+    private String memberPid;
     private String email;
     private String displayName;
     private Long tenantId;

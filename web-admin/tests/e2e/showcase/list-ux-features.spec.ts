@@ -4,7 +4,7 @@
  * Verifies the refactored list page toolbar components work correctly:
  * - Sort popover (open, add rule, badge count)
  * - Column header sort (asc/desc/clear cycle with SVG indicators)
- * - More menu (import, export, configure buttons)
+ * - More menu (export, configure buttons, fail-closed import)
  * - Configure Buttons panel (open, auto-save on change)
  * - Search input
  * - Toolbar buttons existence (sort, fields, quick filters)
@@ -128,8 +128,8 @@ test.describe('List Page UX Features', () => {
     await expect(moreBtn).toBeVisible({ timeout: 10_000 });
     await moreBtn.click();
 
-    // Menu items visible
-    await expect(page.locator('[data-testid="more-menu-import"]')).toBeVisible({ timeout: 5_000 });
+    // Showcase does not declare an import policy/page capability, so import fails closed.
+    await expect(page.locator('[data-testid="more-menu-import"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="more-menu-configure-buttons"]')).toBeVisible();
 
     // Close by clicking outside
@@ -150,7 +150,7 @@ test.describe('List Page UX Features', () => {
     await page.locator('[data-testid="more-menu-configure-buttons"]').click();
 
     // Config panel heading visible
-    const heading = page.getByText('Configure Buttons').first();
+    const heading = page.getByTestId('action-config-panel').getByRole('heading');
     await expect(heading).toBeVisible({ timeout: 5_000 });
 
     // Panel should NOT have Cancel/Save footer buttons (auto-save mode)
@@ -356,7 +356,7 @@ test.describe('List Page UX Features', () => {
     await page.locator('[data-testid="more-menu-configure-buttons"]').click();
 
     // Panel should be visible
-    const heading = page.getByText('Configure Buttons').first();
+    const heading = page.getByTestId('action-config-panel').getByRole('heading');
     await expect(heading).toBeVisible({ timeout: 5_000 });
 
     // Find a visibility toggle (eye icon button) and click it.
@@ -388,7 +388,9 @@ test.describe('List Page UX Features', () => {
     // Re-open configure panel
     await page.locator('[data-testid="toolbar-more-menu"]').click();
     await page.locator('[data-testid="more-menu-configure-buttons"]').click();
-    await expect(page.getByText('Configure Buttons').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId('action-config-panel').getByRole('heading')).toBeVisible({
+      timeout: 5_000,
+    });
     // Panel loads — SavedView was persisted
   });
 });

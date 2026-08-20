@@ -47,6 +47,7 @@ public class WhiteList {
 
             "/api/payment/webhook/**",
             "/api/marketplace/paid/webhooks/stripe",
+            "/api/qr/label-ai/billing/webhooks/stripe",
 
             // Automation webhook receiver (no auth — controller enforces per-automation
             // signature/token validation and fails closed when none is configured)

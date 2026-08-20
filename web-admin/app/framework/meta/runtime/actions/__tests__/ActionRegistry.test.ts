@@ -167,6 +167,49 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
     ).resolves.toEqual(await submitted);
   });
 
+  it('resolves record placeholders in API option endpoints', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({
+      code: '0',
+      data: [{ memberPid: 'member-002', displayName: '李四' }],
+    });
+    window.addEventListener(
+      'dialog:form',
+      (event) => {
+        const detail = (event as CustomEvent).detail;
+        expect(detail.fieldOptions.targetMemberPid).toEqual([
+          { value: 'member-002', label: '李四' },
+        ]);
+        detail.onSubmit({ targetMemberPid: 'member-002' });
+      },
+      { once: true },
+    );
+
+    await expect(
+      promptInputForm(
+        [
+          {
+            field: 'targetMemberPid',
+            type: 'select',
+            dataSource: {
+              type: 'api',
+              endpoint: '/api/tenant/members/${record.pid}/offboarding-candidates',
+              valueField: 'memberPid',
+              labelField: 'displayName',
+            },
+          },
+        ],
+        '资源交接',
+        fetchResult,
+        undefined,
+        { record: { pid: 'member-001' } },
+      ),
+    ).resolves.toEqual({ targetMemberPid: 'member-002' });
+    expect(fetchResult).toHaveBeenCalledWith(
+      '/api/tenant/members/member-001/offboarding-candidates',
+      { method: 'get' },
+    );
+  });
+
   it('preserves API option descriptions and normalizes choice defaults', async () => {
     const fetchResult = vi.fn().mockResolvedValue({
       code: '0',

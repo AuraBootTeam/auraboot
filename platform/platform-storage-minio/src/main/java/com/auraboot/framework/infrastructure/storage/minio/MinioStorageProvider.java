@@ -7,6 +7,7 @@ import io.minio.*;
 import io.minio.errors.*;
 import io.minio.http.Method;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -43,6 +44,7 @@ public class MinioStorageProvider implements StorageProvider, DisposableBean {
     private final MinioClient minioClient;
     private final String bucket;
 
+    @Autowired
     public MinioStorageProvider(StorageProperties properties) {
         StorageProperties.Minio minioConfig = properties.getMinio();
         this.bucket = minioConfig.getBucket();

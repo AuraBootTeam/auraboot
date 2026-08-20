@@ -4,7 +4,7 @@
     {
       "manifest": "docs/coverage/oss-coverage-manifest.json",
       "pluginRoot": "plugins",
-      "specRoots": ["web-admin/tests/e2e"]
+      "specRoots": ["web-admin/tests/e2e", "plugins/crm/e2e"]
     }
   ]
 }

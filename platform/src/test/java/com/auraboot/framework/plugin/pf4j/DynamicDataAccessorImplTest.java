@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
 
 @ExtendWith(MockitoExtension.class)
 class DynamicDataAccessorImplTest {
@@ -112,9 +113,35 @@ class DynamicDataAccessorImplTest {
     }
 
     @Test
+    void create_defensivelyCopiesImmutablePluginPayload() {
+        Map<String, Object> immutable = Map.of("occurred_at", "2026-08-13T00:00:00Z");
+        doAnswer(invocation -> {
+            Map<String, Object> delegated = invocation.getArgument(1);
+            delegated.put("normalized", true);
+            return delegated;
+        }).when(dynamicDataService).create(eq("m"), any());
+
+        assertThat(accessor.create("m", immutable)).containsEntry("normalized", true);
+        assertThat(immutable).doesNotContainKey("normalized");
+    }
+
+    @Test
     void update_delegates() {
         when(dynamicDataService.update("m", "1", Map.of("a", 2))).thenReturn(Map.of("id", "1", "a", 2));
         assertThat(accessor.update("m", "1", Map.of("a", 2))).containsEntry("a", 2);
+    }
+
+    @Test
+    void update_defensivelyCopiesImmutablePluginPayload() {
+        Map<String, Object> immutable = Map.of("status", "claimed");
+        doAnswer(invocation -> {
+            Map<String, Object> delegated = invocation.getArgument(2);
+            delegated.put("normalized", true);
+            return delegated;
+        }).when(dynamicDataService).update(eq("m"), eq("1"), any());
+
+        assertThat(accessor.update("m", "1", immutable)).containsEntry("normalized", true);
+        assertThat(immutable).doesNotContainKey("normalized");
     }
 
     @Test

@@ -10,6 +10,7 @@ import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDate;
 
 /**
  * User-role association data access layer.
@@ -41,6 +42,15 @@ public interface UserRoleMapper extends BaseMapper<UserRole> {
      */
     @Select("SELECT * FROM ab_user_role WHERE member_id = #{memberId} AND tenant_id = #{tenantId} AND status = 'active' AND deleted_flag = false")
     List<UserRole> findByMemberIdAndTenantId(@Param("memberId") Long memberId, @Param("tenantId") Long tenantId);
+
+    @Select("SELECT * FROM ab_user_role WHERE member_id = #{memberId} AND tenant_id = #{tenantId} " +
+            "AND status = 'active' AND deleted_flag = false " +
+            "AND (effective_date IS NULL OR effective_date <= #{asOf}) " +
+            "AND (expiry_date IS NULL OR expiry_date >= #{asOf})")
+    List<UserRole> findEffectiveByMemberIdAndTenantId(
+            @Param("memberId") Long memberId,
+            @Param("tenantId") Long tenantId,
+            @Param("asOf") LocalDate asOf);
 
     /**
      * Find association by member ID, role ID, and tenant ID

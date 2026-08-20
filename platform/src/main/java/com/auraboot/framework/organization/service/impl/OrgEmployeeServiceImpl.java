@@ -52,6 +52,7 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
 
     // Employee field codes
     private static final String EMP_NAME = "org_emp_name";
+    private static final String EMP_CODE = "org_emp_code";
     private static final String EMP_EMAIL = "org_emp_email";
     private static final String EMP_PHONE = "org_emp_phone";
     private static final String EMP_GENDER = "org_emp_gender";
@@ -202,8 +203,12 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
 
         // 3. Create employee record
         Map<String, Object> empData = new HashMap<>();
+        if (hasText(request.getEmployeeCode())) {
+            empData.put(EMP_CODE, request.getEmployeeCode().trim());
+        }
         empData.put(EMP_NAME, user.getNickName() != null ? user.getNickName() : user.getUserName());
         empData.put(EMP_EMAIL, user.getEmail());
+        empData.put(EMP_PHONE, user.getMobile());
         empData.put(EMP_DEPT_ID, request.getDeptPid());
         empData.put(EMP_MEMBER_ID, member.getPid());
         empData.put(EMP_USER_ID, user.getPid());
@@ -225,6 +230,47 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
             member.getPid(), created.get("pid"));
 
         return organizationService.toEmployeeDTO(created);
+    }
+
+    @Override
+    @Transactional
+    public OrgEmployeeDTO linkExistingMember(String employeePid, String memberPid) {
+        Map<String, Object> employee = dynamicDataService.getById(MODEL_EMPLOYEE, employeePid);
+        if (employee == null) {
+            throw new BusinessException("Employee not found: " + employeePid);
+        }
+        if (hasText(value(employee.get(EMP_MEMBER_ID)))) {
+            throw new BusinessException("Employee is already linked to a tenant member");
+        }
+
+        TenantMember member = tenantMemberService.findByPid(memberPid);
+        if (member == null) {
+            throw new BusinessException("Member not found: " + memberPid);
+        }
+        if (member.getEmployeeId() != null) {
+            throw new BusinessException("Tenant member is already linked to an employee");
+        }
+        User user = userService.findByUserId(member.getUserId());
+        if (user == null) {
+            throw new BusinessException("User not found for member: " + memberPid);
+        }
+
+        Map<String, Object> updateData = new HashMap<>();
+        updateData.put(EMP_USER_ID, user.getPid());
+        updateData.put(EMP_MEMBER_ID, member.getPid());
+        updateData.put(EMP_STATUS, StatusConstants.ACTIVE);
+        Map<String, Object> updated = dynamicDataService.update(MODEL_EMPLOYEE, employeePid, updateData);
+
+        member.setEmployeeId(extractId(employee));
+        tenantMemberService.updateMember(member);
+
+        log.info("Existing employee linked to member: employeePid={}, memberPid={}", employeePid, memberPid);
+        Map<String, Object> linkedEmployee = new HashMap<>(employee);
+        linkedEmployee.putAll(updateData);
+        if (updated != null) {
+            linkedEmployee.putAll(updated);
+        }
+        return organizationService.toEmployeeDTO(linkedEmployee);
     }
 
     @Override

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -31,6 +32,14 @@ public interface TeamMemberMapper extends BaseMapper<TeamMember> {
             LIMIT 1
             """)
     TeamMember findByTeamIdAndUserId(@Param("teamId") Long teamId, @Param("userId") Long userId);
+
+    @Update("""
+            UPDATE ab_team_member
+            SET role = #{role}, updated_by = #{operatorId}, updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{id} AND tenant_id = #{tenantId}
+            """)
+    int updateRole(@Param("id") Long id, @Param("tenantId") Long tenantId,
+                   @Param("role") String role, @Param("operatorId") Long operatorId);
 
     @Select("""
             SELECT tm.team_id FROM ab_team_member tm

@@ -84,6 +84,19 @@ public class DataScopeServiceImpl implements DataScopeService {
     }
 
     @Override
+    public boolean isOwnerInDepartments(String ownerUserPid, List<String> departmentPids) {
+        if (ownerUserPid == null || ownerUserPid.isBlank()
+                || departmentPids == null || departmentPids.isEmpty()) {
+            return false;
+        }
+        Map<String, Object> employee = organizationService.getEmployeeByUserPid(ownerUserPid);
+        if (employee == null || employee.get("org_emp_dept_id") == null) {
+            return false;
+        }
+        return departmentPids.contains(String.valueOf(employee.get("org_emp_dept_id")));
+    }
+
+    @Override
     @CacheEvict(value = "dataScopeCondition", cacheManager = "permissionCacheManager", allEntries = true)
     public void setScope(Long tenantId, Long roleId, String resourceCode, String actionCode,
                          String scopeType, String mergeStrategy) {
@@ -272,13 +285,16 @@ public class DataScopeServiceImpl implements DataScopeService {
 
         String ownerField = getDataScopeOwnerField(resourceCode);
         String deptField = getDataScopeDeptField(resourceCode);
+        String deptOwnerField = getDataScopeDeptOwnerField(resourceCode);
         String scopeTypeCode = includeSub ? DataScopeType.DEPT_AND_SUB.code() : DataScopeType.DEPT.code();
         return new DataScopeCondition(
                 scopeTypeCode,
                 ownerField,
                 resolveOwnerValue(resourceCode, ownerField),
                 deptField,
+                deptOwnerField,
                 deptPids,
+                Collections.emptyList(),
                 Collections.emptyList()
         );
     }
@@ -329,6 +345,19 @@ public class DataScopeServiceImpl implements DataScopeService {
         }
         Object deptField = dataScopeConfig.get("departmentField");
         return deptField != null ? deptField.toString() : DEFAULT_DEPT_FIELD;
+    }
+
+    /**
+     * Read an owner field whose user PID should be resolved through org employee membership.
+     * This takes precedence over departmentField when configured.
+     */
+    private String getDataScopeDeptOwnerField(String resourceCode) {
+        Map<String, Object> dataScopeConfig = getDataScopeConfig(resourceCode);
+        if (dataScopeConfig == null) {
+            return null;
+        }
+        Object field = dataScopeConfig.get("departmentOwnerField");
+        return field != null && !field.toString().isBlank() ? field.toString() : null;
     }
 
     /**

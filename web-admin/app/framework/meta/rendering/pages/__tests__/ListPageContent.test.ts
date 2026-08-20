@@ -1,8 +1,12 @@
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  applyLocalSortUpdate,
   buildListReferenceDisplayCacheKey,
+  buildBulkFieldCommandPayload,
   buildViewManageFieldOptions,
+  buildListColumnSettingsDefinitions,
+  buildListFilterFieldMetadata,
   collectListReferenceDisplayConfigs,
   findPersonalPresetSavedView,
   getListFieldValueWithAlias,
@@ -17,10 +21,106 @@ import {
   resolveListSavedViewPageKey,
   resolveListMiscBlocksPosition,
   resolveTableBlockRowActions,
+  queryConditionToExportCondition,
+  resolveUrlStateSyncAction,
   shouldSkipListData,
   shouldSkipModelFieldMeta,
   useRestoreSavedViewFromUrl,
+  useSerializedSearchParamsUpdater,
+  viewFilterToQueryCondition,
+  resolveSavedViewFilterExpressions,
+  resolveInitialListTabKey,
 } from '../ListPageContent';
+
+describe('resolveInitialListTabKey', () => {
+  it('uses the explicit all tab when the DSL provides one', () => {
+    expect(
+      resolveInitialListTabKey([
+        { blockType: 'tabs', tabs: [{ key: 'available' }, { key: 'all' }] },
+      ]),
+    ).toBe('all');
+  });
+
+  it('uses the first DSL tab when no all tab exists', () => {
+    expect(
+      resolveInitialListTabKey([
+        { blockType: 'tabs', tabs: [{ key: 'available' }, { key: 'claimed' }] },
+      ]),
+    ).toBe('available');
+  });
+
+  it('falls back to all when the page has no valid tabs', () => {
+    expect(resolveInitialListTabKey([])).toBe('all');
+    expect(resolveInitialListTabKey([{ blockType: 'tabs', tabs: [{}] }])).toBe('all');
+  });
+});
+
+describe('buildBulkFieldCommandPayload', () => {
+  it('maps the collected value only to the DSL-owned command input', () => {
+    expect(
+      buildBulkFieldCommandPayload(
+        { field: 'crm_opp_owner', component: 'MemberPicker', required: true },
+        'user-public-pid',
+      ),
+    ).toEqual({ crm_opp_owner: 'user-public-pid' });
+  });
+});
+
+describe('useSerializedSearchParamsUpdater', () => {
+  it('merges same-turn functional URL updates instead of restoring a stale query string', () => {
+    const committed: string[] = [];
+    const routerSetter = vi.fn((nextInit: any) => {
+      const next = typeof nextInit === 'function' ? nextInit(new URLSearchParams()) : nextInit;
+      committed.push(new URLSearchParams(next).toString());
+    });
+    const { result } = renderHook(() =>
+      useSerializedSearchParamsUpdater(
+        new URLSearchParams('sort=updated_at%3Adesc'),
+        routerSetter as any,
+      ),
+    );
+
+    act(() => {
+      result.current(
+        (prev: URLSearchParams) => {
+          const next = new URLSearchParams(prev);
+          next.set('view', 'personal-view');
+          return next;
+        },
+        { replace: true },
+      );
+      result.current(
+        (prev: URLSearchParams) => {
+          const next = new URLSearchParams(prev);
+          next.set('pageNum', '1');
+          return next;
+        },
+        { replace: true },
+      );
+    });
+
+    expect(committed.at(-1)).toBe('sort=updated_at%3Adesc&view=personal-view&pageNum=1');
+  });
+
+  it('drops queued list URL writes after an outgoing page navigation begins', () => {
+    const routerSetter = vi.fn();
+    const writesEnabledRef = { current: true };
+    const { result } = renderHook(() =>
+      useSerializedSearchParamsUpdater(
+        new URLSearchParams('sort=updated_at%3Adesc'),
+        routerSetter as any,
+        writesEnabledRef,
+      ),
+    );
+
+    act(() => {
+      writesEnabledRef.current = false;
+      result.current(new URLSearchParams('sort=created_at%3Aasc'), { replace: true });
+    });
+
+    expect(routerSetter).not.toHaveBeenCalled();
+  });
+});
 
 describe('renderComponentToValueType', () => {
   it('maps renderComponent (and DSL renderType) to a list cell valueType', () => {
@@ -30,6 +130,49 @@ describe('renderComponentToValueType', () => {
     expect(renderComponentToValueType('moneyinput')).toBe('currency');
     expect(renderComponentToValueType('input')).toBeUndefined();
     expect(renderComponentToValueType(undefined)).toBeUndefined();
+  });
+});
+
+describe('buildListColumnSettingsDefinitions', () => {
+  it('combines DSL defaults, hidden readable model fields and system fields', () => {
+    const modelFields = new Map<string, any>([
+      ['name', { code: 'name', dataType: 'string', extension: { displayName: '名称' } }],
+      ['amount', { code: 'amount', dataType: 'decimal', extension: { displayName: '金额' } }],
+      ['private_note', { code: 'private_note', dataType: 'string', visible: false }],
+    ]);
+
+    expect(
+      buildListColumnSettingsDefinitions(
+        [{ field: 'name', width: 180, fixed: 'left' }],
+        modelFields,
+        [{ field: 'updated_at', label: '更新时间', valueType: 'datetime' }],
+        (column) => (typeof column.label === 'string' ? column.label : '名称'),
+      ),
+    ).toEqual([
+      {
+        field: 'name',
+        label: '名称',
+        dataType: 'string',
+        group: 'business',
+        defaultVisible: true,
+        defaultWidth: 180,
+        defaultFrozenPosition: 'left',
+      },
+      {
+        field: 'amount',
+        label: '金额',
+        dataType: 'decimal',
+        group: 'business',
+        defaultVisible: false,
+      },
+      {
+        field: 'updated_at',
+        label: '更新时间',
+        dataType: 'datetime',
+        group: 'system',
+        defaultVisible: false,
+      },
+    ]);
   });
 });
 
@@ -190,12 +333,7 @@ describe('findPersonalPresetSavedView', () => {
 
 describe('pruneNoopViewConfigPatch', () => {
   it('removes empty sort patches that match the saved view state', () => {
-    expect(
-      pruneNoopViewConfigPatch(
-        { rowHeight: 'medium', sorts: [] },
-        { sorts: [] },
-      ),
-    ).toBeNull();
+    expect(pruneNoopViewConfigPatch({ rowHeight: 'medium', sorts: [] }, { sorts: [] })).toBeNull();
   });
 
   it('keeps empty sort patches when they clear a saved sort', () => {
@@ -480,6 +618,252 @@ describe('resolveColumnCapabilityDataType', () => {
     expect(resolveColumnCapabilityDataType({ field: 'name', sorter: true }, new Map())).toBe(
       'text',
     );
+  });
+});
+
+describe('buildListFilterFieldMetadata', () => {
+  it('uses model metadata for numeric, enum and reference filter controls', () => {
+    const fields = buildListFilterFieldMetadata(
+      [
+        { field: 'amount', label: 'Amount' },
+        { field: 'stage', label: 'Stage', renderType: 'tag' },
+        { field: 'owner', label: 'Owner' },
+      ],
+      new Map([
+        ['amount', { code: 'amount', dataType: 'money' }],
+        ['stage', { code: 'stage', dataType: 'enum', dictCode: 'opp_stage' }],
+        [
+          'owner',
+          {
+            code: 'owner',
+            dataType: 'reference',
+            refTarget: {
+              targetEntity: 'sys_user',
+              valueField: 'pid',
+              displayField: 'displayName',
+            },
+          },
+        ],
+      ]),
+      (column) => String(column.label),
+    );
+
+    expect(fields).toContainEqual({
+      fieldCode: 'amount',
+      label: 'Amount',
+      fieldType: 'money',
+      dictCode: undefined,
+      referenceModelCode: undefined,
+      referenceValueField: 'pid',
+      referenceDisplayField: undefined,
+    });
+    expect(fields).toContainEqual(
+      expect.objectContaining({
+        fieldCode: 'stage',
+        fieldType: 'enum',
+        dictCode: 'opp_stage',
+      }),
+    );
+    expect(fields).toContainEqual(
+      expect.objectContaining({
+        fieldCode: 'owner',
+        fieldType: 'reference',
+        referenceModelCode: 'sys_user',
+        referenceValueField: 'pid',
+        referenceDisplayField: 'displayName',
+      }),
+    );
+  });
+
+  it('can supply localized system metadata for sort chips outside the visible table', () => {
+    expect(
+      buildListFilterFieldMetadata(
+        [{ field: 'updated_at', label: '更新时间', valueType: 'datetime' }],
+        new Map(),
+        (column) => String(column.label),
+      ),
+    ).toContainEqual({
+      fieldCode: 'updated_at',
+      label: '更新时间',
+      fieldType: 'datetime',
+      referenceDisplayField: undefined,
+      referenceModelCode: undefined,
+      referenceValueField: 'pid',
+      dictCode: undefined,
+    });
+  });
+});
+
+describe('viewFilterToQueryCondition', () => {
+  it('keeps IN and BETWEEN values as arrays for list and export requests', () => {
+    const inCondition = viewFilterToQueryCondition({
+      fieldCode: 'forecast_category',
+      operator: 'in',
+      value: ['commit', 'best_case'],
+    });
+    const betweenCondition = viewFilterToQueryCondition({
+      fieldCode: 'close_date',
+      operator: 'between',
+      value: ['2026-08-01', '2026-08-31'],
+    });
+
+    expect(inCondition).toEqual({
+      fieldName: 'forecast_category',
+      operator: 'IN',
+      values: ['commit', 'best_case'],
+    });
+    expect(betweenCondition).toEqual({
+      fieldName: 'close_date',
+      operator: 'BETWEEN',
+      values: ['2026-08-01', '2026-08-31'],
+    });
+    expect(queryConditionToExportCondition(inCondition!)).toEqual({
+      field: 'forecast_category',
+      operator: 'IN',
+      value: ['commit', 'best_case'],
+    });
+  });
+
+  it('keeps numbers typed and wraps LIKE values only once', () => {
+    expect(
+      viewFilterToQueryCondition({ fieldCode: 'amount', operator: 'gte', value: 100000 }),
+    ).toEqual({ fieldName: 'amount', operator: 'GTE', value: 100000 });
+    expect(
+      viewFilterToQueryCondition({ fieldCode: 'name', operator: 'like', value: '华东' }),
+    ).toEqual({ fieldName: 'name', operator: 'LIKE', value: '%华东%' });
+  });
+});
+
+describe('resolveSavedViewFilterExpressions', () => {
+  it('resolves both supported current-user syntaxes to a public user PID', () => {
+    const resolved = resolveSavedViewFilterExpressions(
+      [
+        {
+          fieldCode: 'owner',
+          operator: 'eq',
+          value: null,
+          isExpression: true,
+          expression: '#currentUser',
+        },
+        {
+          fieldCode: 'reviewer',
+          operator: 'eq',
+          value: null,
+          isExpression: true,
+          expression: '${system.currentUser}',
+        },
+      ],
+      { currentUserPid: ' 01K2USERPID ' },
+    );
+
+    expect(resolved.map((filter) => filter.value)).toEqual(['01K2USERPID', '01K2USERPID']);
+    expect(resolved.every((filter) => filter.isExpression)).toBe(true);
+  });
+
+  it('drops stale values for unsupported expressions and preserves static filters', () => {
+    const staticFilter = { fieldCode: 'stage', operator: 'eq' as const, value: 'closed_won' };
+    const resolved = resolveSavedViewFilterExpressions(
+      [
+        staticFilter,
+        {
+          fieldCode: 'owner',
+          operator: 'eq',
+          value: 'stale-user',
+          isExpression: true,
+          expression: '#unsupported',
+        },
+      ],
+      { currentUserPid: '01K2USERPID' },
+    );
+
+    expect(resolved[0]).toBe(staticFilter);
+    expect(resolved[1].value).toBeUndefined();
+    expect(viewFilterToQueryCondition(resolved[1])).toBeNull();
+  });
+
+  it('resolves the department-owner expression to an authenticated backend resolver', () => {
+    const resolved = resolveSavedViewFilterExpressions(
+      [
+        {
+          fieldCode: 'owner',
+          operator: 'in',
+          value: null,
+          isExpression: true,
+          expression: '#currentDepartmentOwners',
+        },
+      ],
+      { currentUserPid: '01K2USERPID' },
+    );
+
+    expect(resolved[0].value).toEqual({
+      $currentDepartmentOwnerPids: { includeSubDepartments: true },
+    });
+    expect(viewFilterToQueryCondition(resolved[0])).toEqual({
+      fieldName: 'owner',
+      operator: 'IN',
+      values: [{ $currentDepartmentOwnerPids: { includeSubDepartments: true } }],
+    });
+  });
+
+  it('resolves collaborative records through the authenticated backend without exposing PIDs', () => {
+    const resolved = resolveSavedViewFilterExpressions(
+      [
+        {
+          fieldCode: 'pid',
+          operator: 'in',
+          value: null,
+          isExpression: true,
+          expression: '#currentSharedRecords',
+        },
+      ],
+      { currentUserPid: '01K2USERPID' },
+    );
+
+    expect(resolved[0].value).toEqual({
+      $currentSharedRecordPids: { action: 'read' },
+    });
+    expect(viewFilterToQueryCondition(resolved[0])).toEqual({
+      fieldName: 'pid',
+      operator: 'IN',
+      values: [{ $currentSharedRecordPids: { action: 'read' } }],
+    });
+  });
+});
+
+describe('resolveUrlStateSyncAction', () => {
+  it('marks a restored local sort before the URL effect can reapply stale search params', () => {
+    const pending = { current: undefined as string | null | undefined };
+    const restored = applyLocalSortUpdate(
+      [],
+      [{ fieldCode: 'updated_at', direction: 'desc', priority: 0 }],
+      pending,
+    );
+
+    expect(restored).toEqual([{ fieldCode: 'updated_at', direction: 'desc', priority: 0 }]);
+    expect(pending.current).toBe('updated_at:desc');
+    expect(resolveUrlStateSyncAction(pending.current, null)).toBe('wait-for-local');
+    expect(resolveUrlStateSyncAction(pending.current, 'updated_at:desc')).toBe('ack-local');
+  });
+
+  it('does not let a stale URL write clobber newer local list state', () => {
+    expect(resolveUrlStateSyncAction('new-filter-state', 'older-filter-state')).toBe(
+      'wait-for-local',
+    );
+    expect(resolveUrlStateSyncAction('new-filter-state', 'new-filter-state')).toBe('ack-local');
+    expect(resolveUrlStateSyncAction(undefined, 'browser-history-state')).toBe('apply-url');
+  });
+
+  it('keeps a restored default sort until React Router acknowledges the local URL write', () => {
+    const restoredSort = 'updated_at:desc';
+
+    expect(resolveUrlStateSyncAction(restoredSort, null)).toBe('wait-for-local');
+    expect(resolveUrlStateSyncAction(restoredSort, restoredSort)).toBe('ack-local');
+    expect(resolveUrlStateSyncAction(undefined, restoredSort)).toBe('apply-url');
+  });
+
+  it('acknowledges clearing a sort without reapplying the stale sorted URL', () => {
+    expect(resolveUrlStateSyncAction(null, 'updated_at:desc')).toBe('wait-for-local');
+    expect(resolveUrlStateSyncAction(null, null)).toBe('ack-local');
   });
 });
 

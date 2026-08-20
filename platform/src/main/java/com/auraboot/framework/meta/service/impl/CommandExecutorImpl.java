@@ -32,6 +32,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -208,7 +209,8 @@ public class CommandExecutorImpl implements CommandExecutor {
             }
 
             if (e instanceof BusinessException || e instanceof ValidationException
-                    || e instanceof com.auraboot.framework.exception.ConflictException) {
+                    || e instanceof com.auraboot.framework.exception.ConflictException
+                    || e instanceof AccessDeniedException) {
                 throw e;
             }
             throw new BusinessException(ResponseCode.BadParam, "Command execution failed: " + e.getMessage());

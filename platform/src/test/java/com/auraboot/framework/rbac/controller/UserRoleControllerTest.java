@@ -23,6 +23,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -58,14 +59,20 @@ class UserRoleControllerTest {
         AssignRolesByCodeRequest request = new AssignRolesByCodeRequest();
         request.setMemberPid("member_e2e_viewer");
         request.setRoleCodes(List.of("e2et_viewer"));
-        when(userRoleService.assignRolesToMemberByRoleCodes("member_e2e_viewer", List.of("e2et_viewer"), 100L, 700L))
+        request.setEffectiveDate(LocalDate.of(2026, 8, 13));
+        request.setExpiryDate(LocalDate.of(2026, 8, 20));
+        when(userRoleService.assignRolesToMemberByRoleCodes(
+                "member_e2e_viewer", List.of("e2et_viewer"),
+                LocalDate.of(2026, 8, 13), LocalDate.of(2026, 8, 20), 100L, 700L))
                 .thenReturn(true);
 
         ApiResponse<Boolean> response = controller.assignRolesToMemberByCode(request, 700L);
 
         assertTrue(response.isSuccess());
         assertTrue(response.getData());
-        verify(userRoleService).assignRolesToMemberByRoleCodes("member_e2e_viewer", List.of("e2et_viewer"), 100L, 700L);
+        verify(userRoleService).assignRolesToMemberByRoleCodes(
+                "member_e2e_viewer", List.of("e2et_viewer"),
+                LocalDate.of(2026, 8, 13), LocalDate.of(2026, 8, 20), 100L, 700L);
     }
 
     @Test
@@ -73,14 +80,16 @@ class UserRoleControllerTest {
         AssignRolesByPidRequest request = new AssignRolesByPidRequest();
         request.setMemberPid("member_e2e_operator");
         request.setRolePids(List.of("role_e2et_operator"));
-        when(userRoleService.assignRolesToMemberByRolePids("member_e2e_operator", List.of("role_e2et_operator"), 100L, 700L))
+        when(userRoleService.assignRolesToMemberByRolePids(
+                "member_e2e_operator", List.of("role_e2et_operator"), null, null, 100L, 700L))
                 .thenReturn(true);
 
         ApiResponse<Boolean> response = controller.assignRolesToMemberByPid(request, 700L);
 
         assertTrue(response.isSuccess());
         assertTrue(response.getData());
-        verify(userRoleService).assignRolesToMemberByRolePids("member_e2e_operator", List.of("role_e2et_operator"), 100L, 700L);
+        verify(userRoleService).assignRolesToMemberByRolePids(
+                "member_e2e_operator", List.of("role_e2et_operator"), null, null, 100L, 700L);
     }
 
     @Test
@@ -136,10 +145,10 @@ class UserRoleControllerTest {
         second.setMemberPid("member_e2e_viewer");
         second.setRolePids(List.of("role_e2et_viewer"));
         when(userRoleService.assignRolesToMemberByRolePids(
-                "member_e2e_operator", List.of("role_e2et_operator"), 100L, 700L))
+                "member_e2e_operator", List.of("role_e2et_operator"), null, null, 100L, 700L))
                 .thenReturn(true);
         when(userRoleService.assignRolesToMemberByRolePids(
-                "member_e2e_viewer", List.of("role_e2et_viewer"), 100L, 700L))
+                "member_e2e_viewer", List.of("role_e2et_viewer"), null, null, 100L, 700L))
                 .thenReturn(true);
 
         ApiResponse<Boolean> response = controller.batchAssignRolesByPid(List.of(first, second), 700L);
@@ -147,9 +156,9 @@ class UserRoleControllerTest {
         assertTrue(response.isSuccess());
         assertTrue(response.getData());
         verify(userRoleService).assignRolesToMemberByRolePids(
-                "member_e2e_operator", List.of("role_e2et_operator"), 100L, 700L);
+                "member_e2e_operator", List.of("role_e2et_operator"), null, null, 100L, 700L);
         verify(userRoleService).assignRolesToMemberByRolePids(
-                "member_e2e_viewer", List.of("role_e2et_viewer"), 100L, 700L);
+                "member_e2e_viewer", List.of("role_e2et_viewer"), null, null, 100L, 700L);
     }
 
     @Test

@@ -13,6 +13,8 @@ import java.util.List;
  *                        owner columns (e.g. crm_acc_owner) — comparing a numeric id against a
  *                        varchar column is a SQL type error
  * @param deptField       field name for department filtering on target model
+ * @param deptOwnerField  owner field whose user PID is resolved through org employee membership;
+ *                        used when the target record does not persist a department snapshot
  * @param deptPids        list of department PIDs within scope (string-based, from dynamic tables)
  * @param sharedRecordIds record IDs explicitly shared via ReBAC
  * @param sharedRecordPids public record PIDs explicitly shared via ReBAC
@@ -22,6 +24,7 @@ public record DataScopeCondition(
         String ownerField,
         Object ownerValue,
         String deptField,
+        String deptOwnerField,
         List<String> deptPids,
         List<Long> sharedRecordIds,
         List<String> sharedRecordPids
@@ -43,7 +46,23 @@ public record DataScopeCondition(
             String deptField,
             List<String> deptPids,
             List<Long> sharedRecordIds) {
-        this(scopeType, ownerField, ownerValue, deptField, deptPids, sharedRecordIds, Collections.emptyList());
+        this(scopeType, ownerField, ownerValue, deptField, null,
+                deptPids, sharedRecordIds, Collections.emptyList());
+    }
+
+    /**
+     * Backward-compatible constructor for direct-department conditions with PID shares.
+     */
+    public DataScopeCondition(
+            String scopeType,
+            String ownerField,
+            Object ownerValue,
+            String deptField,
+            List<String> deptPids,
+            List<Long> sharedRecordIds,
+            List<String> sharedRecordPids) {
+        this(scopeType, ownerField, ownerValue, deptField, null,
+                deptPids, sharedRecordIds, sharedRecordPids);
     }
 
     public DataScopeCondition withSharedRecords(List<Long> recordIds, List<String> recordPids) {
@@ -52,6 +71,7 @@ public record DataScopeCondition(
                 ownerField,
                 ownerValue,
                 deptField,
+                deptOwnerField,
                 deptPids,
                 recordIds,
                 recordPids);
@@ -62,7 +82,7 @@ public record DataScopeCondition(
      */
     public static DataScopeCondition all() {
         return new DataScopeCondition(
-                "all", null, null, null,
+                "all", null, null, null, null,
                 Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
 
@@ -71,7 +91,7 @@ public record DataScopeCondition(
      */
     public static DataScopeCondition none() {
         return new DataScopeCondition(
-                "none", null, null, null,
+                "none", null, null, null, null,
                 Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
 
@@ -86,7 +106,7 @@ public record DataScopeCondition(
      */
     public static DataScopeCondition notConfigured() {
         return new DataScopeCondition(
-                "not_configured", null, null, null,
+                "not_configured", null, null, null, null,
                 Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
     }
 

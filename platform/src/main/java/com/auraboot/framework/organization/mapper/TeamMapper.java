@@ -25,4 +25,13 @@ public interface TeamMapper extends BaseMapper<Team> {
             LIMIT 1
             """)
     Team findByPid(@Param("pid") String pid);
+
+    @Select("""
+            SELECT * FROM ab_team
+            WHERE tenant_id = #{tenantId}
+              AND pid = #{pid}
+              AND deleted_flag = FALSE
+            LIMIT 1
+            """)
+    Team findByTenantIdAndPid(@Param("tenantId") Long tenantId, @Param("pid") String pid);
 }

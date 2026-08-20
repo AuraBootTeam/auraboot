@@ -94,6 +94,8 @@ export interface RoleMemberDTO {
   departmentName: string;
   positionName: string;
   assignedAt: string;
+  effectiveDate?: string;
+  expiryDate?: string;
 }
 
 export interface PaginationResult<T> {

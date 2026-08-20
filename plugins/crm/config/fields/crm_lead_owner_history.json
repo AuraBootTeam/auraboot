@@ -1,0 +1,10 @@
+[
+  { "code": "crm_loh_lead_id", "displayName:zh-CN": "线索", "displayName:en": "Lead", "dataType": "reference", "referenceModelCode": "crm_lead_common", "constraints": { "required": true }, "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_loh_pool_id", "displayName:zh-CN": "线索池", "displayName:en": "Lead Pool", "dataType": "reference", "referenceModelCode": "crm_lead_pool", "constraints": { "required": true }, "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_loh_event", "displayName:zh-CN": "归属事件", "displayName:en": "Ownership Event", "dataType": "enum", "dictCode": "crm_lead_owner_event", "constraints": { "required": true }, "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_loh_previous_owner", "displayName:zh-CN": "前负责人", "displayName:en": "Previous Owner", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } },
+  { "code": "crm_loh_next_owner", "displayName:zh-CN": "新负责人", "displayName:en": "Next Owner", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } },
+  { "code": "crm_loh_actor", "displayName:zh-CN": "操作人", "displayName:en": "Actor", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } },
+  { "code": "crm_loh_reason", "displayName:zh-CN": "原因", "displayName:en": "Reason", "dataType": "text", "feature": { "readonly": true } },
+  { "code": "crm_loh_occurred_at", "displayName:zh-CN": "发生时间", "displayName:en": "Occurred At", "dataType": "datetime", "constraints": { "required": true }, "feature": { "readonly": true, "sortable": true } }
+]

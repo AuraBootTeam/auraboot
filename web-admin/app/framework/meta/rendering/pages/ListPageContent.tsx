@@ -9,7 +9,13 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams } from 'react-router';
+import {
+  createSearchParams,
+  useSearchParams,
+  type NavigateFunction,
+  type NavigateOptions,
+  type To,
+} from 'react-router';
 import { BlockRenderer, type PageContentProps } from '@auraboot/runtime-kernel';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -27,7 +33,10 @@ import type {
 import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
-import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import {
+  resolveCommandErrorMessage,
+  useActionHandler,
+} from '~/framework/meta/hooks/useActionHandler';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import { confirmDialog } from '~/utils/confirmDialog';
 import {
@@ -50,7 +59,6 @@ import {
   type RowHeight,
   type SavedView,
   type SavedViewCreateRequest,
-  type ColumnConfig as ViewColumnConfig,
   type ViewType,
   type ViewScope,
   type ViewConfig,
@@ -69,7 +77,19 @@ import { ListTabs } from './list/ListTabs';
 import { ListPagination } from './list/ListPagination';
 import { ListModals } from './list/ListModals';
 import { ListToolbar } from './list/ListToolbar';
+import { ViewAnalysisDrawer } from './list/ViewAnalysisDrawer';
+import {
+  buildColumnSettingsRows,
+  serializeColumnSettings,
+  type ColumnSettingsDefinition,
+  type ColumnSettingsSavePayload,
+} from '~/framework/smart/components/view/ColumnSettingsPanel';
 import { ListTable } from './list/ListTable';
+import {
+  BulkActionResultDialog,
+  type BulkActionFailure,
+  type BulkActionResult,
+} from './list/BulkActionResultDialog';
 import {
   areFiltersEqual,
   areSortsEqual,
@@ -101,11 +121,18 @@ import {
   selectedCount as selectionSelectedCount,
   isPageFullySelected as selectionIsPageFullySelected,
   getExplicitIds as selectionGetExplicitIds,
+  getExcludedIds as selectionGetExcludedIds,
   isAllMatching as selectionIsAllMatching,
 } from './list/selectionModel';
+import {
+  resolveBuiltInBulkCapabilities,
+  selectBulkEditableColumns,
+  type BuiltInBulkCapabilitiesConfig,
+} from './list/bulkCapabilities';
 import { savedViewService, type ChipPin } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
+import { TenantMemberAccountImportDialog } from './list/TenantMemberAccountImportDialog';
 import {
   buildCommandTargetParams,
   getLegacyCompatibleRecordPid,
@@ -120,6 +147,7 @@ import {
   mergeViewConfigPatch,
   summarizeViewConfigPatch,
 } from '~/framework/smart/utils/savedViewPersistence';
+import { canUseImport } from '~/framework/smart/components/data-tools/importCapability';
 
 // Dict data item type
 interface DictItem {
@@ -139,6 +167,32 @@ interface ListLoadDataParams {
   size?: number;
   filters?: Record<string, any>;
   sorts?: SortConfig[];
+  chipFilters?: ViewFilterConfig[];
+}
+
+interface BulkFieldCommandState {
+  button: ButtonConfig;
+  selectedIds: string[];
+  selectedCount: number;
+  actionLabel: string;
+  field: FieldConfig;
+  operationType: 'UPDATE' | 'DELETE';
+}
+
+export function buildBulkFieldCommandPayload(field: FieldConfig, value: unknown) {
+  return { [field.field]: value };
+}
+
+export function resolveInitialListTabKey(blocks: unknown): string {
+  if (!Array.isArray(blocks)) return 'all';
+  const tabsBlock = blocks.find(
+    (block): block is { blockType: string; tabs?: Array<{ key?: unknown }> } =>
+      Boolean(block && typeof block === 'object' && (block as any).blockType === 'tabs'),
+  );
+  const tabs = Array.isArray(tabsBlock?.tabs) ? tabsBlock.tabs : [];
+  const allTab = tabs.find((tab) => tab?.key === 'all');
+  const initialKey = allTab?.key ?? tabs[0]?.key;
+  return typeof initialKey === 'string' && initialKey.length > 0 ? initialKey : 'all';
 }
 
 export interface ListReferenceDisplayConfig {
@@ -215,6 +269,49 @@ export function viewConfigFiltersToRuntimeFilters(
     restoredFilters[filter.fieldCode] = filter.value;
   }
   return restoredFilters;
+}
+
+export interface SavedViewFilterExpressionContext {
+  /** Public user PID used by reference fields such as an opportunity owner. */
+  currentUserPid?: string;
+}
+
+const CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER = {
+  $currentDepartmentOwnerPids: { includeSubDepartments: true },
+} as const;
+
+const CURRENT_SHARED_RECORD_PIDS_RESOLVER = {
+  $currentSharedRecordPids: { action: 'read' },
+} as const;
+
+/**
+ * Resolve the deliberately small, documented set of SavedView filter expressions.
+ *
+ * SavedView expressions are convenience filters, not an authorization boundary;
+ * backend data-scope policies remain authoritative. Unknown expressions are left
+ * inactive instead of accidentally reusing a stale static value.
+ */
+export function resolveSavedViewFilterExpressions(
+  filters: ViewFilterConfig[] | undefined,
+  context: SavedViewFilterExpressionContext,
+): ViewFilterConfig[] {
+  return (filters ?? []).map((filter) => {
+    if (!filter.isExpression) return filter;
+
+    const expression = String(filter.expression ?? '').trim();
+    const resolvedValue =
+      expression === '#currentUser' || expression === '${system.currentUser}'
+        ? context.currentUserPid?.trim() || undefined
+        : expression === '#currentDepartmentOwners' ||
+            expression === '${system.currentDepartmentOwners}'
+          ? CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER
+          : expression === '#currentSharedRecords' ||
+              expression === '${system.currentSharedRecords}'
+            ? CURRENT_SHARED_RECORD_PIDS_RESOLVER
+            : undefined;
+
+    return { ...filter, value: resolvedValue };
+  });
 }
 
 function clearTransientViewSearchParams(params: URLSearchParams): void {
@@ -342,6 +439,42 @@ export function useRestoreSavedViewFromUrl({
   }, [urlViewPid, savedViews, viewsLoading, selectView, setActiveViewType]);
 }
 
+type SearchParamsSetter = ReturnType<typeof useSearchParams>[1];
+
+/**
+ * Serialize URL search-param writes made during the same React turn.
+ *
+ * React Router's functional `setSearchParams` form does not queue updates like
+ * React state does. List state can change sorts, filters, pagination and the
+ * selected SavedView together, so independently queued writers could otherwise
+ * restore an older query string and drop a newly selected `view` parameter.
+ */
+export function useSerializedSearchParamsUpdater(
+  searchParams: URLSearchParams,
+  setSearchParams: SearchParamsSetter,
+  writesEnabledRef?: { current: boolean },
+): SearchParamsSetter {
+  const latestSearchParamsRef = useRef(new URLSearchParams(searchParams));
+
+  useEffect(() => {
+    latestSearchParamsRef.current = new URLSearchParams(searchParams);
+  }, [searchParams]);
+
+  return useCallback<SearchParamsSetter>(
+    (nextInit, options) => {
+      if (writesEnabledRef?.current === false) return;
+      const resolvedInit =
+        typeof nextInit === 'function'
+          ? nextInit(new URLSearchParams(latestSearchParamsRef.current))
+          : nextInit;
+      const next = createSearchParams(resolvedInit);
+      latestSearchParamsRef.current = new URLSearchParams(next);
+      setSearchParams(next, options);
+    },
+    [setSearchParams, writesEnabledRef],
+  );
+}
+
 export function resolveTableBlockRowActions(tableBlock: any): ButtonConfig[] {
   const blockRowActions = Array.isArray(tableBlock?.rowActions) ? tableBlock.rowActions : [];
   const tableRowActions = Array.isArray(tableBlock?.table?.rowActions)
@@ -466,6 +599,119 @@ export function resolveColumnCapabilityDataType(
   );
 }
 
+export interface ListFilterFieldMetadata {
+  fieldCode: string;
+  label: string;
+  fieldType: string;
+  dictCode?: string;
+  referenceModelCode?: string;
+  referenceValueField?: string;
+  referenceDisplayField?: string;
+}
+
+/**
+ * Build the typed metadata shared by the filter picker, filter chips and value editor.
+ *
+ * A table column is primarily a presentation contract, so many DSL pages omit its
+ * data type. The model field metadata remains the source of truth for filter
+ * operators and editors (money must expose numeric comparisons, enums their dict,
+ * and references their target model).
+ */
+export function buildListFilterFieldMetadata(
+  tableColumns: ColumnConfig[],
+  modelFieldMap: Map<string, any> | undefined,
+  resolveLabel: (column: ColumnConfig) => string,
+): ListFilterFieldMetadata[] {
+  return tableColumns
+    .filter((column) => !column.isActionColumn && Boolean(column.field))
+    .map((column) => {
+      const meta = modelFieldMap?.get(column.field);
+      const refTarget = readRefTargetConfig(column, meta);
+      const referenceModelCode = String(
+        refTarget.modelCode ||
+          refTarget.targetModel ||
+          refTarget.targetEntity ||
+          meta?.referenceModelCode ||
+          meta?.extension?.referenceModelCode ||
+          '',
+      ).trim();
+      return {
+        fieldCode: column.field,
+        label: resolveLabel(column),
+        fieldType: resolveColumnCapabilityDataType(column, modelFieldMap),
+        dictCode: column.dictCode || meta?.dictCode || meta?.extension?.dictCode || undefined,
+        referenceModelCode: referenceModelCode || undefined,
+        referenceValueField: String(
+          refTarget.valueField || refTarget.targetValueField || refTarget.idField || 'pid',
+        ),
+        referenceDisplayField:
+          String(
+            refTarget.displayField || refTarget.labelField || refTarget.targetField || '',
+          ).trim() || undefined,
+      };
+    });
+}
+
+export interface ListQueryFilterCondition {
+  fieldName: string;
+  operator: string;
+  value?: unknown;
+  values?: unknown[];
+}
+
+/** Preserve array-valued IN/BETWEEN filters for the dynamic query contract. */
+export function viewFilterToQueryCondition(
+  filter: ViewFilterConfig,
+): ListQueryFilterCondition | null {
+  if (!filter.fieldCode) return null;
+  const operator = (filter.operator || 'eq').toUpperCase();
+  if (operator === 'ISNULL' || operator === 'ISNOTNULL') {
+    return { fieldName: filter.fieldCode, operator, value: null };
+  }
+  if (filter.value == null || filter.value === '') return null;
+  if (operator === 'IN' || operator === 'BETWEEN') {
+    const values = Array.isArray(filter.value) ? filter.value : [filter.value];
+    if (values.length === 0) return null;
+    return { fieldName: filter.fieldCode, operator, values };
+  }
+  return {
+    fieldName: filter.fieldCode,
+    operator,
+    value: operator === 'LIKE' ? `%${String(filter.value)}%` : filter.value,
+  };
+}
+
+/** Convert the dynamic-list condition shape to the export endpoint shape. */
+export function queryConditionToExportCondition(condition: ListQueryFilterCondition): {
+  field: string;
+  operator: string;
+  value: unknown;
+} {
+  return {
+    field: condition.fieldName,
+    operator: condition.operator,
+    value: condition.values ?? condition.value ?? null,
+  };
+}
+
+export function resolveUrlStateSyncAction(
+  pendingLocalEncoding: string | null | undefined,
+  currentUrlEncoding: string | null,
+): 'apply-url' | 'ack-local' | 'wait-for-local' {
+  if (pendingLocalEncoding === undefined) return 'apply-url';
+  return pendingLocalEncoding === currentUrlEncoding ? 'ack-local' : 'wait-for-local';
+}
+
+export function applyLocalSortUpdate(
+  previous: SortConfig[],
+  update: SortConfig[] | ((previous: SortConfig[]) => SortConfig[]),
+  pendingUrlSync: { current: string | null | undefined },
+): SortConfig[] {
+  const next = typeof update === 'function' ? update(previous) : update;
+  pendingUrlSync.current = encodeSorts(next);
+  return next;
+}
+
 export interface ViewManageFieldOption {
   code: string;
   name: string;
@@ -501,6 +747,57 @@ export function buildViewManageFieldOptions(
   }
 
   return Array.from(byCode.values());
+}
+
+export function buildListColumnSettingsDefinitions(
+  baseColumns: ColumnConfig[],
+  modelFieldMap: Map<string, any> | undefined,
+  systemColumns: ColumnConfig[],
+  resolveLabel: (column: ColumnConfig) => string,
+): ColumnSettingsDefinition[] {
+  const definitions = new Map<string, ColumnSettingsDefinition>();
+
+  for (const column of baseColumns) {
+    if (!column.field || column.isActionColumn) continue;
+    definitions.set(column.field, {
+      field: column.field,
+      label: resolveLabel(column),
+      dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
+      group: 'business',
+      defaultVisible: true,
+      defaultWidth:
+        typeof column.width === 'number'
+          ? column.width
+          : typeof column.width === 'string'
+            ? Number.parseInt(column.width, 10) || undefined
+            : undefined,
+      defaultFrozenPosition: column.fixed,
+    });
+  }
+
+  for (const [fieldCode, meta] of modelFieldMap?.entries() ?? []) {
+    if (!fieldCode || meta?.visible === false || definitions.has(fieldCode)) continue;
+    definitions.set(fieldCode, {
+      field: fieldCode,
+      label: resolveFieldMetaDisplayName(fieldCode, modelFieldMap) ?? fieldCode,
+      dataType: resolveFieldMetaDataType(fieldCode, modelFieldMap) ?? 'text',
+      group: 'business',
+      defaultVisible: false,
+    });
+  }
+
+  for (const column of systemColumns) {
+    if (!column.field || definitions.has(column.field)) continue;
+    definitions.set(column.field, {
+      field: column.field,
+      label: resolveLabel(column),
+      dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
+      group: 'system',
+      defaultVisible: false,
+    });
+  }
+
+  return Array.from(definitions.values());
 }
 
 export function collectListReferenceDisplayConfigs(
@@ -638,23 +935,6 @@ interface InviteCodeData {
   createdAt?: string;
 }
 
-interface TenantMemberImportError {
-  rowNumber: number;
-  name?: string | null;
-  email?: string | null;
-  reason: string;
-}
-
-interface TenantMemberImportResult {
-  totalRows: number;
-  successCount: number;
-  errorCount: number;
-  existingUserBoundCount: number;
-  invitedCount: number;
-  employeeCreatedCount: number;
-  errors: TenantMemberImportError[];
-}
-
 // Quick filter chip definitions — preset views (T8). Keys + filter logic live
 // in ./list/quickFilterPresets so the toolbar and the view switcher share one
 // source of truth.
@@ -686,7 +966,13 @@ function ListPageContentInner(props: PageContentProps) {
   );
 
   // Parse filter_* params from URL for drill-down navigation
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, routerSetSearchParams] = useSearchParams();
+  const listUrlWritesEnabledRef = useRef(true);
+  const setSearchParams = useSerializedSearchParamsUpdater(
+    searchParams,
+    routerSetSearchParams,
+    listUrlWritesEnabledRef,
+  );
   const urlFilters = useMemo(() => {
     const filters: Record<string, any> = {};
     searchParams.forEach((value, key) => {
@@ -721,6 +1007,8 @@ function ListPageContentInner(props: PageContentProps) {
     createSelectionModel(),
   );
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkFieldCommand, setBulkFieldCommand] = useState<BulkFieldCommandState | null>(null);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
   const [pageState, setPageState] = useState(() => ({
     filters: { ...urlFilters } as Record<string, any>,
     pagination: {
@@ -733,6 +1021,9 @@ function ListPageContentInner(props: PageContentProps) {
   // P2-1 fix: destructure state for convenience
   const { filters, pagination } = pageState;
   const schemaExtension = (schema as any)?.extension ?? {};
+  const isApiDatasourcePage = Boolean(
+    schema?.dataSource?.type === 'api' && schema.dataSource.endpoint,
+  );
   const skipListData = shouldSkipListData(schema);
   const skipModelFieldMeta = shouldSkipModelFieldMeta(schema, skipListData);
   const miscBlocksPosition = resolveListMiscBlocksPosition(schema);
@@ -794,8 +1085,26 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Active sort state — initialized from URL > SavedView > DSL defaultSort
   const [activeSorts, setActiveSorts] = useState<SortConfig[]>(() => urlSorts);
+  const pendingSortUrlSyncRef = useRef<string | null | undefined>(undefined);
+  const setLocalActiveSorts = useCallback(
+    (update: SortConfig[] | ((previous: SortConfig[]) => SortConfig[])) => {
+      setActiveSorts((previous) => applyLocalSortUpdate(previous, update, pendingSortUrlSyncRef));
+    },
+    [],
+  );
   // Active filter chips — user-added filters via chip bar (separate from filters)
   const [chipFilters, setChipFilters] = useState<ViewFilterConfig[]>(() => urlChipFilters);
+  const pendingChipFilterUrlSyncRef = useRef<string | null | undefined>(undefined);
+  const setLocalChipFilters = useCallback(
+    (update: ViewFilterConfig[] | ((previous: ViewFilterConfig[]) => ViewFilterConfig[])) => {
+      setChipFilters((previous) => {
+        const next = typeof update === 'function' ? update(previous) : update;
+        pendingChipFilterUrlSyncRef.current = encodeFilters(next);
+        return next;
+      });
+    },
+    [],
+  );
   // FilterFieldPicker state
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
   const [fieldPickerAnchor, setFieldPickerAnchor] = useState<
@@ -806,6 +1115,11 @@ function ListPageContentInner(props: PageContentProps) {
   const [valuePopoverAnchor, setValuePopoverAnchor] = useState<
     { x: number; y: number } | undefined
   >();
+  const chipFiltersRef = useRef<ViewFilterConfig[]>(chipFilters);
+
+  useEffect(() => {
+    chipFiltersRef.current = chipFilters;
+  }, [chipFilters]);
 
   // Client-side grouping state
   const [groupByField, setGroupByField] = useState<string | null>(null);
@@ -865,6 +1179,11 @@ function ListPageContentInner(props: PageContentProps) {
       (tableBlock as any)?.table?.bulkActions ?? (tableBlock as any)?.bulkActions ?? [];
     return Array.isArray(configured) ? configured : [];
   }, [tableBlock]);
+  const tableBulkCapabilities = useMemo<BuiltInBulkCapabilitiesConfig | undefined>(() => {
+    const configured =
+      (tableBlock as any)?.table?.bulkCapabilities ?? (tableBlock as any)?.bulkCapabilities;
+    return configured && typeof configured === 'object' ? configured : undefined;
+  }, [tableBlock]);
   // T9 — ids of the rows currently loaded on this page (cross-page selection
   // accumulates across these as the user pages).
   const pageRowIds = useMemo(
@@ -898,7 +1217,11 @@ function ListPageContentInner(props: PageContentProps) {
   // explicit mode this is the full cross-page pick; in all-matching mode we
   // fall back to the currently-selected rows on this page (a finite, safe set)
   // — export is the cross-page path and uses the filter directly.
-  const selectedIdList = allMatchingSelected ? Array.from(selectedIds) : explicitSelectedIds;
+  const selectedIdList = allMatchingSelected ? [] : explicitSelectedIds;
+  const allMatchingExcludedIds = useMemo(
+    () => selectionGetExcludedIds(selectionState),
+    [selectionState],
+  );
   // Whether row selection (checkbox column + bulk bar + select-all banner) is
   // active for this page — DSL opt-in via the table block, minus any host-level
   // override.
@@ -962,13 +1285,30 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Sync URL chip filters -> local state (supports refresh and browser back/forward).
   useEffect(() => {
+    const currentUrlEncoding = searchParams.get('filters');
+    const syncAction = resolveUrlStateSyncAction(
+      pendingChipFilterUrlSyncRef.current,
+      currentUrlEncoding,
+    );
+    if (syncAction === 'wait-for-local') return;
+    if (syncAction === 'ack-local') {
+      pendingChipFilterUrlSyncRef.current = undefined;
+      return;
+    }
     setChipFilters((prev) => (areFiltersEqual(prev, urlChipFilters) ? prev : urlChipFilters));
-  }, [urlChipFilters]);
+  }, [searchParams, urlChipFilters]);
 
   // Sync URL sorts -> local state (supports refresh and browser back/forward).
   useEffect(() => {
+    const currentUrlEncoding = searchParams.get('sort');
+    const syncAction = resolveUrlStateSyncAction(pendingSortUrlSyncRef.current, currentUrlEncoding);
+    if (syncAction === 'wait-for-local') return;
+    if (syncAction === 'ack-local') {
+      pendingSortUrlSyncRef.current = undefined;
+      return;
+    }
     setActiveSorts((prev) => (areSortsEqual(prev, urlSorts) ? prev : urlSorts));
-  }, [urlSorts]);
+  }, [searchParams, urlSorts]);
 
   // Sync local pagination state -> URL query params (preserve existing filter_* params).
   useEffect(() => {
@@ -991,6 +1331,16 @@ function ListPageContentInner(props: PageContentProps) {
       filters,
     },
   });
+  const navigateAwayFromList = useCallback(
+    ((toOrDelta: To | number, options?: NavigateOptions) => {
+      // List URL state effects (SavedView sorts, filters and pagination) can still be queued
+      // when a user clicks Create/View/Edit. Once an outgoing navigation starts, those stale
+      // effects must never replace the destination route with the list's query-string URL.
+      listUrlWritesEnabledRef.current = false;
+      return typeof toOrDelta === 'number' ? navigate(toOrDelta) : navigate(toOrDelta, options);
+    }) as NavigateFunction,
+    [navigate],
+  );
 
   const appendListSearch = useCallback(
     (path: string) => {
@@ -1006,13 +1356,13 @@ function ListPageContentInner(props: PageContentProps) {
       if (recordPid == null || recordPid === '') {
         return;
       }
-      navigate(appendListSearch(`/p/${tableName}/view/${String(recordPid)}`));
+      navigateAwayFromList(appendListSearch(`/p/${tableName}/view/${String(recordPid)}`));
     },
-    [appendListSearch, navigate, tableName],
+    [appendListSearch, navigateAwayFromList, tableName],
   );
 
   // Tab state for tabs
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState(() => resolveInitialListTabKey(schema?.blocks));
   const [importOpen, setImportOpen] = useState(false);
   const [viewManageOpen, setViewManageOpen] = useState(false);
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
@@ -1049,12 +1399,7 @@ function ListPageContentInner(props: PageContentProps) {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteCodeData, setInviteCodeData] = useState<InviteCodeData | null>(null);
   const [memberImportDialogOpen, setMemberImportDialogOpen] = useState(false);
-  const [memberImportFile, setMemberImportFile] = useState<File | null>(null);
-  const [memberImportLoading, setMemberImportLoading] = useState(false);
-  const [memberImportError, setMemberImportError] = useState<string | null>(null);
-  const [memberImportResult, setMemberImportResult] = useState<TenantMemberImportResult | null>(
-    null,
-  );
+  const [bulkActionResult, setBulkActionResult] = useState<BulkActionResult | null>(null);
   const { formats: dateTimeFormats, timezone: effectiveTimezone } = useTimezone();
   const pendingSavedViewFiltersRef = useRef<Record<string, any> | null>(null);
   // When restoring a preset view from ?preset= on mount, skip the first run of
@@ -1067,6 +1412,10 @@ function ListPageContentInner(props: PageContentProps) {
 
   // SavedView integration
   const modelCode = schema?.modelCode || tableName;
+  const importConfig = schemaExtension.import as
+    | import('~/framework/smart/components/data-tools/ImportModal').ImportConfiguration
+    | undefined;
+  const canImport = canUseImport(importConfig, hasPermission);
   const pageKey = resolveListSavedViewPageKey(schema, tableName);
   const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant_member';
   const hideSavedViews =
@@ -1077,6 +1426,7 @@ function ListPageContentInner(props: PageContentProps) {
     listExtensions?.hideQuickFilters ?? Boolean(schemaExtension.hideQuickFilters);
   const {
     views: savedViews,
+    accessibleViews,
     currentView,
     selectView,
     selectDefaultView,
@@ -1092,9 +1442,17 @@ function ListPageContentInner(props: PageContentProps) {
   } = useSavedViews({
     modelCode,
     pageKey,
-    scopeFilter: 'personal',
+    scopeFilter: 'all',
     autoLoad: !!schema && !hideSavedViews && !skipListData,
   });
+
+  const availableViewTypes = useMemo<ViewType[]>(() => {
+    const supported = new Set<ViewType>(['table']);
+    for (const view of accessibleViews) {
+      if (view.viewType === 'kanban') supported.add('kanban');
+    }
+    return ['table', 'kanban'].filter((type) => supported.has(type as ViewType)) as ViewType[];
+  }, [accessibleViews]);
 
   // Quick-filter chip pins (Half B): the current user's pinned views for this
   // model/page, merged into the chip row alongside built-in presets + global pins.
@@ -1114,10 +1472,9 @@ function ListPageContentInner(props: PageContentProps) {
     void loadChipPins();
   }, [loadChipPins]);
 
-  // Team-scoped views the user may pin for their team. The saved-view list above
-  // is personal-only (scopeFilter='personal'), so team views are fetched
-  // separately and only when the user can author team pins (team-manage or the
-  // broader view-manage, mirroring the backend gate).
+  // Team-scoped views the user may pin for their team. They are already visible
+  // in the all-scope selector; this separate fetch is only for team pin authoring
+  // and remains permission-gated.
   const canManageTeamPins =
     hasPermission('dashboard.saved_view.team.update') ||
     hasPermission('dashboard.saved_view.update');
@@ -1179,6 +1536,70 @@ function ListPageContentInner(props: PageContentProps) {
         ? mergeViewConfigPatch(currentView.viewConfig, pendingViewConfig ?? {})
         : undefined,
     [currentView, pendingViewConfig],
+  );
+  const activeViewTemplate = useMemo(
+    () =>
+      accessibleViews.find((view) => view.viewType === activeViewType && view.isDefault) ??
+      accessibleViews.find((view) => view.viewType === activeViewType) ??
+      null,
+    [accessibleViews, activeViewType],
+  );
+  const activeTabViewFilter = useMemo<ViewFilterConfig | null>(() => {
+    const tabsBlock = schema?.blocks?.find((block: any) => block.blockType === 'tabs');
+    const tab = (tabsBlock?.tabs as any[] | undefined)?.find(
+      (candidate) => candidate.key === activeTab,
+    );
+    if (!tab?.filter) return null;
+    const fieldCode = tab.filter.fieldName || tab.filter.field;
+    if (!fieldCode) return null;
+    return {
+      fieldCode,
+      operator: String(tab.filter.operator || 'EQ').toLowerCase() as ViewFilterConfig['operator'],
+      value: tab.filter.value,
+    };
+  }, [activeTab, schema?.blocks]);
+  const resolvedEffectiveViewFilters = useMemo(
+    () =>
+      resolveSavedViewFilterExpressions(effectiveViewConfig?.filters, {
+        currentUserPid: user?.pid,
+      }),
+    [effectiveViewConfig?.filters, user?.pid],
+  );
+  const activeRuntimeViewFilters = useMemo<ViewFilterConfig[]>(() => {
+    const merged = [
+      ...resolvedEffectiveViewFilters,
+      ...Object.entries(filters)
+        .filter(([, value]) => value != null && value !== '')
+        .map(([fieldCode, value]) => ({
+          fieldCode,
+          operator: 'eq' as const,
+          value,
+        })),
+      ...chipFilters,
+      ...(activeTabViewFilter ? [activeTabViewFilter] : []),
+    ];
+    const unique = new Map<string, ViewFilterConfig>();
+    for (const filter of merged) {
+      unique.set(`${filter.fieldCode}:${filter.operator}:${JSON.stringify(filter.value)}`, filter);
+    }
+    return Array.from(unique.values());
+  }, [activeTabViewFilter, chipFilters, filters, resolvedEffectiveViewFilters]);
+  const effectiveNonNullViewConfig = useMemo<Partial<ViewConfig>>(
+    () =>
+      Object.fromEntries(
+        Object.entries(effectiveViewConfig ?? {}).filter(
+          ([, value]) => value !== null && value !== undefined,
+        ),
+      ),
+    [effectiveViewConfig],
+  );
+  const activeViewConfig = useMemo<ViewConfig>(
+    () => ({
+      ...(activeViewTemplate?.viewConfig ?? {}),
+      ...effectiveNonNullViewConfig,
+      filters: activeRuntimeViewFilters,
+    }),
+    [activeRuntimeViewFilters, activeViewTemplate?.viewConfig, effectiveNonNullViewConfig],
   );
   const pendingViewSummary = useMemo(
     () => summarizeViewConfigPatch(pendingViewConfig),
@@ -1263,27 +1684,37 @@ function ListPageContentInner(props: PageContentProps) {
   // Restore view from URL ?view= parameter (highest priority).
   useRestoreSavedViewFromUrl({
     urlViewPid,
-    savedViews,
+    savedViews: accessibleViews,
     viewsLoading,
     selectView,
     setActiveViewType,
   });
 
+  const currentViewPid = currentView?.pid;
+  const currentViewType = currentView?.viewType;
+  const currentViewConfig = currentView?.viewConfig;
   useEffect(() => {
-    if (!currentView) return;
-    setActiveViewType((currentView.viewType as ViewType) || 'table');
-  }, [currentView?.pid, currentView?.viewType]);
+    if (!currentViewPid) return;
+    setActiveViewType((currentViewType as ViewType) || 'table');
+  }, [currentViewPid, currentViewType]);
 
   const applyViewConfigToListState = useCallback(
     (viewConfig: ViewConfig | undefined): Record<string, any> => {
       const vc = viewConfig ?? {};
-      const restoredFilters = viewConfigFiltersToRuntimeFilters(vc.filters);
+      const restoredViewFilters = resolveSavedViewFilterExpressions(vc.filters, {
+        currentUserPid: user?.pid,
+      });
+      const restoredFilters: Record<string, any> = {};
 
       pendingSavedViewFiltersRef.current = restoredFilters;
       setFilters(restoredFilters);
+      chipFiltersRef.current = restoredViewFilters;
+      setLocalChipFilters((prev) =>
+        areFiltersEqual(prev, restoredViewFilters) ? prev : restoredViewFilters,
+      );
 
       const restoredSorts = vc.sorts ?? [];
-      setActiveSorts((prev) => (areSortsEqual(prev, restoredSorts) ? prev : restoredSorts));
+      setLocalActiveSorts((prev) => (areSortsEqual(prev, restoredSorts) ? prev : restoredSorts));
 
       if (vc.pagination?.pageSize && vc.pagination.pageSize > 0) {
         setPagination((prev: typeof pagination) => ({
@@ -1294,16 +1725,16 @@ function ListPageContentInner(props: PageContentProps) {
 
       return restoredFilters;
     },
-    [setFilters, setPagination],
+    [setFilters, setLocalActiveSorts, setLocalChipFilters, setPagination, user?.pid],
   );
 
   // Apply SavedView viewConfig (pagination + filters + sorts) when view changes.
   // Empty config is meaningful: it restores the selected view back to a clean list state.
   useEffect(() => {
     if (activeQuickFilterRef.current) return;
-    if (!currentView) return;
-    applyViewConfigToListState(currentView.viewConfig);
-  }, [currentView?.pid, currentView?.viewConfig, applyViewConfigToListState]);
+    if (!currentViewPid) return;
+    applyViewConfigToListState(currentViewConfig);
+  }, [applyViewConfigToListState, currentViewConfig, currentViewPid]);
 
   const clearKeyword = useCallback(() => {
     keywordRef.current = '';
@@ -1383,12 +1814,14 @@ function ListPageContentInner(props: PageContentProps) {
       },
       state: {
         filters,
+        selectedIds: selectedIdList,
       },
       locale,
       t: (key: string) => t(key),
+      token,
       __dataSourceManager: dataSourceManager,
     });
-  }, [locale, filters, t, dataSourceManager]);
+  }, [locale, filters, selectedIdList, t, token, dataSourceManager]);
 
   // Get current tab filter as QueryCondition (if tabs block exists)
   const getTabFilter = useCallback((): {
@@ -1431,7 +1864,7 @@ function ListPageContentInner(props: PageContentProps) {
       userFilters?: Record<string, any>,
       chipFiltersList?: ViewFilterConfig[],
     ) => {
-      const conditions: Array<{ fieldName: string; operator: string; value: string }> = [];
+      const conditions: ListQueryFilterCondition[] = [];
       if (tabCondition) {
         conditions.push(tabCondition);
       }
@@ -1471,23 +1904,8 @@ function ListPageContentInner(props: PageContentProps) {
       if (chipFiltersList) {
         for (const cf of chipFiltersList) {
           if (!cf.fieldCode) continue;
-          // Skip unary operators (isNull/isNotNull) that don't need a value
-          if (cf.operator === 'isNull' || cf.operator === 'isNotNull') {
-            conditions.push({
-              fieldName: cf.fieldCode,
-              operator: cf.operator.toUpperCase(),
-              value: '',
-            });
-            continue;
-          }
-          if (cf.value == null || cf.value === '') continue;
-          const op = cf.operator?.toUpperCase() || 'EQ';
-          const val = String(cf.value);
-          conditions.push({
-            fieldName: cf.fieldCode,
-            operator: op,
-            value: op === 'LIKE' ? `%${val}%` : val,
-          });
+          const condition = viewFilterToQueryCondition(cf);
+          if (condition) conditions.push(condition);
         }
       }
       return conditions.length > 0 ? JSON.stringify(conditions) : undefined;
@@ -1583,7 +2001,11 @@ function ListPageContentInner(props: PageContentProps) {
         } else {
           // For standard dynamic tables, use JSON filters array
           const tabCondition = getTabFilter();
-          const filtersParam = buildFiltersParam(tabCondition, params?.filters, chipFilters);
+          const filtersParam = buildFiltersParam(
+            tabCondition,
+            params?.filters,
+            params?.chipFilters ?? chipFiltersRef.current,
+          );
           if (filtersParam) {
             queryParams.filters = filtersParam;
           }
@@ -1673,7 +2095,6 @@ function ListPageContentInner(props: PageContentProps) {
       namedQueryCode,
       tableBlock,
       activeSorts,
-      chipFilters,
       skipListData,
     ],
   );
@@ -1735,7 +2156,7 @@ function ListPageContentInner(props: PageContentProps) {
   // to avoid temporal dead zone ("Cannot access 'handleAction' before initialization").
   const { handleAction } = useActionHandler({
     runtime,
-    navigate,
+    navigate: navigateAwayFromList,
     tableName,
     context: {
       loadData,
@@ -1755,7 +2176,8 @@ function ListPageContentInner(props: PageContentProps) {
     // full-page "加载失败" ErrorAlert (which is reserved for data/schema load failures), forcing a
     // reload to recover. Blocking a single row's action should never blank the table.
     onError: (err) => {
-      if (import.meta.env?.DEV) console.warn('[ListPageContent] action error (shown via toast):', err.message);
+      if (import.meta.env?.DEV)
+        console.warn('[ListPageContent] action error (shown via toast):', err.message);
     },
   });
 
@@ -1948,6 +2370,7 @@ function ListPageContentInner(props: PageContentProps) {
     [
       schema,
       buildFiltersParam,
+      chipFilters,
       filters,
       pagination.pageSize,
       tableName,
@@ -2104,7 +2527,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Column header sort toggle: none → asc → desc → none
   // Shift+click appends to multi-sort, regular click replaces
   const toggleSort = useCallback((fieldCode: string, multiSort = false) => {
-    setActiveSorts((prev) => {
+    setLocalActiveSorts((prev) => {
       const existing = prev.find((s) => s.fieldCode === fieldCode);
       let next: SortConfig[];
       if (!existing) {
@@ -2122,7 +2545,7 @@ function ListPageContentInner(props: PageContentProps) {
       }
       return next;
     });
-  }, []);
+  }, [setLocalActiveSorts]);
 
   // Debounced re-fetch when sorts or chip filters change (150ms).
   // Prevents multiple rapid API calls when users adjust multiple filters
@@ -2150,6 +2573,7 @@ function ListPageContentInner(props: PageContentProps) {
     const encoded = encodeSorts(activeSorts);
     const currentEncoded = searchParams.get('sort');
     if ((encoded ?? null) !== (currentEncoded ?? null)) {
+      pendingSortUrlSyncRef.current = encoded;
       setSearchParams(
         (prev) => {
           const p = new URLSearchParams(prev);
@@ -2187,6 +2611,7 @@ function ListPageContentInner(props: PageContentProps) {
     const encoded = encodeFilters(chipFilters);
     const currentEncoded = searchParams.get('filters');
     if ((encoded ?? null) === (currentEncoded ?? null)) return;
+    pendingChipFilterUrlSyncRef.current = encoded;
     shouldPersistPaginationToUrlRef.current = true;
     setSearchParams(
       (prev) => {
@@ -2243,6 +2668,97 @@ function ListPageContentInner(props: PageContentProps) {
     [schema?.modelCode, tableName, loadData, pagination.pageSize, filters],
   );
 
+  const executeTargetedBulkCommand = useCallback(
+    async (
+      button: ButtonConfig,
+      ids: string[],
+      payload: Record<string, unknown>,
+      operationType: 'UPDATE' | 'DELETE' = 'UPDATE',
+    ) => {
+      const label = resolveButtonLabel(button);
+      const isZhLocale = locale.toLowerCase().startsWith('zh');
+      let successCount = 0;
+      const failures: BulkActionFailure[] = [];
+      const recordLabelById = new Map(
+        data.map((record) => {
+          const id = getPublicRecordKey(record) || '';
+          const recordLabel =
+            record.name ||
+            record.title ||
+            record.crm_opp_name ||
+            record.code ||
+            record.crm_opp_code ||
+            id;
+          return [id, String(recordLabel)] as const;
+        }),
+      );
+      const command = (button.action as any)?.command || button.commandCode;
+      if (!command) return;
+
+      for (const id of ids) {
+        try {
+          const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
+            method: 'post',
+            params: {
+              ...buildCommandTargetParams(id),
+              payload,
+              operationType,
+            },
+            token: token || undefined,
+          });
+          if (ResultHelper.isSuccess(result)) {
+            successCount += 1;
+          } else {
+            failures.push({
+              recordPid: id,
+              recordLabel: recordLabelById.get(id) || id,
+              reason: resolveCommandErrorMessage(result, command),
+            });
+          }
+        } catch (error) {
+          failures.push({
+            recordPid: id,
+            recordLabel: recordLabelById.get(id) || id,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      if (successCount > 0) {
+        setSelectionState(selectionClearSelection);
+        await loadData({ page: 0, size: pagination.pageSize, filters });
+      }
+
+      if (failures.length === 0) {
+        showToast(
+          translateOrFallback(
+            t,
+            'list.bulkAction.success',
+            isZhLocale
+              ? `${label}已完成，成功 ${successCount} 条`
+              : `${label} completed for ${successCount} records`,
+          ),
+          'success',
+        );
+      } else {
+        showToast(
+          successCount > 0
+            ? translateOrFallback(
+                t,
+                'list.bulkAction.partial',
+                isZhLocale
+                  ? `${label}部分完成：成功 ${successCount} 条，失败 ${failures.length} 条`
+                  : `${label} completed for ${successCount} records; ${failures.length} failed`,
+              )
+            : failures[0]?.reason || `${label} failed`,
+          successCount > 0 ? 'warning' : 'error',
+        );
+        setBulkActionResult({ actionLabel: label, successCount, failures });
+      }
+    },
+    [data, filters, loadData, locale, pagination.pageSize, resolveButtonLabel, showToast, t, token],
+  );
+
   const handleBulkAction = useCallback(
     async (button: ButtonConfig, ids: string[]) => {
       if (ids.length === 0) return;
@@ -2263,6 +2779,30 @@ function ListPageContentInner(props: PageContentProps) {
         return;
       }
 
+      if (actionType === 'bulk_field_command') {
+        const field = (actionDef as any)?.input as FieldConfig | undefined;
+        if (!field?.field) {
+          showToast(
+            translateOrFallback(
+              t,
+              'list.bulkAction.missingInput',
+              'Bulk field action is missing its input field',
+            ),
+            'error',
+          );
+          return;
+        }
+        setBulkFieldCommand({
+          button,
+          selectedIds: [...ids],
+          selectedCount: ids.length,
+          actionLabel: resolveButtonLabel(button),
+          field,
+          operationType: (actionDef as any)?.operationType || 'UPDATE',
+        });
+        return;
+      }
+
       const confirmKey = button.confirm || button.confirmMessageKey;
       if (confirmKey) {
         const { title, content } = resolveConfirmDialog(confirmKey, t);
@@ -2274,32 +2814,22 @@ function ListPageContentInner(props: PageContentProps) {
         if (!confirmed) return;
       }
 
-      const label = resolveButtonLabel(button);
-      let successCount = 0;
-      const failures: string[] = [];
+      if (actionType === 'bulk_state_transition' || actionType === 'bulk_record_command') {
+        await executeTargetedBulkCommand(
+          button,
+          ids,
+          {},
+          (actionDef as any)?.operationType || 'UPDATE',
+        );
+        return;
+      }
 
-      if (actionType === 'bulk_state_transition') {
-        for (const id of ids) {
-          try {
-            const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
-              method: 'post',
-              params: {
-                ...buildCommandTargetParams(id),
-                payload: {},
-                operationType: 'UPDATE',
-              },
-              token: token || undefined,
-            });
-            if (ResultHelper.isSuccess(result)) {
-              successCount += 1;
-            } else {
-              failures.push((result as any).desc || (result as any).message || id);
-            }
-          } catch (error) {
-            failures.push(error instanceof Error ? error.message : String(error));
-          }
-        }
-      } else if (actionType === 'bulk_command') {
+      const label = resolveButtonLabel(button);
+      const isZhLocale = locale.toLowerCase().startsWith('zh');
+      let successCount = 0;
+      const failures: BulkActionFailure[] = [];
+
+      if (actionType === 'bulk_command') {
         const result = await fetchResult(`/api/meta/commands/execute/${command}`, {
           method: 'post',
           params: {
@@ -2314,7 +2844,11 @@ function ListPageContentInner(props: PageContentProps) {
         if (ResultHelper.isSuccess(result)) {
           successCount = ids.length;
         } else {
-          failures.push((result as any).desc || (result as any).message || command);
+          failures.push({
+            recordPid: command,
+            recordLabel: command,
+            reason: resolveCommandErrorMessage(result, command),
+          });
         }
       } else {
         showToast(
@@ -2338,7 +2872,9 @@ function ListPageContentInner(props: PageContentProps) {
           translateOrFallback(
             t,
             'list.bulkAction.success',
-            `${label} completed for ${successCount} records`,
+            isZhLocale
+              ? `${label}已完成，成功 ${successCount} 条`
+              : `${label} completed for ${successCount} records`,
           ),
           'success',
         );
@@ -2347,18 +2883,24 @@ function ListPageContentInner(props: PageContentProps) {
           translateOrFallback(
             t,
             'list.bulkAction.partial',
-            `${label} completed for ${successCount} records; ${failures.length} failed`,
+            isZhLocale
+              ? `${label}部分完成：成功 ${successCount} 条，失败 ${failures.length} 条`
+              : `${label} completed for ${successCount} records; ${failures.length} failed`,
           ),
           'warning',
         );
+        setBulkActionResult({ actionLabel: label, successCount, failures });
       } else {
-        showToast(failures[0] || `${label} failed`, 'error');
+        showToast(failures[0]?.reason || `${label} failed`, 'error');
+        setBulkActionResult({ actionLabel: label, successCount, failures });
       }
     },
     [
       canUseButton,
+      executeTargetedBulkCommand,
       filters,
       loadData,
+      locale,
       modelCode,
       pagination.pageSize,
       resolveButtonLabel,
@@ -2366,6 +2908,20 @@ function ListPageContentInner(props: PageContentProps) {
       t,
       token,
     ],
+  );
+
+  const handleBulkFieldCommandSubmit = useCallback(
+    async (value: unknown) => {
+      if (!bulkFieldCommand) return;
+      await executeTargetedBulkCommand(
+        bulkFieldCommand.button,
+        bulkFieldCommand.selectedIds,
+        buildBulkFieldCommandPayload(bulkFieldCommand.field, value),
+        bulkFieldCommand.operationType,
+      );
+      setBulkFieldCommand(null);
+    },
+    [bulkFieldCommand, executeTargetedBulkCommand],
   );
 
   const handleBulkEditComplete = useCallback(() => {
@@ -2704,26 +3260,29 @@ function ListPageContentInner(props: PageContentProps) {
   }, [allBlocks]);
 
   // System fields on every dynamic entity — not in DSL but available in API response
-  const SYSTEM_FIELD_DEFS: ColumnConfig[] = [
-    {
-      field: 'created_at',
-      label: t(getSystemFieldI18nKey('created_at') || 'common.created_at') || 'Created At',
-      valueType: 'datetime' as any,
-    },
-    {
-      field: 'updated_at',
-      label: t(getSystemFieldI18nKey('updated_at') || 'common.updated_at') || 'Updated At',
-      valueType: 'datetime' as any,
-    },
-    {
-      field: 'created_by',
-      label: t('common.creator') || 'Created By',
-    },
-    {
-      field: 'updated_by',
-      label: t('common.modifier') || 'Updated By',
-    },
-  ];
+  const SYSTEM_FIELD_DEFS: ColumnConfig[] = useMemo(
+    () => [
+      {
+        field: 'created_at',
+        label: t(getSystemFieldI18nKey('created_at') || 'common.created_at') || 'Created At',
+        valueType: 'datetime' as any,
+      },
+      {
+        field: 'updated_at',
+        label: t(getSystemFieldI18nKey('updated_at') || 'common.updated_at') || 'Updated At',
+        valueType: 'datetime' as any,
+      },
+      {
+        field: 'created_by',
+        label: t('common.creator') || 'Created By',
+      },
+      {
+        field: 'updated_by',
+        label: t('common.modifier') || 'Updated By',
+      },
+    ],
+    [t],
+  );
 
   // Get columns: prefer table.columns, fallback to block-level columns
   // Then apply SavedView column visibility/order overrides
@@ -2769,22 +3328,46 @@ function ListPageContentInner(props: PageContentProps) {
 
     const viewColMap = new Map(viewColumns.map((vc) => [vc.fieldCode, vc]));
     // Filter visible columns and apply order
-    // Include system fields that are explicitly enabled in viewConfig
+    // Include model and system fields that are explicitly enabled in viewConfig.
+    // This lets SavedView promote a valid model field that the DSL table does
+    // not show by default, while the page schema remains the default layout.
     const baseFields = new Set(baseCols.map((c) => c.field));
+    const modelCols: ColumnConfig[] = [];
+    for (const vc of viewColumns) {
+      if (vc.visible === false || baseFields.has(vc.fieldCode)) continue;
+      const meta = modelFieldMap.get(vc.fieldCode);
+      if (!meta) continue;
+      const renderComponent = resolveFieldMetaRenderComponent(vc.fieldCode, modelFieldMap);
+      const dataType = resolveFieldMetaDataType(vc.fieldCode, modelFieldMap);
+      modelCols.push({
+        field: vc.fieldCode,
+        label: resolveFieldMetaDisplayName(vc.fieldCode, modelFieldMap) ?? vc.fieldCode,
+        valueType: renderComponentToValueType(renderComponent),
+        sorter: dataType,
+        sortable: true,
+        dictCode: meta.dictCode || meta.extension?.dictCode || undefined,
+        refTarget: meta.refTarget || meta.extension?.refTarget || undefined,
+      } as ColumnConfig);
+      baseFields.add(vc.fieldCode);
+    }
     const sysCols = SYSTEM_FIELD_DEFS.filter((sf) => {
       const vc = viewColMap.get(sf.field);
       return vc && vc.visible !== false && !baseFields.has(sf.field);
     });
-    const allCols = [...baseCols, ...sysCols];
+    const allCols = [...baseCols, ...modelCols, ...sysCols];
     const visibleCols = allCols
       .map((col) => {
         const vc = viewColMap.get(col.field);
         if (vc && vc.visible === false) return null;
-        // Apply width override
-        if (vc?.width) {
-          return { ...col, width: vc.width };
-        }
-        return col;
+        return {
+          ...col,
+          ...(vc?.width ? { width: vc.width } : {}),
+          ...(vc?.frozen && vc.frozenPosition
+            ? { fixed: vc.frozenPosition }
+            : vc?.frozen === false
+              ? { fixed: undefined }
+              : {}),
+        };
       })
       .filter((col): col is ColumnConfig => col !== null);
 
@@ -2799,7 +3382,7 @@ function ListPageContentInner(props: PageContentProps) {
     }
 
     return visibleCols;
-  }, [tableBlock, effectiveViewConfig]);
+  }, [tableBlock, effectiveViewConfig, modelFieldMap, SYSTEM_FIELD_DEFS]);
 
   const referenceDisplayConfigs = useMemo(
     () => collectListReferenceDisplayConfigs(tableColumns, modelFieldMap),
@@ -3021,7 +3604,7 @@ function ListPageContentInner(props: PageContentProps) {
         const resolved = detailUrl.replace(/\{(\w+)\}/g, (_: string, key: string) =>
           String(record[key] ?? ''),
         );
-        navigate(appendListSearch(resolved));
+        navigateAwayFromList(appendListSearch(resolved));
         return;
       }
 
@@ -3035,56 +3618,38 @@ function ListPageContentInner(props: PageContentProps) {
         const optionDetailPageKey = (schema as any)?.options?.detailPageKey;
         const resolvedDetailPageKey = relatedDetailPageKey || optionDetailPageKey;
         if (resolvedDetailPageKey) {
-          navigate(appendListSearch(`/p/${resolvedDetailPageKey}/view/${pid}`));
+          navigateAwayFromList(appendListSearch(`/p/${resolvedDetailPageKey}/view/${pid}`));
         } else {
-          navigate(appendListSearch(`/p/${tableName}/view/${pid}`));
+          navigateAwayFromList(appendListSearch(`/p/${tableName}/view/${pid}`));
         }
         return;
       }
 
       setPreviewRecordId(pid);
     },
-    [appendListSearch, schema, tableBlock, tableName, navigate, listExtensions?.disableRowClick],
+    [
+      appendListSearch,
+      schema,
+      tableBlock,
+      tableName,
+      navigateAwayFromList,
+      listExtensions?.disableRowClick,
+    ],
   );
 
-  // All column definitions for ColumnSettingsPanel (with labels)
+  // All model-backed column definitions for ColumnSettingsPanel. DSL columns
+  // define the default visible subset; other readable model fields begin hidden.
   const allColumnDefs = useMemo(() => {
     if (!tableBlock) return [];
     const cols = (tableBlock as BlockConfig).table?.columns || tableBlock.columns;
     if (!Array.isArray(cols)) return [];
-    const dslCols = (cols as ColumnConfig[])
-      .filter((c) => !c.isActionColumn)
-      .map((col) => ({
-        field: col.field,
-        label: col.label
-          ? typeof col.label === 'string'
-            ? col.label
-            : getLocalizedText(col.label, locale, t)
-          : (() => {
-              const systemKey = getSystemFieldI18nKey(col.field);
-              if (systemKey) {
-                const systemLabel = t(systemKey);
-                if (systemLabel !== systemKey) return systemLabel;
-              }
-              const mc = schema?.modelCode || tableName;
-              const modelKey = `model.${mc}.${col.field}.label`;
-              const modelLabel = t(modelKey);
-              if (modelLabel !== modelKey) return modelLabel;
-              const fieldKey = `field.${col.field}.label`;
-              const fieldLabel = t(fieldKey);
-              if (fieldLabel !== fieldKey) return fieldLabel;
-              const commonKey = `common.field.${col.field}`;
-              const commonLabel = t(commonKey);
-              return commonLabel !== commonKey ? commonLabel : col.field;
-            })(),
-      }));
-    // Append system fields (hidden by default in ColumnSettingsPanel)
-    const sysDefs = SYSTEM_FIELD_DEFS.map((sf) => ({
-      field: sf.field,
-      label: typeof sf.label === 'string' ? sf.label : sf.field,
-    }));
-    return [...dslCols, ...sysDefs];
-  }, [tableBlock, locale, t, tableName, schema?.modelCode]);
+    return buildListColumnSettingsDefinitions(
+      cols as ColumnConfig[],
+      modelFieldMap,
+      SYSTEM_FIELD_DEFS,
+      resolveColumnLabel,
+    );
+  }, [tableBlock, modelFieldMap, resolveColumnLabel, SYSTEM_FIELD_DEFS]);
 
   const viewManageFields = useMemo(() => {
     const fieldMap = new Map(
@@ -3102,6 +3667,46 @@ function ListPageContentInner(props: PageContentProps) {
 
     return Array.from(fieldMap.values());
   }, [tableColumns, modelFieldMap, resolveColumnLabel]);
+
+  const filterFieldMetadata = useMemo(() => {
+    const businessFields = buildListFilterFieldMetadata(
+      tableColumns,
+      modelFieldMap,
+      resolveColumnLabel,
+    );
+    const known = new Set(businessFields.map((field) => field.fieldCode));
+    const systemFields = buildListFilterFieldMetadata(
+      SYSTEM_FIELD_DEFS.filter((column) => !known.has(column.field)),
+      modelFieldMap,
+      resolveColumnLabel,
+    );
+    return [...businessFields, ...systemFields];
+  }, [tableColumns, modelFieldMap, resolveColumnLabel, SYSTEM_FIELD_DEFS]);
+
+  const handleAnalysisDrillDown = useCallback(
+    (drillFilters: import('~/framework/smart/types/chart').FilterConfig[]) => {
+      const next = drillFilters.map<ViewFilterConfig>((filter) => ({
+        fieldCode: filter.field,
+        operator: 'eq',
+        value: filter.value,
+      }));
+      const fields = new Set(next.map((filter) => filter.fieldCode));
+      const nextChipFilters = [
+        ...chipFilters.filter((filter) => !fields.has(filter.fieldCode)),
+        ...next,
+      ];
+      chipFiltersRef.current = nextChipFilters;
+      setLocalChipFilters(nextChipFilters);
+      void loadData({
+        page: 0,
+        size: pagination.pageSize,
+        filters,
+        chipFilters: nextChipFilters,
+      });
+      setAnalysisOpen(false);
+    },
+    [chipFilters, filters, loadData, pagination.pageSize, setLocalChipFilters],
+  );
 
   // Personal-only baseline: changes to an explicit personal view are staged as
   // a visible local draft. The user chooses save-current, save-as-new, or discard.
@@ -3345,25 +3950,35 @@ function ListPageContentInner(props: PageContentProps) {
     },
   });
 
+  const buildCurrentColumnSettings = useCallback(
+    () =>
+      serializeColumnSettings(buildColumnSettingsRows(allColumnDefs, effectiveViewConfig?.columns)),
+    [allColumnDefs, effectiveViewConfig?.columns],
+  );
+
   // Handle column reorder via drag-and-drop
   const handleColumnReorder = useCallback(
     (newOrder: string[]) => {
       setColumnOrder(newOrder);
-      // Persist to SavedView
-      const cols = newOrder.map((fieldCode, idx) => {
-        const existing = effectiveViewConfig?.columns?.find((c) => c.fieldCode === fieldCode);
-        return { ...(existing || { fieldCode }), fieldCode, order: idx };
-      });
-      autoSave({ columns: cols });
+      const existing = buildCurrentColumnSettings();
+      const byField = new Map(existing.map((column) => [column.fieldCode, column]));
+      const reordered = newOrder.map((fieldCode, order) => ({
+        ...(byField.get(fieldCode) || { fieldCode }),
+        fieldCode,
+        order,
+      }));
+      const trailing = existing
+        .filter((column) => !newOrder.includes(column.fieldCode))
+        .map((column, index) => ({ ...column, order: newOrder.length + index }));
+      autoSave({ columns: [...reordered, ...trailing] });
     },
-    [effectiveViewConfig, autoSave],
+    [autoSave, buildCurrentColumnSettings],
   );
 
   // Handle column resize
   const handleColumnResize = useCallback(
     (field: string, width: number) => {
-      if (!currentView) return;
-      const cols = [...(effectiveViewConfig?.columns || [])];
+      const cols = buildCurrentColumnSettings();
       const idx = cols.findIndex((c) => c.fieldCode === field);
       if (idx >= 0) {
         cols[idx] = { ...cols[idx], width };
@@ -3372,13 +3987,13 @@ function ListPageContentInner(props: PageContentProps) {
       }
       autoSave({ columns: cols });
     },
-    [currentView, effectiveViewConfig, autoSave],
+    [autoSave, buildCurrentColumnSettings],
   );
 
   // Handle column settings save -> update SavedView
   const handleColumnSettingsSave = useCallback(
-    async (columns: ViewColumnConfig[]) => {
-      await ensureViewAndUpdateConfig({ columns });
+    async ({ columns, rowHeight }: ColumnSettingsSavePayload) => {
+      await ensureViewAndUpdateConfig({ columns, rowHeight }, { rethrow: true });
     },
     [ensureViewAndUpdateConfig],
   );
@@ -3446,6 +4061,16 @@ function ListPageContentInner(props: PageContentProps) {
     tableBulkActions,
   ]);
 
+  const bulkEditColumns = useMemo(
+    () => selectBulkEditableColumns(tableColumns, tableBulkCapabilities !== undefined),
+    [tableBulkCapabilities, tableColumns],
+  );
+  const builtInBulkCapabilities = useMemo(
+    () =>
+      resolveBuiltInBulkCapabilities(tableBulkCapabilities, hasPermission, bulkEditColumns.length),
+    [bulkEditColumns.length, hasPermission, tableBulkCapabilities],
+  );
+
   // Build export filter conditions for toolbar
   const exportFilterConditions = useMemo(() => {
     const conditions: Array<{ field: string; operator: string; value: unknown }> = [];
@@ -3470,8 +4095,12 @@ function ListPageContentInner(props: PageContentProps) {
         }
       }
     }
+    for (const filter of chipFilters) {
+      const condition = viewFilterToQueryCondition(filter);
+      if (condition) conditions.push(queryConditionToExportCondition(condition));
+    }
     return conditions.length > 0 ? conditions : undefined;
-  }, [filters, getTabFilter]);
+  }, [chipFilters, filters, getTabFilter]);
 
   // Shared export request — posts the given conditions to the export endpoint
   // and triggers a browser download of the returned file.
@@ -3487,6 +4116,7 @@ function ListPageContentInner(props: PageContentProps) {
           body: JSON.stringify({
             format: format === 'xlsx' ? 'excel' : 'csv',
             conditions,
+            keyword: keywordRef.current.trim() || undefined,
           }),
         });
         if (!res.ok) throw new Error('Export request failed');
@@ -3524,7 +4154,13 @@ function ListPageContentInner(props: PageContentProps) {
   const handleExportSelected = useCallback(
     async (format: 'xlsx' | 'csv' = 'xlsx') => {
       if (allMatchingSelected) {
-        await runExport(format, exportFilterConditions);
+        const conditions = [
+          ...(exportFilterConditions ?? []),
+          ...(allMatchingExcludedIds.length > 0
+            ? [{ field: 'pid', operator: 'NOT_IN', value: allMatchingExcludedIds }]
+            : []),
+        ];
+        await runExport(format, conditions.length > 0 ? conditions : undefined);
         return;
       }
       if (explicitSelectedIds.length === 0) return;
@@ -3534,7 +4170,13 @@ function ListPageContentInner(props: PageContentProps) {
       ];
       await runExport(format, conditions);
     },
-    [allMatchingSelected, runExport, exportFilterConditions, explicitSelectedIds],
+    [
+      allMatchingExcludedIds,
+      allMatchingSelected,
+      runExport,
+      exportFilterConditions,
+      explicitSelectedIds,
+    ],
   );
 
   // Row height from current view config (with fallback)
@@ -3742,15 +4384,15 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Save current filters to SavedView
   const handleSaveFilters = useCallback(async () => {
-    const viewFilters = Object.entries(filters)
+    const formFilters = Object.entries(filters)
       .filter(([, v]) => v != null && v !== '')
       .map(([field, value]) => ({
         fieldCode: field,
         operator: 'eq' as const,
         value: String(value),
       }));
-    await ensureViewAndUpdateConfig({ filters: viewFilters });
-  }, [filters, ensureViewAndUpdateConfig]);
+    await ensureViewAndUpdateConfig({ filters: [...formFilters, ...chipFilters] });
+  }, [filters, chipFilters, ensureViewAndUpdateConfig]);
 
   const loadCurrentInviteCode = useCallback(async () => {
     if (!isTenantMemberPage) return;
@@ -3822,80 +4464,6 @@ function ListPageContentInner(props: PageContentProps) {
       setInviteLoading(false);
     }
   }, [inviteCodeData?.code, showErrorToast, showSuccessToast, token]);
-
-  const resetMemberImportState = useCallback(() => {
-    setMemberImportFile(null);
-    setMemberImportLoading(false);
-    setMemberImportError(null);
-    setMemberImportResult(null);
-  }, []);
-
-  const handleTenantMemberImport = useCallback(async () => {
-    if (!memberImportFile) {
-      setMemberImportError('请先选择 Excel 文件');
-      return;
-    }
-
-    setMemberImportLoading(true);
-    setMemberImportError(null);
-    try {
-      const XLSX = await import('xlsx');
-      const workbook = XLSX.read(await memberImportFile.arrayBuffer(), { type: 'array' });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      if (!firstSheet) {
-        throw new Error('Excel 文件缺少可读取的工作表');
-      }
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: '' });
-      const payload = rows.map((row) => ({
-        name: String(row['姓名*'] ?? row['姓名'] ?? row['name'] ?? '').trim(),
-        email: String(row['邮箱*'] ?? row['邮箱'] ?? row['email'] ?? '').trim(),
-        phone: String(row['手机号'] ?? row['手机'] ?? row['phone'] ?? '').trim(),
-        department: String(row['部门'] ?? row['department'] ?? '').trim(),
-        position: String(row['职位'] ?? row['position'] ?? '').trim(),
-      }));
-
-      const response = await fetch('/api/tenant/members/import-rows', {
-        method: 'post',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(payload),
-      });
-      const body = await response.json().catch(() => null);
-      if (!response.ok || !body || !ResultHelper.isSuccess(body)) {
-        throw new Error(body?.message || body?.desc || '批量导入失败');
-      }
-
-      const result = body.data as TenantMemberImportResult;
-      setMemberImportResult(result);
-      if (result.successCount > 0) {
-        showSuccessToast(`已导入 ${result.successCount} 条成员记录`);
-        await loadDataRef.current?.({
-          page: 0,
-          size: pagination.pageSize,
-          filters,
-        });
-      }
-      if (result.errorCount > 0) {
-        showWarningToast(`有 ${result.errorCount} 条记录导入失败，请检查错误列表`);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '批量导入失败';
-      setMemberImportError(message);
-      showErrorToast(message);
-    } finally {
-      setMemberImportLoading(false);
-    }
-  }, [
-    filters,
-    memberImportFile,
-    pagination.pageSize,
-    showErrorToast,
-    showSuccessToast,
-    showWarningToast,
-    token,
-  ]);
 
   const listTabsBlock = useMemo(() => {
     const found = allBlocks.find((block: any) => block.blockType === 'tabs');
@@ -4066,11 +4634,9 @@ function ListPageContentInner(props: PageContentProps) {
             }}
             onViewTypeChange={(vt) => {
               setActiveViewType(vt);
-              if (vt !== 'table' && (!currentView || currentView.viewType !== vt)) {
-                const match = savedViews.find((v) => v.viewType === vt);
-                if (match) selectView(match.pid);
-              }
             }}
+            enableMultiView={Boolean(schemaExtension.enableMultiView)}
+            availableViewTypes={availableViewTypes}
             buttons={actionBlock?.buttons || []}
             toolbarActions={effectiveViewConfig?.toolbarActions}
             onAction={handleAction}
@@ -4082,17 +4648,10 @@ function ListPageContentInner(props: PageContentProps) {
             exportFilters={exportFilterConditions}
             isTenantMemberPage={isTenantMemberPage}
             onInvite={() => setInviteDialogOpen(true)}
-            onImportMembers={() => {
-              resetMemberImportState();
-              setMemberImportDialogOpen(true);
-            }}
+            onImportMembers={() => setMemberImportDialogOpen(true)}
             hideSavedViews={hideSavedViews}
             hideBuiltInImport={
-              skipListData
-                ? true
-                : (listExtensions?.hideBuiltInImport ??
-                  (schema as any)?.extension?.hideBuiltInImport ??
-                  (schema as any)?.extension?.hideToolbarMore)
+              skipListData ? true : (listExtensions?.hideBuiltInImport ?? !canImport)
             }
             hideBuiltInExport={
               skipListData
@@ -4110,227 +4669,19 @@ function ListPageContentInner(props: PageContentProps) {
             }
           />
 
-          {isTenantMemberPage && memberImportDialogOpen && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              data-testid="member-import-dialog"
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-            >
-              <div className="rounded-card bg-panel w-full max-w-2xl p-6 shadow-xl">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-text text-lg font-semibold">批量导入成员</h3>
-                    <p className="text-text-2 mt-1 text-sm">
-                      入口归属 tenant_member。导入的主语义是批量准入，不是直接维护组织树。
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMemberImportDialogOpen(false);
-                      resetMemberImportState();
-                    }}
-                    className="text-text-2 hover:text-text-2 text-sm"
-                  >
-                    关闭
-                  </button>
-                </div>
-
-                <div className="text-text-2 space-y-4 text-sm">
-                  <div className="rounded-control bg-accent-weak border border-blue-200 p-3">
-                    <p className="font-medium text-blue-900">推荐流程</p>
-                    <p className="mt-1 text-blue-800">
-                      Excel 导入先处理租户成员准入，再按邮箱复用已有 User
-                      或创建待激活账号，最后再建立组织关系。
-                    </p>
-                  </div>
-
-                  <div className="rounded-control border-border bg-subtle border p-4">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="text-text font-medium">1. 下载模板</p>
-                        <p className="text-text-2 mt-1 text-xs">
-                          支持 `.xlsx`。必填列是姓名、邮箱；部门和职位用于补全组织关系。
-                        </p>
-                      </div>
-                      <a
-                        href="/api/tenant/members/import/template"
-                        className="rounded-control bg-panel text-accent hover:bg-accent-weak inline-flex items-center justify-center border border-blue-200 px-3 py-2 text-sm font-medium"
-                      >
-                        下载模板
-                      </a>
-                    </div>
-
-                    <div className="mt-4">
-                      <p className="text-text font-medium">2. 选择文件</p>
-                      <input
-                        data-testid="member-import-file-input"
-                        type="file"
-                        accept=".xlsx,.xls"
-                        onChange={(event) => {
-                          const selectedFile = event.target.files?.[0] ?? null;
-                          setMemberImportFile(selectedFile);
-                          setMemberImportError(null);
-                        }}
-                        className="rounded-control border-border-strong text-text-2 file:rounded-control file:bg-accent hover:file:bg-accent-hover mt-2 block w-full border px-3 py-2 text-sm file:mr-3 file:border-0 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
-                      />
-                      {memberImportFile && (
-                        <p className="text-text-2 mt-2 text-xs">已选择: {memberImportFile.name}</p>
-                      )}
-                    </div>
-
-                    {memberImportError && (
-                      <div className="rounded-control bg-status-red-bg mt-3 border border-red-200 px-3 py-2 text-sm text-red-700">
-                        {memberImportError}
-                      </div>
-                    )}
-
-                    <div className="mt-4 flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMemberImportDialogOpen(false);
-                          resetMemberImportState();
-                        }}
-                        className="rounded-control border-border-strong text-text-2 hover:bg-hover border px-4 py-2 text-sm font-medium"
-                      >
-                        取消
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="member-import-submit"
-                        disabled={!memberImportFile || memberImportLoading}
-                        onClick={() => void handleTenantMemberImport()}
-                        className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-blue-300"
-                      >
-                        {memberImportLoading ? '导入中...' : '开始导入'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-text font-medium">导入结果分三类</p>
-                    <ul className="mt-2 list-disc space-y-1 pl-5">
-                      <li>已绑定已有用户：复用现有 User，创建 TenantMember，并建立组织关系</li>
-                      <li>待激活成员：创建准入记录，发送邀请，等首次设置密码后启用登录</li>
-                      <li>冲突项：邮箱重复、同租户已存在成员、部门不存在、职位不存在</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <p className="text-text font-medium">建议模板字段</p>
-                    <div className="rounded-control border-border mt-2 overflow-hidden border">
-                      <table className="divide-border min-w-full divide-y text-sm">
-                        <thead className="bg-subtle">
-                          <tr>
-                            <th className="text-text-2 px-3 py-2 text-left font-medium">字段</th>
-                            <th className="text-text-2 px-3 py-2 text-left font-medium">必填</th>
-                            <th className="text-text-2 px-3 py-2 text-left font-medium">说明</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-border bg-panel divide-y">
-                          <tr>
-                            <td className="px-3 py-2">姓名</td>
-                            <td className="px-3 py-2">是</td>
-                            <td className="px-3 py-2">员工显示名称</td>
-                          </tr>
-                          <tr>
-                            <td className="px-3 py-2">邮箱</td>
-                            <td className="px-3 py-2">是</td>
-                            <td className="px-3 py-2">作为账号识别键；优先用于复用已有 User</td>
-                          </tr>
-                          <tr>
-                            <td className="px-3 py-2">手机号</td>
-                            <td className="px-3 py-2">否</td>
-                            <td className="px-3 py-2">补充联系方式</td>
-                          </tr>
-                          <tr>
-                            <td className="px-3 py-2">部门</td>
-                            <td className="px-3 py-2">否</td>
-                            <td className="px-3 py-2">
-                              用于自动建立组织关系；不存在时进入冲突列表
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="px-3 py-2">职位</td>
-                            <td className="px-3 py-2">否</td>
-                            <td className="px-3 py-2">依赖部门/职位主数据匹配</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div className="rounded-control bg-status-amber-bg border border-amber-200 p-3 text-amber-900">
-                    第一版实现先固定入口和规则，不默认给新导入人员生成可直接登录的密码。新用户应走邀请激活链路。
-                  </div>
-
-                  {memberImportResult && (
-                    <div
-                      data-testid="member-import-result"
-                      className="rounded-card border border-emerald-200 bg-emerald-50 p-4"
-                    >
-                      <p className="font-medium text-emerald-900">导入结果</p>
-                      <div className="mt-2 grid gap-2 text-sm text-emerald-900 md:grid-cols-2">
-                        <div>总行数: {memberImportResult.totalRows}</div>
-                        <div>成功: {memberImportResult.successCount}</div>
-                        <div>复用已有用户: {memberImportResult.existingUserBoundCount}</div>
-                        <div>待激活邀请: {memberImportResult.invitedCount}</div>
-                        <div>建立组织关系: {memberImportResult.employeeCreatedCount}</div>
-                        <div>失败: {memberImportResult.errorCount}</div>
-                      </div>
-
-                      {memberImportResult.errors.length > 0 && (
-                        <div className="rounded-control bg-panel mt-4 overflow-hidden border border-amber-200">
-                          <table className="min-w-full divide-y divide-amber-100 text-sm">
-                            <thead className="bg-status-amber-bg">
-                              <tr>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">
-                                  行号
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">
-                                  姓名
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">
-                                  邮箱
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">
-                                  原因
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-amber-100">
-                              {memberImportResult.errors.slice(0, 10).map((item) => (
-                                <tr key={`${item.rowNumber}-${item.email ?? item.name ?? 'row'}`}>
-                                  <td className="px-3 py-2">{item.rowNumber}</td>
-                                  <td className="px-3 py-2">{item.name || '-'}</td>
-                                  <td className="px-3 py-2">{item.email || '-'}</td>
-                                  <td className="px-3 py-2 text-amber-900">{item.reason}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-6 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMemberImportDialogOpen(false);
-                      resetMemberImportState();
-                    }}
-                    className="rounded-control border-border-strong text-text-2 hover:bg-hover border px-4 py-2 text-sm font-medium"
-                  >
-                    关闭
-                  </button>
-                </div>
-              </div>
-            </div>
+          {isTenantMemberPage && (
+            <TenantMemberAccountImportDialog
+              open={memberImportDialogOpen}
+              token={token}
+              onClose={() => setMemberImportDialogOpen(false)}
+              onImported={async () => {
+                await loadDataRef.current?.({
+                  page: pagination.current - 1,
+                  size: pagination.pageSize,
+                  filters,
+                });
+              }}
+            />
           )}
 
           {isTenantMemberPage && inviteDialogOpen && (
@@ -4644,7 +4995,7 @@ function ListPageContentInner(props: PageContentProps) {
                 onActivateChip={handleActivateChip}
                 onSaveActivePreset={handleSaveActivePreset}
                 activeSorts={activeSorts}
-                onSortsChange={setActiveSorts}
+                onSortsChange={setLocalActiveSorts}
                 sortableColumns={tableColumns
                   .filter((c: ColumnConfig) => !c.isActionColumn && c.field && c.sortable !== false)
                   .map((c: ColumnConfig) => ({
@@ -4655,24 +5006,60 @@ function ListPageContentInner(props: PageContentProps) {
                 rowHeight={effectiveViewConfig?.rowHeight}
                 onRowHeightChange={handleRowHeightChange}
                 onColumnSettingsOpen={() => setColumnSettingsOpen(true)}
+                onAnalysisOpen={
+                  namedQueryCode || isApiDatasourcePage ? undefined : () => setAnalysisOpen(true)
+                }
                 chipFilters={chipFilters}
-                onChipFiltersChange={setChipFilters}
-                fieldMetadata={tableColumns
-                  .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
-                  .map((c: ColumnConfig) => ({
-                    fieldCode: c.field,
-                    label: resolveColumnLabel(c),
-                    fieldType: c.valueType || c.sorter || 'text',
-                    dictCode: c.dictCode,
-                  }))}
+                onChipFiltersChange={(nextChipFilters) => {
+                  chipFiltersRef.current = nextChipFilters;
+                  setLocalChipFilters(nextChipFilters);
+                  void loadData({
+                    page: 0,
+                    size: pagination.pageSize,
+                    filters,
+                    chipFilters: nextChipFilters,
+                  });
+                }}
+                fieldMetadata={filterFieldMetadata}
                 resolveChipValueLabel={(filter) => {
-                  const col = tableColumns.find((c: ColumnConfig) => c.field === filter.fieldCode);
-                  const dc = (col as any)?.dictCode as string | undefined;
+                  if (filter.isExpression && filter.expression) {
+                    if (
+                      filter.expression === '#currentUser' ||
+                      filter.expression === '${system.currentUser}'
+                    ) {
+                      return (
+                        user?.name ||
+                        user?.nickname ||
+                        user?.username ||
+                        translateCommon('common.current_user', '当前用户')
+                      );
+                    }
+                    if (
+                      filter.expression === '#currentDepartmentOwners' ||
+                      filter.expression === '${system.currentDepartmentOwners}'
+                    ) {
+                      return translateCommon('common.current_department', '当前部门');
+                    }
+                    if (
+                      filter.expression === '#currentSharedRecords' ||
+                      filter.expression === '${system.currentSharedRecords}'
+                    ) {
+                      return translateCommon('common.collaborative_records', '协作记录');
+                    }
+                    return filter.expression;
+                  }
+                  const dc = filterFieldMetadata.find(
+                    (field) => field.fieldCode === filter.fieldCode,
+                  )?.dictCode;
                   if (!dc) return undefined;
-                  const item = dictDataCache.current
-                    .get(dc)
-                    ?.find((i) => String(i.value) === String(filter.value));
-                  return item?.label;
+                  const values = Array.isArray(filter.value) ? filter.value : [filter.value];
+                  const items = dictDataCache.current.get(dc);
+                  const labels = values.map(
+                    (value) =>
+                      items?.find((item) => String(item.value) === String(value))?.label ??
+                      String(value),
+                  );
+                  return labels.join('、');
                 }}
                 onAddFilter={(e?: React.MouseEvent) => {
                   const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect?.();
@@ -4687,8 +5074,16 @@ function ListPageContentInner(props: PageContentProps) {
                   setEditingChipIdx(idx);
                 }}
                 onClearAll={() => {
-                  setChipFilters([]);
-                  setActiveSorts([]);
+                  chipFiltersRef.current = [];
+                  setLocalChipFilters([]);
+                  setLocalActiveSorts([]);
+                  void loadData({
+                    page: 0,
+                    size: pagination.pageSize,
+                    filters,
+                    sorts: [],
+                    chipFilters: [],
+                  });
                 }}
                 hideQuickFilters={hideQuickFilters}
                 hideSort={listExtensions?.hideSort ?? Boolean(schemaExtension.hideSort)}
@@ -4703,6 +5098,17 @@ function ListPageContentInner(props: PageContentProps) {
                 }
               />
 
+              <ViewAnalysisDrawer
+                open={analysisOpen}
+                onClose={() => setAnalysisOpen(false)}
+                modelCode={schema?.modelCode || tableName}
+                viewName={getLocalizedText(currentView?.name, locale, t)}
+                keyword={keyword}
+                filters={activeRuntimeViewFilters}
+                fields={filterFieldMetadata}
+                onDrillDown={handleAnalysisDrillDown}
+              />
+
               {/* T9 — cross-page select-all banner. Shown once the whole page
                   is selected and more matching records exist beyond it, or
                   while in "all N matching" mode. */}
@@ -4715,6 +5121,7 @@ function ListPageContentInner(props: PageContentProps) {
                 onSelectAllMatching={handleSelectAllMatching}
                 onClearSelection={clearAllSelection}
                 t={t}
+                locale={locale}
               />
 
               {/* Table area — extracted to ListTable with DnD column reorder */}
@@ -4784,13 +5191,24 @@ function ListPageContentInner(props: PageContentProps) {
                 onPageChange={handlePageChange}
                 onPageSizeChange={handlePageSizeChange}
                 t={t}
+                locale={locale}
                 selectedCount={effectiveSelectedCount}
                 selectedIds={selectedIdList}
                 modelCode={modelCode}
-                onBulkEdit={() => setBulkEditOpen(true)}
-                onBulkDelete={handleBulkDelete}
-                onBulkExport={() => handleExportSelected('xlsx')}
-                bulkActions={visibleBulkActions}
+                onBulkEdit={
+                  builtInBulkCapabilities.edit && !allMatchingSelected
+                    ? () => setBulkEditOpen(true)
+                    : undefined
+                }
+                onBulkDelete={
+                  builtInBulkCapabilities.delete && !allMatchingSelected
+                    ? handleBulkDelete
+                    : undefined
+                }
+                onBulkExport={
+                  builtInBulkCapabilities.export ? () => handleExportSelected('xlsx') : undefined
+                }
+                bulkActions={allMatchingSelected ? [] : visibleBulkActions}
                 onBulkAction={handleBulkAction}
                 resolveBulkActionLabel={resolveButtonLabel}
                 onClearSelection={clearAllSelection}
@@ -4800,10 +5218,10 @@ function ListPageContentInner(props: PageContentProps) {
             <SmartViewRenderer
               view={
                 {
-                  ...(currentView || {}),
+                  ...(activeViewTemplate || currentView || {}),
                   modelCode,
                   viewType: activeViewType,
-                  viewConfig: effectiveViewConfig || {},
+                  viewConfig: activeViewConfig,
                 } as any
               }
               onGanttTaskClick={navigateToRecordView}
@@ -4825,16 +5243,20 @@ function ListPageContentInner(props: PageContentProps) {
             onBulkEditClose={() => setBulkEditOpen(false)}
             selectedIds={selectedIdList}
             modelCode={modelCode}
-            bulkEditFields={tableColumns
-              .filter((c) => !c.isActionColumn && c.field)
-              .map((c) => ({
-                code: c.field,
-                name: c.field,
-                dataType: c.valueType || 'string',
-              }))}
+            bulkEditFields={bulkEditColumns.map((c) => ({
+              code: c.field,
+              name: resolveColumnLabel(c),
+              dataType: c.valueType || 'string',
+            }))}
             onBulkEditComplete={handleBulkEditComplete}
+            locale={locale}
+            bulkFieldCommand={bulkFieldCommand}
+            bulkFieldCommandContext={pageContext}
+            onBulkFieldCommandClose={() => setBulkFieldCommand(null)}
+            onBulkFieldCommandSubmit={handleBulkFieldCommandSubmit}
             // ImportModal
             importOpen={importOpen}
+            importConfig={importConfig}
             onImportClose={() => setImportOpen(false)}
             onImportComplete={handleImportComplete}
             // ViewManagePanel
@@ -4924,19 +5346,13 @@ function ListPageContentInner(props: PageContentProps) {
             onColumnSettingsClose={() => setColumnSettingsOpen(false)}
             allColumnDefs={allColumnDefs}
             viewColumns={effectiveViewConfig?.columns}
+            columnSettingsRowHeight={effectiveRowHeight}
             onColumnSettingsSave={handleColumnSettingsSave}
             t={t}
             // FilterFieldPicker
             fieldPickerOpen={fieldPickerOpen}
             fieldPickerAnchor={fieldPickerAnchor}
-            fieldPickerFields={tableColumns
-              .filter((c: ColumnConfig) => !c.isActionColumn && c.field)
-              .map((c: ColumnConfig) => ({
-                fieldCode: c.field,
-                label: resolveColumnLabel(c),
-                fieldType: c.valueType || c.sorter || 'text',
-                dictCode: c.dictCode,
-              }))}
+            filterFieldMetadata={filterFieldMetadata}
             chipFilterFieldCodes={chipFilters.map((f) => f.fieldCode)}
             onFieldPickerSelect={(fieldCode) => {
               // Add a new empty filter chip and immediately open the value popover
@@ -4945,7 +5361,7 @@ function ListPageContentInner(props: PageContentProps) {
                 operator: 'eq',
                 value: '',
               };
-              setChipFilters((prev) => {
+              setLocalChipFilters((prev) => {
                 const next = [...prev, newFilter];
                 // Open value popover for the newly added chip
                 setTimeout(() => {
@@ -4966,12 +5382,20 @@ function ListPageContentInner(props: PageContentProps) {
             schema={schema}
             tableName={tableName}
             onFilterApply={(operator, value) => {
-              setChipFilters((prev) =>
-                prev.map((f, i) =>
-                  i === editingChipIdx ? { ...f, operator: operator as any, value } : f,
-                ),
+              const nextChipFilters = chipFilters.map((filter, index) =>
+                index === editingChipIdx
+                  ? { ...filter, operator: operator as ViewFilterConfig['operator'], value }
+                  : filter,
               );
+              chipFiltersRef.current = nextChipFilters;
+              setLocalChipFilters(nextChipFilters);
               setEditingChipIdx(null);
+              void loadData({
+                page: 0,
+                size: pagination.pageSize,
+                filters,
+                chipFilters: nextChipFilters,
+              });
             }}
             onFilterCancel={() => setEditingChipIdx(null)}
             // ColumnContextMenu
@@ -4980,29 +5404,42 @@ function ListPageContentInner(props: PageContentProps) {
             onSort={(dir) => {
               if (!contextMenu) return;
               if (dir === 'clear') {
-                setActiveSorts((prev) =>
+                setLocalActiveSorts((prev) =>
                   prev.filter((s) => s.fieldCode !== contextMenu.column.field),
                 );
               } else {
-                setActiveSorts([
+                setLocalActiveSorts([
                   { fieldCode: contextMenu.column.field, direction: dir, priority: 0 },
                 ]);
               }
             }}
-            onFreeze={(_pos) => {
-              // Column freeze is handled via DSL config; for runtime, update SavedView
-              // This would require extending ViewColumnConfig with frozen support
+            onFreeze={(position) => {
+              if (!contextMenu) return;
+              const fieldCode = contextMenu.column.field;
+              const columns = buildCurrentColumnSettings().map((column) => {
+                if (column.fieldCode === fieldCode) {
+                  return position === 'none'
+                    ? { ...column, frozen: false, frozenPosition: undefined }
+                    : {
+                        ...column,
+                        visible: true,
+                        frozen: true,
+                        frozenPosition: position,
+                      };
+                }
+                return column;
+              });
+              void ensureViewAndUpdateConfig({ columns });
             }}
             onHide={() => {
               if (!contextMenu) return;
-              const cols = (effectiveViewConfig?.columns || []).map((c) =>
-                c.fieldCode === contextMenu.column.field ? { ...c, visible: false } : c,
+              if (tableColumns.filter((column) => !column.isActionColumn).length <= 1) return;
+              const columns = buildCurrentColumnSettings().map((column) =>
+                column.fieldCode === contextMenu.column.field
+                  ? { ...column, visible: false, frozen: false, frozenPosition: undefined }
+                  : column,
               );
-              // If column not in saved config yet, add it as hidden
-              if (!cols.find((c) => c.fieldCode === contextMenu.column.field)) {
-                cols.push({ fieldCode: contextMenu.column.field, visible: false });
-              }
-              void ensureViewAndUpdateConfig({ columns: cols });
+              void ensureViewAndUpdateConfig({ columns });
             }}
             onFilterByColumn={() => {
               // Placeholder — will be connected to FilterChipBar in integration step
@@ -5027,6 +5464,12 @@ function ListPageContentInner(props: PageContentProps) {
         </div>
       </div>
       <AsyncTaskModalHost />
+      <BulkActionResultDialog
+        result={bulkActionResult}
+        onClose={() => setBulkActionResult(null)}
+        locale={locale}
+        t={t}
+      />
     </DataSourceProvider>
   );
 }

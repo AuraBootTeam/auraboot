@@ -2,6 +2,8 @@ package com.auraboot.module.meta.excel;
 
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.TypeSystemManager;
+import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.module.meta.excel.mapper.ImportJobMapper;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -40,11 +42,34 @@ class ExcelEdgeCaseTest {
     @Mock
     private ImportJobMapper importJobMapper;
 
+    @Mock
+    private ExcelImportPolicyResolver policyResolver;
+
+    @Mock
+    private CommandExecutor commandExecutor;
+
+    @Mock
+    private ExcelReferenceResolver referenceResolver;
+
+    @Mock
+    private ExcelImportErrorReportService errorReportService;
+
     private ExcelImportService importService;
 
     @BeforeEach
     void setUp() {
-        importService = new ExcelImportService(dynamicDataService, metaModelService, importJobMapper);
+        importService = new ExcelImportService(
+                dynamicDataService, metaModelService, importJobMapper, policyResolver,
+                commandExecutor, referenceResolver, new TypeSystemManager(), errorReportService,
+                new com.fasterxml.jackson.databind.ObjectMapper());
+        lenient().when(policyResolver.requireEnabled(anyString())).thenReturn(ExcelImportPolicy.builder()
+                .modelCode("test_model")
+                .enabled(true)
+                .modes(java.util.Set.of("insert", "update"))
+                .updateKeys(List.of("code"))
+                .createFields(java.util.Set.of("name", "code"))
+                .updateFields(java.util.Set.of("name", "code"))
+                .build());
     }
 
     /**

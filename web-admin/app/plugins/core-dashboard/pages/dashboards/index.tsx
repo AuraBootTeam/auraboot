@@ -30,6 +30,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { DashboardViewer } from '~/plugins/core-dashboard/components/DashboardViewer';
+import { resolveDashboardRuntimeValue } from '~/plugins/core-dashboard/utils/drillDownNavigation';
 import { ExportPdfButton } from '~/framework/smart/components/data-tools/ExportPdfButton';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 import type { Dashboard } from '~/plugins/core-dashboard/types';
@@ -44,6 +45,16 @@ const HIDDEN_DEFAULT_TAB_CODES = new Set([
   'sc_workflow_dashboard',
   'sc_arsenal_dashboard',
 ]);
+const ACCESS_DENIED_PATTERN = /access forbidden|access denied|forbidden|permission denied|403/i;
+
+export function resolveDashboardErrorMessage(
+  message: string,
+  translate: (key: string) => string,
+): string {
+  return ACCESS_DENIED_PATTERN.test(message)
+    ? translate('dashboard.error.access_forbidden')
+    : message;
+}
 
 function getBrowserStorage(): Storage | null {
   if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
@@ -190,6 +201,13 @@ export default function DashboardViewerPage() {
   const activeDashboard = useMemo(
     () => sortedList.find((d) => d.code === activeCode) ?? null,
     [sortedList, activeCode],
+  );
+  const runtimeWidgets = useMemo(
+    () =>
+      resolveDashboardRuntimeValue(activeDashboard?.widgets ?? [], {
+        recordPid: searchParams.get('recordPid'),
+      }),
+    [activeDashboard?.widgets, searchParams],
   );
 
   // dnd-kit sensors — require 5px movement to distinguish click from drag
@@ -403,7 +421,7 @@ export default function DashboardViewerPage() {
 
         {!loading && error && (
           <div className="flex h-64 flex-col items-center justify-center text-red-500">
-            <p>{error}</p>
+            <p>{resolveDashboardErrorMessage(error, t)}</p>
             <button onClick={handleRefresh} className="mt-3 text-sm text-blue-600 hover:underline">
               {t('dashboard.retry')}
             </button>
@@ -413,7 +431,7 @@ export default function DashboardViewerPage() {
         {!loading && !error && activeDashboard && (
           <div ref={dashboardRef}>
             <DashboardViewer
-              widgets={activeDashboard.widgets || []}
+              widgets={runtimeWidgets}
               layoutConfig={activeDashboard.layoutConfig || { columns: 12, rowHeight: 80, gap: 16 }}
               className="min-h-[calc(100vh-140px)]"
             />

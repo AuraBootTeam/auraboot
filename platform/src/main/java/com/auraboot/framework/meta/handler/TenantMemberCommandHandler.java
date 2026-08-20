@@ -64,8 +64,8 @@ public class TenantMemberCommandHandler implements CommandHandler {
                 case "admin:reject_member" -> handleReject(extractMemberPid(context), context.getPayload(), userId, result);
                 case "admin:suspend_member" -> handleSuspend(extractMemberPid(context), context.getPayload(), userId, result);
                 case "admin:restore_member" -> handleRestore(extractMemberPid(context), userId, result);
-                case "admin:leave_member" -> handleLeave(extractMemberPid(context), userId, result);
-                case "admin:delete_member" -> handleDelete(extractMemberPid(context), userId, result);
+                case "admin:leave_member" -> handleLeave(extractMemberPid(context), context.getPayload(), userId, result);
+                case "admin:delete_member" -> handleDelete(extractMemberPid(context), context.getPayload(), userId, result);
                 case "admin:reset_member_password" -> handleResetPassword(extractMemberPid(context), userId, result);
                 case "admin:create_member" -> handleCreateMember(context.getPayload(), userId, result);
                 case "admin:provision_member_from_employee" -> handleProvisionMemberFromEmployee(context.getPayload(), result);
@@ -107,7 +107,8 @@ public class TenantMemberCommandHandler implements CommandHandler {
 
     private void handleSuspend(String memberPid, Map<String, Object> payload, Long userId, Map<String, Object> result) {
         String reason = extractReason(payload);
-        tenantMemberApplicationService.updateMemberStatus(memberPid, "suspended", reason, userId);
+        tenantMemberApplicationService.updateMemberStatus(
+                memberPid, "suspended", reason, extractTargetMemberPid(payload), userId);
         result.put("action", "suspend");
         result.put("newStatus", StatusConstants.SUSPENDED);
         if (reason != null) {
@@ -121,14 +122,15 @@ public class TenantMemberCommandHandler implements CommandHandler {
         result.put("newStatus", StatusConstants.ACTIVE);
     }
 
-    private void handleLeave(String memberPid, Long userId, Map<String, Object> result) {
-        tenantMemberApplicationService.updateMemberStatus(memberPid, "inactive", null, userId);
+    private void handleLeave(String memberPid, Map<String, Object> payload, Long userId, Map<String, Object> result) {
+        tenantMemberApplicationService.updateMemberStatus(
+                memberPid, "inactive", extractReason(payload), extractTargetMemberPid(payload), userId);
         result.put("action", "leave");
         result.put("newStatus", StatusConstants.INACTIVE);
     }
 
-    private void handleDelete(String memberPid, Long userId, Map<String, Object> result) {
-        tenantMemberApplicationService.removeMember(memberPid, userId);
+    private void handleDelete(String memberPid, Map<String, Object> payload, Long userId, Map<String, Object> result) {
+        tenantMemberApplicationService.removeMember(memberPid, extractTargetMemberPid(payload), userId);
         result.put("action", "delete");
         result.put("removed", true);
     }
@@ -185,6 +187,9 @@ public class TenantMemberCommandHandler implements CommandHandler {
         result.put("employeePid", provisioned.getEmployeePid());
         result.put("userPid", provisioned.getUserPid());
         result.put("memberPid", provisioned.getMemberPid());
+        result.put("email", provisioned.getEmail());
+        result.put("userName", provisioned.getUserName());
+        result.put("displayName", provisioned.getDisplayName());
         result.put("createdUser", provisioned.isCreatedUser());
         result.put("createdMember", provisioned.isCreatedMember());
         result.put("adminManaged", provisioned.isAdminManaged());
@@ -235,6 +240,10 @@ public class TenantMemberCommandHandler implements CommandHandler {
         }
         Object reason = payload.get("reason");
         return reason != null ? reason.toString() : null;
+    }
+
+    private String extractTargetMemberPid(Map<String, Object> payload) {
+        return extractString(payload, "targetMemberPid");
     }
 
     private String extractString(Map<String, Object> payload, String key) {

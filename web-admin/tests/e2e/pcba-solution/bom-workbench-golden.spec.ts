@@ -247,7 +247,9 @@ test.describe('BOM standardization workbench golden', () => {
       ]);
       await waitForDynamicPageLoad(page, 20_000);
 
-      await expect(page.getByTestId('status-banner-bom_workbench_task_status')).toHaveCount(0);
+      const completedBanner = page.getByTestId('status-banner-bom_workbench_task_status');
+      await expect(completedBanner).toBeVisible({ timeout: 20_000 });
+      await expect(completedBanner).toContainText(/BOM 匹配已完成|BOM matching completed/i);
       await expect(page.getByTestId('workbench-action-download_new_bom')).toBeVisible({
         timeout: 20_000,
       });

@@ -2,6 +2,7 @@ package com.auraboot.module.meta.excel;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * Represents a single validation or import error for a specific row/field.
@@ -11,6 +12,7 @@ import lombok.Data;
  */
 @Data
 @AllArgsConstructor
+@NoArgsConstructor
 public class ImportValidationError {
 
     /** 1-based row number in the Excel file (header = row 1, first data = row 2). */

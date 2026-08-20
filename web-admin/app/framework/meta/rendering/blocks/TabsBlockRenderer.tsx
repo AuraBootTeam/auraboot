@@ -25,7 +25,11 @@ export const TabsBlockRenderer: React.FC<TabsBlockRendererProps> = ({ block, run
     <div className="tabs-block">
       {/* Tab headers */}
       <div className="border-border border-b">
-        <nav className="-mb-px flex space-x-8" role="tablist" aria-label="Tabs">
+        <nav
+          className="-mb-px flex space-x-8"
+          role="tablist"
+          aria-label={getLocalizedText({ 'zh-CN': '页签', en: 'Tabs' }, locale, t)}
+        >
           {tabs.map((tab, index) => {
             const label = getLocalizedText(tab.label, locale, t);
             return (

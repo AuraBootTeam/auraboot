@@ -21,6 +21,9 @@
       "crm_fcst_status": {
         "strategy": "fixed_value",
         "value": "draft"
+      },
+      "crm_fcst_owner": {
+        "strategy": "current_user_pid"
       }
     },
     "permissions": [

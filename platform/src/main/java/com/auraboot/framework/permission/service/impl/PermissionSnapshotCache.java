@@ -7,6 +7,7 @@ import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
+import com.auraboot.framework.rbac.service.MemberRoleContributor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.Cache;
@@ -60,6 +61,7 @@ public class PermissionSnapshotCache {
     private final UserRoleMapper userRoleMapper;
     private final RolePermissionMapper rolePermissionMapper;
     private final RoleMapper roleMapper;
+    private final List<MemberRoleContributor> memberRoleContributors;
     private final CacheManager cacheManager;
 
     public PermissionSnapshotCache(
@@ -67,11 +69,13 @@ public class PermissionSnapshotCache {
             UserRoleMapper userRoleMapper,
             RolePermissionMapper rolePermissionMapper,
             RoleMapper roleMapper,
+            List<MemberRoleContributor> memberRoleContributors,
             @Qualifier("permissionCacheManager") CacheManager cacheManager) {
         this.permissionMapper = permissionMapper;
         this.userRoleMapper = userRoleMapper;
         this.rolePermissionMapper = rolePermissionMapper;
         this.roleMapper = roleMapper;
+        this.memberRoleContributors = memberRoleContributors == null ? List.of() : List.copyOf(memberRoleContributors);
         this.cacheManager = cacheManager;
     }
 
@@ -80,7 +84,8 @@ public class PermissionSnapshotCache {
             return Collections.emptySet();
         }
         LocalDate today = LocalDate.now();
-        EffectivePermissionKey key = new EffectivePermissionKey(tenantId, userId, today);
+        EffectivePermissionKey key = new EffectivePermissionKey(
+                tenantId, userId, today, contributorDiscriminator(memberId, tenantId));
         return getOrLoad(EFFECTIVE_PERMISSION_CACHE, key,
                 () -> loadEffectivePermissionIds(tenantId, userId, memberId, today));
     }
@@ -124,9 +129,10 @@ public class PermissionSnapshotCache {
         if (tenantId == null || userId == null) {
             return;
         }
-        cache(USER_ROLE_CACHE).evict(new UserRoleKey(tenantId, userId));
-        cache(EFFECTIVE_PERMISSION_CACHE)
-                .evict(new EffectivePermissionKey(tenantId, userId, LocalDate.now()));
+        cache(USER_ROLE_CACHE).evict(new UserRoleKey(tenantId, userId, LocalDate.now()));
+        // Contributor discriminators are member-source dependent and cannot be reconstructed from
+        // a user id alone. This cache is intentionally small and short-lived.
+        cache(EFFECTIVE_PERMISSION_CACHE).clear();
     }
 
     public void evictRole(Long tenantId, Long roleId) {
@@ -192,18 +198,37 @@ public class PermissionSnapshotCache {
         if (tenantId == null || userId == null || memberId == null) {
             return List.of();
         }
-        UserRoleKey key = new UserRoleKey(tenantId, userId);
-        return getOrLoad(USER_ROLE_CACHE, key, () -> {
-            List<UserRole> rows = userRoleMapper.findByMemberIdAndTenantId(memberId, tenantId);
+        LocalDate today = LocalDate.now();
+        UserRoleKey key = new UserRoleKey(tenantId, userId, today);
+        List<Long> directRoleIds = getOrLoad(USER_ROLE_CACHE, key, () -> {
+            List<UserRole> rows = userRoleMapper.findEffectiveByMemberIdAndTenantId(memberId, tenantId, today);
             if (rows == null || rows.isEmpty()) {
                 return List.of();
             }
             return rows.stream()
-                    .map(UserRole::getRoleId)
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .toList();
+                        .map(UserRole::getRoleId)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .toList();
         });
+        LinkedHashSet<Long> roleIds = new LinkedHashSet<>(directRoleIds);
+        for (MemberRoleContributor contributor : memberRoleContributors) {
+            List<Long> contributed = contributor.findRoleIds(memberId, tenantId);
+            if (contributed != null) {
+                contributed.stream().filter(Objects::nonNull).forEach(roleIds::add);
+            }
+        }
+        return roleIds.isEmpty() ? List.of() : List.copyOf(roleIds);
+    }
+
+    private String contributorDiscriminator(Long memberId, Long tenantId) {
+        if (memberRoleContributors.isEmpty()) {
+            return "";
+        }
+        return memberRoleContributors.stream()
+                .map(contributor -> Objects.toString(contributor.cacheDiscriminator(memberId, tenantId), ""))
+                .reduce((left, right) -> left + "|" + right)
+                .orElse("");
     }
 
     private Set<Long> getRolePermissionIds(Long tenantId, Long roleId, LocalDate today) {
@@ -274,7 +299,7 @@ public class PermissionSnapshotCache {
             Map<Long, String> codesById) {
     }
 
-    private record UserRoleKey(Long tenantId, Long userId) {
+    private record UserRoleKey(Long tenantId, Long userId, LocalDate effectiveDate) {
     }
 
     private record RolePermissionKey(Long tenantId, Long roleId, LocalDate effectiveDate) {
@@ -283,7 +308,8 @@ public class PermissionSnapshotCache {
     private record BaselineRoleKey(Long tenantId) {
     }
 
-    private record EffectivePermissionKey(Long tenantId, Long userId, LocalDate effectiveDate) {
+    private record EffectivePermissionKey(
+            Long tenantId, Long userId, LocalDate effectiveDate, String contributorDiscriminator) {
     }
 
     private record BaselineRoleLookup(Long roleId) {

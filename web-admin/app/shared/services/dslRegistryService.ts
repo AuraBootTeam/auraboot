@@ -146,6 +146,7 @@ const FALLBACK_REGISTRY: DslRegistryData = {
       { code: 'stat-card', label: 'Stat Card' },
       { code: 'selection-info', label: 'Selection Info' },
       { code: 'metric-strip', label: 'Metric Strip' },
+      { code: 'stage-rail', label: 'Stage Rail' },
       { code: 'record-inspector', label: 'Record Inspector' },
       { code: 'candidate-list', label: 'Candidate List' },
       { code: 'workbench-action-bar', label: 'Workbench Action Bar' },

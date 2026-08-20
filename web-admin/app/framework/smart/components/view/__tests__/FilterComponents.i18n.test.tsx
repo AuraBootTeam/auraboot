@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '~/contexts/I18nContext';
 import { FilterChipBar } from '../FilterChipBar';
+import { FilterFieldPicker } from '../FilterFieldPicker';
 import { FilterValuePopover } from '../FilterValuePopover';
 
 const ZH = {
@@ -11,6 +12,7 @@ const ZH = {
     apply: '应用',
     cancel: '取消',
     clear_all: '清除全部',
+    collaborative_records: '协作记录',
     no: '否',
     select_placeholder: '请选择',
     yes: '是',
@@ -68,6 +70,30 @@ describe('FilterValuePopover i18n', () => {
   });
 });
 
+describe('FilterFieldPicker i18n', () => {
+  it('renders Chinese section and field-type labels', () => {
+    renderZh(
+      <FilterFieldPicker
+        open
+        anchorEl={{ x: 0, y: 0 }}
+        fields={[
+          { fieldCode: 'amount', label: '预期金额', fieldType: 'MONEY' },
+          { fieldCode: 'owner', label: '负责人', fieldType: 'REFERENCE' },
+        ]}
+        activeFieldCodes={[]}
+        onSelect={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('常用字段')).toBeInTheDocument();
+    expect(screen.getByText('金额')).toBeInTheDocument();
+    expect(screen.getByText('关联')).toBeInTheDocument();
+    expect(screen.queryByText('Common Fields')).not.toBeInTheDocument();
+    expect(screen.queryByText('Money')).not.toBeInTheDocument();
+  });
+});
+
 describe('FilterChipBar i18n', () => {
   it('renders textual operators and actions in Chinese', () => {
     renderZh(
@@ -87,5 +113,32 @@ describe('FilterChipBar i18n', () => {
     expect(screen.getByRole('button', { name: '清除全部' })).toBeInTheDocument();
     expect(screen.queryByText('contains')).not.toBeInTheDocument();
     expect(screen.queryByText('Clear All')).not.toBeInTheDocument();
+  });
+
+  it('renders the collaborative-record expression as a product label instead of PID', () => {
+    renderZh(
+      <FilterChipBar
+        filters={[
+          {
+            fieldCode: 'pid',
+            operator: 'in',
+            value: { $currentSharedRecordPids: { action: 'read' } },
+            isExpression: true,
+            expression: '#currentSharedRecords',
+          },
+        ]}
+        sorts={[]}
+        fieldMetadata={[]}
+        onFiltersChange={vi.fn()}
+        onSortsChange={vi.fn()}
+        onAddFilter={vi.fn()}
+        onClearAll={vi.fn()}
+        resolveValueLabel={() => '协作记录'}
+      />,
+    );
+
+    expect(screen.getAllByText('协作记录')).toHaveLength(2);
+    expect(screen.queryByText('pid')).not.toBeInTheDocument();
+    expect(screen.queryByText('#currentSharedRecords')).not.toBeInTheDocument();
   });
 });

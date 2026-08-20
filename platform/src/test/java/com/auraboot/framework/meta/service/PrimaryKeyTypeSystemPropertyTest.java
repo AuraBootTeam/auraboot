@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
@@ -224,6 +225,19 @@ public class PrimaryKeyTypeSystemPropertyTest {
         
         System.out.println("✓ 完成 " + successCount + " 次迭代");
         System.out.println("✓ 数据类型转换正确性");
+    }
+
+    @Test
+    @DisplayName("Property 6.6.1: DateTime conversion matches Excel validation formats")
+    void testDateTimeConversionMatchesExcelValidationFormats() {
+        FieldDefinition dateTimeField = FieldDefinition.builder()
+                .code("meeting_at")
+                .dataType("datetime")
+                .build();
+
+        LocalDateTime expected = LocalDateTime.of(2026, 8, 13, 9, 30, 45);
+        assertEquals(expected, typeSystemManager.convertValue("2026-08-13T09:30:45", dateTimeField));
+        assertEquals(expected, typeSystemManager.convertValue("2026-08-13 09:30:45", dateTimeField));
     }
 
     @Test

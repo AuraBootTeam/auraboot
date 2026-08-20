@@ -14,7 +14,7 @@ import {
   type UserEngagement,
 } from '~/shared/services/engagementService';
 import { AddFavoriteModal } from '~/plugins/core-dashboard/widgets/workbench/AddFavoriteModal';
-import { useRootLoaderData } from '~/root';
+import { useRootLoaderData } from '~/root-data';
 import { resolveIcon } from '~/utils/icon-resolver';
 
 export interface ShortcutItem {

@@ -117,6 +117,34 @@ class DataScopeEvaluatorTest {
     }
 
     @Test
+    void ownerDerivedDeptScopeUsesAuthoritativeOrganizationMembership() {
+        DataScopeCondition condition = new DataScopeCondition(
+                "dept_and_sub", "owner_id", "current-user", null, "owner_id",
+                List.of("d1", "d1-child"), List.of(), List.of());
+        when(dataScopeService.resolveScope(1L, "M", "view")).thenReturn(condition);
+        when(dataScopeService.isOwnerInDepartments("owner-user", condition.deptPids()))
+                .thenReturn(true);
+
+        EvaluationStep step = evaluator.evaluate(
+                1L, "M", "view", Map.of("owner_id", "owner-user"));
+
+        assertEquals(EvaluationVerdict.ALLOW, step.verdict());
+    }
+
+    @Test
+    void ownerDerivedDeptScopeDeniesMissingOrOutsideOwner() {
+        DataScopeCondition condition = new DataScopeCondition(
+                "dept", "owner_id", "current-user", null, "owner_id",
+                List.of("d1"), List.of(), List.of());
+        when(dataScopeService.resolveScope(1L, "M", "view")).thenReturn(condition);
+
+        assertEquals(EvaluationVerdict.DENY,
+                evaluator.evaluate(1L, "M", "view", Map.of("name", "missing owner")).verdict());
+        assertEquals(EvaluationVerdict.DENY,
+                evaluator.evaluate(1L, "M", "view", Map.of("owner_id", "outside-user")).verdict());
+    }
+
+    @Test
     void unknownScopeTypeNotApplicable() {
         when(dataScopeService.resolveScope(1L, "M", "view"))
                 .thenReturn(new DataScopeCondition("custom", null, null, null, List.of(), List.of()));
