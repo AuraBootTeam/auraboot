@@ -605,7 +605,9 @@ describe('UnifiedDesignerPage', () => {
         '经值班负责人确认接管',
       ),
     );
-    expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument(),
+    );
     expect(screen.getByTestId('studio-handoff-editable-reason')).toBeInTheDocument();
     expect(String(replaceState.mock.calls.at(-1)?.[2])).toContain(
       'authoringSession=session_1',
