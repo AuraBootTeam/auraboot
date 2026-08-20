@@ -4365,6 +4365,7 @@
     "dictType": "static",
     "items": [
       { "value": "moved_to_pool", "label": "Moved to Public Pool", "label:zh-CN": "移入公海", "sortNo": 10, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "imported_to_pool", "label": "Imported to Public Pool", "label:zh-CN": "导入公海", "sortNo": 15, "status": "enabled", "extension": { "color": "blue" } },
       { "value": "claimed", "label": "Claimed", "label:zh-CN": "领取", "sortNo": 20, "status": "enabled", "extension": { "color": "green" } },
       { "value": "assigned", "label": "Assigned", "label:zh-CN": "分配", "sortNo": 30, "status": "enabled", "extension": { "color": "green" } },
       { "value": "auto_recycled", "label": "Automatically Recycled", "label:zh-CN": "自动回收", "sortNo": 40, "status": "enabled", "extension": { "color": "amber" } }

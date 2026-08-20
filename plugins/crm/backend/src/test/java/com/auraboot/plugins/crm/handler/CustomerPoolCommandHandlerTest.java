@@ -3,9 +3,15 @@ package com.auraboot.plugins.crm.handler;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension.CommandContext;
 import com.auraboot.framework.plugin.extension.DataAccessor;
+import com.auraboot.framework.plugin.extension.FileAccessor;
 import com.auraboot.framework.plugin.extension.RecordShareAccessor;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.time.Instant;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -457,6 +463,94 @@ class CustomerPoolCommandHandlerTest {
                 db.getById("crm_customer_pool_item_common", "item-1").get("crm_cpi_recycle_token"));
     }
 
+    @Test
+    void customerPoolImportTemplateIsAReadableWorkbookWithStableFieldHeaders() throws Exception {
+        Map<String, Object> result = execute(baseline(), CustomerPoolCommandHandler.DOWNLOAD_IMPORT_TEMPLATE,
+                "pool-1", "manager", Map.of());
+
+        assertEquals("crm-customer-pool-import-template.xlsx", result.get("fileName"));
+        byte[] bytes = java.util.Base64.getDecoder().decode(result.get("contentBase64").toString());
+        try (Workbook workbook = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+            assertEquals("crm_acc_code", workbook.getSheetAt(0).getRow(0).getCell(0).getStringCellValue());
+            assertEquals("crm_acc_name", workbook.getSheetAt(0).getRow(0).getCell(1).getStringCellValue());
+            assertEquals("填写说明", workbook.getSheetAt(1).getSheetName());
+        }
+    }
+
+    @Test
+    void customerPoolImportPrecheckReportsRowsAndNeverWrites() throws Exception {
+        FakeDb db = baseline();
+        FakeFiles files = new FakeFiles().put("file-1", "manager", workbook(
+                List.of("crm_acc_code", "crm_acc_name", "crm_acc_rating"),
+                List.of(List.of("CUSTOMER-1", "Existing", "A"), List.of("NEW-1", "New", "Z"))));
+
+        Map<String, Object> result = execute(db, new FakeShares(), files,
+                CustomerPoolCommandHandler.PRECHECK_IMPORT, "pool-1", "manager",
+                Map.of("importFileId", "file-1", "importType", "ADD"));
+
+        assertEquals(2, result.get("totalRows"));
+        assertEquals(0, result.get("validRows"));
+        assertEquals(2, result.get("failedRows"));
+        assertEquals(1, db.query("crm_account_common", Map.of()).size());
+        assertTrue(db.query("crm_customer_pool_item_common", Map.of()).isEmpty());
+    }
+
+    @Test
+    void customerPoolAddImportCanSkipInvalidRowsAndPreservesPoolStateMachine() throws Exception {
+        FakeDb db = baseline();
+        FakeShares shares = new FakeShares();
+        FakeFiles files = new FakeFiles().put("file-1", "manager", workbook(
+                List.of("crm_acc_code", "crm_acc_name", "crm_acc_rating"),
+                List.of(List.of("NEW-1", "New Customer", "A"), List.of("NEW-2", "", "B"))));
+
+        Map<String, Object> blocked = execute(db, shares, files,
+                CustomerPoolCommandHandler.IMPORT_CUSTOMERS, "pool-1", "manager",
+                Map.of("importFileId", "file-1", "importType", "ADD", "skipErrors", false));
+        assertEquals(0, blocked.get("importedRows"));
+        assertTrue(db.query("crm_account_common", Map.of("crm_acc_code", "NEW-1")).isEmpty());
+
+        Map<String, Object> imported = execute(db, shares, files,
+                CustomerPoolCommandHandler.IMPORT_CUSTOMERS, "pool-1", "manager",
+                Map.of("importFileId", "file-1", "importType", "ADD", "skipErrors", true));
+        assertEquals(1, imported.get("createdRows"));
+        Map<String, Object> customer = db.query("crm_account_common", Map.of("crm_acc_code", "NEW-1")).getFirst();
+        assertNull(customer.get("crm_acc_owner"));
+        assertEquals("in_pool", customer.get("crm_acc_pool_state"));
+        assertEquals(1, db.query("crm_customer_pool_item_common",
+                Map.of("crm_cpi_account_id", customer.get("pid"))).size());
+        assertEquals("imported_to_pool", db.query("crm_customer_owner_history_common",
+                Map.of("crm_coh_customer_id", customer.get("pid"))).getFirst().get("crm_coh_event"));
+        assertEquals(3, shares.calls.size());
+    }
+
+    @Test
+    void customerPoolUpdateImportRequiresActorOwnedFileAndRefreshesCustomerSnapshot() throws Exception {
+        FakeDb db = baseline();
+        FakeFiles foreign = new FakeFiles().put("file-foreign", "outside-sales", workbook(
+                List.of("crm_acc_code", "crm_acc_name"), List.of(List.of("CUSTOMER-1", "Renewed"))));
+        assertThrows(SecurityException.class, () -> execute(db, new FakeShares(), foreign,
+                CustomerPoolCommandHandler.PRECHECK_IMPORT, "pool-1", "manager",
+                Map.of("importFileId", "file-foreign", "importType", "UPDATE")));
+
+        availableItem(db, "item-1", "customer-1", "member-a", Instant.parse("2026-08-01T00:00:00Z"));
+        db.getById("crm_account_common", "customer-1").put("crm_acc_pool_state", "in_pool");
+        db.getById("crm_account_common", "customer-1").put("crm_acc_last_pool_id", "pool-1");
+        FakeFiles files = new FakeFiles().put("file-1", "manager", workbook(
+                List.of("crm_acc_code", "crm_acc_name", "crm_acc_phone"),
+                List.of(List.of("CUSTOMER-1", "Renewed Customer", "400-100-200"))));
+
+        Map<String, Object> result = execute(db, new FakeShares(), files,
+                CustomerPoolCommandHandler.IMPORT_CUSTOMERS, "pool-1", "manager",
+                Map.of("importFileId", "file-1", "importType", "UPDATE"));
+
+        assertEquals(1, result.get("updatedRows"));
+        assertEquals("Renewed Customer", db.getById("crm_account_common", "customer-1").get("crm_acc_name"));
+        assertEquals("Renewed Customer",
+                db.getById("crm_customer_pool_item_common", "item-1").get("crm_cpi_account_name"));
+        assertEquals("400-100-200",
+                db.getById("crm_customer_pool_item_common", "item-1").get("crm_cpi_phone"));
+    }
+
     private Map<String, Object> execute(FakeDb db, String command, String recordId, String actor,
                                         Map<String, Object> payload) {
         return execute(db, new FakeShares(), command, recordId, actor, payload);
@@ -464,15 +558,65 @@ class CustomerPoolCommandHandlerTest {
 
     private Map<String, Object> execute(FakeDb db, FakeShares shares, String command,
                                         String recordId, String actor, Map<String, Object> payload) {
+        return execute(db, shares, null, command, recordId, actor, payload);
+    }
+
+    private Map<String, Object> execute(FakeDb db, FakeShares shares, FileAccessor files, String command,
+                                        String recordId, String actor, Map<String, Object> payload) {
+        HashMap<String, Object> settings = new HashMap<>();
+        settings.put("__dataAccessor", db);
+        settings.put("__currentUser", actor);
+        settings.put(CommandHandlerExtension.CURRENT_USER_PID_KEY, actor);
+        settings.put(RecordShareAccessor.SETTINGS_KEY, shares);
+        if (files != null) settings.put(FileAccessor.SETTINGS_KEY, files);
         CommandContext context = new CommandContext(1L, "com.auraboot.crm", "crm", command,
                 command.contains("pool_customer") ? "crm_customer_pool_item_common" : "crm_account_common",
-                recordId, payload, Map.of(
-                        "__dataAccessor", db,
-                        CommandHandlerExtension.CURRENT_USER_PID_KEY, actor,
-                        RecordShareAccessor.SETTINGS_KEY, shares), false);
+                recordId, payload, settings, false);
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) handler.execute(context);
         return result;
+    }
+
+    private static byte[] workbook(List<String> headers, List<List<String>> rows) throws Exception {
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            var sheet = workbook.createSheet("客户公海导入");
+            var header = sheet.createRow(0);
+            for (int column = 0; column < headers.size(); column++) {
+                header.createCell(column).setCellValue(headers.get(column));
+            }
+            for (int index = 0; index < rows.size(); index++) {
+                var row = sheet.createRow(index + 1);
+                for (int column = 0; column < rows.get(index).size(); column++) {
+                    row.createCell(column).setCellValue(rows.get(index).get(column));
+                }
+            }
+            workbook.write(output);
+            return output.toByteArray();
+        }
+    }
+
+    private static final class FakeFiles implements FileAccessor {
+        private final Map<String, byte[]> bytes = new HashMap<>();
+        private final Map<String, FileMetadata> metadata = new HashMap<>();
+
+        FakeFiles put(String fileId, String owner, byte[] content) {
+            bytes.put(fileId, content);
+            metadata.put(fileId, new FileMetadata(fileId, "customers.xlsx", content.length,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", owner, "success"));
+            return this;
+        }
+
+        @Override public InputStream open(String fileId) {
+            return new ByteArrayInputStream(bytes.get(fileId));
+        }
+
+        @Override public FileMetadata describe(String fileId) {
+            return metadata.get(fileId);
+        }
+
+        @Override public SavedFile save(String originalName, String contentType, byte[] content) {
+            throw new UnsupportedOperationException("Not needed by import tests");
+        }
     }
 
     private static boolean succeeds(Runnable work) {

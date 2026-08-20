@@ -12,7 +12,7 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { read as xlsxRead, utils as XLSXUtils } from 'xlsx';
+import { read as xlsxRead, utils as XLSXUtils, write as xlsxWrite } from 'xlsx';
 import { ensureSidebarExpanded, waitForFormReady } from '../helpers';
 
 const ADMIN_EMAIL = 'admin@auraboot.com';
@@ -34,7 +34,13 @@ const MEMBER_OPERATIONS_SCENARIO =
   'member scope, quick edit, chart, exports, guarded delete, batch update, claim and assignment persist on the real stack';
 const GOVERNANCE_RECYCLE_SCENARIO =
   'administrator governs quick pool policy, capacity, relative and fixed recycle rules, and recent activity blocks recycle';
-const CUSTOMER_POOL_SCENARIOS = [MEMBER_OPERATIONS_SCENARIO, GOVERNANCE_RECYCLE_SCENARIO];
+const IMPORT_MOBILE_SCENARIO =
+  'administrator downloads, prechecks and imports XLSX customers while mobile sales reviews customer, activity and ownership tabs';
+const CUSTOMER_POOL_SCENARIOS = [
+  MEMBER_OPERATIONS_SCENARIO,
+  GOVERNANCE_RECYCLE_SCENARIO,
+  IMPORT_MOBILE_SCENARIO,
+];
 const completedScenarios = new Set<string>();
 const failedScenarios = new Set<string>();
 const runtimeScreenshots = new Set<string>();
@@ -286,6 +292,49 @@ function queryRows(body: unknown): Record<string, unknown>[] {
   return Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
 }
 
+function customerPoolWorkbook(rows: unknown[][]): Buffer {
+  const workbook = XLSXUtils.book_new();
+  XLSXUtils.book_append_sheet(
+    workbook,
+    XLSXUtils.aoa_to_sheet([
+      [
+        'crm_acc_code',
+        'crm_acc_name',
+        'crm_acc_industry',
+        'crm_acc_website',
+        'crm_acc_phone',
+        'crm_acc_address',
+        'crm_acc_rating',
+        'crm_acc_status',
+        'crm_acc_remark',
+      ],
+      ...rows,
+    ]),
+    '客户公海导入',
+  );
+  return xlsxWrite(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+}
+
+async function uploadWorkbook(page: Page, name: string, buffer: Buffer): Promise<string> {
+  const response = await page.request.post('/api/file/upload', {
+    multipart: {
+      file: {
+        name,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        buffer,
+      },
+    },
+  });
+  const body = await response.json().catch(() => ({}));
+  expect(
+    response.ok() && String(body?.code) === '0',
+    `workbook upload failed: HTTP ${response.status()} ${JSON.stringify(body).slice(0, 800)}`,
+  ).toBe(true);
+  const fileId = String(body?.data?.fileId ?? body?.fileId ?? '');
+  expect(fileId, 'workbook upload must return a public file id').toBeTruthy();
+  return fileId;
+}
+
 async function dynamicListRows(
   page: Page,
   modelCode: string,
@@ -441,6 +490,56 @@ async function clickRowAction(
   await menuAction.click();
 }
 
+async function runCustomerPoolImportAction(
+  page: Page,
+  poolRow: Locator,
+  actionCode: 'precheck_import' | 'import_customers',
+  commandCode: 'crm:precheck_customer_pool_import' | 'crm:import_customer_pool_customers',
+  workbookName: string,
+  workbook: Buffer,
+  skipErrors = false,
+): Promise<Response> {
+  await clickRowAction(
+    page,
+    poolRow,
+    actionCode,
+    actionCode === 'precheck_import' ? /预检导入文件|Pre-check Import File/ : /正式导入客户|Import Customers/,
+  );
+  const form = page.getByTestId('form-dialog');
+  await expect(form).toBeVisible({ timeout: 10_000 });
+  await expect(form.getByTestId('form-dialog-field-importType')).toBeVisible();
+  if (actionCode === 'import_customers' && skipErrors) {
+    await form.getByTestId('form-dialog-field-skipErrors').locator('input[type="checkbox"]').check();
+  }
+  const chooserPromise = page.waitForEvent('filechooser', { timeout: 15_000 });
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().includes(`/api/meta/commands/execute/${commandCode}`),
+    { timeout: 30_000 },
+  );
+  await form.getByTestId('form-dialog-submit').click();
+  const chooser = await chooserPromise;
+  await chooser.setFiles({
+    name: workbookName,
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: workbook,
+  });
+  const response = await responsePromise;
+  const body = await response.json().catch(() => ({}));
+  expect(
+    response.ok() && String(body?.code) === '0',
+    `${commandCode} dispatch failed: HTTP ${response.status()} ${JSON.stringify(body).slice(0, 800)}`,
+  ).toBe(true);
+  return response;
+}
+
+async function closeAsyncTaskModal(page: Page): Promise<void> {
+  const closeButton = page.getByRole('button', { name: '关闭', exact: true }).last();
+  await expect(closeButton).toBeVisible({ timeout: 20_000 });
+  await closeButton.click();
+}
+
 async function confirmDialog(page: Page): Promise<void> {
   const dialog = page.getByRole('dialog').last();
   await expect(dialog).toBeVisible({ timeout: 5_000 });
@@ -505,14 +604,16 @@ function recordPid(result: CommandResult): string {
 async function provisionUser(
   page: Page,
   stamp: string,
-  kind: 'sales' | 'manager',
+  kind: 'sales' | 'manager' | 'viewer',
   roleCodes: string[],
 ): Promise<{ email: string; pid: string }> {
   const email = `crm-customer-pool-${kind}-${stamp}@e2e.local`;
   const response = await page.request.post('/api/admin/users', {
     data: {
       email,
-      displayName: `Customer Pool ${kind === 'sales' ? 'Sales' : 'Manager'} ${stamp}`,
+      displayName: `Customer Pool ${
+        kind === 'sales' ? 'Sales' : kind === 'manager' ? 'Manager' : 'Viewer'
+      } ${stamp}`,
       initialPassword: PASSWORD,
       roleCodes,
       sendInviteEmail: false,
@@ -1755,5 +1856,284 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     await expect(
       page.getByRole('row', { name: new RegExp(`${capacityRemark} edited`) }),
     ).toHaveCount(0);
+  });
+
+  test(IMPORT_MOBILE_SCENARIO, async ({ page, browser, baseURL }, testInfo) => {
+    await uiLogin(page, ADMIN_EMAIL);
+    const stamp = `${Date.now()}`;
+    const meResponse = await page.request.get('/api/auth/me');
+    const meBody = await meResponse.json();
+    const adminPid = String(meBody?.data?.user?.pid ?? '');
+    expect(adminPid, 'admin pid from /api/auth/me').toBeTruthy();
+    const sales = await provisionUser(page, stamp, 'sales', ['crm_sales']);
+    const viewer = await provisionUser(page, stamp, 'viewer', ['crm_viewer']);
+    const pool = await command(
+      page,
+      'crm:create_customer_pool',
+      {
+        crm_cp_name: `Cordys Import Mobile ${stamp}`,
+        crm_cp_member_user_ids: JSON.stringify([sales.pid]),
+        crm_cp_admin_user_ids: JSON.stringify([adminPid]),
+        crm_cp_daily_pick_limit: 20,
+        crm_cp_new_cooldown_days: 0,
+        crm_cp_previous_owner_cooldown_days: 0,
+        crm_cp_auto_recycle: false,
+        crm_cp_recycle_match_mode: 'all',
+        crm_cp_recycle_after_days: 30,
+        crm_cp_recycle_basis: 'last_activity',
+        crm_cp_description: 'CordysCRM XLSX import and mobile-detail parity fixture',
+      },
+      undefined,
+      'create',
+    );
+    const poolPid = recordPid(pool);
+    expect(poolPid, 'created import customer pool pid').toBeTruthy();
+    const poolName = `Cordys Import Mobile ${stamp}`;
+    const validCode = `IMP-${stamp}`;
+    const validName = `Imported Mobile Customer ${stamp}`;
+    const invalidCode = `IMP-BAD-${stamp}`;
+    const workbook = customerPoolWorkbook([
+      [
+        validCode,
+        validName,
+        'manufacturing',
+        'https://imported.example',
+        '0755-88886666',
+        '深圳市南山区',
+        'A',
+        'active',
+        'Cordys customer-pool import journey',
+      ],
+      [invalidCode, '', 'software', '', '', '', 'B', 'active', 'Missing name must fail'],
+    ]);
+
+    await navigateToCrmMenu(page, /运营与配置|Operations/i, '/p/crm_customer_pool');
+    let poolRow = page.getByRole('row', { name: new RegExp(poolName) });
+    await expect(poolRow).toBeVisible({ timeout: 15_000 });
+
+    const templateResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().includes('/api/meta/commands/execute/crm:download_customer_pool_import_template'),
+      { timeout: 20_000 },
+    );
+    const templateDownloadPromise = page.waitForEvent('download', { timeout: 20_000 });
+    await clickRowAction(
+      page,
+      poolRow,
+      'download_import_template',
+      /下载导入模板|Download Import Template/,
+    );
+    const [templateResponse, templateDownload] = await Promise.all([
+      templateResponsePromise,
+      templateDownloadPromise,
+    ]);
+    await assertUiCommandResponse(templateResponse, 'customer-pool import template', 80);
+    expect(templateDownload.suggestedFilename()).toBe('crm-customer-pool-import-template.xlsx');
+    const templatePath = testInfo.outputPath('customer-pool-import-template.xlsx');
+    await templateDownload.saveAs(templatePath);
+    const templateWorkbook = xlsxRead(fs.readFileSync(templatePath), { type: 'buffer' });
+    const templateRows = XLSXUtils.sheet_to_json<unknown[]>(
+      templateWorkbook.Sheets[templateWorkbook.SheetNames[0]],
+      { header: 1, defval: '' },
+    );
+    expect(templateRows[0]).toEqual([
+      'crm_acc_code',
+      'crm_acc_name',
+      'crm_acc_industry',
+      'crm_acc_website',
+      'crm_acc_phone',
+      'crm_acc_address',
+      'crm_acc_rating',
+      'crm_acc_status',
+      'crm_acc_remark',
+    ]);
+    await testInfo.attach('customer-pool-import-template', {
+      path: templatePath,
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+
+    poolRow = page.getByRole('row', { name: new RegExp(poolName) });
+    await runCustomerPoolImportAction(
+      page,
+      poolRow,
+      'precheck_import',
+      'crm:precheck_customer_pool_import',
+      `customer-pool-precheck-${stamp}.xlsx`,
+      workbook,
+    );
+    await expect(page.getByText(/预检完成，未写入客户数据|Pre-check completed/)).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByText(/Customer name is required/)).toBeVisible();
+    await attachScreenshot(page, testInfo, 'customer-pool-import-precheck-partial');
+    expect(
+      (await dynamicListRows(page, 'crm_account_common')).some(
+        (record) => record.crm_acc_code === validCode,
+      ),
+      'precheck must not persist the valid row',
+    ).toBe(false);
+    await closeAsyncTaskModal(page);
+
+    poolRow = page.getByRole('row', { name: new RegExp(poolName) });
+    await runCustomerPoolImportAction(
+      page,
+      poolRow,
+      'import_customers',
+      'crm:import_customer_pool_customers',
+      `customer-pool-import-blocked-${stamp}.xlsx`,
+      workbook,
+    );
+    await expect(page.getByText(/客户公海导入完成|Customer pool import completed/)).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByText(/Customer name is required/)).toBeVisible();
+    expect(
+      (await dynamicListRows(page, 'crm_account_common')).some(
+        (record) => record.crm_acc_code === validCode,
+      ),
+      'formal import must default to zero writes when any row fails',
+    ).toBe(false);
+    await closeAsyncTaskModal(page);
+
+    poolRow = page.getByRole('row', { name: new RegExp(poolName) });
+    await runCustomerPoolImportAction(
+      page,
+      poolRow,
+      'import_customers',
+      'crm:import_customer_pool_customers',
+      `customer-pool-import-partial-${stamp}.xlsx`,
+      workbook,
+      true,
+    );
+    await expect(page.getByText(/客户公海导入完成|Customer pool import completed/)).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByText(/Customer name is required/)).toBeVisible();
+    await attachScreenshot(page, testInfo, 'customer-pool-import-partial-success');
+    const accounts = await dynamicListRows(page, 'crm_account_common');
+    const importedAccount = accounts.find((record) => record.crm_acc_code === validCode);
+    expect(importedAccount, 'valid row must persist after explicit partial-success consent').toBeTruthy();
+    expect(importedAccount?.crm_acc_pool_state).toBe('in_pool');
+    expect(importedAccount?.crm_acc_owner ?? '').toBeFalsy();
+    const importedAccountPid = String(importedAccount?.pid ?? '');
+    const poolItems = await dynamicListRows(page, 'crm_customer_pool_item_common');
+    const importedItem = poolItems.find(
+      (record) => record.crm_cpi_account_id === importedAccountPid,
+    );
+    const importedItemPid = String(importedItem?.pid ?? '');
+    expect(importedItemPid, 'import must create the public-pool projection').toBeTruthy();
+    await closeAsyncTaskModal(page);
+
+    await command(
+      page,
+      'crm:create_activity',
+      {
+        crm_act_type: 'call',
+        crm_act_subject: `Imported customer follow-up ${stamp}`,
+        crm_act_content: 'Mobile seller reviewed the imported account and confirmed next action.',
+        crm_act_date: new Date().toISOString(),
+        crm_act_source: 'manual',
+        crm_act_related_model: 'crm_account_common',
+        crm_act_related_id: importedAccountPid,
+      },
+      undefined,
+      'create',
+    );
+
+    const adminOwnedDeniedFileId = await uploadWorkbook(
+      page,
+      `viewer-command-denied-${stamp}.xlsx`,
+      customerPoolWorkbook([[`VIEWER-${stamp}`, 'Viewer Must Not Import']]),
+    );
+    const viewerSession = await openAs(browser, baseURL ?? 'http://localhost:5251', viewer.email);
+    try {
+      const denied = await viewerSession.page.request.post(
+        '/api/meta/commands/execute/crm:precheck_customer_pool_import',
+        {
+          data: {
+            targetRecordPid: poolPid,
+            operationType: 'UPDATE',
+            payload: { importFileId: adminOwnedDeniedFileId, importType: 'ADD' },
+          },
+        },
+      );
+      const deniedBody = await denied.json().catch(() => ({}));
+      expect(String(deniedBody?.code)).not.toBe('0');
+      expect(JSON.stringify(deniedBody)).toMatch(/permission|forbidden|not permitted|无权|权限/i);
+    } finally {
+      await viewerSession.context.close();
+    }
+
+    const mobileContext = await browser.newContext({
+      baseURL: baseURL ?? 'http://localhost:5251',
+      storageState: { cookies: [], origins: [] },
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    const mobilePage = await mobileContext.newPage();
+    try {
+      await uiLogin(mobilePage, sales.email);
+      await mobilePage.goto(`/p/crm_customer_pool_item/view/${importedItemPid}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(mobilePage.getByText(validName, { exact: true })).toBeVisible({
+        timeout: 20_000,
+      });
+      const tabs = mobilePage.getByRole('tablist');
+      await expect(tabs).toBeVisible();
+      const tabButtons = tabs.getByRole('tab');
+      expect(await tabButtons.count()).toBeGreaterThanOrEqual(3);
+      const customerInfoTab = tabs.getByRole('tab', { name: /客户信息|Customer Info/ });
+      const activityHistoryTab = tabs.getByRole('tab', { name: /跟进记录|Activity History/ });
+      const ownershipHistoryTab = tabs.getByRole('tab', { name: /归属记录|Ownership History/ });
+      await expect(customerInfoTab).toBeVisible();
+      await expect(activityHistoryTab).toBeVisible();
+      await expect(ownershipHistoryTab).toBeVisible();
+      expect(
+        await tabButtons.evaluateAll((elements) =>
+          elements.every((element) => element.getBoundingClientRect().height >= 44),
+        ),
+        'mobile tabs must provide 44px touch targets',
+      ).toBe(true);
+      expect(
+        await mobilePage.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+        ),
+        'mobile customer detail must not cause page-level horizontal overflow',
+      ).toBe(true);
+      await attachScreenshot(mobilePage, testInfo, 'mobile-pool-customer-info-390');
+
+      const timelineResponsePromise = mobilePage.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return url.searchParams.get('datasourceId') === 'nq:crm_pool_customer_timeline';
+      });
+      await activityHistoryTab.click();
+      const timelineResponse = await timelineResponsePromise;
+      const timelineBody = await timelineResponse.json().catch(() => ({}));
+      expect(String(timelineBody?.code)).toBe('0');
+      expect(JSON.stringify(timelineBody)).toContain(`Imported customer follow-up ${stamp}`);
+      await expect(
+        mobilePage.getByText(`Imported customer follow-up ${stamp}`, { exact: true }),
+      ).toBeVisible({ timeout: 15_000 });
+      await attachScreenshot(mobilePage, testInfo, 'mobile-pool-customer-activity-390');
+
+      const historyResponsePromise = mobilePage.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return url.searchParams.get('datasourceId') === 'nq:crm_pool_customer_owner_history';
+      });
+      await ownershipHistoryTab.click();
+      const historyResponse = await historyResponsePromise;
+      const historyBody = await historyResponse.json().catch(() => ({}));
+      expect(String(historyBody?.code)).toBe('0');
+      expect(JSON.stringify(historyBody)).toContain('imported_to_pool');
+      await expect(mobilePage.getByText(/导入公海|Imported to Pool|imported_to_pool/i).first()).toBeVisible({
+        timeout: 15_000,
+      });
+      await attachScreenshot(mobilePage, testInfo, 'mobile-pool-customer-ownership-390');
+    } finally {
+      await mobileContext.close();
+    }
   });
 });

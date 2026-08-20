@@ -141,6 +141,68 @@
     "cmd_risk_level": "L0"
   },
   {
+    "code": "crm:download_customer_pool_import_template",
+    "displayName:zh-CN": "下载客户公海导入模板",
+    "displayName:en": "Download Customer Pool Import Template",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_common",
+    "handler": "crm:download_customer_pool_import_template",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.customer_pool.import"],
+    "agent_hint": "Download the governed .xlsx template for customer-pool ADD or UPDATE imports.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:precheck_customer_pool_import",
+    "displayName:zh-CN": "预检客户公海导入",
+    "displayName:en": "Pre-check Customer Pool Import",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_common",
+    "handler": "crm:precheck_customer_pool_import",
+    "handlerParams": {
+      "dslPersistence": false,
+      "async": true,
+      "taskPresentation": {
+        "title": { "zh-CN": "客户公海导入预检", "en": "Customer Pool Import Pre-check" },
+        "completedMessage": { "zh-CN": "预检完成，未写入客户数据", "en": "Pre-check completed without customer writes" },
+        "metrics": [
+          { "field": "totalRows", "label": { "zh-CN": "总行数", "en": "Total rows" } },
+          { "field": "validRows", "label": { "zh-CN": "可导入", "en": "Valid rows" }, "tone": "success" },
+          { "field": "failedRows", "label": { "zh-CN": "失败", "en": "Failed rows" }, "tone": "danger" }
+        ]
+      }
+    },
+    "permissions": ["crm.customer_pool.import"],
+    "agent_hint": "Validate an actor-owned .xlsx file against pool membership, import mode and account rules without mutation.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:import_customer_pool_customers",
+    "displayName:zh-CN": "导入客户到公海",
+    "displayName:en": "Import Customers to Pool",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_common",
+    "handler": "crm:import_customer_pool_customers",
+    "handlerParams": {
+      "dslPersistence": false,
+      "async": true,
+      "taskPresentation": {
+        "title": { "zh-CN": "客户公海批量导入", "en": "Customer Pool Bulk Import" },
+        "completedMessage": { "zh-CN": "客户公海导入完成", "en": "Customer pool import completed" },
+        "metrics": [
+          { "field": "totalRows", "label": { "zh-CN": "总行数", "en": "Total rows" } },
+          { "field": "importedRows", "label": { "zh-CN": "已导入", "en": "Imported rows" }, "tone": "success" },
+          { "field": "createdRows", "label": { "zh-CN": "新增", "en": "Created rows" }, "tone": "success" },
+          { "field": "updatedRows", "label": { "zh-CN": "更新", "en": "Updated rows" } },
+          { "field": "failedRows", "label": { "zh-CN": "失败", "en": "Failed rows" }, "tone": "danger" }
+        ]
+      }
+    },
+    "permissions": ["crm.customer_pool.import"],
+    "agent_hint": "Import valid ADD or UPDATE rows through the customer-pool ownership state machine. skipErrors must be explicitly true for partial success.",
+    "cmd_risk_level": "L2"
+  },
+  {
     "code": "crm:run_customer_pool_recycle",
     "displayName:zh-CN": "立即执行自动回收",
     "displayName:en": "Run Customer Pool Recycle Now",

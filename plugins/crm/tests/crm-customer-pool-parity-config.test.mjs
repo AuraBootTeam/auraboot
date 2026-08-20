@@ -29,6 +29,7 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
   const ownershipHistoryDetail = await json(
     'config/pages/crm_customer_owner_history_detail.json',
   );
+  const poolItemDetail = await json('config/pages/crm_customer_pool_item_detail.json');
   const poolFields = await json('config/fields/crm_customer_pool_common.json');
   const recycleRuleFields = await json('config/fields/crm_customer_pool_recycle_rule_common.json');
   const itemFields = await json('config/fields/crm_customer_pool_item_common.json');
@@ -36,6 +37,10 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
   const dictionaries = await json('config/dicts.json');
   const handler = await readFile(
     new URL('backend/src/main/java/com/auraboot/plugins/crm/handler/CustomerPoolCommandHandler.java', root),
+    'utf8',
+  );
+  const importService = await readFile(
+    new URL('backend/src/main/java/com/auraboot/plugins/crm/handler/CustomerPoolImportService.java', root),
     'utf8',
   );
   const scheduler = await readFile(
@@ -140,6 +145,9 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
     'crm:toggle_customer_pool',
     'crm:delete_customer_pool',
     'crm:run_customer_pool_recycle',
+    'crm:download_customer_pool_import_template',
+    'crm:precheck_customer_pool_import',
+    'crm:import_customer_pool_customers',
   ]) assert.ok(commandCodes.has(code), `missing command ${code}`);
 
   for (const code of ['crm:create_customer_pool', 'crm:update_customer_pool']) {
@@ -175,6 +183,9 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
     'crm:toggle_customer_pool',
     'crm:delete_customer_pool',
     'crm:run_customer_pool_recycle',
+    'crm:download_customer_pool_import_template',
+    'crm:precheck_customer_pool_import',
+    'crm:import_customer_pool_customers',
   ]) {
     const command = commands.find((candidate) => candidate.code === code);
     assert.equal(
@@ -317,6 +328,25 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
   );
   assert.equal(quickPolicyLimit.type, 'integer');
   assert.equal(quickPolicyLimit.defaultValue, '${row.crm_cp_daily_pick_limit}');
+  const downloadTemplate = poolSettingsActions.find(
+    (action) => action.code === 'download_import_template',
+  );
+  assert.equal(downloadTemplate.permissionCode, 'crm.customer_pool.import');
+  assert.equal(downloadTemplate.action.command, 'crm:download_customer_pool_import_template');
+  const precheckImport = poolSettingsActions.find((action) => action.code === 'precheck_import');
+  assert.deepEqual(precheckImport.promptUpload, {
+    key: 'importFileId',
+    accept: '.xlsx',
+    feedbackMode: 'panel',
+  });
+  assert.equal(precheckImport.action.command, 'crm:precheck_customer_pool_import');
+  assert.equal(precheckImport.action.inputFields[0].field, 'importType');
+  const formalImport = poolSettingsActions.find((action) => action.code === 'import_customers');
+  assert.equal(formalImport.action.command, 'crm:import_customer_pool_customers');
+  assert.equal(
+    formalImport.action.inputFields.find((field) => field.field === 'skipErrors').defaultValue,
+    false,
+  );
   const quickCustomerRating = rowActions
     .find((action) => action.code === 'quick_update').action.inputFields
     .find((field) => field.field === 'crm_cpi_rating');
@@ -347,6 +377,47 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
   assert.match(queueQuery.fromSql, /CAST\(#\{params\.viewFilter\} AS text\) = 'ready'/);
   assert.match(queueQuery.fromSql, /CAST\(#\{params\.viewFilter\} AS text\) = 'processing'/);
   assert.ok(queueQuery.outputFields.some((field) => field.code === 'operational_state'));
+  for (const code of ['crm_pool_customer_timeline', 'crm_pool_customer_owner_history']) {
+    const query = namedQueries.find((candidate) => candidate.code === code);
+    assert.equal(query.resourceCode, 'crm.customer_pool');
+    assert.match(query.fromSql, /i\.pid = #\{params\.poolItemId\}/);
+    assert.match(query.fromSql, /params\.currentUserId/);
+    assert.match(query.fromSql, /crm_cp_member_user_ids/);
+    assert.match(query.fromSql, /crm_cp_admin_user_ids/);
+  }
+  const timelineQuery = namedQueries.find(
+    (candidate) => candidate.code === 'crm_pool_customer_timeline',
+  );
+  assert.match(timelineQuery.fromSql, /a\.crm_act_related_model = 'crm_account_common'/);
+  assert.match(timelineQuery.fromSql, /r\.crm_ar_activity_id = a\.pid/);
+
+  const mobileTabs = poolItemDetail.blocks.find(
+    (block) => block.id === 'pooled_customer_mobile_tabs',
+  );
+  assert.equal(mobileTabs.blockType, 'tabs');
+  assert.deepEqual(
+    mobileTabs.tabs.map((tab) => tab.label['zh-CN']),
+    ['客户信息', '跟进记录', '归属记录'],
+  );
+  assert.equal(
+    mobileTabs.tabs[1].blocks[0].subTable.dataSource.params.datasourceId,
+    'nq:crm_pool_customer_timeline',
+  );
+  assert.equal(
+    mobileTabs.tabs[2].blocks[0].subTable.dataSource.params.datasourceId,
+    'nq:crm_pool_customer_owner_history',
+  );
+  assert.equal(
+    mobileTabs.tabs[2].blocks[0].subTable.columns.find(
+      (column) => column.field === 'crm_coh_event',
+    ).dictCode,
+    'crm_customer_owner_event',
+  );
+  assert.ok(
+    dictionaries
+      .find((dictionary) => dictionary.code === 'crm_customer_owner_event')
+      .items.some((item) => item.value === 'imported_to_pool'),
+  );
 
   const permissionCodes = new Set(permissions.map((permission) => permission.code));
   for (const code of [
@@ -356,12 +427,26 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
     'crm.customer_pool.assign',
     'crm.customer_pool.manage',
     'crm.customer_pool.recycle',
+    'crm.customer_pool.import',
   ]) assert.ok(permissionCodes.has(code), `missing permission ${code}`);
   const role = (code) => roles.find((candidate) => candidate.code === code).permissions;
   assert.ok(role('crm_sales').includes('crm.customer_pool.pick'));
+  assert.ok(role('crm_sales').includes('crm.customer_pool.import'));
   assert.ok(!role('crm_sales').includes('crm.customer_pool.assign'));
   assert.ok(role('crm_sales_manager').includes('crm.customer_pool.assign'));
   assert.ok(role('crm_sales_manager').includes('crm.customer_pool.recycle'));
+  assert.ok(role('crm_sales_manager').includes('crm.customer_pool.import'));
+  assert.ok(role('crm_admin').includes('crm.customer_pool.import'));
+
+  for (const proof of [
+    'MAX_FILE_BYTES',
+    'Uploaded file owner does not match',
+    'Workbook exceeds 5000 data rows',
+    'importType must be ADD or UPDATE',
+    'skipErrors',
+    'Imported into customer pool',
+    'Customer belongs to a different customer pool',
+  ]) assert.match(importService, new RegExp(proof));
 
   for (const proof of [
     'incrementWithinCap',

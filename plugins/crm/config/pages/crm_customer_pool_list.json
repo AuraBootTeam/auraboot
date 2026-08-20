@@ -49,6 +49,40 @@
                 ]
               }
             },
+            { "code": "download_import_template", "permissionCode": "crm.customer_pool.import", "label": { "zh-CN": "下载导入模板", "en": "Download Import Template" }, "action": { "type": "command", "command": "crm:download_customer_pool_import_template", "operationType": "UPDATE" } },
+            {
+              "code": "precheck_import",
+              "permissionCode": "crm.customer_pool.import",
+              "label": { "zh-CN": "预检导入文件", "en": "Pre-check Import File" },
+              "promptUpload": { "key": "importFileId", "accept": ".xlsx", "feedbackMode": "panel" },
+              "action": {
+                "type": "command",
+                "command": "crm:precheck_customer_pool_import",
+                "operationType": "UPDATE",
+                "inputFieldsTitle": { "zh-CN": "选择客户公海导入方式", "en": "Choose Customer Pool Import Mode" },
+                "inputFieldsSubmitLabel": { "zh-CN": "选择文件并预检", "en": "Choose File and Pre-check" },
+                "inputFields": [
+                  { "field": "importType", "label": { "zh-CN": "导入方式", "en": "Import Mode" }, "type": "segmented", "required": true, "defaultValue": "ADD", "dataSource": { "type": "static", "data": [ { "value": "ADD", "label": { "zh-CN": "新增客户", "en": "Add Customers" }, "description": { "zh-CN": "客户编号已存在时失败", "en": "Existing customer codes fail" } }, { "value": "UPDATE", "label": { "zh-CN": "更新客户", "en": "Update Customers" }, "description": { "zh-CN": "客户编号不存在时失败", "en": "Missing customer codes fail" } } ] } }
+                ]
+              }
+            },
+            {
+              "code": "import_customers",
+              "permissionCode": "crm.customer_pool.import",
+              "label": { "zh-CN": "正式导入客户", "en": "Import Customers" },
+              "promptUpload": { "key": "importFileId", "accept": ".xlsx", "feedbackMode": "panel" },
+              "action": {
+                "type": "command",
+                "command": "crm:import_customer_pool_customers",
+                "operationType": "UPDATE",
+                "inputFieldsTitle": { "zh-CN": "正式导入客户到公海", "en": "Import Customers to Public Pool" },
+                "inputFieldsSubmitLabel": { "zh-CN": "选择文件并导入", "en": "Choose File and Import" },
+                "inputFields": [
+                  { "field": "importType", "label": { "zh-CN": "导入方式", "en": "Import Mode" }, "type": "segmented", "required": true, "defaultValue": "ADD", "dataSource": { "type": "static", "data": [ { "value": "ADD", "label": { "zh-CN": "新增客户", "en": "Add Customers" } }, { "value": "UPDATE", "label": { "zh-CN": "更新客户", "en": "Update Customers" } } ] } },
+                  { "field": "skipErrors", "label": { "zh-CN": "忽略错误并导入合法行", "en": "Skip Errors and Import Valid Rows" }, "type": "checkbox", "defaultValue": false, "helpText": { "zh-CN": "默认关闭：任一行预检失败时零写入。开启后仅导入合法行，并保留逐行失败原因。", "en": "Off by default: any invalid row means zero writes. When enabled, only valid rows are imported and row-level failures remain visible." } }
+                ]
+              }
+            },
             { "code": "toggle", "permissionCode": "crm.customer_pool.manage", "label": { "zh-CN": "启用/停用", "en": "Enable/Disable" }, "action": { "type": "command", "command": "crm:toggle_customer_pool" } },
             { "code": "delete", "danger": true, "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.delete", "confirm": { "zh-CN": "仅空客户公海可删除，确认继续？", "en": "Only an empty pool can be deleted. Continue?" }, "action": { "type": "command", "command": "crm:delete_customer_pool" } }
           ]

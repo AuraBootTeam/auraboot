@@ -69,7 +69,10 @@ import {
   resolvePromptUploadKey,
   resolvePromptUploadFilenameKey,
 } from '~/framework/meta/utils/promptUpload';
-import { promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
+import {
+  downloadBase64CommandArtifact,
+  promptInputForm,
+} from '~/framework/meta/runtime/actions/ActionRegistry';
 import { resolvePageTargetPath } from '~/framework/meta/runtime/actions/resolvePageTarget';
 import type { AsyncTask } from '~/framework/meta/rendering/components/AsyncTaskProgressModal';
 import { useAsyncTaskModalSink } from '~/framework/meta/rendering/components/AsyncTaskModalContext';
@@ -847,6 +850,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               },
             );
             surfaceTemporaryPassword(commandResult);
+            downloadBase64CommandArtifact(commandResult);
             if ((commandResult as any)?.__asyncFailed) {
               if (context.loadData) {
                 await context.loadData();

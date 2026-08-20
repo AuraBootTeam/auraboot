@@ -182,6 +182,46 @@ export function AsyncTaskProgressModal({
     void navigator.clipboard?.writeText(text);
   };
 
+  const failureDetails =
+    isImportResultData(task.resultData) && task.resultData.failedRows > 0 ? (
+      <div className="rounded-control bg-status-red-bg border border-red-200 p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <button
+            type="button"
+            className="text-sm font-medium text-red-700 hover:underline"
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? '收起失败明细' : `查看失败明细 (${task.resultData.failedRows})`}
+          </button>
+          <button
+            type="button"
+            data-testid="copy-failures"
+            className="border-status-red bg-panel rounded border px-2 py-1 text-xs text-red-700 hover:bg-red-100"
+            onClick={handleCopyFailures}
+          >
+            复制
+          </button>
+        </div>
+        {expanded ? (
+          <ul className="max-h-48 space-y-1 overflow-y-auto text-xs text-red-800">
+            {(task.resultData.failures ?? []).map((failure, index) => (
+              <li key={`${failure.row}-${index}`}>
+                第{failure.row}行 — {failure.reason}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <ul className="space-y-1 text-xs text-red-800">
+            {(task.resultData.failures ?? []).slice(0, 1).map((failure, index) => (
+              <li key={`${failure.row}-${index}`}>
+                第{failure.row}行 — {failure.reason}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    ) : null;
+
   return (
     <Modal open title={taskTitle} footer={footer} onCancel={terminal ? onClose : onBackground}>
       {/* Running state: determinate progress bar + live counts */}
@@ -230,16 +270,19 @@ export function AsyncTaskProgressModal({
         <div className="space-y-3">
           <div className="text-text text-base font-semibold">{completedMessage}</div>
           {presentationMetrics.length > 0 ? (
-            <div className="text-text-2 grid grid-cols-2 gap-2 text-sm">
-              {presentationMetrics.map((metric) => (
-                <div key={metric.field}>
-                  {metric.resolvedLabel}:{' '}
-                  <span className={`font-medium ${metricToneClass(metric.tone)}`}>
-                    {formatMetricValue(metric.value)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <>
+              <div className="text-text-2 grid grid-cols-2 gap-2 text-sm">
+                {presentationMetrics.map((metric) => (
+                  <div key={metric.field}>
+                    {metric.resolvedLabel}:{' '}
+                    <span className={`font-medium ${metricToneClass(metric.tone)}`}>
+                      {formatMetricValue(metric.value)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {failureDetails}
+            </>
           ) : isImportResultData(task.resultData) ? (
             task.resultData.totalRows === 0 ? (
               <div className="text-text-2 text-sm">未导入任何数据 / No rows</div>
@@ -268,45 +311,7 @@ export function AsyncTaskProgressModal({
                     </span>
                   </div>
                 </div>
-                {task.resultData.failedRows > 0 && (
-                  <div className="rounded-control bg-status-red-bg border border-red-200 p-3">
-                    <div className="mb-2 flex items-center justify-between">
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-red-700 hover:underline"
-                        onClick={() => setExpanded((v) => !v)}
-                      >
-                        {expanded ? '收起失败明细' : `查看失败明细 (${task.resultData.failedRows})`}
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="copy-failures"
-                        className="border-status-red bg-panel rounded border px-2 py-1 text-xs text-red-700 hover:bg-red-100"
-                        onClick={handleCopyFailures}
-                      >
-                        复制
-                      </button>
-                    </div>
-                    {expanded && (
-                      <ul className="max-h-48 space-y-1 overflow-y-auto text-xs text-red-800">
-                        {(task.resultData.failures ?? []).map((f, i) => (
-                          <li key={`${f.row}-${i}`}>
-                            第{f.row}行 — {f.reason}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {!expanded && (
-                      <ul className="space-y-1 text-xs text-red-800">
-                        {(task.resultData.failures ?? []).slice(0, 1).map((f, i) => (
-                          <li key={`${f.row}-${i}`}>
-                            第{f.row}行 — {f.reason}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
+                {failureDetails}
               </>
             )
           ) : (

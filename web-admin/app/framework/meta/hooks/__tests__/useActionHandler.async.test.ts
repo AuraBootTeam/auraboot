@@ -170,6 +170,61 @@ describe('useActionHandler - handlerParams.async polling', () => {
     expect(result.current.activeTask).toBeNull();
   });
 
+  it('downloads a base64 command artifact from a regular DSL command button', async () => {
+    fetchResultMock.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        fileName: 'crm-customer-pool-import-template.xlsx',
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        contentBase64: 'UEsDBAo=',
+      },
+    });
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:customer-pool-template'),
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    let downloadedName = '';
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function captureDownload(this: HTMLAnchorElement) {
+        downloadedName = this.download;
+      });
+    const loadData = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: vi.fn() as any,
+        tableName: 'crm_customer_pool_common',
+        locale: 'zh-CN',
+        t: ((key: string, _params?: any, fallback?: string) => fallback ?? key) as any,
+        context: { loadData } as any,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleAction(
+        {
+          code: 'download_import_template',
+          action: {
+            type: 'command',
+            command: 'crm:download_customer_pool_import_template',
+            operationType: 'UPDATE',
+          },
+        } as unknown as ButtonConfig,
+        { pid: 'POOL-1' },
+      );
+    });
+
+    expect(clickSpy).toHaveBeenCalledOnce();
+    expect(downloadedName).toBe('crm-customer-pool-import-template.xlsx');
+    expect(URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    clickSpy.mockRestore();
+  });
+
   it('surfaces temporary passwords returned by administrator reset commands', async () => {
     fetchResultMock.mockResolvedValueOnce({
       code: '0',

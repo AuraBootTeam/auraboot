@@ -2,6 +2,7 @@ package com.auraboot.plugins.crm.handler;
 
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.extension.DataAccessor;
+import com.auraboot.framework.plugin.extension.FileAccessor;
 import com.auraboot.framework.plugin.extension.RecordShareAccessor;
 import com.auraboot.plugins.crm.engine.CustomerPoolRules;
 import org.pf4j.Extension;
@@ -37,8 +38,12 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
     public static final String TOGGLE = "crm:toggle_customer_pool";
     public static final String DELETE_POOL = "crm:delete_customer_pool";
     public static final String RUN_RECYCLE = "crm:run_customer_pool_recycle";
+    public static final String DOWNLOAD_IMPORT_TEMPLATE = "crm:download_customer_pool_import_template";
+    public static final String PRECHECK_IMPORT = "crm:precheck_customer_pool_import";
+    public static final String IMPORT_CUSTOMERS = "crm:import_customer_pool_customers";
     private static final Set<String> TYPES = Set.of(
-            MOVE, CLAIM, ASSIGN, UPDATE_CUSTOMER, DELETE_CUSTOMER, TOGGLE, DELETE_POOL, RUN_RECYCLE);
+            MOVE, CLAIM, ASSIGN, UPDATE_CUSTOMER, DELETE_CUSTOMER, TOGGLE, DELETE_POOL, RUN_RECYCLE,
+            DOWNLOAD_IMPORT_TEMPLATE, PRECHECK_IMPORT, IMPORT_CUSTOMERS);
     private static final Map<String, String> CUSTOMER_SNAPSHOT_FIELDS = Map.of(
             "crm_acc_name", "crm_cpi_account_name",
             "crm_acc_industry", "crm_cpi_industry",
@@ -74,26 +79,30 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
 
     @Override
     public Object execute(CommandContext context) {
-        DataAccessor db = requireDb(context);
-        RecordShareAccessor shares = requireShares(context);
-        String actor = requireActor(context);
         return switch (context.commandType()) {
-            case MOVE -> moveToPool(db, required(context.recordId(), "Customer id is required"),
-                    required(first(payload(context, "poolId"), payload(context, "crm_acc_last_pool_id")), "poolId is required"), actor,
-                    string(payload(context, "reason")), "moved_to_pool", Instant.now(), shares, context.tenantId());
-            case CLAIM -> claim(db, required(context.recordId(), "Pool item id is required"), actor,
-                    Instant.now(), shares, context.tenantId());
-            case ASSIGN -> assign(db, required(context.recordId(), "Pool item id is required"), actor,
+            case MOVE -> moveToPool(requireDb(context), required(context.recordId(), "Customer id is required"),
+                    required(first(payload(context, "poolId"), payload(context, "crm_acc_last_pool_id")), "poolId is required"), requireActor(context),
+                    string(payload(context, "reason")), "moved_to_pool", Instant.now(), requireShares(context), context.tenantId());
+            case CLAIM -> claim(requireDb(context), required(context.recordId(), "Pool item id is required"), requireActor(context),
+                    Instant.now(), requireShares(context), context.tenantId());
+            case ASSIGN -> assign(requireDb(context), required(context.recordId(), "Pool item id is required"), requireActor(context),
                     required(first(payload(context, "assigneeId"), payload(context, "crm_cpi_claimed_by")), "assigneeId is required"),
-                    Instant.now(), shares, context.tenantId());
-            case UPDATE_CUSTOMER -> updatePoolCustomer(db,
-                    required(context.recordId(), "Pool item id is required"), actor, context.payload());
-            case DELETE_CUSTOMER -> deletePoolCustomer(db,
-                    required(context.recordId(), "Pool item id is required"), actor);
-            case TOGGLE -> toggle(db, required(context.recordId(), "Pool id is required"), actor);
-            case DELETE_POOL -> deletePool(db, required(context.recordId(), "Pool id is required"), actor);
-            case RUN_RECYCLE -> recycleDetailed(db, shares, context.tenantId(), actor, Instant.now(),
+                    Instant.now(), requireShares(context), context.tenantId());
+            case UPDATE_CUSTOMER -> updatePoolCustomer(requireDb(context),
+                    required(context.recordId(), "Pool item id is required"), requireActor(context), context.payload());
+            case DELETE_CUSTOMER -> deletePoolCustomer(requireDb(context),
+                    required(context.recordId(), "Pool item id is required"), requireActor(context));
+            case TOGGLE -> toggle(requireDb(context), required(context.recordId(), "Pool id is required"), requireActor(context));
+            case DELETE_POOL -> deletePool(requireDb(context), required(context.recordId(), "Pool id is required"), requireActor(context));
+            case RUN_RECYCLE -> recycleDetailed(requireDb(context), requireShares(context), context.tenantId(), requireActor(context), Instant.now(),
                     DEFAULT_RECYCLE_LEASE_TIMEOUT).asMap();
+            case DOWNLOAD_IMPORT_TEMPLATE -> CustomerPoolImportService.downloadTemplate();
+            case PRECHECK_IMPORT -> CustomerPoolImportService.precheck(requireDb(context), requireFiles(context),
+                    required(context.recordId(), "Pool id is required"), requireActor(context),
+                    requireUploadOwner(context), context.payload());
+            case IMPORT_CUSTOMERS -> CustomerPoolImportService.importCustomers(requireDb(context), requireFiles(context),
+                    requireShares(context), context.tenantId(), required(context.recordId(), "Pool id is required"),
+                    requireActor(context), requireUploadOwner(context), context.payload());
             default -> throw new IllegalArgumentException("Unsupported customer-pool command: " + context.commandType());
         };
     }
@@ -832,9 +841,19 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
         return context.recordShareAccessor();
     }
 
+    private static FileAccessor requireFiles(CommandContext context) {
+        if (context.fileAccessor() == null) throw new IllegalStateException("FileAccessor unavailable");
+        return context.fileAccessor();
+    }
+
     private static String requireActor(CommandContext context) {
         return required(context.currentUserPid(),
                 "Authenticated actor context is required");
+    }
+
+    private static String requireUploadOwner(CommandContext context) {
+        Object value = context.settings() == null ? null : context.settings().get("__currentUser");
+        return required(value, "Authenticated upload owner context is required");
     }
 
     private static Object payload(CommandContext context, String key) {

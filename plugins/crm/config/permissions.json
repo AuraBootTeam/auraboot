@@ -832,6 +832,13 @@
     "module": "crm"
   },
   {
+    "code": "crm.customer_pool.import",
+    "name:zh-CN": "导入客户到公海",
+    "name:en": "Import Customers to Public Pool",
+    "resourceType": "operation",
+    "module": "crm"
+  },
+  {
     "code": "model.crm_customer_pool_common.read",
     "name:zh-CN": "查看客户公海池模型",
     "name:en": "Read Customer Pool Model",

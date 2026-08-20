@@ -9,6 +9,7 @@ import com.auraboot.framework.meta.service.AsyncTaskFailureClassifier;
 import com.auraboot.framework.meta.service.AsyncTaskResult;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+import com.auraboot.framework.plugin.extension.RecordShareAccessor;
 import com.auraboot.framework.plugin.pf4j.BiTemporalAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
@@ -71,6 +72,8 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
     private FileService fileService;
     @Autowired(required = false)
     private StorageProvider storageProvider;
+    @Autowired(required = false)
+    private RecordShareAccessor recordShareAccessor;
 
     @Override
     public String getTaskType() {
@@ -89,6 +92,7 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
         }
         Long tenantId = longValue(inputParams, "tenantId");
         Long userId = longValue(inputParams, "userId");
+        String currentUserPid = text(inputParams, "currentUserPid");
         String modelCode = text(inputParams, "modelCode");
         String recordPid = text(inputParams, "recordPid");
         String clientRequestId = text(inputParams, "clientRequestId");
@@ -114,6 +118,10 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             if (userId != null) {
                 pluginSettings.put("__currentUser", userId.toString());
             }
+            if (currentUserPid != null && !currentUserPid.isBlank()) {
+                pluginSettings.put(CommandHandlerExtension.CURRENT_USER_PID_KEY,
+                        currentUserPid.trim());
+            }
             if (clientRequestId != null && !clientRequestId.isBlank()) {
                 pluginSettings.put(CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
                         clientRequestId.trim());
@@ -138,6 +146,9 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             if (fileService != null && storageProvider != null) {
                 pluginSettings.put(CommandHandlerExtension.FILE_ACCESSOR_KEY,
                         new FileAccessorImpl(fileService, storageProvider, userId));
+            }
+            if (recordShareAccessor != null) {
+                pluginSettings.put(RecordShareAccessor.SETTINGS_KEY, recordShareAccessor);
             }
 
             CommandHandlerExtension.CommandContext pluginContext =

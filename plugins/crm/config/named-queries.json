@@ -1794,5 +1794,51 @@
       { "code": "previous_owner_name", "columnExpr": "previous_owner_name", "dataType": "string" },
       { "code": "operational_state", "columnExpr": "operational_state", "dataType": "string" }
     ]
+  },
+  {
+    "code": "crm_pool_customer_timeline",
+    "name:zh-CN": "池内客户跟进记录",
+    "name:en": "Pooled Customer Activity Timeline",
+    "description": "Account, contact and opportunity activities for one exact pool item, restricted to current pool membership.",
+    "resourceCode": "crm.customer_pool",
+    "actionCode": "read",
+    "fromSql": "SELECT DISTINCT a.pid, a.crm_act_type, a.crm_act_subject, a.crm_act_content, a.crm_act_date, a.crm_act_owner, a.crm_act_source, a.crm_act_ext->>'status' AS crm_act_status, COALESCE(r.crm_ar_object_type, CASE a.crm_act_related_model WHEN 'crm_account_common' THEN 'account' WHEN 'crm_contact_common' THEN 'contact' WHEN 'crm_opportunity_common' THEN 'opportunity' ELSE NULL END) AS crm_ar_object_type, r.crm_ar_role, COALESCE(u.nick_name, u.user_name, a.crm_act_owner, '') AS owner_name FROM mt_crm_customer_pool_item_common i JOIN mt_crm_customer_pool_common p ON p.pid = i.crm_cpi_pool_id AND p.tenant_id = i.tenant_id JOIN mt_crm_activity_common a ON a.tenant_id = i.tenant_id LEFT JOIN mt_crm_activity_relation_common r ON r.crm_ar_activity_id = a.pid AND r.tenant_id = i.tenant_id AND ((r.crm_ar_object_type = 'account' AND r.crm_ar_object_id = i.crm_cpi_account_id) OR (r.crm_ar_object_type = 'contact' AND r.crm_ar_object_id IN (SELECT c.pid FROM mt_crm_contact_common c WHERE c.tenant_id = i.tenant_id AND c.crm_ct_account_id = i.crm_cpi_account_id)) OR (r.crm_ar_object_type = 'opportunity' AND r.crm_ar_object_id IN (SELECT o.pid FROM mt_crm_opportunity_common o WHERE o.tenant_id = i.tenant_id AND o.crm_opp_account_id = i.crm_cpi_account_id))) LEFT JOIN ab_user u ON u.pid = a.crm_act_owner WHERE i.tenant_id = #{params.tenantId} AND i.pid = #{params.poolItemId} AND ((a.crm_act_related_model = 'crm_account_common' AND a.crm_act_related_id = i.crm_cpi_account_id) OR (a.crm_act_related_model = 'crm_contact_common' AND a.crm_act_related_id IN (SELECT c.pid FROM mt_crm_contact_common c WHERE c.tenant_id = i.tenant_id AND c.crm_ct_account_id = i.crm_cpi_account_id)) OR (a.crm_act_related_model = 'crm_opportunity_common' AND a.crm_act_related_id IN (SELECT o.pid FROM mt_crm_opportunity_common o WHERE o.tenant_id = i.tenant_id AND o.crm_opp_account_id = i.crm_cpi_account_id)) OR r.pid IS NOT NULL) AND (p.crm_cp_member_user_ids LIKE CONCAT('%\"', (SELECT pid FROM ab_user WHERE id = CAST(#{params.currentUserId} AS bigint)), '\"%') OR p.crm_cp_admin_user_ids LIKE CONCAT('%\"', (SELECT pid FROM ab_user WHERE id = CAST(#{params.currentUserId} AS bigint)), '\"%')) ORDER BY a.crm_act_date DESC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "crm_act_type", "columnExpr": "crm_act_type", "dataType": "string" },
+      { "code": "crm_act_subject", "columnExpr": "crm_act_subject", "dataType": "string", "searchable": true },
+      { "code": "crm_act_content", "columnExpr": "crm_act_content", "dataType": "string" },
+      { "code": "crm_act_date", "columnExpr": "crm_act_date", "dataType": "date", "sortable": true },
+      { "code": "crm_act_owner", "columnExpr": "crm_act_owner", "dataType": "string" },
+      { "code": "owner_name", "columnExpr": "owner_name", "dataType": "string" },
+      { "code": "crm_act_source", "columnExpr": "crm_act_source", "dataType": "string" },
+      { "code": "crm_act_status", "columnExpr": "crm_act_status", "dataType": "string" },
+      { "code": "crm_ar_object_type", "columnExpr": "crm_ar_object_type", "dataType": "string" },
+      { "code": "crm_ar_role", "columnExpr": "crm_ar_role", "dataType": "string" }
+    ]
+  },
+  {
+    "code": "crm_pool_customer_owner_history",
+    "name:zh-CN": "池内客户归属记录",
+    "name:en": "Pooled Customer Ownership History",
+    "description": "Ownership events for one exact pool item, restricted to current pool membership.",
+    "resourceCode": "crm.customer_pool",
+    "actionCode": "read",
+    "fromSql": "SELECT h.pid, h.crm_coh_customer_id, h.crm_coh_pool_id, p.crm_cp_name AS pool_name, h.crm_coh_event, h.crm_coh_previous_owner, COALESCE(previous_user.nick_name, previous_user.user_name, h.crm_coh_previous_owner, '') AS previous_owner_name, h.crm_coh_next_owner, COALESCE(next_user.nick_name, next_user.user_name, h.crm_coh_next_owner, '') AS next_owner_name, h.crm_coh_actor, COALESCE(actor_user.nick_name, actor_user.user_name, h.crm_coh_actor, '') AS actor_name, h.crm_coh_reason, h.crm_coh_occurred_at FROM mt_crm_customer_pool_item_common i JOIN mt_crm_customer_pool_common p ON p.pid = i.crm_cpi_pool_id AND p.tenant_id = i.tenant_id JOIN mt_crm_customer_owner_history_common h ON h.crm_coh_customer_id = i.crm_cpi_account_id AND h.tenant_id = i.tenant_id LEFT JOIN ab_user previous_user ON previous_user.pid = h.crm_coh_previous_owner LEFT JOIN ab_user next_user ON next_user.pid = h.crm_coh_next_owner LEFT JOIN ab_user actor_user ON actor_user.pid = h.crm_coh_actor WHERE i.tenant_id = #{params.tenantId} AND i.pid = #{params.poolItemId} AND (p.crm_cp_member_user_ids LIKE CONCAT('%\"', (SELECT pid FROM ab_user WHERE id = CAST(#{params.currentUserId} AS bigint)), '\"%') OR p.crm_cp_admin_user_ids LIKE CONCAT('%\"', (SELECT pid FROM ab_user WHERE id = CAST(#{params.currentUserId} AS bigint)), '\"%')) ORDER BY h.crm_coh_occurred_at DESC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "crm_coh_customer_id", "columnExpr": "crm_coh_customer_id", "dataType": "string" },
+      { "code": "crm_coh_pool_id", "columnExpr": "crm_coh_pool_id", "dataType": "string" },
+      { "code": "pool_name", "columnExpr": "pool_name", "dataType": "string" },
+      { "code": "crm_coh_event", "columnExpr": "crm_coh_event", "dataType": "string" },
+      { "code": "crm_coh_previous_owner", "columnExpr": "crm_coh_previous_owner", "dataType": "string" },
+      { "code": "previous_owner_name", "columnExpr": "previous_owner_name", "dataType": "string" },
+      { "code": "crm_coh_next_owner", "columnExpr": "crm_coh_next_owner", "dataType": "string" },
+      { "code": "next_owner_name", "columnExpr": "next_owner_name", "dataType": "string" },
+      { "code": "crm_coh_actor", "columnExpr": "crm_coh_actor", "dataType": "string" },
+      { "code": "actor_name", "columnExpr": "actor_name", "dataType": "string" },
+      { "code": "crm_coh_reason", "columnExpr": "crm_coh_reason", "dataType": "string" },
+      { "code": "crm_coh_occurred_at", "columnExpr": "crm_coh_occurred_at", "dataType": "date", "sortable": true }
+    ]
   }
 ]
