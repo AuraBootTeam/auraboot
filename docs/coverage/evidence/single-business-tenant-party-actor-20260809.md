@@ -129,9 +129,15 @@ Controlled mutation: temporarily make application/channel capability intersectio
   correct bind/search returns immutable `entryUUID`, while wrong password and escaped-filter
   injection fail. Canonical instance non-secret config is merged with a
   `cloud-config:` secret reference and routed through the shared admission/link strategy.
-- Android `:data:testDebugUnitTest :features:testDebugUnitTest :app:assembleDebug` completed
-  147 tasks. iOS `xcodebuild build-for-testing` completed after the mobile application/channel
-  split. These are unit/build evidence, not physical-device evidence.
+- Android OAuth-focused unit tests passed 39/39 (`LoginViewModelTest` 23/23 and
+  `AuthRepositoryImplTest` 16/16), and the debug app plus test APKs assembled. The complete
+  Features unit suite still has one unrelated existing `DynamicListViewModelTest` failure, so it
+  is not reported as globally green. iOS native OAuth tests passed 4/4.
+- A fresh SINGLE real-stack runtime exposed a dynamic `Mobile OIDC Fixture` only through
+  `business-mobile/default-business-mobile`. Android connected tests on the booted emulator
+  passed 3/3, and iOS XCUITests on the booted Simulator passed 3/3. Both exercised the live
+  channel-options API, ordinary password login, and the authenticated social-link surface; these
+  are simulator/emulator evidence, not physical-device evidence.
 
 ### Fresh PostgreSQL, Redis and API
 
@@ -192,10 +198,20 @@ Controlled mutation: temporarily make application/channel capability intersectio
 - `adb devices -l` reports no Android physical device.
 - The paired iPhone 13 Pro Max runs iOS 26.5.2 with Developer Mode enabled. A final retry reached
   `available (paired)`, `ddiServicesAvailable=true` and `tunnelState=connected`; the physical Debug
-  build then failed at provisioning because Xcode has no logged-in account for the certificate Team
-  and no development profiles for `com.auraboot.ios`, `.share` or `.widgets`. The app was not installed.
+  build then failed at signing because Xcode could not use an iOS Development certificate for Team
+  `D48N9943FK` and had no development profiles for `com.auraboot.ios`, `.share`, `.widgets`, or the
+  UI-test runner. `-allowProvisioningUpdates` was deliberately not used, so no Apple account state
+  changed and the app was not installed.
 - Therefore native deep-link/state/binding/login remains partial. No simulator or source build is
   counted as a physical-device pass.
+
+### External-provider denominator
+
+- Google, WeChat, WeCom, generic OIDC and Microsoft client identifiers/secrets are unset in the
+  verification environment. A safe scan of the known runtime databases found zero OAuth credential
+  records in `ab_cloud_config`.
+- Therefore a production/sandbox authorization-code → token → userinfo/id-token exchange could not
+  be executed. The intentionally invalid Google authorize canary remains initiation-only evidence.
 
 ## Deliberate partials / residual scope
 

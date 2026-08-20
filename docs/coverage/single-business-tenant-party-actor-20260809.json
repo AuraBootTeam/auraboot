@@ -182,7 +182,7 @@
           "id": "sso.external-canary",
           "action": "Complete an external Google/OIDC and WeChat login with real provider credentials",
           "evidence": ["docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
-          "assertion": "Official Google authorize is reachable with an intentionally invalid client, but no real Google/WeChat credential exchange was performed",
+          "assertion": "Official Google authorize is reachable with an intentionally invalid client, but Google/WeChat/WeCom/OIDC/Microsoft credentials are absent and the known runtime databases contain no OAuth CloudConfig credentials, so no real token exchange was performed",
           "verdict": "partial", "verdict_by": "spec-assert",
           "surface": "journey", "dependencies": "external", "authority": "recorded", "driver": "browser"
         },
@@ -190,7 +190,7 @@
           "id": "sso.native-physical",
           "action": "Complete mobile-channel deep-link/state/native-binding login on iOS and Android physical devices",
           "evidence": ["docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
-          "assertion": "Source-level tests and builds pass, but Android has no attached device; iPhone DDI/tunnel are ready while Xcode lacks the Team account and three development provisioning profiles, so no physical install/login occurred",
+          "assertion": "Native unit tests pass (Android 39/39, iOS 4/4) and the dynamic OAuth UI passes against the real backend on an Android emulator 3/3 and iOS Simulator 3/3; Android has no physical device, while the paired iPhone build is blocked by its signing certificate and four provisioning profiles, so no physical install/login occurred",
           "verdict": "partial", "verdict_by": "spec-assert",
           "surface": "deployed-native", "dependencies": "physical-device", "authority": "blocking-release", "driver": "native"
         }
