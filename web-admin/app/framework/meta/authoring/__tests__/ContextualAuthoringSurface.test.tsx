@@ -693,13 +693,15 @@ describe('ContextualAuthoringSurface', () => {
       canManageDesigner: true,
       canAdministerDesigner: false,
     });
-    fireEvent(window, new Event('focus'));
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+      await Promise.resolve();
+    });
 
-    await waitFor(() =>
-      expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
-        'data-read-only',
-        'false',
-      ),
+    expect(loadAuthoringPermissionSnapshot).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('contextual-authoring-surface')).toHaveAttribute(
+      'data-read-only',
+      'false',
     );
     expect(screen.getByLabelText(/标题/)).toBeEnabled();
     expect(screen.getByLabelText(/标题/)).toHaveValue('权限切换期间的订单标题');
