@@ -1,15 +1,15 @@
 [
-  { "modelCode": "crm_lead_pool", "fieldCode": "crm_lp_code", "sequence": 1, "required": true, "visible": true, "editable": false },
-  { "modelCode": "crm_lead_pool", "fieldCode": "crm_lp_name", "sequence": 2, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool", "fieldCode": "crm_lp_status", "sequence": 3, "required": true, "visible": true, "editable": false },
-  { "modelCode": "crm_lead_pool", "fieldCode": "crm_lp_member_user_ids", "sequence": 4, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool", "fieldCode": "crm_lp_admin_user_ids", "sequence": 5, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool", "fieldCode": "crm_lp_daily_pick_limit", "sequence": 6, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool", "fieldCode": "crm_lp_new_cooldown_days", "sequence": 7, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool", "fieldCode": "crm_lp_previous_owner_cooldown_days", "sequence": 8, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool", "fieldCode": "crm_lp_auto_recycle", "sequence": 9, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool", "fieldCode": "crm_lp_recycle_match_mode", "sequence": 10, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool", "fieldCode": "crm_lp_recycle_after_days", "sequence": 11, "required": false, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool", "fieldCode": "crm_lp_recycle_basis", "sequence": 12, "required": false, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool", "fieldCode": "crm_lp_description", "sequence": 13, "required": false, "visible": false, "editable": true }
+  { "modelCode": "crm_lead_pool_common", "fieldCode": "crm_lp_code", "sequence": 1, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_pool_common", "fieldCode": "crm_lp_name", "sequence": 2, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_common", "fieldCode": "crm_lp_status", "sequence": 3, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_pool_common", "fieldCode": "crm_lp_member_user_ids", "sequence": 4, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_common", "fieldCode": "crm_lp_admin_user_ids", "sequence": 5, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_common", "fieldCode": "crm_lp_daily_pick_limit", "sequence": 6, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_common", "fieldCode": "crm_lp_new_cooldown_days", "sequence": 7, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_common", "fieldCode": "crm_lp_previous_owner_cooldown_days", "sequence": 8, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_common", "fieldCode": "crm_lp_auto_recycle", "sequence": 9, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_common", "fieldCode": "crm_lp_recycle_match_mode", "sequence": 10, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_common", "fieldCode": "crm_lp_recycle_after_days", "sequence": 11, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_common", "fieldCode": "crm_lp_recycle_basis", "sequence": 12, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_common", "fieldCode": "crm_lp_description", "sequence": 13, "required": false, "visible": false, "editable": true }
 ]

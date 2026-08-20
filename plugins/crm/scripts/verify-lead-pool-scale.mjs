@@ -105,17 +105,17 @@ function assertDedicatedDatabase() {
     fail(`refusing scale seed into non-dedicated database ${database}`);
   }
   const conflicting = Number(psqlScalar(
-    `SELECT count(*) FROM mt_crm_lead_pool WHERE crm_lp_code LIKE 'CRM-SCALE-%' AND crm_lp_code <> '${sqlLit(marker)}'`,
+    `SELECT count(*) FROM mt_crm_lead_pool_common WHERE crm_lp_code LIKE 'CRM-SCALE-%' AND crm_lp_code <> '${sqlLit(marker)}'`,
   ));
   if (conflicting > 0) fail(`database ${database} contains a different CRM scale fixture`);
 }
 
 function prepareDataset() {
   const existing = Number(psqlScalar(
-    `SELECT count(*) FROM mt_crm_lead_pool_item WHERE crm_lpi_pool_id='${sqlLit(poolPid)}'`,
+    `SELECT count(*) FROM mt_crm_lead_pool_item_common WHERE crm_lpi_pool_id='${sqlLit(poolPid)}'`,
   ));
   if (existing === datasetSize) {
-    psql('ANALYZE mt_crm_lead_pool_item; ANALYZE mt_crm_lead_pool');
+    psql('ANALYZE mt_crm_lead_pool_item_common; ANALYZE mt_crm_lead_pool_common');
     return;
   }
   if (existing !== 0) fail(`fixture ${runId} has ${existing} rows, expected 0 or ${datasetSize}`);
@@ -123,7 +123,7 @@ function prepareDataset() {
   const poolId = 879_000_000_000_000_000n + BigInt(datasetSize);
   const itemBase = 880_000_000_000_000_000n;
   psql(`
-    INSERT INTO mt_crm_lead_pool (
+    INSERT INTO mt_crm_lead_pool_common (
       id, pid, tenant_id, created_at, updated_at, crm_lp_code, crm_lp_name,
       crm_lp_status, crm_lp_member_user_ids, crm_lp_admin_user_ids,
       crm_lp_daily_pick_limit, crm_lp_new_cooldown_days,
@@ -136,7 +136,7 @@ function prepareDataset() {
       1000, 0, 0, false, 30, 'claimed_at', 1
     ) ON CONFLICT (crm_lp_code) DO NOTHING;
 
-    INSERT INTO mt_crm_lead_pool_item (
+    INSERT INTO mt_crm_lead_pool_item_common (
       id, pid, tenant_id, created_at, updated_at, crm_lpi_lead_key,
       crm_lpi_lead_id, crm_lpi_pool_id, crm_lpi_status, crm_lpi_lead_code,
       crm_lpi_company, crm_lpi_contact_name, crm_lpi_contact_phone,
@@ -160,11 +160,11 @@ function prepareDataset() {
       CASE WHEN gs % 10 >= 7 THEN now() - interval '2 days' ELSE NULL END,
       CASE WHEN gs % 10 >= 7 THEN '${sqlLit(userPid)}' ELSE NULL END, 1
     FROM generate_series(1, ${datasetSize}) AS gs;
-    ANALYZE mt_crm_lead_pool_item;
-    ANALYZE mt_crm_lead_pool;
+    ANALYZE mt_crm_lead_pool_item_common;
+    ANALYZE mt_crm_lead_pool_common;
   `);
   const inserted = Number(psqlScalar(
-    `SELECT count(*) FROM mt_crm_lead_pool_item WHERE crm_lpi_pool_id='${sqlLit(poolPid)}'`,
+    `SELECT count(*) FROM mt_crm_lead_pool_item_common WHERE crm_lpi_pool_id='${sqlLit(poolPid)}'`,
   ));
   if (inserted !== datasetSize) fail(`inserted ${inserted}, expected ${datasetSize}`);
 }

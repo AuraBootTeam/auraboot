@@ -2367,8 +2367,8 @@
           "source": "plugins/crm/config/models.json"
         },
         {
-          "id": "model:crm_lead_pool",
-          "action": "Expose crm_lead_pool through required detail/form/list page surfaces",
+          "id": "model:crm_lead_pool_common",
+          "action": "Expose crm_lead_pool_common through required detail/form/list page surfaces",
           "evidence": [
             "plugins/crm/tests/crm-release-coverage.test.mjs"
           ],
@@ -2382,8 +2382,8 @@
           "source": "plugins/crm/config/models.json"
         },
         {
-          "id": "model:crm_lead_pool_recycle_rule",
-          "action": "Expose crm_lead_pool_recycle_rule through required detail/form/list page surfaces",
+          "id": "model:crm_lead_pool_recycle_rule_common",
+          "action": "Expose crm_lead_pool_recycle_rule_common through required detail/form/list page surfaces",
           "evidence": [
             "plugins/crm/tests/crm-release-coverage.test.mjs"
           ],
@@ -2397,8 +2397,8 @@
           "source": "plugins/crm/config/models.json"
         },
         {
-          "id": "model:crm_lead_capacity",
-          "action": "Expose crm_lead_capacity through required detail/form/list page surfaces",
+          "id": "model:crm_lead_capacity_common",
+          "action": "Expose crm_lead_capacity_common through required detail/form/list page surfaces",
           "evidence": [
             "plugins/crm/tests/crm-release-coverage.test.mjs"
           ],
@@ -2412,8 +2412,8 @@
           "source": "plugins/crm/config/models.json"
         },
         {
-          "id": "model:crm_lead_pool_item",
-          "action": "Expose crm_lead_pool_item through required detail/list page surfaces",
+          "id": "model:crm_lead_pool_item_common",
+          "action": "Expose crm_lead_pool_item_common through required detail/list page surfaces",
           "evidence": [
             "plugins/crm/tests/crm-release-coverage.test.mjs"
           ],
@@ -2427,8 +2427,8 @@
           "source": "plugins/crm/config/models.json"
         },
         {
-          "id": "model:crm_lead_pool_quota",
-          "action": "Keep support model crm_lead_pool_quota out of the direct-page denominator",
+          "id": "model:crm_lead_pool_quota_common",
+          "action": "Keep support model crm_lead_pool_quota_common out of the direct-page denominator",
           "evidence": [
             "plugins/crm/tests/crm-release-coverage.test.mjs"
           ],
@@ -2442,8 +2442,8 @@
           "source": "plugins/crm/config/models.json"
         },
         {
-          "id": "model:crm_lead_owner_history",
-          "action": "Expose crm_lead_owner_history through required detail/list page surfaces",
+          "id": "model:crm_lead_owner_history_common",
+          "action": "Expose crm_lead_owner_history_common through required detail/list page surfaces",
           "evidence": [
             "plugins/crm/tests/crm-release-coverage.test.mjs"
           ],
@@ -3096,7 +3096,7 @@
         },
         {
           "id": "menu:crm_lead_pool_settings",
-          "action": "Navigate through menu crm_lead_pool_settings to /p/crm_lead_pool",
+          "action": "Navigate through menu crm_lead_pool_settings to /p/crm_lead_pool_common",
           "evidence": [],
           "assertion": "Menu visibility, navigation, permission and destination state are not registered.",
           "verdict": "untested",
@@ -3109,7 +3109,7 @@
         },
         {
           "id": "menu:crm_lead_capacity_settings",
-          "action": "Navigate through menu crm_lead_capacity_settings to /p/crm_lead_capacity",
+          "action": "Navigate through menu crm_lead_capacity_settings to /p/crm_lead_capacity_common",
           "evidence": [],
           "assertion": "Menu visibility, navigation, permission and destination state are not registered.",
           "verdict": "untested",
@@ -3122,7 +3122,7 @@
         },
         {
           "id": "menu:crm_lead_pool_recycle_rules",
-          "action": "Navigate through menu crm_lead_pool_recycle_rules to /p/crm_lead_pool_recycle_rule",
+          "action": "Navigate through menu crm_lead_pool_recycle_rules to /p/crm_lead_pool_recycle_rule_common",
           "evidence": [],
           "assertion": "Menu visibility, navigation, permission and destination state are not registered.",
           "verdict": "untested",
@@ -3134,8 +3134,8 @@
           "source": "plugins/crm/config/menus.json"
         },
         {
-          "id": "menu:crm_lead_owner_history",
-          "action": "Navigate through menu crm_lead_owner_history to /p/crm_lead_owner_history",
+          "id": "menu:crm_lead_owner_history_common",
+          "action": "Navigate through menu crm_lead_owner_history_common to /p/crm_lead_owner_history_common",
           "evidence": [],
           "assertion": "Menu visibility, navigation, permission and destination state are not registered.",
           "verdict": "untested",
@@ -32648,7 +32648,7 @@
         },
         {
           "id": "ui-action:crm_lead_pool_item_list:crm_lead_pool_header_actions:pool_policy:2",
-          "action": "action pool_policy on crm_lead_pool_item_list -> navigate:/p/crm_lead_pool",
+          "action": "action pool_policy on crm_lead_pool_item_list -> navigate:/p/crm_lead_pool_common",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -32661,7 +32661,7 @@
         },
         {
           "id": "ui-action:crm_lead_pool_item_list:crm_lead_pool_header_actions:capacity_policy:3",
-          "action": "action capacity_policy on crm_lead_pool_item_list -> navigate:/p/crm_lead_capacity",
+          "action": "action capacity_policy on crm_lead_pool_item_list -> navigate:/p/crm_lead_capacity_common",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -39571,8 +39571,8 @@
           "source": "plugins/crm/config/permissions.json"
         },
         {
-          "id": "permission:model.crm_lead_pool.read",
-          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_lead_pool.read",
+          "id": "permission:model.crm_lead_pool_common.read",
+          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_lead_pool_common.read",
           "evidence": [],
           "assertion": "Positive and negative persona evidence is not registered.",
           "verdict": "untested",
@@ -39584,8 +39584,8 @@
           "source": "plugins/crm/config/permissions.json"
         },
         {
-          "id": "permission:model.crm_lead_pool_recycle_rule.read",
-          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_lead_pool_recycle_rule.read",
+          "id": "permission:model.crm_lead_pool_recycle_rule_common.read",
+          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_lead_pool_recycle_rule_common.read",
           "evidence": [],
           "assertion": "Positive and negative persona evidence is not registered.",
           "verdict": "untested",
@@ -39597,8 +39597,8 @@
           "source": "plugins/crm/config/permissions.json"
         },
         {
-          "id": "permission:model.crm_lead_capacity.read",
-          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_lead_capacity.read",
+          "id": "permission:model.crm_lead_capacity_common.read",
+          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_lead_capacity_common.read",
           "evidence": [],
           "assertion": "Positive and negative persona evidence is not registered.",
           "verdict": "untested",
@@ -39610,8 +39610,8 @@
           "source": "plugins/crm/config/permissions.json"
         },
         {
-          "id": "permission:model.crm_lead_pool_item.read",
-          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_lead_pool_item.read",
+          "id": "permission:model.crm_lead_pool_item_common.read",
+          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_lead_pool_item_common.read",
           "evidence": [],
           "assertion": "Positive and negative persona evidence is not registered.",
           "verdict": "untested",
@@ -39623,8 +39623,8 @@
           "source": "plugins/crm/config/permissions.json"
         },
         {
-          "id": "permission:model.crm_lead_owner_history.read",
-          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_lead_owner_history.read",
+          "id": "permission:model.crm_lead_owner_history_common.read",
+          "action": "Verify allow, deny, menu, action and direct-API behavior for model.crm_lead_owner_history_common.read",
           "evidence": [],
           "assertion": "Positive and negative persona evidence is not registered.",
           "verdict": "untested",

@@ -1,5 +1,5 @@
 {
-  "pageKey": "crm_lead_owner_history_detail", "name:zh-CN": "线索归属证据", "name:en": "Lead Ownership Evidence", "modelCode": "crm_lead_owner_history", "kind": "detail", "schemaVersion": 4,
+  "pageKey": "crm_lead_owner_history_detail", "name:zh-CN": "线索归属证据", "name:en": "Lead Ownership Evidence", "modelCode": "crm_lead_owner_history_common", "kind": "detail", "schemaVersion": 4,
   "layout": { "type": "stack" },
   "blocks": [
     { "id": "ownership_evidence", "blockType": "form-section", "title": { "zh-CN": "不可变归属证据", "en": "Immutable Ownership Evidence" }, "columns": 2, "fields": [

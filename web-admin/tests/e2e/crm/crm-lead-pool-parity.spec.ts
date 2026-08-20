@@ -376,7 +376,7 @@ test.describe('CRM lead-pool Cordys parity W1', () => {
         queueRows.length,
         'lead-pool queue query must return seeded records',
       ).toBeGreaterThanOrEqual(7);
-      await expect(salesPage).toHaveURL(/crm_lead_pool_item/, { timeout: 15_000 });
+      await expect(salesPage).toHaveURL(/crm_lead_pool_item_common/, { timeout: 15_000 });
       await expect(salesPage.getByTestId('metric-strip-item-ready')).toBeVisible({
         timeout: 15_000,
       });
@@ -650,7 +650,7 @@ test.describe('CRM lead-pool Cordys parity W1', () => {
       await managerSession.context.close();
     }
 
-    await navigateToCrmMenu(page, /运营与配置|Operations/i, '/p/crm_lead_owner_history');
+    await navigateToCrmMenu(page, /运营与配置|Operations/i, '/p/crm_lead_owner_history_common');
     await expect(page.getByText(/领取|Claimed/).first()).toBeVisible();
     await expect(page.getByText('CordysCRM W1 automated parity journey').first()).toBeVisible();
     await testInfo.attach('lead-owner-history', {

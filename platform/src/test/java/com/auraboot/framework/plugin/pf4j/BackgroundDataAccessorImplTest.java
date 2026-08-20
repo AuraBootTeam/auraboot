@@ -87,7 +87,7 @@ class BackgroundDataAccessorImplTest {
         when(dds.create(anyString(), any()))
                 .thenThrow(new ValidationException("Validation failed", result));
 
-        assertThat(accessor.tryCreate(42L, "crm_lead_owner_history", Map.of("operation_key", "op-1")))
+        assertThat(accessor.tryCreate(42L, "crm_lead_owner_history_common", Map.of("operation_key", "op-1")))
                 .isEmpty();
         assertThat(MetaContext.exists()).isFalse();
     }
@@ -103,7 +103,7 @@ class BackgroundDataAccessorImplTest {
         ValidationException error = new ValidationException("Validation failed", result);
         when(dds.create(anyString(), any())).thenThrow(error);
 
-        assertThatThrownBy(() -> accessor.tryCreate(42L, "crm_lead_owner_history", Map.of()))
+        assertThatThrownBy(() -> accessor.tryCreate(42L, "crm_lead_owner_history_common", Map.of()))
                 .isSameAs(error);
         assertThat(MetaContext.exists()).isFalse();
     }

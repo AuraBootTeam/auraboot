@@ -1,13 +1,13 @@
 [
-  { "modelCode": "crm_lead_pool_recycle_rule", "fieldCode": "crm_lprr_code", "sequence": 1, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool_recycle_rule", "fieldCode": "crm_lprr_name", "sequence": 2, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool_recycle_rule", "fieldCode": "crm_lprr_pool_id", "sequence": 3, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool_recycle_rule", "fieldCode": "crm_lprr_time_source", "sequence": 4, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool_recycle_rule", "fieldCode": "crm_lprr_operator", "sequence": 5, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool_recycle_rule", "fieldCode": "crm_lprr_days", "sequence": 6, "required": false, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool_recycle_rule", "fieldCode": "crm_lprr_start_at", "sequence": 7, "required": false, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool_recycle_rule", "fieldCode": "crm_lprr_end_at", "sequence": 8, "required": false, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool_recycle_rule", "fieldCode": "crm_lprr_status", "sequence": 9, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool_recycle_rule", "fieldCode": "crm_lprr_sort_order", "sequence": 10, "required": true, "visible": true, "editable": true },
-  { "modelCode": "crm_lead_pool_recycle_rule", "fieldCode": "crm_lprr_description", "sequence": 11, "required": false, "visible": false, "editable": true }
+  { "modelCode": "crm_lead_pool_recycle_rule_common", "fieldCode": "crm_lprr_code", "sequence": 1, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_recycle_rule_common", "fieldCode": "crm_lprr_name", "sequence": 2, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_recycle_rule_common", "fieldCode": "crm_lprr_pool_id", "sequence": 3, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_recycle_rule_common", "fieldCode": "crm_lprr_time_source", "sequence": 4, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_recycle_rule_common", "fieldCode": "crm_lprr_operator", "sequence": 5, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_recycle_rule_common", "fieldCode": "crm_lprr_days", "sequence": 6, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_recycle_rule_common", "fieldCode": "crm_lprr_start_at", "sequence": 7, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_recycle_rule_common", "fieldCode": "crm_lprr_end_at", "sequence": 8, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_recycle_rule_common", "fieldCode": "crm_lprr_status", "sequence": 9, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_recycle_rule_common", "fieldCode": "crm_lprr_sort_order", "sequence": 10, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_lead_pool_recycle_rule_common", "fieldCode": "crm_lprr_description", "sequence": 11, "required": false, "visible": false, "editable": true }
 ]

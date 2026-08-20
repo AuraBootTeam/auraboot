@@ -34,19 +34,19 @@ class LeadPoolCommandHandlerTest {
         assertEquals("available", result.get("status"));
         assertNull(db.getById("crm_lead_common", "lead-1").get("crm_lead_assigned_to"));
         assertEquals("in_pool", db.getById("crm_lead_common", "lead-1").get("crm_lead_pool_state"));
-        assertEquals(1, db.query("crm_lead_pool_item", Map.of("crm_lpi_status", "available")).size());
-        assertEquals("moved_to_pool", db.query("crm_lead_owner_history", Map.of()).getFirst().get("crm_loh_event"));
+        assertEquals(1, db.query("crm_lead_pool_item_common", Map.of("crm_lpi_status", "available")).size());
+        assertEquals("moved_to_pool", db.query("crm_lead_owner_history_common", Map.of()).getFirst().get("crm_loh_event"));
         assertEquals(3, shares.calls.size());
         assertTrue(shares.calls.stream().allMatch(call ->
                 call.userPids().equals(java.util.Set.of("member-a", "rep-b", "manager"))));
         assertTrue(shares.calls.stream().anyMatch(call ->
-                call.resourceCode().equals("crm_lead_pool_item")
+                call.resourceCode().equals("crm_lead_pool_item_common")
                         && call.permissionMask().equals("read,update")));
         assertTrue(shares.calls.stream().anyMatch(call ->
                 call.resourceCode().equals("crm_lead_common")
                         && call.permissionMask().equals("read,update")));
         assertTrue(shares.calls.stream().anyMatch(call ->
-                call.resourceCode().equals("crm_lead_owner_history")
+                call.resourceCode().equals("crm_lead_owner_history_common")
                         && call.permissionMask().equals("read")));
     }
 
@@ -54,13 +54,13 @@ class LeadPoolCommandHandlerTest {
     void claimEnforcesMembershipCapacityDailyLimitAndBothCooldowns() {
         FakeDb cooldown = availableItem(baseline(), "item-1", "lead-1", "member-a",
                 Instant.now().minus(Duration.ofDays(1)));
-        cooldown.getById("crm_lead_pool", "pool-1").put("crm_lp_new_cooldown_days", 2);
+        cooldown.getById("crm_lead_pool_common", "pool-1").put("crm_lp_new_cooldown_days", 2);
         assertThrows(IllegalStateException.class, () -> execute(cooldown, LeadPoolCommandHandler.CLAIM,
                 "item-1", "member-a", Map.of()));
 
         FakeDb capacity = availableItem(baseline(), "item-1", "lead-1", "other-owner",
                 Instant.parse("2026-08-01T00:00:00Z"));
-        capacity.put("crm_lead_capacity", "cap-1", map("crm_lcap_user_id", "member-a",
+        capacity.put("crm_lead_capacity_common", "cap-1", map("crm_lcap_user_id", "member-a",
                 "crm_lcap_capacity", 1, "crm_lcap_status", "active"));
         capacity.put("crm_lead_common", "owned-2", lead("owned-2", "member-a"));
         assertThrows(IllegalStateException.class, () -> execute(capacity, LeadPoolCommandHandler.CLAIM,
@@ -68,7 +68,7 @@ class LeadPoolCommandHandlerTest {
 
         FakeDb daily = availableItem(baseline(), "item-1", "lead-1", "other-owner",
                 Instant.parse("2026-08-01T00:00:00Z"));
-        daily.getById("crm_lead_pool", "pool-1").put("crm_lp_daily_pick_limit", 1);
+        daily.getById("crm_lead_pool_common", "pool-1").put("crm_lp_daily_pick_limit", 1);
         execute(daily, LeadPoolCommandHandler.CLAIM, "item-1", "member-a", Map.of());
         daily.put("crm_lead_common", "lead-2", lead("lead-2", "other-owner"));
         availableItem(daily, "item-2", "lead-2", "other-owner", Instant.parse("2026-08-01T00:00:00Z"));
@@ -77,8 +77,8 @@ class LeadPoolCommandHandlerTest {
 
         FakeDb previous = availableItem(baseline(), "item-1", "lead-1", "member-a",
                 Instant.now().minus(Duration.ofDays(1)));
-        previous.getById("crm_lead_pool", "pool-1").put("crm_lp_new_cooldown_days", 0);
-        previous.getById("crm_lead_pool", "pool-1").put("crm_lp_previous_owner_cooldown_days", 7);
+        previous.getById("crm_lead_pool_common", "pool-1").put("crm_lp_new_cooldown_days", 0);
+        previous.getById("crm_lead_pool_common", "pool-1").put("crm_lp_previous_owner_cooldown_days", 7);
         assertThrows(IllegalStateException.class, () -> execute(previous, LeadPoolCommandHandler.CLAIM,
                 "item-1", "member-a", Map.of()));
 
@@ -93,7 +93,7 @@ class LeadPoolCommandHandlerTest {
         Map<?, ?> result = execute(assign, LeadPoolCommandHandler.ASSIGN, "item-1", "manager",
                 Map.of("assigneeId", "rep-b"));
         assertEquals("rep-b", result.get("ownerId"));
-        assertEquals("assigned", assign.getById("crm_lead_pool_item", "item-1").get("crm_lpi_status"));
+        assertEquals("assigned", assign.getById("crm_lead_pool_item_common", "item-1").get("crm_lpi_status"));
 
         FakeDb race = availableItem(baseline(), "item-1", "lead-1", "member-a",
                 Instant.parse("2026-08-01T00:00:00Z"));
@@ -113,7 +113,7 @@ class LeadPoolCommandHandlerTest {
         FakeDb db = availableItem(baseline(), "item-1", "lead-1", "other-owner",
                 Instant.parse("2026-08-01T00:00:00Z"));
         FakeShares shares = new FakeShares();
-        db.getById("crm_lead_pool_item", "item-1")
+        db.getById("crm_lead_pool_item_common", "item-1")
                 .put("crm_lpi_available_at", "2026-08-01 00:00:00.123456");
 
         Map<?, ?> result = execute(db, shares, LeadPoolCommandHandler.CLAIM, "item-1", "manager", Map.of());
@@ -135,22 +135,22 @@ class LeadPoolCommandHandlerTest {
         assertEquals("disabled", execute(db, LeadPoolCommandHandler.TOGGLE, "pool-1", "manager", Map.of()).get("status"));
 
         FakeDb recycle = baseline();
-        recycle.getById("crm_lead_pool", "pool-1").put("crm_lp_auto_recycle", true);
-        recycle.getById("crm_lead_pool", "pool-1").put("crm_lp_recycle_after_days", 5);
+        recycle.getById("crm_lead_pool_common", "pool-1").put("crm_lp_auto_recycle", true);
+        recycle.getById("crm_lead_pool_common", "pool-1").put("crm_lp_recycle_after_days", 5);
         recycle.getById("crm_lead_common", "lead-1").put("crm_lead_last_pool_id", "pool-1");
         recycle.getById("crm_lead_common", "lead-1").put("crm_lead_claimed_at", "2026-08-01T00:00:00Z");
         int count = LeadPoolCommandHandler.recycle(recycle, new FakeShares(), 1L,
                 "system", Instant.parse("2026-08-14T00:00:00Z"));
         assertEquals(1, count);
         assertEquals("in_pool", recycle.getById("crm_lead_common", "lead-1").get("crm_lead_pool_state"));
-        assertEquals("auto_recycled", recycle.query("crm_lead_owner_history", Map.of()).getFirst().get("crm_loh_event"));
+        assertEquals("auto_recycled", recycle.query("crm_lead_owner_history_common", Map.of()).getFirst().get("crm_loh_event"));
     }
 
     @Test
     void configuredRecycleRulesRespectAllAndAnyCompositionWithoutLegacyMigration() {
         Instant now = Instant.parse("2026-08-14T00:00:00Z");
         FakeDb all = configuredRuleBaseline();
-        all.getById("crm_lead_pool", "pool-1").put("crm_lp_recycle_match_mode", "all");
+        all.getById("crm_lead_pool_common", "pool-1").put("crm_lp_recycle_match_mode", "all");
 
         LeadPoolCommandHandler.RecycleResult allResult = LeadPoolCommandHandler.recycleDetailed(
                 all, new FakeShares(), 1L, "system", now, Duration.ofMinutes(15));
@@ -159,7 +159,7 @@ class LeadPoolCommandHandlerTest {
         assertEquals("owned", all.getById("crm_lead_common", "lead-1").get("crm_lead_pool_state"));
 
         FakeDb any = configuredRuleBaseline();
-        any.getById("crm_lead_pool", "pool-1").put("crm_lp_recycle_match_mode", "any");
+        any.getById("crm_lead_pool_common", "pool-1").put("crm_lp_recycle_match_mode", "any");
 
         LeadPoolCommandHandler.RecycleResult anyResult = LeadPoolCommandHandler.recycleDetailed(
                 any, new FakeShares(), 1L, "system", now, Duration.ofMinutes(15));
@@ -200,8 +200,8 @@ class LeadPoolCommandHandlerTest {
     @Test
     void concurrentSchedulersProduceOneRecycleAndOneHistoryRecord() throws Exception {
         FakeDb db = baseline();
-        db.getById("crm_lead_pool", "pool-1").put("crm_lp_auto_recycle", true);
-        db.getById("crm_lead_pool", "pool-1").put("crm_lp_recycle_after_days", 5);
+        db.getById("crm_lead_pool_common", "pool-1").put("crm_lp_auto_recycle", true);
+        db.getById("crm_lead_pool_common", "pool-1").put("crm_lp_recycle_after_days", 5);
         db.getById("crm_lead_common", "lead-1").put("crm_lead_last_pool_id", "pool-1");
         db.getById("crm_lead_common", "lead-1").put("crm_lead_claimed_at", "2026-08-01T00:00:00Z");
         Instant now = Instant.now();
@@ -218,11 +218,11 @@ class LeadPoolCommandHandlerTest {
             assertEquals(1, recycled);
         }
 
-        assertEquals(1, db.query("crm_lead_owner_history", Map.of(
+        assertEquals(1, db.query("crm_lead_owner_history_common", Map.of(
                 "crm_loh_event", "auto_recycled")).size());
-        assertEquals("available", db.query("crm_lead_pool_item", Map.of()).getFirst()
+        assertEquals("available", db.query("crm_lead_pool_item_common", Map.of()).getFirst()
                 .get("crm_lpi_status"));
-        assertNull(db.query("crm_lead_pool_item", Map.of()).getFirst()
+        assertNull(db.query("crm_lead_pool_item_common", Map.of()).getFirst()
                 .get("crm_lpi_recycle_token"));
         assertEquals("in_pool", db.getById("crm_lead_common", "lead-1")
                 .get("crm_lead_pool_state"));
@@ -231,17 +231,17 @@ class LeadPoolCommandHandlerTest {
     @Test
     void staleRecycleLeaseResumesWithoutDuplicatingHistory() {
         FakeDb db = baseline();
-        db.getById("crm_lead_pool", "pool-1").put("crm_lp_auto_recycle", true);
-        db.getById("crm_lead_pool", "pool-1").put("crm_lp_recycle_after_days", 5);
+        db.getById("crm_lead_pool_common", "pool-1").put("crm_lp_auto_recycle", true);
+        db.getById("crm_lead_pool_common", "pool-1").put("crm_lp_recycle_after_days", 5);
         db.getById("crm_lead_common", "lead-1").put("crm_lead_last_pool_id", "pool-1");
         db.getById("crm_lead_common", "lead-1").put("crm_lead_pool_state", "in_pool");
         db.getById("crm_lead_common", "lead-1").put("crm_lead_assigned_to", null);
-        db.put("crm_lead_pool_item", "item-1", map(
+        db.put("crm_lead_pool_item_common", "item-1", map(
                 "crm_lpi_lead_key", "lead-1", "crm_lpi_lead_id", "lead-1",
                 "crm_lpi_pool_id", "pool-1", "crm_lpi_status", "recycling",
                 "crm_lpi_previous_owner", "member-a", "crm_lpi_recycle_token", "recycle-op-1",
                 "updated_at", "2026-08-01T00:00:00Z"));
-        db.put("crm_lead_owner_history", "history-1", map(
+        db.put("crm_lead_owner_history_common", "history-1", map(
                 "crm_loh_operation_key", "recycle-op-1", "crm_loh_event", "auto_recycled",
                 "crm_loh_lead_id", "lead-1", "crm_loh_pool_id", "pool-1"));
 
@@ -252,17 +252,17 @@ class LeadPoolCommandHandlerTest {
         assertEquals(1, result.recycled());
         assertEquals(1, result.recovered());
         assertEquals(0, result.failed());
-        assertEquals("available", db.getById("crm_lead_pool_item", "item-1").get("crm_lpi_status"));
-        assertNull(db.getById("crm_lead_pool_item", "item-1").get("crm_lpi_recycle_token"));
-        assertEquals(1, db.query("crm_lead_owner_history", Map.of(
+        assertEquals("available", db.getById("crm_lead_pool_item_common", "item-1").get("crm_lpi_status"));
+        assertNull(db.getById("crm_lead_pool_item_common", "item-1").get("crm_lpi_recycle_token"));
+        assertEquals(1, db.query("crm_lead_owner_history_common", Map.of(
                 "crm_loh_operation_key", "recycle-op-1")).size());
     }
 
     @Test
     void completedRecycleClearsTokenSoLaterOwnershipCycleGetsNewHistory() {
         FakeDb db = baseline();
-        db.getById("crm_lead_pool", "pool-1").put("crm_lp_auto_recycle", true);
-        db.getById("crm_lead_pool", "pool-1").put("crm_lp_recycle_after_days", 5);
+        db.getById("crm_lead_pool_common", "pool-1").put("crm_lp_auto_recycle", true);
+        db.getById("crm_lead_pool_common", "pool-1").put("crm_lp_recycle_after_days", 5);
         Map<String, Object> lead = db.getById("crm_lead_common", "lead-1");
         lead.put("crm_lead_last_pool_id", "pool-1");
         lead.put("crm_lead_claimed_at", "2026-08-01T00:00:00Z");
@@ -271,8 +271,8 @@ class LeadPoolCommandHandlerTest {
                 db, new FakeShares(), 1L, "system", Instant.parse("2026-08-14T00:00:00Z"),
                 Duration.ofMinutes(15)).recycled());
 
-        Map<String, Object> item = db.query("crm_lead_pool_item", Map.of()).getFirst();
-        String firstOperation = java.util.Objects.toString(db.query("crm_lead_owner_history", Map.of()).getFirst()
+        Map<String, Object> item = db.query("crm_lead_pool_item_common", Map.of()).getFirst();
+        String firstOperation = java.util.Objects.toString(db.query("crm_lead_owner_history_common", Map.of()).getFirst()
                 .get("crm_loh_operation_key"), null);
         item.put("crm_lpi_status", "assigned");
         item.put("crm_lpi_previous_owner", "member-b");
@@ -284,7 +284,7 @@ class LeadPoolCommandHandlerTest {
                 db, new FakeShares(), 1L, "system", Instant.parse("2026-08-22T00:00:00Z"),
                 Duration.ofMinutes(15)).recycled());
 
-        List<Map<String, Object>> histories = db.query("crm_lead_owner_history", Map.of(
+        List<Map<String, Object>> histories = db.query("crm_lead_owner_history_common", Map.of(
                 "crm_loh_event", "auto_recycled"));
         assertNotNull(firstOperation);
         assertEquals(2, histories.size());
@@ -295,8 +295,8 @@ class LeadPoolCommandHandlerTest {
     @Test
     void freshRecycleLeaseIsNotStolenByAnotherScheduler() {
         FakeDb db = baseline();
-        db.getById("crm_lead_pool", "pool-1").put("crm_lp_auto_recycle", true);
-        db.put("crm_lead_pool_item", "item-1", map(
+        db.getById("crm_lead_pool_common", "pool-1").put("crm_lp_auto_recycle", true);
+        db.put("crm_lead_pool_item_common", "item-1", map(
                 "crm_lpi_lead_key", "lead-1", "crm_lpi_lead_id", "lead-1",
                 "crm_lpi_pool_id", "pool-1", "crm_lpi_status", "recycling",
                 "crm_lpi_recycle_token", "recycle-op-1", "updated_at", "2026-08-14T00:00:00Z"));
@@ -307,34 +307,34 @@ class LeadPoolCommandHandlerTest {
 
         assertEquals(0, result.recycled());
         assertEquals(1, result.activeLeases());
-        assertEquals("recycling", db.getById("crm_lead_pool_item", "item-1").get("crm_lpi_status"));
+        assertEquals("recycling", db.getById("crm_lead_pool_item_common", "item-1").get("crm_lpi_status"));
     }
 
     @Test
     void staleWorkerCannotCommitAfterItsLeaseTokenWasFenced() {
         FakeDb db = baseline();
-        db.put("crm_lead_pool_item", "item-1", map(
+        db.put("crm_lead_pool_item_common", "item-1", map(
                 "crm_lpi_lead_key", "lead-1", "crm_lpi_lead_id", "lead-1",
                 "crm_lpi_pool_id", "pool-1", "crm_lpi_status", "recycling",
                 "crm_lpi_previous_owner", "member-a",
                 "crm_lpi_recycle_token", "operation-1:old-lease",
                 "updated_at", "2026-08-01T00:00:00Z"));
         Map<String, Object> staleSnapshot = new HashMap<>(
-                db.getById("crm_lead_pool_item", "item-1"));
-        db.getById("crm_lead_pool_item", "item-1")
+                db.getById("crm_lead_pool_item_common", "item-1"));
+        db.getById("crm_lead_pool_item_common", "item-1")
                 .put("crm_lpi_recycle_token", "operation-1:new-lease");
         FakeShares shares = new FakeShares();
 
         boolean completed = LeadPoolCommandHandler.completeRecycle(
-                db, shares, 1L, db.getById("crm_lead_pool", "pool-1"), staleSnapshot,
+                db, shares, 1L, db.getById("crm_lead_pool_common", "pool-1"), staleSnapshot,
                 "system", 5, Instant.parse("2026-08-14T00:00:00Z"));
 
         assertFalse(completed);
         assertEquals("owned", db.getById("crm_lead_common", "lead-1").get("crm_lead_pool_state"));
-        assertTrue(db.query("crm_lead_owner_history", Map.of()).isEmpty());
+        assertTrue(db.query("crm_lead_owner_history_common", Map.of()).isEmpty());
         assertTrue(shares.calls.isEmpty());
         assertEquals("operation-1:new-lease",
-                db.getById("crm_lead_pool_item", "item-1").get("crm_lpi_recycle_token"));
+                db.getById("crm_lead_pool_item_common", "item-1").get("crm_lpi_recycle_token"));
     }
 
     private Map<String, Object> execute(FakeDb db, String command, String recordId, String actor,
@@ -345,7 +345,7 @@ class LeadPoolCommandHandlerTest {
     private Map<String, Object> execute(FakeDb db, FakeShares shares, String command,
                                         String recordId, String actor, Map<String, Object> payload) {
         CommandContext context = new CommandContext(1L, "com.auraboot.crm", "crm", command,
-                command.contains("pool_lead") ? "crm_lead_pool_item" : "crm_lead_common",
+                command.contains("pool_lead") ? "crm_lead_pool_item_common" : "crm_lead_common",
                 recordId, payload, Map.of(
                         "__dataAccessor", db,
                         CommandHandlerExtension.CURRENT_USER_PID_KEY, actor,
@@ -381,7 +381,7 @@ class LeadPoolCommandHandlerTest {
 
     private static FakeDb baseline() {
         FakeDb db = new FakeDb();
-        db.put("crm_lead_pool", "pool-1", map(
+        db.put("crm_lead_pool_common", "pool-1", map(
                 "crm_lp_status", "enabled", "crm_lp_member_user_ids", "member-a,rep-b",
                 "crm_lp_admin_user_ids", "manager", "crm_lp_daily_pick_limit", 20,
                 "crm_lp_new_cooldown_days", 0, "crm_lp_previous_owner_cooldown_days", 0,
@@ -393,24 +393,24 @@ class LeadPoolCommandHandlerTest {
 
     private static FakeDb configuredRuleBaseline() {
         FakeDb db = baseline();
-        Map<String, Object> pool = db.getById("crm_lead_pool", "pool-1");
+        Map<String, Object> pool = db.getById("crm_lead_pool_common", "pool-1");
         pool.put("crm_lp_auto_recycle", true);
         pool.put("crm_lp_recycle_after_days", 365);
         Map<String, Object> lead = db.getById("crm_lead_common", "lead-1");
         lead.put("crm_lead_last_pool_id", "pool-1");
         lead.put("crm_lead_claimed_at", "2026-08-01T00:00:00Z");
         lead.put("crm_lead_last_activity_at", "2026-08-13T00:00:00Z");
-        db.put("crm_lead_pool_item", "item-1", map(
+        db.put("crm_lead_pool_item_common", "item-1", map(
                 "crm_lpi_lead_key", "lead-1", "crm_lpi_lead_id", "lead-1",
                 "crm_lpi_pool_id", "pool-1", "crm_lpi_status", "claimed",
                 "crm_lpi_entered_at", "2026-07-25T00:00:00Z",
                 "crm_lpi_claimed_at", "2026-08-01T00:00:00Z",
                 "crm_lpi_claimed_by", "member-a"));
-        db.put("crm_lead_pool_recycle_rule", "rule-1", map(
+        db.put("crm_lead_pool_recycle_rule_common", "rule-1", map(
                 "crm_lprr_pool_id", "pool-1", "crm_lprr_status", "active",
                 "crm_lprr_time_source", "claimed_at", "crm_lprr_operator", "older_than_days",
                 "crm_lprr_days", 5, "crm_lprr_sort_order", 10));
-        db.put("crm_lead_pool_recycle_rule", "rule-2", map(
+        db.put("crm_lead_pool_recycle_rule_common", "rule-2", map(
                 "crm_lprr_pool_id", "pool-1", "crm_lprr_status", "active",
                 "crm_lprr_time_source", "last_activity_at", "crm_lprr_operator", "older_than_days",
                 "crm_lprr_days", 5, "crm_lprr_sort_order", 20));
@@ -418,7 +418,7 @@ class LeadPoolCommandHandlerTest {
     }
 
     private static FakeDb availableItem(FakeDb db, String itemId, String leadId, String previousOwner, Instant entered) {
-        db.put("crm_lead_pool_item", itemId, map(
+        db.put("crm_lead_pool_item_common", itemId, map(
                 "crm_lpi_lead_key", leadId, "crm_lpi_lead_id", leadId, "crm_lpi_pool_id", "pool-1",
                 "crm_lpi_status", "available", "crm_lpi_previous_owner", previousOwner,
                 "crm_lpi_entered_at", entered.toString()));
@@ -468,8 +468,8 @@ class LeadPoolCommandHandlerTest {
         @Override public synchronized Optional<Map<String, Object>> tryCreate(
                 String modelCode, Map<String, Object> data) {
             String uniqueField = switch (modelCode) {
-                case "crm_lead_pool_item" -> "crm_lpi_lead_key";
-                case "crm_lead_owner_history" -> "crm_loh_operation_key";
+                case "crm_lead_pool_item_common" -> "crm_lpi_lead_key";
+                case "crm_lead_owner_history_common" -> "crm_loh_operation_key";
                 default -> null;
             };
             if (uniqueField != null && data.get(uniqueField) != null

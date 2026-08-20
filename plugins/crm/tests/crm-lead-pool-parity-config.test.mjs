@@ -45,13 +45,27 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
 
   const modelCodes = new Set(models.map((model) => model.code));
   for (const code of [
-    'crm_lead_pool',
-    'crm_lead_pool_recycle_rule',
-    'crm_lead_capacity',
-    'crm_lead_pool_item',
-    'crm_lead_pool_quota',
-    'crm_lead_owner_history',
+    'crm_lead_pool_common',
+    'crm_lead_pool_recycle_rule_common',
+    'crm_lead_capacity_common',
+    'crm_lead_pool_item_common',
+    'crm_lead_pool_quota_common',
+    'crm_lead_owner_history_common',
   ]) assert.ok(modelCodes.has(code), `missing model ${code}`);
+
+  const providedModels = new Set(
+    (await json('plugin.json')).provides
+      .filter((entry) => entry.type === 'model')
+      .map((entry) => entry.code),
+  );
+  for (const code of [
+    'crm_lead_pool_common',
+    'crm_lead_pool_recycle_rule_common',
+    'crm_lead_capacity_common',
+    'crm_lead_pool_item_common',
+    'crm_lead_pool_quota_common',
+    'crm_lead_owner_history_common',
+  ]) assert.ok(providedModels.has(code), `missing provided model ${code}`);
 
   const poolFieldCodes = new Set(poolFields.map((field) => field.code));
   for (const code of [
@@ -299,20 +313,20 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
     'Previous owner cooldown',
     'Lead capacity reached',
     'available leads and cannot be deleted',
-    'crm_lead_owner_history',
+    'crm_lead_owner_history_common',
   ]) assert.match(handler, new RegExp(proof));
   assert.match(scheduler, /@Scheduled/);
   assert.match(scheduler, /listActiveTenantIds/);
   assert.match(handler, /currentUserPid/);
   assert.match(handler, /replaceReadSharesForUsers/);
   assert.match(shareSync, /chainsAfterPrimary\(\).*true/);
-  assert.match(shareSync, /crm_lead_owner_history/);
+  assert.match(shareSync, /crm_lead_owner_history_common/);
 
-  const poolItem = models.find((model) => model.code === 'crm_lead_pool_item');
+  const poolItem = models.find((model) => model.code === 'crm_lead_pool_item_common');
   assert.equal(poolItem.extension?.dataScope?.ownerField, 'crm_lpi_claimed_by');
-  const capacity = models.find((model) => model.code === 'crm_lead_capacity');
+  const capacity = models.find((model) => model.code === 'crm_lead_capacity_common');
   assert.equal(capacity.extension?.dataScope?.ownerField, 'crm_lcap_user_id');
-  const quota = models.find((model) => model.code === 'crm_lead_pool_quota');
+  const quota = models.find((model) => model.code === 'crm_lead_pool_quota_common');
   assert.equal(quota.extension?.dataScope?.ownerField, 'crm_lpq_user_id');
 });
 

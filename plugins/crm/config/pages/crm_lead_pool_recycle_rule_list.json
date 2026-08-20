@@ -2,7 +2,7 @@
   "pageKey": "crm_lead_pool_recycle_rule_list",
   "name:zh-CN": "线索池回收规则",
   "name:en": "Lead Pool Recycle Rules",
-  "modelCode": "crm_lead_pool_recycle_rule",
+  "modelCode": "crm_lead_pool_recycle_rule_common",
   "kind": "list",
   "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12 },

@@ -2,7 +2,7 @@
   "pageKey": "crm_lead_pool_recycle_rule_form",
   "name:zh-CN": "回收条件编辑",
   "name:en": "Recycle Condition Editor",
-  "modelCode": "crm_lead_pool_recycle_rule",
+  "modelCode": "crm_lead_pool_recycle_rule_common",
   "kind": "form",
   "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 16 },

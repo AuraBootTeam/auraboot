@@ -2,7 +2,7 @@
   "pageKey": "crm_lead_pool_form",
   "name:zh-CN": "线索池策略",
   "name:en": "Lead Pool Policy",
-  "modelCode": "crm_lead_pool",
+  "modelCode": "crm_lead_pool_common",
   "kind": "form",
   "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 16 },

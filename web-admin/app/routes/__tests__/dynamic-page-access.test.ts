@@ -13,15 +13,15 @@ describe('dynamic page access inheritance', () => {
 
   it('checks the parent menu path for list, create, edit, and detail routes', async () => {
     vi.mocked(fetchResult).mockResolvedValue({ code: '0', data: null } as never);
-    const request = new Request('http://localhost/p/crm_lead_pool_recycle_rule/new');
+    const request = new Request('http://localhost/p/crm_lead_pool_recycle_rule_common/new');
 
     await expect(
-      resolveDynamicPageAccessError(request, 'sales-token', 'crm_lead_pool_recycle_rule'),
+      resolveDynamicPageAccessError(request, 'sales-token', 'crm_lead_pool_recycle_rule_common'),
     ).resolves.toBeNull();
     expect(fetchResult).toHaveBeenCalledWith(
       '/api/menu/by-path',
       expect.objectContaining({
-        params: { path: '/p/crm_lead_pool_recycle_rule' },
+        params: { path: '/p/crm_lead_pool_recycle_rule_common' },
         token: 'sales-token',
       }),
       request,
@@ -36,9 +36,9 @@ describe('dynamic page access inheritance', () => {
 
     await expect(
       resolveDynamicPageAccessError(
-        new Request('http://localhost/p/crm_lead_pool_recycle_rule/edit/record-1'),
+        new Request('http://localhost/p/crm_lead_pool_recycle_rule_common/edit/record-1'),
         'sales-token',
-        'crm_lead_pool_recycle_rule',
+        'crm_lead_pool_recycle_rule_common',
       ),
     ).resolves.toBe('Command permission denied');
   });

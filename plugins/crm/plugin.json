@@ -47,23 +47,27 @@
     },
     {
       "type": "model",
-      "code": "crm_lead_pool"
+      "code": "crm_lead_pool_common"
     },
     {
       "type": "model",
-      "code": "crm_lead_pool_recycle_rule"
+      "code": "crm_lead_pool_recycle_rule_common"
     },
     {
       "type": "model",
-      "code": "crm_lead_capacity"
+      "code": "crm_lead_capacity_common"
     },
     {
       "type": "model",
-      "code": "crm_lead_pool_item"
+      "code": "crm_lead_pool_item_common"
     },
     {
       "type": "model",
-      "code": "crm_lead_owner_history"
+      "code": "crm_lead_pool_quota_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_lead_owner_history_common"
     },
     {
       "type": "command",

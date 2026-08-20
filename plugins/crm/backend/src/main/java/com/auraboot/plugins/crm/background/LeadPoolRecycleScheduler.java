@@ -67,7 +67,7 @@ public class LeadPoolRecycleScheduler implements BackgroundComponentExtension {
 
     static boolean isCrmModelAbsent(Throwable error) {
         for (Throwable current = error; current != null; current = current.getCause()) {
-            if ("Model not found: crm_lead_pool".equals(current.getMessage())) return true;
+            if ("Model not found: crm_lead_pool_common".equals(current.getMessage())) return true;
         }
         return false;
     }

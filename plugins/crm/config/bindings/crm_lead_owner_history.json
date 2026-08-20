@@ -1,11 +1,11 @@
 [
-  { "modelCode": "crm_lead_owner_history", "fieldCode": "crm_loh_lead_id", "sequence": 1, "required": true, "visible": true, "editable": false },
-  { "modelCode": "crm_lead_owner_history", "fieldCode": "crm_loh_pool_id", "sequence": 2, "required": true, "visible": true, "editable": false },
-  { "modelCode": "crm_lead_owner_history", "fieldCode": "crm_loh_event", "sequence": 3, "required": true, "visible": true, "editable": false },
-  { "modelCode": "crm_lead_owner_history", "fieldCode": "crm_loh_previous_owner", "sequence": 4, "required": false, "visible": true, "editable": false },
-  { "modelCode": "crm_lead_owner_history", "fieldCode": "crm_loh_next_owner", "sequence": 5, "required": false, "visible": true, "editable": false },
-  { "modelCode": "crm_lead_owner_history", "fieldCode": "crm_loh_actor", "sequence": 6, "required": false, "visible": true, "editable": false },
-  { "modelCode": "crm_lead_owner_history", "fieldCode": "crm_loh_reason", "sequence": 7, "required": false, "visible": false, "editable": false },
-  { "modelCode": "crm_lead_owner_history", "fieldCode": "crm_loh_occurred_at", "sequence": 8, "required": true, "visible": true, "editable": false },
-  { "modelCode": "crm_lead_owner_history", "fieldCode": "crm_loh_operation_key", "sequence": 9, "required": false, "visible": false, "editable": false }
+  { "modelCode": "crm_lead_owner_history_common", "fieldCode": "crm_loh_lead_id", "sequence": 1, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_owner_history_common", "fieldCode": "crm_loh_pool_id", "sequence": 2, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_owner_history_common", "fieldCode": "crm_loh_event", "sequence": 3, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_owner_history_common", "fieldCode": "crm_loh_previous_owner", "sequence": 4, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_owner_history_common", "fieldCode": "crm_loh_next_owner", "sequence": 5, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_owner_history_common", "fieldCode": "crm_loh_actor", "sequence": 6, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_owner_history_common", "fieldCode": "crm_loh_reason", "sequence": 7, "required": false, "visible": false, "editable": false },
+  { "modelCode": "crm_lead_owner_history_common", "fieldCode": "crm_loh_occurred_at", "sequence": 8, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_lead_owner_history_common", "fieldCode": "crm_loh_operation_key", "sequence": 9, "required": false, "visible": false, "editable": false }
 ]

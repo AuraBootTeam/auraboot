@@ -789,7 +789,7 @@
     "lifecycle_description": "Draft -> Compiling -> Validation Failed / Ready for Review -> Released -> Superseded. Published content changes always create a new numbered QDP revision; only async compilation and lifecycle evidence may change on an existing record."
   },
   {
-    "code": "crm_lead_pool",
+    "code": "crm_lead_pool_common",
     "displayName:zh-CN": "线索池",
     "displayName:en": "Lead Pool",
     "description": "Configures lead-pool membership, claim limits, cooldowns and automatic recycling.",
@@ -807,7 +807,7 @@
     "lifecycle_description": "Enabled <-> Disabled. A pool with available items cannot be deleted."
   },
   {
-    "code": "crm_lead_pool_recycle_rule",
+    "code": "crm_lead_pool_recycle_rule_common",
     "displayName:zh-CN": "线索池回收规则",
     "displayName:en": "Lead Pool Recycle Rule",
     "description": "One ordered time condition evaluated by a lead pool automatic recycle policy.",
@@ -825,7 +825,7 @@
     "lifecycle_description": "Active <-> Inactive. Inactive rules remain auditable but do not participate in scheduled or manual recycle evaluation."
   },
   {
-    "code": "crm_lead_capacity",
+    "code": "crm_lead_capacity_common",
     "displayName:zh-CN": "线索库容",
     "displayName:en": "Lead Capacity",
     "description": "Maximum concurrently owned open leads for one sales user.",
@@ -844,7 +844,7 @@
     "lifecycle_description": "Active or inactive capacity configuration."
   },
   {
-    "code": "crm_lead_pool_item",
+    "code": "crm_lead_pool_item_common",
     "displayName:zh-CN": "线索池条目",
     "displayName:en": "Lead Pool Item",
     "description": "Command-owned operational projection of one lead entering, leaving or being recycled into a pool.",
@@ -864,7 +864,7 @@
     "lifecycle_description": "Available -> Claiming -> Claimed / Assigned. Automatic recycle acquires Recycling, stale recovery alternates Recycling <-> Recycling Retry as a fenced lease, and only a fully completed re-entry returns the same item to Available."
   },
   {
-    "code": "crm_lead_pool_quota",
+    "code": "crm_lead_pool_quota_common",
     "displayName:zh-CN": "线索领取额度",
     "displayName:en": "Lead Claim Quota",
     "description": "Command-owned per-pool, per-user, per-day claim counter.",
@@ -885,7 +885,7 @@
     "lifecycle_description": "One immutable identity per pool-user-local-date; the claim counter only increases."
   },
   {
-    "code": "crm_lead_owner_history",
+    "code": "crm_lead_owner_history_common",
     "displayName:zh-CN": "线索归属历史",
     "displayName:en": "Lead Ownership History",
     "description": "Immutable audit evidence for move, claim, assign and automatic recycle events.",

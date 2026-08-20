@@ -2,7 +2,7 @@
   "pageKey": "crm_lead_pool_item_list",
   "name:zh-CN": "线索池运营台",
   "name:en": "Lead Pool Operations",
-  "modelCode": "crm_lead_pool_item",
+  "modelCode": "crm_lead_pool_item_common",
   "description": "Task-first workspace for lead-pool availability, cooldown, claim, assignment and ownership evidence.",
   "kind": "detail",
   "schemaVersion": 4,
@@ -132,14 +132,14 @@
           "permissionCode": "crm.lead_pool.manage",
           "label": { "zh-CN": "线索池策略", "en": "Pool Policies" },
           "variant": "secondary",
-          "onClick": { "action": "navigate", "args": { "to": "/p/crm_lead_pool" } }
+          "onClick": { "action": "navigate", "args": { "to": "/p/crm_lead_pool_common" } }
         },
         {
           "code": "capacity_policy",
           "permissionCode": "crm.lead_pool.manage",
           "label": { "zh-CN": "人员库容", "en": "User Capacity" },
           "variant": "secondary",
-          "onClick": { "action": "navigate", "args": { "to": "/p/crm_lead_capacity" } }
+          "onClick": { "action": "navigate", "args": { "to": "/p/crm_lead_capacity_common" } }
         }
       ]
     },

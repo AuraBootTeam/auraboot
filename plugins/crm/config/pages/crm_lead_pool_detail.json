@@ -2,7 +2,7 @@
   "pageKey": "crm_lead_pool_detail",
   "name:zh-CN": "线索池详情",
   "name:en": "Lead Pool Detail",
-  "modelCode": "crm_lead_pool",
+  "modelCode": "crm_lead_pool_common",
   "kind": "detail",
   "schemaVersion": 4,
   "layout": { "type": "stack" },

@@ -2,7 +2,7 @@
   "pageKey": "crm_lead_pool_batch_list",
   "name:zh-CN": "线索池批量处理",
   "name:en": "Lead Pool Batch Operations",
-  "modelCode": "crm_lead_pool_item",
+  "modelCode": "crm_lead_pool_item_common",
   "kind": "list",
   "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12 },

@@ -745,48 +745,48 @@
     "module": "crm"
   },
   {
-    "code": "model.crm_lead_pool.read",
+    "code": "model.crm_lead_pool_common.read",
     "name:zh-CN": "查看线索池模型",
     "name:en": "Read Lead Pool Model",
     "resourceType": "model",
     "module": "crm",
-    "resourceCode": "crm_lead_pool",
+    "resourceCode": "crm_lead_pool_common",
     "action": "read"
   },
   {
-    "code": "model.crm_lead_pool_recycle_rule.read",
+    "code": "model.crm_lead_pool_recycle_rule_common.read",
     "name:zh-CN": "查看线索池回收规则模型",
     "name:en": "Read Lead Pool Recycle Rule Model",
     "resourceType": "model",
     "module": "crm",
-    "resourceCode": "crm_lead_pool_recycle_rule",
+    "resourceCode": "crm_lead_pool_recycle_rule_common",
     "action": "read"
   },
   {
-    "code": "model.crm_lead_capacity.read",
+    "code": "model.crm_lead_capacity_common.read",
     "name:zh-CN": "查看线索库容模型",
     "name:en": "Read Lead Capacity Model",
     "resourceType": "model",
     "module": "crm",
-    "resourceCode": "crm_lead_capacity",
+    "resourceCode": "crm_lead_capacity_common",
     "action": "read"
   },
   {
-    "code": "model.crm_lead_pool_item.read",
+    "code": "model.crm_lead_pool_item_common.read",
     "name:zh-CN": "查看线索池条目模型",
     "name:en": "Read Lead Pool Item Model",
     "resourceType": "model",
     "module": "crm",
-    "resourceCode": "crm_lead_pool_item",
+    "resourceCode": "crm_lead_pool_item_common",
     "action": "read"
   },
   {
-    "code": "model.crm_lead_owner_history.read",
+    "code": "model.crm_lead_owner_history_common.read",
     "name:zh-CN": "查看线索归属历史",
     "name:en": "Read Lead Ownership History",
     "resourceType": "model",
     "module": "crm",
-    "resourceCode": "crm_lead_owner_history",
+    "resourceCode": "crm_lead_owner_history_common",
     "action": "read"
   }
 ]

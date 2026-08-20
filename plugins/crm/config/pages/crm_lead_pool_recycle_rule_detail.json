@@ -2,7 +2,7 @@
   "pageKey": "crm_lead_pool_recycle_rule_detail",
   "name:zh-CN": "回收条件详情",
   "name:en": "Recycle Condition Detail",
-  "modelCode": "crm_lead_pool_recycle_rule",
+  "modelCode": "crm_lead_pool_recycle_rule_common",
   "kind": "detail",
   "schemaVersion": 4,
   "layout": { "type": "stack" },

@@ -1,5 +1,5 @@
 {
-  "pageKey": "crm_lead_capacity_form", "name:zh-CN": "线索库容设置", "name:en": "Lead Capacity Setting", "modelCode": "crm_lead_capacity", "kind": "form", "schemaVersion": 4,
+  "pageKey": "crm_lead_capacity_form", "name:zh-CN": "线索库容设置", "name:en": "Lead Capacity Setting", "modelCode": "crm_lead_capacity_common", "kind": "form", "schemaVersion": 4,
   "layout": { "type": "grid", "cols": 12, "gap": 16 },
   "blocks": [
     { "id": "capacity", "blockType": "form-section", "title": { "zh-CN": "用户库容", "en": "User Capacity" }, "fields": [
