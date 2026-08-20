@@ -48,11 +48,11 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.equal(committed.scope.productDenominator.commands, 238);
   assert.equal(committed.scope.productDenominator.permissions, 114);
   assert.equal(committed.scope.productDenominator['page-blocks'], 402);
-  assert.equal(committed.scope.productDenominator['page-fields'], 1708);
+  assert.equal(committed.scope.productDenominator['page-fields'], 1707);
   assert.equal(committed.scope.productDenominator['ui-actions'], 600);
   assert.equal(committed.scope.productDenominator.queries, 55);
   assert.equal(committed.scope.productVerdicts.pass, 641);
-  assert.equal(committed.scope.productVerdicts.untested, 2742);
+  assert.equal(committed.scope.productVerdicts.untested, 2741);
   assert.ok(committed.scope.productVerdicts.untested > 0);
   assert.equal(committed.scope.productVerdicts.gap ?? 0, 0);
   const coreWorkbenchContract = committed.runtimeEvidenceContracts.find(
@@ -120,15 +120,15 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   const customerPoolContract = committed.runtimeEvidenceContracts.find(
     (contract) => contract.id === 'CRM-CUSTOMER-POOL',
   );
-  assert.equal(customerPoolContract.expectedScenarios, 4);
+  assert.equal(customerPoolContract.expectedScenarios, 6);
   assert.equal(customerPoolContract.minimumScreenshots, 15);
   assert.equal(customerPoolContract.expectedCoverage.pages.length, 15);
   assert.equal(customerPoolContract.expectedCoverage.commands.length, 19);
   assert.equal(customerPoolContract.expectedCoverage.permissions.length, 7);
   assert.equal(customerPoolContract.expectedCoverage.queries.length, 8);
   assert.equal(customerPoolContract.expectedCoverage.blocks.length, 50);
-  assert.equal(customerPoolContract.expectedCoverage.fields.length, 108);
-  assert.equal(customerPoolContract.expectedCoverage.uiActions.length, 68);
+  assert.equal(customerPoolContract.expectedCoverage.fields.length, 109);
+  assert.equal(customerPoolContract.expectedCoverage.uiActions.length, 69);
   assert.deepEqual(Object.keys(customerPoolContract.expectedCoverage).sort(), [
     'blocks',
     'commands',

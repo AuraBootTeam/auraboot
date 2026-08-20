@@ -37,15 +37,21 @@ const MEMBER_OPERATIONS_SCENARIO =
   'member scope, quick edit, chart, exports, guarded delete, batch update, claim and assignment persist on the real stack';
 const GOVERNANCE_RECYCLE_SCENARIO =
   'administrator governs quick pool policy, capacity, relative and fixed recycle rules, and recent activity blocks recycle';
+const RECYCLE_VISUAL_STATE_SCENARIO =
+  'sales sees empty, recycling and recovery states while one stale recycle lease is recovered exactly once';
 const IMPORT_MOBILE_SCENARIO =
   'administrator downloads, prechecks and imports XLSX customers while mobile sales reviews customer, activity and ownership tabs';
 const PERMISSION_LIFECYCLE_SCENARIO =
   'existing sales session loses and regains customer-pool access after role changes while cross-tenant membership is rejected';
+const ASSIGNED_CONFLICT_VISUAL_SCENARIO =
+  'administrator, assigned sales and peer sales see ownership while concurrent UI claim gives one winner and one actionable conflict';
 const CUSTOMER_POOL_SCENARIOS = [
   MEMBER_OPERATIONS_SCENARIO,
   GOVERNANCE_RECYCLE_SCENARIO,
+  RECYCLE_VISUAL_STATE_SCENARIO,
   IMPORT_MOBILE_SCENARIO,
   PERMISSION_LIFECYCLE_SCENARIO,
+  ASSIGNED_CONFLICT_VISUAL_SCENARIO,
 ];
 const completedScenarios = new Set<string>();
 const failedScenarios = new Set<string>();
@@ -182,22 +188,30 @@ async function navigateToCrmMenu(page: Page, section: RegExp, href: string): Pro
   await ensureSidebarExpanded(page);
   let nav = page.locator('nav, aside, [role="navigation"]').first();
   if ((page.viewportSize()?.width ?? 1280) <= 640) {
-    const openMobileMenu = page.getByRole('button', {
-      name: /打开导航菜单|Open navigation menu/i,
-    });
-    const closeMobileMenu = page.getByRole('button', {
-      name: /关闭导航菜单|Close navigation menu/i,
-    });
+    const header = page.locator('header[data-hydrated]');
+    await expect(
+      header,
+      'mobile header must be hydrated before opening navigation',
+    ).toHaveAttribute('data-hydrated', 'true', { timeout: 10_000 });
+    const mobileMenuToggle = page.getByTestId('header-sidebar-toggle');
     const mobileSidebar = page.getByTestId('sidebar');
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      if (await closeMobileMenu.isVisible().catch(() => false)) break;
-      await expect(openMobileMenu).toBeVisible({ timeout: 8_000 });
-      await openMobileMenu.click();
-      await page.waitForTimeout(250);
+    if ((await mobileMenuToggle.getAttribute('aria-expanded')) !== 'true') {
+      await expect(mobileMenuToggle).toBeVisible({ timeout: 8_000 });
+      await mobileMenuToggle.click();
     }
-    await expect(closeMobileMenu, 'mobile navigation drawer must be open').toBeVisible({
+    await expect(
+      mobileMenuToggle,
+      'mobile navigation toggle must report the open state',
+    ).toHaveAttribute('aria-expanded', 'true', { timeout: 5_000 });
+    await expect(
+      page.getByTestId('sidebar-mobile-backdrop'),
+      'mobile navigation backdrop',
+    ).toBeVisible({
       timeout: 5_000,
     });
+    await expect(mobileSidebar, 'mobile navigation drawer must be in the viewport').toHaveClass(
+      /translate-x-0/,
+    );
     nav = mobileSidebar;
   }
   const leaf = nav.locator(`a[href="${href}"]`).first();
@@ -355,6 +369,27 @@ async function captureNamedQueryResponses(
   }
 }
 
+async function searchCustomerPoolQueue(page: Page, keyword: string): Promise<void> {
+  const search = page.getByRole('textbox', {
+    name: /搜索池内客户|Search pooled customers/,
+  });
+  await search.fill(keyword);
+  await expect(search, 'customer-pool search keyword').toHaveValue(keyword);
+  await search.blur();
+  const responsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      response.request().method() === 'GET' &&
+      url.pathname === '/api/datasource/list' &&
+      url.searchParams.get('datasourceId') === 'nq:crm_customer_pool_ops_queue'
+    );
+  });
+  await page.getByTestId('filter-btn-search').click();
+  const response = await responsePromise;
+  const body = await response.json().catch(() => ({}));
+  expect(response.ok() && String(body?.code) === '0', 'customer-pool search response').toBe(true);
+}
+
 function queryRows(body: unknown): Record<string, unknown>[] {
   const value = body as Record<string, unknown> | undefined;
   const candidates = [value?.records, value?.rows, value?.content, value?.data, body];
@@ -437,7 +472,14 @@ async function fillFormField(page: Page, fieldCode: string, value: string): Prom
     )
     .first();
   await expect(control, `${fieldCode} form control`).toBeVisible({ timeout: 10_000 });
-  await control.fill(value);
+  if ((await control.getAttribute('inputmode')) === 'decimal') {
+    await control.selectText();
+    await control.pressSequentially(value);
+  } else {
+    await control.fill(value);
+  }
+  await expect(control, `${fieldCode} form value`).toHaveValue(value);
+  await control.blur();
 }
 
 async function pickSmartSelect(
@@ -868,6 +910,94 @@ async function expectNoPoolShareResidue(tenantId: string, memberPid: string): Pr
   }
 }
 
+async function setCustomerPoolLeaseFixture(
+  itemPid: string,
+  status: 'assigned' | 'recycling' | 'recycling_retry',
+  recycleToken: string | null,
+  stale = false,
+): Promise<void> {
+  const pool = new Pool(PG_CONN);
+  try {
+    const result = await pool.query(
+      `UPDATE mt_crm_customer_pool_item_common
+       SET crm_cpi_status = $2,
+           crm_cpi_recycle_token = $3,
+           updated_at = CASE WHEN $4 THEN now() - interval '16 minutes' ELSE now() END
+       WHERE pid = $1
+       RETURNING pid`,
+      [itemPid, status, recycleToken, stale],
+    );
+    expect(result.rowCount, `customer-pool lease fixture ${itemPid}`).toBe(1);
+  } finally {
+    await pool.end();
+  }
+}
+
+async function customerPoolLeaseFact(
+  itemPid: string,
+): Promise<{ status: string; recycleToken: string | null }> {
+  const pool = new Pool(PG_CONN);
+  try {
+    const result = await pool.query<{ status: string; recycle_token: string | null }>(
+      `SELECT crm_cpi_status AS status, crm_cpi_recycle_token AS recycle_token
+       FROM mt_crm_customer_pool_item_common
+       WHERE pid = $1`,
+      [itemPid],
+    );
+    expect(result.rowCount, `customer-pool lease fact ${itemPid}`).toBe(1);
+    return {
+      status: result.rows[0].status,
+      recycleToken: result.rows[0].recycle_token,
+    };
+  } finally {
+    await pool.end();
+  }
+}
+
+async function customerPoolOwnershipFact(
+  itemPid: string,
+  customerPid: string,
+): Promise<{ status: string; ownerPid: string; historyCount: number }> {
+  const pool = new Pool(PG_CONN);
+  try {
+    const item = await pool.query<{ status: string; owner_pid: string }>(
+      `SELECT crm_cpi_status AS status, crm_cpi_claimed_by AS owner_pid
+       FROM mt_crm_customer_pool_item_common
+       WHERE pid = $1`,
+      [itemPid],
+    );
+    expect(item.rowCount, `customer-pool ownership fact ${itemPid}`).toBe(1);
+    const history = await pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM mt_crm_customer_owner_history_common
+       WHERE crm_coh_customer_id = $1`,
+      [customerPid],
+    );
+    return {
+      status: item.rows[0].status,
+      ownerPid: item.rows[0].owner_pid,
+      historyCount: Number(history.rows[0]?.count ?? 0),
+    };
+  } finally {
+    await pool.end();
+  }
+}
+
+async function recycleHistoryCount(operationKey: string): Promise<number> {
+  const pool = new Pool(PG_CONN);
+  try {
+    const result = await pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM mt_crm_customer_owner_history_common
+       WHERE crm_coh_operation_key = $1`,
+      [operationKey],
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  } finally {
+    await pool.end();
+  }
+}
+
 async function createCustomerAndMove(
   page: Page,
   poolPid: string,
@@ -1010,6 +1140,29 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     const deletableA = await createCustomerAndMove(page, poolPid, deleteA, 9);
     const deletableB = await createCustomerAndMove(page, poolPid, deleteB, 10);
     const guardedDelete = await createCustomerAndMove(page, poolPid, guardedDeleteA, 11);
+    const cooldownPool = await command(
+      page,
+      'crm:create_customer_pool',
+      {
+        crm_cp_name: `华东高潜客户公海 ${stamp.slice(-4)}`,
+        crm_cp_member_user_ids: JSON.stringify([sales.pid]),
+        crm_cp_admin_user_ids: JSON.stringify([adminPid, manager.pid]),
+        crm_cp_daily_pick_limit: 10,
+        crm_cp_new_cooldown_days: 2,
+        crm_cp_previous_owner_cooldown_days: 7,
+        crm_cp_auto_recycle: true,
+        crm_cp_recycle_after_days: 30,
+        crm_cp_recycle_basis: 'last_activity',
+        crm_cp_recycle_match_mode: 'all',
+        crm_cp_description: '新入池客户先完成两天冷却，再进入销售领取队列',
+      },
+      undefined,
+      'create',
+    );
+    const cooldownPoolPid = recordPid(cooldownPool);
+    expect(cooldownPoolPid, 'created visual cooldown pool pid').toBeTruthy();
+    const cooldownCustomerName = `云衡工业自动化 ${stamp.slice(-4)}`;
+    await createCustomerAndMove(page, cooldownPoolPid, cooldownCustomerName, 12);
     await command(
       page,
       'crm:create_contact',
@@ -1084,18 +1237,18 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
         name: /搜索池内客户|Search pooled customers/,
       });
       await expect(searchBox).toBeVisible();
-      const compactMetricCards = salesPage.locator('[data-testid^="metric-strip-item-"].h-20');
-      await expect(compactMetricCards).toHaveCount(5);
+      const statusFilterChips = salesPage.locator('[data-testid^="metric-strip-item-"]');
+      await expect(statusFilterChips).toHaveCount(5);
       await expect(
-        compactMetricCards.locator('[data-testid^="metric-strip-subtext-"]'),
-        'compact metric cards must not render clipped auxiliary copy',
+        statusFilterChips.locator('[data-testid^="metric-strip-subtext-"]'),
+        'status filter chips must not render auxiliary copy',
       ).toHaveCount(0);
-      const compactMetricHeights = await compactMetricCards.evaluateAll((cards) =>
-        cards.map((card) => card.getBoundingClientRect().height),
+      const statusFilterChipHeights = await statusFilterChips.evaluateAll((chips) =>
+        chips.map((chip) => chip.getBoundingClientRect().height),
       );
       expect(
-        compactMetricHeights.every((height) => height <= 82),
-        `compact metric cards must stay within the 80px visual contract: ${compactMetricHeights.join(',')}`,
+        statusFilterChipHeights.every((height) => height <= 40),
+        `status filter chips must stay within the 40px visual contract: ${statusFilterChipHeights.join(',')}`,
       ).toBe(true);
       const compactFilter = salesPage.locator('.filters-block[data-density="compact"]');
       await expect(compactFilter).toBeVisible();
@@ -1103,7 +1256,7 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
         await compactFilter.evaluate((element) => element.getBoundingClientRect().height),
         'compact search and actions should not consume a second toolbar row',
       ).toBeLessThanOrEqual(90);
-      await expect(salesPage.locator('.table-block').first()).toHaveCSS('max-height', '360px');
+      await expect(salesPage.locator('.table-block').first()).toHaveCSS('max-height', '280px');
       await attachScreenshot(salesPage, testInfo, 'sales-ready-operations-workbench');
 
       await searchBox.fill(singleB);
@@ -1113,7 +1266,37 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
       await salesPage.getByTestId('filter-btn-reset').click();
       await expect(companyCell(salesPage, singleA)).toBeVisible();
 
-      const detailRow = salesPage.getByRole('row', { name: new RegExp(singleB) });
+      await searchBox.fill(cooldownCustomerName);
+      await salesPage.getByTestId('filter-btn-search').click();
+      const cooldownRow = salesPage.getByRole('row', {
+        name: new RegExp(cooldownCustomerName),
+      });
+      await expect(cooldownRow).toContainText(/冷却中|Cooling Down/);
+      await cooldownRow.click();
+      const cooldownBanner = salesPage.getByTestId('status-banner-crm_customer_pool_status');
+      await expect(cooldownBanner).toContainText(/客户仍在领取冷却期|still cooling down/i);
+      await expect(
+        cooldownBanner
+          .locator('dt', { hasText: /下次可领取|Next Eligible At/ })
+          .locator('..')
+          .locator('dd'),
+      ).not.toHaveText('');
+      await expect(
+        salesPage.getByRole('button', { name: /领取此客户|Claim Customer/, exact: true }),
+      ).toHaveCount(0);
+      await attachScreenshot(salesPage, testInfo, 'sales-cooldown-eligibility');
+      await salesPage.getByTestId('filter-btn-reset').click();
+      await expect(companyCell(salesPage, singleA)).toBeVisible();
+
+      let detailRow = salesPage.getByRole('row', { name: new RegExp(singleB) });
+      await clickRowAction(salesPage, detailRow, 'open_customer', /档案|Record/);
+      await expect(salesPage).toHaveURL(new RegExp(`/p/crm_account_common/view/${b.customerPid}$`));
+      await expect(salesPage.getByText(singleB, { exact: true }).first()).toBeVisible({
+        timeout: 15_000,
+      });
+      await salesPage.goBack({ waitUntil: 'domcontentloaded' });
+      await expect(companyCell(salesPage, singleB)).toBeVisible({ timeout: 15_000 });
+      detailRow = salesPage.getByRole('row', { name: new RegExp(singleB) });
       await clickRowAction(salesPage, detailRow, 'view_pool_evidence', /池内详情|Pool Detail/);
       await expect(salesPage).toHaveURL(/crm_customer_pool_item.*view/);
       await expect(salesPage.getByText(/客户快照|Customer Snapshot/)).toBeVisible();
@@ -1842,6 +2025,14 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     await expect(page.getByRole('cell', { name: poolName, exact: true })).toBeVisible({
       timeout: 15_000,
     });
+    await expect(page.getByRole('columnheader', { name: /自动回收|Auto Recycle/ })).toBeVisible();
+    await expect(page.getByRole('row', { name: new RegExp(poolName) })).toContainText(
+      /已开启|Enabled/,
+    );
+    await expect(page.getByRole('columnheader', { name: /新客冷却|New Cooldown/ })).toHaveCount(0);
+    await expect(
+      page.getByRole('columnheader', { name: /前负责人冷却|Prior-owner Cooldown/ }),
+    ).toHaveCount(0);
     await attachScreenshot(page, testInfo, 'customer-pool-governance-list');
 
     // D7/D8: open the persisted detail and edit the same record from its UI action.
@@ -2237,6 +2428,172 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     ).toHaveCount(0);
   });
 
+  test(RECYCLE_VISUAL_STATE_SCENARIO, async ({ page, browser, baseURL }, testInfo) => {
+    await uiLogin(page, ADMIN_EMAIL);
+    const stamp = `${Date.now()}`;
+    const meResponse = await page.request.get('/api/auth/me');
+    const meBody = await meResponse.json();
+    const adminPid = String(meBody?.data?.user?.pid ?? '');
+    expect(adminPid, 'admin pid from /api/auth/me').toBeTruthy();
+    const sales = await provisionUser(page, stamp, 'sales', ['crm_sales']);
+
+    const pool = await command(
+      page,
+      'crm:create_customer_pool',
+      {
+        crm_cp_name: `回收状态黄金公海 ${stamp.slice(-4)}`,
+        crm_cp_member_user_ids: JSON.stringify([sales.pid]),
+        crm_cp_admin_user_ids: JSON.stringify([adminPid]),
+        crm_cp_daily_pick_limit: 10,
+        crm_cp_new_cooldown_days: 0,
+        crm_cp_previous_owner_cooldown_days: 0,
+        crm_cp_auto_recycle: true,
+        crm_cp_recycle_after_days: 30,
+        crm_cp_recycle_basis: 'claimed_at',
+        crm_cp_recycle_match_mode: 'all',
+        crm_cp_description: 'PAR-06 empty and recycle-state golden fixture',
+      },
+      undefined,
+      'create',
+    );
+    const poolPid = recordPid(pool);
+    expect(poolPid, 'recycle visual pool pid').toBeTruthy();
+
+    const salesSession = await openAs(browser, baseURL ?? 'http://localhost:5251', sales.email);
+    try {
+      await navigateToCrmMenu(
+        salesSession.page,
+        /业务档案|Business Records/i,
+        '/p/c/crm_customer_pool_item_list',
+      );
+      await expect(
+        salesSession.page.getByText(/当前公海队列为空|public-pool queue is empty/i),
+      ).toBeVisible({ timeout: 20_000 });
+      await expect(salesSession.page.getByTestId('metric-strip-item-processing')).toContainText(
+        '0',
+      );
+      await attachScreenshot(salesSession.page, testInfo, 'sales-customer-pool-empty-state');
+
+      const processingName = `回收处理中客户 ${stamp.slice(-4)}`;
+      const retryName = `回收恢复客户 ${stamp.slice(-4)}`;
+      const processing = await createCustomerAndMove(page, poolPid, processingName, 81);
+      const retry = await createCustomerAndMove(page, poolPid, retryName, 82);
+      await command(
+        page,
+        'crm:assign_pool_customer',
+        { crm_cpi_claimed_by: sales.pid },
+        processing.itemPid,
+        'update',
+      );
+      await command(
+        page,
+        'crm:assign_pool_customer',
+        { crm_cpi_claimed_by: sales.pid },
+        retry.itemPid,
+        'update',
+      );
+
+      const processingOperationKey = `visual-processing-${stamp}`;
+      const retryOperationKey = `visual-retry-${stamp}`;
+      await setCustomerPoolLeaseFixture(
+        processing.itemPid,
+        'recycling',
+        `${processingOperationKey}:lease`,
+      );
+      await setCustomerPoolLeaseFixture(
+        retry.itemPid,
+        'recycling_retry',
+        `${retryOperationKey}:old-lease`,
+        true,
+      );
+      await salesSession.page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(salesSession.page.getByTestId('metric-strip-item-processing')).toContainText(
+        '2',
+        { timeout: 20_000 },
+      );
+
+      await searchCustomerPoolQueue(salesSession.page, processingName);
+      let stateRow = salesSession.page.getByRole('row', { name: new RegExp(processingName) });
+      await expect(stateRow).toContainText(/回收处理中|Recycling/, { timeout: 20_000 });
+      await expect(salesSession.page.getByRole('row', { name: new RegExp(retryName) })).toHaveCount(
+        0,
+      );
+      await expect(stateRow.getByRole('button', { name: /领取|Claim/ })).toHaveCount(0);
+      await expect(stateRow.getByRole('button', { name: /分配|Assign/ })).toHaveCount(0);
+      await expect(
+        salesSession.page.getByText(/系统正在自动回收该客户|system is recycling this customer/i),
+      ).toBeVisible();
+      await attachScreenshot(salesSession.page, testInfo, 'sales-customer-pool-recycling-state');
+
+      await searchCustomerPoolQueue(salesSession.page, retryName);
+      stateRow = salesSession.page.getByRole('row', { name: new RegExp(retryName) });
+      await expect(stateRow).toContainText(/回收恢复中|Recovering Recycle/, { timeout: 20_000 });
+      await expect(
+        salesSession.page.getByRole('row', { name: new RegExp(processingName) }),
+      ).toHaveCount(0);
+      await expect(
+        salesSession.page.getByText(
+          /系统正在恢复未完成的回收任务|system is recovering an incomplete recycle/i,
+        ),
+      ).toBeVisible();
+      await attachScreenshot(
+        salesSession.page,
+        testInfo,
+        'sales-customer-pool-recycling-retry-state',
+      );
+
+      // The first fixture only proves the fresh-lease visual state. Restore it to an owned state
+      // before running recovery so the concurrent command has exactly one stale lease to recover.
+      await setCustomerPoolLeaseFixture(processing.itemPid, 'assigned', null);
+      const recycleResponses = await Promise.all(
+        [0, 1].map(() =>
+          page.request.post('/api/meta/commands/execute/crm:run_customer_pool_recycle', {
+            data: { payload: {} },
+            timeout: 20_000,
+          }),
+        ),
+      );
+      const recycleBodies = await Promise.all(
+        recycleResponses.map((response) => response.json().catch(() => ({}))),
+      );
+      recycleBodies.forEach((body, index) => {
+        expect(String(body?.code), `concurrent recycle response ${index + 1}`).toBe('0');
+      });
+      const results = recycleBodies.map((body) => body?.data?.data ?? body?.data ?? {});
+      expect(
+        results.reduce((sum, result) => sum + Number(result?.recovered ?? 0), 0),
+        'the tenant-wide recycle run must include the target stale lease',
+      ).toBeGreaterThanOrEqual(1);
+      await attachJson(testInfo, 'customer-pool-recycle-recovery-race.json', results);
+
+      const recoveredFact = await customerPoolLeaseFact(retry.itemPid);
+      expect(recoveredFact).toEqual({ status: 'available', recycleToken: null });
+      expect(await recycleHistoryCount(retryOperationKey)).toBe(1);
+      expect(await customerPoolLeaseFact(processing.itemPid)).toEqual({
+        status: 'assigned',
+        recycleToken: null,
+      });
+
+      await salesSession.page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(salesSession.page.getByTestId('metric-strip-item-processing')).toContainText(
+        '0',
+        { timeout: 20_000 },
+      );
+      await searchCustomerPoolQueue(salesSession.page, retryName);
+      const recoveredRow = salesSession.page.getByRole('row', { name: new RegExp(retryName) });
+      await expect(recoveredRow).toContainText(/现在可领|Ready/, { timeout: 20_000 });
+      await expect(
+        salesSession.page.getByRole('row', { name: new RegExp(processingName) }),
+      ).toHaveCount(0);
+      await expect(
+        salesSession.page.getByText(/该客户现在可以领取或分配|ready to claim or assign/i),
+      ).toBeVisible();
+      await attachScreenshot(salesSession.page, testInfo, 'sales-customer-pool-recovered-ready');
+    } finally {
+      await salesSession.context.close();
+    }
+  });
+
   test(IMPORT_MOBILE_SCENARIO, async ({ page, browser, baseURL }, testInfo) => {
     await uiLogin(page, ADMIN_EMAIL);
     const stamp = `${Date.now()}`;
@@ -2514,10 +2871,17 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
       const claimButton = importedCard.getByRole('button', { name: /领取|Claim/ });
       const assignButton = importedCard.getByRole('button', { name: /分配|Assign/ });
       const detailButton = importedCard.getByRole('button', { name: /详情|Details/ });
+      const customerRecordButton = importedCard.getByRole('button', {
+        name: /客户档案|Customer Record/,
+      });
       await expect(claimButton).toBeVisible();
       await expect(
         assignButton,
         'sales must not receive the pool-administrator assignment action',
+      ).toHaveCount(0);
+      await expect(
+        customerRecordButton,
+        'mobile cards keep the action surface focused on claim, assign and pool details',
       ).toHaveCount(0);
       await expect(detailButton).toBeVisible();
       expect(
@@ -2541,9 +2905,11 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
       await expect(mobilePage).toHaveURL(
         new RegExp(`/p/crm_customer_pool_item/view/${importedItemPid}$`),
       );
-      await expect(mobilePage.getByText(validName, { exact: true })).toBeVisible({
-        timeout: 20_000,
-      });
+      await expect(
+        mobilePage
+          .getByTestId('form-field-crm_cpi_account_name')
+          .getByText(validName, { exact: true }),
+      ).toBeVisible({ timeout: 20_000 });
       const tabs = mobilePage.getByRole('tablist');
       await expect(tabs).toBeVisible();
       const tabButtons = tabs.getByRole('tab');
@@ -2785,6 +3151,227 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
       });
     } finally {
       await salesSession.context.close();
+    }
+  });
+
+  test(ASSIGNED_CONFLICT_VISUAL_SCENARIO, async ({ page, browser, baseURL }, testInfo) => {
+    await uiLogin(page, ADMIN_EMAIL);
+    const stamp = `${Date.now()}`;
+    const meResponse = await page.request.get('/api/auth/me');
+    const meBody = await meResponse.json();
+    const adminPid = String(meBody?.data?.user?.pid ?? '');
+    expect(adminPid, 'admin pid from /api/auth/me').toBeTruthy();
+
+    const salesA = await provisionUser(page, `${stamp}-assigned`, 'sales', ['crm_sales']);
+    const salesB = await provisionUser(page, `${stamp}-peer`, 'sales', ['crm_sales']);
+    const pool = await command(
+      page,
+      'crm:create_customer_pool',
+      {
+        crm_cp_name: `Assigned Conflict Matrix ${stamp}`,
+        crm_cp_member_user_ids: JSON.stringify([salesA.pid, salesB.pid]),
+        crm_cp_admin_user_ids: JSON.stringify([adminPid]),
+        crm_cp_daily_pick_limit: 10,
+        crm_cp_new_cooldown_days: 0,
+        crm_cp_previous_owner_cooldown_days: 0,
+        crm_cp_auto_recycle: false,
+        crm_cp_recycle_after_days: 30,
+        crm_cp_recycle_basis: 'last_activity',
+        crm_cp_recycle_match_mode: 'all',
+        crm_cp_description: 'PAR-06 assigned and conflict visual denominator',
+      },
+      undefined,
+      'create',
+    );
+    const poolPid = recordPid(pool);
+    expect(poolPid, 'assigned/conflict pool pid').toBeTruthy();
+    for (const sales of [salesA, salesB]) {
+      await command(
+        page,
+        'crm:create_customer_capacity',
+        {
+          crm_ccap_user_id: sales.pid,
+          crm_ccap_capacity: 10,
+          crm_ccap_status: 'active',
+          crm_ccap_remark: 'PAR-06 assigned/conflict role matrix',
+        },
+        undefined,
+        'create',
+      );
+    }
+
+    const assignedName = `Assigned-Matrix-${stamp}`;
+    const conflictName = `Conflict-Matrix-${stamp}`;
+    const assigned = await createCustomerAndMove(page, poolPid, assignedName, 41);
+    const conflict = await createCustomerAndMove(page, poolPid, conflictName, 42);
+    await command(
+      page,
+      'crm:assign_pool_customer',
+      { assigneeId: salesA.pid },
+      assigned.itemPid,
+      'update',
+    );
+
+    await navigateToCrmMenu(page, /业务档案|Business Records/i, '/p/c/crm_customer_pool_item_list');
+    const adminSearch = page.getByRole('textbox', {
+      name: /搜索池内客户|Search pooled customers/,
+    });
+    await adminSearch.fill(assignedName);
+    await page.getByTestId('filter-btn-search').click();
+    const adminAssignedRow = page.getByRole('row', { name: new RegExp(assignedName) });
+    await expect(adminAssignedRow).toContainText(/已分配|Assigned/);
+    await expect(adminAssignedRow).toContainText(
+      new RegExp(`Customer Pool Sales ${stamp}-assigned`, 'i'),
+    );
+    await adminAssignedRow.click();
+    await expect(page.getByText(/客户已由管理员分配|assigned by an administrator/)).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /领取此客户|Claim Customer/, exact: true }),
+    ).toHaveCount(0);
+    await attachScreenshot(page, testInfo, 'assigned-admin-owner-workbench');
+
+    const salesASession = await openAs(browser, baseURL ?? 'http://localhost:5251', salesA.email);
+    const salesBSession = await openAs(browser, baseURL ?? 'http://localhost:5251', salesB.email);
+    try {
+      for (const [session, screenshotName] of [
+        [salesASession, 'assigned-sales-owner-workbench'],
+        [salesBSession, 'assigned-sales-peer-workbench'],
+      ] as const) {
+        const rolePage = session.page;
+        await navigateToCrmMenu(
+          rolePage,
+          /业务档案|Business Records/i,
+          '/p/c/crm_customer_pool_item_list',
+        );
+        const search = rolePage.getByRole('textbox', {
+          name: /搜索池内客户|Search pooled customers/,
+        });
+        await search.fill(assignedName);
+        await rolePage.getByTestId('filter-btn-search').click();
+        const row = rolePage.getByRole('row', { name: new RegExp(assignedName) });
+        await expect(row).toContainText(/已分配|Assigned/);
+        await row.click();
+        await expect(
+          rolePage.getByText(/客户已由管理员分配|assigned by an administrator/),
+        ).toBeVisible();
+        await expect(
+          rolePage.getByRole('button', { name: /领取此客户|Claim Customer/, exact: true }),
+        ).toHaveCount(0);
+        await expect(
+          rolePage.getByRole('button', { name: /分配给成员|Assign to Member/, exact: true }),
+        ).toHaveCount(0);
+        await attachScreenshot(rolePage, testInfo, screenshotName);
+      }
+
+      for (const session of [salesASession, salesBSession]) {
+        const rolePage = session.page;
+        const search = rolePage.getByRole('textbox', {
+          name: /搜索池内客户|Search pooled customers/,
+        });
+        await search.fill(conflictName);
+        await rolePage.getByTestId('filter-btn-search').click();
+        const row = rolePage.getByRole('row', { name: new RegExp(conflictName) });
+        await expect(row).toContainText(/现在可领|Ready Now|待领取|Available/);
+        await row.click();
+        await rolePage
+          .getByRole('button', { name: /领取此客户|Claim Customer/, exact: true })
+          .click();
+        await expect(rolePage.getByRole('dialog')).toBeVisible();
+      }
+
+      const responsePromises = [salesASession, salesBSession].map((session) =>
+        session.page.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            response.url().includes('/api/meta/commands/execute/crm:claim_pool_customer'),
+          { timeout: 30_000 },
+        ),
+      );
+      await Promise.all(
+        [salesASession, salesBSession].map((session) =>
+          session.page
+            .getByRole('dialog')
+            .getByRole('button', { name: /确认|Confirm|继续|Continue/i })
+            .click(),
+        ),
+      );
+      const responses = await Promise.all(responsePromises);
+      const bodies = await Promise.all(
+        responses.map((response) => response.json().catch(() => ({}))),
+      );
+      const winnerIndex = bodies.findIndex((body) => String(body?.code) === '0');
+      const loserIndexes = bodies
+        .map((body, index) => ({ body, index }))
+        .filter(({ body }) => String(body?.code) !== '0');
+      expect(winnerIndex, 'one UI claim must win').toBeGreaterThanOrEqual(0);
+      expect(loserIndexes, 'one UI claim must lose with a conflict').toHaveLength(1);
+      expect(JSON.stringify(loserIndexes[0].body)).toMatch(/already claimed or assigned/i);
+
+      const winnerPage = [salesASession.page, salesBSession.page][winnerIndex];
+      const loserPage = [salesASession.page, salesBSession.page][loserIndexes[0].index];
+      await expect(winnerPage.getByText(/领取成功|Customer claimed/)).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(
+        loserPage.getByText(
+          /^(?:领取失败，队列已刷新；请查看最新状态，或检查冷却、上限、库容与并发归属|Claim failed and the queue was refreshed; review the latest state, cooldown, quota, capacity, or concurrent ownership)$/i,
+        ),
+      ).toBeVisible({ timeout: 15_000 });
+      await expect(loserPage.getByText(/客户已由成员领取|claimed by a member/)).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(
+        loserPage.getByRole('button', { name: /领取此客户|Claim Customer/, exact: true }),
+      ).toHaveCount(0);
+      await attachScreenshot(loserPage, testInfo, 'conflict-sales-loser-feedback');
+
+      await winnerPage.reload({ waitUntil: 'domcontentloaded' });
+      const winnerSearch = winnerPage.getByRole('textbox', {
+        name: /搜索池内客户|Search pooled customers/,
+      });
+      await winnerPage.getByTestId('filter-btn-reset').click();
+      await winnerSearch.fill(conflictName);
+      const winnerSearchResponse = winnerPage.waitForResponse(
+        (response) => {
+          if (!response.url().includes('/api/datasource/list')) return false;
+          const url = new URL(response.url());
+          return (
+            url.searchParams.get('datasourceId') === 'nq:crm_customer_pool_ops_queue' &&
+            url.searchParams.get('customerKeyword') === conflictName
+          );
+        },
+        { timeout: 30_000 },
+      );
+      await winnerPage.getByTestId('filter-btn-search').click();
+      await winnerSearchResponse;
+      await expect(companyCell(winnerPage, assignedName)).toHaveCount(0);
+      const winnerRow = winnerPage.getByRole('row', { name: new RegExp(conflictName) });
+      await expect(winnerRow).toContainText(/已领取|Claimed/);
+      await winnerRow.click();
+      await expect(winnerPage.getByText(/客户已由成员领取|claimed by a member/)).toBeVisible();
+      await attachScreenshot(winnerPage, testInfo, 'conflict-sales-winner-workbench');
+
+      const fact = await customerPoolOwnershipFact(conflict.itemPid, conflict.customerPid);
+      expect(fact.status).toBe('claimed');
+      expect([salesA.pid, salesB.pid]).toContain(fact.ownerPid);
+      expect(fact.historyCount).toBe(2);
+      await attachJson(testInfo, 'assigned-conflict-role-matrix.json', {
+        assigned: {
+          itemPid: assigned.itemPid,
+          ownerPid: salesA.pid,
+          roles: ['admin', 'owner', 'peer'],
+        },
+        conflict: {
+          itemPid: conflict.itemPid,
+          winnerPid: fact.ownerPid,
+          winnerIndex,
+          loserIndex: loserIndexes[0].index,
+          historyCount: fact.historyCount,
+        },
+      });
+    } finally {
+      await salesASession.context.close();
+      await salesBSession.context.close();
     }
   });
 });

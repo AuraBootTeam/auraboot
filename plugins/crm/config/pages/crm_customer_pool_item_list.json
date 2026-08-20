@@ -33,9 +33,8 @@
       "id": "crm_customer_pool_metrics",
       "blockType": "metric-strip",
       "dataSource": "poolStats",
-      "variant": "cards",
+      "variant": "chips",
       "density": "compact",
-      "columns": 5,
       "metrics": [
         {
           "key": "available",
@@ -114,18 +113,10 @@
       "align": "end",
       "actions": [
         {
-          "code": "open_customer",
-          "permissionCode": "crm.account.read",
-          "label": { "zh-CN": "打开客户档案", "en": "Open Customer Record" },
-          "variant": "secondary",
-          "visibleWhen": "state.selectedPoolItem != null",
-          "onClick": { "action": "navigate", "args": { "to": "/p/crm_account_common/view/${state.selectedPoolItem.crm_cpi_account_id}" } }
-        },
-        {
           "code": "batch_operations",
           "permissionCode": "crm.customer_pool.pick",
           "label": { "zh-CN": "批量处理", "en": "Batch Operations" },
-          "variant": "primary",
+          "variant": "secondary",
           "onClick": { "action": "navigate", "args": { "to": "/p/c/crm_customer_pool_batch_list" } }
         },
         {
@@ -143,19 +134,14 @@
       "title": { "zh-CN": "领取与分配队列", "en": "Claim and Assignment Queue" },
       "dataSource": "poolQueue",
       "density": "compact",
-      "maxHeight": 360,
+      "maxHeight": 280,
       "selection": { "mode": "single", "bind": "selectedPoolItem", "defaultFirst": true },
       "mobileCard": {
         "enabled": true,
         "titleField": "crm_cpi_account_name",
         "eyebrowField": "pool_name",
         "statusField": "operational_state",
-        "fields": [
-          "crm_cpi_rating",
-          "crm_cpi_industry",
-          "next_eligible_at",
-          "owner_name"
-        ],
+        "fields": ["next_eligible_at", "owner_name"],
         "actionCodes": ["claim", "assign", "view_pool_evidence"]
       },
       "columns": [
@@ -169,6 +155,12 @@
         { "field": "owner_name", "width": 115, "label": { "zh-CN": "当前获配人", "en": "Current Owner" } }
       ],
       "rowActions": [
+        {
+          "code": "open_customer",
+          "label": { "zh-CN": "档案", "en": "Record" },
+          "permissionCode": "crm.account.read",
+          "action": { "type": "navigate", "to": "/p/crm_account_common/view/{crm_cpi_account_id}" }
+        },
         {
           "code": "claim",
           "label": { "zh-CN": "领取", "en": "Claim" },
@@ -283,9 +275,10 @@
               "operationType": "update",
               "targetRecordPid": "${state.selectedPoolItem.pid}",
               "reload": ["poolStats", "poolQueue"],
+              "reloadOnError": ["poolStats", "poolQueue"],
               "feedback": {
                 "successMessage": { "zh-CN": "领取成功，责任和数据权限已更新", "en": "Customer claimed; ownership and access updated" },
-                "errorMessage": { "zh-CN": "领取失败，请按提示检查冷却、上限、库容或并发状态", "en": "Claim failed; check cooldown, quota, capacity, or concurrent ownership" }
+                "errorMessage": { "zh-CN": "领取失败，队列已刷新；请查看最新状态，或检查冷却、上限、库容与并发归属", "en": "Claim failed and the queue was refreshed; review the latest state, cooldown, quota, capacity, or concurrent ownership" }
               }
             }
           }
@@ -317,6 +310,7 @@
                 }
               ],
               "reload": ["poolStats", "poolQueue"],
+              "reloadOnError": ["poolStats", "poolQueue"],
               "feedback": {
                 "successMessage": { "zh-CN": "分配成功，责任和数据权限已更新", "en": "Customer assigned; ownership and access updated" },
                 "errorMessage": { "zh-CN": "分配失败，请检查管理员资格、人员库容或并发状态", "en": "Assignment failed; check admin role, capacity, or concurrent ownership" }

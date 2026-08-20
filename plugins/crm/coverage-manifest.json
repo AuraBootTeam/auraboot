@@ -28,7 +28,7 @@
       "menus": 55,
       "pages": 125,
       "page-blocks": 402,
-      "page-fields": 1708,
+      "page-fields": 1707,
       "ui-actions": 600,
       "commands": 238,
       "permissions": 114,
@@ -37,7 +37,7 @@
     },
     "productVerdicts": {
       "pass": 641,
-      "untested": 2742
+      "untested": 2741
     },
     "fullProductNonGoals": [
       "data migration"
@@ -2398,7 +2398,7 @@
     {
       "id": "CRM-CUSTOMER-POOL",
       "filePrefix": "crm-customer-pool-parity",
-      "expectedScenarios": 4,
+      "expectedScenarios": 6,
       "minimumScreenshots": 15,
       "expectedCoverage": {
         "pages": [
@@ -2572,6 +2572,7 @@
           "crm_customer_pool_strategy:crm_customer_policy_pool_table:member_count",
           "crm_customer_pool_strategy:crm_customer_policy_pool_table:admin_count",
           "crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_daily_pick_limit",
+          "crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_auto_recycle",
           "crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_new_cooldown_days",
           "crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_previous_owner_cooldown_days",
           "crm_customer_pool_strategy:crm_customer_policy_pool_table:active_rule_count",
@@ -2646,6 +2647,7 @@
           "crm_customer_pool_item_list:crm_customer_pool_actions:assign",
           "crm_customer_pool_item_list:crm_customer_pool_actions:claim",
           "crm_customer_pool_item_list:crm_customer_pool_header_actions:batch_operations",
+          "crm_customer_pool_item_list:crm_customer_pool_queue:open_customer",
           "crm_customer_pool_item_list:crm_customer_pool_queue:assign",
           "crm_customer_pool_item_list:crm_customer_pool_queue:claim",
           "crm_customer_pool_item_list:crm_customer_pool_queue:view_pool_evidence",
@@ -18874,7 +18876,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[3].rowActions[1].action.inputFields[0].field"
+          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[3].rowActions[2].action.inputFields[0].field"
         },
         {
           "id": "field:crm_customer_pool_item_list:crm_customer_pool_status:crm_cpi_account_code:10",
@@ -19980,8 +19982,8 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[0].blocks[0].columns[4].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_new_cooldown_days:6",
-          "action": "Verify field crm_cp_new_cooldown_days in crm_customer_policy_pool_table on crm_customer_pool_strategy",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_auto_recycle:6",
+          "action": "Verify field crm_cp_auto_recycle in crm_customer_policy_pool_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
           ],
@@ -19995,8 +19997,8 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[0].blocks[0].columns[5].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_previous_owner_cooldown_days:7",
-          "action": "Verify field crm_cp_previous_owner_cooldown_days in crm_customer_policy_pool_table on crm_customer_pool_strategy",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:active_rule_count:7",
+          "action": "Verify field active_rule_count in crm_customer_policy_pool_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
           ],
@@ -20010,22 +20012,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[0].blocks[0].columns[6].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:active_rule_count:8",
-          "action": "Verify field active_rule_count in crm_customer_policy_pool_table on crm_customer_pool_strategy",
-          "evidence": [
-            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
-          ],
-          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
-          "verdict": "pass",
-          "verdict_by": "spec-assert",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "authority": "blocking-release",
-          "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[0].blocks[0].columns[7].field"
-        },
-        {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_name:9",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_name:8",
           "action": "Verify field crm_cp_name in crm_customer_policy_pool_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20040,7 +20027,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[0].blocks[0].rowActions[2].action.inputFields[0].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_daily_pick_limit:10",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_daily_pick_limit:9",
           "action": "Verify field crm_cp_daily_pick_limit in crm_customer_policy_pool_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20055,7 +20042,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[0].blocks[0].rowActions[2].action.inputFields[1].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_new_cooldown_days:11",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_new_cooldown_days:10",
           "action": "Verify field crm_cp_new_cooldown_days in crm_customer_policy_pool_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20070,7 +20057,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[0].blocks[0].rowActions[2].action.inputFields[2].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_previous_owner_cooldown_days:12",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_previous_owner_cooldown_days:11",
           "action": "Verify field crm_cp_previous_owner_cooldown_days in crm_customer_policy_pool_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20085,7 +20072,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[0].blocks[0].rowActions[2].action.inputFields[3].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:importType:13",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:importType:12",
           "action": "Verify field importType in crm_customer_policy_pool_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20100,7 +20087,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[0].blocks[0].rowActions[4].action.inputFields[0].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:importFileId:14",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:importFileId:13",
           "action": "Verify field importFileId in crm_customer_policy_pool_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20115,7 +20102,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[0].blocks[0].rowActions[4].action.inputFields[1].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:importType:15",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:importType:14",
           "action": "Verify field importType in crm_customer_policy_pool_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20130,7 +20117,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[0].blocks[0].rowActions[5].action.inputFields[0].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:importFileId:16",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:importFileId:15",
           "action": "Verify field importFileId in crm_customer_policy_pool_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20145,7 +20132,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[0].blocks[0].rowActions[5].action.inputFields[1].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:skipErrors:17",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_pool_table:skipErrors:16",
           "action": "Verify field skipErrors in crm_customer_policy_pool_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20160,7 +20147,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[0].blocks[0].rowActions[5].action.inputFields[2].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_capacity_table:user_name:18",
+          "id": "field:crm_customer_pool_strategy:crm_customer_capacity_table:user_name:17",
           "action": "Verify field user_name in crm_customer_capacity_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20175,7 +20162,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[1].blocks[1].columns[0].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_capacity_table:crm_ccap_capacity:19",
+          "id": "field:crm_customer_pool_strategy:crm_customer_capacity_table:crm_ccap_capacity:18",
           "action": "Verify field crm_ccap_capacity in crm_customer_capacity_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20190,7 +20177,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[1].blocks[1].columns[1].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_capacity_table:owned_customer_count:20",
+          "id": "field:crm_customer_pool_strategy:crm_customer_capacity_table:owned_customer_count:19",
           "action": "Verify field owned_customer_count in crm_customer_capacity_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20205,7 +20192,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[1].blocks[1].columns[2].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_capacity_table:remaining_capacity:21",
+          "id": "field:crm_customer_pool_strategy:crm_customer_capacity_table:remaining_capacity:20",
           "action": "Verify field remaining_capacity in crm_customer_capacity_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20220,7 +20207,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[1].blocks[1].columns[3].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_capacity_table:crm_ccap_status:22",
+          "id": "field:crm_customer_pool_strategy:crm_customer_capacity_table:crm_ccap_status:21",
           "action": "Verify field crm_ccap_status in crm_customer_capacity_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20235,7 +20222,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[1].blocks[1].columns[4].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_capacity_table:crm_ccap_remark:23",
+          "id": "field:crm_customer_pool_strategy:crm_customer_capacity_table:crm_ccap_remark:22",
           "action": "Verify field crm_ccap_remark in crm_customer_capacity_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20250,7 +20237,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[1].blocks[1].columns[5].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_name:24",
+          "id": "field:crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_name:23",
           "action": "Verify field crm_cprr_name in crm_customer_recycle_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20265,7 +20252,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[2].blocks[1].columns[0].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_recycle_table:pool_name:25",
+          "id": "field:crm_customer_pool_strategy:crm_customer_recycle_table:pool_name:24",
           "action": "Verify field pool_name in crm_customer_recycle_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20280,7 +20267,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[2].blocks[1].columns[1].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_time_source:26",
+          "id": "field:crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_time_source:25",
           "action": "Verify field crm_cprr_time_source in crm_customer_recycle_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20295,7 +20282,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[2].blocks[1].columns[2].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_operator:27",
+          "id": "field:crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_operator:26",
           "action": "Verify field crm_cprr_operator in crm_customer_recycle_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20310,7 +20297,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[2].blocks[1].columns[3].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_days:28",
+          "id": "field:crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_days:27",
           "action": "Verify field crm_cprr_days in crm_customer_recycle_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20325,7 +20312,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[2].blocks[1].columns[4].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_status:29",
+          "id": "field:crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_status:28",
           "action": "Verify field crm_cprr_status in crm_customer_recycle_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20340,7 +20327,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[2].blocks[1].columns[5].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_sort_order:30",
+          "id": "field:crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_sort_order:29",
           "action": "Verify field crm_cprr_sort_order in crm_customer_recycle_table on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20355,7 +20342,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[3].tabs[2].blocks[1].columns[6].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_status:member_count:31",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_status:member_count:30",
           "action": "Verify field member_count in crm_customer_policy_status on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20370,7 +20357,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[4].summaryFields[0].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_status:admin_count:32",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_status:admin_count:31",
           "action": "Verify field admin_count in crm_customer_policy_status on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20385,7 +20372,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[4].summaryFields[1].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_status:crm_cp_daily_pick_limit:33",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_status:crm_cp_daily_pick_limit:32",
           "action": "Verify field crm_cp_daily_pick_limit in crm_customer_policy_status on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20400,7 +20387,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[4].summaryFields[2].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_status:crm_cp_new_cooldown_days:34",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_status:crm_cp_new_cooldown_days:33",
           "action": "Verify field crm_cp_new_cooldown_days in crm_customer_policy_status on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20415,7 +20402,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[4].summaryFields[3].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_status:active_rule_count:35",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_status:active_rule_count:34",
           "action": "Verify field active_rule_count in crm_customer_policy_status on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20430,7 +20417,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[4].summaryFields[4].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_name:36",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_name:35",
           "action": "Verify field crm_cp_name in crm_customer_policy_evidence on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20445,7 +20432,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[5].sections[0].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_description:37",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_description:36",
           "action": "Verify field crm_cp_description in crm_customer_policy_evidence on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20460,7 +20447,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[5].sections[1].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_daily_pick_limit:38",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_daily_pick_limit:37",
           "action": "Verify field crm_cp_daily_pick_limit in crm_customer_policy_evidence on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20475,7 +20462,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[5].sections[2].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_new_cooldown_days:39",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_new_cooldown_days:38",
           "action": "Verify field crm_cp_new_cooldown_days in crm_customer_policy_evidence on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20490,7 +20477,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[5].sections[3].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_previous_owner_cooldown_days:40",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_previous_owner_cooldown_days:39",
           "action": "Verify field crm_cp_previous_owner_cooldown_days in crm_customer_policy_evidence on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20505,7 +20492,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[5].sections[4].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_recycle_match_mode:41",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_recycle_match_mode:40",
           "action": "Verify field crm_cp_recycle_match_mode in crm_customer_policy_evidence on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -20520,7 +20507,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_strategy.json#root[5].sections[5].field"
         },
         {
-          "id": "field:crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_recycle_after_days:42",
+          "id": "field:crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_recycle_after_days:41",
           "action": "Verify field crm_cp_recycle_after_days in crm_customer_policy_evidence on crm_customer_pool_strategy",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -36359,7 +36346,7 @@
         },
         {
           "id": "ui-action:crm_customer_pool_batch_list:pool_queue:open_customer:10",
-          "action": "button open_customer on crm_customer_pool_batch_list -> navigate:/p/crm_account_common/view/${row.crm_cpi_account_id}",
+          "action": "button open_customer on crm_customer_pool_batch_list -> navigate:/p/crm_account_common/view/{crm_cpi_account_id}",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
           "verdict": "untested",
@@ -36528,20 +36515,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_detail.json#root[0].tabs[2]"
         },
         {
-          "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_header_actions:open_customer:0",
-          "action": "action open_customer on crm_customer_pool_item_list -> navigate:/p/crm_account_common/view/${state.selectedPoolItem.crm_cpi_account_id}",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "authority": "blocking-release",
-          "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[2].actions[0]"
-        },
-        {
-          "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_header_actions:batch_operations:1",
+          "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_header_actions:batch_operations:0",
           "action": "action batch_operations on crm_customer_pool_item_list -> navigate:/p/c/crm_customer_pool_batch_list",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -36553,10 +36527,10 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[2].actions[1]"
+          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[2].actions[0]"
         },
         {
-          "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_header_actions:pool_policy:2",
+          "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_header_actions:pool_policy:1",
           "action": "action pool_policy on crm_customer_pool_item_list -> navigate:/p/c/crm_customer_pool_strategy",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -36566,7 +36540,22 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[2].actions[2]"
+          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[2].actions[1]"
+        },
+        {
+          "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_queue:open_customer:2",
+          "action": "row-action open_customer on crm_customer_pool_item_list -> navigate:/p/crm_account_common/view/{crm_cpi_account_id}",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[3].rowActions[0]"
         },
         {
           "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_queue:claim:3",
@@ -36581,7 +36570,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[3].rowActions[0]"
+          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[3].rowActions[1]"
         },
         {
           "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_queue:assign:4",
@@ -36596,7 +36585,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[3].rowActions[1]"
+          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[3].rowActions[2]"
         },
         {
           "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_queue:view_pool_evidence:5",
@@ -36611,7 +36600,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[3].rowActions[2]"
+          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[3].rowActions[3]"
         },
         {
           "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_actions:claim:6",

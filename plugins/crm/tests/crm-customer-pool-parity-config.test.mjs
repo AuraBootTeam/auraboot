@@ -260,7 +260,7 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
   assert.equal(operations.blocks.find((block) => block.id === 'crm_customer_pool_metrics').density, 'compact');
   assert.equal(operations.blocks.find((block) => block.id === 'crm_customer_pool_search').density, 'compact');
   const poolQueue = operations.blocks.find((block) => block.id === 'crm_customer_pool_queue');
-  assert.equal(poolQueue.maxHeight, 360);
+  assert.equal(poolQueue.maxHeight, 280);
   assert.equal(poolQueue.density, 'compact');
   assert.equal(poolQueue.selection.defaultFirst, true);
   assert.deepEqual(poolQueue.mobileCard, {
@@ -268,12 +268,7 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
     titleField: 'crm_cpi_account_name',
     eyebrowField: 'pool_name',
     statusField: 'operational_state',
-    fields: [
-      'crm_cpi_rating',
-      'crm_cpi_industry',
-      'next_eligible_at',
-      'owner_name',
-    ],
+    fields: ['next_eligible_at', 'owner_name'],
     actionCodes: ['claim', 'assign', 'view_pool_evidence'],
   });
   const mobileClaim = poolQueue.rowActions.find((action) => action.code === 'claim');
@@ -418,6 +413,8 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
   assert.match(queueQuery.fromSql, /CAST\(#\{params\.viewFilter\} AS text\) = 'ready'/);
   assert.match(queueQuery.fromSql, /CAST\(#\{params\.viewFilter\} AS text\) = 'blocked'/);
   assert.match(queueQuery.fromSql, /CAST\(#\{params\.viewFilter\} AS text\) = 'processing'/);
+  assert.match(queueQuery.fromSql, /q\.crm_cpi_phone ILIKE/);
+  assert.doesNotMatch(queueQuery.fromSql, /COALESCE\(q\.crm_cpi_phone/);
   assert.ok(queueQuery.outputFields.some((field) => field.code === 'operational_state'));
   for (const code of ['crm_pool_customer_timeline', 'crm_pool_customer_owner_history']) {
     const query = namedQueries.find((candidate) => candidate.code === code);

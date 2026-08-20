@@ -4163,7 +4163,7 @@
       { "value": "ready", "label": "Ready", "label:zh-CN": "现在可领", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
       { "value": "cooldown", "label": "Cooling Down", "label:zh-CN": "冷却中", "sortNo": 20, "status": "enabled", "extension": { "color": "amber" } },
       { "value": "quota_blocked", "label": "Daily Quota Reached", "label:zh-CN": "今日额度已满", "sortNo": 30, "status": "enabled", "extension": { "color": "amber" } },
-      { "value": "capacity_blocked", "label": "Customer Capacity Reached", "label:zh-CN": "人员库容已满", "sortNo": 40, "status": "enabled", "extension": { "color": "red" } },
+      { "value": "capacity_blocked", "label": "Lead Capacity Reached", "label:zh-CN": "人员库容已满", "sortNo": 40, "status": "enabled", "extension": { "color": "red" } },
       { "value": "claimed", "label": "Claimed", "label:zh-CN": "已领取", "sortNo": 50, "status": "enabled", "extension": { "color": "blue" } },
       { "value": "assigned", "label": "Assigned", "label:zh-CN": "已分配", "sortNo": 60, "status": "enabled", "extension": { "color": "blue" } },
       { "value": "recycling", "label": "Recycling", "label:zh-CN": "回收处理中", "sortNo": 70, "status": "enabled", "extension": { "color": "amber" } },
@@ -4373,6 +4373,16 @@
       { "value": "claimed", "label": "Claimed", "label:zh-CN": "领取", "sortNo": 20, "status": "enabled", "extension": { "color": "green" } },
       { "value": "assigned", "label": "Assigned", "label:zh-CN": "分配", "sortNo": 30, "status": "enabled", "extension": { "color": "green" } },
       { "value": "auto_recycled", "label": "Automatically Recycled", "label:zh-CN": "自动回收", "sortNo": 40, "status": "enabled", "extension": { "color": "amber" } }
+    ]
+  },
+  {
+    "code": "crm_boolean_switch",
+    "name": "CRM Boolean Switch",
+    "name:zh-CN": "CRM 开关状态",
+    "dictType": "static",
+    "items": [
+      { "value": "true", "label": "Enabled", "label:zh-CN": "已开启", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "false", "label": "Disabled", "label:zh-CN": "未开启", "sortNo": 20, "status": "enabled", "extension": { "color": "gray" } }
     ]
   }
 ]

@@ -394,6 +394,38 @@ class CustomerPoolCommandHandlerTest {
     }
 
     @Test
+    void failedRecycleEntersRetryStateAndAStaleRetryRecoversExactlyOnce() {
+        FakeDb db = baseline();
+        Instant now = Instant.now();
+        db.getById("crm_customer_pool_common", "pool-1").put("crm_cp_auto_recycle", true);
+        db.getById("crm_customer_pool_common", "pool-1").put("crm_cp_recycle_after_days", 5);
+        db.getById("crm_account_common", "customer-1").put("crm_acc_last_pool_id", "pool-1");
+        db.getById("crm_account_common", "customer-1").put(
+                "crm_acc_claimed_at", now.minus(Duration.ofDays(30)).toString());
+        db.failNextHistoryCreate = true;
+
+        CustomerPoolCommandHandler.RecycleResult failed = CustomerPoolCommandHandler.recycleDetailed(
+                db, new FakeShares(), 1L, "system", now, Duration.ofMinutes(15));
+
+        Map<String, Object> retryItem = db.query("crm_customer_pool_item_common", Map.of()).getFirst();
+        assertEquals(1, failed.failed());
+        assertEquals("recycling_retry", retryItem.get("crm_cpi_status"));
+        assertNotNull(retryItem.get("crm_cpi_recycle_token"));
+
+        retryItem.put("updated_at", now.minus(Duration.ofMinutes(16)).toString());
+        CustomerPoolCommandHandler.RecycleResult recovered = CustomerPoolCommandHandler.recycleDetailed(
+                db, new FakeShares(), 1L, "system", now, Duration.ofMinutes(15));
+
+        assertEquals(1, recovered.recycled());
+        assertEquals(1, recovered.recovered());
+        assertEquals(0, recovered.failed());
+        assertEquals("available", retryItem.get("crm_cpi_status"));
+        assertNull(retryItem.get("crm_cpi_recycle_token"));
+        assertEquals(1, db.query("crm_customer_owner_history_common", Map.of(
+                "crm_coh_event", "auto_recycled")).size());
+    }
+
+    @Test
     void completedRecycleClearsTokenSoLaterOwnershipCycleGetsNewHistory() {
         FakeDb db = baseline();
         db.getById("crm_customer_pool_common", "pool-1").put("crm_cp_auto_recycle", true);
@@ -713,6 +745,7 @@ class CustomerPoolCommandHandlerTest {
     private static final class FakeDb implements DataAccessor {
         private final Map<String, LinkedHashMap<String, Map<String, Object>>> rows = new HashMap<>();
         private long sequence = 100;
+        private boolean failNextHistoryCreate;
 
         void put(String model, String id, Map<String, Object> values) {
             HashMap<String, Object> copy = new HashMap<>(values);
@@ -732,6 +765,10 @@ class CustomerPoolCommandHandlerTest {
         }
 
         @Override public synchronized Map<String, Object> create(String modelCode, Map<String, Object> data) {
+            if (failNextHistoryCreate && "crm_customer_owner_history_common".equals(modelCode)) {
+                failNextHistoryCreate = false;
+                throw new IllegalStateException("simulated ownership-history outage");
+            }
             String id = "generated-" + (++sequence);
             put(modelCode, id, data);
             getById(modelCode, id).putIfAbsent("updated_at", Instant.now().toString());

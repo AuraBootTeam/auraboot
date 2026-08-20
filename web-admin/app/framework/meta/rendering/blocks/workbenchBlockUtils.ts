@@ -576,6 +576,17 @@ export async function executeSimpleWorkbenchAction(
       }
       return resultData;
     } catch (error) {
+      const reloadOnErrorIds = resolveReloadIds(args.reloadOnError);
+      if (
+        typeof reloadOnErrorIds === 'string' ||
+        (Array.isArray(reloadOnErrorIds) && reloadOnErrorIds.length > 0)
+      ) {
+        try {
+          await reloadDataSources(runtime, reloadOnErrorIds);
+        } catch (reloadError) {
+          console.error('[workbench] command error-state reload failed:', reloadError);
+        }
+      }
       showCommandFeedback(
         runtime,
         feedback,

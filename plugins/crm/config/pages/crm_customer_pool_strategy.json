@@ -162,8 +162,7 @@
                 { "field": "member_count", "width": 85, "align": "right", "label": { "zh-CN": "成员", "en": "Members" } },
                 { "field": "admin_count", "width": 85, "align": "right", "label": { "zh-CN": "管理员", "en": "Admins" } },
                 { "field": "crm_cp_daily_pick_limit", "width": 110, "align": "right", "label": { "zh-CN": "每日上限", "en": "Daily Limit" } },
-                { "field": "crm_cp_new_cooldown_days", "width": 115, "align": "right", "label": { "zh-CN": "新客冷却/天", "en": "New Cooldown" } },
-                { "field": "crm_cp_previous_owner_cooldown_days", "width": 125, "align": "right", "label": { "zh-CN": "前负责人冷却/天", "en": "Prior-owner Cooldown" } },
+                { "field": "crm_cp_auto_recycle", "width": 110, "dictCode": "crm_boolean_switch", "label": { "zh-CN": "自动回收", "en": "Auto Recycle" } },
                 { "field": "active_rule_count", "width": 105, "align": "right", "label": { "zh-CN": "生效条件", "en": "Active Rules" } }
               ],
               "rowActions": [

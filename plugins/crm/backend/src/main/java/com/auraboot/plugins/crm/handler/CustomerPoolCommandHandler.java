@@ -352,12 +352,14 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
             for (String leaseState : RECYCLE_LEASE_STATES) {
                 for (Map<String, Object> item : poolItems) {
                     if (!leaseState.equals(string(item.get("crm_cpi_status")))) continue;
+                    Map<String, Object> leasedItem = null;
                     try {
                         LeaseAttempt attempt = acquireStaleLease(db, item, now, leaseTimeout);
                         if (attempt.activeLease()) {
                             activeLeases++;
                         } else if (attempt.item() != null) {
-                            if (completeRecycle(db, shares, tenantId, pool, attempt.item(), actor, days, now)) {
+                            leasedItem = attempt.item();
+                            if (completeRecycle(db, shares, tenantId, pool, leasedItem, actor, days, now)) {
                                 recycled++;
                                 recovered++;
                             } else {
@@ -367,6 +369,7 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
                     } catch (RuntimeException error) {
                         // Per-item tolerance: one corrupt or unavailable customer must not block every
                         // other tenant-scoped recycle candidate in the same scheduler tick.
+                        markRecycleRetry(db, leasedItem);
                         failed++;
                         log.warn("Failed to recover customer-pool recycle item {} in pool {}",
                                 string(item.get("pid")), poolId, error);
@@ -382,6 +385,7 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
                     : Map.of();
             for (Map<String, Object> customer : customers) {
                 if (!OPEN_CUSTOMER_STATES.contains(string(customer.get("crm_acc_status")))) continue;
+                Map<String, Object> leasedItem = null;
                 try {
                     String customerId = required(customer.get("pid"), "Customer has no pid");
                     Map<String, Object> ruleCustomer = withLatestAccountActivity(
@@ -393,7 +397,8 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
                         if (attempt.activeLease()) {
                             activeLeases++;
                         } else if (attempt.item() != null) {
-                            if (completeRecycle(db, shares, tenantId, pool, attempt.item(), actor, days, now)) {
+                            leasedItem = attempt.item();
+                            if (completeRecycle(db, shares, tenantId, pool, leasedItem, actor, days, now)) {
                                 recycled++;
                                 if (attempt.recovered()) recovered++;
                             } else {
@@ -403,12 +408,34 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
                     }
                 } catch (RuntimeException error) {
                     // Per-item tolerance: surface the failed candidate and continue independent work.
+                    markRecycleRetry(db, leasedItem);
                     failed++;
                     log.warn("Failed to recycle customer {} in pool {}", string(customer.get("pid")), poolId, error);
                 }
             }
         }
         return new RecycleResult(recycled, recovered, activeLeases, failed);
+    }
+
+    private static void markRecycleRetry(DataAccessor db, Map<String, Object> leasedItem) {
+        if (leasedItem == null) return;
+        String itemId = string(leasedItem.get("pid"));
+        String leasedToken = string(leasedItem.get("crm_cpi_recycle_token"));
+        if (itemId == null || leasedToken == null) return;
+        try {
+            Map<String, Object> current = db.getById("crm_customer_pool_item_common", itemId);
+            if (current == null || !RECYCLE_LEASE_STATES.contains(string(current.get("crm_cpi_status")))) {
+                return;
+            }
+            String currentToken = string(current.get("crm_cpi_recycle_token"));
+            if (currentToken == null || !recycleOperationKey(currentToken).equals(recycleOperationKey(leasedToken))) {
+                return;
+            }
+            db.compareAndSet("crm_customer_pool_item_common", itemId, "crm_cpi_recycle_token",
+                    currentToken, Map.of("crm_cpi_status", "recycling_retry"));
+        } catch (RuntimeException retryError) {
+            log.warn("Failed to mark customer-pool recycle item {} for retry", itemId, retryError);
+        }
     }
 
     private static List<Map<String, Object>> activeRecycleRules(DataAccessor db, String poolId) {
