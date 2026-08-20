@@ -6,7 +6,6 @@ import com.auraboot.framework.auth.service.PasswordPolicyService;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.exception.BusinessException;
-import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.organization.service.TeamMemberService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dto.MemberQueryRequest;
@@ -26,7 +25,6 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.io.Resource;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Collections;
@@ -57,7 +55,6 @@ class TenantMemberApplicationServiceImplTest {
     @Mock private PasswordPolicyService passwordPolicyService;
     @Mock private SessionManagementService sessionManagementService;
     @Mock private TeamMemberService teamMemberService;
-    @Mock private DynamicDataService dynamicDataService;
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private TenantMemberOffboardingCoordinator offboardingCoordinator;
 
@@ -370,25 +367,4 @@ class TenantMemberApplicationServiceImplTest {
         assertEquals(teams, service.getMemberTeams("p"));
     }
 
-    @Test
-    @DisplayName("downloadImportTemplate produces non-empty xlsx resource")
-    void downloadTemplate() throws Exception {
-        Resource res = service.downloadImportTemplate();
-        assertNotNull(res);
-        assertTrue(res.contentLength() > 0);
-    }
-
-    @Test
-    @DisplayName("importMembers (MultipartFile) is unsupported")
-    void importMembersFileUnsupported() {
-        assertThrows(BusinessException.class,
-                () -> service.importMembers((org.springframework.web.multipart.MultipartFile) null, 7L));
-    }
-
-    @Test
-    @DisplayName("importMembers (rows) rejects empty input")
-    void importMembersRowsEmpty() {
-        assertThrows(BusinessException.class, () -> service.importMembers((List) null, 7L));
-        assertThrows(BusinessException.class, () -> service.importMembers(Collections.emptyList(), 7L));
-    }
 }

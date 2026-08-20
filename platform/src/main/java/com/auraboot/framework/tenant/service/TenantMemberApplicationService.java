@@ -5,12 +5,8 @@ import com.auraboot.framework.tenant.dto.MemberQueryRequest;
 import com.auraboot.framework.tenant.dto.MemberResponse;
 import com.auraboot.framework.tenant.dto.TenantMemberCreateRequest;
 import com.auraboot.framework.tenant.dto.TenantMemberCreateResult;
-import com.auraboot.framework.tenant.dto.TenantMemberImportResult;
-import com.auraboot.framework.tenant.dto.TenantMemberImportRow;
 import com.auraboot.framework.tenant.dto.TenantMemberOffboardingImpactResponse;
 import com.auraboot.framework.tenant.dto.TenantMemberOffboardingCandidate;
-import org.springframework.core.io.Resource;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -113,18 +109,4 @@ public interface TenantMemberApplicationService {
      */
     List<java.util.Map<String, Object>> getMemberTeams(String memberPid);
 
-    /**
-     * Download the tenant member Excel import template.
-     */
-    Resource downloadImportTemplate();
-
-    /**
-     * Batch import tenant members from Excel.
-     */
-    TenantMemberImportResult importMembers(MultipartFile file, Long userId);
-
-    /**
-     * Batch import tenant members from already parsed rows.
-     */
-    TenantMemberImportResult importMembers(List<TenantMemberImportRow> rows, Long userId);
 }

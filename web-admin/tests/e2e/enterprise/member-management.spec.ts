@@ -9,6 +9,12 @@
  * MM-04: Row action visibility — active member shows suspend/delete, not approve/reject
  * MM-05: Suspend then restore cycle (uses self-created test member)
  * MM-06: i18n — labels use translated text, not raw keys
+ * MM-07: Six-column no-email workbook happy path + one-time credentials
+ * MM-08: Unknown organization code blocks commit
+ * MM-09: Duplicate login name / employee code blocks commit
+ * MM-10: Existing unbound employee is linked by unique codes
+ * MM-11: Linked employee / cross-department position blocks commit
+ * MM-12: Baseline member cannot see or call account import
  *
  * Prerequisites:
  * - platform-admin plugin imported with tenant_member model
@@ -18,6 +24,7 @@
  */
 
 import { test, expect } from '../../fixtures';
+import type { Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import AdmZip from 'adm-zip';
 import * as XLSX from 'xlsx';
@@ -32,6 +39,11 @@ import {
 } from '../helpers/index';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { BACKEND_URL } from '../../helpers/environments';
+import { ensureRoleUser, makeRoleUser, openAsRole } from '../rbac/rbac-helpers';
+
+const MEMBER_IMPORT_HEADERS = ['姓名*', '登录名', '手机号', '工号', '部门编码', '岗位编码'];
+
+type MemberImportRow = [string, string, string, string, string, string];
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -46,6 +58,81 @@ function isCommandSuccess(body: any): boolean {
   if (code === 0 || code === '0' || code === '00000') return true;
   if (body?.success === true || body?.data?.success === true) return true;
   return false;
+}
+
+function buildMemberImportWorkbook(rows: MemberImportRow[]): Buffer {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([
+      ['填写说明：姓名必填；登录名为空时默认使用姓名。'],
+      MEMBER_IMPORT_HEADERS,
+      ...rows,
+    ]),
+    '账号导入',
+  );
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+}
+
+async function openMemberImportDialog(page: Page): Promise<void> {
+  await navigateToDynamicPage(page, 'tenant_member');
+  await page.getByTestId('member-import-entry').click();
+  await expect(page.getByTestId('member-import-dialog')).toBeVisible();
+}
+
+async function uploadAndPreviewMemberImport(
+  page: Page,
+  rows: MemberImportRow[],
+  name = 'employee-account-import.xlsx',
+): Promise<any> {
+  await page.getByTestId('member-import-file-input').setInputFiles({
+    name,
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: buildMemberImportWorkbook(rows),
+  });
+  const previewResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/admin/users/employee-accounts/import/preview') &&
+      response.request().method() === 'POST',
+  );
+  await page.getByTestId('member-import-preview').click();
+  const previewResponse = await previewResponsePromise;
+  expect(previewResponse.ok()).toBe(true);
+  const previewBody = await previewResponse.json();
+  expect(previewBody?.code).toBe('0');
+  return previewBody;
+}
+
+async function createImportOrganizationFixture(page: Page, suffix: string) {
+  const departmentCode = `DEPT-${suffix}`;
+  const positionCode = `POS-${suffix}`;
+  const departmentResponse = await page.request.post('/api/org/departments', {
+    data: {
+      org_dept_name: `导入部门${suffix}`,
+      org_dept_code: departmentCode,
+      org_dept_status: 'active',
+      org_dept_order: 1,
+    },
+  });
+  expect(departmentResponse.ok()).toBe(true);
+  const departmentPid = String((await departmentResponse.json())?.data?.pid ?? '');
+  expect(departmentPid).toBeTruthy();
+
+  const positionResponse = await page.request.post('/api/dynamic/org_position/create', {
+    data: {
+      org_pos_name: `导入岗位${suffix}`,
+      org_pos_code: positionCode,
+      org_pos_level: 'P1',
+      org_pos_status: 'active',
+      org_pos_dept_id: departmentPid,
+    },
+  });
+  expect(positionResponse.ok()).toBe(true);
+  const positionBody = await positionResponse.json();
+  const positionPid = String(positionBody?.data?.pid ?? positionBody?.data?.data?.pid ?? '');
+  expect(positionPid).toBeTruthy();
+
+  return { departmentCode, departmentPid, positionCode, positionPid };
 }
 
 /** Helper: get admin JWT from backend */
@@ -610,6 +697,18 @@ test.describe('Member Management — DSL Page', () => {
     } finally {
       await accountContext.close();
     }
+
+    await credentialDialog
+      .getByRole('button', { name: /Close|关闭/ })
+      .last()
+      .click();
+    await expect(credentialDialog).toBeHidden();
+    await page.getByTestId('member-import-entry').click();
+    await expect(page.getByTestId('member-import-dialog')).toBeVisible();
+    await expect(page.getByTestId('member-import-file-input')).toBeVisible();
+    await expect(page.getByTestId('member-import-credential-row')).toHaveCount(0);
+    await expect(page.getByTestId('member-import-download-credentials')).toHaveCount(0);
+    await expect(page.getByText(account.initialPassword, { exact: true })).toHaveCount(0);
   });
 
   test('MM-08: blocks import when an organization code cannot be resolved', async ({ page }) => {
@@ -653,6 +752,211 @@ test.describe('Member Management — DSL Page', () => {
       missingDepartmentCode,
     );
     await expect(page.getByTestId('member-import-confirm')).toBeDisabled();
+  });
+
+  test('MM-09: reports duplicate login names and employee codes before commit', async ({
+    page,
+  }) => {
+    const suffix = uniqueId('MM09')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .slice(-14);
+    const organization = await createImportOrganizationFixture(page, suffix);
+    const duplicateLogin = `mm09_${suffix}`;
+    const duplicateEmployeeCode = `EMP-${suffix}`;
+
+    await openMemberImportDialog(page);
+    const previewBody = await uploadAndPreviewMemberImport(page, [
+      [`重复登录甲${suffix}`, duplicateLogin, '', '', '', ''],
+      [`重复登录乙${suffix}`, duplicateLogin, '', '', '', ''],
+      [
+        `重复工号甲${suffix}`,
+        `mm09_emp_a_${suffix}`,
+        '',
+        duplicateEmployeeCode,
+        organization.departmentCode,
+        organization.positionCode,
+      ],
+      [
+        `重复工号乙${suffix}`,
+        `mm09_emp_b_${suffix}`,
+        '',
+        duplicateEmployeeCode,
+        organization.departmentCode,
+        organization.positionCode,
+      ],
+    ]);
+
+    expect(previewBody?.data?.errorCount).toBe(2);
+    const errors = previewBody.data.rows.flatMap((row: any) => row.errors ?? []);
+    expect(errors).toContain(`Duplicate login name in workbook: ${duplicateLogin}`);
+    expect(errors).toContain(`Duplicate employee code in workbook: ${duplicateEmployeeCode}`);
+    await expect(page.getByTestId('member-import-preview-result')).toContainText(
+      'Duplicate login name in workbook',
+    );
+    await expect(page.getByTestId('member-import-preview-result')).toContainText(
+      'Duplicate employee code in workbook',
+    );
+    await expect(page.getByTestId('member-import-confirm')).toBeDisabled();
+  });
+
+  test('MM-10: links an existing unbound employee by unique organization codes', async ({
+    page,
+  }) => {
+    const suffix = uniqueId('MM10')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .slice(-14);
+    const organization = await createImportOrganizationFixture(page, suffix);
+    const employeeCode = `EMP-${suffix}`;
+    const loginName = `mm10_${suffix}`;
+    const employeeResponse = await page.request.post('/api/dynamic/org_employee/create', {
+      data: {
+        org_emp_name: `已有人员${suffix}`,
+        org_emp_code: employeeCode,
+        org_emp_dept_id: organization.departmentPid,
+        org_emp_position_id: organization.positionPid,
+        org_emp_status: 'active',
+        org_emp_type: 'human',
+      },
+    });
+    expect(employeeResponse.ok()).toBe(true);
+    const employeeBody = await employeeResponse.json();
+    const employeePid = String(employeeBody?.data?.pid ?? employeeBody?.data?.data?.pid ?? '');
+    expect(employeePid).toBeTruthy();
+
+    await openMemberImportDialog(page);
+    const previewBody = await uploadAndPreviewMemberImport(page, [
+      [
+        `已有人员${suffix}`,
+        loginName,
+        '',
+        employeeCode,
+        organization.departmentCode,
+        organization.positionCode,
+      ],
+    ]);
+    expect(previewBody?.data?.errorCount).toBe(0);
+    expect(previewBody?.data?.rows?.[0]?.action).toBe('LINK_EXISTING_EMPLOYEE');
+    await expect(page.getByTestId('member-import-confirm')).toBeEnabled();
+
+    const importResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/admin/users/employee-accounts/import') &&
+        response.request().method() === 'POST',
+    );
+    await page.getByTestId('member-import-confirm').click();
+    const importResponse = await importResponsePromise;
+    expect(importResponse.ok()).toBe(true);
+    const importBody = await importResponse.json();
+    const account = importBody?.data?.accounts?.[0];
+    expect(account?.userName).toBe(loginName);
+    expect(account?.organizationAction).toBe('LINKED');
+    expect(account?.employeePid).toBe(employeePid);
+
+    const employees = await queryFilteredList(page, 'org_employee', 'org_emp_code', employeeCode, {
+      operator: 'EQ',
+    });
+    expect(employees).toHaveLength(1);
+    expect(employees[0]?.pid).toBe(employeePid);
+    expect(employees[0]?.org_emp_member_id).toBe(account.memberPid);
+  });
+
+  test('MM-11: blocks linked employees and positions outside the selected department', async ({
+    page,
+  }) => {
+    const suffix = uniqueId('MM11')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .slice(-14);
+    const sales = await createImportOrganizationFixture(page, `${suffix}A`);
+    const support = await createImportOrganizationFixture(page, `${suffix}B`);
+    const linkedEmployeeCode = `EMP-LINKED-${suffix}`;
+    const seedResponse = await page.request.post('/api/admin/users/employee-accounts', {
+      data: {
+        employees: [
+          {
+            name: `已关联人员${suffix}`,
+            userName: `mm11_seed_${suffix}`,
+            employeeCode: linkedEmployeeCode,
+            departmentCode: sales.departmentCode,
+            positionCode: sales.positionCode,
+          },
+        ],
+      },
+    });
+    expect(seedResponse.ok(), await seedResponse.text()).toBe(true);
+
+    await openMemberImportDialog(page);
+    const previewBody = await uploadAndPreviewMemberImport(page, [
+      [
+        `岗位错配${suffix}`,
+        `mm11_mismatch_${suffix}`,
+        '',
+        `EMP-MISMATCH-${suffix}`,
+        support.departmentCode,
+        sales.positionCode,
+      ],
+      [
+        `重复关联${suffix}`,
+        `mm11_linked_${suffix}`,
+        '',
+        linkedEmployeeCode,
+        sales.departmentCode,
+        sales.positionCode,
+      ],
+    ]);
+
+    expect(previewBody?.data?.errorCount).toBe(2);
+    const errors = previewBody.data.rows.flatMap((row: any) => row.errors ?? []);
+    expect(errors).toContain(
+      `Position ${sales.positionCode} does not belong to department ${support.departmentCode}`,
+    );
+    expect(errors).toContain(
+      `Employee is already linked to a tenant member: ${linkedEmployeeCode}`,
+    );
+    await expect(page.getByTestId('member-import-confirm')).toBeDisabled();
+  });
+
+  test('MM-12: hides import from a baseline member and rejects the admin API', async ({
+    page,
+    browser,
+  }) => {
+    const suffix = uniqueId('MM12')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .slice(-14);
+    const restrictedUser = makeRoleUser(`member-import-${suffix}`, ['tenant_member']);
+    await ensureRoleUser(page, restrictedUser);
+
+    const { context, page: restrictedPage } = await openAsRole(
+      browser,
+      restrictedUser.email,
+      restrictedUser.password,
+    );
+    try {
+      await restrictedPage.goto('/p/tenant_member', { waitUntil: 'domcontentloaded' });
+      await expect(restrictedPage.getByRole('banner')).toBeVisible({ timeout: 30_000 });
+      await expect(restrictedPage.getByTestId('member-import-entry')).toHaveCount(0);
+
+      const deniedResponse = await restrictedPage.request.post(
+        '/api/admin/users/employee-accounts/import/preview',
+        {
+          multipart: {
+            file: {
+              name: 'employee-accounts.xlsx',
+              mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              buffer: buildMemberImportWorkbook([
+                [`无权限成员${suffix}`, `mm12_${suffix}`, '', '', '', ''],
+              ]),
+            },
+          },
+        },
+      );
+      const deniedText = await deniedResponse.text();
+      expect(deniedResponse.status(), deniedText).toBe(200);
+      const deniedBody = JSON.parse(deniedText);
+      expect(deniedBody?.code).toBe('409');
+      expect(deniedBody?.message).toBe('admin role required');
+    } finally {
+      await context.close();
+    }
   });
 });
 

@@ -1426,6 +1426,7 @@ function ListPageContentInner(props: PageContentProps) {
   const canImport = canUseImport(importConfig, hasPermission);
   const pageKey = resolveListSavedViewPageKey(schema, tableName);
   const isTenantMemberPage = modelCode === 'tenant_member' || pageKey === 'tenant_member';
+  const canManageMemberAccounts = isTenantMemberPage && hasPermission('org.role.update');
   const hideSavedViews =
     listExtensions?.hideSavedViews ?? Boolean(schemaExtension.hideSavedViews || skipListData);
   // Quick filters live only in the toolbar. They apply to default view mode and
@@ -2542,26 +2543,31 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Column header sort toggle: none → asc → desc → none
   // Shift+click appends to multi-sort, regular click replaces
-  const toggleSort = useCallback((fieldCode: string, multiSort = false) => {
-    setLocalActiveSorts((prev) => {
-      const existing = prev.find((s) => s.fieldCode === fieldCode);
-      let next: SortConfig[];
-      if (!existing) {
-        // Add new sort
-        const newSort: SortConfig = { fieldCode, direction: 'asc', priority: prev.length };
-        next = multiSort ? [...prev, newSort] : [newSort];
-      } else if (existing.direction === 'asc') {
-        // asc → desc
-        next = multiSort
-          ? prev.map((s) => (s.fieldCode === fieldCode ? { ...s, direction: 'desc' as const } : s))
-          : [{ fieldCode, direction: 'desc', priority: 0 }];
-      } else {
-        // desc → clear
-        next = multiSort ? prev.filter((s) => s.fieldCode !== fieldCode) : [];
-      }
-      return next;
-    });
-  }, [setLocalActiveSorts]);
+  const toggleSort = useCallback(
+    (fieldCode: string, multiSort = false) => {
+      setLocalActiveSorts((prev) => {
+        const existing = prev.find((s) => s.fieldCode === fieldCode);
+        let next: SortConfig[];
+        if (!existing) {
+          // Add new sort
+          const newSort: SortConfig = { fieldCode, direction: 'asc', priority: prev.length };
+          next = multiSort ? [...prev, newSort] : [newSort];
+        } else if (existing.direction === 'asc') {
+          // asc → desc
+          next = multiSort
+            ? prev.map((s) =>
+                s.fieldCode === fieldCode ? { ...s, direction: 'desc' as const } : s,
+              )
+            : [{ fieldCode, direction: 'desc', priority: 0 }];
+        } else {
+          // desc → clear
+          next = multiSort ? prev.filter((s) => s.fieldCode !== fieldCode) : [];
+        }
+        return next;
+      });
+    },
+    [setLocalActiveSorts],
+  );
 
   // Debounced re-fetch when sorts or chip filters change (150ms).
   // Prevents multiple rapid API calls when users adjust multiple filters
@@ -4665,7 +4671,9 @@ function ListPageContentInner(props: PageContentProps) {
             exportFilters={exportFilterConditions}
             isTenantMemberPage={isTenantMemberPage}
             onInvite={() => setInviteDialogOpen(true)}
-            onImportMembers={() => setMemberImportDialogOpen(true)}
+            onImportMembers={
+              canManageMemberAccounts ? () => setMemberImportDialogOpen(true) : undefined
+            }
             hideSavedViews={hideSavedViews}
             hideBuiltInImport={
               skipListData ? true : (listExtensions?.hideBuiltInImport ?? !canImport)
@@ -4686,7 +4694,7 @@ function ListPageContentInner(props: PageContentProps) {
             }
           />
 
-          {isTenantMemberPage && (
+          {canManageMemberAccounts && (
             <TenantMemberAccountImportDialog
               open={memberImportDialogOpen}
               token={token}
