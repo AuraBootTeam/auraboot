@@ -96,7 +96,7 @@ function browserRequest(path: string, origin?: string) {
   } as any;
 }
 
-describe('BffProxyService — non-JSON pass-through', () => {
+describe('BffProxyService — opaque response pass-through', () => {
   it('🚨 forwards an embeddable script as JavaScript, not as a JSON string', async () => {
     const program = 'var AuraCS=(function(){return{init:function(){}}})();';
     const backend = await startBackend('application/javascript; charset=utf-8', program);
@@ -107,16 +107,17 @@ describe('BffProxyService — non-JSON pass-through', () => {
     await service.handleApiRequest(browserRequest('/api/public/cs/widget.js'), res);
     backend.close();
 
-    // The body is the program itself. If this were res.json(), the customer's <script> tag would
-    // receive `"var AuraCS=…"` — a string literal that parses, runs, and does nothing at all.
+    // The body contains the exact program bytes. If this were res.json(), the customer's <script>
+    // tag would receive `"var AuraCS=…"` — a string literal that parses, runs, and does nothing.
     expect(state.sentVia).toBe('send');
-    expect(state.body).toBe(program);
+    expect(state.body).toEqual(Buffer.from(program, 'utf8'));
     expect(state.headers['content-type']).toContain('javascript');
     expect(state.headers['content-type']).not.toContain('json');
   });
 
-  it('still sends JSON as JSON', async () => {
-    const backend = await startBackend('application/json', JSON.stringify({ code: '0', data: 42 }));
+  it('preserves JSON bytes and its JSON media type', async () => {
+    const jsonBody = JSON.stringify({ code: '0', data: 42 });
+    const backend = await startBackend('application/json', jsonBody);
 
     const service = new BffProxyService({ target: `http://127.0.0.1:${backend.port}` });
     const { res, state } = recordingResponse();
@@ -124,8 +125,9 @@ describe('BffProxyService — non-JSON pass-through', () => {
     await service.handleApiRequest(browserRequest('/api/meta/models'), res);
     backend.close();
 
-    expect(state.sentVia).toBe('json');
-    expect(state.body).toEqual({ code: '0', data: 42 });
+    expect(state.sentVia).toBe('send');
+    expect(state.body).toEqual(Buffer.from(jsonBody, 'utf8'));
+    expect(JSON.parse((state.body as Buffer).toString('utf8'))).toEqual({ code: '0', data: 42 });
     expect(state.headers['content-type']).toContain('json');
   });
 });

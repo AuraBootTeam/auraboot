@@ -25,28 +25,7 @@ const noProxyHttpsAgent = new https.Agent({
 });
 
 /**
- * Whether a request path should be proxied as a raw binary download rather than
- * parsed/re-serialized through the JSON proxy.
- *
- * Matches download/export artifact endpoints that must not be parsed and
- * re-serialized through the JSON proxy. If xlsx bytes fall through the JSON
- * path, they become a JSON string (`"PK…`) and the downloaded file is
- * corrupted.
- */
-export function isBinaryDownloadPath(path: string): boolean {
-  const pathname = path.split('?')[0];
-  return (
-    /\/download(?:\/|$)/.test(pathname) ||
-    /\/export\/(?:excel|xlsx|csv|pdf)(?:\/|$)/.test(pathname) ||
-    /\/admin\/users\/employee-accounts\/import\/template$/.test(pathname) ||
-    /\/meta\/excel\/template\/[^/]+$/.test(pathname) ||
-    /\/meta\/excel\/import\/[^/]+\/error-report\/[^/]+$/.test(pathname) ||
-    /\.(?:csv|xlsx?|pdf|zip)$/i.test(pathname)
-  );
-}
-
-/**
- * Whether the backend operation is expected to outlive the default 30-second
+ * Whether the backend operation is expected to outlive the default 60-second
  * interactive proxy budget.
  *
  * BOM format exploration performs one bounded LLM call before returning a
@@ -96,8 +75,6 @@ export function shouldForwardRequestBody(method: string, body?: unknown): boolea
   return normalized !== 'GET' && normalized !== 'HEAD' && hasNonEmptyBody(body);
 }
 
-type ResponseHeaderValue = string | number | readonly string[];
-
 const BROWSER_ONLY_PROXY_HEADERS = new Set([
   'access-control-request-headers',
   'access-control-request-method',
@@ -110,7 +87,7 @@ const BROWSER_ONLY_PROXY_HEADERS = new Set([
 /**
  * Headers that frame the client's request body on the wire. Every path that reuses
  * sanitizeHeaders rebuilds the body from the already-parsed `req.body` (axios
- * re-serializes it; the binary-download and SSE fetches JSON.stringify it), so the
+ * re-serializes it; the SSE fetch path uses JSON.stringify), so the
  * outgoing byte count is ours to declare — the client's is stale by construction.
  *
  * Forwarding them lets Content-Length disagree with the bytes actually written, which
@@ -127,17 +104,15 @@ const BROWSER_ONLY_PROXY_HEADERS = new Set([
  */
 const REQUEST_FRAMING_HEADERS = new Set(['content-length', 'transfer-encoding']);
 
-function toResponseHeaderValue(value: unknown): ResponseHeaderValue | undefined {
-  if (typeof value === 'string' || typeof value === 'number') {
-    return value;
+function toResponseBuffer(data: unknown): Buffer {
+  if (data === undefined || data === null) return Buffer.alloc(0);
+  if (Buffer.isBuffer(data)) return data;
+  if (data instanceof ArrayBuffer) return Buffer.from(data);
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
   }
-
-  if (Array.isArray(value)) {
-    const stringValues = value.filter((item): item is string => typeof item === 'string');
-    return stringValues.length > 0 ? stringValues : undefined;
-  }
-
-  return undefined;
+  if (typeof data === 'string') return Buffer.from(data, 'utf8');
+  return Buffer.from(JSON.stringify(data), 'utf8');
 }
 
 /**
@@ -236,7 +211,8 @@ export class BffProxyService {
 
       // Check if this is an SSE request using unified detection
       if (this.isSSERequest(originalPath, req.method, String(req.headers.accept ?? ''))) {
-        const sseMethod = this.getSSEMethod(originalPath) ?? (req.method.toLowerCase() as 'get' | 'post');
+        const sseMethod =
+          this.getSSEMethod(originalPath) ?? (req.method.toLowerCase() as 'get' | 'post');
         logger.info(
           `[${requestId}] Detected SSE request (method: ${sseMethod}), using streaming proxy`,
         );
@@ -254,20 +230,13 @@ export class BffProxyService {
         return;
       }
 
-      // Check if this is a file download request (/download as a complete path
-      // segment — including the trailing-id form /download/{fileId}).
-      if (isBinaryDownloadPath(originalPath)) {
-        await this.handleBinaryDownload(req, res, backendUrl, requestId);
-        return;
-      }
-
       // Longer timeout for plugin import and deploy operations
       const isLongRunning = isLongRunningProxyPath(originalPath);
       const longRunningTimeout = Number.parseInt(
         process.env.BFF_LONG_RUNNING_TIMEOUT_MS || '900000',
         10,
       );
-      const timeout = isLongRunning ? longRunningTimeout : 30000;
+      const timeout = isLongRunning ? longRunningTimeout : 60000;
 
       // 准备请求配置
       const axiosConfig: AxiosRequestConfig = {
@@ -275,6 +244,10 @@ export class BffProxyService {
         url: backendUrl,
         headers: await this.sanitizeHeaders(req),
         timeout,
+        // The BFF is a transport boundary, not a response serializer. Always
+        // retain the upstream bytes; Content-Type tells the browser how to
+        // interpret them after the proxy has forwarded them unchanged.
+        responseType: 'arraybuffer',
         httpAgent: noProxyHttpAgent,
         httpsAgent: noProxyHttpsAgent,
         proxy: false as const, // Disable axios built-in proxy detection
@@ -309,7 +282,11 @@ export class BffProxyService {
       if (!skipLogging) {
         if (this.isVerboseLogging()) {
           // 详细日志模式：包含响应数据预览
-          const responsePreview = this.formatResponsePreview(response.data, 500);
+          const responsePreview = this.formatResponsePreview(
+            response.data,
+            500,
+            String(response.headers?.['content-type'] ?? ''),
+          );
           logger.info(`✅ API Proxy Success [${requestId}]`, {
             ...successDetails,
             responsePreview,
@@ -336,96 +313,6 @@ export class BffProxyService {
 
       logger.error(`🚨 API Proxy Error [${requestId}]`, requestDetails);
       this.handleProxyError(error, res);
-    }
-  }
-
-  /**
-   * 处理二进制文件下载
-   */
-  private async handleBinaryDownload(
-    req: Request,
-    res: Response,
-    backendUrl: string,
-    requestId: string,
-  ): Promise<void> {
-    try {
-      const headers = await this.sanitizeHeaders(req);
-      // 移除 accept: application/json，允许接收任何类型
-      delete headers['accept'];
-
-      logger.info(`[${requestId}] Starting binary download from ${backendUrl}`);
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60000);
-      const requestInit: RequestInit = {
-        method: req.method.toLowerCase() as any,
-        headers,
-        signal: controller.signal,
-      };
-      if (shouldForwardRequestBody(req.method, req.body)) {
-        const raw = rawRequestBody(req as never);
-        requestInit.body = raw
-          ? new Uint8Array(raw)
-          : typeof req.body === 'string'
-            ? req.body
-            : Buffer.isBuffer(req.body)
-              ? new Uint8Array(req.body)
-              : JSON.stringify(req.body ?? {});
-      }
-
-      let response: globalThis.Response;
-      try {
-        response = await fetch(backendUrl, requestInit);
-      } finally {
-        clearTimeout(timeout);
-      }
-      const responseBody = Buffer.from(await response.arrayBuffer());
-
-      if (!response.ok) {
-        logger.error(
-          `[${requestId}] Binary download backend returned ${response.status}: ${responseBody
-            .toString('utf8')
-            .slice(0, 300)}`,
-        );
-        res
-          .status(response.status)
-          .setHeader('Content-Type', response.headers.get('content-type') || 'application/json');
-        res.send(responseBody);
-        return;
-      }
-
-      // 转发响应头
-      const contentType = toResponseHeaderValue(response.headers.get('content-type'));
-      const contentDisposition = toResponseHeaderValue(response.headers.get('content-disposition'));
-      const contentLength = toResponseHeaderValue(response.headers.get('content-length'));
-
-      if (contentType !== undefined) {
-        res.setHeader('Content-Type', contentType);
-      }
-      if (contentDisposition !== undefined) {
-        res.setHeader('Content-Disposition', contentDisposition);
-      }
-      if (contentLength !== undefined) {
-        res.setHeader('Content-Length', contentLength);
-      }
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-
-      // 发送二进制数据
-      res.status(response.status).send(responseBody);
-
-      logger.info(
-        `[${requestId}] Binary download completed, size: ${responseBody.byteLength} bytes`,
-      );
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`[${requestId}] Binary download error: ${errorMessage}`);
-
-      if (!res.headersSent) {
-        res.status(500).json({
-          error: 'Download Error',
-          message: errorMessage,
-        });
-      }
     }
   }
 
@@ -697,7 +584,8 @@ export class BffProxyService {
     // does not protect anything; it just makes every request look like it came from nowhere and get
     // refused. Forwarded exactly where it is load-bearing, and nowhere else.
     const path = req.originalUrl || req.url || '';
-    const originIsSecurityInput = path.startsWith('/api/public/') || path.startsWith('/api/collect/');
+    const originIsSecurityInput =
+      path.startsWith('/api/public/') || path.startsWith('/api/collect/');
 
     Object.entries(req.headers).forEach(([key, value]) => {
       const lowerKey = key.toLowerCase();
@@ -940,11 +828,22 @@ export class BffProxyService {
   /**
    * 格式化响应数据预览
    */
-  private formatResponsePreview(data: any, maxLength: number = 100): string {
+  private formatResponsePreview(
+    data: any,
+    maxLength: number = 100,
+    contentType: string = '',
+  ): string {
     if (!data) return 'null';
 
     let preview: string;
-    if (typeof data === 'string') {
+    if (Buffer.isBuffer(data) || data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+      const buffer = toResponseBuffer(data);
+      const isTextual =
+        contentType === '' ||
+        /(?:json|text|javascript|xml|html|x-www-form-urlencoded)/i.test(contentType);
+      if (!isTextual) return `[opaque response: ${buffer.byteLength} bytes]`;
+      preview = buffer.toString('utf8');
+    } else if (typeof data === 'string') {
       preview = data;
     } else if (typeof data === 'object') {
       try {
@@ -986,42 +885,28 @@ export class BffProxyService {
     res.status(response.status);
 
     try {
-      // What the backend actually said it was sending. Most of the time it is JSON; when it is not,
-      // re-serialising the body as JSON destroys it.
-      //
-      // This is the other half of a bug we half-fixed once already. The Accept header used to be
-      // narrowed to application/json, so an embeddable `<script src>` got a 406 and never reached
-      // this method at all. Widening Accept let the request through — and then this method wrapped
-      // the JavaScript in quotes and labelled it JSON, so the customer's script tag loaded a string
-      // literal and the widget never started. Both halves are on the customer's real path: browser →
-      // BFF → backend. Neither shows up if you only ever curl the backend directly.
+      // Treat upstream bodies as opaque transport bytes. Axios is configured with
+      // responseType=arraybuffer, so neither JSON nor binary artifacts are decoded and
+      // re-serialized at the BFF boundary.
       const upstreamType = String(response.headers?.['content-type'] ?? '');
-      const isJson = upstreamType === '' || upstreamType.includes('json');
-
-      this.setJsonResponseHeaders(res, response.headers, isJson ? undefined : upstreamType);
-
-      if (isJson) {
-        res.json(response.data);
-      } else {
-        // axios hands us a string for a text/* or application/javascript body. Send it as it came.
-        res.send(response.data);
-      }
+      this.setProxyResponseHeaders(res, response.headers, upstreamType || undefined);
+      res.send(toResponseBuffer(response.data));
 
       // 记录响应转发日志
       if (!skipLogging) {
         if (this.isVerboseLogging()) {
           //todo 这里的1000000是一个临时值，需要根据实际情况调整
-          const responsePreview = this.formatResponsePreview(response.data, 1000000);
+          const responsePreview = this.formatResponsePreview(response.data, 1000000, upstreamType);
           logger.info(
-            `JSON response forwarded - Status: ${response.status}, Response: ${responsePreview}`,
+            `Proxy response forwarded - Status: ${response.status}, Response: ${responsePreview}`,
           );
         } else {
-          logger.info(`JSON response forwarded - Status: ${response.status}`);
+          logger.info(`Proxy response forwarded - Status: ${response.status}`);
         }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`Failed to process JSON response: ${errorMessage}`);
+      logger.error(`Failed to process proxy response: ${errorMessage}`);
 
       res.status(500).json({
         error: 'Response Processing Error',
@@ -1032,15 +917,15 @@ export class BffProxyService {
   }
 
   /**
-   * 设置JSON响应头
+   * Forward response metadata while letting Express derive framing from the
+   * bytes that are actually sent.
    */
-  private setJsonResponseHeaders(res: Response, originalHeaders: any, contentType?: string): void {
+  private setProxyResponseHeaders(res: Response, originalHeaders: any, contentType?: string): void {
     // 清除可能冲突的响应头
     res.removeHeader('Content-Length');
     res.removeHeader('Transfer-Encoding');
-    // Not everything the backend returns is JSON. An embeddable SDK is JavaScript, and stamping
-    // application/json on it — then re-serialising the body — hands the customer's <script> tag a
-    // quoted string instead of a program.
+    // Preserve the upstream media type. Endpoints without one keep the historical
+    // JSON default so existing API clients continue to interpret the bytes correctly.
     res.set('Content-Type', contentType || 'application/json; charset=utf-8');
 
     // 转发其他响应头（排除可能冲突的头）
@@ -1067,6 +952,12 @@ export class BffProxyService {
     const errorStatusText = error.response?.statusText || 'N/A';
     const requestUrl = error.config?.url || 'Unknown URL';
     const requestMethod = error.config?.method?.toUpperCase() || 'Unknown Method';
+    const errorContentType = String(error.response?.headers?.['content-type'] ?? '');
+    const responsePreview = this.formatResponsePreview(
+      error.response?.data,
+      2000,
+      errorContentType,
+    );
 
     // 构建详细的错误日志
     const errorDetails = {
@@ -1077,7 +968,7 @@ export class BffProxyService {
       url: requestUrl,
       method: requestMethod,
       headers: error.config?.headers ? this.sanitizeHeadersForLogging(error.config.headers) : {},
-      responseData: error.response?.data || null,
+      responseData: responsePreview,
       requestData: error.config?.data
         ? this.sanitizeRequestDataForLogging(error.config.data)
         : null,
@@ -1096,7 +987,7 @@ export class BffProxyService {
         logger.error(`🔐 Authentication Error [${errorCode}] - ${requestMethod} ${requestUrl}`, {
           status: status,
           message: errorMessage,
-          responseData: error.response.data,
+          responseData: responsePreview,
           headers: errorDetails.headers,
           suggestion: 'Check JWT token validity, expiration, or authentication configuration',
         });
@@ -1104,7 +995,7 @@ export class BffProxyService {
         logger.error(`🚫 Authorization Error [${errorCode}] - ${requestMethod} ${requestUrl}`, {
           status: status,
           message: errorMessage,
-          responseData: error.response.data,
+          responseData: responsePreview,
           headers: errorDetails.headers,
           suggestion: 'Check user permissions and role-based access control',
         });
@@ -1112,14 +1003,14 @@ export class BffProxyService {
         logger.error(`🔍 Not Found Error [${errorCode}] - ${requestMethod} ${requestUrl}`, {
           status: status,
           message: errorMessage,
-          responseData: error.response.data,
+          responseData: responsePreview,
           suggestion: 'Check API endpoint URL and backend service availability',
         });
       } else if (status >= 500) {
         logger.error(`🔥 Server Error [${errorCode}] - ${requestMethod} ${requestUrl}`, {
           status: status,
           message: errorMessage,
-          responseData: error.response.data,
+          responseData: responsePreview,
           headers: errorDetails.headers,
           suggestion: 'Backend service internal error, check backend logs',
         });
@@ -1134,7 +1025,7 @@ export class BffProxyService {
       if (responseData !== undefined && responseData !== null) {
         if (typeof responseData === 'string') {
           try {
-            this.setJsonResponseHeaders(res, error.response.headers || {});
+            this.setProxyResponseHeaders(res, error.response.headers || {});
             res.status(status).json(JSON.parse(responseData));
             return;
           } catch {
@@ -1150,18 +1041,27 @@ export class BffProxyService {
               ? Buffer.from(responseData)
               : Buffer.from(responseData.buffer, responseData.byteOffset, responseData.byteLength);
           const text = buffer.toString('utf-8');
-          try {
-            this.setJsonResponseHeaders(res, error.response.headers || {});
-            res.status(status).json(JSON.parse(text));
-            return;
-          } catch {
-            res.status(status).send(text);
-            return;
+          const responseType = String(error.response.headers?.['content-type'] ?? '');
+          if (responseType === '' || responseType.includes('json')) {
+            try {
+              this.setProxyResponseHeaders(res, error.response.headers || {});
+              res.status(status).json(JSON.parse(text));
+              return;
+            } catch {
+              // Invalid JSON should still reach the client exactly as received.
+            }
           }
+          this.setProxyResponseHeaders(
+            res,
+            error.response.headers || {},
+            responseType || 'application/octet-stream',
+          );
+          res.status(status).send(buffer);
+          return;
         }
 
         if (typeof responseData === 'object') {
-          this.setJsonResponseHeaders(res, error.response.headers || {});
+          this.setProxyResponseHeaders(res, error.response.headers || {});
           res.status(status).json(responseData);
           return;
         }
