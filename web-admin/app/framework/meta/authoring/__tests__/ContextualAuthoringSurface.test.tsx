@@ -244,7 +244,10 @@ describe('ContextualAuthoringSurface', () => {
     const safeTab = vi.fn();
     renderSurface(unsafeAction, safeTab);
 
-    fireEvent.click(screen.getByTestId('contextual-authoring-enter'));
+    const entry = screen.getByTestId('contextual-authoring-enter');
+    expect(entry).toHaveClass('bottom-24');
+    expect(entry).not.toHaveClass('bottom-6');
+    fireEvent.click(entry);
     expect(await screen.findByTestId('contextual-authoring-surface')).toHaveAttribute(
       'data-mode',
       'select',

@@ -1271,7 +1271,7 @@ export function ContextualAuthoringSurface({
               if (event.key === 'Enter' || event.key === ' ') captureEntryInteraction();
             }}
             disabled={opening}
-            className="border-border-strong bg-panel text-text hover:bg-hover fixed right-6 bottom-6 z-30 inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-lg disabled:cursor-wait disabled:opacity-70"
+            className="border-border-strong bg-panel text-text hover:bg-hover fixed right-6 bottom-24 z-30 inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-lg disabled:cursor-wait disabled:opacity-70"
             data-testid="contextual-authoring-enter"
           >
             <Settings2 className="h-4 w-4" />
