@@ -87,9 +87,53 @@ describe('FiltersBlockRenderer', () => {
       expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'searchKeyword', ''),
     );
   });
+
+  it('renders the compact workbench filter surface without changing action semantics', () => {
+    const runtime = makeRuntime();
+    const block = {
+      id: 'queue_filters',
+      blockType: 'filters',
+      density: 'compact',
+      fields: [],
+    } as unknown as BlockConfig;
+
+    const { container } = render(<FiltersBlockRenderer block={block} runtime={runtime} />);
+
+    const filter = container.querySelector('.filters-block');
+    expect(filter).toHaveAttribute('data-density', 'compact');
+    expect(filter).toHaveClass('bg-panel', 'px-4', 'py-1.5');
+  });
 });
 
 describe('MetricStripBlockRenderer', () => {
+  it('renders compact cards for dense operational workbenches', () => {
+    const runtime = makeRuntime({ data: { summary: { availableCount: 12 } } });
+    const block = {
+      id: 'metrics',
+      blockType: 'metric-strip',
+      dataSource: 'summary',
+      density: 'compact',
+      metrics: [
+        {
+          key: 'available',
+          label: 'Available',
+          valueField: 'availableCount',
+          subText: 'Still in the pool',
+        },
+      ],
+    } as unknown as BlockConfig;
+
+    render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('metric-strip-metrics')).toHaveAttribute('data-density', 'compact');
+    expect(screen.getByTestId('metric-strip-item-available')).toHaveClass('h-20', 'p-3');
+    expect(screen.getByTestId('metric-strip-item-available')).toHaveAttribute(
+      'aria-description',
+      'Still in the pool',
+    );
+    expect(screen.queryByTestId('metric-strip-subtext-available')).not.toBeInTheDocument();
+  });
+
   it('renders a stable empty state when no metrics are configured', () => {
     const runtime = makeRuntime();
     const block: BlockConfig = {
@@ -1094,9 +1138,7 @@ describe('StatusBannerBlockRenderer', () => {
 
     render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
 
-    expect(screen.getByTestId('status-banner-account_attention')).toHaveTextContent(
-      'CN¥1,886,000',
-    );
+    expect(screen.getByTestId('status-banner-account_attention')).toHaveTextContent('CN¥1,886,000');
   });
 
   it('renders directly from a runtime-state context without a duplicate detail query', () => {

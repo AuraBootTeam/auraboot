@@ -34,6 +34,7 @@
       "blockType": "metric-strip",
       "dataSource": "poolStats",
       "variant": "cards",
+      "density": "compact",
       "columns": 5,
       "metrics": [
         {
@@ -91,6 +92,7 @@
     {
       "id": "crm_lead_pool_search",
       "blockType": "filters",
+      "density": "compact",
       "onSearch": { "action": "dataSource.reload", "args": { "dataSourceId": "poolQueue" } },
       "onReset": { "action": "state.set", "args": { "searchKeyword": "" } },
       "fields": [
@@ -147,7 +149,7 @@
       "title": { "zh-CN": "领取与分配队列", "en": "Claim and Assignment Queue" },
       "dataSource": "poolQueue",
       "density": "compact",
-      "maxHeight": 430,
+      "maxHeight": 360,
       "selection": { "mode": "single", "bind": "selectedPoolItem", "defaultFirst": true },
       "columns": [
         { "field": "pool_name", "width": 145, "label": { "zh-CN": "线索池", "en": "Pool" } },

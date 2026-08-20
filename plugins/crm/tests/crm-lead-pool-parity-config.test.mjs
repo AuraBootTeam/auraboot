@@ -218,7 +218,10 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
     operations.blocks.find((block) => block.id === 'crm_lead_pool_metrics').metrics.map((metric) => metric.key),
     ['available', 'ready', 'cooldown', 'owned', 'processing'],
   );
+  assert.equal(operations.blocks.find((block) => block.id === 'crm_lead_pool_metrics').density, 'compact');
+  assert.equal(operations.blocks.find((block) => block.id === 'crm_lead_pool_search').density, 'compact');
   const poolQueue = operations.blocks.find((block) => block.id === 'crm_lead_pool_queue');
+  assert.equal(poolQueue.maxHeight, 360);
   assert.equal(poolQueue.density, 'compact');
   assert.equal(poolQueue.selection.defaultFirst, true);
   const operationalStateColumn = poolQueue.columns.find((column) => column.field === 'operational_state');
