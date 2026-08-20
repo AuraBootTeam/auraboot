@@ -1,0 +1,11 @@
+{
+  "pageKey": "crm_customer_owner_history_detail", "name:zh-CN": "客户归属证据", "name:en": "Customer Ownership Evidence", "modelCode": "crm_customer_owner_history_common", "kind": "detail", "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "extension": { "showEdit": false, "showShare": false },
+  "blocks": [
+    { "id": "ownership_evidence", "blockType": "form-section", "title": { "zh-CN": "不可变归属证据", "en": "Immutable Ownership Evidence" }, "columns": 2, "fields": [
+      { "field": "crm_coh_customer_id", "readOnly": true }, { "field": "crm_coh_pool_id", "readOnly": true }, { "field": "crm_coh_event", "readOnly": true }, { "field": "crm_coh_occurred_at", "readOnly": true },
+      { "field": "crm_coh_previous_owner", "readOnly": true }, { "field": "crm_coh_next_owner", "readOnly": true }, { "field": "crm_coh_actor", "readOnly": true }, { "field": "crm_coh_reason", "readOnly": true }
+    ] }
+  ]
+}

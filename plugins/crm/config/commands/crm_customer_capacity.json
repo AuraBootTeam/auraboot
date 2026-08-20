@@ -1,0 +1,41 @@
+[
+  {
+    "code": "crm:create_customer_capacity",
+    "displayName:zh-CN": "新建客户库容",
+    "displayName:en": "Create Customer Capacity",
+    "type": "create",
+    "modelCode": "crm_customer_capacity_common",
+    "inputFields": ["crm_ccap_user_id", "crm_ccap_capacity", "crm_ccap_status", "crm_ccap_remark"],
+    "autoSetFields": { "crm_ccap_user_key": { "strategy": "copy_field", "sourceField": "crm_ccap_user_id" } },
+    "permissions": ["crm.customer_pool.manage"],
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_customer_capacity",
+    "displayName:zh-CN": "编辑客户库容",
+    "displayName:en": "Update Customer Capacity",
+    "type": "update",
+    "modelCode": "crm_customer_capacity_common",
+    "inputFields": ["crm_ccap_capacity", "crm_ccap_status", "crm_ccap_remark"],
+    "permissions": ["crm.customer_pool.manage"],
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_customer_capacity",
+    "displayName:zh-CN": "删除客户库容",
+    "displayName:en": "Delete Customer Capacity",
+    "type": "delete",
+    "modelCode": "crm_customer_capacity_common",
+    "permissions": ["crm.customer_pool.manage"],
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:list_customer_capacities",
+    "displayName:zh-CN": "客户库容列表",
+    "displayName:en": "List Customer Capacities",
+    "type": "query",
+    "modelCode": "crm_customer_capacity_common",
+    "permissions": ["crm.customer_pool.read"],
+    "cmd_risk_level": "L0"
+  }
+]

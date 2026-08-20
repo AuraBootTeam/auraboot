@@ -5,6 +5,7 @@ import com.auraboot.framework.meta.dto.ValidationResult;
 import com.auraboot.framework.meta.exception.ValidationException;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -190,6 +191,30 @@ class BackgroundDataAccessorImplTest {
         ArgumentCaptor<DynamicQueryRequest> captor = ArgumentCaptor.forClass(DynamicQueryRequest.class);
         verify(dds).list(eq("cr_crawl_url"), captor.capture());
         assertThat(captor.getValue().getConditions()).isEmpty();
+    }
+
+    @Test
+    void queryIn_usesOneTenantScopedINQueryForDistinctValues() {
+        PaginationResult<Map<String, Object>> page = new PaginationResult<>();
+        page.setRecords(List.of(Map.of("pid", "a1")));
+        when(dds.list(eq("crm_activity_common"), any(DynamicQueryRequest.class))).thenAnswer(inv -> {
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);
+            assertThat(MetaContext.getCurrentUserId()).isEqualTo(0L);
+            return page;
+        });
+
+        List<Map<String, Object>> result = accessor.queryIn(
+                42L, "crm_activity_common", "crm_act_related_id",
+                java.util.Arrays.asList("c1", "c2", "c1", null));
+
+        ArgumentCaptor<DynamicQueryRequest> captor = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dds).list(eq("crm_activity_common"), captor.capture());
+        QueryCondition condition = captor.getValue().getConditions().getFirst();
+        assertThat(condition.getFieldName()).isEqualTo("crm_act_related_id");
+        assertThat(condition.getOperator()).isEqualTo(QueryCondition.Operator.IN);
+        assertThat(condition.getValues()).containsExactly("c1", "c2");
+        assertThat(result).hasSize(1);
+        assertThat(MetaContext.exists()).isFalse();
     }
 
     @Test

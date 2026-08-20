@@ -903,5 +903,121 @@
     "domain_category": "crm",
     "data_sensitivity": "internal",
     "lifecycle_description": "Append-only evidence; records are never edited or deleted."
+  },
+  {
+    "code": "crm_customer_pool_common",
+    "displayName:zh-CN": "客户公海池",
+    "displayName:en": "Customer Public Pool",
+    "description": "Configures customer-pool membership, claim limits, cooldowns and automatic recycling.",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Waves",
+      "category": "crm",
+      "titleField": "crm_cp_name",
+      "subtitleField": "crm_cp_code"
+    },
+    "semantic_description": "A governed shared customer pool. Members may see and claim available customers; administrators may assign them and maintain policy. Capacity, daily limits and cooldowns are enforced atomically.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Enabled <-> Disabled. A pool with available customers cannot be deleted."
+  },
+  {
+    "code": "crm_customer_pool_recycle_rule_common",
+    "displayName:zh-CN": "客户公海回收规则",
+    "displayName:en": "Customer Pool Recycle Rule",
+    "description": "One ordered time condition evaluated by a customer-pool automatic recycle policy.",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "ListChecks",
+      "category": "crm",
+      "titleField": "crm_cprr_name",
+      "subtitleField": "crm_cprr_pool_id"
+    },
+    "semantic_description": "An operator-managed recycle condition. Active rules are grouped by pool and evaluated using the pool ALL/ANY match mode against entry, claim or last-activity time.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Active <-> Inactive. Inactive rules remain auditable but do not participate in scheduled or manual recycle evaluation."
+  },
+  {
+    "code": "crm_customer_capacity_common",
+    "displayName:zh-CN": "客户库容",
+    "displayName:en": "Customer Capacity",
+    "description": "Maximum concurrently owned active customers for one sales user.",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Gauge",
+      "category": "crm",
+      "titleField": "crm_ccap_user_id",
+      "subtitleField": "crm_ccap_capacity",
+      "dataScope": { "ownerField": "crm_ccap_user_id" }
+    },
+    "semantic_description": "Per-user customer ownership capacity used by claim and manager assignment. A missing active record means unlimited capacity; duplicate active user configurations are rejected by the unique user key.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Active or inactive capacity configuration."
+  },
+  {
+    "code": "crm_customer_pool_item_common",
+    "displayName:zh-CN": "公海客户",
+    "displayName:en": "Pooled Customer",
+    "description": "Command-owned operational projection of one customer entering, leaving or being recycled into a public pool.",
+    "modelType": "entity",
+    "modelCategory": "activity",
+    "commandOnlyCreate": true,
+    "extension": {
+      "icon": "Inbox",
+      "category": "crm",
+      "titleField": "crm_cpi_account_name",
+      "subtitleField": "crm_cpi_account_code",
+      "dataScope": { "ownerField": "crm_cpi_claimed_by" }
+    },
+    "semantic_description": "Concurrency-safe public-pool projection. The unique account key and available-to-claim compare-and-set prevent two users claiming the same customer. Snapshot fields keep the shared queue readable without weakening ordinary customer owner data scope.",
+    "domain_category": "crm",
+    "data_sensitivity": "confidential",
+    "lifecycle_description": "Available -> Claiming -> Claimed / Assigned. Automatic recycle uses a fenced lease and returns only fully completed re-entry to Available."
+  },
+  {
+    "code": "crm_customer_pool_quota_common",
+    "displayName:zh-CN": "客户领取额度",
+    "displayName:en": "Customer Claim Quota",
+    "description": "Command-owned per-pool, per-user, per-day customer claim counter.",
+    "modelType": "entity",
+    "modelCategory": "activity",
+    "commandOnlyCreate": true,
+    "extension": {
+      "icon": "Hash",
+      "category": "crm",
+      "skipDetailPage": true,
+      "titleField": "crm_cpq_key",
+      "subtitleField": "crm_cpq_pick_count",
+      "dataScope": { "ownerField": "crm_cpq_user_id" }
+    },
+    "semantic_description": "Atomic daily customer claim counter bounded by the pool limit snapshot.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "One immutable identity per pool-user-local-date; the claim counter only increases."
+  },
+  {
+    "code": "crm_customer_owner_history_common",
+    "displayName:zh-CN": "客户归属历史",
+    "displayName:en": "Customer Ownership History",
+    "description": "Immutable audit evidence for move, claim, assign and automatic recycle events.",
+    "modelType": "entity",
+    "modelCategory": "activity",
+    "immutable": true,
+    "commandOnlyCreate": true,
+    "extension": {
+      "icon": "History",
+      "category": "crm",
+      "titleField": "crm_coh_event",
+      "subtitleField": "crm_coh_occurred_at"
+    },
+    "semantic_description": "Append-only customer ownership history recording pool, previous owner, next owner, actor, reason and timestamp for every governed transition.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Append-only evidence; records are never edited or deleted."
   }
 ]

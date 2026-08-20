@@ -169,5 +169,38 @@
     "feature": {
       "searchable": true
     }
+  },
+  {
+    "code": "crm_acc_pool_state",
+    "displayName:zh-CN": "公海状态",
+    "displayName:en": "Public Pool State",
+    "dataType": "enum",
+    "dictCode": "crm_customer_pool_state",
+    "defaultValue": "owned",
+    "constraints": { "required": true },
+    "feature": { "readonly": true, "searchable": true }
+  },
+  {
+    "code": "crm_acc_last_pool_id",
+    "displayName:zh-CN": "最近公海池",
+    "displayName:en": "Last Public Pool",
+    "dataType": "reference",
+    "referenceModelCode": "crm_customer_pool_common",
+    "refTarget": { "targetModel": "crm_customer_pool_common", "valueField": "pid", "displayField": "crm_cp_name" },
+    "feature": { "readonly": true, "searchable": true }
+  },
+  {
+    "code": "crm_acc_claimed_at",
+    "displayName:zh-CN": "最近领取时间",
+    "displayName:en": "Last Claimed At",
+    "dataType": "datetime",
+    "feature": { "readonly": true, "sortable": true }
+  },
+  {
+    "code": "crm_acc_last_activity_at",
+    "displayName:zh-CN": "最近活动时间",
+    "displayName:en": "Last Activity At",
+    "dataType": "datetime",
+    "feature": { "readonly": true, "sortable": true }
   }
 ]

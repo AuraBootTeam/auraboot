@@ -1,0 +1,289 @@
+{
+  "pageKey": "crm_customer_pool_item_list",
+  "name:zh-CN": "客户公海运营台",
+  "name:en": "Customer Pool Operations",
+  "modelCode": "crm_customer_pool_item_common",
+  "description": "Task-first workspace for customer-pool availability, cooldown, claim, assignment and ownership evidence.",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "extension": { "showShare": false, "showReport": false, "showPrint": false, "showEdit": false },
+  "dataSources": {
+    "poolStats": {
+      "type": "namedQuery",
+      "queryCode": "crm_customer_pool_ops_stats",
+      "params": {},
+      "adaptor": "table",
+      "format": "records"
+    },
+    "poolQueue": {
+      "type": "namedQuery",
+      "queryCode": "crm_customer_pool_ops_queue",
+      "params": {
+        "customerKeyword": "${state.searchKeyword}",
+        "viewFilter": "${state.viewFilter}"
+      },
+      "dependOn": ["state.searchKeyword", "state.viewFilter"],
+      "adaptor": "table",
+      "format": "records"
+    }
+  },
+  "blocks": [
+    {
+      "id": "crm_customer_pool_metrics",
+      "blockType": "metric-strip",
+      "dataSource": "poolStats",
+      "variant": "cards",
+      "density": "compact",
+      "columns": 5,
+      "metrics": [
+        {
+          "key": "available",
+          "label": { "zh-CN": "待领取", "en": "Available" },
+          "valueField": "available_count",
+          "subText": { "zh-CN": "仍在客户公海中", "en": "Still in the pool" },
+          "tone": "blue",
+          "icon": "Inbox",
+          "activeWhen": "state.viewFilter == null || state.viewFilter == '' || state.viewFilter == 'available'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "available" } }
+        },
+        {
+          "key": "ready",
+          "label": { "zh-CN": "现在可领", "en": "Ready Now" },
+          "valueField": "ready_count",
+          "subText": { "zh-CN": "已满足新客户冷却期", "en": "Cooldown has elapsed" },
+          "tone": "green",
+          "icon": "BadgeCheck",
+          "activeWhen": "state.viewFilter == 'ready'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "ready" } }
+        },
+        {
+          "key": "cooldown",
+          "label": { "zh-CN": "冷却中", "en": "Cooling Down" },
+          "valueField": "cooldown_count",
+          "subText": { "zh-CN": "到期后自动进入可领队列", "en": "Unlocks automatically" },
+          "tone": "amber",
+          "icon": "Clock3",
+          "activeWhen": "state.viewFilter == 'cooldown'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "cooldown" } }
+        },
+        {
+          "key": "owned",
+          "label": { "zh-CN": "本轮已获配", "en": "Owned" },
+          "valueField": "owned_count",
+          "subText": { "zh-CN": "已领取或管理员分配", "en": "Claimed or assigned" },
+          "tone": "default",
+          "icon": "UserCheck",
+          "activeWhen": "state.viewFilter == 'owned'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "owned" } }
+        },
+        {
+          "key": "processing",
+          "label": { "zh-CN": "回收处理中", "en": "Recycling" },
+          "valueField": "processing_count",
+          "subText": { "zh-CN": "含自动恢复中的任务", "en": "Includes automatic recovery" },
+          "tone": "amber",
+          "icon": "RefreshCw",
+          "activeWhen": "state.viewFilter == 'processing'",
+          "onClick": { "action": "state.set", "args": { "viewFilter": "processing" } }
+        }
+      ]
+    },
+    {
+      "id": "crm_customer_pool_search",
+      "blockType": "filters",
+      "density": "compact",
+      "onSearch": { "action": "dataSource.reload", "args": { "dataSourceId": "poolQueue" } },
+      "onReset": { "action": "state.set", "args": { "searchKeyword": "" } },
+      "fields": [
+        {
+          "field": "crm_cpi_account_name",
+          "component": "SmartInput",
+          "bindState": "searchKeyword",
+          "label": { "zh-CN": "搜索池内客户", "en": "Search pooled customers" },
+          "placeholder": { "zh-CN": "输入客户名称、编号或联系电话", "en": "Search customer name, code, or phone" },
+          "helpText": { "zh-CN": "筛选当前用户有权访问的公海客户，不改变池策略。", "en": "Filters customers in public pools available to the current user without changing pool policy." }
+        }
+      ]
+    },
+    {
+      "id": "crm_customer_pool_header_actions",
+      "blockType": "workbench-action-bar",
+      "surface": "bare",
+      "density": "compact",
+      "align": "end",
+      "actions": [
+        {
+          "code": "open_customer",
+          "permissionCode": "crm.account.read",
+          "label": { "zh-CN": "打开客户档案", "en": "Open Customer Record" },
+          "variant": "secondary",
+          "visibleWhen": "state.selectedPoolItem != null",
+          "onClick": { "action": "navigate", "args": { "to": "/p/crm_account_common/view/${state.selectedPoolItem.crm_cpi_account_id}" } }
+        },
+        {
+          "code": "batch_operations",
+          "permissionCode": "crm.customer_pool.pick",
+          "label": { "zh-CN": "批量处理", "en": "Batch Operations" },
+          "variant": "primary",
+          "onClick": { "action": "navigate", "args": { "to": "/p/c/crm_customer_pool_batch_list" } }
+        },
+        {
+          "code": "pool_policy",
+          "permissionCode": "crm.customer_pool.manage",
+          "label": { "zh-CN": "客户公海策略", "en": "Pool Policies" },
+          "variant": "secondary",
+          "onClick": { "action": "navigate", "args": { "to": "/p/crm_customer_pool" } }
+        },
+        {
+          "code": "capacity_policy",
+          "permissionCode": "crm.customer_pool.manage",
+          "label": { "zh-CN": "人员库容", "en": "User Capacity" },
+          "variant": "secondary",
+          "onClick": { "action": "navigate", "args": { "to": "/p/crm_customer_capacity" } }
+        }
+      ]
+    },
+    {
+      "id": "crm_customer_pool_queue",
+      "blockType": "table",
+      "title": { "zh-CN": "领取与分配队列", "en": "Claim and Assignment Queue" },
+      "dataSource": "poolQueue",
+      "density": "compact",
+      "maxHeight": 360,
+      "selection": { "mode": "single", "bind": "selectedPoolItem", "defaultFirst": true },
+      "columns": [
+        { "field": "pool_name", "width": 125, "label": { "zh-CN": "客户公海", "en": "Pool" } },
+        { "field": "crm_cpi_account_name", "width": 170, "label": { "zh-CN": "客户名称", "en": "Customer" } },
+        { "field": "crm_cpi_rating", "width": 65, "label": { "zh-CN": "评级", "en": "Rating" } },
+        { "field": "crm_cpi_industry", "width": 100, "dictCode": "crm_account_industry", "label": { "zh-CN": "行业", "en": "Industry" } },
+        { "field": "crm_cpi_health_score", "width": 75, "align": "right", "label": { "zh-CN": "健康分", "en": "Health" } },
+        { "field": "operational_state", "width": 105, "renderType": "tag", "dictCode": "crm_customer_pool_operational_state", "label": { "zh-CN": "领取状态", "en": "Claim State" } },
+        { "field": "crm_cpi_claim_release_at", "width": 145, "valueType": "datetime", "label": { "zh-CN": "可领取时间", "en": "Available At" } },
+        { "field": "owner_name", "width": 115, "label": { "zh-CN": "当前获配人", "en": "Current Owner" } }
+      ],
+      "rowActions": [
+        {
+          "code": "view_pool_evidence",
+          "label": { "zh-CN": "池内详情", "en": "Pool Detail" },
+          "permissionCode": "crm.customer_pool.read",
+          "action": { "type": "navigate", "to": "crm_customer_pool_item_detail" }
+        }
+      ],
+      "empty": {
+        "title": { "zh-CN": "当前公海队列为空", "en": "The public-pool queue is empty" },
+        "description": { "zh-CN": "可调整状态筛选，或从客户列表将活跃客户移入已启用的公海池。", "en": "Adjust the status filter or move an active customer from the customer list into an enabled pool." }
+      }
+    },
+    {
+      "id": "crm_customer_pool_status",
+      "blockType": "status-banner",
+      "context": "${state.selectedPoolItem}",
+      "statusField": "operational_state",
+      "toneMap": { "ready": "green", "cooldown": "amber", "claimed": "blue", "assigned": "blue", "recycling": "amber", "recycling_retry": "amber" },
+      "titleMap": {
+        "ready": { "zh-CN": "该客户现在可以领取或分配", "en": "This customer is ready to claim or assign" },
+        "cooldown": { "zh-CN": "客户仍在领取冷却期", "en": "This customer is still cooling down" },
+        "claimed": { "zh-CN": "客户已由成员领取", "en": "This customer was claimed by a member" },
+        "assigned": { "zh-CN": "客户已由管理员分配", "en": "This customer was assigned by an administrator" },
+        "recycling": { "zh-CN": "系统正在自动回收该客户", "en": "The system is recycling this customer" },
+        "recycling_retry": { "zh-CN": "系统正在恢复未完成的回收任务", "en": "The system is recovering an incomplete recycle" }
+      },
+      "descriptionMap": {
+        "ready": { "zh-CN": "领取时会再次校验成员资格、每日上限、人员库容和并发状态。", "en": "Membership, daily quota, capacity, and concurrency are rechecked on claim." },
+        "cooldown": { "zh-CN": "管理员可分配；普通成员需等待可领取时间，前负责人还要满足专属冷却规则。", "en": "Administrators may assign; members must wait for release and previous-owner cooldown." },
+        "claimed": { "zh-CN": "责任和数据权限已经切换到领取人，可从客户档案继续推进。", "en": "Ownership and record access now belong to the claimant." },
+        "assigned": { "zh-CN": "管理员分配结果已经写入责任历史，可从客户档案继续推进。", "en": "The assignment is recorded in ownership history." },
+        "recycling": { "zh-CN": "租约生效期间不会被重复领取或重复回收；完成后自动回到待领取队列。", "en": "An active lease prevents duplicate claims or recycles; the customer returns to the available queue when complete." },
+        "recycling_retry": { "zh-CN": "上一次回收未完整结束，系统已由唯一恢复者续跑，归属历史不会重复。", "en": "A single recovery worker resumed the incomplete recycle without duplicating ownership history." }
+      },
+      "summaryFields": [
+        { "field": "crm_cpi_account_code", "label": { "zh-CN": "客户编号", "en": "Customer Code" }, "linkTo": "/p/crm_account_common/view/${crm_cpi_account_id}" },
+        { "field": "pool_name", "label": { "zh-CN": "所属客户公海", "en": "Pool" } },
+        { "field": "previous_owner_name", "label": { "zh-CN": "前负责人", "en": "Previous Owner" } },
+        { "field": "owner_name", "label": { "zh-CN": "当前获配人", "en": "Current Owner" } },
+        { "field": "crm_cpi_claim_release_at", "valueType": "datetime", "label": { "zh-CN": "可领取时间", "en": "Available At" } }
+      ]
+    },
+    {
+      "id": "crm_customer_pool_actions",
+      "blockType": "workbench-action-bar",
+      "title": { "zh-CN": "下一步动作", "en": "Next Action" },
+      "surface": "card",
+      "density": "compact",
+      "actions": [
+        {
+          "code": "claim",
+          "permissionCode": "crm.customer_pool.pick",
+          "label": { "zh-CN": "领取此客户", "en": "Claim Customer" },
+          "variant": "primary",
+          "visibleWhen": "state.selectedPoolItem != null && state.selectedPoolItem.operational_state == 'ready'",
+          "confirm": { "zh-CN": "系统将再次校验领取资格并原子切换责任人。确认领取？", "en": "Eligibility will be rechecked before ownership changes atomically. Continue?" },
+          "onClick": {
+            "action": "command.execute",
+            "args": {
+              "command": "crm:claim_pool_customer",
+              "operationType": "update",
+              "targetRecordPid": "${state.selectedPoolItem.pid}",
+              "reload": ["poolStats", "poolQueue"],
+              "feedback": {
+                "successMessage": { "zh-CN": "领取成功，责任和数据权限已更新", "en": "Customer claimed; ownership and access updated" },
+                "errorMessage": { "zh-CN": "领取失败，请按提示检查冷却、上限、库容或并发状态", "en": "Claim failed; check cooldown, quota, capacity, or concurrent ownership" }
+              }
+            }
+          }
+        },
+        {
+          "code": "assign",
+          "permissionCode": "crm.customer_pool.assign",
+          "label": { "zh-CN": "分配给成员", "en": "Assign to Member" },
+          "variant": "primary",
+          "visibleWhen": "state.selectedPoolItem != null && (state.selectedPoolItem.operational_state == 'ready' || state.selectedPoolItem.operational_state == 'cooldown')",
+          "onClick": {
+            "action": "command.execute",
+            "args": {
+              "command": "crm:assign_pool_customer",
+              "operationType": "update",
+              "targetRecordPid": "${state.selectedPoolItem.pid}",
+              "inputFieldsTitle": { "zh-CN": "分配池内客户", "en": "Assign Pooled Customer" },
+              "inputFieldsSubmitLabel": { "zh-CN": "确认分配", "en": "Confirm Assignment" },
+              "inputFields": [
+                {
+                  "field": "crm_cpi_claimed_by",
+                  "label": { "zh-CN": "分配给", "en": "Assign To" },
+                  "type": "reference",
+                  "component": "MemberPicker",
+                  "required": true,
+                  "placeholder": { "zh-CN": "选择该公海池内的销售成员", "en": "Select a sales member in this pool" },
+                  "helpText": { "zh-CN": "分配会校验成员资格与客户库容，并立即收敛数据权限。", "en": "Assignment validates pool membership and customer capacity, then narrows record access immediately." },
+                  "props": { "multiple": false }
+                }
+              ],
+              "reload": ["poolStats", "poolQueue"],
+              "feedback": {
+                "successMessage": { "zh-CN": "分配成功，责任和数据权限已更新", "en": "Customer assigned; ownership and access updated" },
+                "errorMessage": { "zh-CN": "分配失败，请检查管理员资格、人员库容或并发状态", "en": "Assignment failed; check admin role, capacity, or concurrent ownership" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "crm_customer_pool_evidence",
+      "blockType": "evidence-panel",
+      "context": "${state.selectedPoolItem}",
+      "title": { "zh-CN": "领取与责任证据", "en": "Claim and Ownership Evidence" },
+      "description": { "zh-CN": "入池原因、冷却、前负责人和当前获配结果使用同一选中上下文。", "en": "Entry reason, cooldown, previous owner, and ownership share one selected context." },
+      "sections": [
+        { "key": "customer", "label": { "zh-CN": "客户", "en": "Customer" }, "field": "crm_cpi_account_name" },
+        { "key": "rating", "label": { "zh-CN": "客户评级", "en": "Rating" }, "field": "crm_cpi_rating" },
+        { "key": "entered", "label": { "zh-CN": "入池时间", "en": "Entered At" }, "field": "crm_cpi_entered_at", "format": "datetime" },
+        { "key": "reason", "label": { "zh-CN": "入池原因", "en": "Entry Reason" }, "field": "crm_cpi_reason" },
+        { "key": "previous", "label": { "zh-CN": "前负责人", "en": "Previous Owner" }, "field": "previous_owner_name" },
+        { "key": "owner", "label": { "zh-CN": "当前获配人", "en": "Current Owner" }, "field": "owner_name" }
+      ],
+      "empty": { "title": { "zh-CN": "选择一条池内客户，查看领取规则和责任证据", "en": "Select a pooled customer to review eligibility and ownership evidence" } }
+    }
+  ]
+}

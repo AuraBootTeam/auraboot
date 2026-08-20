@@ -1747,5 +1747,52 @@
       { "code": "related_id", "columnExpr": "related_id", "dataType": "string" },
       { "code": "attention_reason", "columnExpr": "attention_reason", "dataType": "string" }
     ]
+  },
+  {
+    "code": "crm_customer_pool_ops_stats",
+    "name:zh-CN": "客户公海运营统计",
+    "name:en": "Customer Pool Operations Stats",
+    "description": "One-row operational summary for available, claimable, cooling-down, owned and recycling customers.",
+    "resourceCode": "crm.customer_pool",
+    "actionCode": "read",
+    "fromSql": "SELECT COUNT(*) FILTER (WHERE i.crm_cpi_status = 'available') AS available_count, COUNT(*) FILTER (WHERE i.crm_cpi_status = 'available' AND (i.crm_cpi_claim_release_at IS NULL OR i.crm_cpi_claim_release_at <= now())) AS ready_count, COUNT(*) FILTER (WHERE i.crm_cpi_status = 'available' AND i.crm_cpi_claim_release_at > now()) AS cooldown_count, COUNT(*) FILTER (WHERE i.crm_cpi_status IN ('claimed', 'assigned')) AS owned_count, COUNT(*) FILTER (WHERE i.crm_cpi_status IN ('recycling', 'recycling_retry')) AS processing_count FROM mt_crm_customer_pool_item_common i JOIN mt_crm_customer_pool_common p ON p.pid = i.crm_cpi_pool_id AND p.tenant_id = i.tenant_id WHERE i.tenant_id = #{params.tenantId} AND (p.crm_cp_member_user_ids LIKE CONCAT('%\"', (SELECT pid FROM ab_user WHERE id = CAST(#{params.currentUserId} AS bigint)), '\"%') OR p.crm_cp_admin_user_ids LIKE CONCAT('%\"', (SELECT pid FROM ab_user WHERE id = CAST(#{params.currentUserId} AS bigint)), '\"%'))",
+    "outputFields": [
+      { "code": "available_count", "columnExpr": "available_count", "dataType": "number" },
+      { "code": "ready_count", "columnExpr": "ready_count", "dataType": "number" },
+      { "code": "cooldown_count", "columnExpr": "cooldown_count", "dataType": "number" },
+      { "code": "owned_count", "columnExpr": "owned_count", "dataType": "number" },
+      { "code": "processing_count", "columnExpr": "processing_count", "dataType": "number" }
+    ]
+  },
+  {
+    "code": "crm_customer_pool_ops_queue",
+    "name:zh-CN": "客户公海领取与分配队列",
+    "name:en": "Customer Pool Claim and Assignment Queue",
+    "description": "Dense customer queue with policy context and explicit readiness for claim and assignment decisions.",
+    "resourceCode": "crm.customer_pool",
+    "actionCode": "read",
+    "fromSql": "SELECT q.* FROM (SELECT i.pid, i.crm_cpi_account_id, i.crm_cpi_pool_id, p.crm_cp_name AS pool_name, i.crm_cpi_status, i.crm_cpi_account_code, i.crm_cpi_account_name, i.crm_cpi_rating, i.crm_cpi_phone, i.crm_cpi_industry, i.crm_cpi_health_score, i.crm_cpi_entered_at, i.crm_cpi_reason, i.crm_cpi_claim_release_at, i.crm_cpi_claimed_at, i.crm_cpi_claimed_by, COALESCE(owner_user.nick_name, owner_user.user_name, i.crm_cpi_claimed_by, '') AS owner_name, i.crm_cpi_previous_owner, COALESCE(previous_user.nick_name, previous_user.user_name, i.crm_cpi_previous_owner, '') AS previous_owner_name, CASE WHEN i.crm_cpi_status = 'available' AND (i.crm_cpi_claim_release_at IS NULL OR i.crm_cpi_claim_release_at <= now()) THEN 'ready' WHEN i.crm_cpi_status = 'available' THEN 'cooldown' ELSE i.crm_cpi_status END AS operational_state FROM mt_crm_customer_pool_item_common i JOIN mt_crm_customer_pool_common p ON p.pid = i.crm_cpi_pool_id AND p.tenant_id = i.tenant_id LEFT JOIN ab_user owner_user ON owner_user.pid = i.crm_cpi_claimed_by LEFT JOIN ab_user previous_user ON previous_user.pid = i.crm_cpi_previous_owner WHERE i.tenant_id = #{params.tenantId} AND (p.crm_cp_member_user_ids LIKE CONCAT('%\"', (SELECT pid FROM ab_user WHERE id = CAST(#{params.currentUserId} AS bigint)), '\"%') OR p.crm_cp_admin_user_ids LIKE CONCAT('%\"', (SELECT pid FROM ab_user WHERE id = CAST(#{params.currentUserId} AS bigint)), '\"%'))) q WHERE (COALESCE(CAST(#{params.customerKeyword} AS text), '') = '' OR q.crm_cpi_account_code ILIKE CONCAT('%', CAST(#{params.customerKeyword} AS text), '%') OR q.crm_cpi_account_name ILIKE CONCAT('%', CAST(#{params.customerKeyword} AS text), '%') OR COALESCE(q.crm_cpi_phone, '') ILIKE CONCAT('%', CAST(#{params.customerKeyword} AS text), '%')) AND (COALESCE(CAST(#{params.viewFilter} AS text), '') = '' OR (CAST(#{params.viewFilter} AS text) = 'available' AND q.crm_cpi_status = 'available') OR (CAST(#{params.viewFilter} AS text) = 'ready' AND q.operational_state = 'ready') OR (CAST(#{params.viewFilter} AS text) = 'cooldown' AND q.operational_state = 'cooldown') OR (CAST(#{params.viewFilter} AS text) = 'owned' AND q.crm_cpi_status IN ('claimed', 'assigned')) OR (CAST(#{params.viewFilter} AS text) = 'processing' AND q.crm_cpi_status IN ('recycling', 'recycling_retry'))) ORDER BY CASE q.operational_state WHEN 'ready' THEN 1 WHEN 'cooldown' THEN 2 WHEN 'recycling_retry' THEN 3 WHEN 'recycling' THEN 4 WHEN 'assigned' THEN 5 ELSE 6 END, q.crm_cpi_health_score DESC NULLS LAST, q.crm_cpi_entered_at ASC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "crm_cpi_account_id", "columnExpr": "crm_cpi_account_id", "dataType": "string" },
+      { "code": "crm_cpi_pool_id", "columnExpr": "crm_cpi_pool_id", "dataType": "string" },
+      { "code": "pool_name", "columnExpr": "pool_name", "dataType": "string", "searchable": true },
+      { "code": "crm_cpi_status", "columnExpr": "crm_cpi_status", "dataType": "string" },
+      { "code": "crm_cpi_account_code", "columnExpr": "crm_cpi_account_code", "dataType": "string", "searchable": true },
+      { "code": "crm_cpi_account_name", "columnExpr": "crm_cpi_account_name", "dataType": "string", "searchable": true },
+      { "code": "crm_cpi_rating", "columnExpr": "crm_cpi_rating", "dataType": "string" },
+      { "code": "crm_cpi_phone", "columnExpr": "crm_cpi_phone", "dataType": "string" },
+      { "code": "crm_cpi_industry", "columnExpr": "crm_cpi_industry", "dataType": "string" },
+      { "code": "crm_cpi_health_score", "columnExpr": "crm_cpi_health_score", "dataType": "number" },
+      { "code": "crm_cpi_entered_at", "columnExpr": "crm_cpi_entered_at", "dataType": "date" },
+      { "code": "crm_cpi_reason", "columnExpr": "crm_cpi_reason", "dataType": "string" },
+      { "code": "crm_cpi_claim_release_at", "columnExpr": "crm_cpi_claim_release_at", "dataType": "date" },
+      { "code": "crm_cpi_claimed_at", "columnExpr": "crm_cpi_claimed_at", "dataType": "date" },
+      { "code": "crm_cpi_claimed_by", "columnExpr": "crm_cpi_claimed_by", "dataType": "string" },
+      { "code": "owner_name", "columnExpr": "owner_name", "dataType": "string" },
+      { "code": "crm_cpi_previous_owner", "columnExpr": "crm_cpi_previous_owner", "dataType": "string" },
+      { "code": "previous_owner_name", "columnExpr": "previous_owner_name", "dataType": "string" },
+      { "code": "operational_state", "columnExpr": "operational_state", "dataType": "string" }
+    ]
   }
 ]

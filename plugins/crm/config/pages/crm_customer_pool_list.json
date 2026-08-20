@@ -1,0 +1,49 @@
+{
+  "pageKey": "crm_customer_pool_list",
+  "name:zh-CN": "客户公海设置",
+  "name:en": "Customer Pool Settings",
+  "modelCode": "crm_customer_pool_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12 },
+  "blocks": [
+    {
+      "id": "crm_cp_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        { "code": "create", "primary": true, "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.create", "action": { "type": "navigate", "to": "crm_customer_pool_form" } },
+        { "code": "run_recycle", "permissionCode": "crm.customer_pool.recycle", "label": { "zh-CN": "立即执行回收", "en": "Run Recycle Now" }, "action": { "type": "command", "command": "crm:run_customer_pool_recycle" } }
+      ]
+    },
+    {
+      "id": "crm_cp_table",
+      "blockType": "table",
+      "columns": [
+        { "field": "crm_cp_code", "width": 150, "sortable": true },
+        { "field": "crm_cp_name", "width": 200, "sortable": true },
+        { "field": "crm_cp_status", "width": 100, "renderType": "tag", "dictCode": "crm_customer_pool_status" },
+        { "field": "crm_cp_daily_pick_limit", "width": 120, "align": "right" },
+        { "field": "crm_cp_new_cooldown_days", "width": 130, "align": "right" },
+        { "field": "crm_cp_previous_owner_cooldown_days", "width": 150, "align": "right" },
+        { "field": "crm_cp_auto_recycle", "width": 110 },
+        { "field": "crm_cp_recycle_after_days", "width": 130, "align": "right" },
+        {
+          "field": "actions", "isActionColumn": true, "label": "$i18n:common.actions",
+          "buttons": [
+            { "code": "view", "label": "$i18n:common.button.view", "action": { "type": "navigate", "to": "crm_customer_pool_detail" } },
+            { "code": "edit", "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_customer_pool_form" } },
+            { "code": "toggle", "permissionCode": "crm.customer_pool.manage", "label": { "zh-CN": "启用/停用", "en": "Enable/Disable" }, "action": { "type": "command", "command": "crm:toggle_customer_pool" } },
+            { "code": "delete", "danger": true, "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.delete", "confirm": { "zh-CN": "仅空客户公海可删除，确认继续？", "en": "Only an empty pool can be deleted. Continue?" }, "action": { "type": "command", "command": "crm:delete_customer_pool" } }
+          ]
+        }
+      ],
+      "searchFields": ["crm_cp_code", "crm_cp_name"],
+      "searchPlaceholder": { "zh-CN": "搜索公海编号或名称", "en": "Search pool code or name" },
+      "empty": {
+        "title": { "zh-CN": "尚未配置客户公海池", "en": "No customer public pool is configured" },
+        "description": { "zh-CN": "新建公海池并设置成员、领取上限、冷却和回收规则。", "en": "Create a pool and configure membership, claim limits, cooldowns, and recycle policy." }
+      },
+      "defaultSort": { "field": "updated_at", "order": "desc" }
+    }
+  ]
+}

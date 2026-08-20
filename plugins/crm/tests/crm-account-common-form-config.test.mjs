@@ -137,3 +137,15 @@ test('account status is required on create form and defaults to active', () => {
   assert.equal(create.autoSetFields?.crm_acc_status?.strategy, 'default_value');
   assert.equal(create.autoSetFields?.crm_acc_status?.value, 'active');
 });
+
+test('new accounts start in the owned state required by the customer-pool state machine', () => {
+  const poolState = fieldByCode.get('crm_acc_pool_state');
+  assert.ok(poolState, 'crm_acc_pool_state field should exist');
+  assert.equal(poolState.constraints?.required, true);
+  assert.equal(poolState.defaultValue, 'owned');
+
+  const create = commandByCode.get('crm:create_account');
+  assert.ok(create, 'crm:create_account command should exist');
+  assert.equal(create.autoSetFields?.crm_acc_pool_state?.strategy, 'fixed_value');
+  assert.equal(create.autoSetFields?.crm_acc_pool_state?.value, 'owned');
+});

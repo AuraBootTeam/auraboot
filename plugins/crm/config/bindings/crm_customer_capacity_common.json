@@ -1,0 +1,7 @@
+[
+  { "modelCode": "crm_customer_capacity_common", "fieldCode": "crm_ccap_user_key", "sequence": 1, "required": true, "visible": false, "editable": false },
+  { "modelCode": "crm_customer_capacity_common", "fieldCode": "crm_ccap_user_id", "sequence": 2, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_customer_capacity_common", "fieldCode": "crm_ccap_capacity", "sequence": 3, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_customer_capacity_common", "fieldCode": "crm_ccap_status", "sequence": 4, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_customer_capacity_common", "fieldCode": "crm_ccap_remark", "sequence": 5, "required": false, "visible": false, "editable": true }
+]

@@ -1,0 +1,13 @@
+[
+  { "modelCode": "crm_customer_pool_recycle_rule_common", "fieldCode": "crm_cprr_code", "sequence": 1, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_customer_pool_recycle_rule_common", "fieldCode": "crm_cprr_name", "sequence": 2, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_customer_pool_recycle_rule_common", "fieldCode": "crm_cprr_pool_id", "sequence": 3, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_customer_pool_recycle_rule_common", "fieldCode": "crm_cprr_time_source", "sequence": 4, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_customer_pool_recycle_rule_common", "fieldCode": "crm_cprr_operator", "sequence": 5, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_customer_pool_recycle_rule_common", "fieldCode": "crm_cprr_days", "sequence": 6, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_customer_pool_recycle_rule_common", "fieldCode": "crm_cprr_start_at", "sequence": 7, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_customer_pool_recycle_rule_common", "fieldCode": "crm_cprr_end_at", "sequence": 8, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_customer_pool_recycle_rule_common", "fieldCode": "crm_cprr_status", "sequence": 9, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_customer_pool_recycle_rule_common", "fieldCode": "crm_cprr_sort_order", "sequence": 10, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_customer_pool_recycle_rule_common", "fieldCode": "crm_cprr_description", "sequence": 11, "required": false, "visible": false, "editable": true }
+]

@@ -63,6 +63,14 @@
                   "readOnly": true
                 },
                 {
+                  "field": "crm_acc_pool_state",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_acc_last_pool_id",
+                  "readOnly": true
+                },
+                {
                   "field": "crm_acc_address",
                   "span": 2,
                   "readOnly": true
@@ -517,6 +525,17 @@
           "action": {
             "type": "command",
             "command": "crm:recompute_health"
+          }
+        },
+        {
+          "code": "move_to_customer_pool",
+          "icon": "Waves",
+          "permissionCode": "crm.customer_pool.move",
+          "label": { "zh-CN": "移入客户公海", "en": "Move to Public Pool" },
+          "visibleWhen": "record.crm_acc_pool_state != 'in_pool' && record.crm_acc_status == 'active'",
+          "action": {
+            "type": "command",
+            "command": "crm:move_customer_to_pool"
           }
         }
       ]

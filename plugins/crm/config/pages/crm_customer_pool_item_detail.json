@@ -1,0 +1,15 @@
+{
+  "pageKey": "crm_customer_pool_item_detail", "name:zh-CN": "池内客户详情", "name:en": "Pooled Customer Detail", "modelCode": "crm_customer_pool_item_common", "kind": "detail", "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "blocks": [
+    { "id": "customer_snapshot", "blockType": "form-section", "title": { "zh-CN": "客户快照", "en": "Customer Snapshot" }, "columns": 3, "fields": [
+      { "field": "crm_cpi_pool_id", "readOnly": true }, { "field": "crm_cpi_status", "readOnly": true }, { "field": "crm_cpi_account_code", "readOnly": true },
+      { "field": "crm_cpi_account_name", "readOnly": true }, { "field": "crm_cpi_rating", "readOnly": true }, { "field": "crm_cpi_phone", "readOnly": true },
+      { "field": "crm_cpi_industry", "readOnly": true }, { "field": "crm_cpi_health_score", "readOnly": true }, { "field": "crm_cpi_previous_owner", "readOnly": true }
+    ] },
+    { "id": "pool_evidence", "blockType": "form-section", "title": { "zh-CN": "入池与领取证据", "en": "Pool and Claim Evidence" }, "columns": 3, "fields": [
+      { "field": "crm_cpi_entered_at", "readOnly": true }, { "field": "crm_cpi_entered_by", "readOnly": true }, { "field": "crm_cpi_claim_release_at", "readOnly": true },
+      { "field": "crm_cpi_claimed_at", "readOnly": true }, { "field": "crm_cpi_claimed_by", "readOnly": true }, { "field": "crm_cpi_reason", "readOnly": true }
+    ] }
+  ]
+}

@@ -1120,6 +1120,30 @@ describe('WorkbenchActionBarBlockRenderer', () => {
 });
 
 describe('StatusBannerBlockRenderer', () => {
+  it('formats datetime summary values instead of exposing raw transport timestamps', () => {
+    const releasedAt = '2026-08-20T05:13:40.519+00:00';
+    const runtime = makeRuntime() as any;
+    runtime.getContext().locale = 'zh-CN';
+    runtime.getContext().state.selectedCustomer = {
+      operational_state: 'ready',
+      released_at: releasedAt,
+    };
+    const block: BlockConfig = {
+      id: 'customer_pool_status',
+      blockType: 'status-banner',
+      context: '${state.selectedCustomer}',
+      statusField: 'operational_state',
+      titleMap: { ready: 'Ready' },
+      summaryFields: [{ label: 'Available At', field: 'released_at', valueType: 'datetime' }],
+    };
+
+    render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+
+    const banner = screen.getByTestId('status-banner-customer_pool_status');
+    expect(banner).toHaveTextContent(new Date(releasedAt).toLocaleString('zh-CN'));
+    expect(banner).not.toHaveTextContent(releasedAt);
+  });
+
   it('formats configured currency summary values as readable business amounts', () => {
     const runtime = makeRuntime() as any;
     runtime.getContext().state.selectedAccount = {
@@ -3091,6 +3115,31 @@ describe('RecordInspectorBlockRenderer', () => {
 });
 
 describe('EvidencePanelBlockRenderer', () => {
+  it('formats datetime evidence sections instead of exposing raw transport timestamps', () => {
+    const enteredAt = '2026-08-20T05:13:40.519+00:00';
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        form: {},
+        global: {},
+        state: { selectedCustomer: { enteredAt } },
+      }),
+    });
+    const block: BlockConfig = {
+      id: 'evidence',
+      blockType: 'evidence-panel',
+      context: '${state.selectedCustomer}',
+      sections: [{ key: 'entered', label: 'Entered At', field: 'enteredAt', format: 'datetime' }],
+    };
+
+    render(<EvidencePanelBlockRenderer block={block} runtime={runtime} />);
+
+    const section = screen.getByTestId('evidence-panel-section-entered');
+    expect(section).toHaveTextContent(new Date(enteredAt).toLocaleString('zh-CN'));
+    expect(section).not.toHaveTextContent(enteredAt);
+  });
+
   it('renders an empty state when the configured context is missing', () => {
     const runtime = makeRuntime();
     const block: BlockConfig = {

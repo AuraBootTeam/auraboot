@@ -1,0 +1,22 @@
+{
+  "pageKey": "crm_customer_pool_detail",
+  "name:zh-CN": "客户公海详情",
+  "name:en": "Customer Pool Detail",
+  "modelCode": "crm_customer_pool_common",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "blocks": [
+    { "id": "policy", "blockType": "form-section", "title": { "zh-CN": "策略总览", "en": "Policy Overview" }, "columns": 3, "fields": [
+      { "field": "crm_cp_code", "readOnly": true }, { "field": "crm_cp_name", "readOnly": true }, { "field": "crm_cp_status", "readOnly": true },
+      { "field": "crm_cp_member_user_ids", "span": 2, "readOnly": true }, { "field": "crm_cp_admin_user_ids", "readOnly": true },
+      { "field": "crm_cp_daily_pick_limit", "readOnly": true }, { "field": "crm_cp_new_cooldown_days", "readOnly": true }, { "field": "crm_cp_previous_owner_cooldown_days", "readOnly": true },
+      { "field": "crm_cp_auto_recycle", "readOnly": true }, { "field": "crm_cp_recycle_match_mode", "readOnly": true }, { "field": "crm_cp_recycle_after_days", "readOnly": true }, { "field": "crm_cp_recycle_basis", "readOnly": true },
+      { "field": "crm_cp_description", "span": 3, "readOnly": true }
+    ] },
+    { "id": "actions", "blockType": "toolbar", "buttons": [
+      { "code": "edit", "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_customer_pool_form" } },
+      { "code": "manage_recycle_rules", "permissionCode": "crm.customer_pool.manage", "label": { "zh-CN": "维护回收条件", "en": "Manage Recycle Conditions" }, "action": { "type": "navigate", "to": "crm_customer_pool_recycle_rule_list" } }
+    ] }
+  ]
+}

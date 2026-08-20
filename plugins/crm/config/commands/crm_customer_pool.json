@@ -1,0 +1,125 @@
+[
+  {
+    "code": "crm:create_customer_pool",
+    "displayName:zh-CN": "新建客户公海",
+    "displayName:en": "Create Customer Pool",
+    "type": "create",
+    "modelCode": "crm_customer_pool_common",
+    "inputFields": ["crm_cp_name", "crm_cp_member_user_ids", "crm_cp_admin_user_ids", "crm_cp_daily_pick_limit", "crm_cp_new_cooldown_days", "crm_cp_previous_owner_cooldown_days", "crm_cp_auto_recycle", "crm_cp_recycle_match_mode", "crm_cp_recycle_after_days", "crm_cp_recycle_basis", "crm_cp_description"],
+    "autoSetFields": {
+      "crm_cp_code": { "strategy": "auto_generate", "pattern": "CP-{yyyyMMdd}-{seq}" },
+      "crm_cp_status": { "strategy": "fixed_value", "value": "enabled" }
+    },
+    "permissions": ["crm.customer_pool.manage"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:update_customer_pool",
+    "displayName:zh-CN": "编辑客户公海策略",
+    "displayName:en": "Update Customer Pool Policy",
+    "type": "update",
+    "modelCode": "crm_customer_pool_common",
+    "inputFields": ["crm_cp_name", "crm_cp_member_user_ids", "crm_cp_admin_user_ids", "crm_cp_daily_pick_limit", "crm_cp_new_cooldown_days", "crm_cp_previous_owner_cooldown_days", "crm_cp_auto_recycle", "crm_cp_recycle_match_mode", "crm_cp_recycle_after_days", "crm_cp_recycle_basis", "crm_cp_description"],
+    "permissions": ["crm.customer_pool.manage"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:toggle_customer_pool",
+    "displayName:zh-CN": "启用/停用客户公海",
+    "displayName:en": "Enable or Disable Customer Pool",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_common",
+    "handler": "crm:toggle_customer_pool",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.customer_pool.manage"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:delete_customer_pool",
+    "displayName:zh-CN": "删除客户公海",
+    "displayName:en": "Delete Customer Pool",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_common",
+    "handler": "crm:delete_customer_pool",
+    "handlerParams": { "dslPersistence": false },
+    "extension": { "confirmMessage:zh-CN": "仅空客户公海可删除，确认继续？", "confirmMessage:en": "Only an empty customer pool can be deleted. Continue?" },
+    "permissions": ["crm.customer_pool.manage"],
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:list_customer_pools",
+    "displayName:zh-CN": "客户公海列表",
+    "displayName:en": "List Customer Pools",
+    "type": "query",
+    "modelCode": "crm_customer_pool_common",
+    "permissions": ["crm.customer_pool.read"],
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:detail_customer_pool",
+    "displayName:zh-CN": "查看客户公海",
+    "displayName:en": "View Customer Pool",
+    "type": "query",
+    "modelCode": "crm_customer_pool_common",
+    "permissions": ["crm.customer_pool.read"],
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:move_customer_to_pool",
+    "displayName:zh-CN": "移入客户公海",
+    "displayName:en": "Move Customer to Pool",
+    "type": "custom",
+    "modelCode": "crm_account_common",
+    "handler": "crm:move_customer_to_pool",
+    "handlerParams": { "dslPersistence": false },
+    "inputFields": ["crm_acc_last_pool_id"],
+    "permissions": ["crm.customer_pool.move"],
+    "agent_hint": "Move an owned customer into an enabled public pool. Payload poolId or crm_acc_last_pool_id is required.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:claim_pool_customer",
+    "displayName:zh-CN": "领取客户",
+    "displayName:en": "Claim Customer",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_item_common",
+    "handler": "crm:claim_pool_customer",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.customer_pool.pick"],
+    "agent_hint": "Claim one available pool item. Capacity, daily limit and cooldown policies are enforced atomically.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:assign_pool_customer",
+    "displayName:zh-CN": "分配客户",
+    "displayName:en": "Assign Customer",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_item_common",
+    "handler": "crm:assign_pool_customer",
+    "handlerParams": { "dslPersistence": false },
+    "inputFields": ["crm_cpi_claimed_by"],
+    "permissions": ["crm.customer_pool.assign"],
+    "agent_hint": "Pool administrators assign one available pool item to a user. Payload assigneeId or crm_cpi_claimed_by is required.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:list_customer_pool_items",
+    "displayName:zh-CN": "客户公海条目列表",
+    "displayName:en": "List Customer Pool Items",
+    "type": "query",
+    "modelCode": "crm_customer_pool_item_common",
+    "permissions": ["crm.customer_pool.read"],
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:run_customer_pool_recycle",
+    "displayName:zh-CN": "立即执行自动回收",
+    "displayName:en": "Run Customer Pool Recycle Now",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_common",
+    "handler": "crm:run_customer_pool_recycle",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.customer_pool.recycle"],
+    "cmd_risk_level": "L2"
+  }
+]

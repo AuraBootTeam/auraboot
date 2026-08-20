@@ -87,6 +87,42 @@
     },
     {
       "type": "model",
+      "code": "crm_customer_pool_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_customer_pool_recycle_rule_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_customer_capacity_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_customer_pool_item_common"
+    },
+    {
+      "type": "model",
+      "code": "crm_customer_owner_history_common"
+    },
+    {
+      "type": "command",
+      "code": "crm:move_customer_to_pool"
+    },
+    {
+      "type": "command",
+      "code": "crm:claim_pool_customer"
+    },
+    {
+      "type": "command",
+      "code": "crm:assign_pool_customer"
+    },
+    {
+      "type": "page",
+      "code": "crm_customer_pool_item_list"
+    },
+    {
+      "type": "model",
       "code": "crm_opportunity_common"
     },
     {

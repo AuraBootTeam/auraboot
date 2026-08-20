@@ -743,6 +743,7 @@ function replaceRecordEndpointPlaceholders(template: string, recordPid: string):
 export function resolveEditRecordEndpoint(
   schema:
     | {
+        modelCode?: string;
         recordSource?: { endpoint?: string; method?: string };
         extension?: { recordSource?: { endpoint?: string; method?: string } };
       }
@@ -759,9 +760,9 @@ export function resolveEditRecordEndpoint(
     return custom.replace(/\/+$/, '');
   }
   if (!recordPid) {
-    return `/api/dynamic/${tableName}`;
+    return `/api/dynamic/${schema?.modelCode || tableName}`;
   }
-  return `/api/dynamic/${tableName}/${recordPid}`;
+  return `/api/dynamic/${schema?.modelCode || tableName}/${recordPid}`;
 }
 
 function isSingletonRecordSource(schema: any): boolean {

@@ -1,0 +1,72 @@
+{
+  "pageKey": "crm_customer_pool_batch_list",
+  "name:zh-CN": "客户公海批量处理",
+  "name:en": "Customer Pool Batch Operations",
+  "modelCode": "crm_customer_pool_item_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12 },
+  "blocks": [
+    {
+      "id": "batch_guidance",
+      "blockType": "description",
+      "content": {
+        "zh-CN": "<h3>批量领取与分配</h3><p>仅选择待领取客户。系统会逐条校验成员资格、冷却、每日上限、人员库容和并发状态，并明确报告每条结果。</p>",
+        "en": "<h3>Batch claim and assignment</h3><p>Select only available customers. Membership, cooldown, daily quota, capacity, and concurrency are validated per record with explicit results.</p>"
+      }
+    },
+    {
+      "id": "pool_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        { "key": "available", "label": { "zh-CN": "待领取", "en": "Available" }, "filter": { "field": "crm_cpi_status", "value": "available", "operator": "EQ" } },
+        { "key": "claimed", "label": { "zh-CN": "已领取", "en": "Claimed" }, "filter": { "field": "crm_cpi_status", "value": "claimed", "operator": "EQ" } },
+        { "key": "assigned", "label": { "zh-CN": "已分配", "en": "Assigned" }, "filter": { "field": "crm_cpi_status", "value": "assigned", "operator": "EQ" } }
+      ]
+    },
+    {
+      "id": "pool_queue",
+      "blockType": "table",
+      "table": {
+        "selection": { "mode": "multiple", "bind": "{{state.selectedIds}}" },
+        "bulkCapabilities": { "edit": false, "delete": false, "export": { "permissionCode": "crm.customer_pool.read" } },
+        "empty": {
+          "title": { "zh-CN": "没有可批量处理的公海客户", "en": "No pooled customers are available for batch processing" },
+          "description": { "zh-CN": "调整状态筛选，或从客户列表将活跃客户移入已启用的公海池。", "en": "Adjust the status filter or move active customers from the customer list into an enabled pool." }
+        },
+        "bulkActions": [
+          { "code": "batch_claim", "permissionCode": "crm.customer_pool.pick", "label": { "zh-CN": "批量领取", "en": "Claim Selected" }, "confirm": { "zh-CN": "容量、每日上限与冷却规则将逐条校验。确认领取？", "en": "Capacity, daily limit and cooldown rules will be enforced. Continue?" }, "action": { "type": "bulk_state_transition", "command": "crm:claim_pool_customer" } },
+          { "code": "batch_assign", "permissionCode": "crm.customer_pool.assign", "label": { "zh-CN": "批量分配", "en": "Assign Selected" }, "action": { "type": "bulk_field_command", "command": "crm:assign_pool_customer", "input": { "field": "crm_cpi_claimed_by", "label": { "zh-CN": "分配给", "en": "Assign To" }, "type": "reference", "component": "MemberPicker", "required": true, "placeholder": { "zh-CN": "选择该公海池内的销售成员", "en": "Select a sales member in this pool" }, "helpText": { "zh-CN": "系统逐条校验成员资格、客户库容和并发状态，并返回每条结果。", "en": "Membership, customer capacity, and concurrency are validated per customer with explicit results." }, "props": { "multiple": false } } } }
+        ]
+      },
+      "columns": [
+        { "field": "crm_cpi_pool_id", "width": 180 },
+        { "field": "crm_cpi_account_name", "width": 220, "sortable": true },
+        { "field": "crm_cpi_rating", "width": 130 },
+        { "field": "crm_cpi_industry", "width": 120, "renderType": "tag", "dictCode": "crm_account_industry" },
+        { "field": "crm_cpi_health_score", "width": 90, "align": "right", "sortable": true },
+        { "field": "crm_cpi_previous_owner", "width": 140 },
+        { "field": "crm_cpi_entered_at", "width": 170, "sortable": true },
+        { "field": "crm_cpi_claim_release_at", "width": 170 },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "label": "$i18n:common.actions",
+          "buttons": [
+            { "code": "view_pool_evidence", "label": { "zh-CN": "池内详情", "en": "Pool Detail" }, "action": { "type": "navigate", "to": "crm_customer_pool_item_detail" } },
+            { "code": "open_customer", "label": { "zh-CN": "查看客户", "en": "View Customer" }, "action": { "type": "navigate", "to": "/p/crm_account_common/view/${row.crm_cpi_account_id}" } },
+            { "code": "claim", "permissionCode": "crm.customer_pool.pick", "label": { "zh-CN": "领取", "en": "Claim" }, "visibleWhen": "row.crm_cpi_status == 'available'", "action": { "type": "command", "command": "crm:claim_pool_customer" } },
+            { "code": "assign", "permissionCode": "crm.customer_pool.assign", "label": { "zh-CN": "分配", "en": "Assign" }, "visibleWhen": "row.crm_cpi_status == 'available'", "action": { "type": "command", "command": "crm:assign_pool_customer", "operationType": "update", "inputFieldsTitle": { "zh-CN": "分配客户", "en": "Assign Customer" }, "inputFields": [ { "field": "crm_cpi_claimed_by", "label": { "zh-CN": "分配给", "en": "Assign To" }, "type": "reference", "component": "MemberPicker", "required": true, "placeholder": { "zh-CN": "选择该公海池内的销售成员", "en": "Select a sales member in this pool" }, "helpText": { "zh-CN": "分配会校验成员资格与客户库容，并立即更新责任归属。", "en": "Assignment validates membership and capacity, then updates ownership immediately." }, "props": { "multiple": false } } ] } }
+          ]
+        }
+      ],
+      "searchFields": ["crm_cpi_account_name", "crm_cpi_rating", "crm_cpi_account_code"],
+      "searchPlaceholder": { "zh-CN": "搜索客户名称、编号或评级", "en": "Search customer name, code, or rating" },
+      "empty": {
+        "title": { "zh-CN": "没有可批量处理的公海客户", "en": "No pooled customers are available for batch processing" },
+        "description": { "zh-CN": "调整状态筛选，或从客户列表将活跃客户移入已启用的公海池。", "en": "Adjust the status filter or move active customers from the customer list into an enabled pool." }
+      },
+      "defaultSort": { "field": "crm_cpi_entered_at", "order": "desc" }
+    }
+  ]
+}

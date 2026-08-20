@@ -1,0 +1,57 @@
+{
+  "pageKey": "crm_customer_pool_recycle_rule_list",
+  "name:zh-CN": "客户公海回收规则",
+  "name:en": "Customer Pool Recycle Rules",
+  "modelCode": "crm_customer_pool_recycle_rule_common",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12 },
+  "blocks": [
+    {
+      "id": "crm_cprr_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        { "code": "create", "primary": true, "permissionCode": "crm.customer_pool.manage", "label": { "zh-CN": "新增回收条件", "en": "Add Recycle Condition" }, "action": { "type": "navigate", "to": "crm_customer_pool_recycle_rule_form" } },
+        { "code": "back_to_pools", "label": { "zh-CN": "返回客户公海设置", "en": "Back to Customer Pools" }, "action": { "type": "navigate", "to": "crm_customer_pool_list" } }
+      ]
+    },
+    {
+      "id": "crm_cprr_guidance",
+      "blockType": "description",
+      "content": {
+        "zh-CN": "<h3>组合式自动回收</h3><p>一条记录代表一个时间条件。同一客户公海按池策略中的“全部满足（AND）/任一满足（OR）”组合生效条件；没有组合条件时继续使用兼容回收天数，无需迁移开发数据。</p>",
+        "en": "<h3>Composed automatic recycle</h3><p>Each record is one time condition. Active conditions for a pool use its ALL (AND) or ANY (OR) policy. Pools without composed conditions retain the compatible recycle-day policy, with no development-data migration required.</p>"
+      }
+    },
+    {
+      "id": "crm_cprr_table",
+      "blockType": "table",
+      "columns": [
+        { "field": "crm_cprr_name", "width": 200, "sortable": true },
+        { "field": "crm_cprr_pool_id", "width": 180 },
+        { "field": "crm_cprr_time_source", "width": 170, "renderType": "tag", "dictCode": "crm_customer_recycle_time_source" },
+        { "field": "crm_cprr_operator", "width": 160, "renderType": "tag", "dictCode": "crm_customer_recycle_time_operator" },
+        { "field": "crm_cprr_days", "width": 100, "align": "right" },
+        { "field": "crm_cprr_start_at", "width": 180 },
+        { "field": "crm_cprr_end_at", "width": 180 },
+        { "field": "crm_cprr_status", "width": 100, "renderType": "tag", "dictCode": "crm_customer_recycle_rule_status" },
+        { "field": "crm_cprr_sort_order", "width": 100, "align": "right", "sortable": true },
+        {
+          "field": "actions", "isActionColumn": true, "label": "$i18n:common.actions",
+          "buttons": [
+            { "code": "view", "label": "$i18n:common.button.view", "action": { "type": "navigate", "to": "crm_customer_pool_recycle_rule_detail" } },
+            { "code": "edit", "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_customer_pool_recycle_rule_form" } },
+            { "code": "delete", "danger": true, "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.delete", "confirm": { "zh-CN": "删除后该条件不再参与自动回收，确认继续？", "en": "This condition will no longer participate in automatic recycle. Continue?" }, "action": { "type": "command" } }
+          ]
+        }
+      ],
+      "searchFields": ["crm_cprr_code", "crm_cprr_name"],
+      "searchPlaceholder": { "zh-CN": "搜索规则编号或名称", "en": "Search rule code or name" },
+      "empty": {
+        "title": { "zh-CN": "尚未配置客户回收条件", "en": "No customer recycle condition is configured" },
+        "description": { "zh-CN": "新建条件后，启用自动回收的公海会按 AND/OR 策略组合评估。", "en": "Create a condition; pools with automatic recycle compose active conditions using their AND/OR policy." }
+      },
+      "defaultSort": { "field": "crm_cprr_sort_order", "order": "asc" }
+    }
+  ]
+}
