@@ -154,6 +154,9 @@ describe('DSL Generated Schema', () => {
         expect.objectContaining({ $ref: '#/definitions/LocalizedText' }),
       ]),
     );
+    expect(defs.CommandInputFieldConfig?.properties?.dictCode).toEqual(
+      expect.objectContaining({ type: 'string' }),
+    );
 
     const validateAction = new Ajv({ strict: false }).compile({
       ...defs.ActionDef,

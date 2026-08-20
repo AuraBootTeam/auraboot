@@ -88,6 +88,67 @@ describe('ActionRegistry record navigation', () => {
 });
 
 describe('ActionRegistry command.execute inputFields (command-form sugar)', () => {
+  it('loads dictCode choices before opening a command form', async () => {
+    const fetchResult = vi.fn().mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/api/meta/dict/by-code/inv_shipment_manual_tracking_milestone/data') {
+        return {
+          code: '0',
+          data: {
+            items: [
+              { value: 'departed', label: '已发车' },
+              { value: 'in_transit', label: '运输中' },
+            ],
+          },
+        };
+      }
+      return { code: '0', data: { ok: true } };
+    });
+    window.addEventListener(
+      'dialog:form',
+      (event) => {
+        const detail = (event as CustomEvent).detail;
+        expect(detail.fieldOptions.inv_sht_milestone).toEqual([
+          { value: 'departed', label: '已发车' },
+          { value: 'in_transit', label: '运输中' },
+        ]);
+        detail.onSubmit({ inv_sht_milestone: 'in_transit' });
+      },
+      { once: true },
+    );
+
+    await actionRegistry.execute('command.execute', {
+      fetchResult,
+      args: {
+        command: 'inv:record_shipment_tracking',
+        targetRecordPid: 'SHIP-1',
+        inputFields: [
+          {
+            field: 'inv_sht_milestone',
+            type: 'select',
+            dictCode: 'inv_shipment_manual_tracking_milestone',
+            required: true,
+          },
+        ],
+      },
+    });
+
+    expect(fetchResult).toHaveBeenNthCalledWith(
+      1,
+      '/api/meta/dict/by-code/inv_shipment_manual_tracking_milestone/data',
+      { method: 'get' },
+    );
+    expect(fetchResult).toHaveBeenNthCalledWith(
+      2,
+      '/api/meta/commands/execute/inv:record_shipment_tracking',
+      expect.objectContaining({
+        method: 'post',
+        params: expect.objectContaining({
+          payload: { inv_sht_milestone: 'in_transit' },
+        }),
+      }),
+    );
+  });
+
   it('pops a form (FormDialog) and merges collected values into the command payload', async () => {
     const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: { ok: true } });
     // Simulate the user filling + submitting the FormDialog the action pops.
@@ -288,11 +349,9 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
 
   it('aborts (does not submit the command) when the user cancels the form', async () => {
     const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {} });
-    window.addEventListener(
-      'dialog:form',
-      (e) => (e as CustomEvent).detail.onCancel(),
-      { once: true },
-    );
+    window.addEventListener('dialog:form', (e) => (e as CustomEvent).detail.onCancel(), {
+      once: true,
+    });
 
     await actionRegistry.execute('command.execute', {
       fetchResult,
@@ -334,9 +393,13 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
         },
       },
     });
-    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:command-artifact');
+    const createObjectURL = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:command-artifact');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
 
     await actionRegistry.execute('command.execute', {
       fetchResult,
@@ -357,7 +420,8 @@ describe('ActionRegistry dialog.confirm', () => {
       args: {
         message: {
           'zh-CN': '确认应用此模板？这将在当前租户创建模板包含的模型与页面。',
-          'en-US': "Install this template? It will create the template's models and pages in your tenant.",
+          'en-US':
+            "Install this template? It will create the template's models and pages in your tenant.",
         },
       },
     });

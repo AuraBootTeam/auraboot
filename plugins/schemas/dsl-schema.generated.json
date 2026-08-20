@@ -1453,6 +1453,10 @@
         "type": {
           "type": "string"
         },
+        "dictCode": {
+          "type": "string",
+          "description": "Static dictionary used to populate select/segmented choice fields."
+        },
         "required": {
           "type": "boolean"
         }

@@ -306,6 +306,8 @@ export interface CommandInputFieldConfig {
   helpText?: string | LocalizedText;
   placeholder?: string | LocalizedText;
   type?: string;
+  /** Static dictionary used to populate select/segmented choice fields. */
+  dictCode?: string;
   required?: boolean;
   [key: string]: unknown;
 }

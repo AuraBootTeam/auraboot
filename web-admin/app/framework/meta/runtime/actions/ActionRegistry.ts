@@ -611,7 +611,8 @@ actionRegistry.register('toast.error', ({ args, showToast }) => {
 actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm }) => {
   let message: any = args?.message || args?.content || 'Are you sure you want to proceed?';
   if (message && typeof message === 'object') {
-    message = (message as any)['zh-CN'] || (message as any)['en-US'] || 'Are you sure you want to proceed?';
+    message =
+      (message as any)['zh-CN'] || (message as any)['en-US'] || 'Are you sure you want to proceed?';
   }
   const doConfirm = ctxConfirm ?? confirmDialog;
   const confirmed = await doConfirm({ content: message as string });
@@ -626,7 +627,7 @@ actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm }) 
  *
  * Shared by the `dialog.form` action (which stores the values into stateManager)
  * and `command.execute`'s `inputFields` sugar (which merges them into the command
- * payload). Pre-fetches options for choice fields with api/static dataSources.
+ * payload). Pre-fetches options for choice fields with dictCode or api/static dataSources.
  */
 export async function promptInputForm(
   fields: Array<Record<string, any>>,
@@ -640,7 +641,45 @@ export async function promptInputForm(
     Array<{ label: any; value: string; description?: any; disabled?: boolean; visibleWhen?: any }>
   > = {};
   for (const field of fields) {
-    if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
+    if (field.dictCode && fetchResult) {
+      try {
+        const result = await fetchResult(
+          `/api/meta/dict/by-code/${encodeURIComponent(String(field.dictCode))}/data`,
+          { method: 'get' },
+        );
+        const data = result.data as
+          | { items?: Array<Record<string, any>> }
+          | Array<Record<string, any>>;
+        const rawOptions = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.items)
+            ? data.items
+            : [];
+        fieldOptions[field.field] = rawOptions
+          .map((option: any) => {
+            const value = option?.value;
+            const label = option?.label ?? option?.['label:zh-CN'] ?? option?.['label:en'] ?? value;
+            if (value === undefined || value === null) return null;
+            return {
+              value: String(value),
+              label: label && typeof label === 'object' ? label : String(label ?? value),
+              ...(option?.description === undefined || option?.description === null
+                ? {}
+                : { description: option.description }),
+              ...(option?.disabled === true ? { disabled: true } : {}),
+            };
+          })
+          .filter(Boolean) as Array<{
+          label: any;
+          value: string;
+          description?: any;
+          disabled?: boolean;
+        }>;
+      } catch (e) {
+        console.error(`[promptInputForm] Failed to fetch dictionary for ${field.field}:`, e);
+        fieldOptions[field.field] = [];
+      }
+    } else if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
       try {
         const endpoint = String(field.dataSource.endpoint).replace(
           /\$\{([^}]+)\}/g,
@@ -701,7 +740,10 @@ export async function promptInputForm(
               ? parsed.map((value) => String(value).trim()).filter(Boolean)
               : [];
           } catch {
-            defaults[field.field] = raw.split(',').map((value: string) => value.trim()).filter(Boolean);
+            defaults[field.field] = raw
+              .split(',')
+              .map((value: string) => value.trim())
+              .filter(Boolean);
           }
         } else {
           defaults[field.field] = [];
@@ -1003,11 +1045,11 @@ export function downloadBase64CommandArtifact(value: any): boolean {
   let artifact = value;
   for (let depth = 0; depth < 4; depth += 1) {
     if (
-      artifact
-      && typeof artifact === 'object'
-      && typeof artifact.contentBase64 !== 'string'
-      && artifact.data
-      && typeof artifact.data === 'object'
+      artifact &&
+      typeof artifact === 'object' &&
+      typeof artifact.contentBase64 !== 'string' &&
+      artifact.data &&
+      typeof artifact.data === 'object'
     ) {
       artifact = artifact.data;
     } else {
@@ -1015,10 +1057,11 @@ export function downloadBase64CommandArtifact(value: any): boolean {
     }
   }
   if (
-    typeof document === 'undefined'
-    || typeof artifact?.contentBase64 !== 'string'
-    || typeof artifact?.fileName !== 'string'
-  ) return false;
+    typeof document === 'undefined' ||
+    typeof artifact?.contentBase64 !== 'string' ||
+    typeof artifact?.fileName !== 'string'
+  )
+    return false;
   const binary = atob(artifact.contentBase64);
   const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
   const blob = new Blob([bytes], { type: artifact.contentType || 'application/octet-stream' });
