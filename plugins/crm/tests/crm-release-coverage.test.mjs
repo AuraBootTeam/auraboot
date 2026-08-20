@@ -48,10 +48,10 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.equal(committed.scope.productDenominator.commands, 238);
   assert.equal(committed.scope.productDenominator.permissions, 114);
   assert.equal(committed.scope.productDenominator['page-blocks'], 391);
-  assert.equal(committed.scope.productDenominator['page-fields'], 1653);
-  assert.equal(committed.scope.productDenominator['ui-actions'], 576);
+  assert.equal(committed.scope.productDenominator['page-fields'], 1654);
+  assert.equal(committed.scope.productDenominator['ui-actions'], 578);
   assert.equal(committed.scope.productDenominator.queries, 51);
-  assert.equal(committed.scope.productVerdicts.pass, 556);
+  assert.equal(committed.scope.productVerdicts.pass, 559);
   assert.equal(committed.scope.productVerdicts.untested, 2732);
   assert.ok(committed.scope.productVerdicts.untested > 0);
   assert.equal(committed.scope.productVerdicts.gap ?? 0, 0);
@@ -127,8 +127,8 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.equal(customerPoolContract.expectedCoverage.permissions.length, 7);
   assert.equal(customerPoolContract.expectedCoverage.queries.length, 4);
   assert.equal(customerPoolContract.expectedCoverage.blocks.length, 39);
-  assert.equal(customerPoolContract.expectedCoverage.fields.length, 70);
-  assert.equal(customerPoolContract.expectedCoverage.uiActions.length, 43);
+  assert.equal(customerPoolContract.expectedCoverage.fields.length, 71);
+  assert.equal(customerPoolContract.expectedCoverage.uiActions.length, 45);
   assert.deepEqual(Object.keys(customerPoolContract.expectedCoverage).sort(), [
     'blocks',
     'commands',

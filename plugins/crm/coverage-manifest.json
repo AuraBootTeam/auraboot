@@ -28,15 +28,15 @@
       "menus": 55,
       "pages": 124,
       "page-blocks": 391,
-      "page-fields": 1653,
-      "ui-actions": 576,
+      "page-fields": 1654,
+      "ui-actions": 578,
       "commands": 238,
       "permissions": 114,
       "queries": 51,
       "dashboards": 37
     },
     "productVerdicts": {
-      "pass": 556,
+      "pass": 559,
       "untested": 2732
     },
     "fullProductNonGoals": [
@@ -2490,6 +2490,7 @@
           "crm_customer_pool_item_list:crm_customer_pool_evidence:crm_cpi_account_name",
           "crm_customer_pool_item_list:crm_customer_pool_evidence:owner_name",
           "crm_customer_pool_item_list:crm_customer_pool_queue:crm_cpi_account_name",
+          "crm_customer_pool_item_list:crm_customer_pool_queue:crm_cpi_claimed_by",
           "crm_customer_pool_item_list:crm_customer_pool_queue:operational_state",
           "crm_customer_pool_item_list:crm_customer_pool_search:crm_cpi_account_name",
           "crm_customer_pool_item_list:crm_customer_pool_status:owner_name",
@@ -2543,6 +2544,8 @@
           "crm_customer_pool_item_list:crm_customer_pool_actions:assign",
           "crm_customer_pool_item_list:crm_customer_pool_actions:claim",
           "crm_customer_pool_item_list:crm_customer_pool_header_actions:batch_operations",
+          "crm_customer_pool_item_list:crm_customer_pool_queue:assign",
+          "crm_customer_pool_item_list:crm_customer_pool_queue:claim",
           "crm_customer_pool_item_list:crm_customer_pool_queue:view_pool_evidence",
           "crm_customer_pool_item_detail:pooled_customer_mobile_tabs:activity_history",
           "crm_customer_pool_item_detail:pooled_customer_mobile_tabs:customer_info",
@@ -18554,7 +18557,22 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[3].columns[7].field"
         },
         {
-          "id": "field:crm_customer_pool_item_list:crm_customer_pool_status:crm_cpi_account_code:9",
+          "id": "field:crm_customer_pool_item_list:crm_customer_pool_queue:crm_cpi_claimed_by:9",
+          "action": "Verify field crm_cpi_claimed_by in crm_customer_pool_queue on crm_customer_pool_item_list",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[3].rowActions[1].action.inputFields[0].field"
+        },
+        {
+          "id": "field:crm_customer_pool_item_list:crm_customer_pool_status:crm_cpi_account_code:10",
           "action": "Verify field crm_cpi_account_code in crm_customer_pool_status on crm_customer_pool_item_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18567,7 +18585,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[4].summaryFields[0].field"
         },
         {
-          "id": "field:crm_customer_pool_item_list:crm_customer_pool_status:pool_name:10",
+          "id": "field:crm_customer_pool_item_list:crm_customer_pool_status:pool_name:11",
           "action": "Verify field pool_name in crm_customer_pool_status on crm_customer_pool_item_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18580,7 +18598,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[4].summaryFields[1].field"
         },
         {
-          "id": "field:crm_customer_pool_item_list:crm_customer_pool_status:previous_owner_name:11",
+          "id": "field:crm_customer_pool_item_list:crm_customer_pool_status:previous_owner_name:12",
           "action": "Verify field previous_owner_name in crm_customer_pool_status on crm_customer_pool_item_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18593,7 +18611,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[4].summaryFields[2].field"
         },
         {
-          "id": "field:crm_customer_pool_item_list:crm_customer_pool_status:owner_name:12",
+          "id": "field:crm_customer_pool_item_list:crm_customer_pool_status:owner_name:13",
           "action": "Verify field owner_name in crm_customer_pool_status on crm_customer_pool_item_list",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -18608,7 +18626,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[4].summaryFields[3].field"
         },
         {
-          "id": "field:crm_customer_pool_item_list:crm_customer_pool_status:crm_cpi_claim_release_at:13",
+          "id": "field:crm_customer_pool_item_list:crm_customer_pool_status:crm_cpi_claim_release_at:14",
           "action": "Verify field crm_cpi_claim_release_at in crm_customer_pool_status on crm_customer_pool_item_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18621,7 +18639,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[4].summaryFields[4].field"
         },
         {
-          "id": "field:crm_customer_pool_item_list:crm_customer_pool_actions:crm_cpi_claimed_by:14",
+          "id": "field:crm_customer_pool_item_list:crm_customer_pool_actions:crm_cpi_claimed_by:15",
           "action": "Verify field crm_cpi_claimed_by in crm_customer_pool_actions on crm_customer_pool_item_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18634,7 +18652,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[5].actions[1].onClick.args.inputFields[0].field"
         },
         {
-          "id": "field:crm_customer_pool_item_list:crm_customer_pool_evidence:crm_cpi_account_name:15",
+          "id": "field:crm_customer_pool_item_list:crm_customer_pool_evidence:crm_cpi_account_name:16",
           "action": "Verify field crm_cpi_account_name in crm_customer_pool_evidence on crm_customer_pool_item_list",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -18649,7 +18667,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[6].sections[0].field"
         },
         {
-          "id": "field:crm_customer_pool_item_list:crm_customer_pool_evidence:crm_cpi_rating:16",
+          "id": "field:crm_customer_pool_item_list:crm_customer_pool_evidence:crm_cpi_rating:17",
           "action": "Verify field crm_cpi_rating in crm_customer_pool_evidence on crm_customer_pool_item_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18662,7 +18680,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[6].sections[1].field"
         },
         {
-          "id": "field:crm_customer_pool_item_list:crm_customer_pool_evidence:crm_cpi_entered_at:17",
+          "id": "field:crm_customer_pool_item_list:crm_customer_pool_evidence:crm_cpi_entered_at:18",
           "action": "Verify field crm_cpi_entered_at in crm_customer_pool_evidence on crm_customer_pool_item_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18675,7 +18693,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[6].sections[2].field"
         },
         {
-          "id": "field:crm_customer_pool_item_list:crm_customer_pool_evidence:crm_cpi_reason:18",
+          "id": "field:crm_customer_pool_item_list:crm_customer_pool_evidence:crm_cpi_reason:19",
           "action": "Verify field crm_cpi_reason in crm_customer_pool_evidence on crm_customer_pool_item_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18688,7 +18706,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[6].sections[3].field"
         },
         {
-          "id": "field:crm_customer_pool_item_list:crm_customer_pool_evidence:previous_owner_name:19",
+          "id": "field:crm_customer_pool_item_list:crm_customer_pool_evidence:previous_owner_name:20",
           "action": "Verify field previous_owner_name in crm_customer_pool_evidence on crm_customer_pool_item_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18701,7 +18719,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[6].sections[4].field"
         },
         {
-          "id": "field:crm_customer_pool_item_list:crm_customer_pool_evidence:owner_name:20",
+          "id": "field:crm_customer_pool_item_list:crm_customer_pool_evidence:owner_name:21",
           "action": "Verify field owner_name in crm_customer_pool_evidence on crm_customer_pool_item_list",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -35471,8 +35489,8 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[2].actions[3]"
         },
         {
-          "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_queue:view_pool_evidence:4",
-          "action": "row-action view_pool_evidence on crm_customer_pool_item_list -> navigate:crm_customer_pool_item_detail",
+          "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_queue:claim:4",
+          "action": "row-action claim on crm_customer_pool_item_list -> command:crm:claim_pool_customer",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
           ],
@@ -35486,7 +35504,37 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[3].rowActions[0]"
         },
         {
-          "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_actions:claim:5",
+          "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_queue:assign:5",
+          "action": "row-action assign on crm_customer_pool_item_list -> command:crm:assign_pool_customer",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[3].rowActions[1]"
+        },
+        {
+          "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_queue:view_pool_evidence:6",
+          "action": "row-action view_pool_evidence on crm_customer_pool_item_list -> navigate:crm_customer_pool_item_detail",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[3].rowActions[2]"
+        },
+        {
+          "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_actions:claim:7",
           "action": "action claim on crm_customer_pool_item_list -> command:crm:claim_pool_customer",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -35501,7 +35549,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_item_list.json#root[5].actions[0]"
         },
         {
-          "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_actions:assign:6",
+          "id": "ui-action:crm_customer_pool_item_list:crm_customer_pool_actions:assign:8",
           "action": "action assign on crm_customer_pool_item_list -> command:crm:assign_pool_customer",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"

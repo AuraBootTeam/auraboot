@@ -30,6 +30,7 @@ import {
   writeRuntimeState,
 } from './workbenchBlockUtils';
 import { InlineEditCell } from '~/framework/meta/rendering/components/InlineEditCell';
+import { useMediaQuery } from '~/framework/meta/rendering/components/ResponsiveBlockLayout';
 import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
 
 export interface TableBlockRendererProps {
@@ -191,6 +192,8 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   const rowActions: ButtonConfig[] = Array.isArray(block.rowActions)
     ? (block.rowActions as ButtonConfig[])
     : [];
+  const mobileCardConfig = ((block as any).mobileCard || {}) as Record<string, any>;
+  const useMobileCards = useMediaQuery('(max-width: 640px)') && mobileCardConfig.enabled !== false;
   const rowClassRules: Array<{ when?: string; className?: string }> = Array.isArray(
     (block.table as any)?.rowClassRules,
   )
@@ -323,10 +326,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     block.table?.rowKey || (selectionConfig as any)?.keyField,
   );
   const hasSafeRecommendationContract = Boolean(
-    hasStableSelectionIdentity &&
-      recommendedField &&
-      safeField &&
-      recommendedField !== safeField,
+    hasStableSelectionIdentity && recommendedField && safeField && recommendedField !== safeField,
   );
   const groupedRadioPresentation =
     isMultipleSelection &&
@@ -773,7 +773,11 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   };
 
   // 渲染操作按钮
-  const renderActionButtons = (row: any, actions: ButtonConfig[]) => {
+  const renderActionButtons = (
+    row: any,
+    actions: ButtonConfig[],
+    presentation: 'links' | 'buttons' = 'links',
+  ) => {
     return (
       <div className="flex flex-wrap gap-2">
         {actions.map((button) => {
@@ -801,6 +805,18 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
             : false;
 
           const label = getLocalizedText(button.label || button.content || button.code, locale, t);
+          const buttonClass =
+            presentation === 'buttons'
+              ? button.variant === 'primary'
+                ? 'bg-accent text-white hover:bg-accent-hover border-accent min-h-11 flex-1 rounded-md border px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50'
+                : button.variant === 'danger' || (button as any).danger
+                  ? 'border-status-red/40 text-status-red hover:bg-status-red-bg min-h-11 flex-1 rounded-md border bg-panel px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50'
+                  : 'border-border bg-panel text-text hover:bg-hover min-h-11 flex-1 rounded-md border px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50'
+              : `text-sm ${
+                  button.variant === 'danger' || (button as any).danger
+                    ? 'text-status-red hover:opacity-80'
+                    : 'text-accent hover:text-accent-hover'
+                } disabled:cursor-not-allowed disabled:opacity-50`;
 
           return (
             <button
@@ -811,11 +827,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                 event.stopPropagation();
                 handleAction(button, row);
               }}
-              className={`text-sm ${
-                button.variant === 'danger' || (button as any).danger
-                  ? 'text-status-red hover:opacity-80'
-                  : 'text-accent hover:text-accent-hover'
-              } disabled:cursor-not-allowed disabled:opacity-50`}
+              className={buttonClass}
             >
               {label}
             </button>
@@ -825,7 +837,114 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     );
   };
 
-  const renderRowActions = (row: any) => renderActionButtons(row, rowActions);
+  const renderRowActions = (row: any) =>
+    renderActionButtons(
+      row,
+      rowActions.filter((action) => !(action as any).mobileOnly),
+    );
+
+  const mobileActions = (() => {
+    const configuredCodes = Array.isArray(mobileCardConfig.actionCodes)
+      ? new Set(mobileCardConfig.actionCodes.map(String))
+      : null;
+    return rowActions.filter(
+      (action) =>
+        !(action as any).desktopOnly && (!configuredCodes || configuredCodes.has(action.code)),
+    );
+  })();
+
+  const resolveMobileColumn = (entry: string | Record<string, any>): ColumnConfig => {
+    const config = typeof entry === 'string' ? { field: entry } : entry;
+    const base = columns.find((column) => column.field === config.field);
+    return { ...(base || {}), ...config } as ColumnConfig;
+  };
+
+  const renderMobileCards = () => {
+    const titleColumn = resolveMobileColumn(mobileCardConfig.titleField || columns[0]?.field || '');
+    const eyebrowColumn = mobileCardConfig.eyebrowField
+      ? resolveMobileColumn(mobileCardConfig.eyebrowField)
+      : null;
+    const statusColumn = mobileCardConfig.statusField
+      ? resolveMobileColumn(mobileCardConfig.statusField)
+      : null;
+    const summaryColumns = (
+      Array.isArray(mobileCardConfig.fields) ? mobileCardConfig.fields : columns.slice(1, 5)
+    ).map(resolveMobileColumn);
+
+    if (data.length === 0) {
+      return (
+        <div
+          data-testid="table-mobile-empty"
+          className="border-border bg-panel text-text-2 rounded-card border px-5 py-8 text-center text-sm"
+        >
+          {(block as any).empty?.title
+            ? getLocalizedText((block as any).empty.title, locale, t)
+            : t('common.noData') !== 'common.noData'
+              ? t('common.noData')
+              : 'No data'}
+        </div>
+      );
+    }
+
+    return (
+      <div data-testid="table-mobile-cards" className="grid gap-3">
+        {data.map((row: any, index: number) => {
+          const rowIdentity = getRowIdentity(row, index);
+          const isSelected = isMultipleSelection
+            ? effectiveSelectedRowKeySet.has(rowIdentity)
+            : Boolean(effectiveSelectedRowKey) && effectiveSelectedRowKey === rowIdentity;
+
+          return (
+            <article
+              key={rowIdentity}
+              data-testid={`table-mobile-card-${rowIdentity}`}
+              onClick={() => handleRowClick(row, index)}
+              className={`rounded-card bg-panel border p-4 shadow-sm transition-colors ${
+                isSelected ? 'border-accent ring-accent/15 ring-2' : 'border-border'
+              } ${selectionConfig?.bind ? 'cursor-pointer' : ''} ${rowClassName(row)}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  {eyebrowColumn && (
+                    <div className="text-text-2 mb-1 truncate text-xs font-medium">
+                      {renderCellContent(eyebrowColumn, row)}
+                    </div>
+                  )}
+                  <h3 className="text-text text-base leading-6 font-semibold">
+                    {renderCellContent(titleColumn, row)}
+                  </h3>
+                </div>
+                {statusColumn && (
+                  <div className="shrink-0">{renderCellContent(statusColumn, row)}</div>
+                )}
+              </div>
+
+              {summaryColumns.length > 0 && (
+                <dl className="border-border mt-3 grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-3">
+                  {summaryColumns.map((column) => (
+                    <div key={column.field} className="min-w-0">
+                      <dt className="text-text-3 text-xs font-medium">
+                        {getLocalizedText(column.label || column.field, locale, t)}
+                      </dt>
+                      <dd className="text-text mt-1 min-w-0 text-sm font-medium break-words">
+                        {renderCellContent(column, row)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
+              {mobileActions.length > 0 && (
+                <div className="border-border mt-4 flex flex-wrap gap-2 border-t pt-3">
+                  {renderActionButtons(row, mobileActions, 'buttons')}
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    );
+  };
 
   const rowClassName = (row: any): string =>
     rowClassRules
@@ -1108,6 +1227,15 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
         >
           {renderGroupedRadioSelection()}
         </div>
+      </>
+    );
+  }
+
+  if (useMobileCards && mobileCardConfig.titleField) {
+    return (
+      <>
+        {staleState}
+        {renderMobileCards()}
       </>
     );
   }

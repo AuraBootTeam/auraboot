@@ -111,46 +111,47 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
       {/* Navigation */}
       <nav
         ref={navRef}
-        className={`min-h-0 flex-1 ${collapsed ? 'px-2' : 'px-4'} scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 dark:hover:scrollbar-thumb-gray-500 space-y-1 overflow-y-auto py-1`}
+        className={`min-h-0 flex-1 ${collapsed ? 'px-2' : 'px-4'} scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent space-y-1 overflow-y-auto py-1 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 dark:hover:scrollbar-thumb-gray-500`}
       >
         {menus.map((menu: any, index: number) => (
-              <div key={menu.id || index}>
-                {collapsed ? (
-                  <CollapsedMenuItem
-                    menu={menu}
-                    location={location}
-                    t={t}
-                    setSidebarOpen={setSidebarOpen}
-                  />
-                ) : menu.submenu && menu.submenu.length > 0 ? (
-                  <SidebarSubmenu
-                    submenu={menu.submenu}
-                    name={resolveMenuLabel(t, menu)}
-                    icon={menu.icon}
-                  />
-                ) : (
-                  <NavLink
-                    to={menu.path}
-                    className={({ isActive }) =>
-                      `group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
-                        isActive
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
-                          : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
-                      } `
-                    }
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <span className="me-3 flex-shrink-0">
-                      {resolveIcon(menu.icon, resolveMenuLabel(t, menu), 18)}
-                    </span>
-                    <span className="truncate">{resolveMenuLabel(t, menu)}</span>
-                    {location.pathname === menu.path && (
-                      <span className="ms-auto h-2 w-2 rounded-full bg-blue-500" />
-                    )}
-                  </NavLink>
+          <div key={menu.id || index}>
+            {collapsed ? (
+              <CollapsedMenuItem
+                menu={menu}
+                location={location}
+                t={t}
+                setSidebarOpen={setSidebarOpen}
+              />
+            ) : menu.submenu && menu.submenu.length > 0 ? (
+              <SidebarSubmenu
+                submenu={menu.submenu}
+                name={resolveMenuLabel(t, menu)}
+                icon={menu.icon}
+                onNavigate={() => setSidebarOpen(false)}
+              />
+            ) : (
+              <NavLink
+                to={menu.path}
+                className={({ isActive }) =>
+                  `group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                    isActive
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                      : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
+                  } `
+                }
+                onClick={() => setSidebarOpen(false)}
+              >
+                <span className="me-3 flex-shrink-0">
+                  {resolveIcon(menu.icon, resolveMenuLabel(t, menu), 18)}
+                </span>
+                <span className="truncate">{resolveMenuLabel(t, menu)}</span>
+                {location.pathname === menu.path && (
+                  <span className="ms-auto h-2 w-2 rounded-full bg-blue-500" />
                 )}
-              </div>
-            ))}
+              </NavLink>
+            )}
+          </div>
+        ))}
       </nav>
     </div>
   );

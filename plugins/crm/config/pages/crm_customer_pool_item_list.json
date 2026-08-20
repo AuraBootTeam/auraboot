@@ -152,6 +152,19 @@
       "density": "compact",
       "maxHeight": 360,
       "selection": { "mode": "single", "bind": "selectedPoolItem", "defaultFirst": true },
+      "mobileCard": {
+        "enabled": true,
+        "titleField": "crm_cpi_account_name",
+        "eyebrowField": "pool_name",
+        "statusField": "operational_state",
+        "fields": [
+          "crm_cpi_rating",
+          "crm_cpi_industry",
+          "crm_cpi_claim_release_at",
+          "owner_name"
+        ],
+        "actionCodes": ["claim", "assign", "view_pool_evidence"]
+      },
       "columns": [
         { "field": "pool_name", "width": 125, "label": { "zh-CN": "客户公海", "en": "Pool" } },
         { "field": "crm_cpi_account_name", "width": 170, "label": { "zh-CN": "客户名称", "en": "Customer" } },
@@ -164,9 +177,52 @@
       ],
       "rowActions": [
         {
+          "code": "claim",
+          "label": { "zh-CN": "领取", "en": "Claim" },
+          "permissionCode": "crm.customer_pool.pick",
+          "variant": "primary",
+          "mobileOnly": true,
+          "visibleWhen": "record.operational_state == 'ready'",
+          "confirm": { "zh-CN": "系统将再次校验领取资格并原子切换责任人。确认领取？", "en": "Eligibility will be rechecked before ownership changes atomically. Continue?" },
+          "action": {
+            "type": "command",
+            "command": "crm:claim_pool_customer",
+            "operationType": "update",
+            "reload": ["poolStats", "poolQueue"]
+          }
+        },
+        {
+          "code": "assign",
+          "label": { "zh-CN": "分配", "en": "Assign" },
+          "permissionCode": "crm.customer_pool.assign",
+          "variant": "secondary",
+          "mobileOnly": true,
+          "visibleWhen": "record.operational_state == 'ready' || record.operational_state == 'cooldown'",
+          "action": {
+            "type": "command",
+            "command": "crm:assign_pool_customer",
+            "operationType": "update",
+            "inputFieldsTitle": { "zh-CN": "分配池内客户", "en": "Assign Pooled Customer" },
+            "inputFields": [
+              {
+                "field": "crm_cpi_claimed_by",
+                "label": { "zh-CN": "分配给", "en": "Assign To" },
+                "type": "reference",
+                "component": "MemberPicker",
+                "required": true,
+                "placeholder": { "zh-CN": "选择该公海池内的销售成员", "en": "Select a sales member in this pool" },
+                "helpText": { "zh-CN": "分配会校验成员资格与客户库容，并立即收敛数据权限。", "en": "Assignment validates pool membership and customer capacity, then narrows record access immediately." },
+                "props": { "multiple": false }
+              }
+            ],
+            "reload": ["poolStats", "poolQueue"]
+          }
+        },
+        {
           "code": "view_pool_evidence",
-          "label": { "zh-CN": "池内详情", "en": "Pool Detail" },
+          "label": { "zh-CN": "池内详情", "en": "Pool Details" },
           "permissionCode": "crm.customer_pool.read",
+          "variant": "secondary",
           "action": { "type": "navigate", "to": "crm_customer_pool_item_detail" }
         }
       ],

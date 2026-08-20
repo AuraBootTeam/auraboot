@@ -263,6 +263,29 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
   assert.equal(poolQueue.maxHeight, 360);
   assert.equal(poolQueue.density, 'compact');
   assert.equal(poolQueue.selection.defaultFirst, true);
+  assert.deepEqual(poolQueue.mobileCard, {
+    enabled: true,
+    titleField: 'crm_cpi_account_name',
+    eyebrowField: 'pool_name',
+    statusField: 'operational_state',
+    fields: [
+      'crm_cpi_rating',
+      'crm_cpi_industry',
+      'crm_cpi_claim_release_at',
+      'owner_name',
+    ],
+    actionCodes: ['claim', 'assign', 'view_pool_evidence'],
+  });
+  const mobileClaim = poolQueue.rowActions.find((action) => action.code === 'claim');
+  assert.equal(mobileClaim.mobileOnly, true);
+  assert.equal(mobileClaim.permissionCode, 'crm.customer_pool.pick');
+  assert.equal(mobileClaim.action.command, 'crm:claim_pool_customer');
+  assert.deepEqual(mobileClaim.action.reload, ['poolStats', 'poolQueue']);
+  const mobileAssign = poolQueue.rowActions.find((action) => action.code === 'assign');
+  assert.equal(mobileAssign.mobileOnly, true);
+  assert.equal(mobileAssign.permissionCode, 'crm.customer_pool.assign');
+  assert.equal(mobileAssign.action.command, 'crm:assign_pool_customer');
+  assert.equal(mobileAssign.action.inputFields[0].component, 'MemberPicker');
   const operationalStateColumn = poolQueue.columns.find((column) => column.field === 'operational_state');
   assert.equal(operationalStateColumn?.dictCode, 'crm_customer_pool_operational_state');
   assert.deepEqual(

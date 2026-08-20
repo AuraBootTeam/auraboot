@@ -153,6 +153,22 @@ function writeRuntimeReceipt(): void {
 
 async function navigateToCrmMenu(page: Page, section: RegExp, href: string): Promise<void> {
   await ensureSidebarExpanded(page);
+  if ((page.viewportSize()?.width ?? 1280) <= 640) {
+    const mobileMenu = page.getByRole('button', {
+      name: /打开导航菜单|Open navigation menu/i,
+    });
+    const mobileSidebar = page.getByTestId('sidebar');
+    await expect(mobileMenu).toBeVisible({ timeout: 8_000 });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await mobileMenu.click();
+      await page.waitForTimeout(250);
+      const sidebarBox = await mobileSidebar.boundingBox();
+      if (sidebarBox && sidebarBox.x >= -1) break;
+    }
+    await expect
+      .poll(async () => (await mobileSidebar.boundingBox())?.x ?? -999, { timeout: 5_000 })
+      .toBeGreaterThanOrEqual(-1);
+  }
   const nav = page.locator('nav, aside, [role="navigation"]').first();
   const leaf = nav.locator(`a[href="${href}"]`).first();
   if (!(await leaf.isVisible().catch(() => false))) {
@@ -503,13 +519,18 @@ async function runCustomerPoolImportAction(
     page,
     poolRow,
     actionCode,
-    actionCode === 'precheck_import' ? /预检导入文件|Pre-check Import File/ : /正式导入客户|Import Customers/,
+    actionCode === 'precheck_import'
+      ? /预检导入文件|Pre-check Import File/
+      : /正式导入客户|Import Customers/,
   );
   const form = page.getByTestId('form-dialog');
   await expect(form).toBeVisible({ timeout: 10_000 });
   await expect(form.getByTestId('form-dialog-field-importType')).toBeVisible();
   if (actionCode === 'import_customers' && skipErrors) {
-    await form.getByTestId('form-dialog-field-skipErrors').locator('input[type="checkbox"]').check();
+    await form
+      .getByTestId('form-dialog-field-skipErrors')
+      .locator('input[type="checkbox"]')
+      .check();
   }
   const chooserPromise = page.waitForEvent('filechooser', { timeout: 15_000 });
   const responsePromise = page.waitForResponse(
@@ -1384,9 +1405,11 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
       );
       sqlEvidence.managerBatchAssign1 = batchAssignCounts[0];
       sqlEvidence.managerBatchAssign2 = batchAssignCounts[1];
-      await expect(managerPage.getByText(/批量分配已完成.*成功 2 条|Assign.*2/i)).toBeVisible({
-        timeout: 20_000,
-      });
+      await expect(
+        managerPage.getByText(
+          /^(?:批量分配已完成.*成功 2 条|Batch assignment completed.*2 (?:records )?succeeded)$/i,
+        ),
+      ).toBeVisible({ timeout: 20_000 });
       await expect(companyCell(managerPage, singleB)).toHaveCount(0);
       await expect(companyCell(managerPage, revokedA)).toHaveCount(0);
       await batchTabs.getByRole('button', { name: /已分配|Assigned/ }).click();
@@ -1635,6 +1658,8 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     const relativeRule = await submitFormCommand(page, 'crm:create_customer_pool_recycle_rule');
     const relativeRulePid = recordPid(relativeRule);
     expect(relativeRulePid, 'UI-created relative recycle rule pid').toBeTruthy();
+    const recycleRuleSearch = page.getByPlaceholder(/查询|Search/i).first();
+    await recycleRuleSearch.fill(relativeRuleName);
     let relativeRuleRow = page.getByRole('row', { name: new RegExp(relativeRuleName) });
     await expect(relativeRuleRow).toBeVisible({ timeout: 15_000 });
     await clickRowAction(page, relativeRuleRow, 'view', /查看|View/);
@@ -1653,6 +1678,7 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     await submitFormCommand(page, 'crm:update_customer_pool_recycle_rule');
     relativeRuleRow = page.getByRole('row', { name: new RegExp(relativeRuleName) });
     await expect(relativeRuleRow).toContainText('11', { timeout: 15_000 });
+    await recycleRuleSearch.fill('');
 
     // Fixed-window fields are a separate Cordys contract. Create an inactive interval rule so its
     // conditional inputs are exercised without altering the live relative-rule decision below.
@@ -1674,6 +1700,12 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     const fixedRule = await submitFormCommand(page, 'crm:create_customer_pool_recycle_rule');
     const fixedRulePid = recordPid(fixedRule);
     expect(fixedRulePid, 'UI-created fixed recycle rule pid').toBeTruthy();
+    const fixedRuleFact = await page.request.get(
+      `/api/dynamic/crm_customer_pool_recycle_rule_common/${fixedRulePid}`,
+    );
+    const fixedRuleBody = await fixedRuleFact.json();
+    expect(String(fixedRuleBody?.data?.crm_cprr_name)).toBe(fixedRuleName);
+    await recycleRuleSearch.fill(fixedRuleName);
     let fixedRuleRow = page.getByRole('row', { name: new RegExp(fixedRuleName) });
     await expect(fixedRuleRow).toBeVisible({ timeout: 15_000 });
     await attachScreenshot(page, testInfo, 'customer-pool-recycle-rule-list');
@@ -1687,6 +1719,7 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     const deleteFixedBody = await deleteFixedResponse.json();
     expect(String(deleteFixedBody?.code)).toBe('0');
     await expect(page.getByRole('row', { name: new RegExp(fixedRuleName) })).toHaveCount(0);
+    await recycleRuleSearch.fill('');
 
     const staleName = `W2-Stale-${stamp}`;
     const recentName = `W2-Recent-${stamp}`;
@@ -1914,7 +1947,9 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     const templateResponsePromise = page.waitForResponse(
       (response) =>
         response.request().method() === 'POST' &&
-        response.url().includes('/api/meta/commands/execute/crm:download_customer_pool_import_template'),
+        response
+          .url()
+          .includes('/api/meta/commands/execute/crm:download_customer_pool_import_template'),
       { timeout: 20_000 },
     );
     const templateDownloadPromise = page.waitForEvent('download', { timeout: 20_000 });
@@ -2013,7 +2048,10 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     await attachScreenshot(page, testInfo, 'customer-pool-import-partial-success');
     const accounts = await dynamicListRows(page, 'crm_account_common');
     const importedAccount = accounts.find((record) => record.crm_acc_code === validCode);
-    expect(importedAccount, 'valid row must persist after explicit partial-success consent').toBeTruthy();
+    expect(
+      importedAccount,
+      'valid row must persist after explicit partial-success consent',
+    ).toBeTruthy();
     expect(importedAccount?.crm_acc_pool_state).toBe('in_pool');
     expect(importedAccount?.crm_acc_owner ?? '').toBeFalsy();
     const importedAccountPid = String(importedAccount?.pid ?? '');
@@ -2065,6 +2103,37 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
       await viewerSession.context.close();
     }
 
+    const adminMobileContext = await browser.newContext({
+      baseURL: baseURL ?? 'http://localhost:5251',
+      storageState: { cookies: [], origins: [] },
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    const adminMobilePage = await adminMobileContext.newPage();
+    try {
+      await uiLogin(adminMobilePage, ADMIN_EMAIL);
+      await navigateToCrmMenu(
+        adminMobilePage,
+        /业务档案|Business Records/i,
+        '/p/c/crm_customer_pool_item_list',
+      );
+      const adminCard = adminMobilePage.getByTestId(`table-mobile-card-${importedItemPid}`);
+      await expect(adminCard).toContainText(validName, { timeout: 20_000 });
+      const adminAssignButton = adminCard.getByRole('button', { name: /分配|Assign/ });
+      await expect(adminAssignButton).toBeVisible();
+      await adminAssignButton.click();
+      const adminMobileAssignDialog = adminMobilePage.getByRole('dialog');
+      await expect(
+        adminMobileAssignDialog.getByText(/分配池内客户|Assign Pooled Customer/),
+      ).toBeVisible();
+      await expect(adminMobileAssignDialog.getByTestId('member-picker-add')).toBeVisible();
+      await attachScreenshot(adminMobilePage, testInfo, 'mobile-pool-admin-assign-dialog-390');
+      await adminMobileAssignDialog.getByRole('button', { name: /取消|Cancel/ }).click();
+    } finally {
+      await adminMobileContext.close();
+    }
+
     const mobileContext = await browser.newContext({
       baseURL: baseURL ?? 'http://localhost:5251',
       storageState: { cookies: [], origins: [] },
@@ -2075,9 +2144,48 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     const mobilePage = await mobileContext.newPage();
     try {
       await uiLogin(mobilePage, sales.email);
-      await mobilePage.goto(`/p/crm_customer_pool_item/view/${importedItemPid}`, {
-        waitUntil: 'domcontentloaded',
-      });
+      await navigateToCrmMenu(
+        mobilePage,
+        /业务档案|Business Records/i,
+        '/p/c/crm_customer_pool_item_list',
+      );
+      await expect(
+        mobilePage.getByRole('heading', { name: /客户公海运营台|Customer Pool Operations/ }),
+      ).toBeVisible({ timeout: 20_000 });
+      const mobileCards = mobilePage.getByTestId('table-mobile-cards');
+      await expect(mobileCards).toBeVisible();
+      await expect(mobilePage.getByTestId('table-block')).toHaveCount(0);
+      const importedCard = mobilePage.getByTestId(`table-mobile-card-${importedItemPid}`);
+      await expect(importedCard).toContainText(validName);
+      const claimButton = importedCard.getByRole('button', { name: /领取|Claim/ });
+      const assignButton = importedCard.getByRole('button', { name: /分配|Assign/ });
+      const detailButton = importedCard.getByRole('button', { name: /详情|Details/ });
+      await expect(claimButton).toBeVisible();
+      await expect(
+        assignButton,
+        'sales must not receive the pool-administrator assignment action',
+      ).toHaveCount(0);
+      await expect(detailButton).toBeVisible();
+      expect(
+        await importedCard
+          .getByRole('button')
+          .evaluateAll((elements) =>
+            elements.every((element) => element.getBoundingClientRect().height >= 44),
+          ),
+        'mobile public-pool card actions must provide 44px touch targets',
+      ).toBe(true);
+      expect(
+        await mobilePage.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+        ),
+        'mobile public-pool queue must not cause page-level horizontal overflow',
+      ).toBe(true);
+      await attachScreenshot(mobilePage, testInfo, 'mobile-pool-customer-cards-390');
+
+      await detailButton.click();
+      await expect(mobilePage).toHaveURL(
+        new RegExp(`/p/crm_customer_pool_item/view/${importedItemPid}$`),
+      );
       await expect(mobilePage.getByText(validName, { exact: true })).toBeVisible({
         timeout: 20_000,
       });
@@ -2128,7 +2236,9 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
       const historyBody = await historyResponse.json().catch(() => ({}));
       expect(String(historyBody?.code)).toBe('0');
       expect(JSON.stringify(historyBody)).toContain('imported_to_pool');
-      await expect(mobilePage.getByText(/导入公海|Imported to Pool|imported_to_pool/i).first()).toBeVisible({
+      await expect(
+        mobilePage.getByText(/导入公海|Imported to Pool|imported_to_pool/i).first(),
+      ).toBeVisible({
         timeout: 15_000,
       });
       await attachScreenshot(mobilePage, testInfo, 'mobile-pool-customer-ownership-390');
