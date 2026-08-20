@@ -253,7 +253,8 @@ test('OSS golden stack stages current-source hybrid jars before import', () => {
 
   assert.match(golden, /stage_requested_hybrid_jars\(\)/);
   assert.match(golden, /:platform-plugin-api:publishToMavenLocal/);
-  assert.match(golden, /GRADLE_USER_HOME="\$gradle_home" gradle --no-daemon/);
+  assert.match(golden, /GRADLE_USER_HOME="\$gradle_home" "\$REPO_ROOT\/platform\/gradlew"/);
+  assert.match(golden, /--project-dir "\$backend_dir" --no-daemon/);
   assert.match(golden, /-Dmaven\.repo\.local="\$maven_repo" clean jar/);
   assert.match(golden, /runtime_env "\$runtime_name" MAVEN_REPO_LOCAL/);
   assert.match(golden, /runtime_env "\$runtime_name" GRADLE_USER_HOME/);
@@ -265,6 +266,31 @@ test('OSS golden stack stages current-source hybrid jars before import', () => {
       golden.indexOf('log "5/9 start backend'),
     'hybrid jars must be staged before the PF4J host starts',
   );
+});
+
+test('host-side build scripts never fall back to the system Gradle executable', () => {
+  const scripts = [
+    'scripts/oss-golden-stack.sh',
+    'scripts/p1-verify-in-docker.sh',
+    'scripts/mes-wms-golden-run.sh',
+    'plugins/scripts/build-plugin.sh',
+  ];
+
+  for (const script of scripts) {
+    const source = read(script);
+    assert.doesNotMatch(
+      source,
+      /(?:^|[;&(|]\s*|\s)gradle\s+(?:--no-daemon\s+)?(?:build|clean|jar)/m,
+      `${script} must use a repository Gradle wrapper`,
+    );
+  }
+
+  const mesWms = read('scripts/mes-wms-golden-run.sh');
+  assert.match(mesWms, /--project-dir "\$2" jar --console=plain -q --no-daemon/);
+
+  const buildPlugin = read('plugins/scripts/build-plugin.sh');
+  assert.match(buildPlugin, /publishToMavenLocal --quiet --no-daemon/);
+  assert.match(buildPlugin, /clean build -x test --quiet --no-daemon/);
 });
 
 test('Docker bootstrap entrypoints preserve plugin dependency order', () => {
