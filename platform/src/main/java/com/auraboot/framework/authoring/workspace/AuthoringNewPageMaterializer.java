@@ -98,7 +98,7 @@ public class AuthoringNewPageMaterializer {
         java.util.List<NewPageOption> permissions = jdbcTemplate.query("""
                         SELECT code, name FROM ab_permission
                         WHERE tenant_id = ? AND status = 'active' AND deleted_flag = FALSE
-                        ORDER BY code LIMIT 1000
+                        ORDER BY code
                         """,
                 (resultSet, rowNumber) -> new NewPageOption(
                         resultSet.getString("code"), resultSet.getString("name")),

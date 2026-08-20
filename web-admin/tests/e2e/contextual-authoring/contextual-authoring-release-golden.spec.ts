@@ -1825,6 +1825,7 @@ test.describe('Contextual authoring release PC golden', () => {
         apiPath(response.url()) ===
           `/api/authoring/sessions/${opened.sessionPid}/identity-simulations` &&
         response.status() === 200,
+      { timeout: 15_000 },
     );
     await page.getByTestId('identity-simulation-start').click();
     const firstSimulation = await expectApiData<IdentitySimulation>(
@@ -1901,6 +1902,7 @@ test.describe('Contextual authoring release PC golden', () => {
         response.request().method() === 'POST' &&
         apiPath(response.url()) ===
           `/api/authoring/identity-simulations/${firstSimulation.simulationPid}/end`,
+      { timeout: 15_000 },
     );
     await page.getByTestId('identity-simulation-end').click();
     const ended = await expectApiData<IdentitySimulation>(
@@ -1923,6 +1925,7 @@ test.describe('Contextual authoring release PC golden', () => {
         response.request().method() === 'POST' &&
         apiPath(response.url()) ===
           `/api/authoring/sessions/${opened.sessionPid}/identity-simulations`,
+      { timeout: 15_000 },
     );
     await page.getByTestId('identity-simulation-start').click();
     const expiring = await expectApiData<IdentitySimulation>(

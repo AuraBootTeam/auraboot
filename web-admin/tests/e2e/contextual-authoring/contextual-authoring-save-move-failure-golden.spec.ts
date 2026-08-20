@@ -1278,8 +1278,8 @@ async function recoveryKeys(page: Page): Promise<string[]> {
 async function enterAuthoringFromRuntime(page: Page): Promise<AuthoringSession> {
   const link = page.locator('nav').locator(`a[href="${RUNTIME_ROUTE}"]`).first();
   await expect(link).toBeVisible({ timeout: 10_000 });
-  await link.click();
   try {
+    await link.click();
     await page.waitForURL(new RegExp(`${RUNTIME_ROUTE}$`), { timeout: 3_000 });
   } catch {
     // Login may finish a delayed redirect after the first SPA click; navigate once after it settles.

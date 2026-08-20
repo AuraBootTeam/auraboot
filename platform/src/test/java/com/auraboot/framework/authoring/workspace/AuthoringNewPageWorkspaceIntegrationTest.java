@@ -148,6 +148,38 @@ class AuthoringNewPageWorkspaceIntegrationTest extends BaseIntegrationTest {
         assertThat(countMenu(fixture.menuCode())).isZero();
     }
 
+    @Test
+    void newPageOptionsDoNotSilentlyDropValidPermissionsAfterOneThousandRows() {
+        String suffix = UniqueIdGenerator.generate().toLowerCase();
+        String targetPermission = "zz.authoring." + suffix + ".read";
+        insertPermission(targetPermission);
+        jdbcTemplate.update("""
+                INSERT INTO ab_permission (
+                    pid, tenant_id, code, name, resource_type, resource_code, action,
+                    source, status, deleted_flag)
+                SELECT CONCAT(?, '_', sequence_number), ?,
+                       CONCAT('aa.authoring.', ?, '.', LPAD(sequence_number::text, 4, '0')),
+                       'Authoring scale permission', 'PAGE',
+                       CONCAT('authoring.', ?, '.', sequence_number), 'read',
+                       'test', 'active', FALSE
+                FROM generate_series(1, 1001) AS sequence_number
+                """, suffix, getTestTenant().getId(), suffix, suffix);
+
+        try {
+            var options = workspaceService.newPageOptions();
+
+            assertThat(options.permissions()).hasSizeGreaterThan(1000);
+            assertThat(options.permissions())
+                    .anyMatch(option -> option.value().equals(targetPermission));
+        } finally {
+            jdbcTemplate.update("""
+                    DELETE FROM ab_permission
+                    WHERE tenant_id = ? AND (code = ? OR code LIKE ?)
+                    """, getTestTenant().getId(), targetPermission,
+                    "aa.authoring." + suffix + ".%");
+        }
+    }
+
     private Fixture fixture() {
         PageSchema sourcePage = insertSourcePage();
         SessionView source = workspaceService.open(new OpenSessionRequest(sourcePage.getPid(), null));
