@@ -32,8 +32,7 @@ class PageSchemaDiffServiceTest {
         assertThat(diff).extracting(SemanticDiffEntry::getPath, SemanticDiffEntry::getOp)
                 .containsExactlyInAnyOrder(
                         tuple("layout.type", SemanticDiffEntry.Op.MODIFY),
-                        tuple("layout.cols", SemanticDiffEntry.Op.ADD)
-                );
+                        tuple("layout.cols", SemanticDiffEntry.Op.ADD));
     }
 
     @Test
@@ -44,7 +43,7 @@ class PageSchemaDiffServiceTest {
         List<SemanticDiffEntry> diff = service.diff(a, b);
         assertThat(diff).hasSize(1);
         SemanticDiffEntry entry = diff.get(0);
-        assertThat(entry.getPath()).isEqualTo("blocks[1]");
+        assertThat(entry.getPath()).isEqualTo("blocks[b2]");
         assertThat(entry.getOp()).isEqualTo(SemanticDiffEntry.Op.ADD);
         assertThat(entry.getOldValue()).isNull();
         assertThat(entry.getNewValue()).isNotNull();
@@ -57,7 +56,7 @@ class PageSchemaDiffServiceTest {
 
         List<SemanticDiffEntry> diff = service.diff(a, b);
         assertThat(diff).hasSize(1);
-        assertThat(diff.get(0).getPath()).isEqualTo("blocks[1]");
+        assertThat(diff.get(0).getPath()).isEqualTo("blocks[b2]");
         assertThat(diff.get(0).getOp()).isEqualTo(SemanticDiffEntry.Op.DELETE);
     }
 
@@ -69,7 +68,7 @@ class PageSchemaDiffServiceTest {
         List<SemanticDiffEntry> diff = service.diff(a, b);
         assertThat(diff).hasSize(1);
         SemanticDiffEntry entry = diff.get(0);
-        assertThat(entry.getPath()).isEqualTo("blocks[0].buttons[0].label");
+        assertThat(entry.getPath()).isEqualTo("blocks[b1].buttons[0].label");
         assertThat(entry.getOp()).isEqualTo(SemanticDiffEntry.Op.MODIFY);
         assertThat(entry.getOldValue()).isEqualTo("old");
         assertThat(entry.getNewValue()).isEqualTo("new");
@@ -83,8 +82,28 @@ class PageSchemaDiffServiceTest {
 
         List<SemanticDiffEntry> diff = service.diff(a, b);
         assertThat(diff).hasSize(1);
-        assertThat(diff.get(0).getPath()).isEqualTo("blocks[0].label");
+        assertThat(diff.get(0).getPath()).isEqualTo("blocks[b1].label");
         assertThat(diff.get(0).getOp()).isEqualTo(SemanticDiffEntry.Op.MODIFY);
+    }
+
+    @Test
+    void reorderedStableBlocks_producesMovesWithoutDeleteAddNoise() {
+        String tableThenFilters = "[{\"id\":\"a\",\"blockType\":\"table\"},"
+                + "{\"id\":\"b\",\"blockType\":\"filters\"}]";
+        String filtersThenTable = "[{\"id\":\"b\",\"blockType\":\"filters\"},"
+                + "{\"id\":\"a\",\"blockType\":\"table\"}]";
+        PageSchema a = page(tableThenFilters, null, null);
+        PageSchema b = page(filtersThenTable, null, null);
+
+        List<SemanticDiffEntry> diff = service.diff(a, b);
+
+        assertThat(diff).extracting(SemanticDiffEntry::getPath, SemanticDiffEntry::getOp,
+                        SemanticDiffEntry::getOldValue, SemanticDiffEntry::getNewValue)
+                .containsExactly(
+                        tuple("blocks[a]", SemanticDiffEntry.Op.MOVE, 0, 1),
+                        tuple("blocks[b]", SemanticDiffEntry.Op.MOVE, 1, 0));
+        assertThat(diff).noneMatch(entry -> entry.getOp() == SemanticDiffEntry.Op.ADD
+                || entry.getOp() == SemanticDiffEntry.Op.DELETE);
     }
 
     @Test

@@ -177,7 +177,7 @@ describe('executeFetch', () => {
     expect(result.success).toBe(false); // code !== '0'
   });
 
-  it('should pass init options to fetch', async () => {
+  it('should pass init options to fetch with an uppercase wire method', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ code: '0', desc: 'OK', data: null }),
@@ -193,6 +193,27 @@ describe('executeFetch', () => {
 
     await executeFetch('http://localhost:3500/api/test', init);
 
-    expect(mockFetch).toHaveBeenCalledWith('http://localhost:3500/api/test', init);
+    expect(mockFetch).toHaveBeenCalledWith('http://localhost:3500/api/test', {
+      ...init,
+      method: 'POST',
+    });
+  });
+
+  it('should normalize lowercase PATCH before it reaches the server', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ code: '0', desc: 'OK', data: null }),
+    });
+    globalThis.fetch = mockFetch;
+
+    await executeFetch('http://localhost:3500/api/authoring/sessions/session-1/patches', {
+      method: 'patch',
+      body: '{}',
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'http://localhost:3500/api/authoring/sessions/session-1/patches',
+      { method: 'PATCH', body: '{}' },
+    );
   });
 });

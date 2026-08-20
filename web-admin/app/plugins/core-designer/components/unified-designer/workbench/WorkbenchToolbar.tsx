@@ -8,7 +8,13 @@ import {
 } from '../registry/kindPolicy';
 import type { PageSchemaV3, WorkbenchMode } from '../types';
 
-export type DesignerSaveStatus = 'saved' | 'dirty' | 'saving' | 'invalid' | 'error';
+export type DesignerSaveStatus =
+  | 'saved'
+  | 'dirty'
+  | 'saving'
+  | 'invalid'
+  | 'error'
+  | 'import-error';
 
 /** Lifecycle state of the publish/unpublish action point. */
 export type DesignerPublishStatus = 'draft' | 'publishing' | 'published' | 'unpublishing' | 'error';
@@ -24,6 +30,7 @@ interface WorkbenchToolbarProps {
   canRedo: boolean;
   returnHref?: string;
   aiCopilotEnabled?: boolean;
+  aiCopilotGoverned?: boolean;
   /**
    * The persisted page id (pid) when the document is page-bound. Publish /
    * unpublish are only available for a saved page; a local/new document has no
@@ -53,6 +60,9 @@ interface WorkbenchToolbarProps {
    * server-side version history.
    */
   onOpenVersions?: () => void;
+  readOnly?: boolean;
+  contextualRestricted?: boolean;
+  previewOnly?: boolean;
 }
 
 // C4 — localized labels for the switchable page kinds.
@@ -74,6 +84,7 @@ export function WorkbenchToolbar({
   canRedo,
   returnHref,
   aiCopilotEnabled,
+  aiCopilotGoverned,
   pageId,
   publishStatus = 'draft',
   publishError,
@@ -88,9 +99,12 @@ export function WorkbenchToolbar({
   onImportFile,
   onOpenAiCopilot,
   onOpenVersions,
+  readOnly = false,
+  contextualRestricted = false,
+  previewOnly = false,
 }: WorkbenchToolbarProps) {
   const { locale } = useI18n();
-  const saveDisabled = !isDirty || saveStatus === 'saving' || saveStatus === 'invalid';
+  const saveDisabled = readOnly || !isDirty || saveStatus === 'saving' || saveStatus === 'invalid';
   const [showLeaveWarning, setShowLeaveWarning] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -100,7 +114,7 @@ export function WorkbenchToolbar({
   // button is disabled to prevent double submits.
   const publishBusy = publishStatus === 'publishing' || publishStatus === 'unpublishing';
   const isPublished = publishStatus === 'published';
-  const publishDisabled = !pageId || isDirty || publishBusy;
+  const publishDisabled = readOnly || !pageId || isDirty || publishBusy;
 
   useEffect(() => {
     if (!isDirty) setShowLeaveWarning(false);
@@ -113,12 +127,15 @@ export function WorkbenchToolbar({
   };
 
   return (
-    <div className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2">
-      <div className="min-w-[150px] flex-1">
-        <div className="text-sm font-semibold text-slate-900">{resolveTitle(document.title, locale)}</div>
-        <div className="font-mono text-xs text-slate-400">{document.id}</div>
-      </div>
-      <div className="flex max-w-full shrink-0 items-center gap-2 overflow-x-auto">
+    <div className="border-b border-slate-200 bg-white">
+      <div className="flex min-h-14 flex-wrap items-center justify-between gap-2 px-4 py-2">
+        <div className="min-w-[150px] flex-1">
+          <div className="text-sm font-semibold text-slate-900">
+            {resolveTitle(document.title, locale)}
+          </div>
+          <div className="font-mono text-xs text-slate-400">{document.id}</div>
+        </div>
+        <div className="flex max-w-full shrink-0 items-center gap-2 overflow-x-auto">
         {onSwitchKind ? (
           <label
             className="flex items-center gap-1.5 text-xs font-medium text-slate-500"
@@ -128,6 +145,7 @@ export function WorkbenchToolbar({
             <select
               data-testid="designer-kind-switch"
               value={KIND_SWITCH_TARGETS.includes(document.kind) ? document.kind : ''}
+              disabled={readOnly}
               onChange={(event) => {
                 const next = event.target.value as PageSchemaV3['kind'];
                 if (next) onSwitchKind(next);
@@ -174,14 +192,17 @@ export function WorkbenchToolbar({
             {resolveDesignerText(DESIGNER_I18N.unified.pages, locale)}
           </a>
         ) : null}
-        {aiCopilotEnabled ? (
+        {aiCopilotEnabled && !readOnly ? (
           <button
             type="button"
             data-testid="designer-ai-copilot"
             onClick={onOpenAiCopilot}
             className="rounded-md border border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50 px-3 py-1.5 text-sm font-medium text-purple-700 hover:from-purple-100 hover:to-indigo-100"
           >
-            ✨ AI
+            ✨{' '}
+            {aiCopilotGoverned
+              ? resolveDesignerText(DESIGNER_I18N.unified.aiProposal.toolbar, locale)
+              : 'AI'}
           </button>
         ) : null}
         <button
@@ -202,10 +223,10 @@ export function WorkbenchToolbar({
             data-testid="designer-undo"
             aria-label={resolveDesignerText(DESIGNER_I18N.unified.undo, locale)}
             title={resolveDesignerText(DESIGNER_I18N.unified.undo, locale)}
-            disabled={!canUndo}
+            disabled={readOnly || !canUndo}
             onClick={onUndo}
             className={`inline-flex h-8 w-8 items-center justify-center border-r border-slate-200 ${
-              canUndo
+              !readOnly && canUndo
                 ? 'text-slate-600 hover:bg-slate-50'
                 : 'cursor-not-allowed text-slate-300'
             }`}
@@ -217,10 +238,10 @@ export function WorkbenchToolbar({
             data-testid="designer-redo"
             aria-label={resolveDesignerText(DESIGNER_I18N.unified.redo, locale)}
             title={resolveDesignerText(DESIGNER_I18N.unified.redo, locale)}
-            disabled={!canRedo}
+            disabled={readOnly || !canRedo}
             onClick={onRedo}
             className={`inline-flex h-8 w-8 items-center justify-center ${
-              canRedo
+              !readOnly && canRedo
                 ? 'text-slate-600 hover:bg-slate-50'
                 : 'cursor-not-allowed text-slate-300'
             }`}
@@ -232,8 +253,9 @@ export function WorkbenchToolbar({
           <button
             type="button"
             data-testid="designer-mode-edit"
+            disabled={previewOnly}
             onClick={() => onModeChange('edit')}
-            className={`rounded px-3 py-1.5 text-sm ${
+            className={`rounded px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40 ${
               mode === 'edit' ? 'bg-white font-medium text-blue-700 shadow-sm' : 'text-slate-500'
             }`}
           >
@@ -242,8 +264,9 @@ export function WorkbenchToolbar({
           <button
             type="button"
             data-testid="designer-mode-layout"
+            disabled={previewOnly}
             onClick={() => onModeChange('layout')}
-            className={`rounded px-3 py-1.5 text-sm ${
+            className={`rounded px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40 ${
               mode === 'layout' ? 'bg-white font-medium text-blue-700 shadow-sm' : 'text-slate-500'
             }`}
           >
@@ -256,105 +279,113 @@ export function WorkbenchToolbar({
         >
           {getStatusLabel(saveStatus, validationErrorCount, locale)}
         </span>
-        {saveError ? (
+        {readOnly ? (
           <span
-            className="max-w-[320px] truncate rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700"
-            data-testid="designer-save-error"
-            title={saveError}
+            className="rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700"
+            data-testid="designer-contextual-read-only"
           >
-            {saveError}
+            现场上下文只读
+          </span>
+        ) : null}
+        {contextualRestricted && !readOnly ? (
+          <span
+            className="rounded-md bg-violet-50 px-2 py-1 text-xs font-medium text-violet-700"
+            data-testid="designer-contextual-restricted"
+          >
+            同一 ChangeSet · 受治理编辑
           </span>
         ) : null}
         {/* Export / import — pure client-side JSON round-trip, no backend. */}
-        <div className="ml-2 grid grid-cols-2 rounded-md border border-slate-200 bg-white">
-          <button
-            type="button"
-            data-testid="designer-export"
-            aria-label={resolveDesignerText(DESIGNER_I18N.unified.exportPage, locale)}
-            title={resolveDesignerText(DESIGNER_I18N.unified.exportPage, locale)}
-            onClick={onExport}
-            className="inline-flex h-8 w-8 items-center justify-center border-r border-slate-200 text-slate-600 hover:bg-slate-50"
-          >
-            <Download className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            data-testid="designer-import"
-            aria-label={resolveDesignerText(DESIGNER_I18N.unified.importPage, locale)}
-            title={resolveDesignerText(DESIGNER_I18N.unified.importPage, locale)}
-            onClick={() => importInputRef.current?.click()}
-            className="inline-flex h-8 w-8 items-center justify-center text-slate-600 hover:bg-slate-50"
-          >
-            <Upload className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
-        <input
-          ref={importInputRef}
-          type="file"
-          accept="application/json,.json"
-          data-testid="designer-import-input"
-          className="hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            // Reset the value so selecting the same file twice re-fires change.
-            event.target.value = '';
-            if (file) onImportFile?.(file);
-          }}
-        />
+        {onExport || onImportFile ? (
+          <>
+            <div className="ml-2 grid grid-cols-2 rounded-md border border-slate-200 bg-white">
+              <button
+                type="button"
+                data-testid="designer-export"
+                aria-label={resolveDesignerText(DESIGNER_I18N.unified.exportPage, locale)}
+                title={resolveDesignerText(DESIGNER_I18N.unified.exportPage, locale)}
+                onClick={onExport}
+                disabled={!onExport}
+                className="inline-flex h-8 w-8 items-center justify-center border-r border-slate-200 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                <Download className="h-4 w-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                data-testid="designer-import"
+                aria-label={resolveDesignerText(DESIGNER_I18N.unified.importPage, locale)}
+                title={resolveDesignerText(DESIGNER_I18N.unified.importPage, locale)}
+                onClick={() => importInputRef.current?.click()}
+                disabled={readOnly || !onImportFile}
+                className="inline-flex h-8 w-8 items-center justify-center text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                <Upload className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              data-testid="designer-import-input"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                // Reset the value so selecting the same file twice re-fires change.
+                event.target.value = '';
+                if (file) onImportFile?.(file);
+              }}
+            />
+          </>
+        ) : null}
         {/* Version history — only for a saved page (GET/POST /api/pages/{pid}/versions). */}
-        <button
-          type="button"
-          data-testid="designer-versions"
-          aria-label={resolveDesignerText(DESIGNER_I18N.unified.versionHistory, locale)}
-          title={
-            !pageId
-              ? resolveDesignerText(DESIGNER_I18N.unified.versionsSaveFirst, locale)
-              : resolveDesignerText(DESIGNER_I18N.unified.versionHistory, locale)
-          }
-          disabled={!pageId}
-          onClick={onOpenVersions}
-          className={`ml-2 inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 ${
-            pageId
-              ? 'text-slate-600 hover:bg-slate-50'
-              : 'cursor-not-allowed text-slate-300'
-          }`}
-        >
-          <History className="h-4 w-4" aria-hidden="true" />
-        </button>
+        {onOpenVersions ? (
+          <button
+            type="button"
+            data-testid="designer-versions"
+            aria-label={resolveDesignerText(DESIGNER_I18N.unified.versionHistory, locale)}
+            title={resolveDesignerText(DESIGNER_I18N.unified.versionHistory, locale)}
+            disabled={readOnly || !pageId}
+            onClick={onOpenVersions}
+            className={`ml-2 inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 ${
+              !readOnly && pageId
+                ? 'text-slate-600 hover:bg-slate-50'
+                : 'cursor-not-allowed text-slate-300'
+            }`}
+          >
+            <History className="h-4 w-4" aria-hidden="true" />
+          </button>
+        ) : null}
         {/* Publish — only for a saved, clean page (POST /api/pages/{pid}/publish). */}
-        <button
-          type="button"
-          data-testid="designer-publish"
-          disabled={publishDisabled}
-          title={
-            !pageId
-              ? resolveDesignerText(DESIGNER_I18N.unified.publishSaveFirst, locale)
-              : undefined
-          }
-          onClick={onPublish}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-            publishDisabled
-              ? 'cursor-not-allowed bg-slate-200 text-slate-500'
-              : 'bg-emerald-600 text-white hover:bg-emerald-700'
-          }`}
-        >
-          {resolveDesignerText(
-            publishStatus === 'publishing'
-              ? DESIGNER_I18N.unified.publishing
-              : isPublished
-                ? DESIGNER_I18N.unified.published
-                : DESIGNER_I18N.unified.publish,
-            locale,
-          )}
-        </button>
+        {onPublish ? (
+          <button
+            type="button"
+            data-testid="designer-publish"
+            disabled={publishDisabled}
+            onClick={onPublish}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+              publishDisabled
+                ? 'cursor-not-allowed bg-slate-200 text-slate-500'
+                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+            }`}
+          >
+            {resolveDesignerText(
+              publishStatus === 'publishing'
+                ? DESIGNER_I18N.unified.publishing
+                : isPublished
+                  ? DESIGNER_I18N.unified.published
+                  : DESIGNER_I18N.unified.publish,
+              locale,
+            )}
+          </button>
+        ) : null}
         {isPublished || publishStatus === 'unpublishing' ? (
           <button
             type="button"
             data-testid="designer-unpublish"
-            disabled={publishBusy || isDirty || !pageId}
+            disabled={readOnly || publishBusy || isDirty || !pageId}
             onClick={onUnpublish}
             className={`rounded-md border px-3 py-1.5 text-sm font-medium ${
-              publishBusy || isDirty || !pageId
+              readOnly || publishBusy || isDirty || !pageId
                 ? 'cursor-not-allowed border-slate-200 text-slate-400'
                 : 'border-slate-300 text-slate-700 hover:bg-slate-50'
             }`}
@@ -415,7 +446,17 @@ export function WorkbenchToolbar({
             locale,
           )}
         </button>
+        </div>
       </div>
+      {saveError ? (
+        <div
+          className="mx-4 mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-5 text-red-700"
+          data-testid="designer-save-error"
+          role="alert"
+        >
+          {saveError}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -439,6 +480,9 @@ function getStatusLabel(
       count: validationErrorCount,
     });
   }
+  if (status === 'import-error') {
+    return resolveDesignerText(DESIGNER_I18N.unified.statusImportError, locale);
+  }
   if (status === 'error') return resolveDesignerText(DESIGNER_I18N.unified.statusError, locale);
   return resolveDesignerText(DESIGNER_I18N.unified.statusSaved, locale);
 }
@@ -446,6 +490,8 @@ function getStatusLabel(
 function getStatusClassName(status: DesignerSaveStatus): string {
   if (status === 'dirty') return 'bg-amber-50 text-amber-700';
   if (status === 'saving') return 'bg-blue-50 text-blue-700';
-  if (status === 'invalid' || status === 'error') return 'bg-red-50 text-red-700';
+  if (status === 'invalid' || status === 'error' || status === 'import-error') {
+    return 'bg-red-50 text-red-700';
+  }
   return 'bg-emerald-50 text-emerald-700';
 }

@@ -20,6 +20,7 @@ export function ColumnContextMenu({
   onFilterByColumn,
   onGroupBy,
   onClose,
+  t = (key) => key,
 }: {
   x: number;
   y: number;
@@ -31,6 +32,7 @@ export function ColumnContextMenu({
   onFilterByColumn: () => void;
   onGroupBy: () => void;
   onClose: () => void;
+  t?: (key: string) => string;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -42,6 +44,10 @@ export function ColumnContextMenu({
   }, [onClose]);
 
   const frozenPos = column.fixed || (column as any).frozenPosition;
+  const translate = (key: string, fallback: string) => {
+    const value = t(key);
+    return value && value !== key ? value : fallback;
+  };
   const menuItems = [
     {
       icon: '↑',
@@ -70,7 +76,14 @@ export function ColumnContextMenu({
       onClick: () => onFreeze(frozenPos === 'right' ? 'none' : 'right'),
     },
     'divider' as const,
-    { icon: '👁', label: 'Hide Column', onClick: onHide },
+    {
+      icon: '👁',
+      label: column.mandatory
+        ? translate('common.saved_view_mandatory_column', 'Required Column')
+        : 'Hide Column',
+      disabled: column.mandatory === true,
+      onClick: onHide,
+    },
     { icon: '🔍', label: 'Filter by Column', onClick: onFilterByColumn },
     'divider' as const,
     { icon: '☰', label: 'Group by Column', onClick: onGroupBy },
@@ -95,10 +108,13 @@ export function ColumnContextMenu({
             type="button"
             className={`hover:bg-hover flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${item.active ? 'text-accent font-medium' : 'text-text-2'}`}
             data-testid={`column-context-menu-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+            disabled={item.disabled}
             onClick={() => {
+              if (item.disabled) return;
               item.onClick();
               onClose();
             }}
+            title={item.disabled ? '必显字段不能在个人视图中隐藏' : undefined}
           >
             <span className="w-4 text-center text-xs">{item.icon}</span>
             <span className="flex-1">{item.label}</span>

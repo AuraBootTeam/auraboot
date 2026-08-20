@@ -53,7 +53,9 @@ export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ bloc
     <div className="filters-block border-border bg-subtle border-b px-6 py-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {fields.map((field) => (
-          <FieldRenderer key={field.field} field={field} runtime={runtime} />
+          <div key={field.field} data-authoring-node-id={(field as any).id || field.field}>
+            <FieldRenderer field={field} runtime={runtime} />
+          </div>
         ))}
       </div>
       <div className="mt-4 flex justify-end space-x-2">

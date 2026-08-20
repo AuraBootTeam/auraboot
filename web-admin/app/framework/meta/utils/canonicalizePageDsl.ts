@@ -52,6 +52,16 @@ export interface PageSchemaDTO {
   metaInfo?: Record<string, unknown> | null;
   isTemplate?: boolean;
   extension?: Record<string, any>;
+  runtime?: {
+    source: 'PAGE_SCHEMA' | 'AUTHORING_RELEASE';
+    releasePid?: string | null;
+    channelVersion: number;
+    sourceVersion: number;
+    snapshotChecksum?: string | null;
+    cacheKey: string;
+  };
+  rowVersion?: number | null;
+  version?: number | null;
   'name:zh-CN'?: string;
   'name:en'?: string;
   'name:en-US'?: string;
@@ -452,6 +462,7 @@ export function canonicalizePageSchemaDto(pageSchemaDTO: PageSchemaDTO): Unified
       options: pageSchemaDTO.extension.options,
     }),
     ...(pageSchemaDTO.extension && { extension: pageSchemaDTO.extension }),
+    ...(pageSchemaDTO.runtime && { runtime: pageSchemaDTO.runtime }),
   };
 
   const migrated = DslMigrator.migrate(raw);

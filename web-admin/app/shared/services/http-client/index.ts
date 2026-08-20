@@ -36,6 +36,11 @@ export { fetchResult, get, post, put, del, patch } from './HttpClient';
 export type { RequestContext, FetchOptions, Result, ApiConfig, ErrorCode } from './types';
 
 export { ErrorCodes } from './types';
+export {
+  activateAuthoringPreviewGuard,
+  resetAuthoringPreviewGuardForTests,
+  AUTHORING_WRITE_BLOCKED_EVENT,
+} from './AuthoringPreviewGuard';
 
 // ============================================================================
 // Advanced API - Direct Layer Access (for advanced use cases)

@@ -305,6 +305,7 @@ const columnFields: PropertySchema<string>[] = [
 
 const tableFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
+  { key: 'dataSource.model', label: 'Model', type: 'model' },
   { key: 'props.rows', label: 'Preview rows JSON', type: 'json' },
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];

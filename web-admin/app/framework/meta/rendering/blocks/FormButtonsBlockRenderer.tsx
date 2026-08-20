@@ -119,6 +119,7 @@ export const FormButtonsBlockRenderer: React.FC<FormButtonsBlockRendererProps> =
     return (
       <button
         key={button.code}
+        data-authoring-node-id={(button as any).id || button.code}
         type="button"
         data-testid={`form-btn-${button.code}`}
         onClick={() => handleButtonClick(button)}

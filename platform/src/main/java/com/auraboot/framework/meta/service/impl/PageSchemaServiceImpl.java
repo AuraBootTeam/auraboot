@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.authoring.workspace.AuthoringRuntimePageMaterializer;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.ValidationException;
@@ -51,6 +52,7 @@ public class PageSchemaServiceImpl implements PageSchemaService {
     private final MetaModelService metaModelService;
     private final PageSchemaDefaultBlockGenerator defaultBlockGenerator;
     private final ObjectMapper objectMapper;
+    private final AuthoringRuntimePageMaterializer authoringRuntimePageMaterializer;
 
     /** Extension key used to snapshot the bound {modelCode}@{version} at page-save time. */
     private static final String EXT_BOUND_MODEL_VERSION = "boundModelVersion";
@@ -412,8 +414,15 @@ public class PageSchemaServiceImpl implements PageSchemaService {
         }
 
         // 直接通过 page_key 查询
-        PageSchema pageSchema = pageSchemaMapper.selectByPageKey(pageKey);
-        return pageSchema != null ? injectSystemTabs(enrichWithModelCategory(pageSchemaConverter.toDTO(pageSchema))) : null;
+        return toRuntimeDTO(pageSchemaMapper.selectByPageKey(pageKey));
+    }
+
+    @Override
+    public PageSchemaDTO findRuntimeByPid(String pid) {
+        if (!StringUtils.hasText(pid)) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed, "页面PID不能为空");
+        }
+        return toRuntimeDTO(pageSchemaMapper.selectPublishedByPid(pid));
     }
 
     @Override
@@ -424,6 +433,15 @@ public class PageSchemaServiceImpl implements PageSchemaService {
 
         PageSchema pageSchema = pageSchemaMapper.selectAnyByPageKey(pageKey);
         return pageSchema != null ? injectSystemTabs(enrichWithModelCategory(pageSchemaConverter.toDTO(pageSchema))) : null;
+    }
+
+    private PageSchemaDTO toRuntimeDTO(PageSchema pageSchema) {
+        if (pageSchema == null) {
+            return null;
+        }
+        PageSchemaDTO baseline = pageSchemaConverter.toDTO(pageSchema);
+        PageSchemaDTO materialized = authoringRuntimePageMaterializer.materialize(baseline);
+        return injectSystemTabs(enrichWithModelCategory(materialized));
     }
 
     // ==================== 私有辅助方法 ====================
@@ -861,7 +879,9 @@ public class PageSchemaServiceImpl implements PageSchemaService {
     @Transactional(readOnly = true)
     public List<PageSchemaSyncVersionDTO> getVersionsSince(Instant since) {
         log.info("Query schema versions since: {}", since);
-        return pageSchemaMapper.selectVersionsSince(since);
+        List<PageSchemaSyncVersionDTO> versions = pageSchemaMapper.selectVersionsSince(since);
+        versions.forEach(this::attachRuntimeVersion);
+        return versions;
     }
 
     @Override
@@ -872,6 +892,26 @@ public class PageSchemaServiceImpl implements PageSchemaService {
             return List.of();
         }
         List<PageSchema> schemas = pageSchemaMapper.selectBatchByKeys(pageKeys);
-        return pageSchemaConverter.toDTOList(schemas);
+        return schemas.stream().map(this::toRuntimeDTO).toList();
+    }
+
+    private void attachRuntimeVersion(PageSchemaSyncVersionDTO version) {
+        long sourceVersion = version.getRuntimeSourceVersion() == null
+                ? 1L
+                : version.getRuntimeSourceVersion();
+        String releasePid = version.getRuntimeReleasePid();
+        if (releasePid == null) {
+            version.setRuntime(new PageSchemaRuntimeDTO(
+                    "PAGE_SCHEMA", null, 0, sourceVersion, null,
+                    "page-schema:" + version.getPagePid() + ":" + sourceVersion));
+            return;
+        }
+        long channelVersion = version.getRuntimeChannelVersion() == null
+                ? 0L
+                : version.getRuntimeChannelVersion();
+        String checksum = version.getRuntimeSnapshotChecksum();
+        version.setRuntime(new PageSchemaRuntimeDTO(
+                "AUTHORING_RELEASE", releasePid, channelVersion, sourceVersion, checksum,
+                "authoring-release:" + releasePid + ":" + channelVersion + ":" + checksum));
     }
 }

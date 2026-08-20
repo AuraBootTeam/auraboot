@@ -99,6 +99,15 @@ describe('mergeConfig', () => {
     expect(result[2].visible).toBe(false);
   });
 
+  it('restores a mandatory action even when legacy config hides it', () => {
+    const result = mergeConfig(
+      [makeButton('export', { mandatory: true })],
+      [{ code: 'export', visible: false, pinned: false, order: 0 }],
+    );
+
+    expect(result).toEqual([{ code: 'export', visible: true, pinned: false, order: 0 }]);
+  });
+
   it('adds new buttons not in config to the end', () => {
     const config: ToolbarActionConfig[] = [
       { code: 'create', visible: true, pinned: true, order: 0 },

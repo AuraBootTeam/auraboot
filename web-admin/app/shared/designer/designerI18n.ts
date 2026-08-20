@@ -292,12 +292,242 @@ export const DESIGNER_I18N = {
     mode: { 'zh-CN': '模式', 'en-US': 'Mode' } as L,
     untitledPage: { 'zh-CN': '未命名页面', 'en-US': 'Untitled page' } as L,
     deleteBlock: { 'zh-CN': '删除', 'en-US': 'Delete' } as L,
+    duplicateBlock: { 'zh-CN': '复制区块', 'en-US': 'Duplicate block' } as L,
+    duplicateBlockHint: {
+      'zh-CN': '生成新 ID，并保留来源关系',
+      'en-US': 'Creates new IDs and preserves source lineage',
+    } as L,
     aiLockBadge: { 'zh-CN': 'AI 锁定', 'en-US': 'AI locked' } as L,
 
     // Multi-select batch bar (shift / cmd / ctrl + click on the canvas)
     multiSelectCount: { 'zh-CN': '已选 {count} 项', 'en-US': '{count} selected' } as L,
     multiSelectDelete: { 'zh-CN': '删除所选', 'en-US': 'Delete selected' } as L,
     multiSelectClear: { 'zh-CN': '清除选择', 'en-US': 'Clear selection' } as L,
+
+    rolePreview: {
+      device: { 'zh-CN': '预览设备', 'en-US': 'Preview device' } as L,
+      perspective: { 'zh-CN': '权限视角', 'en-US': 'Permission perspective' } as L,
+      currentActor: {
+        'zh-CN': '当前操作者 · 实时预览',
+        'en-US': 'Current actor · live preview',
+      } as L,
+      calculating: {
+        'zh-CN': '正在计算权限结构…',
+        'en-US': 'Calculating permission structure...',
+      } as L,
+      title: {
+        'zh-CN': '{role} · 权限结构预览',
+        'en-US': '{role} · permission structure preview',
+      } as L,
+      intersection: {
+        'zh-CN': '当前操作者权限 ∩ 目标角色权限',
+        'en-US': 'Current actor permissions ∩ target role permissions',
+      } as L,
+      exit: { 'zh-CN': '退出角色预览', 'en-US': 'Exit role preview' } as L,
+      noTargetData: {
+        'zh-CN': '不读取目标角色真实数据',
+        'en-US': 'No target-role business data is read',
+      } as L,
+      exportOff: { 'zh-CN': '导出关闭', 'en-US': 'Export disabled' } as L,
+      actionsOff: { 'zh-CN': '业务动作关闭', 'en-US': 'Business actions disabled' } as L,
+      inspect: { 'zh-CN': '查看结构裁决', 'en-US': 'Inspect structure decisions' } as L,
+      visibleWritable: { 'zh-CN': '可见 · 可写', 'en-US': 'Visible · writable' } as L,
+      visibleReadOnly: { 'zh-CN': '可见 · 只读', 'en-US': 'Visible · read-only' } as L,
+      hidden: { 'zh-CN': '不可见', 'en-US': 'Hidden' } as L,
+      failed: {
+        'zh-CN': '权限结构计算失败，已停止目标角色预览：{error}',
+        'en-US': 'Permission structure calculation failed; target-role preview stopped: {error}',
+      } as L,
+      targetsFailed: {
+        'zh-CN': '可预览角色加载失败：{error}',
+        'en-US': 'Preview roles could not be loaded: {error}',
+      } as L,
+      safeLoading: {
+        'zh-CN': '正在生成不含业务数据的权限结构…',
+        'en-US': 'Generating a permission structure without business data...',
+      } as L,
+      safeFailure: {
+        'zh-CN': '无法安全生成目标角色结构；请退出角色预览后重试。',
+        'en-US':
+          'The target-role structure could not be generated safely. Exit role preview and retry.',
+      } as L,
+      node: {
+        menu: { 'zh-CN': '菜单', 'en-US': 'Menu' } as L,
+        block: { 'zh-CN': '区块', 'en-US': 'Block' } as L,
+        field: { 'zh-CN': '字段', 'en-US': 'Field' } as L,
+        action: { 'zh-CN': '动作', 'en-US': 'Action' } as L,
+      },
+    },
+    syntheticPreview: {
+      option: {
+        'zh-CN': '合成数据 · 隔离预览',
+        'en-US': 'Synthetic data · isolated preview',
+      } as L,
+      calculating: {
+        'zh-CN': '正在生成隔离合成数据…',
+        'en-US': 'Generating isolated synthetic data...',
+      } as L,
+      title: {
+        'zh-CN': '合成数据预览',
+        'en-US': 'Synthetic data preview',
+      } as L,
+      source: {
+        'zh-CN': '仅由页面字段元数据在内存中生成',
+        'en-US': 'Generated in memory from page field metadata only',
+      } as L,
+      exit: {
+        'zh-CN': '退出合成预览',
+        'en-US': 'Exit synthetic preview',
+      } as L,
+      isolated: {
+        'zh-CN': '不查询真实租户记录',
+        'en-US': 'No tenant business records queried',
+      } as L,
+      notPersisted: {
+        'zh-CN': '合成值不保存',
+        'en-US': 'Synthetic values are not persisted',
+      } as L,
+      actionsOff: {
+        'zh-CN': '业务动作与导出关闭',
+        'en-US': 'Business actions and export disabled',
+      } as L,
+      recordCount: {
+        'zh-CN': '{count} 条合成记录',
+        'en-US': '{count} synthetic records',
+      } as L,
+      failed: {
+        'zh-CN': '合成数据生成失败，已停止隔离预览：{error}',
+        'en-US': 'Synthetic fixture generation failed; isolated preview stopped: {error}',
+      } as L,
+      safeLoading: {
+        'zh-CN': '正在建立不接触真实租户数据的预览边界…',
+        'en-US': 'Establishing a preview boundary without tenant business data...',
+      } as L,
+      safeFailure: {
+        'zh-CN': '无法安全生成合成数据；不会回退到实时数据。请退出后重试。',
+        'en-US':
+          'Synthetic data could not be generated safely. Live data will not be used as a fallback.',
+      } as L,
+    },
+    identitySimulation: {
+      open: {
+        'zh-CN': '启动审计身份模拟',
+        'en-US': 'Start audited identity simulation',
+      } as L,
+      confirmTitle: {
+        'zh-CN': '这是受审计的高敏感操作',
+        'en-US': 'This is an audited, sensitive operation',
+      } as L,
+      confirmDescription: {
+        'zh-CN':
+          '仅模拟当前操作者与目标角色的权限交集；限时、只读、禁导出、禁业务动作，当前阶段不读取真实业务记录。',
+        'en-US':
+          'Only the current actor and target-role permission intersection is simulated. It is time-bound, read-only, non-exportable, and does not read business records in this phase.',
+      } as L,
+      duration: { 'zh-CN': '有效时长', 'en-US': 'Duration' } as L,
+      minutes: { 'zh-CN': '{count} 分钟', 'en-US': '{count} minutes' } as L,
+      reason: { 'zh-CN': '模拟原因（必填）', 'en-US': 'Reason (required)' } as L,
+      reasonPlaceholder: {
+        'zh-CN': '例如：复核工单 INC-742 的权限表现',
+        'en-US': 'For example: review permission behavior for incident INC-742',
+      } as L,
+      start: { 'zh-CN': '确认并启动', 'en-US': 'Confirm and start' } as L,
+      starting: {
+        'zh-CN': '正在启动审计身份模拟…',
+        'en-US': 'Starting audited simulation...',
+      } as L,
+      title: {
+        'zh-CN': '{role} · 审计身份模拟',
+        'en-US': '{role} · audited identity simulation',
+      } as L,
+      active: { 'zh-CN': '进行中', 'en-US': 'Active' } as L,
+      ended: { 'zh-CN': '已主动结束', 'en-US': 'Ended' } as L,
+      expired: { 'zh-CN': '已到期', 'en-US': 'Expired' } as L,
+      readOnly: { 'zh-CN': '全程只读', 'en-US': 'Read-only throughout' } as L,
+      noBusinessRecords: {
+        'zh-CN': '当前阶段不读取真实业务记录',
+        'en-US': 'This phase does not read real business records',
+      } as L,
+      end: { 'zh-CN': '立即结束', 'en-US': 'End now' } as L,
+      ending: { 'zh-CN': '正在结束…', 'en-US': 'Ending...' } as L,
+      dismiss: { 'zh-CN': '返回结构预览', 'en-US': 'Return to structure preview' } as L,
+      failed: {
+        'zh-CN': '身份模拟操作失败，未放宽任何权限：{error}',
+        'en-US': 'Identity simulation failed without relaxing permissions: {error}',
+      } as L,
+      safeFailure: {
+        'zh-CN': '无法确认模拟仍在有效期内，已停止渲染模拟结果；不会回退到实时数据。',
+        'en-US':
+          'The simulation validity could not be confirmed, so simulated output is blocked. Live data will not be used as a fallback.',
+      } as L,
+    },
+    aiProposal: {
+      title: { 'zh-CN': '受治理 AI 变更提案', 'en-US': 'Governed AI change proposal' } as L,
+      toolbar: { 'zh-CN': 'AI 提案', 'en-US': 'AI proposal' } as L,
+      boundary: {
+        'zh-CN': 'AI 只能提议已声明的属性补丁，不会直接修改页面或绕过审批。',
+        'en-US':
+          'AI can only propose declared property patches. It cannot edit the page directly or bypass approval.',
+      } as L,
+      description: { 'zh-CN': '描述希望调整的内容', 'en-US': 'Describe the intended change' } as L,
+      placeholder: {
+        'zh-CN': '例如：把订单表格改为紧凑密度，并将标题调整为“待处理订单”',
+        'en-US': 'For example: use compact density and rename the table to Pending orders',
+      } as L,
+      generate: { 'zh-CN': '生成提案', 'en-US': 'Generate proposal' } as L,
+      generating: {
+        'zh-CN': 'AI 生成中，随后将由服务器独立裁决…',
+        'en-US': 'AI is generating; the server will then validate independently...',
+      } as L,
+      reviewTitle: { 'zh-CN': '人工确认', 'en-US': 'Human confirmation' } as L,
+      reviewHint: {
+        'zh-CN': '下列补丁已通过当前策略预检，但尚未写入草稿。确认时会再次检查权限、策略和修订。',
+        'en-US':
+          'These patches passed the current policy preflight but have not changed the draft. Permissions, policy, and revision are checked again on confirmation.',
+      } as L,
+      typedOnly: { 'zh-CN': '仅 typed patch', 'en-US': 'Typed patches only' } as L,
+      humanRequired: { 'zh-CN': '必须人工确认', 'en-US': 'Human confirmation required' } as L,
+      noDraftMutation: { 'zh-CN': '草稿尚未变化', 'en-US': 'Draft unchanged' } as L,
+      itemCount: { 'zh-CN': '{count} 项属性变更', 'en-US': '{count} property changes' } as L,
+      risk: { 'zh-CN': '风险', 'en-US': 'Risk' } as L,
+      route: { 'zh-CN': '处理路径', 'en-US': 'Route' } as L,
+      publish: { 'zh-CN': '发布策略', 'en-US': 'Publish policy' } as L,
+      operationAdd: { 'zh-CN': '新增属性', 'en-US': 'Add property' } as L,
+      operationReplace: { 'zh-CN': '替换属性', 'en-US': 'Replace property' } as L,
+      operationRemove: { 'zh-CN': '移除属性', 'en-US': 'Remove property' } as L,
+      beforeValue: { 'zh-CN': '变更前', 'en-US': 'Before' } as L,
+      afterValue: { 'zh-CN': '变更后', 'en-US': 'After' } as L,
+      notSetValue: { 'zh-CN': '未设置', 'en-US': 'Not set' } as L,
+      removedValue: { 'zh-CN': '移除', 'en-US': 'Removed' } as L,
+      apply: { 'zh-CN': '确认写入草稿', 'en-US': 'Confirm and apply to draft' } as L,
+      applying: { 'zh-CN': '正在重新校验并写入…', 'en-US': 'Revalidating and applying...' } as L,
+      discard: { 'zh-CN': '拒绝并关闭', 'en-US': 'Reject and close' } as L,
+      discarding: { 'zh-CN': '正在拒绝提案…', 'en-US': 'Rejecting proposal...' } as L,
+      cancel: { 'zh-CN': '取消', 'en-US': 'Cancel' } as L,
+      failed: {
+        'zh-CN': '提案未写入草稿：{error}',
+        'en-US': 'The proposal was not applied to the draft: {error}',
+      } as L,
+      rejectReason: {
+        'zh-CN': '实施人员在应用设计中心拒绝 AI 提案',
+        'en-US': 'Implementer rejected the AI proposal in Studio',
+      } as L,
+      riskL0: { 'zh-CN': 'L0 · 展示级', 'en-US': 'L0 · presentation' } as L,
+      riskL1: { 'zh-CN': 'L1 · 低风险', 'en-US': 'L1 · low risk' } as L,
+      riskL2: { 'zh-CN': 'L2 · 中风险', 'en-US': 'L2 · medium risk' } as L,
+      riskL3: { 'zh-CN': 'L3 · 高风险', 'en-US': 'L3 · high risk' } as L,
+      routeInline: { 'zh-CN': '原地配置', 'en-US': 'Inline' } as L,
+      routeGuided: { 'zh-CN': '引导式配置', 'en-US': 'Guided inline' } as L,
+      routeStudio: { 'zh-CN': '应用设计中心', 'en-US': 'Studio' } as L,
+      routePersonalize: { 'zh-CN': '个人化', 'en-US': 'Personalization' } as L,
+      publishDirect: { 'zh-CN': '允许直接发布', 'en-US': 'Direct publish allowed' } as L,
+      publishDefaultReview: { 'zh-CN': '默认评审', 'en-US': 'Default review' } as L,
+      publishRequiredReview: { 'zh-CN': '必须评审', 'en-US': 'Review required' } as L,
+      publishStudioApproval: {
+        'zh-CN': '必须由 Studio 审批',
+        'en-US': 'Studio approval required',
+      } as L,
+    },
 
     // Palette category headers
     category: {
@@ -328,7 +558,10 @@ export const DESIGNER_I18N = {
     fieldCount: { 'zh-CN': '{count} 个字段', 'en-US': '{count} fields' } as L,
     virtualCount: { 'zh-CN': '{count} 虚拟', 'en-US': '{count} virtual' } as L,
     dragOrDoubleClick: { 'zh-CN': '拖拽或双击添加', 'en-US': 'Drag or double-click to add' } as L,
-    noModelBound: { 'zh-CN': '该页面未绑定模型，无可用字段', 'en-US': 'No model bound to this page' } as L,
+    noModelBound: {
+      'zh-CN': '该页面未绑定模型，无可用字段',
+      'en-US': 'No model bound to this page',
+    } as L,
 
     // Field library groups
     fieldGroup: {
@@ -368,6 +601,13 @@ export const DESIGNER_I18N = {
     statusUnsaved: { 'zh-CN': '未保存', 'en-US': 'Unsaved' } as L,
     statusInvalid: { 'zh-CN': '校验失败 {count}', 'en-US': 'Invalid {count}' } as L,
     statusError: { 'zh-CN': '保存失败', 'en-US': 'Save failed' } as L,
+    protectedSemanticInvalid: {
+      'zh-CN':
+        '保存被拒绝：危险业务动作不能改成误导性文案或非危险样式。请保留动作真实意图与危险提示。',
+      'en-US':
+        'Save rejected: a dangerous business action cannot use a misleading label or non-danger styling. Preserve its true intent and warning treatment.',
+    } as L,
+    statusImportError: { 'zh-CN': '导入失败', 'en-US': 'Import failed' } as L,
     unsavedChanges: { 'zh-CN': '有未保存的更改', 'en-US': 'Unsaved changes' } as L,
     stay: { 'zh-CN': '留下', 'en-US': 'Stay' } as L,
     leave: { 'zh-CN': '离开', 'en-US': 'Leave' } as L,
@@ -446,9 +686,10 @@ export const DESIGNER_I18N = {
     versionDiffAdded: { 'zh-CN': '新增', 'en-US': 'Added' } as L,
     versionDiffRemoved: { 'zh-CN': '删除', 'en-US': 'Removed' } as L,
     versionDiffModified: { 'zh-CN': '修改', 'en-US': 'Modified' } as L,
+    versionDiffMoved: { 'zh-CN': '移动', 'en-US': 'Moved' } as L,
     versionDiffSummary: {
-      'zh-CN': '{added} 新增 / {removed} 删除 / {modified} 修改',
-      'en-US': '{added} added / {removed} removed / {modified} modified',
+      'zh-CN': '{added} 新增 / {removed} 删除 / {modified} 修改 / {moved} 移动',
+      'en-US': '{added} added / {removed} removed / {modified} modified / {moved} moved',
     } as L,
     versionDiffNoChanges: {
       'zh-CN': '两个版本之间没有差异',
@@ -762,14 +1003,23 @@ export const DESIGNER_I18N = {
       'Disabled when JSON': { 'zh-CN': '禁用条件 JSON', 'en-US': 'Disabled when JSON' } as L,
       'Entries JSON': { 'zh-CN': '条目 JSON', 'en-US': 'Entries JSON' } as L,
       'Items JSON': { 'zh-CN': '项目 JSON', 'en-US': 'Items JSON' } as L,
-      'Named query params JSON': { 'zh-CN': '命名查询参数 JSON', 'en-US': 'Named query params JSON' } as L,
+      'Named query params JSON': {
+        'zh-CN': '命名查询参数 JSON',
+        'en-US': 'Named query params JSON',
+      } as L,
       'Options JSON': { 'zh-CN': '选项 JSON', 'en-US': 'Options JSON' } as L,
       'Params JSON': { 'zh-CN': '参数 JSON', 'en-US': 'Params JSON' } as L,
       'Payload JSON': { 'zh-CN': '负载 JSON', 'en-US': 'Payload JSON' } as L,
-      'Picker parameters JSON': { 'zh-CN': '选择器参数 JSON', 'en-US': 'Picker parameters JSON' } as L,
+      'Picker parameters JSON': {
+        'zh-CN': '选择器参数 JSON',
+        'en-US': 'Picker parameters JSON',
+      } as L,
       'Preview rows JSON': { 'zh-CN': '预览行 JSON', 'en-US': 'Preview rows JSON' } as L,
       'Query builder JSON': { 'zh-CN': '查询构建器 JSON', 'en-US': 'Query builder JSON' } as L,
-      'Rich text toolbar JSON': { 'zh-CN': '富文本工具栏 JSON', 'en-US': 'Rich text toolbar JSON' } as L,
+      'Rich text toolbar JSON': {
+        'zh-CN': '富文本工具栏 JSON',
+        'en-US': 'Rich text toolbar JSON',
+      } as L,
       'Rows JSON': { 'zh-CN': '行 JSON', 'en-US': 'Rows JSON' } as L,
       'Run query JSON': { 'zh-CN': '运行查询 JSON', 'en-US': 'Run query JSON' } as L,
       'Series JSON': { 'zh-CN': '系列 JSON', 'en-US': 'Series JSON' } as L,

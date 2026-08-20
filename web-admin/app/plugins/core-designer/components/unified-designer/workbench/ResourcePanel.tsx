@@ -21,6 +21,7 @@ interface ResourcePanelProps {
   blockDefinitions: BlockDefinitionV3[];
   selectedModelCode: string | null;
   modelFields: ModelFieldDefinition[];
+  canAddCustomField: boolean;
   canAddBlock: (blockType: string) => boolean;
   canAddModelField: (field: ModelFieldDefinition) => boolean;
   isModelFieldUsed: (field: ModelFieldDefinition) => boolean;
@@ -38,6 +39,7 @@ export function ResourcePanel({
   blockDefinitions,
   selectedModelCode,
   modelFields,
+  canAddCustomField,
   canAddBlock,
   canAddModelField,
   isModelFieldUsed,
@@ -104,7 +106,7 @@ export function ResourcePanel({
           <FieldPalette
             selectedModelCode={selectedModelCode}
             modelFields={modelFields}
-            canAddField={canAddBlock('field')}
+            canAddField={canAddCustomField}
             canAddModelField={canAddModelField}
             isModelFieldUsed={isModelFieldUsed}
             onAddField={() => onAddBlock('field')}

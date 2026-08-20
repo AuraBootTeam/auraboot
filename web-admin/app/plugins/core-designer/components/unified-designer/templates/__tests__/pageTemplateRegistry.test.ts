@@ -4,6 +4,7 @@ import {
   registerPageTemplate,
   getPageTemplates,
   getPageTemplate,
+  instantiatePageTemplate,
   clearPageTemplates,
 } from '../pageTemplateRegistry';
 
@@ -39,5 +40,27 @@ describe('page template registry (D6 — scenario template library)', () => {
   it('returns undefined for unknown / nullish ids', () => {
     expect(getPageTemplate('nope')).toBeUndefined();
     expect(getPageTemplate(null)).toBeUndefined();
+  });
+
+  it('stamps fresh ids and immutable source lineage for every template application', () => {
+    registerPageTemplate({ ...inspection, version: '3' });
+    const template = getPageTemplate('qr_inspection')!;
+
+    const first = instantiatePageTemplate(template);
+    const second = instantiatePageTemplate(template, first);
+
+    expect(first[0].id).toBe('qr_inspection_form');
+    expect(second[0].id).toBe('qr_inspection_form_2');
+    expect(first[0].blocks?.[0].extension?.authoringTemplateLineage).toEqual({
+      templateId: 'qr_inspection',
+      templateVersion: '3',
+      sourceBlockId: 'f1',
+    });
+    expect(new Set([
+      first[0].id,
+      first[0].blocks?.[0].id,
+      second[0].id,
+      second[0].blocks?.[0].id,
+    ]).size).toBe(4);
   });
 });
