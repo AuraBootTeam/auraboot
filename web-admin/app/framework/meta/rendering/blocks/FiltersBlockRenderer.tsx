@@ -69,7 +69,9 @@ export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ bloc
           }
         >
           {fields.map((field) => (
-            <FieldRenderer key={field.field} field={field} runtime={runtime} />
+            <div key={field.field} data-authoring-node-id={(field as any).id || field.field}>
+              <FieldRenderer field={field} runtime={runtime} />
+            </div>
           ))}
         </div>
         <div

@@ -498,7 +498,7 @@ export const ListTable = React.memo(function ListTable({
         <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
           <table
             className="divide-border min-w-full table-fixed divide-y"
-            style={{ minWidth: `${renderedTableWidth}px` }}
+            style={{ width: `${renderedTableWidth}px`, minWidth: `${renderedTableWidth}px` }}
           >
             <colgroup>
               {enableSelection && <col style={{ width: `${SELECTION_COLUMN_WIDTH}px` }} />}

@@ -13,6 +13,10 @@ import { resolveAuthToken } from './AuthStrategy';
 import { buildRequest } from './URLBuilder';
 import { executeFetch } from './FetchExecutor';
 import type { Result, FetchOptions } from './types';
+import {
+  authoringPreviewBlockedResult,
+  withAuthoringPreviewContext,
+} from './AuthoringPreviewGuard';
 
 /**
  * Unified HTTP request function
@@ -61,7 +65,10 @@ export async function fetchResult<T>(
   options: FetchOptions = {},
   request?: Request,
 ): Promise<Result<T>> {
-  const effectiveOptions = withCommandClientRequestId(path, options);
+  const authoringOptions = withAuthoringPreviewContext(path, options);
+  const effectiveOptions = withCommandClientRequestId(path, authoringOptions);
+  const blocked = authoringPreviewBlockedResult<T>(path, effectiveOptions);
+  if (blocked) return blocked;
 
   // Step 1: Create request context (auto-detect SSR/CSR)
   const context = await createRequestContext(request);

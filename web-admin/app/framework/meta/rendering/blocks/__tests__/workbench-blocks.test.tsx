@@ -56,11 +56,17 @@ function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
     getStateManager: () => ({
       updateState,
       getContext: () => context,
+      getFieldMeta: () => undefined,
+      getFieldValue: (_scopeId: string, field: string) => context.form[field],
+      updateField: (_scopeId: string, field: string, value: unknown) => {
+        context.form[field] = value;
+      },
     }),
     getScopeId: () => 'scope-1',
     getSchema: () => ({ id: 'test_schema', modelCode: 'test_model' }),
     __updateState: updateState,
     __reload: reload,
+    triggerFieldLinkage: vi.fn(),
     ...overrides,
   };
   return stub as unknown as SchemaRuntime;
@@ -94,7 +100,7 @@ describe('FiltersBlockRenderer', () => {
       id: 'queue_filters',
       blockType: 'filters',
       density: 'compact',
-      fields: [],
+      fields: [{ id: 'lead_status_filter', field: 'status', label: 'Status' }],
     } as unknown as BlockConfig;
 
     const { container } = render(<FiltersBlockRenderer block={block} runtime={runtime} />);
@@ -102,6 +108,7 @@ describe('FiltersBlockRenderer', () => {
     const filter = container.querySelector('.filters-block');
     expect(filter).toHaveAttribute('data-density', 'compact');
     expect(filter).toHaveClass('bg-panel', 'px-4', 'py-1.5');
+    expect(container.querySelector('[data-authoring-node-id="lead_status_filter"]')).not.toBeNull();
   });
 });
 

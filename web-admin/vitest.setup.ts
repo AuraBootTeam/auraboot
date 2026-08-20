@@ -39,7 +39,11 @@ afterEach(() => {
 function createStorageMock() {
   const storage = new Map<string, string>();
   return {
+    get length() {
+      return storage.size;
+    },
     getItem: (key: string) => storage.get(key) ?? null,
+    key: (index: number) => [...storage.keys()][index] ?? null,
     setItem: (key: string, value: string) => {
       storage.set(key, value);
     },

@@ -34,11 +34,9 @@
 
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { loginViaUI } from '../../helpers/wd-fixtures';
 import { uniqueId } from '../helpers';
-
-const ADMIN_STORAGE_STATE =
-  process.env.PW_ADMIN_STORAGE_STATE ||
-  (process.env.PW_STORAGE_DIR ? `${process.env.PW_STORAGE_DIR}/admin.json` : './tests/storage/admin.json');
 
 // ab_announcement is a published platform meta-model present in every OSS stack;
 // it satisfies the detail-page contract for the root detail block.
@@ -89,12 +87,7 @@ async function openDesigner(page: Page, pid: string): Promise<void> {
 const ROOT_BLOCK = 'detail_root';
 const SECTION_BLOCK = 'pd_pub_section';
 
-async function seedDraftPage(
-  browser: import('@playwright/test').Browser,
-  uid: string,
-): Promise<string> {
-  const ctx = await browser.newContext({ storageState: ADMIN_STORAGE_STATE });
-  const page = await ctx.newPage();
+async function seedDraftPage(page: Page, uid: string): Promise<string> {
   const resp = await page.request.post('/api/pages', {
     data: {
       name: `Publish golden ${uid}`,
@@ -132,19 +125,23 @@ async function seedDraftPage(
   const pid = String(body.data?.pid ?? '');
   expect(pid, 'seeded pid').toBeTruthy();
   expect(body.data?.status, 'seeded page is draft').toBe('draft');
-  await ctx.close();
   return pid;
 }
+
+test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe.serial('Unified Designer publish/export/import golden', () => {
   // Real save/reopen round-trips plus publish/unpublish; the 15s default is tight.
   test.describe.configure({ timeout: 120_000 });
 
+  test.beforeEach(async ({ page }) => {
+    await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  });
+
   test('C1: publish toolbar action → backend status=published + publishedAt; unpublish reverts', async ({
     page,
-    browser,
   }, testInfo) => {
-    const pid = await seedDraftPage(browser, uniqueId('pdpub'));
+    const pid = await seedDraftPage(page, uniqueId('pdpub'));
 
     await openDesigner(page, pid);
 
@@ -157,6 +154,33 @@ test.describe.serial('Unified Designer publish/export/import golden', () => {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
+
+    // Route one attempt to a missing page on the real backend. The UI must keep
+    // the bound page in draft, expose a retryable error, and enable publish again.
+    const publishPath = `/api/pages/${pid}/publish`;
+    await page.route(
+      `**${publishPath}`,
+      async (route) => {
+        await route.continue({
+          url: route
+            .request()
+            .url()
+            .replace(publishPath, '/api/pages/missing-publish-gate/publish'),
+        });
+      },
+      { times: 1 },
+    );
+    const failedPublishResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().includes('/api/pages/missing-publish-gate/publish'),
+    );
+    await publishBtn.click();
+    expect((await failedPublishResponse).status()).toBeGreaterThanOrEqual(400);
+    await expect(page.getByTestId('designer-publish-error')).toBeVisible();
+    await expect(publishBtn).toBeEnabled();
+    expect((await readPage(page, pid)).status, 'backend status after failed publish').toBe('draft');
+    await page.unroute(`**${publishPath}`);
 
     // Drive the real publish button and wait for the POST /publish round-trip.
     await expect(async () => {
@@ -206,26 +230,21 @@ test.describe.serial('Unified Designer publish/export/import golden', () => {
     expect(draftDto.publishedAt ?? null, 'backend publishedAt after unpublish').toBeNull();
   });
 
-  test('C1 (sad path): a new/local page (no pid) keeps the publish button disabled', async ({
-    page,
-  }) => {
+  test('C1 (sad path): a new/local page (no pid) hides publish actions', async ({ page }) => {
     // No pageId / pageKey → the designer loads the local sample document; it is
-    // not page-bound, so publishing is not possible until it is saved.
+    // not page-bound, so publishing actions are not exposed until it is saved.
     await page.goto('/unified-designer', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('unified-designer-workbench')).toBeVisible({ timeout: 30_000 });
 
-    const publishBtn = page.getByTestId('designer-publish');
-    await expect(publishBtn).toBeVisible();
-    await expect(publishBtn).toBeDisabled();
-    // No backend page exists → no unpublish entry point.
+    await expect(page.getByTestId('designer-publish')).toHaveCount(0);
+    // No backend page exists → neither publish nor unpublish has an entry point.
     await expect(page.getByTestId('designer-unpublish')).toHaveCount(0);
   });
 
   test('C2: export downloads <pageKey>.page.json whose content carries the live blocks', async ({
     page,
-    browser,
   }, testInfo) => {
-    const pid = await seedDraftPage(browser, uniqueId('pdexp'));
+    const pid = await seedDraftPage(page, uniqueId('pdexp'));
     const seeded = await readPage(page, pid);
     const expectedPageKey = seeded.pageKey;
 
@@ -243,7 +262,10 @@ test.describe.serial('Unified Designer publish/export/import golden', () => {
     expect(downloadPath, 'download has a local path').toBeTruthy();
     const fs = await import('fs');
     const exportedRaw = fs.readFileSync(downloadPath!, 'utf-8');
-    const exported = JSON.parse(exportedRaw) as PageSchemaDto & { schemaVersion?: number; id?: string };
+    const exported = JSON.parse(exportedRaw) as PageSchemaDto & {
+      schemaVersion?: number;
+      id?: string;
+    };
     await testInfo.attach('c2-exported-json', {
       body: Buffer.from(exportedRaw),
       contentType: 'application/json',
@@ -261,16 +283,17 @@ test.describe.serial('Unified Designer publish/export/import golden', () => {
 
   test('C2: import loads a known JSON onto the canvas and it round-trips on save', async ({
     page,
-    browser,
   }, testInfo) => {
     const uid = uniqueId('pdimp');
-    const pid = await seedDraftPage(browser, uid);
+    const pid = await seedDraftPage(page, uid);
     const seeded = await readPage(page, pid);
 
     await openDesigner(page, pid);
 
     // Before import: the original section is on the canvas, the imported one is not.
-    await expect(page.getByTestId(`outline-item-${SECTION_BLOCK}`)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId(`outline-item-${SECTION_BLOCK}`)).toBeVisible({
+      timeout: 10_000,
+    });
     const IMPORTED_BLOCK = `pd_imported_${uid}`.replace(/-/g, '_');
     await expect(page.getByTestId(`outline-item-${IMPORTED_BLOCK}`)).toHaveCount(0);
 
@@ -314,7 +337,9 @@ test.describe.serial('Unified Designer publish/export/import golden', () => {
 
     // The imported block appears on the canvas/outline, the original is gone,
     // and the document is now dirty (import joins the undo stack).
-    await expect(page.getByTestId(`outline-item-${IMPORTED_BLOCK}`)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId(`outline-item-${IMPORTED_BLOCK}`)).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.getByTestId(`outline-item-${SECTION_BLOCK}`)).toHaveCount(0);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await testInfo.attach('c2-after-import', {
@@ -328,7 +353,9 @@ test.describe.serial('Unified Designer publish/export/import golden', () => {
     await expect(page.getByTestId(`outline-item-${IMPORTED_BLOCK}`)).toHaveCount(0);
     // Redo re-applies the import.
     await page.getByTestId('designer-redo').click();
-    await expect(page.getByTestId(`outline-item-${IMPORTED_BLOCK}`)).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId(`outline-item-${IMPORTED_BLOCK}`)).toBeVisible({
+      timeout: 5_000,
+    });
 
     // Save the imported document and verify it round-trips to the backend.
     await expect(async () => {
@@ -345,18 +372,22 @@ test.describe.serial('Unified Designer publish/export/import golden', () => {
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('已保存');
 
     const persisted = await readPage(page, pid);
-    expect(findBlockById(persisted.blocks, IMPORTED_BLOCK), 'imported block persisted').toBeTruthy();
+    expect(
+      findBlockById(persisted.blocks, IMPORTED_BLOCK),
+      'imported block persisted',
+    ).toBeTruthy();
     expect(findBlockById(persisted.blocks, SECTION_BLOCK), 'original block replaced').toBeNull();
   });
 
   test('C2 (sad path): invalid JSON import shows an inline error and leaves the document unchanged', async ({
     page,
-    browser,
   }, testInfo) => {
-    const pid = await seedDraftPage(browser, uniqueId('pdbad'));
+    const pid = await seedDraftPage(page, uniqueId('pdbad'));
 
     await openDesigner(page, pid);
-    await expect(page.getByTestId(`outline-item-${SECTION_BLOCK}`)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId(`outline-item-${SECTION_BLOCK}`)).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Feed malformed JSON → the import handler must reject it without mutating
     // the document, and surface an inline error via the save-error channel.

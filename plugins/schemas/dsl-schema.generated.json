@@ -919,6 +919,10 @@
         "code": {
           "type": "string"
         },
+        "mandatory": {
+          "type": "boolean",
+          "description": "Runtime personalization may reorder but never hide this baseline action."
+        },
         "preset": {
           "type": "string",
           "description": "Designer-authored shorthand for common toolbar buttons."
@@ -1740,6 +1744,10 @@
               "$ref": "#/definitions/LocalizedText"
             }
           ]
+        },
+        "mandatory": {
+          "type": "boolean",
+          "description": "Runtime personalization may reorder but never hide this baseline field."
         },
         "align": {
           "type": "string",

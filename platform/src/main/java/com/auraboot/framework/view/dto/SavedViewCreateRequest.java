@@ -30,7 +30,7 @@ public class SavedViewCreateRequest {
     private String pageKey;
 
     /**
-     * Scope: PERSONAL (default), TEAM, GLOBAL.
+     * Scope: PERSONAL (default), TEAM, ROLE, GLOBAL.
      */
     private String scope;
 
@@ -43,6 +43,11 @@ public class SavedViewCreateRequest {
      * Team ID (required when scope = TEAM)
      */
     private String teamId;
+
+    /**
+     * Role PID (required when scope = ROLE)
+     */
+    private String roleId;
 
     /**
      * View configuration

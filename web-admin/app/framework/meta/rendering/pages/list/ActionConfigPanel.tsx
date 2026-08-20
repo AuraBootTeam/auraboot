@@ -17,6 +17,7 @@ export interface ActionConfigPanelProps {
   buttons: ButtonConfig[];
   currentConfig?: ToolbarActionConfig[];
   resolveLabel: (button: ButtonConfig) => string;
+  t?: (key: string, params?: Record<string, unknown>, fallback?: string) => string;
   /** Called on every change (toggle, drag reorder) — auto-saves immediately */
   onChange: (config: ToolbarActionConfig[]) => void;
   onClose: () => void;
@@ -38,22 +39,32 @@ interface ActionItem {
   visible: boolean;
   pinned: boolean;
   isBuiltin?: boolean;
+  mandatory?: boolean;
 }
 
 export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
   buttons,
   currentConfig,
   resolveLabel,
+  t,
   onChange,
   onClose,
   hiddenBuiltinCodes,
 }) => {
-  const { t } = useI18n();
+  const { t: contextT } = useI18n();
+  const translateValue = t ?? contextT;
   const [items, setItems] = useState<ActionItem[]>([]);
   const initialized = useRef(false);
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
   const dragSection = useRef<'pinned' | 'overflow' | null>(null);
+  const translate = useCallback(
+    (key: string, fallback: string) => {
+      const value = translateValue(key, undefined, fallback);
+      return value && value !== key ? value : fallback;
+    },
+    [translateValue],
+  );
 
   // Initialize from currentConfig or build defaults (DSL + built-in actions)
   useEffect(() => {
@@ -66,9 +77,10 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
       return {
         code: btn.code,
         label: resolveLabel(btn),
-        visible: cfg?.visible ?? true,
+        visible: btn.mandatory ? true : (cfg?.visible ?? true),
         pinned: cfg?.pinned ?? (isPrimary || idx < 2),
         isBuiltin: false,
+        mandatory: btn.mandatory === true,
       };
     });
 
@@ -79,7 +91,7 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
       const cfg = configMap.get(ba.code);
       return {
         code: ba.code,
-        label: t(ba.labelKey, undefined, ba.fallback),
+        label: translateValue(ba.labelKey, undefined, ba.fallback),
         visible: cfg?.visible ?? true,
         pinned: cfg?.pinned ?? false,
         isBuiltin: true,
@@ -102,7 +114,7 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
     setItems(result);
     // Mark as initialized after first render so we don't auto-save the initial load
     initialized.current = true;
-  }, [buttons, currentConfig, hiddenBuiltinCodes, resolveLabel, t]);
+  }, [buttons, currentConfig, hiddenBuiltinCodes, resolveLabel, translateValue]);
 
   // Auto-save on every change (skip initial mount)
   const emitChange = useCallback(
@@ -128,7 +140,7 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
     (code: string) => {
       setItems((prev) => {
         const next = prev.map((item) =>
-          item.code === code ? { ...item, visible: !item.visible } : item,
+          item.code === code && !item.mandatory ? { ...item, visible: !item.visible } : item,
         );
         emitChange(next);
         return next;
@@ -221,7 +233,12 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         {item.label}
         {item.isBuiltin && (
           <span className="text-text-3 ml-1.5 text-[10px] font-normal">
-            ({t('action_config.builtin', undefined, '内置')})
+            ({translateValue('action_config.builtin', undefined, '内置')})
+          </span>
+        )}
+        {item.mandatory && (
+          <span className="bg-accent-weak text-accent ml-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium">
+            {translate('common.saved_view_mandatory', 'Required')}
           </span>
         )}
       </span>
@@ -234,8 +251,8 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         className="text-text-3 hover:bg-hover hover:text-accent rounded p-1"
         title={
           item.pinned
-            ? t('action_config.move_to_menu', undefined, '移到更多菜单')
-            : t('action_config.pin_to_toolbar', undefined, '固定到工具栏')
+            ? translateValue('action_config.move_to_menu', undefined, '移到更多菜单')
+            : translateValue('action_config.pin_to_toolbar', undefined, '固定到工具栏')
         }
       >
         {item.pinned ? (
@@ -270,6 +287,7 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         type="button"
         data-testid={`action-config-visible-${item.code}`}
         onClick={() => toggleVisible(item.code)}
+        disabled={item.mandatory}
         className={cn(
           'rounded p-1 transition-colors',
           item.visible
@@ -277,9 +295,14 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
             : 'text-text-3 hover:bg-hover',
         )}
         title={
-          item.visible
-            ? t('action_config.hide_button', undefined, '隐藏按钮')
-            : t('action_config.show_button', undefined, '显示按钮')
+          item.mandatory
+            ? translate(
+                'common.saved_view_mandatory_action_reason',
+                'Required actions cannot be hidden in a personal view',
+              )
+            : item.visible
+              ? translateValue('action_config.hide_button', undefined, '隐藏按钮')
+              : translateValue('action_config.show_button', undefined, '显示按钮')
         }
       >
         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -312,12 +335,12 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         {/* Header */}
         <div className="border-border flex items-center justify-between border-b px-5 py-4">
           <h3 className="text-text text-base font-semibold">
-            {t('action_config.title', undefined, '配置按钮')}
+            {translateValue('action_config.title', undefined, '配置按钮')}
           </h3>
           <button
             type="button"
             data-testid="action-config-close"
-            aria-label={t('action.close', undefined, '关闭')}
+            aria-label={translateValue('action.close', undefined, '关闭')}
             onClick={onClose}
             className="rounded-control text-text-3 hover:bg-hover hover:text-text-2 p-1"
           >
@@ -336,12 +359,12 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
         <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
           {/* Toolbar (pinned) section */}
           <div className="text-text-2 mb-2 text-xs font-medium tracking-wide uppercase">
-            {t('action_config.toolbar', undefined, '工具栏')}
+            {translateValue('action_config.toolbar', undefined, '工具栏')}
           </div>
           <div className="mb-3 space-y-0.5">
             {pinnedItems.length === 0 ? (
               <div className="text-text-3 px-3 py-2 text-sm italic">
-                {t('action_config.no_pinned', undefined, '没有固定按钮')}
+                {translateValue('action_config.no_pinned', undefined, '没有固定按钮')}
               </div>
             ) : (
               pinnedItems.map((item, idx) => renderItem(item, idx, 'pinned'))
@@ -352,19 +375,19 @@ export const ActionConfigPanel: React.FC<ActionConfigPanelProps> = ({
           <div className="my-3 flex items-center gap-2">
             <div className="border-border flex-1 border-t" />
             <span className="text-text-3 text-xs">
-              {t('action_config.divider', undefined, '此线以下显示在 ··· 菜单')}
+              {translateValue('action_config.divider', undefined, '此线以下显示在 ··· 菜单')}
             </span>
             <div className="border-border flex-1 border-t" />
           </div>
 
           {/* Overflow section */}
           <div className="text-text-2 mb-2 text-xs font-medium tracking-wide uppercase">
-            {t('action_config.more_menu', undefined, '更多菜单')}
+            {translateValue('action_config.more_menu', undefined, '更多菜单')}
           </div>
           <div className="space-y-0.5">
             {overflowItems.length === 0 ? (
               <div className="text-text-3 px-3 py-2 text-sm italic">
-                {t('action_config.no_overflow', undefined, '没有更多按钮')}
+                {translateValue('action_config.no_overflow', undefined, '没有更多按钮')}
               </div>
             ) : (
               overflowItems.map((item, idx) => renderItem(item, idx, 'overflow'))

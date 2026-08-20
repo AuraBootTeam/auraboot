@@ -53,7 +53,7 @@ public class SavedView {
     private String pageKey;
 
     /**
-     * View scope: PERSONAL, TEAM, GLOBAL
+     * View scope: PERSONAL, TEAM, ROLE, GLOBAL
      */
     @TableField("scope")
     private String scope;
@@ -75,6 +75,12 @@ public class SavedView {
      */
     @TableField("team_id")
     private String teamId;
+
+    /**
+     * Role PID (for ROLE overlays)
+     */
+    @TableField("role_id")
+    private String roleId;
 
     /**
      * View configuration as JSONB
@@ -131,6 +137,10 @@ public class SavedView {
 
     public boolean isTeam() {
         return "team".equals(scope);
+    }
+
+    public boolean isRole() {
+        return "role".equals(scope);
     }
 
     public boolean isGlobal() {

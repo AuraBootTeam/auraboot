@@ -29,22 +29,30 @@ function shouldUseSchemaCache(): boolean {
   return process.env.NODE_ENV === 'production';
 }
 
-function getCachedSchema(pageKey: string): UnifiedSchema | null {
+function runtimeCacheKey(pageSchema: PageSchemaDTO): string {
+  if (pageSchema.runtime?.cacheKey) {
+    return pageSchema.runtime.cacheKey;
+  }
+  const sourceVersion = pageSchema.rowVersion ?? pageSchema.version ?? 'unknown';
+  return `legacy-page-schema:${pageSchema.pid || pageSchema.pageKey}:${sourceVersion}`;
+}
+
+function getCachedSchema(cacheKey: string): UnifiedSchema | null {
   if (!shouldUseSchemaCache()) return null;
 
-  const entry = schemaCache.get(pageKey);
+  const entry = schemaCache.get(cacheKey);
   if (!entry) return null;
   if (Date.now() - entry.timestamp > SCHEMA_CACHE_TTL_MS) {
-    schemaCache.delete(pageKey);
+    schemaCache.delete(cacheKey);
     return null;
   }
   // Move to end (LRU)
-  schemaCache.delete(pageKey);
-  schemaCache.set(pageKey, entry);
+  schemaCache.delete(cacheKey);
+  schemaCache.set(cacheKey, entry);
   return entry.schema;
 }
 
-function setCachedSchema(pageKey: string, schema: UnifiedSchema): void {
+function setCachedSchema(cacheKey: string, schema: UnifiedSchema): void {
   if (!shouldUseSchemaCache()) return;
 
   // Evict oldest if at capacity
@@ -52,7 +60,7 @@ function setCachedSchema(pageKey: string, schema: UnifiedSchema): void {
     const oldest = schemaCache.keys().next().value;
     if (oldest) schemaCache.delete(oldest);
   }
-  schemaCache.set(pageKey, { schema, timestamp: Date.now() });
+  schemaCache.set(cacheKey, { schema, timestamp: Date.now() });
 }
 
 function isTransientFetchError(error: Error): boolean {
@@ -142,14 +150,8 @@ export function useSchemaLoader(options: UseSchemaLoaderOptions): UseSchemaLoade
         return;
       }
 
-      // Check in-memory cache first
-      const cached = getCachedSchema(pageKey);
-      if (cached) {
-        setSchema(cached);
-        setLoading(false);
-        return;
-      }
-
+      // Runtime correctness requires revalidating the active release pointer on every
+      // navigation. The immutable payload itself is cached by the server-owned release key.
       setLoading(true);
 
       const endpoint = `/api/pages/key/${pageKey}`;
@@ -179,7 +181,9 @@ export function useSchemaLoader(options: UseSchemaLoaderOptions): UseSchemaLoade
         throw new Error(`No schema found for pageKey: ${pageKey}`);
       }
 
-      const merged = canonicalizePageSchemaDto(pageSchemaDTO);
+      const cacheKey = runtimeCacheKey(pageSchemaDTO);
+      const cached = getCachedSchema(cacheKey);
+      const merged = cached ?? canonicalizePageSchemaDto(pageSchemaDTO);
 
       // Dev-mode DSL validation
       if (process.env.NODE_ENV === 'development') {
@@ -196,7 +200,9 @@ export function useSchemaLoader(options: UseSchemaLoaderOptions): UseSchemaLoade
       }
 
       // Store in cache
-      setCachedSchema(pageKey, merged);
+      if (!cached) {
+        setCachedSchema(cacheKey, merged);
+      }
       setSchema(merged);
     } catch (err) {
       if (isStale()) {

@@ -38,6 +38,7 @@ public class SavedViewDTO {
     private String viewType;
     private String ownerId;
     private String teamId;
+    private String roleId;
 
     private ViewConfig viewConfig;
 
@@ -72,4 +73,5 @@ public class SavedViewDTO {
      */
     private String ownerName;
     private String teamName;
+    private String roleName;
 }

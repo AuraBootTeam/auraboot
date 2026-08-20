@@ -233,7 +233,9 @@ describe('FormDialog choice fields', () => {
       target: { files: [file] },
     });
     await waitFor(() => expect(file.text).toHaveBeenCalled());
-    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    const submitButton = screen.getByTestId('form-dialog-submit');
+    await waitFor(() => expect(submitButton).toBeEnabled());
+    fireEvent.click(submitButton);
 
     expect(onSubmit).toHaveBeenCalledWith({
       csvText: 'deviceCode,sn\nDPS-001,SN-001',

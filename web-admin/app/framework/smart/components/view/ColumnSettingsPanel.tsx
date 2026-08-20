@@ -25,6 +25,7 @@ import { cn } from '~/utils/cn';
 export interface ColumnSettingsDefinition {
   field: string;
   label: string;
+  mandatory?: boolean;
   dataType?: string;
   group?: 'business' | 'system';
   defaultVisible?: boolean;
@@ -38,6 +39,7 @@ export interface ColumnSettingsRow extends ViewColumnConfig {
   group: 'business' | 'system';
   defaultVisible: boolean;
   defaultWidth?: number;
+  mandatory?: boolean;
 }
 
 export interface ColumnSettingsSavePayload {
@@ -77,7 +79,11 @@ export function buildColumnSettingsRows(
         group: definition.group || 'business',
         defaultVisible: definition.defaultVisible !== false,
         defaultWidth: definition.defaultWidth,
-        visible: saved?.visible ?? definition.defaultVisible !== false,
+        ...(definition.mandatory === true ? { mandatory: true } : {}),
+        visible:
+          definition.mandatory === true
+            ? true
+            : (saved?.visible ?? definition.defaultVisible !== false),
         width: saved?.width,
         order: saved?.order ?? index,
         frozen: saved?.frozen ?? Boolean(saved?.frozenPosition ?? definition.defaultFrozenPosition),
@@ -90,7 +96,7 @@ export function buildColumnSettingsRows(
 export function serializeColumnSettings(rows: ColumnSettingsRow[]): ViewColumnConfig[] {
   return rows.map((row, order) => ({
     fieldCode: row.fieldCode,
-    visible: row.visible !== false,
+    visible: row.mandatory || row.visible !== false,
     ...(row.width ? { width: Math.min(600, Math.max(80, row.width)) } : {}),
     order,
     frozen: Boolean(row.frozen && row.frozenPosition),
@@ -125,7 +131,6 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
     },
     [t],
   );
-
   const resetState = useCallback(() => {
     const nextColumns = buildColumnSettingsRows(allColumns, viewColumns);
     const nextRowHeight = normalizeRowHeight(rowHeight);
@@ -175,6 +180,7 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
       setColumns((previous) => {
         const target = previous.find((column) => column.fieldCode === fieldCode);
         if (!target) return previous;
+        if (target.mandatory) return previous;
         if (
           target.visible !== false &&
           previous.filter((column) => column.visible !== false).length <= 1
@@ -383,6 +389,7 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
           ) : (
             filteredColumns.map((column) => {
               const isOnlyVisible = column.visible !== false && visibleCount === 1;
+              const visibilityLocked = column.mandatory || isOnlyVisible;
               return (
                 <div
                   key={column.fieldCode}
@@ -402,10 +409,18 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
                   <input
                     type="checkbox"
                     checked={column.visible !== false}
-                    disabled={isOnlyVisible}
+                    disabled={visibilityLocked}
                     onChange={() => toggleVisibility(column.fieldCode)}
                     className="border-border-strong text-accent focus-visible:shadow-focus h-4 w-4 rounded disabled:cursor-not-allowed disabled:opacity-50"
                     aria-label={column.label}
+                    title={
+                      column.mandatory
+                        ? l(
+                            'common.saved_view_mandatory_field_reason',
+                            'Required fields cannot be hidden in a personal view',
+                          )
+                        : undefined
+                    }
                     data-testid={`column-settings-visible-${column.fieldCode}`}
                   />
                   <div className="min-w-0">
@@ -418,6 +433,17 @@ export const ColumnSettingsPanel: React.FC<ColumnSettingsPanelProps> = ({
                       >
                         {column.label}
                       </span>
+                      {column.mandatory && (
+                        <span
+                          className="bg-accent-weak text-accent rounded px-1 py-0.5 text-[9px] font-medium uppercase"
+                          title={l(
+                            'common.saved_view_mandatory_field_reason',
+                            'Required fields cannot be hidden in a personal view',
+                          )}
+                        >
+                          {l('common.saved_view_mandatory', 'Required')}
+                        </span>
+                      )}
                       {column.group === 'system' && (
                         <span className="bg-subtle text-text-3 rounded px-1 py-0.5 text-[9px] font-medium uppercase">
                           {l('common.column_settings_system', 'System')}

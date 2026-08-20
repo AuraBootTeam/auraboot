@@ -1,64 +1,55 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import axios from 'axios';
 import {
   BffProxyService,
-  isBinaryDownloadPath,
   isLongRunningProxyPath,
   shouldForwardRequestBody,
 } from '../BffProxyService';
 
-describe('isBinaryDownloadPath', () => {
-  it('detects /download/{id} as a mid-path segment (the file-download endpoint)', () => {
-    // Regression: /api/file/download/{fileId} was missed by the old
-    // `/download$|/download?` regex and fell through to the JSON proxy, which
-    // re-serialized the xlsx bytes as a JSON string ("PK…").
-    expect(isBinaryDownloadPath('/api/file/download/01KSW25R5V19GS99XE77PAG0HW')).toBe(true);
+vi.mock('axios', () => {
+  const axiosMock = vi.fn();
+  Object.assign(axiosMock, {
+    get: vi.fn(),
+    isAxiosError: vi.fn(() => false),
   });
-
-  it('still detects /download at end of path and with a query', () => {
-    expect(isBinaryDownloadPath('/api/pages/page_1/download')).toBe(true);
-    expect(isBinaryDownloadPath('/api/export-tasks/abc/download?fmt=xlsx')).toBe(true);
-    expect(isBinaryDownloadPath('/api/templates/t1/download')).toBe(true);
-  });
-
-  it('detects report artifact export endpoints that stream binary bytes', () => {
-    expect(isBinaryDownloadPath('/api/reports/export/excel')).toBe(true);
-    expect(isBinaryDownloadPath('/api/reports/export/excel?format=xlsx')).toBe(true);
-    expect(isBinaryDownloadPath('/api/reports/export/pdf')).toBe(true);
-    expect(
-      isBinaryDownloadPath('/api/qr/label-templates/platform/productions/analytics.csv?dateFrom=2026-07-10'),
-    ).toBe(true);
-  });
-
-  it('detects generated Excel template endpoints before axios can decode OOXML as text', () => {
-    expect(
-      isBinaryDownloadPath('/api/admin/users/employee-accounts/import/template'),
-    ).toBe(true);
-    expect(
-      isBinaryDownloadPath('/api/meta/excel/template/crm_account_common?mode=insert'),
-    ).toBe(true);
-    expect(isBinaryDownloadPath('/api/meta/excel/template/crm_lead_common?mode=update')).toBe(true);
-  });
-
-  it('detects Excel correction workbooks before axios can corrupt OOXML bytes', () => {
-    expect(
-      isBinaryDownloadPath(
-        '/api/meta/excel/import/crm_contact_common/error-report/01KZXG1MV9C7QYCKFVVKVXMWR6',
-      ),
-    ).toBe(true);
-  });
-
-  it('does not over-match paths that merely contain "download"', () => {
-    expect(isBinaryDownloadPath('/api/downloads/list')).toBe(false);
-    expect(isBinaryDownloadPath('/api/file/downloaded')).toBe(false);
-    expect(isBinaryDownloadPath('/api/pages/page_1')).toBe(false);
-  });
+  return { default: axiosMock };
 });
+
+function createResponseRecorder() {
+  const headers = new Map<string, string | number | readonly string[]>();
+  const response = {
+    headersSent: false,
+    statusCode: 0,
+    body: undefined as Buffer | undefined,
+    setHeader: vi.fn((key: string, value: string | number | readonly string[]) => {
+      headers.set(key, value);
+      return response;
+    }),
+    removeHeader: vi.fn((key: string) => {
+      headers.delete(key);
+      return response;
+    }),
+    set: vi.fn((key: string, value: string | number | readonly string[]) => {
+      headers.set(key, value);
+      return response;
+    }),
+    status: vi.fn((statusCode: number) => {
+      response.statusCode = statusCode;
+      return response;
+    }),
+    send: vi.fn((body: Buffer) => {
+      response.body = body;
+      response.headersSent = true;
+      return response;
+    }),
+    json: vi.fn(),
+  };
+  return { headers, response };
+}
 
 describe('isLongRunningProxyPath', () => {
   it('gives bounded BOM format exploration the long-running proxy budget', () => {
-    expect(
-      isLongRunningProxyPath('/api/meta/commands/execute/bom:explore_format'),
-    ).toBe(true);
+    expect(isLongRunningProxyPath('/api/meta/commands/execute/bom:explore_format')).toBe(true);
     expect(
       isLongRunningProxyPath('/api/meta/commands/execute/bom:explore_format?taskId=01ABC'),
     ).toBe(true);
@@ -74,7 +65,244 @@ describe('isLongRunningProxyPath', () => {
 
 describe('BffProxyService', () => {
   afterEach(() => {
+    vi.clearAllMocks();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it('requests and forwards arbitrary XLSX responses as opaque bytes', async () => {
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    const xlsxBytes = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0xff, 0x00, 0x81]);
+    vi.mocked(axios).mockResolvedValueOnce({
+      status: 200,
+      headers: {
+        'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'content-disposition': 'attachment; filename="arbitrary-template.xlsx"',
+        'content-length': String(xlsxBytes.length),
+      },
+      data: xlsxBytes,
+    });
+    const { headers, response } = createResponseRecorder();
+
+    await service.handleApiRequest(
+      {
+        method: 'GET',
+        originalUrl: '/api/arbitrary/templates/current',
+        url: '/api/arbitrary/templates/current',
+        headers: { accept: '*/*' },
+        ip: '127.0.0.1',
+        connection: { remoteAddress: '127.0.0.1' },
+      } as any,
+      response as any,
+    );
+
+    expect(axios).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'http://127.0.0.1:6443/api/arbitrary/templates/current',
+        responseType: 'arraybuffer',
+        timeout: 60000,
+      }),
+    );
+    expect(response.statusCode).toBe(200);
+    expect(headers.get('Content-Type')).toBe(
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    expect(headers.get('content-disposition')).toBe(
+      'attachment; filename="arbitrary-template.xlsx"',
+    );
+    expect(response.body).toEqual(xlsxBytes);
+    expect(response.json).not.toHaveBeenCalled();
+  });
+
+  it('forwards JSON success responses as the exact upstream bytes', async () => {
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    const jsonBytes = Buffer.from('{"data":{"name":"王佳霞"}}', 'utf8');
+    vi.mocked(axios).mockResolvedValueOnce({
+      status: 200,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'content-length': String(jsonBytes.length),
+      },
+      data: jsonBytes,
+    });
+    const { headers, response } = createResponseRecorder();
+
+    await service.handleApiRequest(
+      {
+        method: 'GET',
+        originalUrl: '/api/arbitrary/json',
+        url: '/api/arbitrary/json',
+        headers: { accept: 'application/json' },
+        ip: '127.0.0.1',
+        connection: { remoteAddress: '127.0.0.1' },
+      } as any,
+      response as any,
+    );
+
+    expect(axios).toHaveBeenCalledWith(expect.objectContaining({ responseType: 'arraybuffer' }));
+    expect(response.statusCode).toBe(200);
+    expect(headers.get('Content-Type')).toBe('application/json; charset=utf-8');
+    expect(response.body).toEqual(jsonBytes);
+    expect(response.json).not.toHaveBeenCalled();
+  });
+
+  it('preserves the configured timeout budget for long-running operations', async () => {
+    vi.stubEnv('BFF_LONG_RUNNING_TIMEOUT_MS', '123456');
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    vi.mocked(axios).mockResolvedValueOnce({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: Buffer.from('{"code":"0"}', 'utf8'),
+    });
+    const { response } = createResponseRecorder();
+
+    await service.handleApiRequest(
+      {
+        method: 'POST',
+        originalUrl: '/api/plugins/import',
+        url: '/api/plugins/import',
+        headers: { accept: 'application/json' },
+        body: { plugin: 'example' },
+        ip: '127.0.0.1',
+        connection: { remoteAddress: '127.0.0.1' },
+      } as any,
+      response as any,
+    );
+
+    expect(axios).toHaveBeenCalledWith(
+      expect.objectContaining({ responseType: 'arraybuffer', timeout: 123456 }),
+    );
+  });
+
+  it('forwards JavaScript responses without quoting or decoding them', async () => {
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    const scriptBytes = Buffer.from('window.AuraEmbed={ready:true};', 'utf8');
+    vi.mocked(axios).mockResolvedValueOnce({
+      status: 200,
+      headers: {
+        'content-type': 'application/javascript; charset=utf-8',
+        'x-content-version': 'sdk-7',
+      },
+      data: scriptBytes,
+    });
+    const { headers, response } = createResponseRecorder();
+
+    await service.handleApiRequest(
+      {
+        method: 'GET',
+        originalUrl: '/api/arbitrary/embed/current',
+        url: '/api/arbitrary/embed/current',
+        headers: { accept: '*/*' },
+        ip: '127.0.0.1',
+        connection: { remoteAddress: '127.0.0.1' },
+      } as any,
+      response as any,
+    );
+
+    expect(headers.get('Content-Type')).toBe('application/javascript; charset=utf-8');
+    expect(headers.get('x-content-version')).toBe('sdk-7');
+    expect(response.body).toEqual(scriptBytes);
+    expect(response.json).not.toHaveBeenCalled();
+  });
+
+  it('preserves an empty upstream response without inventing a JSON object', async () => {
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    vi.mocked(axios).mockResolvedValueOnce({
+      status: 204,
+      headers: {},
+      data: Buffer.alloc(0),
+    });
+    const { response } = createResponseRecorder();
+
+    await service.handleApiRequest(
+      {
+        method: 'DELETE',
+        originalUrl: '/api/arbitrary/resource/42',
+        url: '/api/arbitrary/resource/42',
+        headers: { accept: 'application/json' },
+        ip: '127.0.0.1',
+        connection: { remoteAddress: '127.0.0.1' },
+      } as any,
+      response as any,
+    );
+
+    expect(response.statusCode).toBe(204);
+    expect(response.body).toEqual(Buffer.alloc(0));
+    expect(response.json).not.toHaveBeenCalled();
+  });
+
+  it('keeps JSON error envelopes readable when axios returns arraybuffer data', async () => {
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    const envelope = { code: 'BadParam', message: 'invalid request' };
+    vi.mocked(axios.isAxiosError).mockReturnValueOnce(true);
+    vi.mocked(axios).mockRejectedValueOnce({
+      message: 'Request failed with status code 422',
+      code: 'ERR_BAD_REQUEST',
+      config: { method: 'post', url: '/api/arbitrary/validate', headers: {} },
+      response: {
+        status: 422,
+        statusText: 'Unprocessable Entity',
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+        data: Buffer.from(JSON.stringify(envelope), 'utf8'),
+      },
+    });
+    const { response } = createResponseRecorder();
+
+    await service.handleApiRequest(
+      {
+        method: 'POST',
+        originalUrl: '/api/arbitrary/validate',
+        url: '/api/arbitrary/validate',
+        headers: { accept: 'application/json' },
+        body: { value: 'invalid' },
+        ip: '127.0.0.1',
+        connection: { remoteAddress: '127.0.0.1' },
+      } as any,
+      response as any,
+    );
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json).toHaveBeenCalledWith(envelope);
+    expect(response.send).not.toHaveBeenCalled();
+  });
+
+  it('forwards non-JSON error artifacts without converting bytes to text', async () => {
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    const artifactBytes = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x00, 0xff]);
+    vi.mocked(axios.isAxiosError).mockReturnValueOnce(true);
+    vi.mocked(axios).mockRejectedValueOnce({
+      message: 'Request failed with status code 409',
+      code: 'ERR_BAD_REQUEST',
+      config: { method: 'get', url: '/api/arbitrary/report', headers: {} },
+      response: {
+        status: 409,
+        statusText: 'Conflict',
+        headers: {
+          'content-type': 'application/pdf',
+          'content-disposition': 'attachment; filename="conflict.pdf"',
+        },
+        data: artifactBytes,
+      },
+    });
+    const { headers, response } = createResponseRecorder();
+
+    await service.handleApiRequest(
+      {
+        method: 'GET',
+        originalUrl: '/api/arbitrary/report',
+        url: '/api/arbitrary/report',
+        headers: { accept: '*/*' },
+        ip: '127.0.0.1',
+        connection: { remoteAddress: '127.0.0.1' },
+      } as any,
+      response as any,
+    );
+
+    expect(response.statusCode).toBe(409);
+    expect(headers.get('Content-Type')).toBe('application/pdf');
+    expect(headers.get('content-disposition')).toBe('attachment; filename="conflict.pdf"');
+    expect(response.body).toEqual(artifactBytes);
+    expect(response.json).not.toHaveBeenCalled();
   });
 
   it('only forwards non-empty request bodies on body-capable methods', () => {
@@ -130,8 +358,8 @@ describe('BffProxyService', () => {
     expect(headers['sec-fetch-mode']).toBeUndefined();
   });
 
-  // Every consumer of sanitizeHeaders (the axios JSON proxy, the binary-download fetch,
-  // the SSE fetch) rebuilds the request body from the *parsed* req.body, so the byte
+  // Every consumer of sanitizeHeaders (the axios proxy and the SSE fetch) rebuilds
+  // the request body from the *parsed* req.body, so the byte
   // length it puts on the wire is its own — never the client's. Forwarding the client's
   // framing headers therefore lets `Content-Length` disagree with the bytes actually
   // written, which desyncs the pooled keep-alive socket to Spring: Tomcat reads only the
@@ -176,38 +404,17 @@ describe('BffProxyService', () => {
       Buffer.alloc(900_000, 'A'),
       Buffer.from('</svg>'),
     ]);
-    const fetchMock = vi.fn(async () => {
-      return new globalThis.Response(svgBytes, {
-        status: 200,
-        headers: {
-          'content-type': 'image/svg+xml',
-          'content-length': String(svgBytes.length),
-          'content-disposition': 'inline; filename="board-top.svg"',
-        },
-      });
+    vi.mocked(axios).mockResolvedValueOnce({
+      status: 200,
+      headers: {
+        'content-type': 'image/svg+xml',
+        'content-length': String(svgBytes.length),
+        'transfer-encoding': 'chunked',
+        'content-disposition': 'inline; filename="board-top.svg"',
+      },
+      data: svgBytes,
     });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const responseHeaders = new Map<string, string | number | readonly string[]>();
-    const res = {
-      headersSent: false,
-      statusCode: 0,
-      body: undefined as Buffer | undefined,
-      setHeader: vi.fn((key: string, value: string | number | readonly string[]) => {
-        responseHeaders.set(key, value);
-        return res;
-      }),
-      status: vi.fn((statusCode: number) => {
-        res.statusCode = statusCode;
-        return res;
-      }),
-      send: vi.fn((body: Buffer) => {
-        res.body = body;
-        res.headersSent = true;
-        return res;
-      }),
-      json: vi.fn(),
-    };
+    const { headers: responseHeaders, response: res } = createResponseRecorder();
 
     await service.handleApiRequest(
       {
@@ -225,10 +432,11 @@ describe('BffProxyService', () => {
       res as any,
     );
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:6443/api/file/download/01KV6XD0AX2JQ9M3M1VZZFC34J',
+    expect(axios).toHaveBeenCalledWith(
       expect.objectContaining({
         method: 'get',
+        url: 'http://127.0.0.1:6443/api/file/download/01KV6XD0AX2JQ9M3M1VZZFC34J',
+        responseType: 'arraybuffer',
         headers: expect.objectContaining({
           authorization: 'Bearer test-token',
         }),
@@ -236,8 +444,9 @@ describe('BffProxyService', () => {
     );
     expect(res.statusCode).toBe(200);
     expect(responseHeaders.get('Content-Type')).toBe('image/svg+xml');
-    expect(responseHeaders.get('Content-Length')).toBe(String(svgBytes.length));
-    expect(responseHeaders.get('Content-Disposition')).toBe('inline; filename="board-top.svg"');
+    expect(responseHeaders.has('Content-Length')).toBe(false);
+    expect(responseHeaders.has('Transfer-Encoding')).toBe(false);
+    expect(responseHeaders.get('content-disposition')).toBe('inline; filename="board-top.svg"');
     expect(res.body).toEqual(svgBytes);
     expect(res.json).not.toHaveBeenCalled();
   });

@@ -24,6 +24,15 @@ import {
   getLegacyCompatibleRecordPid,
 } from '~/framework/meta/utils/publicRecordId';
 
+function translateOrFallback(
+  t: ((key: string) => string) | undefined,
+  key: string,
+  fallback: string,
+): string {
+  const translated = t?.(key);
+  return translated && translated !== key ? translated : fallback;
+}
+
 /**
  * 动作执行上下文
  * 包含所有动作执行所需的依赖和状态
@@ -289,6 +298,7 @@ actionRegistry.register(
     fetchResult,
     buildApiEndpoint,
     t,
+    locale,
     confirm: ctxConfirm,
     showToast,
   }) => {
@@ -302,8 +312,13 @@ actionRegistry.register(
       return;
     }
 
-    const confirmMessage =
-      t?.('common.confirm.delete') || 'Are you sure you want to delete this record?';
+    const confirmMessage = translateOrFallback(
+      t,
+      'common.confirm.delete',
+      locale?.toLowerCase().startsWith('zh')
+        ? '确定要删除这条记录吗？'
+        : 'Are you sure you want to delete this record?',
+    );
     const doConfirm = ctxConfirm ?? confirmDialog;
     const confirmed = await doConfirm({ content: confirmMessage, variant: 'danger' });
     if (!confirmed) {
@@ -338,16 +353,30 @@ actionRegistry.register(
           });
 
       if (ResultHelper.isSuccess(result)) {
-        const successMessage = t?.('common.success.delete') || 'Deleted successfully';
+        const successMessage = translateOrFallback(
+          t,
+          'common.success.delete',
+          locale?.toLowerCase().startsWith('zh') ? '删除成功' : 'Deleted successfully',
+        );
         showToast?.(successMessage, 'success');
         await loadData({ filters });
       } else {
-        const errorMessage = result.desc || t?.('common.error.delete') || 'Delete failed';
+        const errorMessage =
+          result.desc ||
+          translateOrFallback(
+            t,
+            'common.error.delete',
+            locale?.toLowerCase().startsWith('zh') ? '删除失败' : 'Delete failed',
+          );
         showToast?.(errorMessage, 'error');
       }
     } catch (error) {
       console.error('[ActionRegistry] delete error:', error);
-      const errorMessage = t?.('common.error.delete') || 'Delete failed';
+      const errorMessage = translateOrFallback(
+        t,
+        'common.error.delete',
+        locale?.toLowerCase().startsWith('zh') ? '删除失败' : 'Delete failed',
+      );
       showToast?.(errorMessage, 'error');
     }
   },
@@ -611,7 +640,8 @@ actionRegistry.register('toast.error', ({ args, showToast }) => {
 actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm }) => {
   let message: any = args?.message || args?.content || 'Are you sure you want to proceed?';
   if (message && typeof message === 'object') {
-    message = (message as any)['zh-CN'] || (message as any)['en-US'] || 'Are you sure you want to proceed?';
+    message =
+      (message as any)['zh-CN'] || (message as any)['en-US'] || 'Are you sure you want to proceed?';
   }
   const doConfirm = ctxConfirm ?? confirmDialog;
   const confirmed = await doConfirm({ content: message as string });
@@ -701,7 +731,10 @@ export async function promptInputForm(
               ? parsed.map((value) => String(value).trim()).filter(Boolean)
               : [];
           } catch {
-            defaults[field.field] = raw.split(',').map((value: string) => value.trim()).filter(Boolean);
+            defaults[field.field] = raw
+              .split(',')
+              .map((value: string) => value.trim())
+              .filter(Boolean);
           }
         } else {
           defaults[field.field] = [];
@@ -1003,11 +1036,11 @@ export function downloadBase64CommandArtifact(value: any): boolean {
   let artifact = value;
   for (let depth = 0; depth < 4; depth += 1) {
     if (
-      artifact
-      && typeof artifact === 'object'
-      && typeof artifact.contentBase64 !== 'string'
-      && artifact.data
-      && typeof artifact.data === 'object'
+      artifact &&
+      typeof artifact === 'object' &&
+      typeof artifact.contentBase64 !== 'string' &&
+      artifact.data &&
+      typeof artifact.data === 'object'
     ) {
       artifact = artifact.data;
     } else {
@@ -1015,10 +1048,11 @@ export function downloadBase64CommandArtifact(value: any): boolean {
     }
   }
   if (
-    typeof document === 'undefined'
-    || typeof artifact?.contentBase64 !== 'string'
-    || typeof artifact?.fileName !== 'string'
-  ) return false;
+    typeof document === 'undefined' ||
+    typeof artifact?.contentBase64 !== 'string' ||
+    typeof artifact?.fileName !== 'string'
+  )
+    return false;
   const binary = atob(artifact.contentBase64);
   const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
   const blob = new Blob([bytes], { type: artifact.contentType || 'application/octet-stream' });
