@@ -333,6 +333,34 @@ async function enrichDetailRecordDisplayFields(
   return mergeDetailDisplayFields(record, listRecord);
 }
 
+export interface DetailRecordRefreshSnapshot {
+  rawData: RecordData;
+  recordData: RecordData;
+}
+
+/**
+ * Load the complete post-command detail snapshot. The returned promise does not
+ * settle until reference display enrichment has also completed, so the next
+ * toolbar action sees the refreshed row_version together with its display data.
+ */
+export async function loadDetailRecordRefreshSnapshot(
+  fetchRecord: () => Promise<any>,
+  recordPath: string | undefined,
+  modelCode: string,
+  recordPid: string | undefined,
+  token?: string,
+  enrichRecord: typeof enrichDetailRecordDisplayFields = enrichDetailRecordDisplayFields,
+): Promise<DetailRecordRefreshSnapshot | null> {
+  const result = await fetchRecord();
+  if (!ResultHelper.isSuccess(result) || !result.data) return null;
+  const rawData = result.data as RecordData;
+  const unwrappedRecord = unwrapDetailRecord(rawData, recordPath);
+  const recordData = recordPid
+    ? await enrichRecord(modelCode, recordPid, unwrappedRecord, token)
+    : unwrappedRecord;
+  return { rawData, recordData };
+}
+
 /**
  * Extract a nested array for a block's `dataPath` from the raw detail API payload
  * (e.g. `priceComponents` / `quotaTemplates` siblings of the master record in the DTO).
@@ -741,7 +769,7 @@ function DetailPageContentInner(props: PageContentProps) {
   ]);
 
   // Stable callback to reload the parent record (used after sub-table command execution)
-  const reloadRecord = useCallback(() => {
+  const reloadRecord = useCallback(async (): Promise<void> => {
     if ((!routeRecordPid && !hasApiSingletonRecordSource) || !recordModelCode) return;
     const currentRecordPid = routeRecordPid;
     const currentModelCode = recordModelCode;
@@ -750,25 +778,23 @@ function DetailPageContentInner(props: PageContentProps) {
       currentModelCode,
       currentRecordPid,
     );
-    fetchResult<RecordData>(endpoint, { method, token: token || undefined })
-      .then((result) => {
-        if (ResultHelper.isSuccess(result) && result.data) {
-          const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
-          const unwrappedRecord = unwrapDetailRecord(result.data, recordPath);
-          setRawData(result.data);
-          if (currentRecordPid && !shouldSkipDetailModelFieldMeta(schema)) {
-            enrichDetailRecordDisplayFields(
-              currentModelCode,
-              currentRecordPid,
-              unwrappedRecord,
-              token || undefined,
-            ).then(setRecordData);
-          } else {
-            setRecordData(unwrappedRecord);
-          }
-        }
-      })
-      .catch(() => {});
+    try {
+      const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
+      const shouldEnrich = currentRecordPid && !shouldSkipDetailModelFieldMeta(schema);
+      const snapshot = await loadDetailRecordRefreshSnapshot(
+        () => fetchResult<RecordData>(endpoint, { method, token: token || undefined }),
+        recordPath,
+        currentModelCode,
+        shouldEnrich ? currentRecordPid : undefined,
+        token || undefined,
+      );
+      if (!snapshot) return;
+      setRawData(snapshot.rawData);
+      setRecordData(snapshot.recordData);
+    } catch {
+      // Preserve the current detail snapshot when a transient refresh fails.
+      // The action itself has already succeeded; a later refresh can recover.
+    }
   }, [routeRecordPid, recordModelCode, token, schema, hasApiSingletonRecordSource]);
 
   // Enrich a page-schema field with model field metadata (dictCode, component, dataType)
