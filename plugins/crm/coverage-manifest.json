@@ -36,8 +36,8 @@
       "dashboards": 37
     },
     "productVerdicts": {
-      "pass": 675,
-      "untested": 2726
+      "pass": 692,
+      "untested": 2709
     },
     "fullProductNonGoals": [
       "data migration"
@@ -78,6 +78,11 @@
       "id": "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE",
       "verdict": "pass",
       "note": "A self-seeded real-stack journey verifies contact primary/enable-disable invariants and the Web follow-up plan/record lifecycle without development-data migration."
+    },
+    {
+      "id": "CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY",
+      "verdict": "pass",
+      "note": "A self-seeded browser journey converts a qualified lead and proves that direct and relation-anchored follow-up activities, comments and deduplicated customer history remain visible across the resulting account, contact and opportunity graph."
     }
   ],
   "axes": {
@@ -535,14 +540,16 @@
         "id": "crm:convert_lead",
         "goals": [
           "RG-1",
-          "RG-3"
+          "RG-3",
+          "CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY"
         ],
         "permissionCodes": [
           "crm.lead.manage"
         ],
         "evidence": [
           "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-          "plugins/crm/scripts/adoption_journey.py"
+          "plugins/crm/scripts/adoption_journey.py",
+          "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
         ],
         "permissionsVerified": true,
         "verdict": "pass"
@@ -567,14 +574,16 @@
         "id": "crm:create_activity",
         "goals": [
           "RG-3",
-          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE"
+          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE",
+          "CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY"
         ],
         "permissionCodes": [
           "crm.activity.manage"
         ],
         "evidence": [
           "plugins/crm/scripts/adoption_journey.py",
-          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+          "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
         ],
         "permissionsVerified": true,
         "verdict": "pass"
@@ -654,13 +663,15 @@
       {
         "id": "crm:create_lead",
         "goals": [
-          "RG-3"
+          "RG-3",
+          "CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY"
         ],
         "permissionCodes": [
           "crm.lead.manage"
         ],
         "evidence": [
-          "plugins/crm/scripts/adoption_journey.py"
+          "plugins/crm/scripts/adoption_journey.py",
+          "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
         ],
         "permissionsVerified": true,
         "verdict": "pass"
@@ -848,6 +859,20 @@
         "verdict": "pass"
       },
       {
+        "id": "crm:log_lead_activity",
+        "goals": [
+          "CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY"
+        ],
+        "permissionCodes": [
+          "crm.activity.manage"
+        ],
+        "evidence": [
+          "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+        ],
+        "permissionsVerified": false,
+        "verdict": "pass"
+      },
+      {
         "id": "crm:log_opp_activity",
         "goals": [
           "RG-1"
@@ -951,14 +976,16 @@
         "id": "crm:qualify_lead",
         "goals": [
           "RG-1",
-          "RG-3"
+          "RG-3",
+          "CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY"
         ],
         "permissionCodes": [
           "crm.lead.manage"
         ],
         "evidence": [
           "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-          "plugins/crm/scripts/adoption_journey.py"
+          "plugins/crm/scripts/adoption_journey.py",
+          "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
         ],
         "permissionsVerified": true,
         "verdict": "pass"
@@ -1170,16 +1197,31 @@
     ],
     "pages": [
       {
+        "id": "crm_account_common_detail",
+        "goals": [
+          "CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY"
+        ],
+        "kind": "detail",
+        "permissionCodes": [],
+        "evidence": [
+          "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+        ],
+        "permissionsVerified": false,
+        "verdict": "pass"
+      },
+      {
         "id": "crm_activity_common_detail",
         "goals": [
           "CORDYS-FOLLOWUP-COMMENTS",
-          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE"
+          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE",
+          "CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY"
         ],
         "kind": "detail",
         "permissionCodes": [],
         "evidence": [
           "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
-          "web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts"
+          "web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts",
+          "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
         ],
         "permissionsVerified": false,
         "verdict": "pass"
@@ -1217,12 +1259,14 @@
       {
         "id": "crm_contact_common_detail",
         "goals": [
-          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE"
+          "CORDYS-CONTACT-FOLLOWUP-LIFECYCLE",
+          "CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY"
         ],
         "kind": "detail",
         "permissionCodes": [],
         "evidence": [
-          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+          "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
         ],
         "permissionsVerified": false,
         "verdict": "pass"
@@ -1480,6 +1524,19 @@
         "verdict": "pass"
       },
       {
+        "id": "crm_lead_common_detail",
+        "goals": [
+          "CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY"
+        ],
+        "kind": "detail",
+        "permissionCodes": [],
+        "evidence": [
+          "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+        ],
+        "permissionsVerified": false,
+        "verdict": "pass"
+      },
+      {
         "id": "crm_lead_desk_workbench",
         "goals": [
           "RG-1",
@@ -1499,12 +1556,14 @@
       {
         "id": "crm_opportunity_common_detail",
         "goals": [
-          "RELEASE-B"
+          "RELEASE-B",
+          "CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY"
         ],
         "kind": "detail",
         "permissionCodes": [],
         "evidence": [
-          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+          "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
         ],
         "permissionsVerified": false,
         "verdict": "pass"
@@ -1602,7 +1661,8 @@
           "plugins/crm/e2e/core-workbenches.golden.spec.ts",
           "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
           "plugins/crm/scripts/adoption_journey.py",
-          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+          "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+          "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
         ],
         "verdict": "pass"
       },
@@ -1695,7 +1755,8 @@
         "id": "crm.lead.manage",
         "evidence": [
           "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-          "plugins/crm/scripts/adoption_journey.py"
+          "plugins/crm/scripts/adoption_journey.py",
+          "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
         ],
         "verdict": "pass"
       },
@@ -1777,7 +1838,17 @@
         "resourceCode": null,
         "actionCode": null,
         "evidence": [
-          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+          "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+          "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+        ],
+        "verdict": "pass"
+      },
+      {
+        "id": "crm_activities_by_object",
+        "resourceCode": null,
+        "actionCode": null,
+        "evidence": [
+          "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
         ],
         "verdict": "pass"
       },
@@ -2868,6 +2939,65 @@
       "expectedTechnicalVerdict": "pass",
       "expectedDataMigration": "out-of-scope-development-stage",
       "requireNoFailedRuntimeRequests": true
+    },
+    {
+      "id": "CRM-LEAD-CONVERSION-ACTIVITY-CARRY",
+      "filePrefix": "crm-lead-conversion-activity-carry-",
+      "expectedScenarios": 10,
+      "minimumScreenshots": 7,
+      "expectedCoverage": {
+        "pages": [
+          "crm_lead_common_detail",
+          "crm_account_common_detail",
+          "crm_contact_common_detail",
+          "crm_opportunity_common_detail",
+          "crm_activity_common_detail"
+        ],
+        "commands": [
+          "crm:create_lead",
+          "crm:qualify_lead",
+          "crm:create_activity",
+          "crm:log_lead_activity",
+          "crm:convert_lead"
+        ],
+        "queries": [
+          "crm_activities_by_object",
+          "crm_account_timeline"
+        ],
+        "blocks": [
+          "crm_lead_common_detail:crm_lead_tabs",
+          "crm_lead_common_detail:block_activities",
+          "crm_lead_common_detail:block_conversion",
+          "crm_lead_common_detail:crm_lead_detail_toolbar",
+          "crm_account_common_detail:crm_account_tabs",
+          "crm_account_common_detail:block_activities",
+          "crm_contact_common_detail:crm_contact_tabs",
+          "crm_contact_common_detail:block_activities",
+          "crm_opportunity_common_detail:crm_opportunity_tabs",
+          "crm_opportunity_common_detail:block_activities",
+          "crm_activity_common_detail:activity_followup_comments"
+        ],
+        "uiActions": [
+          "crm_lead_common_detail:crm_lead_tabs:activities",
+          "crm_lead_common_detail:crm_lead_detail_toolbar:convert",
+          "crm_lead_common_detail:crm_lead_tabs:conversion",
+          "crm_account_common_detail:crm_account_tabs:activities",
+          "crm_contact_common_detail:crm_contact_tabs:activities",
+          "crm_opportunity_common_detail:crm_opportunity_tabs:activities"
+        ]
+      },
+      "expectedTechnicalVerdict": "pass",
+      "expectedDataMigration": "out-of-scope-development-stage",
+      "requireNoFailedRuntimeRequests": true,
+      "expectedFixtureMode": "self-seeded",
+      "requiredRecordIds": [
+        "lead",
+        "account",
+        "contact",
+        "opportunity",
+        "customerRequest",
+        "activities"
+      ]
     }
   ],
   "untested": [
@@ -4393,10 +4523,12 @@
         {
           "id": "page:crm_account_common_detail",
           "action": "Open crm_account_common_detail (detail) from its supported product entry and exercise its complete page journey",
-          "evidence": [],
-          "assertion": "No qualifying browser journey is registered for this page; it remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "Real-stack browser evidence exists for the current release scope.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -4434,7 +4566,8 @@
           "action": "Open crm_activity_common_detail (detail) from its supported product entry and exercise its complete page journey",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
-            "web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts"
+            "web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "Real-stack browser evidence exists for the current release scope.",
           "verdict": "pass",
@@ -4765,7 +4898,8 @@
           "id": "page:crm_contact_common_detail",
           "action": "Open crm_contact_common_detail (detail) from its supported product entry and exercise its complete page journey",
           "evidence": [
-            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "Real-stack browser evidence exists for the current release scope.",
           "verdict": "pass",
@@ -5336,10 +5470,12 @@
         {
           "id": "page:crm_lead_common_detail",
           "action": "Open crm_lead_common_detail (detail) from its supported product entry and exercise its complete page journey",
-          "evidence": [],
-          "assertion": "No qualifying browser journey is registered for this page; it remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "Real-stack browser evidence exists for the current release scope.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -5665,7 +5801,8 @@
           "id": "page:crm_opportunity_common_detail",
           "action": "Open crm_opportunity_common_detail (detail) from its supported product entry and exercise its complete page journey",
           "evidence": [
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "Real-stack browser evidence exists for the current release scope.",
           "verdict": "pass",
@@ -6085,10 +6222,12 @@
         {
           "id": "block:crm_account_common_detail:crm_account_tabs:0",
           "action": "Render and semantically verify tabs block crm_account_tabs on crm_account_common_detail",
-          "evidence": [],
-          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -6176,10 +6315,12 @@
         {
           "id": "block:crm_account_common_detail:block_activities:7",
           "action": "Render and semantically verify activity-timeline block block_activities on crm_account_common_detail",
-          "evidence": [],
-          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -6322,7 +6463,8 @@
           "id": "block:crm_activity_common_detail:activity_followup_comments:4",
           "action": "Render and semantically verify record-comments block activity_followup_comments on crm_activity_common_detail",
           "evidence": [
-            "web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts"
+            "web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "The registered real-stack journey renders this block and asserts its business state.",
           "verdict": "pass",
@@ -7331,10 +7473,12 @@
         {
           "id": "block:crm_contact_common_detail:crm_contact_tabs:0",
           "action": "Render and semantically verify tabs block crm_contact_tabs on crm_contact_common_detail",
-          "evidence": [],
-          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -7359,10 +7503,12 @@
         {
           "id": "block:crm_contact_common_detail:block_activities:2",
           "action": "Render and semantically verify activity-timeline block block_activities on crm_contact_common_detail",
-          "evidence": [],
-          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -9224,10 +9370,12 @@
         {
           "id": "block:crm_lead_common_detail:crm_lead_tabs:0",
           "action": "Render and semantically verify tabs block crm_lead_tabs on crm_lead_common_detail",
-          "evidence": [],
-          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -9250,10 +9398,12 @@
         {
           "id": "block:crm_lead_common_detail:block_activities:2",
           "action": "Render and semantically verify activity-timeline block block_activities on crm_lead_common_detail",
-          "evidence": [],
-          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -9263,10 +9413,12 @@
         {
           "id": "block:crm_lead_common_detail:block_conversion:3",
           "action": "Render and semantically verify form-section block block_conversion on crm_lead_common_detail",
-          "evidence": [],
-          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -9276,10 +9428,12 @@
         {
           "id": "block:crm_lead_common_detail:crm_lead_detail_toolbar:4",
           "action": "Render and semantically verify toolbar block crm_lead_detail_toolbar on crm_lead_common_detail",
-          "evidence": [],
-          "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -10229,7 +10383,8 @@
           "id": "block:crm_opportunity_common_detail:crm_opportunity_tabs:1",
           "action": "Render and semantically verify tabs block crm_opportunity_tabs on crm_opportunity_common_detail",
           "evidence": [
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "The registered real-stack journey renders this block and asserts its business state.",
           "verdict": "pass",
@@ -10354,7 +10509,8 @@
           "id": "block:crm_opportunity_common_detail:block_activities:10",
           "action": "Render and semantically verify activity-timeline block block_activities on crm_opportunity_common_detail",
           "evidence": [
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "The registered real-stack journey renders this block and asserts its business state.",
           "verdict": "pass",
@@ -34322,10 +34478,12 @@
         {
           "id": "ui-action:crm_account_common_detail:crm_account_tabs:activities:6",
           "action": "tab activities on crm_account_common_detail -> view-state:activities",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -36257,10 +36415,12 @@
         {
           "id": "ui-action:crm_contact_common_detail:crm_contact_tabs:activities:1",
           "action": "tab activities on crm_contact_common_detail -> view-state:activities",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -38840,10 +39000,12 @@
         {
           "id": "ui-action:crm_lead_common_detail:crm_lead_tabs:activities:1",
           "action": "tab activities on crm_lead_common_detail -> view-state:activities",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -38853,10 +39015,12 @@
         {
           "id": "ui-action:crm_lead_common_detail:crm_lead_tabs:conversion:2",
           "action": "tab conversion on crm_lead_common_detail -> view-state:conversion",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -38957,10 +39121,12 @@
         {
           "id": "ui-action:crm_lead_common_detail:crm_lead_detail_toolbar:convert:10",
           "action": "button convert on crm_lead_common_detail -> command:crm:convert_lead",
-          "evidence": [],
-          "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -40363,7 +40529,8 @@
           "id": "ui-action:crm_opportunity_common_detail:crm_opportunity_tabs:activities:4",
           "action": "tab activities on crm_opportunity_common_detail -> view-state:activities",
           "evidence": [
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
           "verdict": "pass",
@@ -42472,7 +42639,8 @@
           "action": "Execute crm:create_activity (create) through its supported user or runtime path",
           "evidence": [
             "plugins/crm/scripts/adoption_journey.py",
-            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "The command has registered release evidence.",
           "verdict": "pass",
@@ -43410,14 +43578,16 @@
         {
           "id": "command:crm:log_lead_activity",
           "action": "Execute crm:log_lead_activity (create) through its supported user or runtime path",
-          "evidence": [],
-          "assertion": "No complete browser/backend evidence pair is registered for this command.",
-          "verdict": "untested",
-          "verdict_by": null,
-          "surface": "service",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The command has registered release evidence.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "journey",
           "dependencies": "real-stack",
           "authority": "blocking-release",
-          "driver": "it",
+          "driver": "browser",
           "source": "plugins/crm/config/commands/crm_context_actions.json"
         },
         {
@@ -44417,7 +44587,8 @@
           "id": "command:crm:create_lead",
           "action": "Execute crm:create_lead (create) through its supported user or runtime path",
           "evidence": [
-            "plugins/crm/scripts/adoption_journey.py"
+            "plugins/crm/scripts/adoption_journey.py",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "The command has registered release evidence.",
           "verdict": "pass",
@@ -44462,7 +44633,8 @@
           "action": "Execute crm:qualify_lead (state_transition) through its supported user or runtime path",
           "evidence": [
             "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/scripts/adoption_journey.py"
+            "plugins/crm/scripts/adoption_journey.py",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "The command has registered release evidence.",
           "verdict": "pass",
@@ -44478,7 +44650,8 @@
           "action": "Execute crm:convert_lead (custom) through its supported user or runtime path",
           "evidence": [
             "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/scripts/adoption_journey.py"
+            "plugins/crm/scripts/adoption_journey.py",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "The command has registered release evidence.",
           "verdict": "pass",
@@ -45722,7 +45895,8 @@
           "action": "Verify allow, deny, menu, action and direct-API behavior for crm.lead.manage",
           "evidence": [
             "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/scripts/adoption_journey.py"
+            "plugins/crm/scripts/adoption_journey.py",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "The permission participates in registered release evidence.",
           "verdict": "pass",
@@ -45787,7 +45961,8 @@
             "plugins/crm/e2e/core-workbenches.golden.spec.ts",
             "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
             "plugins/crm/scripts/adoption_journey.py",
-            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts"
+            "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "The permission participates in registered release evidence.",
           "verdict": "pass",
@@ -47224,10 +47399,12 @@
         {
           "id": "query:crm_activities_by_object",
           "action": "Execute crm_activities_by_object with tenant isolation and assert non-empty business semantics where fixtures require data",
-          "evidence": [],
-          "assertion": "No real-stack response and consuming-page evidence pair is registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "The named query has registered release evidence.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "api",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -47290,7 +47467,8 @@
           "id": "query:crm_account_timeline",
           "action": "Execute crm_account_timeline with tenant isolation and assert non-empty business semantics where fixtures require data",
           "evidence": [
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
           ],
           "assertion": "The named query has registered release evidence.",
           "verdict": "pass",

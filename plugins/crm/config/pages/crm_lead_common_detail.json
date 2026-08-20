@@ -105,7 +105,8 @@
                   "params": {
                     "datasourceId": "nq:crm_activities_by_object",
                     "objectType": "lead",
-                    "objectId": "${recordPid}"
+                    "objectId": "${recordPid}",
+                    "format": "records"
                   }
                 },
                 "readOnly": true,
@@ -268,6 +269,10 @@
           "label": {
             "zh-CN": "转化线索",
             "en-US": "Convert Lead"
+          },
+          "confirm": {
+            "zh-CN": "确认将此线索转化为客户、联系人、商机和客户需求？转化前的跟进记录与评论将继续保留。",
+            "en-US": "Convert this lead to an account, contact, opportunity, and customer request? Existing follow-up records and comments will be preserved."
           },
           "action": {
             "type": "command",

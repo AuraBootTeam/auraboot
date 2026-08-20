@@ -34,10 +34,32 @@ class ConvertLeadHandlerTest {
                 "crm_lead_requirement", "Need a fast quote for EV controller board\nAnnual volume 20k",
                 "crm_lead_status", "qualified"
         ));
+        db.seed("crm_activity_common", row(
+                "pid", "activity-direct",
+                "crm_act_type", "visit",
+                "crm_act_subject", "Lead site visit",
+                "crm_act_related_model", "crm_lead_common",
+                "crm_act_related_id", "lead-1"
+        ));
+        db.seed("crm_activity_common", row(
+                "pid", "activity-related",
+                "crm_act_type", "task",
+                "crm_act_subject", "Lead follow-up plan"
+        ));
+        db.seed("crm_activity_relation_common", row(
+                "pid", "relation-lead",
+                "crm_ar_activity_id", "activity-related",
+                "crm_ar_object_type", "lead",
+                "crm_ar_object_id", "lead-1",
+                "crm_ar_role", "primary"
+        ));
 
         Object result = handler.execute(context("lead-1", db));
 
         assertTrue(result instanceof Map<?, ?>);
+        Map<?, ?> conversion = (Map<?, ?>) result;
+        assertEquals(2, conversion.get("carriedActivityCount"));
+        assertEquals(7, conversion.get("createdActivityRelationCount"));
         assertEquals(1, db.store.get("crm_account_common").size());
         assertEquals(1, db.store.get("crm_contact_common").size());
         assertEquals(1, db.store.get("crm_opportunity_common").size());
@@ -79,6 +101,18 @@ class ConvertLeadHandlerTest {
         assertEquals("PID3", lead.get("crm_lead_converted_opportunity_id"));
         assertEquals("PID4", lead.get("crm_lead_converted_request_id"));
         assertFalse(String.valueOf(lead.get("crm_lead_converted_at")).isBlank());
+
+        List<Map<String, Object>> relations = db.store.get("crm_activity_relation_common");
+        assertEquals(8, relations.size());
+        for (String activityId : List.of("activity-direct", "activity-related")) {
+            assertTrue(hasEdge(relations, activityId, "lead", "lead-1"));
+            assertTrue(hasEdge(relations, activityId, "account", "PID1"));
+            assertTrue(hasEdge(relations, activityId, "contact", "PID2"));
+            assertTrue(hasEdge(relations, activityId, "opportunity", "PID3"));
+        }
+        Map<String, Object> directActivity = db.getById("crm_activity_common", "activity-direct");
+        assertEquals("crm_lead_common", directActivity.get("crm_act_related_model"));
+        assertEquals("lead-1", directActivity.get("crm_act_related_id"));
     }
 
     @Test
@@ -177,6 +211,17 @@ class ConvertLeadHandlerTest {
             data.put((String) kv[i], kv[i + 1]);
         }
         return data;
+    }
+
+    private static boolean hasEdge(
+            List<Map<String, Object>> relations,
+            String activityId,
+            String objectType,
+            String objectId) {
+        return relations.stream().anyMatch(relation ->
+                activityId.equals(relation.get("crm_ar_activity_id"))
+                        && objectType.equals(relation.get("crm_ar_object_type"))
+                        && objectId.equals(relation.get("crm_ar_object_id")));
     }
 
     private static final class FakeDataAccessor implements DataAccessor {

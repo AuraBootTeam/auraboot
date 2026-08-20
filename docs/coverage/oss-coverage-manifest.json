@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "28e9fbb10",
+    "commit": "062e225be",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [

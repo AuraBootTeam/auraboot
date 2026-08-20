@@ -93,7 +93,8 @@
                   "params": {
                     "datasourceId": "nq:crm_activities_by_object",
                     "objectType": "contact",
-                    "objectId": "${recordPid}"
+                    "objectId": "${recordPid}",
+                    "format": "records"
                   }
                 },
                 "readOnly": true,
