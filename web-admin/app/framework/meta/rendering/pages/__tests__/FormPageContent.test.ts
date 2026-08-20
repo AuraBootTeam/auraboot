@@ -14,11 +14,44 @@ import {
   resolveEditRecordEndpoint,
   resolveFormBackLink,
   resolveFormSubmitEndpoint,
+  resolveCreateSubTableEmptyState,
   resolveSubmitCommandCode,
   shouldBypassFormSubmit,
   shouldLoadMainRecordForForm,
   unwrapJsonLikeValue,
 } from '../FormPageContent';
+
+describe('resolveCreateSubTableEmptyState', () => {
+  const t = (key: string) => key;
+
+  it('uses localized DSL copy for business-specific create-form guidance', () => {
+    expect(
+      resolveCreateSubTableEmptyState(
+        {
+          emptyState: {
+            title: { 'zh-CN': '保存草稿后添加退料明细', en: 'Add return lines after save' },
+            description: {
+              'zh-CN': '保存后进入详情页，逐批登记退料数量与现场状态。',
+              en: 'Save first, then capture each returned lot on the detail page.',
+            },
+          },
+        },
+        'zh-CN',
+        t,
+      ),
+    ).toEqual({
+      title: '保存草稿后添加退料明细',
+      description: '保存后进入详情页，逐批登记退料数量与现场状态。',
+    });
+  });
+
+  it('uses a localized fallback instead of leaking the English-only placeholder', () => {
+    expect(resolveCreateSubTableEmptyState(undefined, 'zh-CN', t)).toEqual({
+      title: '明细将在保存后登记',
+      description: '请先保存当前单据，再到详情页添加业务明细。',
+    });
+  });
+});
 
 describe('resolveSubmitCommandCode (convention over configuration)', () => {
   const crud = {
@@ -142,11 +175,7 @@ describe('collectFormFieldDataTypes', () => {
         [
           {
             blockType: 'form-section',
-            fields: [
-              { field: 'process_name' },
-              { field: 'process_key' },
-              { field: 'deployed_at' },
-            ],
+            fields: [{ field: 'process_name' }, { field: 'process_key' }, { field: 'deployed_at' }],
           },
         ],
         {
