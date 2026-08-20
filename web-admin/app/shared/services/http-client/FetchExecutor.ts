@@ -132,6 +132,7 @@ async function handleHttpError(response: Response): Promise<Result<any>> {
       success: false,
       data: body.data || null,
       context: body.context ?? null,
+      httpStatus: response.status,
     };
   } catch {
     // Response body is not JSON or empty — fall back to status info
@@ -142,6 +143,7 @@ async function handleHttpError(response: Response): Promise<Result<any>> {
       success: false,
       data: null,
       context: null,
+      httpStatus: response.status,
     };
   }
 }
@@ -160,13 +162,23 @@ async function handleHttpError(response: Response): Promise<Result<any>> {
  * // Result: { code: 'network_error', desc: 'Network error: Failed to fetch', data: null }
  */
 function handleNetworkError(error: Error): Result<any> {
+  const cause = error.cause;
+  const diagnostic =
+    cause && typeof cause === 'object'
+      ? Object.fromEntries(
+          ['name', 'message', 'code', 'syscall', 'address', 'port']
+            .map((key) => [key, (cause as Record<string, unknown>)[key]])
+            .filter(([, value]) => value !== undefined),
+        )
+      : null;
+
   return {
     code: ErrorCodes.NETWORK_ERROR,
     desc: `Network error: ${error.message}`,
     message: `Network error: ${error.message}`,
     success: false,
     data: null,
-    context: null,
+    context: diagnostic ? { transportCause: diagnostic } : null,
   };
 }
 
