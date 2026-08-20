@@ -187,6 +187,45 @@ else
 fi
 RESET_STOP_PROCESSES="${AURA_RESET_STOP_PROCESSES:-1}"
 
+backend_owner_command_token() {
+    local record_file token
+    record_file="$(aura_reset_service_record_file backend)"
+    if [ ! -f "$record_file" ]; then
+        printf '%s\n' "java -jar"
+        return
+    fi
+    token="$(aura_reset_record_value "$record_file" command_token)"
+    case "$token" in
+        bootRun|"java -jar") printf '%s\n' "$token" ;;
+        *)
+            aura_reset_owner_error "backend owner uses an unsupported command token: $token"
+            return 1
+            ;;
+    esac
+}
+
+resolve_boot_jar() {
+    local jar
+    if [ -n "${AURA_BOOT_JAR:-}" ]; then
+        jar="$AURA_BOOT_JAR"
+    else
+        jar="$(find "$PLATFORM_DIR/build/libs" -maxdepth 1 -type f -name '*-boot.jar' -print 2>/dev/null \
+            | while IFS= read -r candidate; do
+                printf '%s\t%s\n' "$(stat -f '%m' "$candidate" 2>/dev/null || stat -c '%Y' "$candidate")" "$candidate"
+              done \
+            | sort -rn \
+            | awk -F'\t' 'NR == 1 { print $2; exit }')"
+    fi
+    [ -n "$jar" ] && [ -f "$jar" ] || {
+        echo "No executable boot jar found under $PLATFORM_DIR/build/libs" >&2
+        return 1
+    }
+    case "$jar" in
+        /*) printf '%s\n' "$jar" ;;
+        *) printf '%s/%s\n' "$PLATFORM_DIR" "$jar" ;;
+    esac
+}
+
 aura_reset_owner_init \
     "oss" "$PROJECT_ROOT" "$RESET_RUNTIME_LABEL_RAW" \
     "$PG_HOST" "$PG_PORT" "$PG_DB" "$BE_PORT" "$VITE_PORT" "$BFF_PORT"
@@ -313,7 +352,7 @@ if [ "$RESET_STOP_PROCESSES" = "0" ]; then
     echo -e "${YELLOW}   Ownership-scoped backend stop disabled; the target port must be free${NC}"
     aura_reset_assert_service_absent "backend" "$BE_PORT"
 else
-    aura_reset_stop_service "backend" "$BE_PORT" "$PLATFORM_DIR" "bootRun"
+    aura_reset_stop_service "backend" "$BE_PORT" "$PLATFORM_DIR" "$(backend_owner_command_token)"
     echo -e "${GREEN}   Owned backend service stopped${NC}"
 fi
 
@@ -346,11 +385,14 @@ else
 fi
 
 # Start backend in background as a single long-running process
+./gradlew --no-daemon :bootJar -x test
+BOOT_JAR="$(resolve_boot_jar)"
 aura_reset_assert_port_available "backend" "$BE_PORT"
-BACKEND_PID="$(aura_reset_spawn_detached "$PLATFORM_DIR" "$BACKEND_LOG" ./gradlew --no-daemon bootRun)"
-aura_reset_register_process "backend" "$BACKEND_PID" "$BE_PORT" "$PLATFORM_DIR" "bootRun"
+BACKEND_PID="$(aura_reset_spawn_detached "$PLATFORM_DIR" "$BACKEND_LOG" env SERVER_PORT="$BE_PORT" java -jar "$BOOT_JAR")"
+aura_reset_register_process "backend" "$BACKEND_PID" "$BE_PORT" "$PLATFORM_DIR" "java -jar"
 
 echo "   Backend starting (PID: $BACKEND_PID)..."
+echo "   Boot jar: $BOOT_JAR"
 echo "   Waiting for backend to be ready..."
 
 # Wait for backend to be ready (max 120 seconds)
@@ -361,7 +403,7 @@ while [ $WAITED -lt $MAX_WAIT ]; do
 
     if [ "$HTTP_CODE" = "200" ]; then
         aura_reset_assert_service_owned \
-            "backend" "$BE_PORT" "$PLATFORM_DIR" "bootRun"
+            "backend" "$BE_PORT" "$PLATFORM_DIR" "java -jar"
         echo -e "${GREEN}   Backend is ready (took ${WAITED}s)${NC}"
         break
     fi

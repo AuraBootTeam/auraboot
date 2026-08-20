@@ -4,7 +4,7 @@
  * Extracted from ListPageContent.tsx (behavior-preserving refactor).
  */
 
-import React, { useState, useLayoutEffect, useEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
 import { partitionRowActions } from './actionColumnWidth';
@@ -19,6 +19,7 @@ const DROPDOWN_ESTIMATED_HEIGHT = 40; // single-item baseline; refined per item
  */
 function DropdownMenu({
   menuRef,
+  menuId,
   moreButtons,
   record,
   resolveButtonLabel,
@@ -26,6 +27,7 @@ function DropdownMenu({
   setOpen,
 }: {
   menuRef: React.RefObject<HTMLDivElement | null>;
+  menuId: string;
   moreButtons: ButtonConfig[];
   record: any;
   resolveButtonLabel: (button: ButtonConfig) => string;
@@ -72,12 +74,16 @@ function DropdownMenu({
         visibility: pos.ready ? 'visible' : 'hidden',
       }}
       data-testid="row-action-dropdown"
+      id={menuId}
+      role="menu"
     >
       {moreButtons.map((btn) => (
         <button
           type="button"
           key={btn.code}
           data-testid={`row-action-${btn.code}`}
+          role="menuitem"
+          data-authoring-node-id={(btn as any).id || btn.code}
           onClick={(e) => {
             e.stopPropagation();
             setOpen(false);
@@ -115,6 +121,7 @@ export function RowActionButtons({
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
 
   // Close dropdown on outside click (check both trigger and portaled dropdown)
   useEffect(() => {
@@ -150,6 +157,7 @@ export function RowActionButtons({
             key={btn.code}
             type="button"
             data-testid={`row-action-${btn.code}`}
+            data-authoring-node-id={(btn as any).id || btn.code}
             title={label}
             onClick={(e) => {
               e.stopPropagation();
@@ -182,6 +190,9 @@ export function RowActionButtons({
           <button
             type="button"
             data-testid="row-action-more"
+            aria-expanded={open}
+            aria-haspopup="menu"
+            aria-controls={menuId}
             onClick={(e) => {
               e.stopPropagation();
               setOpen(!open);
@@ -209,6 +220,7 @@ export function RowActionButtons({
             createPortal(
               <DropdownMenu
                 menuRef={menuRef}
+                menuId={menuId}
                 moreButtons={moreButtons}
                 record={record}
                 resolveButtonLabel={resolveButtonLabel}

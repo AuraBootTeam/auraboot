@@ -84,31 +84,31 @@ describe('DecisionFieldImpactPanel', () => {
     fireEvent.click(screen.getByTestId('field-preflight-run'));
 
     await waitFor(() =>
-      expect(preflightFieldChange).toHaveBeenCalledWith({
-        fieldRef: 'record.data.amount',
-        action: 'DELETE_FIELD',
-        currentDataType: 'decimal',
-        nextDataType: undefined,
-        impactAcknowledged: false,
-        note: undefined,
-      }),
+      expect(screen.getByTestId('field-preflight-result')).toHaveTextContent('已阻断'),
     );
-    expect(screen.getByTestId('field-preflight-result')).toHaveTextContent('已阻断');
+    expect(preflightFieldChange).toHaveBeenCalledWith({
+      fieldRef: 'record.data.amount',
+      action: 'DELETE_FIELD',
+      currentDataType: 'decimal',
+      nextDataType: undefined,
+      impactAcknowledged: false,
+      note: undefined,
+    });
 
     fireEvent.click(screen.getByTestId('field-preflight-ack'));
     fireEvent.click(screen.getByTestId('field-preflight-run'));
 
     await waitFor(() =>
-      expect(preflightFieldChange).toHaveBeenLastCalledWith({
-        fieldRef: 'record.data.amount',
-        action: 'DELETE_FIELD',
-        currentDataType: 'decimal',
-        nextDataType: undefined,
-        impactAcknowledged: true,
-        note: 'DecisionOps field impact acknowledged in DSL field-impact block',
-      }),
+      expect(screen.getByTestId('field-preflight-result')).toHaveTextContent('可执行'),
     );
-    expect(screen.getByTestId('field-preflight-result')).toHaveTextContent('可执行');
+    expect(preflightFieldChange).toHaveBeenLastCalledWith({
+      fieldRef: 'record.data.amount',
+      action: 'DELETE_FIELD',
+      currentDataType: 'decimal',
+      nextDataType: undefined,
+      impactAcknowledged: true,
+      note: 'DecisionOps field impact acknowledged in DSL field-impact block',
+    });
   });
 
   it('preflights dict, permission, and virtual source changes with model governance context', async () => {

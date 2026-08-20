@@ -7,7 +7,7 @@ const readPluginFile = (path) => readFile(new URL(`../${path}`, import.meta.url)
 test('clean-room guide stages the hybrid JAR before starting and importing CRM', async () => {
   const readme = await readPluginFile('README.md');
   const publishApi = readme.indexOf(':platform-plugin-api:publishToMavenLocal');
-  const buildJar = readme.indexOf('gradle -p plugins/crm/backend clean test jar');
+  const buildJar = readme.indexOf('./platform/gradlew --project-dir plugins/crm/backend clean test jar');
   const stageJar = readme.indexOf('install -m 0644');
   const startStack = readme.indexOf('scripts/dev/start-isolated.sh');
   const importDemo = readme.indexOf('scripts/import-plugins.sh');

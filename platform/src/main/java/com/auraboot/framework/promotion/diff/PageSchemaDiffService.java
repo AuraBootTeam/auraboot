@@ -8,12 +8,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * Produces a field-level semantic diff between two {@link PageSchema} versions. Used by
@@ -49,7 +51,9 @@ public class PageSchemaDiffService {
     private void diffJsonField(String fieldName, String sourceJson, String targetJson, List<SemanticDiffEntry> out) {
         JsonNode src = parseOrNull(sourceJson);
         JsonNode tgt = parseOrNull(targetJson);
-        if (src == null && tgt == null) return;
+        if (src == null && tgt == null) {
+            return;
+        }
         compareNodes(fieldName, src, tgt, out);
     }
 
@@ -83,7 +87,7 @@ public class PageSchemaDiffService {
     }
 
     private void compareObjects(String path, JsonNode src, JsonNode tgt, List<SemanticDiffEntry> out) {
-        Set<String> keys = new HashSet<>();
+        Set<String> keys = new TreeSet<>();
         src.fieldNames().forEachRemaining(keys::add);
         tgt.fieldNames().forEachRemaining(keys::add);
         for (String key : keys) {
@@ -93,7 +97,12 @@ public class PageSchemaDiffService {
     }
 
     private void compareArrays(String path, JsonNode src, JsonNode tgt, List<SemanticDiffEntry> out) {
-        // Naive index-aligned compare. Smarter heuristics (LCS, key-based matching) deferred.
+        if (hasStableObjectIds(src) && hasStableObjectIds(tgt)) {
+            compareStableIdArrays(path, src, tgt, out);
+            return;
+        }
+
+        // Arrays without stable object ids keep positional semantics.
         int srcSize = src.size();
         int tgtSize = tgt.size();
         int common = Math.min(srcSize, tgtSize);
@@ -110,8 +119,77 @@ public class PageSchemaDiffService {
         }
     }
 
+    /**
+     * Compare block-like arrays by stable {@code id}. Reordering emits MOVE instead of a cascade
+     * of index-aligned MODIFY/DELETE/ADD entries, so reviewers see the user's semantic action.
+     */
+    private void compareStableIdArrays(String path, JsonNode src, JsonNode tgt, List<SemanticDiffEntry> out) {
+        Map<String, JsonNode> sourceById = indexByStableId(src);
+        Map<String, JsonNode> targetById = indexByStableId(tgt);
+        Map<String, Integer> sourcePositions = positionsByStableId(src);
+        Map<String, Integer> targetPositions = positionsByStableId(tgt);
+
+        Set<String> allIds = new LinkedHashSet<>();
+        allIds.addAll(sourceById.keySet());
+        allIds.addAll(targetById.keySet());
+
+        for (String id : allIds) {
+            JsonNode source = sourceById.get(id);
+            JsonNode target = targetById.get(id);
+            String itemPath = path + "[" + id + "]";
+
+            if (source == null) {
+                out.add(new SemanticDiffEntry(itemPath, SemanticDiffEntry.Op.ADD, null, materialize(target)));
+                continue;
+            }
+            if (target == null) {
+                out.add(new SemanticDiffEntry(itemPath, SemanticDiffEntry.Op.DELETE, materialize(source), null));
+                continue;
+            }
+
+            Integer sourceIndex = sourcePositions.get(id);
+            Integer targetIndex = targetPositions.get(id);
+            if (!sourceIndex.equals(targetIndex)) {
+                out.add(new SemanticDiffEntry(itemPath, SemanticDiffEntry.Op.MOVE, sourceIndex, targetIndex));
+            }
+            compareNodes(itemPath, source, target, out);
+        }
+    }
+
+    private boolean hasStableObjectIds(JsonNode array) {
+        if (array == null || !array.isArray()) {
+            return false;
+        }
+        Set<String> ids = new LinkedHashSet<>();
+        for (JsonNode item : array) {
+            JsonNode id = item != null && item.isObject() ? item.get("id") : null;
+            if (id == null || !id.isTextual() || id.asText().isBlank() || !ids.add(id.asText())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private Map<String, JsonNode> indexByStableId(JsonNode array) {
+        Map<String, JsonNode> result = new LinkedHashMap<>();
+        for (JsonNode item : array) {
+            result.put(item.get("id").asText(), item);
+        }
+        return result;
+    }
+
+    private Map<String, Integer> positionsByStableId(JsonNode array) {
+        Map<String, Integer> result = new LinkedHashMap<>();
+        for (int index = 0; index < array.size(); index++) {
+            result.put(array.get(index).get("id").asText(), index);
+        }
+        return result;
+    }
+
     private JsonNode parseOrNull(String json) {
-        if (json == null || json.isBlank()) return null;
+        if (json == null || json.isBlank()) {
+            return null;
+        }
         try {
             return JSON.readTree(json);
         } catch (JsonProcessingException e) {
@@ -122,13 +200,21 @@ public class PageSchemaDiffService {
 
     /** Convert a JsonNode into a comparable Java value ({@link Map}, {@link List}, primitive). */
     private Object materialize(JsonNode node) {
-        if (node == null || node.isNull()) return null;
-        if (node.isTextual()) return node.asText();
-        if (node.isNumber()) return node.numberValue();
-        if (node.isBoolean()) return node.booleanValue();
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (node.isTextual()) {
+            return node.asText();
+        }
+        if (node.isNumber()) {
+            return node.numberValue();
+        }
+        if (node.isBoolean()) {
+            return node.booleanValue();
+        }
         if (node.isObject()) {
             Map<String, Object> map = new TreeMap<>();
-            Iterator<Map.Entry<String, JsonNode>> it = node.fields();
+            Iterator<Map.Entry<String, JsonNode>> it = node.properties().iterator();
             while (it.hasNext()) {
                 Map.Entry<String, JsonNode> e = it.next();
                 map.put(e.getKey(), materialize(e.getValue()));

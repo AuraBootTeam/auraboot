@@ -157,8 +157,14 @@ describe('buildRequest', () => {
       method: 'get',
       params: { datasourceId: 'execution_logs_dataSource' },
     };
-    const { url } = buildRequest('/api/scheduled-tasks/task-1/logs?limit=50', options, serverContext);
-    expect(url).toContain('/api/scheduled-tasks/task-1/logs?limit=50&datasourceId=execution_logs_dataSource');
+    const { url } = buildRequest(
+      '/api/scheduled-tasks/task-1/logs?limit=50',
+      options,
+      serverContext,
+    );
+    expect(url).toContain(
+      '/api/scheduled-tasks/task-1/logs?limit=50&datasourceId=execution_logs_dataSource',
+    );
     expect(url).not.toContain('limit=50?datasourceId=');
   });
 
@@ -235,6 +241,15 @@ describe('buildRequest', () => {
     const options: FetchOptions = { method: 'get' };
     const { init } = buildRequest('/api/users', options, serverContext);
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+  });
+
+  it('should pass caller headers into the final fetch request', () => {
+    const options: FetchOptions = {
+      method: 'post',
+      headers: { 'X-Aura-Authoring-Session': 'session-1' },
+    };
+    const { init } = buildRequest('/api/commands/execute', options, serverContext);
+    expect((init.headers as Record<string, string>)['X-Aura-Authoring-Session']).toBe('session-1');
   });
 
   it('should set credentials to include', () => {

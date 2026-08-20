@@ -217,6 +217,9 @@ public interface PageSchemaService {
      */
     PageSchemaDTO findByPageKey(String pageKey);
 
+    /** Resolve a published runtime page by PID, including its active authoring release. */
+    PageSchemaDTO findRuntimeByPid(String pid);
+
     /**
      * 根据页面键获取页面Schema配置（包含草稿和已发布）
      * 用于插件导入等需要检查所有非删除页面的场景

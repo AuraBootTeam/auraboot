@@ -96,6 +96,343 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('canvas-block-dashboard_sales')).toBeInTheDocument();
   });
 
+  it('fills its parent when embedded in the governed Studio shell', () => {
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} embedded />);
+
+    expect(screen.getByTestId('unified-designer-workbench')).toHaveClass('h-full', 'min-h-[36rem]');
+    expect(screen.getByTestId('unified-designer-workbench')).not.toHaveClass(
+      'h-[calc(100vh-64px)]',
+    );
+  });
+
+  it('opens only server-declared structure actions in contextual Studio mode', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const document: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'governed-form',
+      blocks: [{
+        id: 'form-root',
+        blockType: 'form',
+        blocks: [{ id: 'section-existing', blockType: 'form-section', blocks: [] }],
+      }],
+    };
+
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={document}
+        onSave={onSave}
+        contextualEditablePropertyPaths={{
+          form: ['/title', '/layout/span'],
+          'form-section': ['/title', '/layout/span'],
+          field: ['/props/label', '/layout/span'],
+        }}
+        contextualReorderableBlockTypes={['form-section']}
+        contextualCreatableBlockTypes={['form-section', 'field']}
+        contextualRemovableBlockTypes={['form-section']}
+        contextualRelocatableBlockTypes={['form-section']}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('outline-item-section-existing'));
+    fireEvent.click(screen.getByTestId('resource-tab-fields'));
+    expect(screen.getByTestId('field-palette-add-field')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('resource-tab-outline'));
+    fireEvent.click(screen.getByTestId('outline-item-form-root'));
+    fireEvent.click(screen.getByTestId('resource-tab-blocks'));
+    expect(screen.getByTestId('palette-add-form-section')).toBeEnabled();
+    expect(screen.queryByTestId('palette-add-field')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('palette-add-form-section'));
+    fireEvent.click(screen.getByTestId('block-delete-section-existing'));
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const savedDocument = onSave.mock.calls[0][0] as PageSchemaV3;
+    expect(findBlockById(savedDocument.blocks, 'section-existing')).toBeNull();
+    expect(findBlockById(savedDocument.blocks, 'form_section_new_section')?.block).toEqual({
+      id: 'form_section_new_section',
+      blockType: 'form-section',
+      title: { en: 'New section', 'zh-CN': '新分组' },
+      layout: { span: 12 },
+    });
+  });
+
+  it('applies an approved template in governed Studio with a stable root and fresh lineage ids', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const document: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'governed-form',
+      blocks: [{ id: 'stable-form-root', blockType: 'form', blocks: [] }],
+    };
+
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={document}
+        onSave={onSave}
+        contextualEditablePropertyPaths={{
+          form: ['/extension/authoringTemplateLineage'],
+          'form-section': ['/title', '/extension/authoringTemplateLineage'],
+        }}
+        contextualCreatableBlockTypes={['form-section']}
+        contextualRemovableBlockTypes={['form-section']}
+      />,
+    );
+
+    expect(screen.getByTestId('designer-template-bar')).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('designer-template-select'), {
+      target: { value: 'core_form_sections' },
+    });
+
+    expect(screen.getByTestId('canvas-block-stable-form-root')).toBeInTheDocument();
+    expect(screen.getByTestId('canvas-block-core_form_sections_primary')).toBeInTheDocument();
+    expect(screen.getByTestId('canvas-block-core_form_sections_more')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const saved = onSave.mock.calls[0][0] as PageSchemaV3;
+    expect(saved.blocks[0].id).toBe('stable-form-root');
+    expect(saved.blocks[0].extension?.authoringTemplateLineage).toBeUndefined();
+    expect(Object.hasOwn(saved.blocks[0], 'extension')).toBe(false);
+    expect(saved.blocks[0].blocks?.map((block) => block.id)).toEqual([
+      'core_form_sections_primary',
+      'core_form_sections_more',
+    ]);
+    expect(saved.blocks[0].blocks?.[0].extension?.authoringTemplateLineage).toEqual({
+      templateId: 'core_form_sections',
+      templateVersion: '1',
+      sourceBlockId: 'primary',
+    });
+  });
+
+  it('switches a compatible governed page kind without changing the stable root id', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const document: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'list',
+      id: 'governed-kind',
+      blocks: [{ id: 'stable-kind-root', blockType: 'list', blocks: [] }],
+    };
+
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={document}
+        onSave={onSave}
+        contextualEditablePropertyPaths={{ list: [], detail: [] }}
+        contextualPageKindSwitchEnabled
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId('designer-kind-switch'), {
+      target: { value: 'detail' },
+    });
+    expect(screen.getByTestId('canvas-block-stable-kind-root')).toHaveTextContent('detail');
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0]).toMatchObject({
+      kind: 'detail',
+      blocks: [{ id: 'stable-kind-root', blockType: 'detail' }],
+    });
+  });
+
+  it('imports governed content only through declared capabilities and preserves page identity', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const document: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'detail',
+      id: 'governed-import',
+      pageKey: 'governed_import',
+      modelCode: 'customer',
+      title: 'Authoritative title',
+      blocks: [{ id: 'stable-detail-root', blockType: 'detail', blocks: [] }],
+    };
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={document}
+        onSave={onSave}
+        contextualEditablePropertyPaths={{
+          detail: [],
+          description: ['/props/content'],
+        }}
+        contextualCreatableBlockTypes={['description']}
+        contextualRemovableBlockTypes={['description']}
+      />,
+    );
+
+    const imported = {
+      ...document,
+      id: 'forged-page-id',
+      pageKey: 'forged_page_key',
+      modelCode: 'payment',
+      title: 'Forged title',
+      blocks: [{
+        id: 'forged-root-id',
+        blockType: 'detail',
+        blocks: [{
+          id: 'imported-description',
+          blockType: 'description',
+          title: 'Not declared by the server',
+          props: { content: 'Governed import', hidden: 'not declared' },
+        }],
+      }],
+    };
+    fireEvent.change(screen.getByTestId('designer-import-input'), {
+      target: {
+        files: [new File([JSON.stringify(imported)], 'governed.page.json', {
+          type: 'application/json',
+        })],
+      },
+    });
+
+    expect(await screen.findByTestId('canvas-block-imported-description')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('designer-save'));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const saved = onSave.mock.calls[0][0] as PageSchemaV3;
+    expect(saved).toEqual({
+      ...document,
+      blocks: [{
+        id: 'stable-detail-root',
+        blockType: 'detail',
+        blocks: [{
+          id: 'imported-description',
+          blockType: 'description',
+          props: { content: 'Governed import' },
+        }],
+      }],
+    });
+    expect(Object.hasOwn(saved.blocks[0], 'extension')).toBe(false);
+  });
+
+  it('rejects unauthorized governed imports immediately without dirtying the document', async () => {
+    const document: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'detail',
+      id: 'governed-import-denied',
+      blocks: [{ id: 'stable-detail-root', blockType: 'detail', blocks: [] }],
+    };
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={document}
+        contextualEditablePropertyPaths={{ detail: [] }}
+        contextualCreatableBlockTypes={[]}
+        contextualRemovableBlockTypes={[]}
+      />,
+    );
+
+    const imported = {
+      ...document,
+      kind: 'dashboard',
+      blocks: [{
+        id: 'forged-root',
+        blockType: 'dashboard',
+        blocks: [{ id: 'forged-widget', blockType: 'stat-card' }],
+      }],
+    };
+    fireEvent.change(screen.getByTestId('designer-import-input'), {
+      target: {
+        files: [new File([JSON.stringify(imported)], 'unauthorized.page.json', {
+          type: 'application/json',
+        })],
+      },
+    });
+
+    expect(await screen.findByTestId('designer-save-error')).toBeInTheDocument();
+    expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('导入失败');
+    expect(screen.getByTestId('canvas-block-stable-detail-root')).toBeInTheDocument();
+    expect(screen.queryByTestId('canvas-block-forged-widget')).not.toBeInTheDocument();
+  });
+
+  it('batch deletes a governed multi-selection as one undoable document step', () => {
+    const document: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'governed-multi',
+      blocks: [{
+        id: 'form-root',
+        blockType: 'form',
+        blocks: [
+          { id: 'section-a', blockType: 'form-section', blocks: [] },
+          { id: 'section-b', blockType: 'form-section', blocks: [] },
+        ],
+      }],
+    };
+
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={document}
+        contextualEditablePropertyPaths={{ form: [], 'form-section': [] }}
+        contextualRemovableBlockTypes={['form-section']}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('canvas-block-section-a'));
+    fireEvent.click(screen.getByTestId('canvas-block-section-b'), { shiftKey: true });
+    expect(screen.getByTestId('multi-select-count')).toHaveTextContent('2');
+    fireEvent.click(screen.getByTestId('multi-select-delete'));
+    expect(screen.queryByTestId('canvas-block-section-a')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('canvas-block-section-b')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('designer-undo'));
+    expect(screen.getByTestId('canvas-block-section-a')).toBeInTheDocument();
+    expect(screen.getByTestId('canvas-block-section-b')).toBeInTheDocument();
+  });
+
+  it('duplicates a governed block with fresh ids and immutable source lineage as one history step', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const document: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'detail',
+      id: 'governed-copy',
+      blocks: [{
+        id: 'detail-root',
+        blockType: 'detail',
+        blocks: [{
+          id: 'description-source',
+          blockType: 'description',
+          props: { content: '<b>Source</b>' },
+        }],
+      }],
+    };
+
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={document}
+        onSave={onSave}
+        contextualEditablePropertyPaths={{
+          detail: [],
+          description: ['/props/content', '/extension/authoringCopyLineage'],
+        }}
+        contextualCreatableBlockTypes={['description']}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('canvas-block-description-source'));
+    expect(screen.getByTestId('designer-duplicate-block')).toBeEnabled();
+    fireEvent.click(screen.getByTestId('designer-duplicate-block'));
+
+    const copiedId = 'description_source_copy';
+    expect(screen.getByTestId(`canvas-block-${copiedId}`)).toBeInTheDocument();
+    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent(copiedId);
+    fireEvent.click(screen.getByTestId('designer-undo'));
+    expect(screen.queryByTestId(`canvas-block-${copiedId}`)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('designer-redo'));
+    expect(screen.getByTestId(`canvas-block-${copiedId}`)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('designer-save'));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const saved = onSave.mock.calls[0][0] as PageSchemaV3;
+    expect(saved.blocks[0].blocks?.map((block) => block.id)).toEqual([
+      'description-source',
+      copiedId,
+    ]);
+    expect(saved.blocks[0].blocks?.[1]).toMatchObject({
+      id: copiedId,
+      props: { content: '<b>Source</b>' },
+      extension: { authoringCopyLineage: { sourceBlockId: 'description-source' } },
+    });
+  });
+
   it('keeps selection in sync between outline, canvas, and inspector', () => {
     render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} />);
 
@@ -379,9 +716,10 @@ describe('UnifiedDesignerWorkbench', () => {
     await waitFor(() => {
       expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('保存失败');
     });
-    expect(screen.getByTestId('designer-save-error')).toHaveTextContent(
-      'Backend rejected PageSchema V3.',
-    );
+    const saveError = screen.getByTestId('designer-save-error');
+    expect(saveError).toHaveTextContent('Backend rejected PageSchema V3.');
+    expect(saveError).toHaveAttribute('role', 'alert');
+    expect(saveError).not.toHaveClass('truncate');
     expect(screen.getByTestId('designer-save')).not.toBeDisabled();
 
     fireEvent.change(screen.getByTestId('inspector-field-props.label'), {
@@ -390,6 +728,25 @@ describe('UnifiedDesignerWorkbench', () => {
 
     expect(screen.queryByTestId('designer-save-error')).not.toBeInTheDocument();
     expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
+  });
+
+  it('explains a protected-semantic rejection instead of exposing a generic business error', async () => {
+    const protectedSemanticError = Object.assign(new Error('Business error'), {
+      context: 'authoring.policy.protected_semantic_invalid',
+    });
+    const onSave = vi.fn().mockRejectedValue(protectedSemanticError);
+    render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} onSave={onSave} />);
+
+    fireEvent.click(screen.getByTestId('outline-item-field_customer_name'));
+    fireEvent.change(screen.getByTestId('inspector-field-props.label'), {
+      target: { value: 'Customer Name' },
+    });
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    const saveError = await screen.findByTestId('designer-save-error');
+    expect(saveError).toHaveTextContent('危险业务动作不能改成误导性文案或非危险样式');
+    expect(saveError).not.toHaveTextContent('Business error');
+    expect(screen.getByTestId('designer-save')).not.toBeDisabled();
   });
 
   it('guards the return link when the document has unsaved changes', () => {
@@ -1097,6 +1454,24 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('model-field-status')).toHaveTextContent('Status');
   });
 
+  it('keeps the newly added field marked as used after selecting its generated block', () => {
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={samplePageSchemaV3}
+        modelFieldsByModel={testModelFields}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('outline-item-section_basic'));
+    fireEvent.click(screen.getByTestId('resource-tab-fields'));
+    fireEvent.click(screen.getByTestId('model-field-email'));
+
+    expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('field_email');
+    expect(screen.getByTestId('model-field-email')).toBeDisabled();
+    expect(screen.getByTestId('model-field-email')).toHaveAttribute('data-used', 'true');
+    expect(screen.getByTestId('model-field-email')).toHaveTextContent('已添加');
+  });
+
   it('shows model field type badges and filters field palette by type', () => {
     render(
       <UnifiedDesignerWorkbench
@@ -1195,6 +1570,52 @@ describe('UnifiedDesignerWorkbench', () => {
     expect(screen.getByTestId('inspector-selected-id')).toHaveTextContent('filter_email');
     expect(screen.getByTestId('inspector-field-props.label')).toHaveValue('Email');
     expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('未保存');
+  });
+
+  it('projects a governed model column to server-declared creation properties', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={samplePageSchemaV3}
+        modelFieldsByModel={testModelFields}
+        onSave={onSave}
+        contextualEditablePropertyPaths={{
+          column: ['/field', '/props/label'],
+        }}
+        contextualCreatableBlockTypes={['column']}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('outline-item-table_customers'));
+    fireEvent.click(screen.getByTestId('resource-tab-fields'));
+    fireEvent.click(screen.getByTestId('model-field-email'));
+    fireEvent.click(screen.getByTestId('designer-save'));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const saved = onSave.mock.calls[0][0] as PageSchemaV3;
+    const created = findBlockById(saved.blocks, 'column_email')?.block;
+    expect(created).toEqual({
+      id: 'column_email',
+      blockType: 'column',
+      field: 'email',
+      props: { label: 'Email' },
+    });
+  });
+
+  it('fails closed when the server capability registry does not allow model-field structure', () => {
+    render(
+      <UnifiedDesignerWorkbench
+        initialDocument={samplePageSchemaV3}
+        modelFieldsByModel={testModelFields}
+        contextualEditablePropertyPaths={{ column: ['/field', '/props/label'] }}
+        contextualCreatableBlockTypes={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('outline-item-table_customers'));
+    fireEvent.click(screen.getByTestId('resource-tab-fields'));
+
+    expect(screen.getByTestId('model-field-email')).toBeDisabled();
   });
 
   it('adds a model field before the selected compatible sibling from the field palette', () => {

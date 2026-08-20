@@ -32,6 +32,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import static org.springframework.http.HttpStatus.NOT_FOUND;
+
 /**
  * 页面配置管理控制器
  * 提供页面配置的 CRUD 操作和版本管理功能
@@ -104,6 +106,16 @@ public class PageSchemaController {
         log.info("查询页面配置详情，PID：{}", logSafe(pid));
         PageSchemaDTO result = pageSchemaService.findByPid(pid);
         return ApiResponse.success(result);
+    }
+
+    /** Resolve a published page for runtime rendering without exposing management drafts. */
+    @GetMapping("/runtime/{pid}")
+    @Operation(summary = "按PID获取运行态页面", description = "仅返回已发布页面，并解析 active authoring release")
+    @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
+    public ApiResponse<PageSchemaDTO> getRuntimeByPid(
+            @Parameter(description = "页面PID") @PathVariable String pid) {
+        PageSchemaDTO schema = pageSchemaService.findRuntimeByPid(pid);
+        return runtimeResponse(schema);
     }
 
     /**
@@ -446,14 +458,19 @@ public class PageSchemaController {
      */
     @GetMapping({"/key/{pageKey}", "/page-key/{pageKey}"})
     @Operation(summary = "根据页面键获取Schema",
-               description = "统一的页面获取端点。Model相关页面使用 {modelCode}_{kind} 格式，如 device_list；独立页面使用自定义 key，如 dashboard_main。支持草稿和已发布页面。")
+               description = "统一运行态页面获取端点。仅返回已发布基线，并在存在 active authoring release 时解析不可变快照。")
     @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
     public ApiResponse<PageSchemaDTO> getByPageKey(
             @Parameter(description = "页面唯一标识，如 device_list, dashboard_main") @PathVariable String pageKey) {
         log.info("获取页面Schema: pageKey={}", logSafe(pageKey));
-        PageSchemaDTO schema = pageSchemaService.findAnyByPageKey(pageKey);
+        PageSchemaDTO schema = pageSchemaService.findByPageKey(pageKey);
+        return runtimeResponse(schema);
+    }
+
+    private ApiResponse<PageSchemaDTO> runtimeResponse(PageSchemaDTO schema) {
         if (schema == null) {
-            return ApiResponse.error("Page not found: " + pageKey);
+            throw new org.springframework.web.server.ResponseStatusException(
+                    NOT_FOUND, "Page not found");
         }
         // Convention over configuration: attach the model's CRUD command codes so
         // standard create/edit/delete forms route through the business command

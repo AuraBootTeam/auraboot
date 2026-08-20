@@ -34,6 +34,7 @@ public interface SavedViewMapper extends BaseMapper<SavedView> {
             @Result(property = "viewType", column = "view_type"),
             @Result(property = "ownerId", column = "owner_id"),
             @Result(property = "teamId", column = "team_id"),
+            @Result(property = "roleId", column = "role_id"),
             @Result(property = "viewConfig", column = "view_config",
                     typeHandler = com.auraboot.framework.view.typehandler.ViewConfigTypeHandler.class),
             @Result(property = "allowFullModel", column = "allow_full_model"),
@@ -140,46 +141,10 @@ public interface SavedViewMapper extends BaseMapper<SavedView> {
                 </foreach>
             )
             </if>
-            OR scope = 'global'
-          )
-        <if test="pageKey != null">
-          AND page_key = #{pageKey}
-        </if>
-        <if test="pageKey == null">
-          AND page_key IS NULL
-        </if>
-        ORDER BY
-            CASE scope
-                WHEN 'personal' THEN 1
-                WHEN 'team' THEN 2
-                WHEN 'global' THEN 3
-            END,
-            sort_order, created_at DESC
-        </script>
-        """)
-    List<SavedView> findAccessibleViews(
-            @Param("modelCode") String modelCode,
-            @Param("pageKey") String pageKey,
-            @Param("ownerId") String ownerId,
-            @Param("teamIds") List<String> teamIds);
-
-    /**
-     * Find default view for a user
-     */
-    @ResultMap(RESULT_MAP_ID)
-    @Select("""
-        <script>
-        SELECT * FROM ab_saved_view
-        WHERE model_code = #{modelCode}
-          AND is_default = true
-          AND deleted_flag = false
-          AND (
-            (scope = 'personal' AND owner_id = #{ownerId})
-            OR (scope = 'team' AND created_by = #{ownerId})
-            <if test="teamIds != null and teamIds.size() > 0">
-            OR (scope = 'team' AND team_id IN
-                <foreach collection="teamIds" item="teamId" open="(" separator="," close=")">
-                    #{teamId}
+            <if test="roleIds != null and roleIds.size() > 0">
+            OR (scope = 'role' AND role_id IN
+                <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">
+                    #{roleId}
                 </foreach>
             )
             </if>
@@ -194,17 +159,79 @@ public interface SavedViewMapper extends BaseMapper<SavedView> {
         ORDER BY
             CASE scope
                 WHEN 'personal' THEN 1
-                WHEN 'team' THEN 2
-                WHEN 'global' THEN 3
-            END
-        LIMIT 1
+                WHEN 'role' THEN 2
+                WHEN 'team' THEN 3
+                WHEN 'global' THEN 4
+            END,
+            sort_order, created_at DESC
         </script>
         """)
-    SavedView findDefaultView(
+    List<SavedView> findAccessibleViews(
             @Param("modelCode") String modelCode,
             @Param("pageKey") String pageKey,
             @Param("ownerId") String ownerId,
-            @Param("teamIds") List<String> teamIds);
+            @Param("teamIds") List<String> teamIds,
+            @Param("roleIds") List<String> roleIds);
+
+    /**
+     * Read every applicable default from low to high precedence so the service can compose
+     * tenant → team → role → personal without trusting the browser to merge shared policy.
+     */
+    @ResultMap(RESULT_MAP_ID)
+    @Select("""
+        <script>
+        SELECT view.*
+        FROM ab_saved_view view
+        LEFT JOIN ab_role role
+          ON view.scope = 'role'
+         AND role.pid = view.role_id
+         AND role.tenant_id = view.tenant_id
+         AND role.deleted_flag = false
+        WHERE view.model_code = #{modelCode}
+          AND view.is_default = true
+          AND view.deleted_flag = false
+          AND (
+            view.scope = 'global'
+            <if test="teamIds != null and teamIds.size() > 0">
+            OR (view.scope = 'team' AND view.team_id IN
+                <foreach collection="teamIds" item="teamId" open="(" separator="," close=")">
+                    #{teamId}
+                </foreach>
+            )
+            </if>
+            <if test="roleIds != null and roleIds.size() > 0">
+            OR (view.scope = 'role' AND view.role_id IN
+                <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">
+                    #{roleId}
+                </foreach>
+            )
+            </if>
+            OR (view.scope = 'personal' AND view.owner_id = #{ownerId})
+          )
+        <if test="pageKey != null">
+          AND view.page_key = #{pageKey}
+        </if>
+        <if test="pageKey == null">
+          AND view.page_key IS NULL
+        </if>
+        ORDER BY
+          CASE view.scope
+            WHEN 'global' THEN 1
+            WHEN 'team' THEN 2
+            WHEN 'role' THEN 3
+            WHEN 'personal' THEN 4
+          END,
+          CASE WHEN view.scope = 'role' THEN COALESCE(role.priority, 2147483647) END DESC,
+          view.sort_order ASC,
+          view.created_at ASC
+        </script>
+        """)
+    List<SavedView> findDefaultOverlayStack(
+            @Param("modelCode") String modelCode,
+            @Param("pageKey") String pageKey,
+            @Param("ownerId") String ownerId,
+            @Param("teamIds") List<String> teamIds,
+            @Param("roleIds") List<String> roleIds);
 
     /**
      * Clear default flag for all views of a model/page/user combination
@@ -254,6 +281,28 @@ public interface SavedViewMapper extends BaseMapper<SavedView> {
             @Param("modelCode") String modelCode,
             @Param("pageKey") String pageKey,
             @Param("teamId") String teamId);
+
+    @Update("""
+        <script>
+        UPDATE ab_saved_view
+        SET is_default = false, updated_at = NOW()
+        WHERE model_code = #{modelCode}
+          AND scope = 'role'
+          AND role_id = #{roleId}
+          AND is_default = true
+          AND deleted_flag = false
+        <if test="pageKey != null">
+          AND page_key = #{pageKey}
+        </if>
+        <if test="pageKey == null">
+          AND page_key IS NULL
+        </if>
+        </script>
+        """)
+    int clearRoleDefaultFlag(
+            @Param("modelCode") String modelCode,
+            @Param("pageKey") String pageKey,
+            @Param("roleId") String roleId);
 
     /**
      * Clear default flag for all GLOBAL views of a model/page combination
@@ -349,6 +398,9 @@ public interface SavedViewMapper extends BaseMapper<SavedView> {
         <if test="teamId != null">
           AND team_id = #{teamId}
         </if>
+        <if test="roleId != null">
+          AND role_id = #{roleId}
+        </if>
         <if test="pageKey != null">
           AND page_key = #{pageKey}
         </if>
@@ -362,7 +414,8 @@ public interface SavedViewMapper extends BaseMapper<SavedView> {
             @Param("pageKey") String pageKey,
             @Param("scope") String scope,
             @Param("ownerId") String ownerId,
-            @Param("teamId") String teamId);
+            @Param("teamId") String teamId,
+            @Param("roleId") String roleId);
 
     /**
      * Insert with JSONB handling
@@ -370,12 +423,12 @@ public interface SavedViewMapper extends BaseMapper<SavedView> {
     @Insert("""
         INSERT INTO ab_saved_view (
             pid, tenant_id, name, description, model_code, page_key,
-            scope, view_type, owner_id, team_id, view_config, allow_full_model,
+            scope, view_type, owner_id, team_id, role_id, view_config, allow_full_model,
             is_default, is_implicit, sort_order, deleted_flag, created_at, updated_at,
             created_by, updated_by
         ) VALUES (
             #{pid}, #{tenantId}, #{name}, #{description}, #{modelCode}, #{pageKey},
-            #{scope}, #{viewType}, #{ownerId}, #{teamId},
+            #{scope}, #{viewType}, #{ownerId}, #{teamId}, #{roleId},
             #{viewConfig, typeHandler=com.auraboot.framework.view.typehandler.ViewConfigTypeHandler},
             #{allowFullModel}, #{isDefault}, #{isImplicit}, #{sortOrder}, #{deletedFlag},
             #{createdAt}, #{updatedAt}, #{createdBy}, #{updatedBy}
@@ -393,6 +446,7 @@ public interface SavedViewMapper extends BaseMapper<SavedView> {
             description = #{description},
             scope = #{scope},
             team_id = #{teamId},
+            role_id = #{roleId},
             view_config = #{viewConfig, typeHandler=com.auraboot.framework.view.typehandler.ViewConfigTypeHandler},
             allow_full_model = #{allowFullModel},
             is_default = #{isDefault},

@@ -28,6 +28,14 @@ function cell(row: unknown[] | undefined, index: number): string {
   return String(row?.[index] ?? '');
 }
 
+async function tableHeaders(page: import('@playwright/test').Page): Promise<string[]> {
+  const headers = page.locator('thead th, [role="columnheader"]');
+  await expect(headers.first()).toBeVisible({ timeout: 15_000 });
+  return headers.evaluateAll((nodes) =>
+    nodes.map((node) => (node.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean),
+  );
+}
+
 function assertNoExcelErrors(workbook: XLSX.WorkBook): void {
   const excelError = /#(?:NULL!|DIV\/0!|VALUE!|REF!|NAME\?|NUM!|N\/A|GETTING_DATA)/i;
   for (const sheetName of workbook.SheetNames) {
@@ -168,20 +176,32 @@ async function clickSidebarPage(
   label: RegExp,
 ): Promise<void> {
   const nav = page.locator('nav, aside, [role="navigation"]').first();
-  const link = nav
-    .locator(`a[href="${href}"]`)
-    .or(nav.getByRole('link', { name: label }))
-    .first();
-  await expect(link).toBeVisible({ timeout: 10_000 });
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    await link.scrollIntoViewIfNeeded();
-    await link.click();
+  const locateLink = () =>
+    nav
+      .locator(`a[href="${href}"]`)
+      .or(nav.getByRole('link', { name: label }))
+      .first();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const link = locateLink();
+    try {
+      await expect(link).toBeVisible({ timeout: 10_000 });
+      await link.scrollIntoViewIfNeeded();
+      await link.click();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const contextReloaded =
+        /Cannot find context with specified id|Execution context was destroyed/i.test(message);
+      if (!contextReloaded || attempt === 2) throw error;
+      await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => undefined);
+      await ensureSidebarExpanded(page);
+      continue;
+    }
     const navigated = await page
       .waitForURL((url) => url.pathname === href, { timeout: 8_000 })
       .then(() => true)
       .catch(() => false);
     if (navigated) break;
-    if (attempt === 1) {
+    if (attempt === 2) {
       await expect.poll(() => new URL(page.url()).pathname).toBe(href);
     }
   }
@@ -233,8 +253,29 @@ test.describe('BOM standardization workbench golden', () => {
       );
       await expect(page.locator('main')).toContainText(created.marker, { timeout: 20_000 });
       await expect(page.getByText(/打开|Open/).first()).toBeVisible({ timeout: 20_000 });
+      expect(await tableHeaders(page)).toEqual([
+        '客户',
+        '项目',
+        '编号',
+        '状态',
+        '创建人',
+        '创建时间',
+        '修改时间',
+        '操作',
+      ]);
 
       const workbenchRow = await findRowInPaginatedList(page, created.marker, 20_000);
+      const workbenchCells = workbenchRow.locator('td');
+      await expect(workbenchCells.nth(0)).toContainText(`${created.marker} customer`);
+      await expect(workbenchCells.nth(1)).toContainText(`${created.marker} project`);
+      await expect(workbenchCells.nth(0).locator('.text-accent')).toHaveCount(0);
+      await expect(workbenchCells.nth(1).locator('.text-accent')).toHaveCount(0);
+      const creatorText = (await workbenchCells.nth(4).innerText()).trim();
+      expect(
+        creatorText,
+        'creator should resolve to a user name instead of a blank/raw id',
+      ).not.toBe('-');
+      expect(creatorText).not.toMatch(/^\d+$/);
       await Promise.all([
         page
           .waitForURL(

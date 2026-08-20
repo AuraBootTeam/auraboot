@@ -197,6 +197,43 @@ $$;
 
 
 --
+-- Name: ab_authoring_guard_release_update(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_authoring_guard_release_update() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF ROW(
+        NEW.pid, NEW.tenant_id, NEW.env_id, NEW.change_set_id,
+        NEW.change_set_revision, NEW.previous_release_pid,
+        NEW.manifest, NEW.manifest_checksum, NEW.created_by, NEW.created_at
+    ) IS DISTINCT FROM ROW(
+        OLD.pid, OLD.tenant_id, OLD.env_id, OLD.change_set_id,
+        OLD.change_set_revision, OLD.previous_release_pid,
+        OLD.manifest, OLD.manifest_checksum, OLD.created_by, OLD.created_at
+    ) THEN
+        RAISE EXCEPTION 'authoring release content is immutable';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: ab_authoring_reject_history_mutation(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_authoring_reject_history_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RAISE EXCEPTION 'authoring history is append-only: %', TG_TABLE_NAME;
+END;
+$$;
+
+
+--
 -- Name: ab_guard_immutable_agent_release(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -224,6 +261,51 @@ BEGIN
     RETURN NEW;
 END
 $$;
+
+
+--
+-- Name: ab_page_schema_apply_ownership_default(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_page_schema_apply_ownership_default() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        IF COALESCE(NEW.ownership_scope, 'TENANT') = 'TENANT' THEN
+            IF NEW.is_template = TRUE THEN
+                NEW.ownership_scope := 'PLATFORM';
+            ELSIF NEW.plugin_pid IS NOT NULL THEN
+                NEW.ownership_scope := 'APPLICATION';
+            ELSE
+                NEW.ownership_scope := 'TENANT';
+            END IF;
+        END IF;
+    ELSIF NEW.ownership_scope IS NOT DISTINCT FROM OLD.ownership_scope
+            AND (NEW.is_template IS DISTINCT FROM OLD.is_template
+                 OR NEW.plugin_pid IS DISTINCT FROM OLD.plugin_pid) THEN
+        IF NEW.is_template = TRUE THEN
+            NEW.ownership_scope := 'PLATFORM';
+        ELSIF NEW.plugin_pid IS NOT NULL THEN
+            NEW.ownership_scope := 'APPLICATION';
+        ELSE
+            NEW.ownership_scope := 'TENANT';
+        END IF;
+    END IF;
+
+    IF NEW.ownership_ref IS NULL AND NEW.plugin_pid IS NOT NULL THEN
+        NEW.ownership_ref := NEW.plugin_pid;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION ab_page_schema_apply_ownership_default(); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.ab_page_schema_apply_ownership_default() IS 'Derives PLATFORM/APPLICATION PageSchema ownership from template/plugin provenance';
 
 
 --
@@ -3279,6 +3361,983 @@ COMMENT ON COLUMN public.ab_aurabot_skill_run.status IS 'SkillRunStatus.code() �
 --
 
 COMMENT ON COLUMN public.ab_aurabot_skill_run.risk_level IS 'RiskLevel.code() snapshot at execute time — one of low / medium / high / critical.';
+
+
+--
+-- Name: ab_authoring_ai_patch_proposal; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_ai_patch_proposal (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    actor_user_id bigint NOT NULL,
+    source_session_id bigint NOT NULL,
+    source_session_pid character varying(26) NOT NULL,
+    change_set_id bigint NOT NULL,
+    change_set_pid character varying(26) NOT NULL,
+    page_pid character varying(64) NOT NULL,
+    base_revision bigint NOT NULL,
+    registry_checksum character varying(64) NOT NULL,
+    proposal_hash character varying(64) NOT NULL,
+    item_count integer NOT NULL,
+    items jsonb NOT NULL,
+    decisions jsonb NOT NULL,
+    aggregate_risk character varying(2) NOT NULL,
+    aggregate_route character varying(32) NOT NULL,
+    publish_policy character varying(32) NOT NULL,
+    status character varying(16) DEFAULT 'PROPOSED'::character varying NOT NULL,
+    result_revision bigint,
+    rejection_reason character varying(1000),
+    applied_at timestamp with time zone,
+    rejected_at timestamp with time zone,
+    row_version bigint DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_authoring_ai_proposal_item_count CHECK ((((item_count >= 1) AND (item_count <= 50)) AND (jsonb_array_length(items) = item_count) AND (jsonb_array_length(decisions) = item_count))),
+    CONSTRAINT chk_authoring_ai_proposal_publish_policy CHECK (((publish_policy)::text = ANY ((ARRAY['DIRECT_ALLOWED'::character varying, 'DEFAULT_REVIEW'::character varying, 'REQUIRED_REVIEW'::character varying, 'STUDIO_APPROVAL'::character varying, 'DENIED'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_ai_proposal_revision CHECK (((base_revision > 0) AND ((result_revision IS NULL) OR (result_revision >= base_revision)))),
+    CONSTRAINT chk_authoring_ai_proposal_risk CHECK (((aggregate_risk)::text = ANY ((ARRAY['L0'::character varying, 'L1'::character varying, 'L2'::character varying, 'L3'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_ai_proposal_route CHECK (((aggregate_route)::text = ANY ((ARRAY['PERSONALIZE'::character varying, 'INLINE'::character varying, 'GUIDED_INLINE'::character varying, 'HANDOFF_STUDIO'::character varying, 'DENY'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_ai_proposal_status CHECK (((status)::text = ANY ((ARRAY['PROPOSED'::character varying, 'APPLIED'::character varying, 'REJECTED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_authoring_ai_patch_proposal; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_ai_patch_proposal IS 'Typed AI patch proposals validated by the same policy engine as manual Studio edits';
+
+
+--
+-- Name: ab_authoring_ai_patch_proposal_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_ai_patch_proposal_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_ai_patch_proposal_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_ai_patch_proposal_id_seq OWNED BY public.ab_authoring_ai_patch_proposal.id;
+
+
+--
+-- Name: ab_authoring_approval; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_approval (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    change_set_id bigint NOT NULL,
+    change_set_revision bigint NOT NULL,
+    status character varying(20) DEFAULT 'PENDING'::character varying NOT NULL,
+    reviewer_user_id bigint,
+    reason character varying(1000),
+    decided_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_authoring_approval_revision CHECK ((change_set_revision > 0)),
+    CONSTRAINT chk_authoring_approval_status CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'STALE'::character varying])::text[])))
+);
+
+
+--
+-- Name: ab_authoring_approval_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_approval_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_approval_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_approval_id_seq OWNED BY public.ab_authoring_approval.id;
+
+
+--
+-- Name: ab_authoring_audit_event; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_audit_event (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    actor_user_id bigint,
+    change_set_pid character varying(26),
+    session_pid character varying(26),
+    event_type character varying(48) NOT NULL,
+    result character varying(16) NOT NULL,
+    reason_code character varying(80),
+    resource_type character varying(40),
+    resource_pid character varying(64),
+    block_id character varying(128),
+    property_path character varying(512),
+    trace_id character varying(64),
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_authoring_audit_result CHECK (((result)::text = ANY ((ARRAY['ALLOW'::character varying, 'DENY'::character varying, 'FAIL'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_authoring_audit_event; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_audit_event IS 'Secret-free append-only authoring decision and lifecycle audit';
+
+
+--
+-- Name: ab_authoring_audit_event_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_audit_event_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_audit_event_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_audit_event_id_seq OWNED BY public.ab_authoring_audit_event.id;
+
+
+--
+-- Name: ab_authoring_change_item; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_change_item (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    change_set_id bigint NOT NULL,
+    resource_draft_id bigint NOT NULL,
+    block_id character varying(128) NOT NULL,
+    property_path character varying(512) NOT NULL,
+    operation character varying(16) NOT NULL,
+    old_value jsonb,
+    new_value jsonb,
+    effect_tags jsonb DEFAULT '[]'::jsonb NOT NULL,
+    risk_level character varying(2) NOT NULL,
+    route character varying(32) NOT NULL,
+    publish_policy character varying(32) NOT NULL,
+    reversibility character varying(24) NOT NULL,
+    manifest_checksum character varying(64) NOT NULL,
+    base_revision bigint NOT NULL,
+    result_revision bigint NOT NULL,
+    actor_user_id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    source_change_item_id bigint,
+    dependency_snapshot jsonb DEFAULT '[]'::jsonb NOT NULL,
+    ownership_scope character varying(16) DEFAULT 'TENANT'::character varying NOT NULL,
+    source_resource_pid character varying(64),
+    override_pid character varying(26),
+    CONSTRAINT chk_authoring_change_item_operation CHECK (((operation)::text = ANY ((ARRAY['ADD'::character varying, 'REPLACE'::character varying, 'REMOVE'::character varying, 'MOVE'::character varying, 'COPY'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_change_item_ownership_scope CHECK (((ownership_scope)::text = 'TENANT'::text)),
+    CONSTRAINT chk_authoring_change_item_publish_policy CHECK (((publish_policy)::text = ANY ((ARRAY['DIRECT_ALLOWED'::character varying, 'DEFAULT_REVIEW'::character varying, 'REQUIRED_REVIEW'::character varying, 'STUDIO_APPROVAL'::character varying, 'DENIED'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_change_item_reversibility CHECK (((reversibility)::text = ANY ((ARRAY['REVERSIBLE'::character varying, 'COMPENSATABLE'::character varying, 'FORWARD_ONLY'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_change_item_revision CHECK (((base_revision > 0) AND (result_revision = (base_revision + 1)))),
+    CONSTRAINT chk_authoring_change_item_risk CHECK (((risk_level)::text = ANY ((ARRAY['L0'::character varying, 'L1'::character varying, 'L2'::character varying, 'L3'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_change_item_route CHECK (((route)::text = ANY ((ARRAY['PERSONALIZE'::character varying, 'INLINE'::character varying, 'GUIDED_INLINE'::character varying, 'HANDOFF_STUDIO'::character varying, 'DENY'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_authoring_change_item; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_change_item IS 'Typed, policy-resolved semantic patch history; no executable business command payload';
+
+
+--
+-- Name: COLUMN ab_authoring_change_item.dependency_snapshot; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_authoring_change_item.dependency_snapshot IS 'Source item pids required before this typed diff can be replayed';
+
+
+--
+-- Name: ab_authoring_change_item_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_change_item_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_change_item_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_change_item_id_seq OWNED BY public.ab_authoring_change_item.id;
+
+
+--
+-- Name: ab_authoring_change_item_split; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_change_item_split (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    split_id bigint NOT NULL,
+    source_change_item_id bigint NOT NULL,
+    target_change_item_id bigint NOT NULL,
+    dependency_snapshot jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_authoring_change_item_split_distinct CHECK ((source_change_item_id <> target_change_item_id))
+);
+
+
+--
+-- Name: TABLE ab_authoring_change_item_split; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_change_item_split IS 'Append-only mapping from immutable source diff rows to replayed child diff rows';
+
+
+--
+-- Name: ab_authoring_change_item_split_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_change_item_split_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_change_item_split_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_change_item_split_id_seq OWNED BY public.ab_authoring_change_item_split.id;
+
+
+--
+-- Name: ab_authoring_change_set; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_change_set (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    owner_user_id bigint NOT NULL,
+    title character varying(200) NOT NULL,
+    status character varying(24) DEFAULT 'DRAFT'::character varying NOT NULL,
+    revision bigint DEFAULT 1 NOT NULL,
+    base_release_pid character varying(26),
+    manifest_checksum character varying(64),
+    risk_level character varying(2) DEFAULT 'L0'::character varying NOT NULL,
+    route character varying(32) DEFAULT 'INLINE'::character varying NOT NULL,
+    publish_policy character varying(32) DEFAULT 'DIRECT_ALLOWED'::character varying NOT NULL,
+    validation_state character varying(24) DEFAULT 'UNVALIDATED'::character varying NOT NULL,
+    approval_state character varying(24) DEFAULT 'NOT_REQUIRED'::character varying NOT NULL,
+    publish_state character varying(24) DEFAULT 'DRAFT'::character varying NOT NULL,
+    stale_reason character varying(80),
+    submitted_at timestamp with time zone,
+    approved_at timestamp with time zone,
+    published_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    deleted_flag boolean DEFAULT false NOT NULL,
+    source_change_set_id bigint,
+    source_change_set_revision bigint,
+    lineage jsonb DEFAULT '[]'::jsonb NOT NULL,
+    impact_state character varying(16) DEFAULT 'UNKNOWN'::character varying NOT NULL,
+    origin character varying(40) DEFAULT 'DESIGN_STUDIO'::character varying NOT NULL,
+    CONSTRAINT chk_authoring_change_set_approval CHECK (((approval_state)::text = ANY ((ARRAY['NOT_REQUIRED'::character varying, 'PENDING'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'STALE'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_change_set_impact CHECK (((impact_state)::text = ANY ((ARRAY['UNKNOWN'::character varying, 'KNOWN'::character varying, 'STALE'::character varying, 'FAILED'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_change_set_origin CHECK (((origin)::text = ANY ((ARRAY['DESIGN_STUDIO'::character varying, 'ENV_PROMOTION'::character varying, 'PRODUCTION_CONTEXTUAL_HOTFIX'::character varying, 'TENANT_OVERRIDE'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_change_set_publish CHECK (((publish_state)::text = ANY ((ARRAY['DRAFT'::character varying, 'READY'::character varying, 'PUBLISHING'::character varying, 'PUBLISHED'::character varying, 'FAILED'::character varying, 'ROLLED_BACK'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_change_set_publish_policy CHECK (((publish_policy)::text = ANY ((ARRAY['DIRECT_ALLOWED'::character varying, 'DEFAULT_REVIEW'::character varying, 'REQUIRED_REVIEW'::character varying, 'STUDIO_APPROVAL'::character varying, 'DENIED'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_change_set_revision CHECK ((revision > 0)),
+    CONSTRAINT chk_authoring_change_set_risk CHECK (((risk_level)::text = ANY ((ARRAY['L0'::character varying, 'L1'::character varying, 'L2'::character varying, 'L3'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_change_set_route CHECK (((route)::text = ANY ((ARRAY['PERSONALIZE'::character varying, 'INLINE'::character varying, 'GUIDED_INLINE'::character varying, 'HANDOFF_STUDIO'::character varying, 'DENY'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_change_set_source_revision CHECK ((((source_change_set_id IS NULL) AND (source_change_set_revision IS NULL)) OR ((source_change_set_id IS NOT NULL) AND (source_change_set_revision > 0)))),
+    CONSTRAINT chk_authoring_change_set_status CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'IN_REVIEW'::character varying, 'APPROVED'::character varying, 'PUBLISHED'::character varying, 'REJECTED'::character varying, 'WITHDRAWN'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_change_set_validation CHECK (((validation_state)::text = ANY ((ARRAY['UNVALIDATED'::character varying, 'VALID'::character varying, 'INVALID'::character varying, 'STALE'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_authoring_change_set; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_change_set IS 'Contextual Authoring aggregate with orthogonal validation, approval and publish states';
+
+
+--
+-- Name: COLUMN ab_authoring_change_set.lineage; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_authoring_change_set.lineage IS 'Ordered immutable ancestry copied into a split child ChangeSet';
+
+
+--
+-- Name: ab_authoring_change_set_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_change_set_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_change_set_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_change_set_id_seq OWNED BY public.ab_authoring_change_set.id;
+
+
+--
+-- Name: ab_authoring_change_set_split; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_change_set_split (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    source_change_set_id bigint NOT NULL,
+    source_change_set_revision bigint NOT NULL,
+    target_change_set_id bigint NOT NULL,
+    actor_user_id bigint NOT NULL,
+    reason character varying(1000) NOT NULL,
+    dependency_snapshot jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_authoring_change_set_split_distinct CHECK ((source_change_set_id <> target_change_set_id)),
+    CONSTRAINT chk_authoring_change_set_split_reason CHECK ((length(TRIM(BOTH FROM reason)) > 0)),
+    CONSTRAINT chk_authoring_change_set_split_revision CHECK ((source_change_set_revision > 0))
+);
+
+
+--
+-- Name: TABLE ab_authoring_change_set_split; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_change_set_split IS 'Append-only governed split operation; source history is never rewritten';
+
+
+--
+-- Name: ab_authoring_change_set_split_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_change_set_split_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_change_set_split_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_change_set_split_id_seq OWNED BY public.ab_authoring_change_set_split.id;
+
+
+--
+-- Name: ab_authoring_config_session; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_config_session (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    actor_user_id bigint NOT NULL,
+    change_set_id bigint NOT NULL,
+    page_pid character varying(64) NOT NULL,
+    state character varying(20) DEFAULT 'ACTIVE'::character varying NOT NULL,
+    interaction_context jsonb DEFAULT '{}'::jsonb NOT NULL,
+    revision bigint DEFAULT 1 NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    workspace_mode character varying(20) DEFAULT 'AUTHORING'::character varying NOT NULL,
+    CONSTRAINT chk_authoring_config_session_revision CHECK ((revision > 0)),
+    CONSTRAINT chk_authoring_config_session_state CHECK (((state)::text = ANY ((ARRAY['ACTIVE'::character varying, 'READ_ONLY'::character varying, 'CLOSED'::character varying, 'EXPIRED'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_config_session_workspace_mode CHECK (((workspace_mode)::text = ANY ((ARRAY['AUTHORING'::character varying, 'OBSERVER'::character varying, 'REVIEW'::character varying])::text[])))
+);
+
+
+--
+-- Name: COLUMN ab_authoring_config_session.workspace_mode; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_authoring_config_session.workspace_mode IS 'Server-enforced authoring surface boundary; REVIEW sessions remain read-only even for designer admins';
+
+
+--
+-- Name: ab_authoring_config_session_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_config_session_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_config_session_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_config_session_id_seq OWNED BY public.ab_authoring_config_session.id;
+
+
+--
+-- Name: ab_authoring_handoff_context; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_handoff_context (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    actor_user_id bigint NOT NULL,
+    change_set_id bigint NOT NULL,
+    nonce_hash character varying(64) NOT NULL,
+    target_route character varying(240) NOT NULL,
+    context_payload jsonb NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    consumed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: TABLE ab_authoring_handoff_context; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_handoff_context IS 'Short-lived, actor/tenant-bound Studio handoff context; URLs contain only its pid';
+
+
+--
+-- Name: ab_authoring_handoff_context_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_handoff_context_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_handoff_context_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_handoff_context_id_seq OWNED BY public.ab_authoring_handoff_context.id;
+
+
+--
+-- Name: ab_authoring_identity_simulation; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_identity_simulation (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    actor_user_id bigint NOT NULL,
+    source_session_pid character varying(26) NOT NULL,
+    change_set_pid character varying(26) NOT NULL,
+    page_pid character varying(64) NOT NULL,
+    target_role_pid character varying(26) NOT NULL,
+    target_role_code character varying(128) NOT NULL,
+    target_role_name character varying(255) NOT NULL,
+    reason character varying(1000) NOT NULL,
+    status character varying(16) DEFAULT 'ACTIVE'::character varying NOT NULL,
+    started_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    ended_at timestamp with time zone,
+    last_accessed_at timestamp with time zone,
+    row_version bigint DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    acknowledged_at timestamp with time zone,
+    CONSTRAINT chk_authoring_identity_simulation_expiry CHECK ((expires_at > started_at)),
+    CONSTRAINT chk_authoring_identity_simulation_status CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'ENDED'::character varying, 'EXPIRED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_authoring_identity_simulation; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_identity_simulation IS 'Actor-bound, read-only, short-lived role simulation lifecycle; every transition is audited';
+
+
+--
+-- Name: ab_authoring_identity_simulation_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_identity_simulation_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_identity_simulation_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_identity_simulation_id_seq OWNED BY public.ab_authoring_identity_simulation.id;
+
+
+--
+-- Name: ab_authoring_impact_run; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_impact_run (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    change_set_id bigint NOT NULL,
+    change_set_revision bigint NOT NULL,
+    resource_draft_id bigint NOT NULL,
+    status character varying(16) NOT NULL,
+    analyzer_version character varying(40) NOT NULL,
+    manifest_checksum character varying(64) NOT NULL,
+    snapshot_checksum character varying(64) NOT NULL,
+    dependency_checksum character varying(64),
+    dependencies jsonb DEFAULT '[]'::jsonb NOT NULL,
+    failure_code character varying(80),
+    actor_user_id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_authoring_impact_dependencies CHECK ((jsonb_typeof(dependencies) = 'array'::text)),
+    CONSTRAINT chk_authoring_impact_result CHECK (((((status)::text = 'KNOWN'::text) AND (dependency_checksum IS NOT NULL) AND (failure_code IS NULL)) OR (((status)::text = 'FAILED'::text) AND (dependency_checksum IS NULL) AND (failure_code IS NOT NULL)))),
+    CONSTRAINT chk_authoring_impact_revision CHECK ((change_set_revision > 0)),
+    CONSTRAINT chk_authoring_impact_status CHECK (((status)::text = ANY ((ARRAY['KNOWN'::character varying, 'FAILED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_authoring_impact_run; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_impact_run IS 'Append-only dependency impact result bound to one immutable ChangeSet revision';
+
+
+--
+-- Name: COLUMN ab_authoring_impact_run.dependencies; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_authoring_impact_run.dependencies IS 'Metadata-only resource fingerprints; no business record values are persisted';
+
+
+--
+-- Name: ab_authoring_impact_run_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_impact_run_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_impact_run_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_impact_run_id_seq OWNED BY public.ab_authoring_impact_run.id;
+
+
+--
+-- Name: ab_authoring_release; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_release (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    change_set_id bigint NOT NULL,
+    change_set_revision bigint NOT NULL,
+    previous_release_pid character varying(26),
+    status character varying(20) DEFAULT 'PREPARING'::character varying NOT NULL,
+    manifest jsonb NOT NULL,
+    manifest_checksum character varying(64) NOT NULL,
+    failure_reason character varying(1000),
+    created_by bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    activated_at timestamp with time zone,
+    CONSTRAINT chk_authoring_release_revision CHECK ((change_set_revision > 0)),
+    CONSTRAINT chk_authoring_release_status CHECK (((status)::text = ANY ((ARRAY['PREPARING'::character varying, 'ACTIVE'::character varying, 'SUPERSEDED'::character varying, 'FAILED'::character varying, 'ROLLED_BACK'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_authoring_release; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_release IS 'Immutable release manifest prepared from one approved ChangeSet revision';
+
+
+--
+-- Name: ab_authoring_release_channel; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_release_channel (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    resource_type character varying(40) NOT NULL,
+    resource_pid character varying(64) NOT NULL,
+    active_release_id bigint NOT NULL,
+    previous_release_id bigint,
+    row_version bigint DEFAULT 1 NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_by bigint NOT NULL,
+    CONSTRAINT chk_authoring_release_channel_version CHECK ((row_version > 0))
+);
+
+
+--
+-- Name: TABLE ab_authoring_release_channel; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_release_channel IS 'Atomic runtime pointer for a tenant/environment/resource; cache keys include active release pid';
+
+
+--
+-- Name: ab_authoring_release_channel_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_release_channel_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_release_channel_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_release_channel_id_seq OWNED BY public.ab_authoring_release_channel.id;
+
+
+--
+-- Name: ab_authoring_release_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_release_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_release_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_release_id_seq OWNED BY public.ab_authoring_release.id;
+
+
+--
+-- Name: ab_authoring_release_item; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_release_item (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    release_id bigint NOT NULL,
+    resource_type character varying(40) NOT NULL,
+    resource_pid character varying(64) NOT NULL,
+    source_version bigint NOT NULL,
+    snapshot jsonb NOT NULL,
+    snapshot_checksum character varying(64) NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    ownership_scope character varying(16) DEFAULT 'TENANT'::character varying NOT NULL,
+    source_resource_pid character varying(64),
+    override_pid character varying(26),
+    CONSTRAINT chk_authoring_release_item_ownership_scope CHECK (((ownership_scope)::text = 'TENANT'::text))
+);
+
+
+--
+-- Name: ab_authoring_release_item_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_release_item_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_release_item_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_release_item_id_seq OWNED BY public.ab_authoring_release_item.id;
+
+
+--
+-- Name: ab_authoring_resource_draft; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_resource_draft (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    change_set_id bigint NOT NULL,
+    resource_type character varying(40) NOT NULL,
+    resource_pid character varying(64) NOT NULL,
+    base_version bigint NOT NULL,
+    base_checksum character varying(64) NOT NULL,
+    manifest_checksum character varying(64) NOT NULL,
+    snapshot jsonb NOT NULL,
+    revision bigint DEFAULT 1 NOT NULL,
+    validation_state character varying(24) DEFAULT 'UNVALIDATED'::character varying NOT NULL,
+    stale_reason character varying(80),
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    impact_state character varying(16) DEFAULT 'UNKNOWN'::character varying NOT NULL,
+    ownership_scope character varying(16) DEFAULT 'TENANT'::character varying NOT NULL,
+    source_ownership_scope character varying(16) DEFAULT 'TENANT'::character varying NOT NULL,
+    source_resource_pid character varying(64),
+    override_pid character varying(26),
+    CONSTRAINT chk_authoring_draft_override_lineage CHECK (((((source_ownership_scope)::text = 'TENANT'::text) AND (override_pid IS NULL)) OR (((source_ownership_scope)::text = ANY ((ARRAY['PLATFORM'::character varying, 'APPLICATION'::character varying])::text[])) AND (source_resource_pid IS NOT NULL) AND (override_pid IS NOT NULL)))),
+    CONSTRAINT chk_authoring_draft_ownership_scope CHECK (((ownership_scope)::text = 'TENANT'::text)),
+    CONSTRAINT chk_authoring_draft_source_ownership_scope CHECK (((source_ownership_scope)::text = ANY ((ARRAY['PLATFORM'::character varying, 'APPLICATION'::character varying, 'TENANT'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_resource_draft_impact CHECK (((impact_state)::text = ANY ((ARRAY['UNKNOWN'::character varying, 'KNOWN'::character varying, 'STALE'::character varying, 'FAILED'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_resource_draft_revision CHECK ((revision > 0)),
+    CONSTRAINT chk_authoring_resource_draft_validation CHECK (((validation_state)::text = ANY ((ARRAY['UNVALIDATED'::character varying, 'VALID'::character varying, 'INVALID'::character varying, 'STALE'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_authoring_resource_draft; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_resource_draft IS 'ChangeSet-owned resource snapshot; never read by normal runtime';
+
+
+--
+-- Name: COLUMN ab_authoring_resource_draft.override_pid; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_authoring_resource_draft.override_pid IS 'Tenant override lineage pid; shared source PageSchema rows are never mutated by authoring';
+
+
+--
+-- Name: ab_authoring_resource_draft_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_resource_draft_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_resource_draft_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_resource_draft_id_seq OWNED BY public.ab_authoring_resource_draft.id;
+
+
+--
+-- Name: ab_authoring_tenant_override; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_tenant_override (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    source_resource_type character varying(40) NOT NULL,
+    source_resource_pid character varying(64) NOT NULL,
+    source_ownership_scope character varying(16) NOT NULL,
+    base_source_version bigint NOT NULL,
+    base_source_checksum character varying(64) NOT NULL,
+    status character varying(16) DEFAULT 'ACTIVE'::character varying NOT NULL,
+    created_by bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    row_version bigint DEFAULT 1 NOT NULL,
+    CONSTRAINT chk_authoring_tenant_override_source_scope CHECK (((source_ownership_scope)::text = ANY ((ARRAY['PLATFORM'::character varying, 'APPLICATION'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_tenant_override_status CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'STALE'::character varying, 'REBASED'::character varying, 'SUPERSEDED'::character varying])::text[]))),
+    CONSTRAINT chk_authoring_tenant_override_version CHECK (((base_source_version > 0) AND (row_version > 0)))
+);
+
+
+--
+-- Name: TABLE ab_authoring_tenant_override; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_tenant_override IS 'Tenant-owned lineage for inherited platform/application PageSchema authoring';
+
+
+--
+-- Name: ab_authoring_tenant_override_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_tenant_override_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_tenant_override_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_tenant_override_id_seq OWNED BY public.ab_authoring_tenant_override.id;
+
+
+--
+-- Name: ab_authoring_validation_run; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_validation_run (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    change_set_id bigint NOT NULL,
+    change_set_revision bigint NOT NULL,
+    resource_draft_id bigint NOT NULL,
+    status character varying(16) NOT NULL,
+    validator_version character varying(40) NOT NULL,
+    manifest_checksum character varying(64) NOT NULL,
+    snapshot_checksum character varying(64) NOT NULL,
+    error_count integer NOT NULL,
+    issues jsonb DEFAULT '[]'::jsonb NOT NULL,
+    actor_user_id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_authoring_validation_error_count CHECK (((error_count >= 0) AND ((((status)::text = 'VALID'::text) AND (error_count = 0)) OR (((status)::text = 'INVALID'::text) AND (error_count > 0))))),
+    CONSTRAINT chk_authoring_validation_issues CHECK ((jsonb_typeof(issues) = 'array'::text)),
+    CONSTRAINT chk_authoring_validation_revision CHECK ((change_set_revision > 0)),
+    CONSTRAINT chk_authoring_validation_status CHECK (((status)::text = ANY ((ARRAY['VALID'::character varying, 'INVALID'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_authoring_validation_run; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_authoring_validation_run IS 'Append-only server validation result bound to one immutable ChangeSet revision';
+
+
+--
+-- Name: COLUMN ab_authoring_validation_run.issues; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_authoring_validation_run.issues IS 'Location-only issue metadata; rejected values and business record data are not persisted';
+
+
+--
+-- Name: ab_authoring_validation_run_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_validation_run_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_validation_run_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_validation_run_id_seq OWNED BY public.ab_authoring_validation_run.id;
+
+
+--
+-- Name: ab_authoring_writer_lease; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_authoring_writer_lease (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    env_id bigint NOT NULL,
+    change_set_id bigint NOT NULL,
+    session_id bigint NOT NULL,
+    holder_user_id bigint NOT NULL,
+    lease_revision bigint DEFAULT 1 NOT NULL,
+    acquired_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    leased_until timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_authoring_writer_lease_revision CHECK ((lease_revision > 0))
+);
+
+
+--
+-- Name: ab_authoring_writer_lease_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_authoring_writer_lease_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_authoring_writer_lease_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_authoring_writer_lease_id_seq OWNED BY public.ab_authoring_writer_lease.id;
 
 
 --
@@ -11067,7 +12126,10 @@ CREATE TABLE public.ab_page_schema (
     deleted_at timestamp with time zone,
     deleted_by bigint,
     plugin_pid character varying(26),
-    CONSTRAINT chk_blocks_size CHECK (((blocks IS NULL) OR (octet_length((blocks)::text) <= 524288)))
+    ownership_scope character varying(16) DEFAULT 'TENANT'::character varying NOT NULL,
+    ownership_ref character varying(64),
+    CONSTRAINT chk_blocks_size CHECK (((blocks IS NULL) OR (octet_length((blocks)::text) <= 524288))),
+    CONSTRAINT chk_page_schema_ownership_scope CHECK (((ownership_scope)::text = ANY ((ARRAY['PLATFORM'::character varying, 'APPLICATION'::character varying, 'TENANT'::character varying])::text[])))
 );
 
 
@@ -11076,6 +12138,13 @@ CREATE TABLE public.ab_page_schema (
 --
 
 COMMENT ON COLUMN public.ab_page_schema.plugin_pid IS 'Reference to plugin that created this page';
+
+
+--
+-- Name: COLUMN ab_page_schema.ownership_scope; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_page_schema.ownership_scope IS 'Declared source ownership: PLATFORM, APPLICATION, or TENANT';
 
 
 --
@@ -11091,7 +12160,8 @@ CREATE TABLE public.ab_page_schema_history (
     op character varying(20) NOT NULL,
     op_by character varying(32),
     op_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    description text
 );
 
 
@@ -11163,6 +12233,13 @@ COMMENT ON COLUMN public.ab_page_schema_history.op_at IS '操作时间';
 --
 
 COMMENT ON COLUMN public.ab_page_schema_history.created_at IS '记录创建时间';
+
+
+--
+-- Name: COLUMN ab_page_schema_history.description; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_page_schema_history.description IS 'Human-readable reason recorded for a page schema version or snapshot action';
 
 
 --
@@ -12327,6 +13404,8 @@ CREATE TABLE public.ab_promotion (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_by bigint,
     deleted_flag boolean DEFAULT false NOT NULL,
+    parent_promotion_pid character varying(26),
+    origin_drift_decision_pid character varying(26),
     CONSTRAINT chk_promotion_envs_distinct CHECK ((source_env_id <> target_env_id)),
     CONSTRAINT chk_promotion_status CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'VALIDATED'::character varying, 'APPLIED'::character varying, 'REJECTED'::character varying, 'FAILED'::character varying])::text[])))
 );
@@ -12368,6 +13447,72 @@ COMMENT ON COLUMN public.ab_promotion.dry_run_at IS 'When dry_run_result was com
 
 
 --
+-- Name: COLUMN ab_promotion.parent_promotion_pid; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_promotion.parent_promotion_pid IS 'Promotion whose governed BACKPORT decision created this reverse plan';
+
+
+--
+-- Name: COLUMN ab_promotion.origin_drift_decision_pid; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_promotion.origin_drift_decision_pid IS 'Append-only decision identity that authorized creation of this plan';
+
+
+--
+-- Name: ab_promotion_drift_event; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_promotion_drift_event (
+    id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
+    tenant_id bigint NOT NULL,
+    promotion_id bigint NOT NULL,
+    promotion_unit_id bigint NOT NULL,
+    event_type character varying(16) NOT NULL,
+    drift_kind character varying(32) NOT NULL,
+    drift_fingerprint character varying(64) NOT NULL,
+    decision character varying(24),
+    reason_code character varying(80) NOT NULL,
+    reason character varying(500),
+    actor_user_id bigint,
+    evidence jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT chk_promotion_drift_event_decision CHECK (((decision IS NULL) OR ((decision)::text = ANY ((ARRAY['REBASE'::character varying, 'BACKPORT'::character varying, 'KEEP_OVERRIDE'::character varying, 'OVERWRITE'::character varying])::text[])))),
+    CONSTRAINT chk_promotion_drift_event_evidence CHECK ((jsonb_typeof(evidence) = 'object'::text)),
+    CONSTRAINT chk_promotion_drift_event_reason CHECK (((reason IS NULL) OR ((char_length(btrim((reason)::text)) >= 1) AND (char_length(btrim((reason)::text)) <= 500)))),
+    CONSTRAINT chk_promotion_drift_event_type CHECK (((event_type)::text = ANY ((ARRAY['DETECTED'::character varying, 'DECIDED'::character varying, 'EXECUTED'::character varying, 'STALE'::character varying, 'APPLIED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ab_promotion_drift_event; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ab_promotion_drift_event IS 'Append-only production drift detection and human resolution evidence';
+
+
+--
+-- Name: ab_promotion_drift_event_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_promotion_drift_event_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_promotion_drift_event_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_promotion_drift_event_id_seq OWNED BY public.ab_promotion_drift_event.id;
+
+
+--
 -- Name: ab_promotion_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -12397,6 +13542,19 @@ CREATE TABLE public.ab_promotion_unit (
     sort_order integer DEFAULT 0,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     deleted_flag boolean DEFAULT false NOT NULL,
+    target_resource_pid character varying(32),
+    drift_status character varying(16) DEFAULT 'NONE'::character varying NOT NULL,
+    drift_fingerprint character varying(64),
+    drift_decision character varying(24),
+    drift_decision_pid character varying(26),
+    drift_execution_status character varying(24) DEFAULT 'NONE'::character varying NOT NULL,
+    drift_execution_pid character varying(26),
+    drift_execution_payload jsonb,
+    CONSTRAINT chk_promotion_unit_drift_decision CHECK (((drift_decision IS NULL) OR ((drift_decision)::text = ANY ((ARRAY['REBASE'::character varying, 'BACKPORT'::character varying, 'KEEP_OVERRIDE'::character varying, 'OVERWRITE'::character varying])::text[])))),
+    CONSTRAINT chk_promotion_unit_drift_execution_payload CHECK (((drift_execution_payload IS NULL) OR (jsonb_typeof(drift_execution_payload) = 'object'::text))),
+    CONSTRAINT chk_promotion_unit_drift_execution_status CHECK (((drift_execution_status)::text = ANY ((ARRAY['NONE'::character varying, 'PREPARED'::character varying, 'DEFERRED'::character varying, 'BACKPORTED'::character varying, 'APPLIED'::character varying])::text[]))),
+    CONSTRAINT chk_promotion_unit_drift_resolution CHECK (((((drift_status)::text = ANY ((ARRAY['NONE'::character varying, 'PENDING'::character varying, 'STALE'::character varying])::text[])) AND (drift_decision IS NULL) AND (drift_decision_pid IS NULL)) OR (((drift_status)::text = ANY ((ARRAY['RESOLVED'::character varying, 'APPLIED'::character varying])::text[])) AND (drift_fingerprint IS NOT NULL) AND (drift_decision IS NOT NULL) AND (drift_decision_pid IS NOT NULL)))),
+    CONSTRAINT chk_promotion_unit_drift_status CHECK (((drift_status)::text = ANY ((ARRAY['NONE'::character varying, 'PENDING'::character varying, 'RESOLVED'::character varying, 'STALE'::character varying, 'APPLIED'::character varying])::text[]))),
     CONSTRAINT chk_promotion_unit_resource_type CHECK (((resource_type)::text = 'PAGE_SCHEMA'::text))
 );
 
@@ -12427,6 +13585,41 @@ COMMENT ON COLUMN public.ab_promotion_unit.source_version IS 'PageSchema.version
 --
 
 COMMENT ON COLUMN public.ab_promotion_unit.target_version IS 'PageSchema.version assigned in target env when applied (NULL until APPLIED)';
+
+
+--
+-- Name: COLUMN ab_promotion_unit.drift_fingerprint; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_promotion_unit.drift_fingerprint IS 'Hash of incoming source, target baseline, active target release, and channel version';
+
+
+--
+-- Name: COLUMN ab_promotion_unit.drift_decision; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_promotion_unit.drift_decision IS 'Explicit fate: REBASE, BACKPORT, KEEP_OVERRIDE, or OVERWRITE';
+
+
+--
+-- Name: COLUMN ab_promotion_unit.drift_execution_status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_promotion_unit.drift_execution_status IS 'Durable executor state for REBASE, BACKPORT, KEEP_OVERRIDE, or OVERWRITE';
+
+
+--
+-- Name: COLUMN ab_promotion_unit.drift_execution_pid; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_promotion_unit.drift_execution_pid IS 'Execution identity or generated reverse-promotion identity';
+
+
+--
+-- Name: COLUMN ab_promotion_unit.drift_execution_payload; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_promotion_unit.drift_execution_payload IS 'Server-owned metadata or prepared rebase snapshot; never supplied by the browser';
 
 
 --
@@ -13325,7 +14518,9 @@ CREATE TABLE public.ab_saved_view (
     created_by character varying(26),
     updated_by character varying(26),
     view_type character varying(20) DEFAULT 'table'::character varying NOT NULL,
-    CONSTRAINT chk_saved_view_scope CHECK (((scope)::text = ANY ((ARRAY['personal'::character varying, 'team'::character varying, 'global'::character varying])::text[])))
+    role_id character varying(26),
+    CONSTRAINT chk_saved_view_scope CHECK (((scope)::text = ANY ((ARRAY['personal'::character varying, 'team'::character varying, 'role'::character varying, 'global'::character varying])::text[]))),
+    CONSTRAINT chk_saved_view_scope_owner CHECK (((((scope)::text = 'personal'::text) AND (owner_id IS NOT NULL)) OR (((scope)::text = 'team'::text) AND (team_id IS NOT NULL)) OR (((scope)::text = 'role'::text) AND (role_id IS NOT NULL)) OR ((scope)::text = 'global'::text)))
 );
 
 
@@ -13340,7 +14535,7 @@ COMMENT ON TABLE public.ab_saved_view IS 'User-defined view configurations for t
 -- Name: COLUMN ab_saved_view.scope; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.ab_saved_view.scope IS 'View visibility: PERSONAL (owner only), TEAM (team members), GLOBAL (all users)';
+COMMENT ON COLUMN public.ab_saved_view.scope IS 'Overlay scope: personal, team, role, or tenant-wide global';
 
 
 --
@@ -13362,6 +14557,13 @@ COMMENT ON COLUMN public.ab_saved_view.allow_full_model IS 'When true, allows ac
 --
 
 COMMENT ON COLUMN public.ab_saved_view.view_type IS 'View type: TABLE, KANBAN, CALENDAR, GALLERY, GANTT, TREE';
+
+
+--
+-- Name: COLUMN ab_saved_view.role_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_saved_view.role_id IS 'Role PID for role-scoped view overlays';
 
 
 --
@@ -16115,6 +17317,132 @@ ALTER TABLE ONLY public.ab_audit_trail ALTER COLUMN id SET DEFAULT nextval('publ
 
 
 --
+-- Name: ab_authoring_ai_patch_proposal id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_ai_patch_proposal ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_ai_patch_proposal_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_approval id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_approval ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_approval_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_audit_event id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_audit_event ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_audit_event_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_change_item id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_change_item_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_change_item_split id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_change_item_split_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_change_set id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_change_set_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_change_set_split id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set_split ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_change_set_split_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_config_session id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_config_session ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_config_session_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_handoff_context id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_handoff_context ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_handoff_context_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_identity_simulation id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_identity_simulation ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_identity_simulation_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_impact_run id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_impact_run ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_impact_run_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_release id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_release_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_release_channel id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release_channel ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_release_channel_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_release_item id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release_item ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_release_item_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_resource_draft id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_resource_draft ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_resource_draft_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_tenant_override id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_tenant_override ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_tenant_override_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_validation_run id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_validation_run ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_validation_run_id_seq'::regclass);
+
+
+--
+-- Name: ab_authoring_writer_lease id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_writer_lease ALTER COLUMN id SET DEFAULT nextval('public.ab_authoring_writer_lease_id_seq'::regclass);
+
+
+--
 -- Name: ab_automation_debug_session id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -16420,6 +17748,13 @@ ALTER TABLE ONLY public.ab_page_schema_history ALTER COLUMN id SET DEFAULT nextv
 --
 
 ALTER TABLE ONLY public.ab_platform_release ALTER COLUMN id SET DEFAULT nextval('public.ab_platform_release_id_seq'::regclass);
+
+
+--
+-- Name: ab_promotion_drift_event id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_promotion_drift_event ALTER COLUMN id SET DEFAULT nextval('public.ab_promotion_drift_event_id_seq'::regclass);
 
 
 --
@@ -17341,6 +18676,342 @@ ALTER TABLE ONLY public.ab_audit_trail
 
 ALTER TABLE ONLY public.ab_aurabot_skill_run
     ADD CONSTRAINT ab_aurabot_skill_run_pkey PRIMARY KEY (pid);
+
+
+--
+-- Name: ab_authoring_ai_patch_proposal ab_authoring_ai_patch_proposal_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_ai_patch_proposal
+    ADD CONSTRAINT ab_authoring_ai_patch_proposal_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_ai_patch_proposal ab_authoring_ai_patch_proposal_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_ai_patch_proposal
+    ADD CONSTRAINT ab_authoring_ai_patch_proposal_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_approval ab_authoring_approval_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_approval
+    ADD CONSTRAINT ab_authoring_approval_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_approval ab_authoring_approval_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_approval
+    ADD CONSTRAINT ab_authoring_approval_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_audit_event ab_authoring_audit_event_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_audit_event
+    ADD CONSTRAINT ab_authoring_audit_event_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_audit_event ab_authoring_audit_event_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_audit_event
+    ADD CONSTRAINT ab_authoring_audit_event_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_change_item ab_authoring_change_item_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item
+    ADD CONSTRAINT ab_authoring_change_item_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_change_item ab_authoring_change_item_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item
+    ADD CONSTRAINT ab_authoring_change_item_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_change_item_split ab_authoring_change_item_split_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT ab_authoring_change_item_split_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_change_item_split ab_authoring_change_item_split_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT ab_authoring_change_item_split_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_change_item_split ab_authoring_change_item_split_source_change_item_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT ab_authoring_change_item_split_source_change_item_id_key UNIQUE (source_change_item_id);
+
+
+--
+-- Name: ab_authoring_change_item_split ab_authoring_change_item_split_target_change_item_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT ab_authoring_change_item_split_target_change_item_id_key UNIQUE (target_change_item_id);
+
+
+--
+-- Name: ab_authoring_change_set ab_authoring_change_set_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set
+    ADD CONSTRAINT ab_authoring_change_set_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_change_set ab_authoring_change_set_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set
+    ADD CONSTRAINT ab_authoring_change_set_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_change_set_split ab_authoring_change_set_split_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set_split
+    ADD CONSTRAINT ab_authoring_change_set_split_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_change_set_split ab_authoring_change_set_split_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set_split
+    ADD CONSTRAINT ab_authoring_change_set_split_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_change_set_split ab_authoring_change_set_split_target_change_set_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set_split
+    ADD CONSTRAINT ab_authoring_change_set_split_target_change_set_id_key UNIQUE (target_change_set_id);
+
+
+--
+-- Name: ab_authoring_config_session ab_authoring_config_session_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_config_session
+    ADD CONSTRAINT ab_authoring_config_session_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_config_session ab_authoring_config_session_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_config_session
+    ADD CONSTRAINT ab_authoring_config_session_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_handoff_context ab_authoring_handoff_context_nonce_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_handoff_context
+    ADD CONSTRAINT ab_authoring_handoff_context_nonce_hash_key UNIQUE (nonce_hash);
+
+
+--
+-- Name: ab_authoring_handoff_context ab_authoring_handoff_context_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_handoff_context
+    ADD CONSTRAINT ab_authoring_handoff_context_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_handoff_context ab_authoring_handoff_context_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_handoff_context
+    ADD CONSTRAINT ab_authoring_handoff_context_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_identity_simulation ab_authoring_identity_simulation_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_identity_simulation
+    ADD CONSTRAINT ab_authoring_identity_simulation_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_identity_simulation ab_authoring_identity_simulation_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_identity_simulation
+    ADD CONSTRAINT ab_authoring_identity_simulation_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_impact_run ab_authoring_impact_run_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_impact_run
+    ADD CONSTRAINT ab_authoring_impact_run_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_impact_run ab_authoring_impact_run_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_impact_run
+    ADD CONSTRAINT ab_authoring_impact_run_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_release_channel ab_authoring_release_channel_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release_channel
+    ADD CONSTRAINT ab_authoring_release_channel_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_release_channel ab_authoring_release_channel_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release_channel
+    ADD CONSTRAINT ab_authoring_release_channel_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_release_item ab_authoring_release_item_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release_item
+    ADD CONSTRAINT ab_authoring_release_item_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_release_item ab_authoring_release_item_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release_item
+    ADD CONSTRAINT ab_authoring_release_item_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_release ab_authoring_release_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release
+    ADD CONSTRAINT ab_authoring_release_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_release ab_authoring_release_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release
+    ADD CONSTRAINT ab_authoring_release_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_resource_draft ab_authoring_resource_draft_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_resource_draft
+    ADD CONSTRAINT ab_authoring_resource_draft_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_resource_draft ab_authoring_resource_draft_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_resource_draft
+    ADD CONSTRAINT ab_authoring_resource_draft_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_tenant_override ab_authoring_tenant_override_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_tenant_override
+    ADD CONSTRAINT ab_authoring_tenant_override_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_tenant_override ab_authoring_tenant_override_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_tenant_override
+    ADD CONSTRAINT ab_authoring_tenant_override_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_validation_run ab_authoring_validation_run_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_validation_run
+    ADD CONSTRAINT ab_authoring_validation_run_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_validation_run ab_authoring_validation_run_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_validation_run
+    ADD CONSTRAINT ab_authoring_validation_run_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_writer_lease ab_authoring_writer_lease_change_set_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_writer_lease
+    ADD CONSTRAINT ab_authoring_writer_lease_change_set_id_key UNIQUE (change_set_id);
+
+
+--
+-- Name: ab_authoring_writer_lease ab_authoring_writer_lease_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_writer_lease
+    ADD CONSTRAINT ab_authoring_writer_lease_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_authoring_writer_lease ab_authoring_writer_lease_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_writer_lease
+    ADD CONSTRAINT ab_authoring_writer_lease_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_authoring_writer_lease ab_authoring_writer_lease_session_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_writer_lease
+    ADD CONSTRAINT ab_authoring_writer_lease_session_id_key UNIQUE (session_id);
 
 
 --
@@ -19592,6 +21263,22 @@ ALTER TABLE ONLY public.ab_plugin_resource
 
 
 --
+-- Name: ab_promotion_drift_event ab_promotion_drift_event_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_promotion_drift_event
+    ADD CONSTRAINT ab_promotion_drift_event_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_promotion_drift_event ab_promotion_drift_event_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_promotion_drift_event
+    ADD CONSTRAINT ab_promotion_drift_event_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: ab_promotion ab_promotion_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -20829,6 +22516,54 @@ ALTER TABLE ONLY public.ab_async_task
 
 ALTER TABLE ONLY public.ab_audit_trail
     ADD CONSTRAINT uq_audit_trail_tenant_seq UNIQUE (tenant_id, sequence_no);
+
+
+--
+-- Name: ab_authoring_approval uq_authoring_approval_revision; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_approval
+    ADD CONSTRAINT uq_authoring_approval_revision UNIQUE (change_set_id, change_set_revision);
+
+
+--
+-- Name: ab_authoring_release_channel uq_authoring_release_channel_resource; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release_channel
+    ADD CONSTRAINT uq_authoring_release_channel_resource UNIQUE (tenant_id, env_id, resource_type, resource_pid);
+
+
+--
+-- Name: ab_authoring_release_item uq_authoring_release_item_resource; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release_item
+    ADD CONSTRAINT uq_authoring_release_item_resource UNIQUE (release_id, resource_type, resource_pid);
+
+
+--
+-- Name: ab_authoring_release uq_authoring_release_revision; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release
+    ADD CONSTRAINT uq_authoring_release_revision UNIQUE (change_set_id, change_set_revision);
+
+
+--
+-- Name: ab_authoring_resource_draft uq_authoring_resource_draft; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_resource_draft
+    ADD CONSTRAINT uq_authoring_resource_draft UNIQUE (change_set_id, resource_type, resource_pid);
+
+
+--
+-- Name: ab_authoring_tenant_override uq_authoring_tenant_override_source; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_tenant_override
+    ADD CONSTRAINT uq_authoring_tenant_override_source UNIQUE (tenant_id, env_id, source_resource_type, source_resource_pid);
 
 
 --
@@ -22909,6 +24644,174 @@ CREATE INDEX idx_aurabot_skill_run_tenant_time ON public.ab_aurabot_skill_run US
 --
 
 CREATE INDEX idx_aurabot_skill_run_undo_token ON public.ab_aurabot_skill_run USING btree (undo_token) WHERE (undo_token IS NOT NULL);
+
+
+--
+-- Name: idx_authoring_ai_proposal_actor; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_ai_proposal_actor ON public.ab_authoring_ai_patch_proposal USING btree (tenant_id, env_id, actor_user_id, status, created_at DESC);
+
+
+--
+-- Name: idx_authoring_ai_proposal_session; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_ai_proposal_session ON public.ab_authoring_ai_patch_proposal USING btree (tenant_id, env_id, source_session_pid, created_at DESC);
+
+
+--
+-- Name: idx_authoring_audit_actor; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_audit_actor ON public.ab_authoring_audit_event USING btree (tenant_id, env_id, actor_user_id, created_at DESC);
+
+
+--
+-- Name: idx_authoring_audit_change_set; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_audit_change_set ON public.ab_authoring_audit_event USING btree (tenant_id, env_id, change_set_pid, created_at DESC);
+
+
+--
+-- Name: idx_authoring_change_item_block; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_change_item_block ON public.ab_authoring_change_item USING btree (tenant_id, env_id, block_id, created_at DESC);
+
+
+--
+-- Name: idx_authoring_change_item_set; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_change_item_set ON public.ab_authoring_change_item USING btree (change_set_id, result_revision, id);
+
+
+--
+-- Name: idx_authoring_change_item_source; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_change_item_source ON public.ab_authoring_change_item USING btree (source_change_item_id);
+
+
+--
+-- Name: idx_authoring_change_item_split_operation; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_change_item_split_operation ON public.ab_authoring_change_item_split USING btree (split_id, id);
+
+
+--
+-- Name: idx_authoring_change_set_owner; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_change_set_owner ON public.ab_authoring_change_set USING btree (tenant_id, env_id, owner_user_id, updated_at DESC) WHERE (deleted_flag = false);
+
+
+--
+-- Name: idx_authoring_change_set_source; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_change_set_source ON public.ab_authoring_change_set USING btree (source_change_set_id, source_change_set_revision);
+
+
+--
+-- Name: idx_authoring_change_set_split_source; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_change_set_split_source ON public.ab_authoring_change_set_split USING btree (tenant_id, env_id, source_change_set_id, created_at DESC);
+
+
+--
+-- Name: idx_authoring_change_set_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_change_set_status ON public.ab_authoring_change_set USING btree (tenant_id, env_id, status, updated_at DESC) WHERE (deleted_flag = false);
+
+
+--
+-- Name: idx_authoring_config_session_actor; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_config_session_actor ON public.ab_authoring_config_session USING btree (tenant_id, env_id, actor_user_id, last_seen_at DESC);
+
+
+--
+-- Name: idx_authoring_config_session_page; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_config_session_page ON public.ab_authoring_config_session USING btree (tenant_id, env_id, page_pid, state);
+
+
+--
+-- Name: idx_authoring_handoff_actor; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_handoff_actor ON public.ab_authoring_handoff_context USING btree (tenant_id, env_id, actor_user_id, expires_at DESC);
+
+
+--
+-- Name: idx_authoring_identity_simulation_actor; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_identity_simulation_actor ON public.ab_authoring_identity_simulation USING btree (tenant_id, env_id, actor_user_id, status, expires_at DESC);
+
+
+--
+-- Name: idx_authoring_identity_simulation_recoverable; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_identity_simulation_recoverable ON public.ab_authoring_identity_simulation USING btree (tenant_id, env_id, actor_user_id, source_session_pid, created_at DESC) WHERE (((status)::text = 'ACTIVE'::text) OR (acknowledged_at IS NULL));
+
+
+--
+-- Name: idx_authoring_identity_simulation_session; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_identity_simulation_session ON public.ab_authoring_identity_simulation USING btree (tenant_id, env_id, source_session_pid, created_at DESC);
+
+
+--
+-- Name: idx_authoring_impact_revision; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_impact_revision ON public.ab_authoring_impact_run USING btree (tenant_id, env_id, change_set_id, change_set_revision, created_at DESC, id DESC);
+
+
+--
+-- Name: idx_authoring_release_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_release_active ON public.ab_authoring_release USING btree (tenant_id, env_id, activated_at DESC) WHERE ((status)::text = 'ACTIVE'::text);
+
+
+--
+-- Name: idx_authoring_release_item_resource; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_release_item_resource ON public.ab_authoring_release_item USING btree (tenant_id, env_id, resource_type, resource_pid, release_id);
+
+
+--
+-- Name: idx_authoring_resource_draft_resource; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_resource_draft_resource ON public.ab_authoring_resource_draft USING btree (tenant_id, env_id, resource_type, resource_pid);
+
+
+--
+-- Name: idx_authoring_tenant_override_tenant; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_tenant_override_tenant ON public.ab_authoring_tenant_override USING btree (tenant_id, env_id, status, updated_at DESC);
+
+
+--
+-- Name: idx_authoring_validation_revision; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authoring_validation_revision ON public.ab_authoring_validation_run USING btree (tenant_id, env_id, change_set_id, change_set_revision, created_at DESC, id DESC);
 
 
 --
@@ -25243,6 +27146,13 @@ CREATE INDEX idx_page_schema_model_code ON public.ab_page_schema USING btree (te
 
 
 --
+-- Name: idx_page_schema_ownership; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_page_schema_ownership ON public.ab_page_schema USING btree (tenant_id, env_id, ownership_scope, page_key) WHERE ((deleted_flag = false) AND (is_current = true));
+
+
+--
 -- Name: idx_page_schema_plugin; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -25471,6 +27381,13 @@ CREATE INDEX idx_po_tenant ON public.ab_payment_order USING btree (tenant_id);
 --
 
 CREATE INDEX idx_pp_plan_tenant ON public.ab_plugin_plan USING btree (tenant_id);
+
+
+--
+-- Name: idx_promotion_drift_event_unit; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_promotion_drift_event_unit ON public.ab_promotion_drift_event USING btree (tenant_id, promotion_unit_id, created_at DESC, id DESC);
 
 
 --
@@ -25723,6 +27640,13 @@ CREATE INDEX idx_saved_view_owner ON public.ab_saved_view USING btree (owner_id)
 --
 
 CREATE INDEX idx_saved_view_page_key ON public.ab_saved_view USING btree (model_code, page_key);
+
+
+--
+-- Name: idx_saved_view_role; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_saved_view_role ON public.ab_saved_view USING btree (tenant_id, role_id) WHERE (((scope)::text = 'role'::text) AND (deleted_flag = false));
 
 
 --
@@ -26720,6 +28644,13 @@ CREATE UNIQUE INDEX uq_aurabot_skill_idemp ON public.ab_aurabot_skill_run USING 
 
 
 --
+-- Name: uq_authoring_identity_simulation_active_session; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_authoring_identity_simulation_active_session ON public.ab_authoring_identity_simulation USING btree (tenant_id, env_id, actor_user_id, source_session_pid) WHERE ((status)::text = 'ACTIVE'::text);
+
+
+--
 -- Name: uq_billing_rc_resource_code; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -26815,6 +28746,20 @@ CREATE UNIQUE INDEX uq_ot_device ON public.ab_ot_device USING btree (tenant_id, 
 --
 
 CREATE UNIQUE INDEX uq_plugin_resource_unique ON public.ab_plugin_resource USING btree (tenant_id, plugin_pid, resource_type, resource_code);
+
+
+--
+-- Name: uq_promotion_origin_drift_decision; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_promotion_origin_drift_decision ON public.ab_promotion USING btree (tenant_id, origin_drift_decision_pid) WHERE ((origin_drift_decision_pid IS NOT NULL) AND (deleted_flag = false));
+
+
+--
+-- Name: INDEX uq_promotion_origin_drift_decision; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON INDEX public.uq_promotion_origin_drift_decision IS 'Exactly-once reverse promotion creation for a governed BACKPORT decision';
 
 
 --
@@ -26958,10 +28903,87 @@ CREATE TRIGGER trg_agent_release_immutable BEFORE DELETE OR UPDATE ON public.ab_
 
 
 --
+-- Name: ab_authoring_audit_event trg_authoring_audit_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_audit_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_audit_event FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_authoring_change_item trg_authoring_change_item_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_change_item_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_change_item FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_authoring_change_item_split trg_authoring_change_item_split_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_change_item_split_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_change_item_split FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_authoring_change_set_split trg_authoring_change_set_split_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_change_set_split_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_change_set_split FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_authoring_impact_run trg_authoring_impact_run_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_impact_run_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_impact_run FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_authoring_release trg_authoring_release_immutable_delete; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_release_immutable_delete BEFORE DELETE ON public.ab_authoring_release FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_authoring_release trg_authoring_release_immutable_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_release_immutable_update BEFORE UPDATE ON public.ab_authoring_release FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_guard_release_update();
+
+
+--
+-- Name: ab_authoring_release_item trg_authoring_release_item_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_release_item_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_release_item FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_authoring_validation_run trg_authoring_validation_run_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_authoring_validation_run_append_only BEFORE DELETE OR UPDATE ON public.ab_authoring_validation_run FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
 -- Name: ab_subject_permission trg_check_group_logic_type_consistency; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER trg_check_group_logic_type_consistency BEFORE INSERT OR UPDATE ON public.ab_subject_permission FOR EACH ROW EXECUTE FUNCTION public.check_group_logic_type_consistency();
+
+
+--
+-- Name: ab_page_schema trg_page_schema_ownership_default; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_page_schema_ownership_default BEFORE INSERT OR UPDATE OF is_template, plugin_pid, ownership_scope, ownership_ref ON public.ab_page_schema FOR EACH ROW EXECUTE FUNCTION public.ab_page_schema_apply_ownership_default();
+
+
+--
+-- Name: ab_promotion_drift_event trg_promotion_drift_event_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_promotion_drift_event_append_only BEFORE DELETE OR UPDATE ON public.ab_promotion_drift_event FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
 
 
 --
@@ -27189,6 +29211,350 @@ ALTER TABLE ONLY public.ab_agent_deployment
 
 
 --
+-- Name: ab_authoring_ai_patch_proposal fk_authoring_ai_proposal_change_set; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_ai_patch_proposal
+    ADD CONSTRAINT fk_authoring_ai_proposal_change_set FOREIGN KEY (change_set_id) REFERENCES public.ab_authoring_change_set(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ab_authoring_ai_patch_proposal fk_authoring_ai_proposal_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_ai_patch_proposal
+    ADD CONSTRAINT fk_authoring_ai_proposal_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_ai_patch_proposal fk_authoring_ai_proposal_session; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_ai_patch_proposal
+    ADD CONSTRAINT fk_authoring_ai_proposal_session FOREIGN KEY (source_session_id) REFERENCES public.ab_authoring_config_session(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ab_authoring_approval fk_authoring_approval_change_set; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_approval
+    ADD CONSTRAINT fk_authoring_approval_change_set FOREIGN KEY (change_set_id) REFERENCES public.ab_authoring_change_set(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ab_authoring_approval fk_authoring_approval_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_approval
+    ADD CONSTRAINT fk_authoring_approval_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_audit_event fk_authoring_audit_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_audit_event
+    ADD CONSTRAINT fk_authoring_audit_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_change_item fk_authoring_change_item_change_set; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item
+    ADD CONSTRAINT fk_authoring_change_item_change_set FOREIGN KEY (change_set_id) REFERENCES public.ab_authoring_change_set(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ab_authoring_change_item fk_authoring_change_item_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item
+    ADD CONSTRAINT fk_authoring_change_item_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_change_item fk_authoring_change_item_resource_draft; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item
+    ADD CONSTRAINT fk_authoring_change_item_resource_draft FOREIGN KEY (resource_draft_id) REFERENCES public.ab_authoring_resource_draft(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ab_authoring_change_item fk_authoring_change_item_source; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item
+    ADD CONSTRAINT fk_authoring_change_item_source FOREIGN KEY (source_change_item_id) REFERENCES public.ab_authoring_change_item(id);
+
+
+--
+-- Name: ab_authoring_change_item_split fk_authoring_change_item_split_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT fk_authoring_change_item_split_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_change_item_split fk_authoring_change_item_split_operation; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT fk_authoring_change_item_split_operation FOREIGN KEY (split_id) REFERENCES public.ab_authoring_change_set_split(id);
+
+
+--
+-- Name: ab_authoring_change_item_split fk_authoring_change_item_split_source; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT fk_authoring_change_item_split_source FOREIGN KEY (source_change_item_id) REFERENCES public.ab_authoring_change_item(id);
+
+
+--
+-- Name: ab_authoring_change_item_split fk_authoring_change_item_split_target; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_item_split
+    ADD CONSTRAINT fk_authoring_change_item_split_target FOREIGN KEY (target_change_item_id) REFERENCES public.ab_authoring_change_item(id);
+
+
+--
+-- Name: ab_authoring_change_set fk_authoring_change_set_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set
+    ADD CONSTRAINT fk_authoring_change_set_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_change_set fk_authoring_change_set_source; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set
+    ADD CONSTRAINT fk_authoring_change_set_source FOREIGN KEY (source_change_set_id) REFERENCES public.ab_authoring_change_set(id);
+
+
+--
+-- Name: ab_authoring_change_set_split fk_authoring_change_set_split_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set_split
+    ADD CONSTRAINT fk_authoring_change_set_split_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_change_set_split fk_authoring_change_set_split_source; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set_split
+    ADD CONSTRAINT fk_authoring_change_set_split_source FOREIGN KEY (source_change_set_id) REFERENCES public.ab_authoring_change_set(id);
+
+
+--
+-- Name: ab_authoring_change_set_split fk_authoring_change_set_split_target; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_change_set_split
+    ADD CONSTRAINT fk_authoring_change_set_split_target FOREIGN KEY (target_change_set_id) REFERENCES public.ab_authoring_change_set(id);
+
+
+--
+-- Name: ab_authoring_config_session fk_authoring_config_session_change_set; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_config_session
+    ADD CONSTRAINT fk_authoring_config_session_change_set FOREIGN KEY (change_set_id) REFERENCES public.ab_authoring_change_set(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ab_authoring_config_session fk_authoring_config_session_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_config_session
+    ADD CONSTRAINT fk_authoring_config_session_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_handoff_context fk_authoring_handoff_change_set; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_handoff_context
+    ADD CONSTRAINT fk_authoring_handoff_change_set FOREIGN KEY (change_set_id) REFERENCES public.ab_authoring_change_set(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ab_authoring_handoff_context fk_authoring_handoff_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_handoff_context
+    ADD CONSTRAINT fk_authoring_handoff_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_identity_simulation fk_authoring_identity_simulation_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_identity_simulation
+    ADD CONSTRAINT fk_authoring_identity_simulation_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_impact_run fk_authoring_impact_change_set; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_impact_run
+    ADD CONSTRAINT fk_authoring_impact_change_set FOREIGN KEY (change_set_id) REFERENCES public.ab_authoring_change_set(id);
+
+
+--
+-- Name: ab_authoring_impact_run fk_authoring_impact_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_impact_run
+    ADD CONSTRAINT fk_authoring_impact_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_impact_run fk_authoring_impact_resource_draft; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_impact_run
+    ADD CONSTRAINT fk_authoring_impact_resource_draft FOREIGN KEY (resource_draft_id) REFERENCES public.ab_authoring_resource_draft(id);
+
+
+--
+-- Name: ab_authoring_release fk_authoring_release_change_set; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release
+    ADD CONSTRAINT fk_authoring_release_change_set FOREIGN KEY (change_set_id) REFERENCES public.ab_authoring_change_set(id);
+
+
+--
+-- Name: ab_authoring_release_channel fk_authoring_release_channel_active; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release_channel
+    ADD CONSTRAINT fk_authoring_release_channel_active FOREIGN KEY (active_release_id) REFERENCES public.ab_authoring_release(id);
+
+
+--
+-- Name: ab_authoring_release_channel fk_authoring_release_channel_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release_channel
+    ADD CONSTRAINT fk_authoring_release_channel_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_release_channel fk_authoring_release_channel_previous; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release_channel
+    ADD CONSTRAINT fk_authoring_release_channel_previous FOREIGN KEY (previous_release_id) REFERENCES public.ab_authoring_release(id);
+
+
+--
+-- Name: ab_authoring_release fk_authoring_release_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release
+    ADD CONSTRAINT fk_authoring_release_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_release_item fk_authoring_release_item_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release_item
+    ADD CONSTRAINT fk_authoring_release_item_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_release_item fk_authoring_release_item_release; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_release_item
+    ADD CONSTRAINT fk_authoring_release_item_release FOREIGN KEY (release_id) REFERENCES public.ab_authoring_release(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ab_authoring_resource_draft fk_authoring_resource_draft_change_set; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_resource_draft
+    ADD CONSTRAINT fk_authoring_resource_draft_change_set FOREIGN KEY (change_set_id) REFERENCES public.ab_authoring_change_set(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ab_authoring_resource_draft fk_authoring_resource_draft_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_resource_draft
+    ADD CONSTRAINT fk_authoring_resource_draft_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_tenant_override fk_authoring_tenant_override_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_tenant_override
+    ADD CONSTRAINT fk_authoring_tenant_override_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_validation_run fk_authoring_validation_change_set; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_validation_run
+    ADD CONSTRAINT fk_authoring_validation_change_set FOREIGN KEY (change_set_id) REFERENCES public.ab_authoring_change_set(id);
+
+
+--
+-- Name: ab_authoring_validation_run fk_authoring_validation_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_validation_run
+    ADD CONSTRAINT fk_authoring_validation_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_validation_run fk_authoring_validation_resource_draft; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_validation_run
+    ADD CONSTRAINT fk_authoring_validation_resource_draft FOREIGN KEY (resource_draft_id) REFERENCES public.ab_authoring_resource_draft(id);
+
+
+--
+-- Name: ab_authoring_writer_lease fk_authoring_writer_lease_change_set; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_writer_lease
+    ADD CONSTRAINT fk_authoring_writer_lease_change_set FOREIGN KEY (change_set_id) REFERENCES public.ab_authoring_change_set(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ab_authoring_writer_lease fk_authoring_writer_lease_env; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_writer_lease
+    ADD CONSTRAINT fk_authoring_writer_lease_env FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_authoring_writer_lease fk_authoring_writer_lease_session; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_authoring_writer_lease
+    ADD CONSTRAINT fk_authoring_writer_lease_session FOREIGN KEY (session_id) REFERENCES public.ab_authoring_config_session(id) ON DELETE CASCADE;
+
+
+--
 -- Name: ab_dict_item fk_dict_item_dict; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -27290,6 +29656,22 @@ ALTER TABLE ONLY public.ab_page_schema
 
 ALTER TABLE ONLY public.ab_page_schema_history
     ADD CONSTRAINT fk_page_schema_history_env_id FOREIGN KEY (env_id) REFERENCES public.ab_environment(id);
+
+
+--
+-- Name: ab_promotion_drift_event fk_promotion_drift_event_promotion; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_promotion_drift_event
+    ADD CONSTRAINT fk_promotion_drift_event_promotion FOREIGN KEY (promotion_id) REFERENCES public.ab_promotion(id);
+
+
+--
+-- Name: ab_promotion_drift_event fk_promotion_drift_event_unit; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_promotion_drift_event
+    ADD CONSTRAINT fk_promotion_drift_event_unit FOREIGN KEY (promotion_unit_id) REFERENCES public.ab_promotion_unit(id);
 
 
 --

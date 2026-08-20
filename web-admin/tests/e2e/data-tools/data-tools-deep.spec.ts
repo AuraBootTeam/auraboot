@@ -16,6 +16,8 @@
  */
 
 import { test, expect } from '../../fixtures';
+import AdmZip from 'adm-zip';
+import * as XLSX from 'xlsx';
 import { navigateToDynamicPage, uniqueId } from '../helpers';
 import { DynamicListPage } from '../../pages';
 import { ErrorCodes } from '~/shared/services/http-client/types';
@@ -348,6 +350,12 @@ test.describe('Data Tools Deep — Template Download', () => {
     if (isExcel) {
       const buffer = await resp.body();
       expect(buffer.length).toBeGreaterThan(0);
+      expect(Array.from(buffer.subarray(0, 2))).toEqual([0x50, 0x4b]);
+      const entries = new Set(new AdmZip(buffer).getEntries().map((entry) => entry.entryName));
+      expect(entries).toContain('xl/workbook.xml');
+      expect(entries).toContain('xl/worksheets/sheet1.xml');
+      const workbook = XLSX.read(buffer, { type: 'buffer' });
+      expect(workbook.SheetNames.length).toBeGreaterThan(0);
     } else {
       const body = await resp.json().catch(() => null);
       expect(body).toBeTruthy();

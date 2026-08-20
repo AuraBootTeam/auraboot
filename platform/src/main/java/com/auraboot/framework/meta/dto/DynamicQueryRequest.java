@@ -45,6 +45,13 @@ public class DynamicQueryRequest {
     private java.util.Map<String, Object> extraParams;
 
     /**
+     * Audit user fields whose display names are required by the current list view.
+     * Only the fixed system fields created_by / updated_by are accepted by the
+     * controller and service. The raw numeric IDs remain internal-only.
+     */
+    private List<String> auditUserDisplayFields;
+
+    /**
      * SavedView PID (optional)
      * When provided, applies the saved view's filter, sort, and column configurations
      */

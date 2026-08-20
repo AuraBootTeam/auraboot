@@ -173,6 +173,7 @@ function useRemoteOptions(neededTypes: string[]): Record<string, ModelOption[]> 
 interface SchemaInspectorProps {
   block: DslBlockV3 | null;
   modelFields?: ModelFieldDefinition[];
+  editablePropertyPaths?: string[];
   onChange: (path: string, value: unknown) => void;
 }
 
@@ -184,9 +185,22 @@ function resolveInspectorLabel(label: string, locale: string): string {
   return entry ? resolveDesignerText(entry, locale) : label;
 }
 
-export function SchemaInspector({ block, modelFields = [], onChange }: SchemaInspectorProps) {
+export function SchemaInspector({
+  block,
+  modelFields = [],
+  editablePropertyPaths,
+  onChange,
+}: SchemaInspectorProps) {
   const { locale } = useI18n();
-  const fields = getInspectorFields(block);
+  const fields = getInspectorFields(block).filter(
+    (field) =>
+      editablePropertyPaths === undefined ||
+      editablePropertyPaths.some((pointer) => propertyPathAllowed(field.key, pointer)),
+  );
+  const advancedFields = ADVANCED_JSON_FIELDS.filter(
+    (field) =>
+      editablePropertyPaths === undefined || editablePropertyPaths.includes(`/${field.key}`),
+  );
   const { options: modelOptions } = useModelOptions();
   // D2 — fetch only the remote-select sources this block's fields actually need.
   const remoteOptions = useRemoteOptions(
@@ -234,9 +248,10 @@ export function SchemaInspector({ block, modelFields = [], onChange }: SchemaIns
             type="button"
             data-testid="inspector-tab-advanced"
             onClick={() => setActiveTab('advanced')}
+            disabled={advancedFields.length === 0}
             className={`px-3 py-2 ${
               activeTab === 'advanced' ? 'font-medium text-blue-700' : 'text-slate-500'
-            }`}
+            } disabled:cursor-not-allowed disabled:text-slate-300`}
           >
             {resolveDesignerText(DESIGNER_I18N.unified.advancedJson, locale)}
           </button>
@@ -244,6 +259,11 @@ export function SchemaInspector({ block, modelFields = [], onChange }: SchemaIns
 
         {activeTab === 'basic' ? (
           <div className="space-y-4">
+            {fields.length === 0 ? (
+              <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+                此对象没有可由当前 Studio 适配器安全保存的属性。
+              </div>
+            ) : null}
             {fields.map((field) => (
               <InspectorField
                 key={field.key}
@@ -271,7 +291,12 @@ export function SchemaInspector({ block, modelFields = [], onChange }: SchemaIns
             ))}
           </div>
         ) : (
-          <AdvancedJsonInspector block={block} locale={locale} onChange={onChange} />
+          <AdvancedJsonInspector
+            block={block}
+            fields={advancedFields}
+            locale={locale}
+            onChange={onChange}
+          />
         )}
       </div>
     </div>
@@ -290,10 +315,12 @@ const ADVANCED_JSON_FIELDS: Array<{
 
 function AdvancedJsonInspector({
   block,
+  fields,
   locale,
   onChange,
 }: {
   block: DslBlockV3;
+  fields: typeof ADVANCED_JSON_FIELDS;
   locale: string;
   onChange: (path: string, value: unknown) => void;
 }) {
@@ -327,7 +354,7 @@ function AdvancedJsonInspector({
 
   return (
     <div className="space-y-4">
-      {ADVANCED_JSON_FIELDS.map((field) => (
+      {fields.map((field) => (
         <div key={field.key} className="rounded-md border border-slate-200 bg-white p-3">
           <div className="mb-2 flex items-center justify-between gap-3">
             <label
@@ -369,6 +396,15 @@ function AdvancedJsonInspector({
       ))}
     </div>
   );
+}
+
+function propertyPathAllowed(dotPath: string, capabilityPointer: string): boolean {
+  const pointer = `/${dotPath.split('.').map(escapePointerSegment).join('/')}`;
+  return pointer === capabilityPointer || pointer.startsWith(`${capabilityPointer}/`);
+}
+
+function escapePointerSegment(segment: string): string {
+  return segment.replace(/~/g, '~0').replace(/\//g, '~1');
 }
 
 function createAdvancedJsonDrafts(block: DslBlockV3): Record<string, string> {

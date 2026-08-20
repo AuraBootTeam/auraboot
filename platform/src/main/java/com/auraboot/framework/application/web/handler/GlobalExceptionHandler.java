@@ -33,6 +33,7 @@ import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -524,6 +525,21 @@ public class GlobalExceptionHandler {
         log.warn("No resource found: {}", ex.getMessage());
         ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.NOT_FOUND, ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    /**
+     * Persistence failures are logged with their full cause but never reflected to the client.
+     * This rule also applies in local/dev profiles: SQL, constraint, trigger, and connection
+     * details are secrets and are not safe debugging context for a browser response.
+     */
+    @ExceptionHandler(DataAccessException.class)
+    @ResponseBody
+    public ResponseEntity<ApiResponse<Object>> handleDataAccessException(DataAccessException ex) {
+        log.error("Unexpected persistence exception", ex);
+        ApiResponse<Object> response = ApiResponse.errorWithContext(
+                ResponseCode.SystemError,
+                "An unexpected error occurred. Please try again later.");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 
     /**

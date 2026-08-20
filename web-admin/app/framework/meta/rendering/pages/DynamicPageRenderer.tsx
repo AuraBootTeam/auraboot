@@ -20,6 +20,7 @@ import { ErrorAlert } from '~/ui/ErrorAlert';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { isUnconfiguredStubPage } from './isUnconfiguredStubPage';
 import { StubPageError } from './StubPageError';
+import { ContextualAuthoringSurface } from '~/framework/meta/authoring/ContextualAuthoringSurface';
 
 // Ensure profiles are registered
 import '~/framework/meta/profiles/admin';
@@ -122,12 +123,25 @@ export function DynamicPageRenderer({
         <ProfileProvider value={profile}>
           <div data-testid={`dynamic-page-${pageType}`}>
             <Suspense fallback={fallback}>
-              <PageContent
+              <ContextualAuthoringSurface
                 schema={schema}
-                tableName={tableName}
                 recordPid={recordPid}
-                token={token}
-              />
+                renderRuntime={(runtimeSchema) => (
+                  <PageContent
+                    schema={runtimeSchema}
+                    tableName={tableName}
+                    recordPid={recordPid}
+                    token={token}
+                  />
+                )}
+              >
+                <PageContent
+                  schema={schema}
+                  tableName={tableName}
+                  recordPid={recordPid}
+                  token={token}
+                />
+              </ContextualAuthoringSurface>
             </Suspense>
           </div>
         </ProfileProvider>
