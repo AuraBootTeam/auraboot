@@ -161,3 +161,60 @@ export function validateQuoteWorkbook(
   assertProcessRows(workbook);
   assertQuoteTotals(workbook, lastBomRow, expectations);
 }
+
+export function validateQuickCustomerBomWorkbook(filePath: string, mpnSuffix: string): void {
+  const workbook = XLSX.read(fs.readFileSync(filePath), {
+    type: 'buffer',
+    cellFormula: true,
+    cellText: false,
+    sheetStubs: true,
+  });
+
+  expect(workbook.SheetNames).toEqual(['报价单', 'BOM明细', '加工明细']);
+  assertNoFormulaErrors(workbook);
+
+  const bomRows = sheetRows(workbook, 'BOM明细');
+  const originalRows = [
+    ['', '位号', '规格描述', '封装', '数量', '品牌', '料号'],
+    ['', 'R1,R2,R3', '240Ω ±1% 1/20W 0201', '', '3', '', `WMF2400TEE${mpnSuffix}`],
+    ['', 'R4,R5', '10kΩ ±1% 贴片电阻', '0603', '2', 'YAGEO', `RC0603FR-0710KL${mpnSuffix}`],
+    ['', 'C1', '0.1uF 50V X7R 贴片电容', '0603', '1', 'SAMSUNG', `CL10B104KB8NNNC${mpnSuffix}`],
+    ['', 'D1', '开关二极管', 'SOD-123', '10', 'MDD', `1N4148W${mpnSuffix}`],
+  ];
+  for (let row = 0; row < originalRows.length; row += 1) {
+    expect(
+      (bomRows[row] ?? []).slice(0, originalRows[row].length).map(String),
+      `BOM明细 row ${row + 1} customer cells must be copied unchanged`,
+    ).toEqual(originalRows[row]);
+  }
+
+  expect((bomRows[0] ?? []).slice(7, 10).map(String)).toEqual(['厂商', 'MPN', '备注']);
+  for (const row of [1, 2, 3]) {
+    expect((bomRows[row] ?? []).slice(7, 10).map(String), `R/C row ${row + 1}`).toEqual([
+      '',
+      '',
+      '',
+    ]);
+  }
+  expect((bomRows[4] ?? []).slice(7, 10).map(String)).toEqual(['MDD', `1N4148W${mpnSuffix}`, '']);
+
+  assertProcessRows(workbook);
+  const process = workbook.Sheets['加工明细'];
+  expect(String(process['F3']?.f ?? '')).not.toContain('BOM明细');
+  expect(String(process['F4']?.f ?? '')).not.toContain('BOM明细');
+
+  const quote = workbook.Sheets['报价单'];
+  expect(String(quote['H15']?.f ?? ''), '非标 BOM 材料成本公式').not.toContain('BOM明细');
+  expectFormula(quote, 'I15', `'加工明细'!$H$12`);
+  expectFormula(quote, 'J15', '(H15+I15)*30%');
+  expectFormula(quote, 'K15', 'ROUND((H15+I15+J15),2)');
+  expectFormula(quote, 'L15', 'G15*K15');
+  expectFormula(quote, 'P15', 'N15+M15+L15');
+  const material = numericCell(quote, 'H15');
+  const processTotal = numericCell(quote, 'I15');
+  expect(numericCell(quote, 'J15')).toBeCloseTo((material + processTotal) * 0.3, 8);
+  expect(numericCell(quote, 'L15')).toBeCloseTo(
+    numericCell(quote, 'G15') * numericCell(quote, 'K15'),
+    8,
+  );
+}
