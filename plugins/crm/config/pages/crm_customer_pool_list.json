@@ -32,6 +32,23 @@
           "buttons": [
             { "code": "view", "label": "$i18n:common.button.view", "action": { "type": "navigate", "to": "crm_customer_pool_detail" } },
             { "code": "edit", "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_customer_pool_form" } },
+            {
+              "code": "quick_update",
+              "permissionCode": "crm.customer_pool.manage",
+              "label": { "zh-CN": "快速调整策略", "en": "Quick Policy Update" },
+              "action": {
+                "type": "command",
+                "command": "crm:update_customer_pool",
+                "inputFieldsTitle": { "zh-CN": "快速调整客户公海策略", "en": "Quickly Update Pool Policy" },
+                "inputFieldsSubmitLabel": { "zh-CN": "保存策略", "en": "Save Policy" },
+                "inputFields": [
+                  { "field": "crm_cp_name", "label": { "zh-CN": "客户公海名称", "en": "Pool Name" }, "type": "string", "required": true, "defaultValue": "${row.crm_cp_name}", "placeholder": { "zh-CN": "例如：华南制造业公海", "en": "For example: South China Manufacturing Pool" }, "helpText": { "zh-CN": "使用销售团队能够快速识别的业务名称。", "en": "Use a business name that the sales team can recognize quickly." } },
+                  { "field": "crm_cp_daily_pick_limit", "label": { "zh-CN": "每日领取上限", "en": "Daily Claim Limit" }, "type": "integer", "required": true, "defaultValue": "${row.crm_cp_daily_pick_limit}", "placeholder": { "zh-CN": "例如：20", "en": "For example: 20" }, "helpText": { "zh-CN": "限制每位普通成员每天可领取的客户数量。", "en": "Limits how many customers each regular member may claim per day." } },
+                  { "field": "crm_cp_new_cooldown_days", "label": { "zh-CN": "新客户冷却天数", "en": "New Customer Cooldown Days" }, "type": "integer", "required": true, "defaultValue": "${row.crm_cp_new_cooldown_days}", "placeholder": { "zh-CN": "例如：2", "en": "For example: 2" }, "helpText": { "zh-CN": "客户入池后经过该天数才允许普通成员领取。", "en": "Regular members can claim a customer only after this many days in the pool." } },
+                  { "field": "crm_cp_previous_owner_cooldown_days", "label": { "zh-CN": "前负责人冷却天数", "en": "Previous Owner Cooldown Days" }, "type": "integer", "required": true, "defaultValue": "${row.crm_cp_previous_owner_cooldown_days}", "placeholder": { "zh-CN": "例如：7", "en": "For example: 7" }, "helpText": { "zh-CN": "前负责人再次领取同一客户需额外等待的天数。", "en": "Additional wait before the previous owner may reclaim the same customer." } }
+                ]
+              }
+            },
             { "code": "toggle", "permissionCode": "crm.customer_pool.manage", "label": { "zh-CN": "启用/停用", "en": "Enable/Disable" }, "action": { "type": "command", "command": "crm:toggle_customer_pool" } },
             { "code": "delete", "danger": true, "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.delete", "confirm": { "zh-CN": "仅空客户公海可删除，确认继续？", "en": "Only an empty pool can be deleted. Continue?" }, "action": { "type": "command", "command": "crm:delete_customer_pool" } }
           ]

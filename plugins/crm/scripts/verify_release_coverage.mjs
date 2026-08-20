@@ -165,12 +165,14 @@ const CUSTOMER_POOL_COVERAGE = {
     'crm:delete_customer_capacity',
     'crm:delete_customer_pool',
     'crm:delete_customer_pool_recycle_rule',
+    'crm:delete_pool_customer',
     'crm:move_customer_to_pool',
     'crm:run_customer_pool_recycle',
     'crm:toggle_customer_pool',
     'crm:update_customer_capacity',
     'crm:update_customer_pool',
     'crm:update_customer_pool_recycle_rule',
+    'crm:update_pool_customer',
   ],
   queries: ['crm_customer_pool_ops_queue', 'crm_customer_pool_ops_stats'],
   permissions: [
@@ -231,6 +233,9 @@ const CUSTOMER_POOL_COVERAGE = {
     'crm_customer_owner_history_list:history:crm_coh_reason',
     'crm_customer_pool_batch_list:pool_queue:crm_cpi_account_name',
     'crm_customer_pool_batch_list:pool_queue:crm_cpi_claimed_by',
+    'crm_customer_pool_batch_list:pool_queue:crm_cpi_industry',
+    'crm_customer_pool_batch_list:pool_queue:crm_cpi_phone',
+    'crm_customer_pool_batch_list:pool_queue:crm_cpi_rating',
     'crm_customer_pool_batch_list:pool_tabs:crm_cpi_status',
     'crm_customer_pool_detail:policy:crm_cp_name',
     'crm_customer_pool_form:claim_policy:crm_cp_daily_pick_limit',
@@ -253,6 +258,9 @@ const CUSTOMER_POOL_COVERAGE = {
     'crm_customer_pool_item_list:crm_customer_pool_search:crm_cpi_account_name',
     'crm_customer_pool_item_list:crm_customer_pool_status:owner_name',
     'crm_customer_pool_list:crm_cp_table:crm_cp_name',
+    'crm_customer_pool_list:crm_cp_table:crm_cp_daily_pick_limit',
+    'crm_customer_pool_list:crm_cp_table:crm_cp_new_cooldown_days',
+    'crm_customer_pool_list:crm_cp_table:crm_cp_previous_owner_cooldown_days',
     'crm_customer_pool_list:crm_cp_table:crm_cp_status',
     'crm_customer_pool_recycle_rule_detail:condition:crm_cprr_code',
     'crm_customer_pool_recycle_rule_detail:condition:crm_cprr_days',
@@ -280,6 +288,15 @@ const CUSTOMER_POOL_COVERAGE = {
     'crm_customer_owner_history_list:history:view',
     'crm_customer_pool_batch_list:pool_queue:batch_assign',
     'crm_customer_pool_batch_list:pool_queue:batch_claim',
+    'crm_customer_pool_batch_list:pool_queue:batch_delete',
+    'crm_customer_pool_batch_list:pool_queue:batch_update_industry',
+    'crm_customer_pool_batch_list:pool_queue:batch_update_name',
+    'crm_customer_pool_batch_list:pool_queue:batch_update_rating',
+    'crm_customer_pool_batch_list:pool_queue:delete',
+    'crm_customer_pool_batch_list:pool_queue:quick_update',
+    'crm_customer_pool_batch_list:platform:analyze_current_view',
+    'crm_customer_pool_batch_list:platform:export_filtered_xlsx',
+    'crm_customer_pool_batch_list:platform:export_selected_xlsx',
     'crm_customer_pool_batch_list:pool_tabs:assigned',
     'crm_customer_pool_batch_list:pool_tabs:available',
     'crm_customer_pool_batch_list:pool_tabs:claimed',
@@ -290,6 +307,7 @@ const CUSTOMER_POOL_COVERAGE = {
     'crm_customer_pool_item_list:crm_customer_pool_header_actions:batch_operations',
     'crm_customer_pool_item_list:crm_customer_pool_queue:view_pool_evidence',
     'crm_customer_pool_list:crm_cp_table:delete',
+    'crm_customer_pool_list:crm_cp_table:quick_update',
     'crm_customer_pool_list:crm_cp_table:toggle',
     'crm_customer_pool_list:crm_cp_table:view',
     'crm_customer_pool_list:crm_cp_toolbar:create',
@@ -1185,6 +1203,7 @@ export function buildReleaseManifest() {
   for (const actionKey of CUSTOMER_POOL_COVERAGE.uiActions) {
     const [pageKey, blockId, ...actionParts] = actionKey.split(':');
     const code = actionParts.join(':');
+    if (blockId === 'platform') continue;
     const page = pages.get(pageKey);
     const structure = collectPageStructure(page, `plugins/crm/config/pages/${pageKey}.json`);
     assert.ok(

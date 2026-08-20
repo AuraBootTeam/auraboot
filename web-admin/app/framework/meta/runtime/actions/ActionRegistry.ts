@@ -665,11 +665,12 @@ export async function promptInputForm(
   submitLabel?: any,
   runtimeContext: Record<string, unknown> = {},
 ): Promise<Record<string, any>> {
+  const normalizedFields = fields.map((field) => normalizePromptInputField(field));
   const fieldOptions: Record<
     string,
     Array<{ label: any; value: string; description?: any; disabled?: boolean; visibleWhen?: any }>
   > = {};
-  for (const field of fields) {
+  for (const field of normalizedFields) {
     if (field.dictCode && fetchResult) {
       try {
         const result = await fetchResult(
@@ -725,7 +726,9 @@ export async function promptInputForm(
           ? result.data
           : Array.isArray(result.data?.records)
             ? result.data.records
-            : [];
+            : Array.isArray(result.data?.items)
+              ? result.data.items
+              : [];
         fieldOptions[field.field] = rawOptions
           .map((option: any) => {
             if (option && typeof option === 'object') {
@@ -756,10 +759,11 @@ export async function promptInputForm(
 
   // Build default values from field configs
   const defaults: Record<string, any> = {};
-  for (const field of fields) {
+  for (const field of normalizedFields) {
     if (field.defaultValue !== undefined) {
+      const resolvedDefaultValue = resolveInputDefaultValue(field.defaultValue, runtimeContext);
       if (field.type === 'multiselect') {
-        const raw = field.defaultValue;
+        const raw = resolvedDefaultValue;
         if (Array.isArray(raw)) {
           defaults[field.field] = raw.map(String).filter(Boolean);
         } else if (typeof raw === 'string' && raw.trim()) {
@@ -778,9 +782,9 @@ export async function promptInputForm(
           defaults[field.field] = [];
         }
       } else if (field.type === 'checkbox') {
-        defaults[field.field] = field.defaultValue === true || field.defaultValue === 'true';
+        defaults[field.field] = resolvedDefaultValue === true || resolvedDefaultValue === 'true';
       } else {
-        defaults[field.field] = field.defaultValue;
+        defaults[field.field] = resolvedDefaultValue;
       }
     }
   }
@@ -789,7 +793,7 @@ export async function promptInputForm(
     const event = new CustomEvent('dialog:form', {
       detail: {
         title,
-        fields,
+        fields: normalizedFields,
         fieldOptions,
         defaults,
         submitLabel,
@@ -798,6 +802,45 @@ export async function promptInputForm(
       },
     });
     window.dispatchEvent(event);
+  });
+}
+
+function normalizePromptInputField(field: Record<string, any>): Record<string, any> {
+  const declaredType = String(field.type || 'text').toLowerCase();
+  const type = ['string', 'varchar', 'char'].includes(declaredType)
+    ? 'text'
+    : ['integer', 'int', 'long', 'decimal', 'double', 'float'].includes(declaredType)
+      ? 'number'
+      : ['enum', 'dict', 'dictionary'].includes(declaredType)
+        ? 'select'
+        : declaredType;
+  const dictCode = typeof field.dictCode === 'string' ? field.dictCode.trim() : '';
+  return {
+    ...field,
+    type,
+    ...(dictCode && !field.dataSource
+      ? {
+          dataSource: {
+            type: 'api',
+            endpoint: `/api/meta/dict/by-code/${encodeURIComponent(dictCode)}/data`,
+            valueField: 'value',
+            labelField: 'label',
+          },
+        }
+      : {}),
+  };
+}
+
+function resolveInputDefaultValue(
+  value: unknown,
+  runtimeContext: Record<string, unknown>,
+): unknown {
+  if (typeof value !== 'string') return value;
+  const exact = value.match(/^\$\{([^}]+)\}$/);
+  if (exact) return readInputPath(runtimeContext, exact[1]);
+  return value.replace(/\$\{([^}]+)\}/g, (_match, path) => {
+    const resolved = readInputPath(runtimeContext, path);
+    return resolved === undefined || resolved === null ? '' : String(resolved);
   });
 }
 
@@ -1157,6 +1200,7 @@ actionRegistry.register(
           args?.inputFieldsTitle,
           fetchResult,
           args?.inputFieldsSubmitLabel,
+          (expressionContext as Record<string, unknown> | undefined) ?? {},
         );
       } catch {
         return; // user cancelled the form — abort the command silently

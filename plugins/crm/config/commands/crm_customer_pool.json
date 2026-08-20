@@ -103,6 +103,35 @@
     "cmd_risk_level": "L2"
   },
   {
+    "code": "crm:update_pool_customer",
+    "displayName:zh-CN": "编辑公海客户",
+    "displayName:en": "Update Pooled Customer",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_item_common",
+    "handler": "crm:update_pool_customer",
+    "handlerParams": { "dslPersistence": false },
+    "inputFields": ["crm_acc_name", "crm_acc_industry", "crm_acc_website", "crm_acc_phone", "crm_acc_address", "crm_acc_rating", "crm_acc_status", "crm_acc_remark", "crm_cpi_account_name", "crm_cpi_industry", "crm_cpi_phone", "crm_cpi_rating"],
+    "permissions": ["crm.customer_pool.manage"],
+    "agent_hint": "Update the underlying customer from a public-pool item and keep the shared pool snapshot consistent.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:delete_pool_customer",
+    "displayName:zh-CN": "永久删除公海客户",
+    "displayName:en": "Permanently Delete Pooled Customer",
+    "type": "custom",
+    "modelCode": "crm_customer_pool_item_common",
+    "handler": "crm:delete_pool_customer",
+    "handlerParams": { "dslPersistence": false },
+    "extension": {
+      "confirmMessage:zh-CN": "客户及其公海记录将被永久删除；存在联系人或商机引用时会阻止删除。确认继续？",
+      "confirmMessage:en": "The customer and its pool records will be permanently deleted. Related contacts or opportunities block deletion. Continue?"
+    },
+    "permissions": ["crm.customer_pool.manage"],
+    "agent_hint": "Permanently delete the customer behind a pool item after checking contact and opportunity references.",
+    "cmd_risk_level": "L4"
+  },
+  {
     "code": "crm:list_customer_pool_items",
     "displayName:zh-CN": "客户公海条目列表",
     "displayName:en": "List Customer Pool Items",

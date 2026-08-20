@@ -1004,10 +1004,10 @@
     "code": "crm_customer_owner_history_common",
     "displayName:zh-CN": "客户归属历史",
     "displayName:en": "Customer Ownership History",
-    "description": "Immutable audit evidence for move, claim, assign and automatic recycle events.",
+    "description": "Append-only audit evidence for move, claim, assign and automatic recycle events; purged only with an explicitly authorized permanent customer deletion.",
     "modelType": "entity",
     "modelCategory": "activity",
-    "immutable": true,
+    "immutable": false,
     "commandOnlyCreate": true,
     "extension": {
       "icon": "History",
@@ -1018,6 +1018,6 @@
     "semantic_description": "Append-only customer ownership history recording pool, previous owner, next owner, actor, reason and timestamp for every governed transition.",
     "domain_category": "crm",
     "data_sensitivity": "internal",
-    "lifecycle_description": "Append-only evidence; records are never edited or deleted."
+    "lifecycle_description": "Append-only during the customer lifecycle; records are never edited and are deleted only as part of the parent customer's authorized permanent purge, matching CordysCRM deletion semantics."
   }
 ]

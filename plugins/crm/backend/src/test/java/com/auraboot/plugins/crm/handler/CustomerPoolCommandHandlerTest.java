@@ -135,6 +135,62 @@ class CustomerPoolCommandHandlerTest {
     }
 
     @Test
+    void poolCustomerUpdateWritesTheCustomerAndItsSharedSnapshot() {
+        FakeDb db = availableItem(baseline(), "item-1", "customer-1", "member-a",
+                Instant.parse("2026-08-01T00:00:00Z"));
+
+        Map<?, ?> result = execute(db, CustomerPoolCommandHandler.UPDATE_CUSTOMER,
+                "item-1", "member-a", map(
+                        "crm_acc_name", "Acme Renewed",
+                        "crm_acc_industry", "manufacturing",
+                        "crm_acc_phone", "0755-12345678",
+                        "crm_acc_website", "https://acme.example"));
+
+        assertEquals("customer-1", result.get("customerId"));
+        assertEquals("Acme Renewed",
+                db.getById("crm_account_common", "customer-1").get("crm_acc_name"));
+        assertEquals("https://acme.example",
+                db.getById("crm_account_common", "customer-1").get("crm_acc_website"));
+        assertEquals("Acme Renewed",
+                db.getById("crm_customer_pool_item_common", "item-1").get("crm_cpi_account_name"));
+        assertEquals("manufacturing",
+                db.getById("crm_customer_pool_item_common", "item-1").get("crm_cpi_industry"));
+        assertThrows(SecurityException.class, () -> execute(db, CustomerPoolCommandHandler.UPDATE_CUSTOMER,
+                "item-1", "outside-sales", Map.of("crm_acc_name", "Forbidden")));
+        assertThrows(IllegalArgumentException.class, () -> execute(db, CustomerPoolCommandHandler.UPDATE_CUSTOMER,
+                "item-1", "member-a", Map.of("crm_acc_owner", "outside-sales")));
+    }
+
+    @Test
+    void poolCustomerDeleteBlocksBusinessReferencesAndRemovesOwnedResources() {
+        FakeDb referenced = availableItem(baseline(), "item-1", "customer-1", "member-a",
+                Instant.parse("2026-08-01T00:00:00Z"));
+        referenced.put("crm_contact_common", "contact-1", map("crm_ct_account_id", "customer-1"));
+        assertThrows(IllegalStateException.class, () -> execute(referenced,
+                CustomerPoolCommandHandler.DELETE_CUSTOMER, "item-1", "member-a", Map.of()));
+        assertNotNull(referenced.getById("crm_account_common", "customer-1"));
+
+        FakeDb removable = availableItem(baseline(), "item-1", "customer-1", "member-a",
+                Instant.parse("2026-08-01T00:00:00Z"));
+        removable.put("crm_customer_owner_history_common", "history-1", map(
+                "crm_coh_customer_id", "customer-1"));
+        removable.put("crm_activity_relation_common", "relation-1", map(
+                "crm_ar_object_type", "account", "crm_ar_object_id", "customer-1"));
+        removable.put("crm_activity_common", "activity-1", map(
+                "crm_act_related_model", "crm_account_common", "crm_act_related_id", "customer-1"));
+
+        Map<?, ?> result = execute(removable, CustomerPoolCommandHandler.DELETE_CUSTOMER,
+                "item-1", "member-a", Map.of());
+
+        assertEquals(true, result.get("deleted"));
+        assertNull(removable.getById("crm_account_common", "customer-1"));
+        assertNull(removable.getById("crm_customer_pool_item_common", "item-1"));
+        assertTrue(removable.query("crm_customer_owner_history_common", Map.of()).isEmpty());
+        assertTrue(removable.query("crm_activity_relation_common", Map.of()).isEmpty());
+        assertTrue(removable.query("crm_activity_common", Map.of()).isEmpty());
+    }
+
+    @Test
     void claimAcceptsPostgresTimestampTextReturnedByDynamicDataAccessor() {
         FakeDb db = availableItem(baseline(), "item-1", "customer-1", "other-owner",
                 Instant.parse("2026-08-01T00:00:00Z"));

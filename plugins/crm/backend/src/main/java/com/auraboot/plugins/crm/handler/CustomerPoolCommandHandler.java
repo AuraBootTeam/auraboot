@@ -32,10 +32,26 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
     public static final String MOVE = "crm:move_customer_to_pool";
     public static final String CLAIM = "crm:claim_pool_customer";
     public static final String ASSIGN = "crm:assign_pool_customer";
+    public static final String UPDATE_CUSTOMER = "crm:update_pool_customer";
+    public static final String DELETE_CUSTOMER = "crm:delete_pool_customer";
     public static final String TOGGLE = "crm:toggle_customer_pool";
     public static final String DELETE_POOL = "crm:delete_customer_pool";
     public static final String RUN_RECYCLE = "crm:run_customer_pool_recycle";
-    private static final Set<String> TYPES = Set.of(MOVE, CLAIM, ASSIGN, TOGGLE, DELETE_POOL, RUN_RECYCLE);
+    private static final Set<String> TYPES = Set.of(
+            MOVE, CLAIM, ASSIGN, UPDATE_CUSTOMER, DELETE_CUSTOMER, TOGGLE, DELETE_POOL, RUN_RECYCLE);
+    private static final Map<String, String> CUSTOMER_SNAPSHOT_FIELDS = Map.of(
+            "crm_acc_name", "crm_cpi_account_name",
+            "crm_acc_industry", "crm_cpi_industry",
+            "crm_acc_phone", "crm_cpi_phone",
+            "crm_acc_rating", "crm_cpi_rating");
+    private static final Map<String, String> SNAPSHOT_PAYLOAD_FIELDS = Map.of(
+            "crm_cpi_account_name", "crm_acc_name",
+            "crm_cpi_industry", "crm_acc_industry",
+            "crm_cpi_phone", "crm_acc_phone",
+            "crm_cpi_rating", "crm_acc_rating");
+    private static final Set<String> POOL_CUSTOMER_EDITABLE_FIELDS = Set.of(
+            "crm_acc_name", "crm_acc_industry", "crm_acc_website", "crm_acc_phone",
+            "crm_acc_address", "crm_acc_rating", "crm_acc_status", "crm_acc_remark");
     private static final Set<String> OPEN_CUSTOMER_STATES = Set.of("active");
     private static final Set<String> RECYCLE_SOURCE_STATES = Set.of("claimed", "assigned");
     private static final Set<String> RECYCLE_LEASE_STATES = Set.of("recycling", "recycling_retry");
@@ -70,6 +86,10 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
             case ASSIGN -> assign(db, required(context.recordId(), "Pool item id is required"), actor,
                     required(first(payload(context, "assigneeId"), payload(context, "crm_cpi_claimed_by")), "assigneeId is required"),
                     Instant.now(), shares, context.tenantId());
+            case UPDATE_CUSTOMER -> updatePoolCustomer(db,
+                    required(context.recordId(), "Pool item id is required"), actor, context.payload());
+            case DELETE_CUSTOMER -> deletePoolCustomer(db,
+                    required(context.recordId(), "Pool item id is required"), actor);
             case TOGGLE -> toggle(db, required(context.recordId(), "Pool id is required"), actor);
             case DELETE_POOL -> deletePool(db, required(context.recordId(), "Pool id is required"), actor);
             case RUN_RECYCLE -> recycleDetailed(db, shares, context.tenantId(), actor, Instant.now(),
@@ -199,6 +219,82 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
         String next = "enabled".equals(string(pool.get("crm_cp_status"))) ? "disabled" : "enabled";
         db.update("crm_customer_pool_common", poolId, Map.of("crm_cp_status", next));
         return Map.of("poolId", poolId, "status", next);
+    }
+
+    private static Map<String, Object> updatePoolCustomer(DataAccessor db, String itemId, String actor,
+                                                           Map<String, Object> payload) {
+        Map<String, Object> item = requireRecord(db, "crm_customer_pool_item_common", itemId, "Pool item");
+        requirePoolMember(db, required(item.get("crm_cpi_pool_id"), "Pool item has no pool"), actor);
+        String customerId = required(item.get("crm_cpi_account_id"), "Pool item has no customer");
+        requireRecord(db, "crm_account_common", customerId, "Customer");
+
+        HashMap<String, Object> customerPatch = new HashMap<>();
+        if (payload != null) {
+            for (String field : POOL_CUSTOMER_EDITABLE_FIELDS) {
+                if (payload.containsKey(field)) customerPatch.put(field, payload.get(field));
+            }
+            for (Map.Entry<String, String> mapping : SNAPSHOT_PAYLOAD_FIELDS.entrySet()) {
+                if (payload.containsKey(mapping.getKey())) {
+                    customerPatch.put(mapping.getValue(), payload.get(mapping.getKey()));
+                }
+            }
+        }
+        if (customerPatch.isEmpty()) {
+            throw new IllegalArgumentException("At least one editable customer field is required");
+        }
+        if (customerPatch.containsKey("crm_acc_name")) {
+            required(customerPatch.get("crm_acc_name"), "Customer name is required");
+        }
+
+        db.update("crm_account_common", customerId, customerPatch);
+        HashMap<String, Object> snapshotPatch = new HashMap<>();
+        for (Map.Entry<String, String> mapping : CUSTOMER_SNAPSHOT_FIELDS.entrySet()) {
+            if (customerPatch.containsKey(mapping.getKey())) {
+                snapshotPatch.put(mapping.getValue(), customerPatch.get(mapping.getKey()));
+            }
+        }
+        if (!snapshotPatch.isEmpty()) db.update("crm_customer_pool_item_common", itemId, snapshotPatch);
+        return Map.of(
+                "customerId", customerId,
+                "poolItemId", itemId,
+                "updatedFields", List.copyOf(customerPatch.keySet()));
+    }
+
+    private static Map<String, Object> deletePoolCustomer(DataAccessor db, String itemId, String actor) {
+        Map<String, Object> item = requireRecord(db, "crm_customer_pool_item_common", itemId, "Pool item");
+        requirePoolMember(db, required(item.get("crm_cpi_pool_id"), "Pool item has no pool"), actor);
+        String customerId = required(item.get("crm_cpi_account_id"), "Pool item has no customer");
+        requireRecord(db, "crm_account_common", customerId, "Customer");
+
+        if (!db.query("crm_contact_common", Map.of("crm_ct_account_id", customerId)).isEmpty()
+                || !db.query("crm_opportunity_common", Map.of("crm_opp_account_id", customerId)).isEmpty()) {
+            throw new IllegalStateException(
+                    "Customer has related contacts or opportunities and cannot be permanently deleted");
+        }
+
+        // The account-key constraint guarantees one pool projection per customer. We already
+        // resolved that projection above, so querying it again before deletion only adds a
+        // redundant metadata/data-scope round trip to every single and batch delete.
+        db.delete("crm_customer_pool_item_common", itemId);
+        deleteMatching(db, "crm_customer_owner_history_common", "crm_coh_customer_id", customerId);
+        deleteMatching(db, "crm_activity_relation_common", Map.of(
+                "crm_ar_object_type", "account", "crm_ar_object_id", customerId));
+        deleteMatching(db, "crm_activity_common", Map.of(
+                "crm_act_related_model", "crm_account_common", "crm_act_related_id", customerId));
+        db.delete("crm_account_common", customerId);
+        return Map.of("customerId", customerId, "poolItemId", itemId, "deleted", true);
+    }
+
+    private static void deleteMatching(DataAccessor db, String model, String field, String value) {
+        deleteMatching(db, model, Map.of(field, value));
+    }
+
+    private static void deleteMatching(DataAccessor db, String model, Map<String, Object> filters) {
+        List<String> ids = db.query(model, filters).stream()
+                .map(record -> string(record.get("pid")))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        db.batchDelete(model, ids);
     }
 
     private static Map<String, Object> deletePool(DataAccessor db, String poolId, String actor) {

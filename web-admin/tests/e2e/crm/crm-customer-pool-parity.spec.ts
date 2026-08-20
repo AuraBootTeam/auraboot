@@ -12,6 +12,7 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { read as xlsxRead, utils as XLSXUtils } from 'xlsx';
 import { ensureSidebarExpanded, waitForFormReady } from '../helpers';
 
 const ADMIN_EMAIL = 'admin@auraboot.com';
@@ -24,11 +25,15 @@ type CommandResult = Record<string, unknown>;
 // the same real command remains <= 100 after those bounded caches are populated.
 const COLD_CLAIM_SQL_BUDGET = 130;
 const STEADY_COMMAND_SQL_BUDGET = 100;
+// The first successful permanent purge initializes metadata for the pool projection,
+// ownership history and both activity relation shapes. The measured cold path is 102 SQL;
+// the second item in the same batch is 85, so keep a narrow cold-only ceiling.
+const COLD_CUSTOMER_DELETE_SQL_BUDGET = 110;
 const REJECT_SQL_BUDGET = 75;
 const MEMBER_OPERATIONS_SCENARIO =
-  'member scope, single claim, capacity, quota, batch claim and assignment, details and audit persist on the real stack';
+  'member scope, quick edit, chart, exports, guarded delete, batch update, claim and assignment persist on the real stack';
 const GOVERNANCE_RECYCLE_SCENARIO =
-  'administrator governs pools, capacity, relative and fixed recycle rules, and recent activity blocks recycle';
+  'administrator governs quick pool policy, capacity, relative and fixed recycle rules, and recent activity blocks recycle';
 const CUSTOMER_POOL_SCENARIOS = [MEMBER_OPERATIONS_SCENARIO, GOVERNANCE_RECYCLE_SCENARIO];
 const completedScenarios = new Set<string>();
 const failedScenarios = new Set<string>();
@@ -45,6 +50,55 @@ async function attachJson(testInfo: TestInfo, name: string, value: unknown): Pro
   const jsonPath = testInfo.outputPath(name);
   fs.writeFileSync(jsonPath, `${JSON.stringify(value, null, 2)}\n`);
   await testInfo.attach(name, { path: jsonPath, contentType: 'application/json' });
+}
+
+async function captureWorkbookExport(
+  page: Page,
+  testInfo: TestInfo,
+  name: string,
+  expectedNames: string[],
+  unexpectedNames: string[],
+  action: () => Promise<void>,
+): Promise<Record<string, unknown>> {
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().includes('/api/dynamic/crm_customer_pool_item_common/export'),
+    { timeout: 20_000 },
+  );
+  const downloadPromise = page.waitForEvent('download', { timeout: 20_000 });
+  await action();
+  const [response, download] = await Promise.all([responsePromise, downloadPromise]);
+  const responseBody = await response.json().catch(() => ({}));
+  expect(
+    response.ok() && String(responseBody?.code) === '0',
+    `${name} export failed: HTTP ${response.status()} ${JSON.stringify(responseBody).slice(0, 800)}`,
+  ).toBe(true);
+  expect(download.suggestedFilename(), `${name} filename`).toMatch(/\.xlsx$/i);
+  const destination = testInfo.outputPath(`${name}.xlsx`);
+  await download.saveAs(destination);
+  const workbookBytes = fs.readFileSync(destination);
+  expect(workbookBytes.subarray(0, 4).toString('hex'), `${name} must be a real XLSX`).toBe(
+    '504b0304',
+  );
+  const workbook = xlsxRead(workbookBytes, { type: 'buffer' });
+  expect(workbook.SheetNames.length, `${name} workbook sheet count`).toBeGreaterThan(0);
+  const rows = XLSXUtils.sheet_to_json<unknown[]>(workbook.Sheets[workbook.SheetNames[0]], {
+    header: 1,
+    defval: '',
+  });
+  const workbookText = JSON.stringify(rows);
+  for (const expected of expectedNames) {
+    expect(workbookText, `${name} must contain ${expected}`).toContain(expected);
+  }
+  for (const unexpected of unexpectedNames) {
+    expect(workbookText, `${name} must exclude ${unexpected}`).not.toContain(unexpected);
+  }
+  await testInfo.attach(name, {
+    path: destination,
+    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  return (response.request().postDataJSON() ?? {}) as Record<string, unknown>;
 }
 
 function writeRuntimeReceipt(): void {
@@ -125,6 +179,20 @@ function assertApiSqlCount(response: APIResponse, label: string, budget: number)
   return assertSqlCount(response.headers()['x-sql-count'], label, budget);
 }
 
+async function assertUiCommandResponse(
+  response: Response,
+  label: string,
+  budget: number,
+): Promise<number> {
+  const body = await response.json().catch(() => ({}));
+  expect(
+    response.ok(),
+    `${label} failed with HTTP ${response.status()}: ${JSON.stringify(body).slice(0, 800)}`,
+  ).toBe(true);
+  expect(String(body?.code), `${label} failed: ${JSON.stringify(body).slice(0, 800)}`).toBe('0');
+  return assertSqlCount(await response.headerValue('x-sql-count'), label, budget);
+}
+
 async function captureUiCommandSqlCount(
   page: Page,
   commandCode: string,
@@ -141,7 +209,7 @@ async function captureUiCommandSqlCount(
     ),
     action(),
   ]);
-  return assertSqlCount(await response.headerValue('x-sql-count'), label, budget);
+  return assertUiCommandResponse(response, label, budget);
 }
 
 async function captureUiCommandSqlCounts(
@@ -166,8 +234,8 @@ async function captureUiCommandSqlCounts(
     await action();
     await expect.poll(() => responses.length, { timeout: 20_000 }).toBe(expectedCount);
     return await Promise.all(
-      responses.map(async (response, index) =>
-        assertSqlCount(await response.headerValue('x-sql-count'), `${label} ${index + 1}`, budget),
+      responses.map((response, index) =>
+        assertUiCommandResponse(response, `${label} ${index + 1}`, budget),
       ),
     );
   } finally {
@@ -223,7 +291,9 @@ async function dynamicListRows(
   modelCode: string,
   size = 500,
 ): Promise<Record<string, unknown>[]> {
-  const response = await page.request.get(`/api/dynamic/${modelCode}/list?page=0&size=${size}`);
+  const response = await page.request.get(
+    `/api/dynamic/${modelCode}/list?pageNum=1&pageSize=${size}`,
+  );
   const body = await response.json().catch(() => ({}));
   expect(
     response.ok() && String(body?.code) === '0',
@@ -241,9 +311,12 @@ function formField(page: Page, fieldCode: string): Locator {
 }
 
 async function fillFormField(page: Page, fieldCode: string, value: string): Promise<void> {
-  const field = formField(page, fieldCode);
-  await field.scrollIntoViewIfNeeded();
-  const control = field.locator('input:not([type="hidden"]), textarea').first();
+  const control = page
+    .locator(
+      `[data-testid="form-field-${fieldCode}"] input:not([type="hidden"]), ` +
+        `[data-testid="form-field-${fieldCode}"] textarea`,
+    )
+    .first();
   await expect(control, `${fieldCode} form control`).toBeVisible({ timeout: 10_000 });
   await control.fill(value);
 }
@@ -503,7 +576,7 @@ async function openAs(
 }
 
 test.describe('CRM customer-pool Cordys parity W1', () => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
 
   test.beforeAll(() => {
     completedScenarios.clear();
@@ -578,13 +651,37 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     const batchB = `W1-Batch-B-${stamp}`;
     const revokedA = `W1-Revoked-A-${stamp}`;
     const raceA = `W1-Race-A-${stamp}`;
+    const quickEditA = `W1-Quick-Edit-${stamp}`;
+    const quickEditedA = `${quickEditA}-Updated`;
+    const deleteA = `W1-Delete-A-${stamp}`;
+    const deleteB = `W1-Delete-B-${stamp}`;
+    const deleteBatchName = `W1-Delete-Renamed-${stamp}`;
+    const guardedDeleteA = `W1-Guarded-Delete-${stamp}`;
     const a = await createCustomerAndMove(page, poolPid, singleA, 1);
     const b = await createCustomerAndMove(page, poolPid, singleB, 2);
     await createCustomerAndMove(page, poolPid, assignA, 3);
-    await createCustomerAndMove(page, poolPid, batchA, 4);
-    await createCustomerAndMove(page, poolPid, batchB, 5);
+    const batchCustomerA = await createCustomerAndMove(page, poolPid, batchA, 4);
+    const batchCustomerB = await createCustomerAndMove(page, poolPid, batchB, 5);
     const revoked = await createCustomerAndMove(page, poolPid, revokedA, 6);
     const race = await createCustomerAndMove(page, poolPid, raceA, 7);
+    const quickEdit = await createCustomerAndMove(page, poolPid, quickEditA, 8);
+    const deletableA = await createCustomerAndMove(page, poolPid, deleteA, 9);
+    const deletableB = await createCustomerAndMove(page, poolPid, deleteB, 10);
+    const guardedDelete = await createCustomerAndMove(page, poolPid, guardedDeleteA, 11);
+    await command(
+      page,
+      'crm:create_contact',
+      {
+        crm_ct_account_id: guardedDelete.customerPid,
+        crm_ct_name: `Guarded Contact ${stamp}`,
+        crm_ct_title: 'Procurement Director',
+        crm_ct_email: `guarded-contact-${stamp}@e2e.local`,
+        crm_ct_is_primary: true,
+        crm_ct_remark: 'Reference that must block permanent customer deletion',
+      },
+      undefined,
+      'create',
+    );
 
     const salesSession = await openAs(browser, baseURL ?? 'http://localhost:5251', sales.email);
     try {
@@ -779,6 +876,26 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
         'revoked membership rejection with an existing session',
         REJECT_SQL_BUDGET,
       );
+      const unauthorizedUpdateResponse = await salesPage.request.post(
+        '/api/meta/commands/execute/crm:update_pool_customer',
+        {
+          data: {
+            targetRecordPid: quickEdit.itemPid,
+            operationType: 'update',
+            payload: { crm_acc_rating: 'D' },
+          },
+        },
+      );
+      const unauthorizedUpdateBody = await unauthorizedUpdateResponse.json().catch(() => ({}));
+      expect(String(unauthorizedUpdateBody?.code)).not.toBe('0');
+      expect(JSON.stringify(unauthorizedUpdateBody)).toMatch(
+        /permission|forbidden|not permitted|command permit scope|无权|权限/i,
+      );
+      sqlEvidence.unauthorizedUpdateReject = assertApiSqlCount(
+        unauthorizedUpdateResponse,
+        'sales role customer update rejection',
+        REJECT_SQL_BUDGET,
+      );
       await salesPage.reload({ waitUntil: 'domcontentloaded' });
       await expect(companyCell(salesPage, revokedA)).toHaveCount(0);
       await expect(companyCell(salesPage, singleB)).toHaveCount(0);
@@ -856,13 +973,259 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
       await managerPage
         .getByRole('button', { name: /批量处理|Batch Operations/, exact: true })
         .click();
-      await expect(managerPage.getByText(/批量领取与分配|Batch claim and assignment/)).toBeVisible({
-        timeout: 15_000,
-      });
+      await expect(
+        managerPage.getByText(/批量治理公海客户|Govern pooled customers in bulk/),
+      ).toBeVisible({ timeout: 15_000 });
       const batchTabs = managerPage.getByRole('navigation', { name: /Tabs/ });
       await expect(batchTabs.getByRole('button', { name: /待领取|Available/ })).toBeVisible();
       await expect(batchTabs.getByRole('button', { name: /已领取|Claimed/ })).toBeVisible();
       await expect(batchTabs.getByRole('button', { name: /已分配|Assigned/ })).toBeVisible();
+
+      // Cordys chart(): analyze the current filtered pool list and prove the aggregate backend,
+      // dictionary labels, chart, and breakdown table all render without an error state.
+      await managerPage.getByTestId('view-analysis-open').click();
+      const analysisDrawer = managerPage.getByTestId('view-analysis-drawer');
+      await expect(analysisDrawer).toBeVisible();
+      await expect(analysisDrawer.getByTestId('view-analysis-error')).toHaveCount(0);
+      await expect(
+        analysisDrawer.locator('[data-testid^="view-analysis-breakdown-"]').first(),
+      ).toBeVisible({ timeout: 20_000 });
+      await analysisDrawer.getByTestId('view-analysis-chart-donut').click();
+      await expect(analysisDrawer.getByTestId('view-analysis-chart-donut')).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      await attachScreenshot(managerPage, testInfo, 'manager-customer-pool-analysis');
+      await analysisDrawer.getByTestId('view-analysis-close').click();
+
+      // Cordys quickUpdate: a generated row form must restore current values, render dictionary
+      // choices, update the account master, and keep the pool projection synchronized.
+      const quickEditRow = managerPage.getByRole('row', { name: new RegExp(quickEditA) });
+      await clickRowAction(managerPage, quickEditRow, 'quick_update', /快速编辑|Quick Edit/);
+      const quickEditDialog = managerPage.getByTestId('form-dialog');
+      await expect(quickEditDialog).toBeVisible();
+      await expect(
+        quickEditDialog.getByTestId('form-dialog-field-crm_cpi_account_name'),
+      ).toHaveValue(quickEditA);
+      await expect(quickEditDialog.getByTestId('form-dialog-field-crm_cpi_rating')).toHaveValue(
+        'A',
+      );
+      await quickEditDialog
+        .getByTestId('form-dialog-field-crm_cpi_account_name')
+        .fill(quickEditedA);
+      await quickEditDialog.getByTestId('form-dialog-field-crm_cpi_rating').selectOption('D');
+      sqlEvidence.quickCustomerUpdate = await captureUiCommandSqlCount(
+        managerPage,
+        'crm:update_pool_customer',
+        'manager quick customer update',
+        STEADY_COMMAND_SQL_BUDGET,
+        () => quickEditDialog.getByTestId('form-dialog-submit').click(),
+      );
+      await expect(companyCell(managerPage, quickEditedA)).toBeVisible({ timeout: 15_000 });
+      await expect(companyCell(managerPage, quickEditA)).toHaveCount(0);
+      const quickAccountResponse = await managerPage.request.get(
+        `/api/dynamic/crm_account_common/${quickEdit.customerPid}`,
+      );
+      const quickItemResponse = await managerPage.request.get(
+        `/api/dynamic/crm_customer_pool_item_common/${quickEdit.itemPid}`,
+      );
+      const quickAccount = (await quickAccountResponse.json())?.data;
+      const quickItem = (await quickItemResponse.json())?.data;
+      expect(quickAccount?.crm_acc_name).toBe(quickEditedA);
+      expect(quickAccount?.crm_acc_rating).toBe('D');
+      expect(quickItem?.crm_cpi_account_name).toBe(quickEditedA);
+      expect(quickItem?.crm_cpi_rating).toBe('D');
+
+      // Cordys exportAll: the current Available tab is exported as a real, parseable workbook.
+      const exportAllRequest = await captureWorkbookExport(
+        managerPage,
+        testInfo,
+        'customer-pool-export-all-available',
+        [quickEditedA, batchA, batchB, guardedDeleteA],
+        [assignA],
+        async () => {
+          await managerPage.getByTestId('toolbar-more-menu').click();
+          await managerPage.getByTestId('more-menu-export-excel').click();
+        },
+      );
+      expect(JSON.stringify(exportAllRequest)).toContain('available');
+
+      // Cordys exportSelect: the selected workbook must contain exactly the chosen business rows.
+      for (const company of [batchA, batchB]) {
+        const row = managerPage.getByRole('row', { name: new RegExp(company) });
+        await row.getByRole('checkbox').click();
+      }
+      const exportSelectedRequest = await captureWorkbookExport(
+        managerPage,
+        testInfo,
+        'customer-pool-export-selected',
+        [batchA, batchB],
+        [raceA, quickEditedA],
+        async () => {
+          await managerPage.getByTestId('bulk-more-actions-btn').click();
+          await managerPage.getByTestId('bulk-export-selected-btn').click();
+        },
+      );
+      expect(JSON.stringify(exportSelectedRequest)).toContain(batchCustomerA.itemPid);
+      expect(JSON.stringify(exportSelectedRequest)).toContain(batchCustomerB.itemPid);
+
+      // Cordys batchUpdate: update two customer masters and their pool snapshots in one governed
+      // interaction. The shared bulk result still executes and budgets each command independently.
+      await managerPage.getByTestId('bulk-more-actions-btn').click();
+      await managerPage.getByTestId('bulk-action-batch_update_rating').click();
+      const batchUpdateDialog = managerPage.getByTestId('bulk-field-command-dialog');
+      await expect(batchUpdateDialog).toContainText(/2 条记录|2 records/);
+      await batchUpdateDialog.getByTestId('select-trigger-crm_acc_rating').click();
+      await managerPage.getByRole('option', { name: /C - 一般客户|C - Normal/ }).click();
+      const batchUpdateCounts = await captureUiCommandSqlCounts(
+        managerPage,
+        'crm:update_pool_customer',
+        2,
+        'successful manager batch customer update',
+        STEADY_COMMAND_SQL_BUDGET,
+        () => batchUpdateDialog.getByTestId('bulk-field-command-submit').click(),
+      );
+      sqlEvidence.managerBatchUpdate1 = batchUpdateCounts[0];
+      sqlEvidence.managerBatchUpdate2 = batchUpdateCounts[1];
+      await expect(
+        managerPage.getByText(/批量修改评级已完成.*成功 2 条|Update Ratings.*2/i),
+      ).toBeVisible({
+        timeout: 20_000,
+      });
+      for (const record of [batchCustomerA, batchCustomerB]) {
+        const accountResponse = await managerPage.request.get(
+          `/api/dynamic/crm_account_common/${record.customerPid}`,
+        );
+        const itemResponse = await managerPage.request.get(
+          `/api/dynamic/crm_customer_pool_item_common/${record.itemPid}`,
+        );
+        expect((await accountResponse.json())?.data?.crm_acc_rating).toBe('C');
+        expect((await itemResponse.json())?.data?.crm_cpi_rating).toBe('C');
+      }
+
+      for (const company of [batchA, batchB]) {
+        await managerPage
+          .getByRole('row', { name: new RegExp(company) })
+          .getByRole('checkbox')
+          .click();
+      }
+      await managerPage.getByTestId('bulk-more-actions-btn').click();
+      await managerPage.getByTestId('bulk-action-batch_update_industry').click();
+      const batchIndustryDialog = managerPage.getByTestId('bulk-field-command-dialog');
+      await batchIndustryDialog.getByTestId('select-trigger-crm_acc_industry').click();
+      await managerPage.getByRole('option', { name: /制造业|Manufacturing/ }).click();
+      const batchIndustryCounts = await captureUiCommandSqlCounts(
+        managerPage,
+        'crm:update_pool_customer',
+        2,
+        'successful manager batch industry update',
+        STEADY_COMMAND_SQL_BUDGET,
+        () => batchIndustryDialog.getByTestId('bulk-field-command-submit').click(),
+      );
+      sqlEvidence.managerBatchIndustry1 = batchIndustryCounts[0];
+      sqlEvidence.managerBatchIndustry2 = batchIndustryCounts[1];
+      await expect(
+        managerPage.getByText(/批量修改行业已完成.*成功 2 条|Update Industries.*2/i),
+      ).toBeVisible({ timeout: 20_000 });
+      for (const record of [batchCustomerA, batchCustomerB]) {
+        const accountResponse = await managerPage.request.get(
+          `/api/dynamic/crm_account_common/${record.customerPid}`,
+        );
+        const itemResponse = await managerPage.request.get(
+          `/api/dynamic/crm_customer_pool_item_common/${record.itemPid}`,
+        );
+        expect((await accountResponse.json())?.data?.crm_acc_industry).toBe('manufacturing');
+        expect((await itemResponse.json())?.data?.crm_cpi_industry).toBe('manufacturing');
+      }
+
+      for (const company of [deleteA, deleteB]) {
+        await managerPage
+          .getByRole('row', { name: new RegExp(company) })
+          .getByRole('checkbox')
+          .click();
+      }
+      await managerPage.getByTestId('bulk-action-batch_update_name').click();
+      const batchNameDialog = managerPage.getByTestId('bulk-field-command-dialog');
+      await batchNameDialog.locator('input[name="crm_acc_name"]').fill(deleteBatchName);
+      const batchNameCounts = await captureUiCommandSqlCounts(
+        managerPage,
+        'crm:update_pool_customer',
+        2,
+        'successful manager batch name update',
+        STEADY_COMMAND_SQL_BUDGET,
+        () => batchNameDialog.getByTestId('bulk-field-command-submit').click(),
+      );
+      sqlEvidence.managerBatchName1 = batchNameCounts[0];
+      sqlEvidence.managerBatchName2 = batchNameCounts[1];
+      await expect(
+        managerPage.getByText(/批量修改客户名称已完成.*成功 2 条|Update Customer Names.*2/i),
+      ).toBeVisible({ timeout: 20_000 });
+      await expect(companyCell(managerPage, deleteBatchName)).toHaveCount(2);
+      await attachScreenshot(managerPage, testInfo, 'manager-customer-pool-update-result');
+
+      // Cordys delete(): a referenced customer must be rejected and remain visible.
+      const guardedDeleteRow = managerPage.getByRole('row', {
+        name: new RegExp(guardedDeleteA),
+      });
+      const guardedDeleteResponsePromise = managerPage.waitForResponse(
+        (response) => response.url().includes('/execute/crm:delete_pool_customer'),
+        { timeout: 20_000 },
+      );
+      await clickRowAction(managerPage, guardedDeleteRow, 'delete', /永久删除|Permanently Delete/);
+      await confirmDialog(managerPage);
+      const guardedDeleteResponse = await guardedDeleteResponsePromise;
+      const guardedDeleteBody = await guardedDeleteResponse.json().catch(() => ({}));
+      expect(String(guardedDeleteBody?.code)).not.toBe('0');
+      expect(JSON.stringify(guardedDeleteBody)).toMatch(
+        /related contacts or opportunities|联系人|商机/i,
+      );
+      sqlEvidence.guardedCustomerDelete = assertSqlCount(
+        await guardedDeleteResponse.headerValue('x-sql-count'),
+        'referenced customer delete rejection',
+        REJECT_SQL_BUDGET,
+      );
+      await expect(companyCell(managerPage, guardedDeleteA)).toBeVisible();
+
+      // Cordys batchDelete: unreferenced customers are permanently removed from both the account
+      // master and pool projection; the L4 confirmation is exercised through the rendered UI.
+      const renamedDeleteRows = await managerPage
+        .getByRole('row', { name: new RegExp(deleteBatchName) })
+        .all();
+      expect(renamedDeleteRows, 'batch name update must leave two deletable rows').toHaveLength(2);
+      for (const row of renamedDeleteRows) {
+        await row.getByRole('checkbox').click();
+      }
+      const batchDeleteCounts = await captureUiCommandSqlCounts(
+        managerPage,
+        'crm:delete_pool_customer',
+        2,
+        'successful manager batch customer delete',
+        COLD_CUSTOMER_DELETE_SQL_BUDGET,
+        async () => {
+          await managerPage.getByTestId('bulk-more-actions-btn').click();
+          await managerPage.getByTestId('bulk-action-batch_delete').click();
+          await confirmDialog(managerPage);
+        },
+      );
+      sqlEvidence.managerBatchDelete1 = batchDeleteCounts[0];
+      sqlEvidence.managerBatchDelete2 = batchDeleteCounts[1];
+      await expect(companyCell(managerPage, deleteBatchName)).toHaveCount(0);
+      const remainingAccounts = await dynamicListRows(managerPage, 'crm_account_common');
+      const remainingPoolItems = await dynamicListRows(
+        managerPage,
+        'crm_customer_pool_item_common',
+      );
+      expect(
+        remainingAccounts.filter((record) =>
+          [deletableA.customerPid, deletableB.customerPid].includes(String(record.pid)),
+        ),
+      ).toHaveLength(0);
+      expect(
+        remainingPoolItems.filter((record) =>
+          [deletableA.itemPid, deletableB.itemPid].includes(String(record.pid)),
+        ),
+      ).toHaveLength(0);
+
       for (const company of [batchA, batchB]) {
         const row = managerPage.getByRole('row', { name: new RegExp(company) });
         await row.getByRole('checkbox').click();
@@ -1066,6 +1429,44 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     await expect(page.getByRole('cell', { name: editedPoolName, exact: true })).toBeVisible({
       timeout: 15_000,
     });
+
+    // Cordys quickUpdate for pool policy: restore the persisted row into a compact generated form
+    // and update only the high-frequency claim-policy fields without reopening the full page.
+    poolRow = page.getByRole('row', { name: new RegExp(editedPoolName) });
+    await clickRowAction(page, poolRow, 'quick_update', /快速调整策略|Quick Policy Update/);
+    const quickPolicyDialog = page.getByTestId('form-dialog');
+    await expect(quickPolicyDialog).toBeVisible();
+    await expect(quickPolicyDialog.getByTestId('form-dialog-field-crm_cp_name')).toHaveValue(
+      editedPoolName,
+    );
+    await expect(
+      quickPolicyDialog.getByTestId('form-dialog-field-crm_cp_daily_pick_limit'),
+    ).toHaveValue('7');
+    await expect(
+      quickPolicyDialog.getByTestId('form-dialog-field-crm_cp_new_cooldown_days'),
+    ).toHaveValue('0');
+    await quickPolicyDialog.getByTestId('form-dialog-field-crm_cp_daily_pick_limit').fill('9');
+    const quickPolicyResponsePromise = page.waitForResponse(
+      (response) => response.url().includes('/execute/crm:update_customer_pool'),
+      { timeout: 20_000 },
+    );
+    await quickPolicyDialog.getByTestId('form-dialog-submit').click();
+    const quickPolicyResponse = await quickPolicyResponsePromise;
+    const quickPolicyBody = await quickPolicyResponse.json().catch(() => ({}));
+    expect(String(quickPolicyBody?.code)).toBe('0');
+    assertSqlCount(
+      await quickPolicyResponse.headerValue('x-sql-count'),
+      'quick pool policy update',
+      STEADY_COMMAND_SQL_BUDGET,
+    );
+    const quickPolicyFact = await page.request.get(
+      `/api/dynamic/crm_customer_pool_common/${poolPid}`,
+    );
+    expect(Number((await quickPolicyFact.json())?.data?.crm_cp_daily_pick_limit)).toBe(9);
+    await expect(page.getByRole('cell', { name: editedPoolName, exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await attachScreenshot(page, testInfo, 'customer-pool-quick-policy-update');
 
     // D9: disable and re-enable the same pool from row commands; every state is persisted.
     poolRow = page.getByRole('row', { name: new RegExp(editedPoolName) });

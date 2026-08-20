@@ -6,6 +6,7 @@ const root = new URL('../', import.meta.url);
 const json = async (path) => JSON.parse(await readFile(new URL(path, root), 'utf8'));
 
 test('PAR-06 customer pool exposes the complete Cordys policy denominator', async () => {
+  const plugin = await json('plugin.json');
   const models = await json('config/models.json');
   const commands = await json('config/commands/crm_customer_pool.json');
   const recycleRuleCommands = await json('config/commands/crm_customer_pool_recycle_rule.json');
@@ -46,6 +47,11 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
     'utf8',
   );
 
+  assert.ok(
+    plugin.dependencies.includes('com.auraboot.org-management'),
+    'CRM department-scoped permissions require the organization model at runtime',
+  );
+
   const modelCodes = new Set(models.map((model) => model.code));
   for (const code of [
     'crm_customer_pool_common',
@@ -55,6 +61,16 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
     'crm_customer_pool_quota_common',
     'crm_customer_owner_history_common',
   ]) assert.ok(modelCodes.has(code), `missing model ${code}`);
+  const ownershipHistoryModel = models.find(
+    (model) => model.code === 'crm_customer_owner_history_common',
+  );
+  assert.equal(ownershipHistoryModel.commandOnlyCreate, true);
+  assert.equal(
+    ownershipHistoryModel.immutable,
+    false,
+    'Cordys permanent customer deletion must be able to cascade-purge ownership history',
+  );
+  assert.match(ownershipHistoryModel.lifecycle_description, /authorized permanent purge/);
 
   const poolFieldCodes = new Set(poolFields.map((field) => field.code));
   for (const code of [
@@ -119,6 +135,8 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
     'crm:move_customer_to_pool',
     'crm:claim_pool_customer',
     'crm:assign_pool_customer',
+    'crm:update_pool_customer',
+    'crm:delete_pool_customer',
     'crm:toggle_customer_pool',
     'crm:delete_customer_pool',
     'crm:run_customer_pool_recycle',
@@ -152,6 +170,8 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
     'crm:move_customer_to_pool',
     'crm:claim_pool_customer',
     'crm:assign_pool_customer',
+    'crm:update_pool_customer',
+    'crm:delete_pool_customer',
     'crm:toggle_customer_pool',
     'crm:delete_customer_pool',
     'crm:run_customer_pool_recycle',
@@ -255,10 +275,54 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
   const batchQueue = batchPage.blocks.find((block) => block.id === 'pool_queue');
   assert.deepEqual(
     batchQueue.table.bulkActions.map((action) => action.code),
-    ['batch_claim', 'batch_assign'],
+    [
+      'batch_claim',
+      'batch_assign',
+      'batch_update_name',
+      'batch_update_industry',
+      'batch_update_rating',
+      'batch_delete',
+    ],
   );
   const batchAssign = batchQueue.table.bulkActions.find((action) => action.code === 'batch_assign');
   assert.equal(batchAssign.action.input.component, 'MemberPicker');
+  const batchIndustry = batchQueue.table.bulkActions.find(
+    (action) => action.code === 'batch_update_industry',
+  );
+  assert.equal(batchIndustry.action.command, 'crm:update_pool_customer');
+  assert.equal(batchIndustry.action.input.dictCode, 'crm_account_industry');
+  const batchDelete = batchQueue.table.bulkActions.find((action) => action.code === 'batch_delete');
+  assert.equal(batchDelete.variant, 'danger');
+  assert.deepEqual(batchDelete.action, {
+    type: 'bulk_record_command',
+    command: 'crm:delete_pool_customer',
+    operationType: 'DELETE',
+  });
+  const rowActions = batchQueue.columns.find((column) => column.isActionColumn).buttons;
+  assert.equal(
+    rowActions.find((action) => action.code === 'quick_update').action.command,
+    'crm:update_pool_customer',
+  );
+  assert.equal(
+    rowActions.find((action) => action.code === 'delete').action.command,
+    'crm:delete_pool_customer',
+  );
+  const poolSettingsActions = pages[0].blocks
+    .find((block) => block.id === 'crm_cp_table')
+    .columns.find((column) => column.isActionColumn).buttons;
+  const quickPolicyUpdate = poolSettingsActions.find((action) => action.code === 'quick_update');
+  assert.equal(quickPolicyUpdate.action.command, 'crm:update_customer_pool');
+  const quickPolicyLimit = quickPolicyUpdate.action.inputFields.find(
+    (field) => field.field === 'crm_cp_daily_pick_limit',
+  );
+  assert.equal(quickPolicyLimit.type, 'integer');
+  assert.equal(quickPolicyLimit.defaultValue, '${row.crm_cp_daily_pick_limit}');
+  const quickCustomerRating = rowActions
+    .find((action) => action.code === 'quick_update').action.inputFields
+    .find((field) => field.field === 'crm_cpi_rating');
+  assert.equal(quickCustomerRating.type, 'enum');
+  assert.equal(quickCustomerRating.dictCode, 'crm_account_rating');
+  assert.equal(quickCustomerRating.defaultValue, '${row.crm_cpi_rating}');
   assert.ok(
     operations.blocks
       .find((block) => block.id === 'crm_customer_pool_header_actions')
@@ -307,6 +371,9 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
     'Previous owner cooldown',
     'Customer capacity reached',
     'available customers and cannot be deleted',
+    'related contacts or opportunities',
+    'crm:update_pool_customer',
+    'crm:delete_pool_customer',
     'crm_customer_owner_history',
   ]) assert.match(handler, new RegExp(proof));
   assert.match(scheduler, /@Scheduled/);

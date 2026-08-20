@@ -28,16 +28,16 @@
       "menus": 55,
       "pages": 124,
       "page-blocks": 388,
-      "page-fields": 1627,
-      "ui-actions": 563,
-      "commands": 233,
+      "page-fields": 1638,
+      "ui-actions": 570,
+      "commands": 235,
       "permissions": 113,
       "queries": 49,
       "dashboards": 37
     },
     "productVerdicts": {
-      "pass": 504,
-      "untested": 2734
+      "pass": 526,
+      "untested": 2732
     },
     "fullProductNonGoals": [
       "data migration"
@@ -739,6 +739,20 @@
         "verdict": "pass"
       },
       {
+        "id": "crm:delete_pool_customer",
+        "goals": [
+          "CORDYS-CUSTOMER-POOL"
+        ],
+        "permissionCodes": [
+          "crm.customer_pool.manage"
+        ],
+        "evidence": [
+          "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+        ],
+        "permissionsVerified": true,
+        "verdict": "pass"
+      },
+      {
         "id": "crm:investigate_complaint",
         "goals": [
           "RG-1"
@@ -1002,6 +1016,20 @@
       },
       {
         "id": "crm:update_customer_pool_recycle_rule",
+        "goals": [
+          "CORDYS-CUSTOMER-POOL"
+        ],
+        "permissionCodes": [
+          "crm.customer_pool.manage"
+        ],
+        "evidence": [
+          "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+        ],
+        "permissionsVerified": true,
+        "verdict": "pass"
+      },
+      {
+        "id": "crm:update_pool_customer",
         "goals": [
           "CORDYS-CUSTOMER-POOL"
         ],
@@ -2282,12 +2310,14 @@
           "crm:delete_customer_capacity",
           "crm:delete_customer_pool",
           "crm:delete_customer_pool_recycle_rule",
+          "crm:delete_pool_customer",
           "crm:move_customer_to_pool",
           "crm:run_customer_pool_recycle",
           "crm:toggle_customer_pool",
           "crm:update_customer_capacity",
           "crm:update_customer_pool",
-          "crm:update_customer_pool_recycle_rule"
+          "crm:update_customer_pool_recycle_rule",
+          "crm:update_pool_customer"
         ],
         "queries": [
           "crm_customer_pool_ops_queue",
@@ -2351,6 +2381,9 @@
           "crm_customer_owner_history_list:history:crm_coh_reason",
           "crm_customer_pool_batch_list:pool_queue:crm_cpi_account_name",
           "crm_customer_pool_batch_list:pool_queue:crm_cpi_claimed_by",
+          "crm_customer_pool_batch_list:pool_queue:crm_cpi_industry",
+          "crm_customer_pool_batch_list:pool_queue:crm_cpi_phone",
+          "crm_customer_pool_batch_list:pool_queue:crm_cpi_rating",
           "crm_customer_pool_batch_list:pool_tabs:crm_cpi_status",
           "crm_customer_pool_detail:policy:crm_cp_name",
           "crm_customer_pool_form:claim_policy:crm_cp_daily_pick_limit",
@@ -2373,6 +2406,9 @@
           "crm_customer_pool_item_list:crm_customer_pool_search:crm_cpi_account_name",
           "crm_customer_pool_item_list:crm_customer_pool_status:owner_name",
           "crm_customer_pool_list:crm_cp_table:crm_cp_name",
+          "crm_customer_pool_list:crm_cp_table:crm_cp_daily_pick_limit",
+          "crm_customer_pool_list:crm_cp_table:crm_cp_new_cooldown_days",
+          "crm_customer_pool_list:crm_cp_table:crm_cp_previous_owner_cooldown_days",
           "crm_customer_pool_list:crm_cp_table:crm_cp_status",
           "crm_customer_pool_recycle_rule_detail:condition:crm_cprr_code",
           "crm_customer_pool_recycle_rule_detail:condition:crm_cprr_days",
@@ -2400,6 +2436,15 @@
           "crm_customer_owner_history_list:history:view",
           "crm_customer_pool_batch_list:pool_queue:batch_assign",
           "crm_customer_pool_batch_list:pool_queue:batch_claim",
+          "crm_customer_pool_batch_list:pool_queue:batch_delete",
+          "crm_customer_pool_batch_list:pool_queue:batch_update_industry",
+          "crm_customer_pool_batch_list:pool_queue:batch_update_name",
+          "crm_customer_pool_batch_list:pool_queue:batch_update_rating",
+          "crm_customer_pool_batch_list:pool_queue:delete",
+          "crm_customer_pool_batch_list:pool_queue:quick_update",
+          "crm_customer_pool_batch_list:platform:analyze_current_view",
+          "crm_customer_pool_batch_list:platform:export_filtered_xlsx",
+          "crm_customer_pool_batch_list:platform:export_selected_xlsx",
           "crm_customer_pool_batch_list:pool_tabs:assigned",
           "crm_customer_pool_batch_list:pool_tabs:available",
           "crm_customer_pool_batch_list:pool_tabs:claimed",
@@ -2410,6 +2455,7 @@
           "crm_customer_pool_item_list:crm_customer_pool_header_actions:batch_operations",
           "crm_customer_pool_item_list:crm_customer_pool_queue:view_pool_evidence",
           "crm_customer_pool_list:crm_cp_table:delete",
+          "crm_customer_pool_list:crm_cp_table:quick_update",
           "crm_customer_pool_list:crm_cp_table:toggle",
           "crm_customer_pool_list:crm_cp_table:view",
           "crm_customer_pool_list:crm_cp_toolbar:create",
@@ -17279,7 +17325,46 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].table.bulkActions[1].action.input.field"
         },
         {
-          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_pool_id:4",
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_acc_name:4",
+          "action": "Verify field crm_acc_name in pool_queue on crm_customer_pool_batch_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].table.bulkActions[2].action.input.field"
+        },
+        {
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_acc_industry:5",
+          "action": "Verify field crm_acc_industry in pool_queue on crm_customer_pool_batch_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].table.bulkActions[3].action.input.field"
+        },
+        {
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_acc_rating:6",
+          "action": "Verify field crm_acc_rating in pool_queue on crm_customer_pool_batch_list",
+          "evidence": [],
+          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
+          "verdict": "untested",
+          "verdict_by": null,
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].table.bulkActions[4].action.input.field"
+        },
+        {
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_pool_id:7",
           "action": "Verify field crm_cpi_pool_id in pool_queue on crm_customer_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -17292,7 +17377,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[0].field"
         },
         {
-          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_account_name:5",
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_account_name:8",
           "action": "Verify field crm_cpi_account_name in pool_queue on crm_customer_pool_batch_list",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -17307,12 +17392,14 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[1].field"
         },
         {
-          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_rating:6",
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_rating:9",
           "action": "Verify field crm_cpi_rating in pool_queue on crm_customer_pool_batch_list",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -17320,12 +17407,14 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[2].field"
         },
         {
-          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_industry:7",
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_industry:10",
           "action": "Verify field crm_cpi_industry in pool_queue on crm_customer_pool_batch_list",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -17333,7 +17422,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[3].field"
         },
         {
-          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_health_score:8",
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_health_score:11",
           "action": "Verify field crm_cpi_health_score in pool_queue on crm_customer_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -17346,7 +17435,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[4].field"
         },
         {
-          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_previous_owner:9",
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_previous_owner:12",
           "action": "Verify field crm_cpi_previous_owner in pool_queue on crm_customer_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -17359,7 +17448,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[5].field"
         },
         {
-          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_entered_at:10",
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_entered_at:13",
           "action": "Verify field crm_cpi_entered_at in pool_queue on crm_customer_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -17372,7 +17461,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[6].field"
         },
         {
-          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_claim_release_at:11",
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_claim_release_at:14",
           "action": "Verify field crm_cpi_claim_release_at in pool_queue on crm_customer_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -17385,7 +17474,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[7].field"
         },
         {
-          "id": "field:crm_customer_pool_batch_list:pool_queue:actions:12",
+          "id": "field:crm_customer_pool_batch_list:pool_queue:actions:15",
           "action": "Verify field actions in pool_queue on crm_customer_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -17398,7 +17487,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[8].field"
         },
         {
-          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_claimed_by:13",
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_claimed_by:16",
           "action": "Verify field crm_cpi_claimed_by in pool_queue on crm_customer_pool_batch_list",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
@@ -17413,7 +17502,67 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[8].buttons[3].action.inputFields[0].field"
         },
         {
-          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_entered_at:14",
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_account_name:17",
+          "action": "Verify field crm_cpi_account_name in pool_queue on crm_customer_pool_batch_list",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[8].buttons[4].action.inputFields[0].field"
+        },
+        {
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_industry:18",
+          "action": "Verify field crm_cpi_industry in pool_queue on crm_customer_pool_batch_list",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[8].buttons[4].action.inputFields[1].field"
+        },
+        {
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_phone:19",
+          "action": "Verify field crm_cpi_phone in pool_queue on crm_customer_pool_batch_list",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[8].buttons[4].action.inputFields[2].field"
+        },
+        {
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_rating:20",
+          "action": "Verify field crm_cpi_rating in pool_queue on crm_customer_pool_batch_list",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[8].buttons[4].action.inputFields[3].field"
+        },
+        {
+          "id": "field:crm_customer_pool_batch_list:pool_queue:crm_cpi_entered_at:21",
           "action": "Verify field crm_cpi_entered_at in pool_queue on crm_customer_pool_batch_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -18291,10 +18440,12 @@
         {
           "id": "field:crm_customer_pool_list:crm_cp_table:crm_cp_daily_pick_limit:3",
           "action": "Verify field crm_cp_daily_pick_limit in crm_cp_table on crm_customer_pool_list",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18304,10 +18455,12 @@
         {
           "id": "field:crm_customer_pool_list:crm_cp_table:crm_cp_new_cooldown_days:4",
           "action": "Verify field crm_cp_new_cooldown_days in crm_cp_table on crm_customer_pool_list",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18317,10 +18470,12 @@
         {
           "id": "field:crm_customer_pool_list:crm_cp_table:crm_cp_previous_owner_cooldown_days:5",
           "action": "Verify field crm_cp_previous_owner_cooldown_days in crm_cp_table on crm_customer_pool_list",
-          "evidence": [],
-          "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -18367,7 +18522,67 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_list.json#root[1].columns[8].field"
         },
         {
-          "id": "field:crm_customer_pool_list:crm_cp_table:updated_at:9",
+          "id": "field:crm_customer_pool_list:crm_cp_table:crm_cp_name:9",
+          "action": "Verify field crm_cp_name in crm_cp_table on crm_customer_pool_list",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_list.json#root[1].columns[8].buttons[2].action.inputFields[0].field"
+        },
+        {
+          "id": "field:crm_customer_pool_list:crm_cp_table:crm_cp_daily_pick_limit:10",
+          "action": "Verify field crm_cp_daily_pick_limit in crm_cp_table on crm_customer_pool_list",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_list.json#root[1].columns[8].buttons[2].action.inputFields[1].field"
+        },
+        {
+          "id": "field:crm_customer_pool_list:crm_cp_table:crm_cp_new_cooldown_days:11",
+          "action": "Verify field crm_cp_new_cooldown_days in crm_cp_table on crm_customer_pool_list",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_list.json#root[1].columns[8].buttons[2].action.inputFields[2].field"
+        },
+        {
+          "id": "field:crm_customer_pool_list:crm_cp_table:crm_cp_previous_owner_cooldown_days:12",
+          "action": "Verify field crm_cp_previous_owner_cooldown_days in crm_cp_table on crm_customer_pool_list",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey asserts this field fact in its consuming page.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_list.json#root[1].columns[8].buttons[2].action.inputFields[3].field"
+        },
+        {
+          "id": "field:crm_customer_pool_list:crm_cp_table:updated_at:13",
           "action": "Verify field updated_at in crm_cp_table on crm_customer_pool_list",
           "evidence": [],
           "assertion": "Label, component type, required state, payload, list/detail/form persistence and negative-path evidence are not yet registered.",
@@ -34593,7 +34808,67 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].table.bulkActions[1]"
         },
         {
-          "id": "ui-action:crm_customer_pool_batch_list:pool_queue:view_pool_evidence:5",
+          "id": "ui-action:crm_customer_pool_batch_list:pool_queue:batch_update_name:5",
+          "action": "bulk-action batch_update_name on crm_customer_pool_batch_list -> bulk_field_command:crm:update_pool_customer",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].table.bulkActions[2]"
+        },
+        {
+          "id": "ui-action:crm_customer_pool_batch_list:pool_queue:batch_update_industry:6",
+          "action": "bulk-action batch_update_industry on crm_customer_pool_batch_list -> bulk_field_command:crm:update_pool_customer",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].table.bulkActions[3]"
+        },
+        {
+          "id": "ui-action:crm_customer_pool_batch_list:pool_queue:batch_update_rating:7",
+          "action": "bulk-action batch_update_rating on crm_customer_pool_batch_list -> bulk_field_command:crm:update_pool_customer",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].table.bulkActions[4]"
+        },
+        {
+          "id": "ui-action:crm_customer_pool_batch_list:pool_queue:batch_delete:8",
+          "action": "bulk-action batch_delete on crm_customer_pool_batch_list -> bulk_record_command:crm:delete_pool_customer",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].table.bulkActions[5]"
+        },
+        {
+          "id": "ui-action:crm_customer_pool_batch_list:pool_queue:view_pool_evidence:9",
           "action": "button view_pool_evidence on crm_customer_pool_batch_list -> navigate:crm_customer_pool_item_detail",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -34606,7 +34881,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[8].buttons[0]"
         },
         {
-          "id": "ui-action:crm_customer_pool_batch_list:pool_queue:open_customer:6",
+          "id": "ui-action:crm_customer_pool_batch_list:pool_queue:open_customer:10",
           "action": "button open_customer on crm_customer_pool_batch_list -> navigate:/p/crm_account_common/view/${row.crm_cpi_account_id}",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -34619,7 +34894,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[8].buttons[1]"
         },
         {
-          "id": "ui-action:crm_customer_pool_batch_list:pool_queue:claim:7",
+          "id": "ui-action:crm_customer_pool_batch_list:pool_queue:claim:11",
           "action": "button claim on crm_customer_pool_batch_list -> command:crm:claim_pool_customer",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -34632,7 +34907,7 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[8].buttons[2]"
         },
         {
-          "id": "ui-action:crm_customer_pool_batch_list:pool_queue:assign:8",
+          "id": "ui-action:crm_customer_pool_batch_list:pool_queue:assign:12",
           "action": "button assign on crm_customer_pool_batch_list -> command:crm:assign_pool_customer",
           "evidence": [],
           "assertion": "This visible action has no qualifying executable evidence and remains in the denominator.",
@@ -34643,6 +34918,36 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[8].buttons[3]"
+        },
+        {
+          "id": "ui-action:crm_customer_pool_batch_list:pool_queue:quick_update:13",
+          "action": "button quick_update on crm_customer_pool_batch_list -> command:crm:update_pool_customer",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[8].buttons[4]"
+        },
+        {
+          "id": "ui-action:crm_customer_pool_batch_list:pool_queue:delete:14",
+          "action": "button delete on crm_customer_pool_batch_list -> command:crm:delete_pool_customer",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_batch_list.json#root[2].columns[8].buttons[5]"
         },
         {
           "id": "ui-action:crm_customer_pool_detail:actions:edit:0",
@@ -34858,8 +35163,8 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_list.json#root[1].columns[8].buttons[1]"
         },
         {
-          "id": "ui-action:crm_customer_pool_list:crm_cp_table:toggle:4",
-          "action": "button toggle on crm_customer_pool_list -> command:crm:toggle_customer_pool",
+          "id": "ui-action:crm_customer_pool_list:crm_cp_table:quick_update:4",
+          "action": "button quick_update on crm_customer_pool_list -> command:crm:update_customer_pool",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
           ],
@@ -34873,8 +35178,8 @@
           "source": "plugins/crm/config/pages/crm_customer_pool_list.json#root[1].columns[8].buttons[2]"
         },
         {
-          "id": "ui-action:crm_customer_pool_list:crm_cp_table:delete:5",
-          "action": "button delete on crm_customer_pool_list -> command:crm:delete_customer_pool",
+          "id": "ui-action:crm_customer_pool_list:crm_cp_table:toggle:5",
+          "action": "button toggle on crm_customer_pool_list -> command:crm:toggle_customer_pool",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
           ],
@@ -34886,6 +35191,21 @@
           "authority": "blocking-release",
           "driver": "browser",
           "source": "plugins/crm/config/pages/crm_customer_pool_list.json#root[1].columns[8].buttons[3]"
+        },
+        {
+          "id": "ui-action:crm_customer_pool_list:crm_cp_table:delete:6",
+          "action": "button delete on crm_customer_pool_list -> command:crm:delete_customer_pool",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey executes this semantic action and asserts its user-visible result.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_customer_pool_list.json#root[1].columns[8].buttons[4]"
         },
         {
           "id": "ui-action:crm_customer_pool_recycle_rule_detail:actions:edit:0",
@@ -40971,6 +41291,36 @@
         {
           "id": "command:crm:assign_pool_customer",
           "action": "Execute crm:assign_pool_customer (custom) through its supported user or runtime path",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The command has registered release evidence.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/commands/crm_customer_pool.json"
+        },
+        {
+          "id": "command:crm:update_pool_customer",
+          "action": "Execute crm:update_pool_customer (custom) through its supported user or runtime path",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
+          ],
+          "assertion": "The command has registered release evidence.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "journey",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/commands/crm_customer_pool.json"
+        },
+        {
+          "id": "command:crm:delete_pool_customer",
+          "action": "Execute crm:delete_pool_customer (custom) through its supported user or runtime path",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts"
           ],

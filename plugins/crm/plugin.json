@@ -11,7 +11,7 @@
   "author": "AuraBoot Team",
   "homepage": "https://auraboot.io/plugins/crm",
   "minPlatformVersion": "1.0.0",
-  "dependencies": [],
+  "dependencies": ["com.auraboot.org-management"],
   "backend": {
     "jarPath": "backend/build/libs/crm-plugin-1.2.0.jar",
     "entryClass": "com.auraboot.plugins.crm.CrmPlugin"
