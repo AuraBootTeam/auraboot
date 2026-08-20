@@ -605,7 +605,9 @@ describe('UnifiedDesignerPage', () => {
         '经值班负责人确认接管',
       ),
     );
-    expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByTestId('authoring-writer-lease-notice')).not.toBeInTheDocument(),
+    );
     expect(screen.getByTestId('studio-handoff-editable-reason')).toBeInTheDocument();
     expect(String(replaceState.mock.calls.at(-1)?.[2])).toContain(
       'authoringSession=session_1',
@@ -1084,7 +1086,9 @@ describe('UnifiedDesignerPage', () => {
         },
       ),
     );
-    expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4');
+    await waitFor(() =>
+      expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4'),
+    );
     expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('已保存');
     expect(savePageSchemaV3).not.toHaveBeenCalled();
   });

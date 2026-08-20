@@ -74,6 +74,7 @@ import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/der
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
 import { useRuntimeStateSubscription } from '~/framework/meta/rendering/blocks/workbenchBlockUtils';
 import { useTimezone } from '~/contexts/TimezoneContext';
+import { useAuth } from '~/contexts/AuthContext';
 import {
   formatInTimezone,
   resolveTemporalFormat,
@@ -512,6 +513,13 @@ export function shouldRenderDefaultDetailEditAction(
   return schema?.extension?.showEdit !== false;
 }
 
+export function canRenderDetailToolbarButton(
+  button: Pick<ButtonConfig, 'permissionCode'>,
+  hasPermission: (permissionCode: string) => boolean,
+): boolean {
+  return !button.permissionCode || hasPermission(button.permissionCode);
+}
+
 export function resolveHiddenSystemTabKeys(
   schema: { extension?: Record<string, any> } | undefined | null,
 ): Set<string> {
@@ -621,6 +629,7 @@ export function resolveActiveDetailTab(
  */
 function DetailPageContentInner(props: PageContentProps) {
   const { schema, tableName, recordPid, token } = props;
+  const { hasPermission } = useAuth();
   const location = useLocation();
   const routerNavigate = useRouterNavigate();
   const recordModelCode = schema?.modelCode || tableName;
@@ -1194,6 +1203,9 @@ function DetailPageContentInner(props: PageContentProps) {
               {effectiveHeaderToolbar?.buttons && effectiveHeaderToolbar.buttons.length > 0 && (
                 <>
                   {effectiveHeaderToolbar.buttons
+                    .filter((button: ButtonConfig) =>
+                      canRenderDetailToolbarButton(button, hasPermission),
+                    )
                     .filter((button: ButtonConfig) => evaluateVisibleWhen(button.visibleWhen))
                     .map((button: ButtonConfig) => (
                       <button

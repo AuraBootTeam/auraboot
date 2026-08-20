@@ -2,6 +2,34 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { actionRegistry, promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
 
+describe('ActionRegistry delete translations', () => {
+  it('does not leak unresolved i18n keys into confirmation and success toasts', async () => {
+    const confirm = vi.fn().mockResolvedValue(true);
+    const showToast = vi.fn();
+    const loadData = vi.fn().mockResolvedValue(undefined);
+
+    await actionRegistry.execute('delete', {
+      tableName: 'supplier_management_supplier',
+      record: { pid: 'SUP-1' },
+      button: { commandCode: 'supplier_management:delete_supplier_management_supplier' },
+      t: (key) => key,
+      locale: 'zh-CN',
+      confirm,
+      showToast,
+      loadData,
+      filters: {},
+      buildApiEndpoint: (tableName) => `/api/dynamic/${tableName}`,
+      fetchResult: vi.fn().mockResolvedValue({ code: '0', data: {} }),
+    });
+
+    expect(confirm).toHaveBeenCalledWith({
+      content: '确定要删除这条记录吗？',
+      variant: 'danger',
+    });
+    expect(showToast).toHaveBeenCalledWith('删除成功', 'success');
+  });
+});
+
 describe('ActionRegistry record navigation', () => {
   it('prefers pid over id for edit routes', async () => {
     const navigate = vi.fn();
@@ -105,7 +133,9 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
         operationType: 'update',
         payload: { keep: 'me' },
         inputFieldsTitle: 'Set Credential',
-        inputFields: [{ field: 'cookies_json', label: 'Cookies', type: 'textarea', required: true }],
+        inputFields: [
+          { field: 'cookies_json', label: 'Cookies', type: 'textarea', required: true },
+        ],
       },
     });
 
@@ -276,11 +306,9 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
 
   it('aborts (does not submit the command) when the user cancels the form', async () => {
     const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {} });
-    window.addEventListener(
-      'dialog:form',
-      (e) => (e as CustomEvent).detail.onCancel(),
-      { once: true },
-    );
+    window.addEventListener('dialog:form', (e) => (e as CustomEvent).detail.onCancel(), {
+      once: true,
+    });
 
     await actionRegistry.execute('command.execute', {
       fetchResult,
@@ -322,9 +350,13 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
         },
       },
     });
-    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:command-artifact');
+    const createObjectURL = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:command-artifact');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
 
     await actionRegistry.execute('command.execute', {
       fetchResult,
@@ -345,7 +377,8 @@ describe('ActionRegistry dialog.confirm', () => {
       args: {
         message: {
           'zh-CN': '确认应用此模板？这将在当前租户创建模板包含的模型与页面。',
-          'en-US': "Install this template? It will create the template's models and pages in your tenant.",
+          'en-US':
+            "Install this template? It will create the template's models and pages in your tenant.",
         },
       },
     });

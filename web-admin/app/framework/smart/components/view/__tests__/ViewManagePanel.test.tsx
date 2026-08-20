@@ -328,6 +328,7 @@ describe('ViewManagePanel personal-only release', () => {
       expect(props.onDuplicateView).toHaveBeenCalledWith('personal-view', '我的订单副本'),
     );
 
+    await waitFor(() => expect(screen.getByLabelText('设为默认')).toBeInTheDocument());
     fireEvent.click(screen.getByLabelText('设为默认'));
     await waitFor(() => expect(props.onSetDefaultView).toHaveBeenCalledWith('personal-view'));
 
