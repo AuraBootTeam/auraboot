@@ -1752,14 +1752,15 @@
     "code": "crm_customer_pool_ops_stats",
     "name:zh-CN": "客户公海运营统计",
     "name:en": "Customer Pool Operations Stats",
-    "description": "One-row operational summary for available, claimable, cooling-down, owned and recycling customers.",
+    "description": "One-row operational summary using the same cooldown, daily quota and customer-capacity decisions as the claim command.",
     "resourceCode": "crm.customer_pool",
     "actionCode": "read",
-    "fromSql": "SELECT COUNT(*) FILTER (WHERE i.crm_cpi_status = 'available') AS available_count, COUNT(*) FILTER (WHERE i.crm_cpi_status = 'available' AND (i.crm_cpi_claim_release_at IS NULL OR i.crm_cpi_claim_release_at <= now())) AS ready_count, COUNT(*) FILTER (WHERE i.crm_cpi_status = 'available' AND i.crm_cpi_claim_release_at > now()) AS cooldown_count, COUNT(*) FILTER (WHERE i.crm_cpi_status IN ('claimed', 'assigned')) AS owned_count, COUNT(*) FILTER (WHERE i.crm_cpi_status IN ('recycling', 'recycling_retry')) AS processing_count FROM mt_crm_customer_pool_item_common i JOIN mt_crm_customer_pool_common p ON p.pid = i.crm_cpi_pool_id AND p.tenant_id = i.tenant_id WHERE i.tenant_id = #{params.tenantId} AND (p.crm_cp_member_user_ids LIKE CONCAT('%\"', (SELECT pid FROM ab_user WHERE id = CAST(#{params.currentUserId} AS bigint)), '\"%') OR p.crm_cp_admin_user_ids LIKE CONCAT('%\"', (SELECT pid FROM ab_user WHERE id = CAST(#{params.currentUserId} AS bigint)), '\"%'))",
+    "fromSql": "SELECT COUNT(*) FILTER (WHERE s.crm_cpi_status = 'available') AS available_count, COUNT(*) FILTER (WHERE s.operational_state = 'ready') AS ready_count, COUNT(*) FILTER (WHERE s.operational_state = 'cooldown') AS cooldown_count, COUNT(*) FILTER (WHERE s.operational_state IN ('cooldown', 'quota_blocked', 'capacity_blocked')) AS blocked_count, COUNT(*) FILTER (WHERE s.crm_cpi_status IN ('claimed', 'assigned')) AS owned_count, COUNT(*) FILTER (WHERE s.crm_cpi_status IN ('recycling', 'recycling_retry')) AS processing_count FROM (SELECT b.crm_cpi_status, CASE WHEN b.crm_cpi_status <> 'available' THEN b.crm_cpi_status WHEN b.capacity_limit IS NOT NULL AND b.owned_customer_count >= b.capacity_limit THEN 'capacity_blocked' WHEN NOT b.is_pool_admin AND b.effective_release_at > now() THEN 'cooldown' WHEN NOT b.is_pool_admin AND b.daily_claim_count >= b.daily_claim_limit THEN 'quota_blocked' ELSE 'ready' END AS operational_state FROM (SELECT i.crm_cpi_status, p.crm_cp_daily_pick_limit AS daily_claim_limit, COALESCE(quota.crm_cpq_pick_count, 0) AS daily_claim_count, capacity.crm_ccap_capacity AS capacity_limit, (SELECT COUNT(*) FROM mt_crm_account_common owned WHERE owned.tenant_id = i.tenant_id AND owned.crm_acc_owner = current_actor.pid AND owned.crm_acc_status = 'active' AND COALESCE(owned.crm_acc_pool_state, '') <> 'in_pool') AS owned_customer_count, p.crm_cp_admin_user_ids LIKE CONCAT('%\"', current_actor.pid, '\"%') AS is_pool_admin, CASE WHEN current_actor.pid = i.crm_cpi_previous_owner THEN GREATEST(i.crm_cpi_claim_release_at, i.crm_cpi_entered_at + make_interval(days => COALESCE(p.crm_cp_previous_owner_cooldown_days, 0))) ELSE i.crm_cpi_claim_release_at END AS effective_release_at FROM mt_crm_customer_pool_item_common i JOIN mt_crm_customer_pool_common p ON p.pid = i.crm_cpi_pool_id AND p.tenant_id = i.tenant_id JOIN ab_user current_actor ON current_actor.id = CAST(#{params.currentUserId} AS bigint) LEFT JOIN mt_crm_customer_pool_quota_common quota ON quota.tenant_id = i.tenant_id AND quota.crm_cpq_pool_id = i.crm_cpi_pool_id AND quota.crm_cpq_user_id = current_actor.pid AND quota.crm_cpq_local_date = (now() AT TIME ZONE 'UTC')::date LEFT JOIN mt_crm_customer_capacity_common capacity ON capacity.tenant_id = i.tenant_id AND capacity.crm_ccap_user_id = current_actor.pid AND capacity.crm_ccap_status = 'active' WHERE i.tenant_id = #{params.tenantId} AND (p.crm_cp_member_user_ids LIKE CONCAT('%\"', current_actor.pid, '\"%') OR p.crm_cp_admin_user_ids LIKE CONCAT('%\"', current_actor.pid, '\"%'))) b) s",
     "outputFields": [
       { "code": "available_count", "columnExpr": "available_count", "dataType": "number" },
       { "code": "ready_count", "columnExpr": "ready_count", "dataType": "number" },
       { "code": "cooldown_count", "columnExpr": "cooldown_count", "dataType": "number" },
+      { "code": "blocked_count", "columnExpr": "blocked_count", "dataType": "number" },
       { "code": "owned_count", "columnExpr": "owned_count", "dataType": "number" },
       { "code": "processing_count", "columnExpr": "processing_count", "dataType": "number" }
     ]
@@ -1771,7 +1772,7 @@
     "description": "Dense customer queue with policy context and explicit readiness for claim and assignment decisions.",
     "resourceCode": "crm.customer_pool",
     "actionCode": "read",
-    "fromSql": "SELECT q.* FROM (SELECT i.pid, i.crm_cpi_account_id, i.crm_cpi_pool_id, p.crm_cp_name AS pool_name, i.crm_cpi_status, i.crm_cpi_account_code, i.crm_cpi_account_name, i.crm_cpi_rating, i.crm_cpi_phone, i.crm_cpi_industry, i.crm_cpi_health_score, i.crm_cpi_entered_at, i.crm_cpi_reason, i.crm_cpi_claim_release_at, i.crm_cpi_claimed_at, i.crm_cpi_claimed_by, COALESCE(owner_user.nick_name, owner_user.user_name, i.crm_cpi_claimed_by, '') AS owner_name, i.crm_cpi_previous_owner, COALESCE(previous_user.nick_name, previous_user.user_name, i.crm_cpi_previous_owner, '') AS previous_owner_name, CASE WHEN i.crm_cpi_status = 'available' AND (i.crm_cpi_claim_release_at IS NULL OR i.crm_cpi_claim_release_at <= now()) THEN 'ready' WHEN i.crm_cpi_status = 'available' THEN 'cooldown' ELSE i.crm_cpi_status END AS operational_state FROM mt_crm_customer_pool_item_common i JOIN mt_crm_customer_pool_common p ON p.pid = i.crm_cpi_pool_id AND p.tenant_id = i.tenant_id LEFT JOIN ab_user owner_user ON owner_user.pid = i.crm_cpi_claimed_by LEFT JOIN ab_user previous_user ON previous_user.pid = i.crm_cpi_previous_owner WHERE i.tenant_id = #{params.tenantId} AND (p.crm_cp_member_user_ids LIKE CONCAT('%\"', (SELECT pid FROM ab_user WHERE id = CAST(#{params.currentUserId} AS bigint)), '\"%') OR p.crm_cp_admin_user_ids LIKE CONCAT('%\"', (SELECT pid FROM ab_user WHERE id = CAST(#{params.currentUserId} AS bigint)), '\"%'))) q WHERE (COALESCE(CAST(#{params.customerKeyword} AS text), '') = '' OR q.crm_cpi_account_code ILIKE CONCAT('%', CAST(#{params.customerKeyword} AS text), '%') OR q.crm_cpi_account_name ILIKE CONCAT('%', CAST(#{params.customerKeyword} AS text), '%') OR COALESCE(q.crm_cpi_phone, '') ILIKE CONCAT('%', CAST(#{params.customerKeyword} AS text), '%')) AND (COALESCE(CAST(#{params.viewFilter} AS text), '') = '' OR (CAST(#{params.viewFilter} AS text) = 'available' AND q.crm_cpi_status = 'available') OR (CAST(#{params.viewFilter} AS text) = 'ready' AND q.operational_state = 'ready') OR (CAST(#{params.viewFilter} AS text) = 'cooldown' AND q.operational_state = 'cooldown') OR (CAST(#{params.viewFilter} AS text) = 'owned' AND q.crm_cpi_status IN ('claimed', 'assigned')) OR (CAST(#{params.viewFilter} AS text) = 'processing' AND q.crm_cpi_status IN ('recycling', 'recycling_retry'))) ORDER BY CASE q.operational_state WHEN 'ready' THEN 1 WHEN 'cooldown' THEN 2 WHEN 'recycling_retry' THEN 3 WHEN 'recycling' THEN 4 WHEN 'assigned' THEN 5 ELSE 6 END, q.crm_cpi_health_score DESC NULLS LAST, q.crm_cpi_entered_at ASC",
+    "fromSql": "SELECT q.* FROM (SELECT assessed.*, CASE WHEN assessed.operational_state = 'cooldown' THEN assessed.effective_release_at WHEN assessed.operational_state = 'quota_blocked' THEN assessed.quota_reset_at ELSE NULL END AS next_eligible_at FROM (SELECT b.*, CASE WHEN b.crm_cpi_status <> 'available' THEN b.crm_cpi_status WHEN b.capacity_limit IS NOT NULL AND b.owned_customer_count >= b.capacity_limit THEN 'capacity_blocked' WHEN NOT b.is_pool_admin AND b.effective_release_at > now() THEN 'cooldown' WHEN NOT b.is_pool_admin AND b.daily_claim_count >= b.daily_claim_limit THEN 'quota_blocked' ELSE 'ready' END AS operational_state FROM (SELECT i.pid, i.crm_cpi_account_id, i.crm_cpi_pool_id, p.crm_cp_name AS pool_name, i.crm_cpi_status, i.crm_cpi_account_code, i.crm_cpi_account_name, i.crm_cpi_rating, i.crm_cpi_phone, i.crm_cpi_industry, i.crm_cpi_health_score, i.crm_cpi_entered_at, i.crm_cpi_reason, i.crm_cpi_claim_release_at, i.crm_cpi_claimed_at, i.crm_cpi_claimed_by, COALESCE(owner_user.nick_name, owner_user.user_name, i.crm_cpi_claimed_by, '') AS owner_name, i.crm_cpi_previous_owner, COALESCE(previous_user.nick_name, previous_user.user_name, i.crm_cpi_previous_owner, '') AS previous_owner_name, p.crm_cp_daily_pick_limit AS daily_claim_limit, COALESCE(quota.crm_cpq_pick_count, 0) AS daily_claim_count, capacity.crm_ccap_capacity AS capacity_limit, (SELECT COUNT(*) FROM mt_crm_account_common owned WHERE owned.tenant_id = i.tenant_id AND owned.crm_acc_owner = current_actor.pid AND owned.crm_acc_status = 'active' AND COALESCE(owned.crm_acc_pool_state, '') <> 'in_pool') AS owned_customer_count, p.crm_cp_admin_user_ids LIKE CONCAT('%\"', current_actor.pid, '\"%') AS is_pool_admin, CASE WHEN current_actor.pid = i.crm_cpi_previous_owner THEN GREATEST(i.crm_cpi_claim_release_at, i.crm_cpi_entered_at + make_interval(days => COALESCE(p.crm_cp_previous_owner_cooldown_days, 0))) ELSE i.crm_cpi_claim_release_at END AS effective_release_at, (date_trunc('day', now() AT TIME ZONE 'UTC') + interval '1 day') AT TIME ZONE 'UTC' AS quota_reset_at FROM mt_crm_customer_pool_item_common i JOIN mt_crm_customer_pool_common p ON p.pid = i.crm_cpi_pool_id AND p.tenant_id = i.tenant_id JOIN ab_user current_actor ON current_actor.id = CAST(#{params.currentUserId} AS bigint) LEFT JOIN ab_user owner_user ON owner_user.pid = i.crm_cpi_claimed_by LEFT JOIN ab_user previous_user ON previous_user.pid = i.crm_cpi_previous_owner LEFT JOIN mt_crm_customer_pool_quota_common quota ON quota.tenant_id = i.tenant_id AND quota.crm_cpq_pool_id = i.crm_cpi_pool_id AND quota.crm_cpq_user_id = current_actor.pid AND quota.crm_cpq_local_date = (now() AT TIME ZONE 'UTC')::date LEFT JOIN mt_crm_customer_capacity_common capacity ON capacity.tenant_id = i.tenant_id AND capacity.crm_ccap_user_id = current_actor.pid AND capacity.crm_ccap_status = 'active' WHERE i.tenant_id = #{params.tenantId} AND (p.crm_cp_member_user_ids LIKE CONCAT('%\"', current_actor.pid, '\"%') OR p.crm_cp_admin_user_ids LIKE CONCAT('%\"', current_actor.pid, '\"%'))) b) assessed) q WHERE (COALESCE(CAST(#{params.customerKeyword} AS text), '') = '' OR q.crm_cpi_account_code ILIKE CONCAT('%', CAST(#{params.customerKeyword} AS text), '%') OR q.crm_cpi_account_name ILIKE CONCAT('%', CAST(#{params.customerKeyword} AS text), '%') OR COALESCE(q.crm_cpi_phone, '') ILIKE CONCAT('%', CAST(#{params.customerKeyword} AS text), '%')) AND (COALESCE(CAST(#{params.viewFilter} AS text), '') = '' OR (CAST(#{params.viewFilter} AS text) = 'available' AND q.crm_cpi_status = 'available') OR (CAST(#{params.viewFilter} AS text) = 'ready' AND q.operational_state = 'ready') OR (CAST(#{params.viewFilter} AS text) = 'blocked' AND q.operational_state IN ('cooldown', 'quota_blocked', 'capacity_blocked')) OR (CAST(#{params.viewFilter} AS text) = 'cooldown' AND q.operational_state = 'cooldown') OR (CAST(#{params.viewFilter} AS text) = 'owned' AND q.crm_cpi_status IN ('claimed', 'assigned')) OR (CAST(#{params.viewFilter} AS text) = 'processing' AND q.crm_cpi_status IN ('recycling', 'recycling_retry'))) ORDER BY CASE q.operational_state WHEN 'ready' THEN 1 WHEN 'cooldown' THEN 2 WHEN 'quota_blocked' THEN 3 WHEN 'capacity_blocked' THEN 4 WHEN 'recycling_retry' THEN 5 WHEN 'recycling' THEN 6 WHEN 'assigned' THEN 7 ELSE 8 END, q.crm_cpi_health_score DESC NULLS LAST, q.crm_cpi_entered_at ASC",
     "outputFields": [
       { "code": "pid", "columnExpr": "pid", "dataType": "string" },
       { "code": "crm_cpi_account_id", "columnExpr": "crm_cpi_account_id", "dataType": "string" },
@@ -1792,7 +1793,98 @@
       { "code": "owner_name", "columnExpr": "owner_name", "dataType": "string" },
       { "code": "crm_cpi_previous_owner", "columnExpr": "crm_cpi_previous_owner", "dataType": "string" },
       { "code": "previous_owner_name", "columnExpr": "previous_owner_name", "dataType": "string" },
+      { "code": "daily_claim_limit", "columnExpr": "daily_claim_limit", "dataType": "number" },
+      { "code": "daily_claim_count", "columnExpr": "daily_claim_count", "dataType": "number" },
+      { "code": "capacity_limit", "columnExpr": "capacity_limit", "dataType": "number" },
+      { "code": "owned_customer_count", "columnExpr": "owned_customer_count", "dataType": "number" },
+      { "code": "effective_release_at", "columnExpr": "effective_release_at", "dataType": "date" },
+      { "code": "next_eligible_at", "columnExpr": "next_eligible_at", "dataType": "date" },
       { "code": "operational_state", "columnExpr": "operational_state", "dataType": "string" }
+    ]
+  },
+  {
+    "code": "crm_customer_pool_policy_stats",
+    "name:zh-CN": "客户公海策略统计",
+    "name:en": "Customer Pool Policy Stats",
+    "description": "Administrator summary for enabled pools, claim capacity, automatic recycle and active recycle conditions.",
+    "resourceCode": "crm.customer_pool",
+    "actionCode": "read",
+    "fromSql": "SELECT COUNT(*) FILTER (WHERE p.crm_cp_status = 'enabled') AS enabled_pool_count, COALESCE(SUM(p.crm_cp_daily_pick_limit) FILTER (WHERE p.crm_cp_status = 'enabled'), 0) AS daily_claim_capacity, COUNT(*) FILTER (WHERE p.crm_cp_status = 'enabled' AND p.crm_cp_auto_recycle = true) AS auto_recycle_pool_count, (SELECT COUNT(*) FROM mt_crm_customer_pool_recycle_rule_common r WHERE r.tenant_id = #{params.tenantId} AND r.crm_cprr_status = 'active') AS active_recycle_rule_count FROM mt_crm_customer_pool_common p WHERE p.tenant_id = #{params.tenantId}",
+    "outputFields": [
+      { "code": "enabled_pool_count", "columnExpr": "enabled_pool_count", "dataType": "number" },
+      { "code": "daily_claim_capacity", "columnExpr": "daily_claim_capacity", "dataType": "number" },
+      { "code": "auto_recycle_pool_count", "columnExpr": "auto_recycle_pool_count", "dataType": "number" },
+      { "code": "active_recycle_rule_count", "columnExpr": "active_recycle_rule_count", "dataType": "number" }
+    ]
+  },
+  {
+    "code": "crm_customer_pool_policy_queue",
+    "name:zh-CN": "客户公海策略队列",
+    "name:en": "Customer Pool Policy Queue",
+    "description": "Pool policies with business-safe membership counts and active recycle-condition counts.",
+    "resourceCode": "crm.customer_pool",
+    "actionCode": "read",
+    "fromSql": "SELECT p.pid, p.crm_cp_code, p.crm_cp_name, p.crm_cp_status, COALESCE(CASE WHEN LEFT(TRIM(COALESCE(p.crm_cp_member_user_ids, '')), 1) = '[' THEN jsonb_array_length(p.crm_cp_member_user_ids::jsonb) ELSE cardinality(string_to_array(NULLIF(TRIM(p.crm_cp_member_user_ids), ''), ',')) END, 0) AS member_count, COALESCE(CASE WHEN LEFT(TRIM(COALESCE(p.crm_cp_admin_user_ids, '')), 1) = '[' THEN jsonb_array_length(p.crm_cp_admin_user_ids::jsonb) ELSE cardinality(string_to_array(NULLIF(TRIM(p.crm_cp_admin_user_ids), ''), ',')) END, 0) AS admin_count, p.crm_cp_daily_pick_limit, p.crm_cp_new_cooldown_days, p.crm_cp_previous_owner_cooldown_days, p.crm_cp_auto_recycle, p.crm_cp_recycle_match_mode, p.crm_cp_recycle_after_days, p.crm_cp_recycle_basis, p.crm_cp_description, (SELECT COUNT(*) FROM mt_crm_customer_pool_recycle_rule_common r WHERE r.tenant_id = p.tenant_id AND r.crm_cprr_pool_id = p.pid AND r.crm_cprr_status = 'active') AS active_rule_count, p.updated_at FROM mt_crm_customer_pool_common p WHERE p.tenant_id = #{params.tenantId} AND (COALESCE(CAST(#{params.policyKeyword} AS text), '') = '' OR p.crm_cp_code ILIKE CONCAT('%', CAST(#{params.policyKeyword} AS text), '%') OR p.crm_cp_name ILIKE CONCAT('%', CAST(#{params.policyKeyword} AS text), '%')) ORDER BY CASE p.crm_cp_status WHEN 'enabled' THEN 1 ELSE 2 END, p.updated_at DESC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "crm_cp_code", "columnExpr": "crm_cp_code", "dataType": "string", "searchable": true },
+      { "code": "crm_cp_name", "columnExpr": "crm_cp_name", "dataType": "string", "searchable": true },
+      { "code": "crm_cp_status", "columnExpr": "crm_cp_status", "dataType": "string" },
+      { "code": "member_count", "columnExpr": "member_count", "dataType": "number" },
+      { "code": "admin_count", "columnExpr": "admin_count", "dataType": "number" },
+      { "code": "crm_cp_daily_pick_limit", "columnExpr": "crm_cp_daily_pick_limit", "dataType": "number" },
+      { "code": "crm_cp_new_cooldown_days", "columnExpr": "crm_cp_new_cooldown_days", "dataType": "number" },
+      { "code": "crm_cp_previous_owner_cooldown_days", "columnExpr": "crm_cp_previous_owner_cooldown_days", "dataType": "number" },
+      { "code": "crm_cp_auto_recycle", "columnExpr": "crm_cp_auto_recycle", "dataType": "boolean" },
+      { "code": "crm_cp_recycle_match_mode", "columnExpr": "crm_cp_recycle_match_mode", "dataType": "string" },
+      { "code": "crm_cp_recycle_after_days", "columnExpr": "crm_cp_recycle_after_days", "dataType": "number" },
+      { "code": "crm_cp_recycle_basis", "columnExpr": "crm_cp_recycle_basis", "dataType": "string" },
+      { "code": "crm_cp_description", "columnExpr": "crm_cp_description", "dataType": "string" },
+      { "code": "active_rule_count", "columnExpr": "active_rule_count", "dataType": "number" },
+      { "code": "updated_at", "columnExpr": "updated_at", "dataType": "date" }
+    ]
+  },
+  {
+    "code": "crm_customer_capacity_policy_queue",
+    "name:zh-CN": "客户库容策略队列",
+    "name:en": "Customer Capacity Policy Queue",
+    "description": "Customer capacity policies with user labels, current ownership and remaining capacity.",
+    "resourceCode": "crm.customer_pool",
+    "actionCode": "read",
+    "fromSql": "SELECT c.pid, c.crm_ccap_user_id, COALESCE(u.nick_name, u.user_name, c.crm_ccap_user_id) AS user_name, c.crm_ccap_capacity, c.crm_ccap_status, c.crm_ccap_remark, (SELECT COUNT(*) FROM mt_crm_account_common a WHERE a.tenant_id = c.tenant_id AND a.crm_acc_owner = c.crm_ccap_user_id AND a.crm_acc_status = 'active' AND COALESCE(a.crm_acc_pool_state, '') <> 'in_pool') AS owned_customer_count, GREATEST(c.crm_ccap_capacity - (SELECT COUNT(*) FROM mt_crm_account_common a WHERE a.tenant_id = c.tenant_id AND a.crm_acc_owner = c.crm_ccap_user_id AND a.crm_acc_status = 'active' AND COALESCE(a.crm_acc_pool_state, '') <> 'in_pool'), 0) AS remaining_capacity FROM mt_crm_customer_capacity_common c LEFT JOIN ab_user u ON u.pid = c.crm_ccap_user_id WHERE c.tenant_id = #{params.tenantId} ORDER BY CASE c.crm_ccap_status WHEN 'active' THEN 1 ELSE 2 END, user_name ASC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "crm_ccap_user_id", "columnExpr": "crm_ccap_user_id", "dataType": "string" },
+      { "code": "user_name", "columnExpr": "user_name", "dataType": "string", "searchable": true },
+      { "code": "crm_ccap_capacity", "columnExpr": "crm_ccap_capacity", "dataType": "number" },
+      { "code": "crm_ccap_status", "columnExpr": "crm_ccap_status", "dataType": "string" },
+      { "code": "crm_ccap_remark", "columnExpr": "crm_ccap_remark", "dataType": "string" },
+      { "code": "owned_customer_count", "columnExpr": "owned_customer_count", "dataType": "number" },
+      { "code": "remaining_capacity", "columnExpr": "remaining_capacity", "dataType": "number" }
+    ]
+  },
+  {
+    "code": "crm_customer_recycle_policy_queue",
+    "name:zh-CN": "客户公海回收策略队列",
+    "name:en": "Customer Pool Recycle Policy Queue",
+    "description": "Recycle conditions with resolved customer-pool business labels.",
+    "resourceCode": "crm.customer_pool",
+    "actionCode": "read",
+    "fromSql": "SELECT r.pid, r.crm_cprr_code, r.crm_cprr_name, r.crm_cprr_pool_id, COALESCE(p.crm_cp_name, r.crm_cprr_pool_id) AS pool_name, r.crm_cprr_time_source, r.crm_cprr_operator, r.crm_cprr_days, r.crm_cprr_start_at, r.crm_cprr_end_at, r.crm_cprr_status, r.crm_cprr_sort_order, r.crm_cprr_description FROM mt_crm_customer_pool_recycle_rule_common r LEFT JOIN mt_crm_customer_pool_common p ON p.pid = r.crm_cprr_pool_id AND p.tenant_id = r.tenant_id WHERE r.tenant_id = #{params.tenantId} ORDER BY CASE r.crm_cprr_status WHEN 'active' THEN 1 ELSE 2 END, pool_name ASC, r.crm_cprr_sort_order ASC",
+    "outputFields": [
+      { "code": "pid", "columnExpr": "pid", "dataType": "string" },
+      { "code": "crm_cprr_code", "columnExpr": "crm_cprr_code", "dataType": "string", "searchable": true },
+      { "code": "crm_cprr_name", "columnExpr": "crm_cprr_name", "dataType": "string", "searchable": true },
+      { "code": "crm_cprr_pool_id", "columnExpr": "crm_cprr_pool_id", "dataType": "string" },
+      { "code": "pool_name", "columnExpr": "pool_name", "dataType": "string", "searchable": true },
+      { "code": "crm_cprr_time_source", "columnExpr": "crm_cprr_time_source", "dataType": "string" },
+      { "code": "crm_cprr_operator", "columnExpr": "crm_cprr_operator", "dataType": "string" },
+      { "code": "crm_cprr_days", "columnExpr": "crm_cprr_days", "dataType": "number" },
+      { "code": "crm_cprr_start_at", "columnExpr": "crm_cprr_start_at", "dataType": "date" },
+      { "code": "crm_cprr_end_at", "columnExpr": "crm_cprr_end_at", "dataType": "date" },
+      { "code": "crm_cprr_status", "columnExpr": "crm_cprr_status", "dataType": "string" },
+      { "code": "crm_cprr_sort_order", "columnExpr": "crm_cprr_sort_order", "dataType": "number" },
+      { "code": "crm_cprr_description", "columnExpr": "crm_cprr_description", "dataType": "string" }
     ]
   },
   {

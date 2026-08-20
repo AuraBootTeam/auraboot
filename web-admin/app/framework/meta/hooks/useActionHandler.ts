@@ -66,6 +66,7 @@ import {
   uploadCommandFile,
   resolvePromptUploadAccept,
   resolvePromptUploadFeedbackMode,
+  resolvePromptUploadFile,
   resolvePromptUploadKey,
   resolvePromptUploadFilenameKey,
 } from '~/framework/meta/utils/promptUpload';
@@ -607,9 +608,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
           ? 'message.accountCredentials.generated.title'
           : 'message.temporaryPassword.generated.title',
         undefined,
-        hasCompleteCredentials
-          ? 'Account credentials generated'
-          : 'Temporary password generated',
+        hasCompleteCredentials ? 'Account credentials generated' : 'Temporary password generated',
       );
       const contentParams = { userName: userName ?? '', tempPassword };
       const content = formatMessage(
@@ -768,11 +767,15 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             const promptUploadUsesPanelFeedback =
               resolvePromptUploadFeedbackMode(promptUpload) === 'panel';
             if (promptUpload) {
-              // Don't keep the button disabled while the OS file picker is open:
-              // some browsers don't fire a 'cancel' event, so awaiting pickFile()
-              // would otherwise hang the loading state and leave the button stuck.
-              setLoading(false);
-              const file = await pickFile(resolvePromptUploadAccept(promptUpload));
+              const collectedFile = resolvePromptUploadFile(promptUpload, payload);
+              let file = collectedFile;
+              if (!file) {
+                // Don't keep the button disabled while the OS file picker is open:
+                // some browsers don't fire a 'cancel' event, so awaiting pickFile()
+                // would otherwise hang the loading state and leave the button stuck.
+                setLoading(false);
+                file = await pickFile(resolvePromptUploadAccept(promptUpload));
+              }
               if (!file) return; // user dismissed the picker — nothing to do
               setLoading(true);
               if (!promptUploadUsesPanelFeedback) {

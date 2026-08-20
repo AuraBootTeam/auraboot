@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   resolvePromptUploadAccept,
   resolvePromptUploadFeedbackMode,
+  resolvePromptUploadFile,
   resolvePromptUploadFilenameKey,
   resolvePromptUploadKey,
   uploadCommandFile,
@@ -17,9 +18,9 @@ describe('resolvePromptUploadKey', () => {
   });
 
   it('uses the object key when promptUpload is configured with metadata', () => {
-    expect(resolvePromptUploadKey({ key: 'corrected_bom_file_id', accept: '.xlsx,.xls,.csv' })).toBe(
-      'corrected_bom_file_id',
-    );
+    expect(
+      resolvePromptUploadKey({ key: 'corrected_bom_file_id', accept: '.xlsx,.xls,.csv' }),
+    ).toBe('corrected_bom_file_id');
   });
 
   it('falls back to source_file_id for blank/invalid values', () => {
@@ -46,9 +47,9 @@ describe('resolvePromptUploadFilenameKey', () => {
 
 describe('resolvePromptUploadAccept', () => {
   it('uses object accept metadata when configured', () => {
-    expect(resolvePromptUploadAccept({ key: 'gerber_file_id', accept: '.zip,.rar,.gbr,.drl' })).toBe(
-      '.zip,.rar,.gbr,.drl',
-    );
+    expect(
+      resolvePromptUploadAccept({ key: 'gerber_file_id', accept: '.zip,.rar,.gbr,.drl' }),
+    ).toBe('.zip,.rar,.gbr,.drl');
   });
 
   it('falls back to spreadsheet uploads for legacy promptUpload values', () => {
@@ -77,6 +78,20 @@ describe('resolvePromptUploadFeedbackMode', () => {
     expect(resolvePromptUploadFeedbackMode({ key: 'source_file_id', feedbackMode: 'quiet' })).toBe(
       'toast',
     );
+  });
+});
+
+describe('resolvePromptUploadFile', () => {
+  it('returns a File already collected under the configured upload key', () => {
+    const file = new File(['xlsx'], 'customers.xlsx');
+
+    expect(resolvePromptUploadFile({ key: 'importFileId' }, { importFileId: file })).toBe(file);
+  });
+
+  it('does not treat an uploaded file id or text payload as a File', () => {
+    expect(
+      resolvePromptUploadFile({ key: 'importFileId' }, { importFileId: 'FILE-123' }),
+    ).toBeNull();
   });
 });
 
@@ -117,7 +132,10 @@ describe('uploadCommandFile', () => {
   });
 
   it('throws on a non-2xx response', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 413, json: async () => ({}) }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 413, json: async () => ({}) }),
+    );
     await expect(uploadCommandFile(new File(['x'], 'a.xlsx'))).rejects.toThrow('413');
   });
 
@@ -154,7 +172,10 @@ describe('uploadCommandFile', () => {
   });
 
   it('throws when the response carries no fileId', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: {} }) }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: {} }) }),
+    );
     await expect(uploadCommandFile(new File(['x'], 'a.xlsx'))).rejects.toThrow('no fileId');
   });
 });

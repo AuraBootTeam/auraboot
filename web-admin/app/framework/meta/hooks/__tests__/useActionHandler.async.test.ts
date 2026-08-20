@@ -895,6 +895,66 @@ describe('useActionHandler - handlerParams.async polling', () => {
     expect(reload).toHaveBeenCalledWith(['lines', 'quoteSummary']);
   });
 
+  it('uploads the file collected inside inputFields without opening a second picker', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { validRows: 12 } });
+    const file = new File(['xlsx-bytes'], 'customer-pool.xlsx');
+    const formListener = vi.fn((event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      detail.onSubmit({
+        importType: 'ADD',
+        importFileId: file,
+        importFilename: file.name,
+      });
+    });
+    window.addEventListener('dialog:form', formListener);
+    const pickFileSpy = vi.spyOn(promptUpload, 'pickFile');
+    pickFileSpy.mockClear();
+    vi.spyOn(promptUpload, 'uploadCommandFile').mockResolvedValueOnce('FILE-CUSTOMER-1');
+
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: vi.fn() as any,
+        tableName: 'crm_customer_pool_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: {} as any,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleAction({
+        code: 'precheck_import',
+        promptUpload: { key: 'importFileId', accept: '.xlsx', feedbackMode: 'panel' },
+        action: {
+          type: 'command',
+          command: 'crm:precheck_customer_pool_import',
+          inputFields: [
+            { field: 'importType', type: 'segmented' },
+            { field: 'importFileId', type: 'file', fileValueMode: 'file' },
+          ],
+        },
+      } as unknown as ButtonConfig);
+    });
+    window.removeEventListener('dialog:form', formListener);
+
+    expect(formListener).toHaveBeenCalledOnce();
+    expect(pickFileSpy).not.toHaveBeenCalled();
+    expect(promptUpload.uploadCommandFile).toHaveBeenCalledWith(file, undefined);
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/crm:precheck_customer_pool_import',
+      expect.objectContaining({
+        params: expect.objectContaining({
+          payload: expect.objectContaining({
+            importType: 'ADD',
+            importFileId: 'FILE-CUSTOMER-1',
+            importFilename: 'customer-pool.xlsx',
+          }),
+        }),
+      }),
+    );
+  });
+
   it('refreshes detail data sources and shows completion feedback after promptUpload commands', async () => {
     fetchResultMock.mockResolvedValueOnce({ code: '0', data: { importId: 'BOM-IMPORT-1' } });
     vi.spyOn(promptUpload, 'pickFile').mockResolvedValueOnce(

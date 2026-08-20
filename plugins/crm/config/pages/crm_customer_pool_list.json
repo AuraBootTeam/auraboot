@@ -59,10 +59,11 @@
                 "type": "command",
                 "command": "crm:precheck_customer_pool_import",
                 "operationType": "UPDATE",
-                "inputFieldsTitle": { "zh-CN": "选择客户公海导入方式", "en": "Choose Customer Pool Import Mode" },
-                "inputFieldsSubmitLabel": { "zh-CN": "选择文件并预检", "en": "Choose File and Pre-check" },
+                "inputFieldsTitle": { "zh-CN": "预检客户公海导入", "en": "Pre-check Customer Pool Import" },
+                "inputFieldsSubmitLabel": { "zh-CN": "开始预检", "en": "Start Pre-check" },
                 "inputFields": [
-                  { "field": "importType", "label": { "zh-CN": "导入方式", "en": "Import Mode" }, "type": "segmented", "required": true, "defaultValue": "ADD", "dataSource": { "type": "static", "data": [ { "value": "ADD", "label": { "zh-CN": "新增客户", "en": "Add Customers" }, "description": { "zh-CN": "客户编号已存在时失败", "en": "Existing customer codes fail" } }, { "value": "UPDATE", "label": { "zh-CN": "更新客户", "en": "Update Customers" }, "description": { "zh-CN": "客户编号不存在时失败", "en": "Missing customer codes fail" } } ] } }
+                  { "field": "importType", "label": { "zh-CN": "导入方式", "en": "Import Mode" }, "type": "segmented", "required": true, "defaultValue": "ADD", "dataSource": { "type": "static", "data": [ { "value": "ADD", "label": { "zh-CN": "新增客户", "en": "Add Customers" }, "description": { "zh-CN": "客户编号已存在时失败", "en": "Existing customer codes fail" } }, { "value": "UPDATE", "label": { "zh-CN": "更新客户", "en": "Update Customers" }, "description": { "zh-CN": "客户编号不存在时失败", "en": "Missing customer codes fail" } } ] } },
+                  { "field": "importFileId", "label": { "zh-CN": "客户导入文件", "en": "Customer Import File" }, "type": "file", "fileValueMode": "file", "fileNameField": "importFilename", "required": true, "accept": ".xlsx", "maxBytes": 52428800, "helpText": { "zh-CN": "仅支持下载模板生成的 .xlsx，最大 50MB；预检不会写入客户数据。", "en": "Use the downloaded .xlsx template, up to 50MB; pre-check does not write customer data." } }
                 ]
               }
             },
@@ -76,9 +77,10 @@
                 "command": "crm:import_customer_pool_customers",
                 "operationType": "UPDATE",
                 "inputFieldsTitle": { "zh-CN": "正式导入客户到公海", "en": "Import Customers to Public Pool" },
-                "inputFieldsSubmitLabel": { "zh-CN": "选择文件并导入", "en": "Choose File and Import" },
+                "inputFieldsSubmitLabel": { "zh-CN": "确认导入", "en": "Confirm Import" },
                 "inputFields": [
-                  { "field": "importType", "label": { "zh-CN": "导入方式", "en": "Import Mode" }, "type": "segmented", "required": true, "defaultValue": "ADD", "dataSource": { "type": "static", "data": [ { "value": "ADD", "label": { "zh-CN": "新增客户", "en": "Add Customers" } }, { "value": "UPDATE", "label": { "zh-CN": "更新客户", "en": "Update Customers" } } ] } },
+                  { "field": "importType", "label": { "zh-CN": "导入方式", "en": "Import Mode" }, "type": "segmented", "required": true, "defaultValue": "ADD", "dataSource": { "type": "static", "data": [ { "value": "ADD", "label": { "zh-CN": "新增客户", "en": "Add Customers" }, "description": { "zh-CN": "仅新增编号不存在的客户", "en": "Adds only customer codes that do not exist" } }, { "value": "UPDATE", "label": { "zh-CN": "更新客户", "en": "Update Customers" }, "description": { "zh-CN": "仅更新编号已存在的客户", "en": "Updates only existing customer codes" } } ] } },
+                  { "field": "importFileId", "label": { "zh-CN": "客户导入文件", "en": "Customer Import File" }, "type": "file", "fileValueMode": "file", "fileNameField": "importFilename", "required": true, "accept": ".xlsx", "maxBytes": 52428800, "helpText": { "zh-CN": "先下载模板并完成预检；文件最大 50MB，导入结果保留逐行成功与失败原因。", "en": "Download the template and pre-check first; files are limited to 50MB and results retain row-level outcomes." } },
                   { "field": "skipErrors", "label": { "zh-CN": "忽略错误并导入合法行", "en": "Skip Errors and Import Valid Rows" }, "type": "checkbox", "defaultValue": false, "helpText": { "zh-CN": "默认关闭：任一行预检失败时零写入。开启后仅导入合法行，并保留逐行失败原因。", "en": "Off by default: any invalid row means zero writes. When enabled, only valid rows are imported and row-level failures remain visible." } }
                 ]
               }

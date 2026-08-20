@@ -77,16 +77,20 @@ class CustomerPoolCommandHandlerTest {
         FakeDb cooldown = availableItem(baseline(), "item-1", "customer-1", "member-a",
                 Instant.now().minus(Duration.ofDays(1)));
         cooldown.getById("crm_customer_pool_common", "pool-1").put("crm_cp_new_cooldown_days", 2);
-        assertThrows(IllegalStateException.class, () -> execute(cooldown, CustomerPoolCommandHandler.CLAIM,
-                "item-1", "member-a", Map.of()));
+        IllegalStateException cooldownError = assertThrows(IllegalStateException.class,
+                () -> execute(cooldown, CustomerPoolCommandHandler.CLAIM,
+                        "item-1", "member-a", Map.of()));
+        assertTrue(cooldownError.getMessage().contains("claim available at"));
 
         FakeDb capacity = availableItem(baseline(), "item-1", "customer-1", "other-owner",
                 Instant.parse("2026-08-01T00:00:00Z"));
         capacity.put("crm_customer_capacity_common", "cap-1", map("crm_ccap_user_id", "member-a",
                 "crm_ccap_capacity", 1, "crm_ccap_status", "active"));
         capacity.put("crm_account_common", "owned-2", customer("owned-2", "member-a"));
-        assertThrows(IllegalStateException.class, () -> execute(capacity, CustomerPoolCommandHandler.CLAIM,
-                "item-1", "member-a", Map.of()));
+        IllegalStateException capacityError = assertThrows(IllegalStateException.class,
+                () -> execute(capacity, CustomerPoolCommandHandler.CLAIM,
+                        "item-1", "member-a", Map.of()));
+        assertTrue(capacityError.getMessage().contains("current 2 / limit 1"));
 
         FakeDb daily = availableItem(baseline(), "item-1", "customer-1", "other-owner",
                 Instant.parse("2026-08-01T00:00:00Z"));
@@ -94,15 +98,20 @@ class CustomerPoolCommandHandlerTest {
         execute(daily, CustomerPoolCommandHandler.CLAIM, "item-1", "member-a", Map.of());
         daily.put("crm_account_common", "customer-2", customer("customer-2", "other-owner"));
         availableItem(daily, "item-2", "customer-2", "other-owner", Instant.parse("2026-08-01T00:00:00Z"));
-        assertThrows(IllegalStateException.class, () -> execute(daily, CustomerPoolCommandHandler.CLAIM,
-                "item-2", "member-a", Map.of()));
+        IllegalStateException dailyError = assertThrows(IllegalStateException.class,
+                () -> execute(daily, CustomerPoolCommandHandler.CLAIM,
+                        "item-2", "member-a", Map.of()));
+        assertTrue(dailyError.getMessage().contains("current 1 / limit 1"));
+        assertTrue(dailyError.getMessage().contains("next eligible at"));
 
         FakeDb previous = availableItem(baseline(), "item-1", "customer-1", "member-a",
                 Instant.now().minus(Duration.ofDays(1)));
         previous.getById("crm_customer_pool_common", "pool-1").put("crm_cp_new_cooldown_days", 0);
         previous.getById("crm_customer_pool_common", "pool-1").put("crm_cp_previous_owner_cooldown_days", 7);
-        assertThrows(IllegalStateException.class, () -> execute(previous, CustomerPoolCommandHandler.CLAIM,
-                "item-1", "member-a", Map.of()));
+        IllegalStateException previousOwnerError = assertThrows(IllegalStateException.class,
+                () -> execute(previous, CustomerPoolCommandHandler.CLAIM,
+                        "item-1", "member-a", Map.of()));
+        assertTrue(previousOwnerError.getMessage().contains("claim available at"));
 
         assertThrows(SecurityException.class, () -> execute(previous, CustomerPoolCommandHandler.CLAIM,
                 "item-1", "stranger", Map.of()));

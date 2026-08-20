@@ -12,7 +12,7 @@
       "blockType": "toolbar",
       "buttons": [
         { "code": "create", "primary": true, "permissionCode": "crm.customer_pool.manage", "label": { "zh-CN": "新增回收条件", "en": "Add Recycle Condition" }, "action": { "type": "navigate", "to": "crm_customer_pool_recycle_rule_form" } },
-        { "code": "back_to_pools", "label": { "zh-CN": "返回客户公海设置", "en": "Back to Customer Pools" }, "action": { "type": "navigate", "to": "crm_customer_pool_list" } }
+        { "code": "back_to_pools", "label": { "zh-CN": "返回客户公海策略", "en": "Back to Customer Pool Strategy" }, "action": { "type": "navigate", "to": "crm_customer_pool_strategy" } }
       ]
     },
     {

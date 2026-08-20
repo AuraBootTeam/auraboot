@@ -167,7 +167,9 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
         String previousOwner = string(item.get("crm_cpi_previous_owner"));
         if (!administrator && actor.equals(previousOwner) && !CustomerPoolRules.cooldownElapsed(enteredAt,
                 intValue(pool.get("crm_cp_previous_owner_cooldown_days")), now)) {
-            throw new IllegalStateException("Previous owner cooldown has not elapsed");
+            throw new IllegalStateException("Previous owner cooldown has not elapsed; claim available at "
+                    + CustomerPoolRules.releaseAt(enteredAt,
+                    intValue(pool.get("crm_cp_previous_owner_cooldown_days"))));
         }
         if (!administrator) incrementDailyQuota(db, poolId, actor, intValue(pool.get("crm_cp_daily_pick_limit")));
         if (!db.compareAndSet("crm_customer_pool_item_common", itemId, "crm_cpi_status", "available", "claiming")) {
@@ -732,7 +734,18 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
         }
         if (db.incrementWithinCap("crm_customer_pool_quota_common", string(quota.get("pid")),
                 "crm_cpq_pick_count", 1, "crm_cpq_limit_snapshot").isEmpty()) {
-            throw new IllegalStateException("Daily customer-pool claim limit reached");
+            List<Map<String, Object>> latestRows = db.query("crm_customer_pool_quota_common",
+                    Map.of("crm_cpq_key", key));
+            Map<String, Object> latest = latestRows == null || latestRows.isEmpty()
+                    ? quota
+                    : latestRows.getFirst();
+            int current = intValue(latest.get("crm_cpq_pick_count"));
+            Instant nextEligibleAt = LocalDate.now(ZoneOffset.UTC)
+                    .plusDays(1)
+                    .atStartOfDay()
+                    .toInstant(ZoneOffset.UTC);
+            throw new IllegalStateException("Daily customer-pool claim limit reached: current "
+                    + current + " / limit " + limit + "; next eligible at " + nextEligibleAt);
         }
     }
 
@@ -746,7 +759,10 @@ public class CustomerPoolCommandHandler implements CommandHandlerExtension {
                 .filter(customer -> OPEN_CUSTOMER_STATES.contains(string(customer.get("crm_acc_status"))))
                 .filter(customer -> !"in_pool".equals(string(customer.get("crm_acc_pool_state"))))
                 .count();
-        if (open >= capacity) throw new IllegalStateException("Customer capacity reached for user " + owner);
+        if (open >= capacity) {
+            throw new IllegalStateException("Customer capacity reached: current " + open
+                    + " / limit " + capacity + " for user " + owner);
+        }
     }
 
     private static Map<String, Object> requirePoolMember(DataAccessor db, String poolId, String actor) {

@@ -32,6 +32,7 @@ import {
 import { InlineEditCell } from '~/framework/meta/rendering/components/InlineEditCell';
 import { useMediaQuery } from '~/framework/meta/rendering/components/ResponsiveBlockLayout';
 import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
+import { RowActionButtons } from '~/framework/meta/rendering/pages/list/RowActionButtons';
 
 export interface TableBlockRendererProps {
   block: BlockConfig;
@@ -837,11 +838,25 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     );
   };
 
-  const renderRowActions = (row: any) =>
-    renderActionButtons(
-      row,
-      rowActions.filter((action) => !(action as any).mobileOnly),
-    );
+  const renderRowActions = (row: any) => (
+    <RowActionButtons
+      buttons={rowActions.filter((action) => !(action as any).mobileOnly)}
+      record={row}
+      evaluateVisibleWhen={(expression, record) =>
+        !expression ||
+        evaluator.evaluateCondition(expression, {
+          ...context,
+          row: record,
+          record,
+        })
+      }
+      canUseButton={(button) => !button.permissionCode || hasPermission(button.permissionCode)}
+      resolveButtonLabel={(button) =>
+        getLocalizedText(button.label || button.content || button.code, locale, t)
+      }
+      handleAction={handleAction}
+    />
+  );
 
   const mobileActions = (() => {
     const configuredCodes = Array.isArray(mobileCardConfig.actionCodes)

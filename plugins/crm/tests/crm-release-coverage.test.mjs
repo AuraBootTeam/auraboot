@@ -20,9 +20,9 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
 
   assert.equal(committed.axes.semanticActions.length, 26);
   assert.equal(committed.axes.commands.length, 49);
-  assert.equal(committed.axes.pages.length, 25);
+  assert.equal(committed.axes.pages.length, 26);
   assert.equal(committed.axes.permissions.length, 24);
-  assert.equal(committed.axes.queries.length, 35);
+  assert.equal(committed.axes.queries.length, 39);
   assert.deepEqual(
     committed.untested.map((row) => row.id),
     ['RG3-INDEPENDENT-HUMAN-ADOPTER'],
@@ -44,15 +44,15 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
       'dashboards',
     ],
   );
-  assert.equal(committed.scope.productDenominator.pages, 124);
+  assert.equal(committed.scope.productDenominator.pages, 125);
   assert.equal(committed.scope.productDenominator.commands, 238);
   assert.equal(committed.scope.productDenominator.permissions, 114);
-  assert.equal(committed.scope.productDenominator['page-blocks'], 391);
-  assert.equal(committed.scope.productDenominator['page-fields'], 1654);
-  assert.equal(committed.scope.productDenominator['ui-actions'], 578);
-  assert.equal(committed.scope.productDenominator.queries, 51);
-  assert.equal(committed.scope.productVerdicts.pass, 559);
-  assert.equal(committed.scope.productVerdicts.untested, 2732);
+  assert.equal(committed.scope.productDenominator['page-blocks'], 402);
+  assert.equal(committed.scope.productDenominator['page-fields'], 1708);
+  assert.equal(committed.scope.productDenominator['ui-actions'], 600);
+  assert.equal(committed.scope.productDenominator.queries, 55);
+  assert.equal(committed.scope.productVerdicts.pass, 641);
+  assert.equal(committed.scope.productVerdicts.untested, 2742);
   assert.ok(committed.scope.productVerdicts.untested > 0);
   assert.equal(committed.scope.productVerdicts.gap ?? 0, 0);
   const coreWorkbenchContract = committed.runtimeEvidenceContracts.find(
@@ -122,13 +122,13 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   );
   assert.equal(customerPoolContract.expectedScenarios, 3);
   assert.equal(customerPoolContract.minimumScreenshots, 13);
-  assert.equal(customerPoolContract.expectedCoverage.pages.length, 14);
+  assert.equal(customerPoolContract.expectedCoverage.pages.length, 15);
   assert.equal(customerPoolContract.expectedCoverage.commands.length, 19);
   assert.equal(customerPoolContract.expectedCoverage.permissions.length, 7);
-  assert.equal(customerPoolContract.expectedCoverage.queries.length, 4);
-  assert.equal(customerPoolContract.expectedCoverage.blocks.length, 39);
-  assert.equal(customerPoolContract.expectedCoverage.fields.length, 71);
-  assert.equal(customerPoolContract.expectedCoverage.uiActions.length, 45);
+  assert.equal(customerPoolContract.expectedCoverage.queries.length, 8);
+  assert.equal(customerPoolContract.expectedCoverage.blocks.length, 50);
+  assert.equal(customerPoolContract.expectedCoverage.fields.length, 108);
+  assert.equal(customerPoolContract.expectedCoverage.uiActions.length, 68);
   assert.deepEqual(Object.keys(customerPoolContract.expectedCoverage).sort(), [
     'blocks',
     'commands',
