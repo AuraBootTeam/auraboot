@@ -110,6 +110,10 @@ import { assembleQuickFilterChips, type QuickFilterChip } from './list/quickFilt
 import { resolveListRowClickMode } from './list/rowClickNavigation';
 import { SelectAllMatchingBanner } from './list/SelectAllMatchingBanner';
 import {
+  resolveAuditUserCellValue,
+  resolveAuditUserDisplayFields,
+} from './list/auditUserDisplayFields';
+import {
   type SelectionState,
   createSelectionModel,
   toggleRow as selectionToggleRow,
@@ -1174,6 +1178,10 @@ function ListPageContentInner(props: PageContentProps) {
     if (!schema?.blocks) return null;
     return schema.blocks.find((block: any) => block.blockType === 'table') || null;
   }, [schema]);
+  const auditUserDisplayFields = useMemo(
+    () => resolveAuditUserDisplayFields(tableBlock),
+    [tableBlock],
+  );
   const tableBulkActions = useMemo<ButtonConfig[]>(() => {
     const configured =
       (tableBlock as any)?.table?.bulkActions ?? (tableBlock as any)?.bulkActions ?? [];
@@ -1975,6 +1983,9 @@ function ListPageContentInner(props: PageContentProps) {
         } else {
           queryParams.pageNum = requestedPageNum;
           queryParams.pageSize = requestedPageSize;
+          if (auditUserDisplayFields) {
+            queryParams.auditUserDisplayFields = auditUserDisplayFields;
+          }
         }
 
         if (isApiDatasource) {
@@ -2094,6 +2105,7 @@ function ListPageContentInner(props: PageContentProps) {
       buildFiltersParam,
       namedQueryCode,
       tableBlock,
+      auditUserDisplayFields,
       activeSorts,
       skipListData,
     ],
@@ -2287,6 +2299,9 @@ function ListPageContentInner(props: PageContentProps) {
           } else {
             queryParams.pageNum = 1;
             queryParams.pageSize = pagination.pageSize;
+            if (auditUserDisplayFields) {
+              queryParams.auditUserDisplayFields = auditUserDisplayFields;
+            }
           }
           if (isApiDatasource) {
             // API datasource: tab filter as individual query param
@@ -2378,6 +2393,7 @@ function ListPageContentInner(props: PageContentProps) {
       t,
       activeSorts,
       tableBlock,
+      auditUserDisplayFields,
       skipListData,
     ],
   );
@@ -2983,7 +2999,8 @@ function ListPageContentInner(props: PageContentProps) {
   // Render cell content using CellRendererRegistry
   const renderCellContent = useCallback(
     (column: ColumnConfig, record: DynamicEntity, rowIndex: number) => {
-      const value = getListFieldValueWithAlias(record, column.field);
+      const rawValue = getListFieldValueWithAlias(record, column.field);
+      const value = resolveAuditUserCellValue(record, column.field, rawValue);
       const recordWithAliasedField = Object.prototype.hasOwnProperty.call(record, column.field)
         ? record
         : { ...record, [column.field]: value };

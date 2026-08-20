@@ -97,4 +97,28 @@ describe('useListData fixedFilters', () => {
     await waitFor(() => expect(fetchResultMock).toHaveBeenCalled());
     expect(lastCallParams().filters).toBeUndefined();
   });
+
+  it('requests audit user display data only when the list visibly renders creator', async () => {
+    fetchResultMock.mockResolvedValue({ code: 0, data: { records: [], total: 0, page: 1 } });
+    const creatorSchema = {
+      kind: 'list',
+      blocks: [
+        {
+          blockType: 'table',
+          table: { columns: [{ field: 'name' }, { field: 'created_by' }] },
+        },
+      ],
+    } as unknown as UnifiedSchema;
+
+    const { result } = renderHook(() =>
+      useListData({ schema: creatorSchema, tableName: 'bom_conversion_task_pcba' }),
+    );
+
+    await act(async () => {
+      await result.current.loadData();
+    });
+
+    await waitFor(() => expect(fetchResultMock).toHaveBeenCalled());
+    expect(lastCallParams().auditUserDisplayFields).toBe('created_by');
+  });
 });

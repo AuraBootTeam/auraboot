@@ -408,13 +408,25 @@ test.describe('PCBA quote minimal create regression', () => {
 
       await navigateToDynamicPage(page, 'qo_quote_common');
       expect(await tableHeaders(page)).toEqual([
-        '报价单编号',
-        '客户信息',
+        '客户',
         '项目',
-        '报价修改日期',
+        '编号',
+        '状态',
+        '创建人',
+        '创建时间',
+        '修改时间',
         '操作',
       ]);
-      await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('状态');
+      const quoteRow = page.locator('tbody tr').filter({ hasText: created.quoteCode }).first();
+      await expect(quoteRow).toBeVisible({ timeout: 15_000 });
+      const quoteCells = quoteRow.locator('td');
+      await expect(quoteCells.nth(0)).toContainText(accountName);
+      await expect(quoteCells.nth(1)).toContainText(projectName);
+      await expect(quoteCells.nth(0).locator('.text-accent')).toHaveCount(0);
+      await expect(quoteCells.nth(1).locator('.text-accent')).toHaveCount(0);
+      const creatorText = (await quoteCells.nth(4).innerText()).trim();
+      expect(creatorText, 'creator should resolve to a user name instead of a blank/raw id').not.toBe('-');
+      expect(creatorText).not.toMatch(/^\d+$/);
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('CRM客户ID');
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('折扣%');
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('有效期至');

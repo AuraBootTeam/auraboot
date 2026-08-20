@@ -59,6 +59,7 @@ public class DynamicController {
     static final String RECORD_INTERNAL_ID_RESOLVER = "$recordInternalId";
     static final String CURRENT_DEPARTMENT_OWNER_PIDS_RESOLVER = "$currentDepartmentOwnerPids";
     static final String CURRENT_SHARED_RECORD_PIDS_RESOLVER = "$currentSharedRecordPids";
+    static final Set<String> AUDIT_USER_DISPLAY_FIELDS = Set.of("created_by", "updated_by");
 
     private static String logSafe(Object value) {
         return LogSanitizer.safe(value);
@@ -129,6 +130,9 @@ public class DynamicController {
             @Parameter(description = "NamedQuery code — when provided, data is fetched from a NamedQuery instead of the model table")
             @RequestParam(required = false) String queryCode,
 
+            @Parameter(description = "Comma-separated audit user fields to resolve for this visible list, limited to created_by and updated_by")
+            @RequestParam(required = false) String auditUserDisplayFields,
+
             @Parameter(description = "Public pid cursor for keyset pagination. Pass the nextCursor value from the previous response to fetch the next page efficiently. When provided, pageNum is ignored and WHERE pid > cursor is used instead of OFFSET.")
             @RequestParam(required = false) String cursor) {
 
@@ -146,6 +150,7 @@ public class DynamicController {
                 .keyword(keyword)
                 .conditions(conditions.isEmpty() ? null : conditions)
                 .sortFields(parsedSortFields.isEmpty() ? null : parsedSortFields)
+                .auditUserDisplayFields(parseAuditUserDisplayFields(auditUserDisplayFields))
                 .cursor(cursor)
                 .build();
 
@@ -177,6 +182,24 @@ public class DynamicController {
 
         PaginationResult<Map<String, Object>> result = dynamicDataService.list(modelCode, queryRequest);
         return ApiResponse.success(PublicRecordSanitizer.sanitizePage(result));
+    }
+
+    static List<String> parseAuditUserDisplayFields(String rawFields) {
+        if (!StringUtils.hasText(rawFields)) {
+            return null;
+        }
+        LinkedHashSet<String> requested = new LinkedHashSet<>();
+        for (String candidate : rawFields.split(",")) {
+            String field = candidate.trim().toLowerCase();
+            if (field.isEmpty()) {
+                continue;
+            }
+            if (!AUDIT_USER_DISPLAY_FIELDS.contains(field)) {
+                throw new IllegalArgumentException("Unsupported audit user display field: " + field);
+            }
+            requested.add(field);
+        }
+        return requested.isEmpty() ? null : List.copyOf(requested);
     }
 
     /**

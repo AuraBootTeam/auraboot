@@ -142,4 +142,33 @@ public interface UserMapper extends BaseMapper<User> {
     Map<String, Object> findUserInTenantByPid(
             @Param("tenantId") Long tenantId,
             @Param("pid") String pid);
+
+    /**
+     * Resolve audit actor display names in one tenant-scoped batch query.
+     *
+     * <p>The dynamic record stores created_by / updated_by as internal user IDs.
+     * Public list rendering must never expose those IDs or query one user per row,
+     * so this projection joins active tenant membership and returns only the safe
+     * display name needed by the list.</p>
+     */
+    @Select("""
+            <script>
+            SELECT u.id AS id,
+                   COALESCE(NULLIF(u.nick_name, ''), NULLIF(u.user_name, ''), NULLIF(u.email, '')) AS display_name
+            FROM ab_user u
+            INNER JOIN ab_tenant_member tm
+                    ON tm.user_id = u.id
+                   AND tm.tenant_id = #{tenantId}
+                   AND tm.status = 'active'
+                   AND tm.deleted_flag = FALSE
+            WHERE u.deleted_flag = FALSE
+              AND u.id IN
+              <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+                #{userId}
+              </foreach>
+            </script>
+            """)
+    List<Map<String, Object>> findDisplayNamesByIdsInTenant(
+            @Param("tenantId") Long tenantId,
+            @Param("userIds") java.util.Collection<Long> userIds);
 }
