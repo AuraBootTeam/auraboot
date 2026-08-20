@@ -92,6 +92,41 @@ describe('FormDialog choice fields', () => {
     );
   });
 
+  it('renders localized business section headings and widens grouped dialogs', () => {
+    renderDialog({
+      title: '记录包装箱',
+      fields: [
+        {
+          field: 'packageCode',
+          group: { 'zh-CN': '箱号与数量', en: 'Carton and Quantity' },
+          label: '包装箱号',
+          type: 'text',
+        },
+        {
+          field: 'quantity',
+          group: { 'zh-CN': '箱号与数量', en: 'Carton and Quantity' },
+          label: '本箱数量',
+          type: 'number',
+        },
+        {
+          field: 'grossWeight',
+          group: { 'zh-CN': '称重结果', en: 'Weight Results' },
+          label: '毛重',
+          type: 'number',
+        },
+      ],
+      fieldOptions: {},
+      defaults: {},
+    });
+
+    expect(screen.getByText('箱号与数量')).toBeInTheDocument();
+    expect(screen.getByText('称重结果')).toBeInTheDocument();
+    expect(screen.getAllByTestId(/form-dialog-group-/)).toHaveLength(2);
+    expect(screen.getByTestId('form-dialog').firstElementChild?.nextElementSibling).toHaveClass(
+      'max-w-2xl',
+    );
+  });
+
   it('switches mode-specific fields and submits only visible values', () => {
     const onSubmit = vi.fn();
     renderDialog({

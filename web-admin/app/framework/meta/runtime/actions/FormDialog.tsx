@@ -35,6 +35,7 @@ interface FormOptionConfig {
 interface FormFieldConfig {
   field: string;
   label?: string | Record<string, string>;
+  group?: string | Record<string, string>;
   helpText?: string | Record<string, string>;
   type?: 'text' | 'select' | 'number' | 'textarea' | 'multiselect' | 'segmented' | 'checkbox' | 'file' | 'reference';
   component?: string;
@@ -250,6 +251,10 @@ export default function FormDialog() {
   const dialogTitle = state.title
     ? getLocalizedText(state.title, locale, t)
     : t('common.form') || 'Form';
+  const visibleFields = state.fields.filter((field) =>
+    matchesVisibility(field.visibleWhen, formData),
+  );
+  const hasBusinessGroups = visibleFields.some((field) => field.group);
 
   return (
     <div
@@ -266,7 +271,9 @@ export default function FormDialog() {
       />
 
       {/* Dialog */}
-      <div className="relative mx-4 flex max-h-[calc(100vh-2rem)] w-full max-w-lg scale-100 transform flex-col rounded-lg bg-white opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800">
+      <div className={`relative mx-4 flex max-h-[calc(100vh-2rem)] w-full scale-100 transform flex-col rounded-lg bg-white opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800 ${
+        hasBusinessGroups ? 'max-w-2xl' : 'max-w-lg'
+      }`}>
         {/* Header */}
         <div className="shrink-0 border-b border-gray-200 px-6 pt-6 pb-4 dark:border-gray-700">
           <h3 id="form-dialog-title" className="text-lg font-semibold text-gray-900 dark:text-white">{dialogTitle}</h3>
@@ -277,9 +284,13 @@ export default function FormDialog() {
           className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4 [scrollbar-gutter:stable]"
           data-testid="form-dialog-body"
         >
-          {state.fields.map((field, index) => {
-            if (!matchesVisibility(field.visibleWhen, formData)) return null;
+          {visibleFields.map((field, index) => {
             const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
+            const groupTitle = field.group ? getLocalizedText(field.group, locale, t) : '';
+            const previousGroupTitle = index > 0 && visibleFields[index - 1].group
+              ? getLocalizedText(visibleFields[index - 1].group!, locale, t)
+              : '';
+            const startsBusinessGroup = Boolean(groupTitle) && groupTitle !== previousGroupTitle;
             const placeholder = field.placeholder
               ? getLocalizedText(field.placeholder, locale, t)
               : '';
@@ -304,7 +315,20 @@ export default function FormDialog() {
               : options;
 
             return (
-              <div key={field.field}>
+              <div key={`${field.field}-${index}`}>
+                {startsBusinessGroup && (
+                  <div
+                    className={`${index > 0 ? 'pt-2' : ''} mb-4`}
+                    data-testid={`form-dialog-group-${index}`}
+                  >
+                    <div className="flex items-center gap-3 border-b border-gray-200 pb-2 dark:border-gray-700">
+                      <span className="h-4 w-1 rounded-full bg-blue-600" aria-hidden="true" />
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {groupTitle}
+                      </h4>
+                    </div>
+                  </div>
+                )}
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   {label}
                   {field.required && <span className="ml-1 text-red-500">*</span>}
