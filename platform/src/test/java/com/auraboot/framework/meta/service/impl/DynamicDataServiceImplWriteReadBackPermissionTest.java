@@ -185,6 +185,37 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
     }
 
     @Test
+    @DisplayName("command-permitted write read-back keeps canonical ids without reference enrichment")
+    void create_readBackSkipsPresentationReferenceEnrichment() {
+        stubReadVerdict(false);
+        FieldDefinition accountRef = FieldDefinition.builder()
+                .code("account_id")
+                .columnName("account_id")
+                .dataType("reference")
+                .extraProps(Map.of("refTarget", Map.of(
+                        "targetEntity", "crm_account_common",
+                        "displayField", "crm_acc_name")))
+                .build();
+        model.setFields(List.of(model.getFields().getFirst(), model.getFields().get(1), accountRef));
+        when(dynamicDataMapper.insert(anyString(), anyMap())).thenReturn(1);
+        when(dynamicDataMapper.selectByQuery(anyString(), anyMap()))
+                .thenReturn(List.of(Map.of(
+                        "pid", RECORD_ID,
+                        "name", "written-value",
+                        "account_id", "account-001")));
+
+        Map<String, Object> created = service.create(MODEL_CODE, new HashMap<>(Map.of(
+                "pid", RECORD_ID,
+                "name", "written-value",
+                "account_id", "account-001")));
+
+        assertThat(created).containsEntry("account_id", "account-001");
+        assertThat(created).doesNotContainKey("account_id_display");
+        verify(permissionFacade, never()).canAction(anyLong(), eq("crm_account_common"), eq("read"));
+        verify(metadataService, never()).getModelDefinition("crm_account_common");
+    }
+
+    @Test
     @DisplayName("update's post-write read-back does not re-run the caller's read permission check")
     void update_readBack_doesNotReProjectCallerPermission() {
         // The PRE-update read of the existing record legitimately goes through the

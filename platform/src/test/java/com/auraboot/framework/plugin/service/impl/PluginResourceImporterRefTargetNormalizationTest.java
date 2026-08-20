@@ -139,17 +139,19 @@ class PluginResourceImporterRefTargetNormalizationTest {
     }
 
     @Test
-    @DisplayName("preserves non-alias keys (valueField, relationship)")
+    @DisplayName("preserves non-alias keys (valueField, importMatchFields, relationship)")
     void preservesOtherKeys() {
         FieldDefinitionDTO dto = refField();
         Map<String, Object> src = new LinkedHashMap<>();
         src.put("modelCode", "crm_account_common");
         src.put("valueField", "pid");
+        src.put("importMatchFields", List.of("crm_acc_code", "crm_acc_name"));
         src.put("relationship", "many-to-one");
         dto.setRefTarget(src);
         Map<String, Object> rt = resolve(dto);
         assertThat(rt).containsEntry("targetEntity", "crm_account_common");
         assertThat(rt).containsEntry("valueField", "pid");
+        assertThat(rt).containsEntry("importMatchFields", List.of("crm_acc_code", "crm_acc_name"));
         assertThat(rt).containsEntry("relationship", "many-to-one");
     }
 

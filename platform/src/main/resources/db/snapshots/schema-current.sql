@@ -9623,7 +9623,8 @@ CREATE TABLE public.ab_import_job (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     completed_at timestamp without time zone,
     created_by bigint,
-    deleted_flag boolean DEFAULT false NOT NULL
+    deleted_flag boolean DEFAULT false NOT NULL,
+    error_details text
 );
 
 

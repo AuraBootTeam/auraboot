@@ -25,4 +25,7 @@ public class ImportOptions {
 
     /** Server-whitelisted field used to find the row in UPDATE mode. */
     private String matchKey;
+
+    /** Request locale captured before asynchronous work leaves the HTTP thread. */
+    private String reportLocale = "zh-CN";
 }

@@ -1,0 +1,40 @@
+{
+  "scope": "crm-multimodel-import-2026-08-13",
+  "runtime": "crm-multimodel-import-20260813-s143",
+  "verdict": {
+    "pass": 12,
+    "partial": 0,
+    "gap": 0,
+    "untested": 0
+  },
+  "items": [
+    { "id": "CMM-A01", "action": "Lead insert precheck and command-default create", "status": "pass", "spec": "CMM-01" },
+    { "id": "CMM-A02", "action": "Lead update matched by business code", "status": "pass", "spec": "CMM-02" },
+    { "id": "CMM-A03", "action": "Two-thousand-row durable asynchronous import within 180 seconds", "status": "pass", "spec": "CMM-09", "elapsedSeconds": 58.1 },
+    { "id": "CMM-A04", "action": "Contact account resolved by unique account code", "status": "pass", "spec": "CMM-03" },
+    { "id": "CMM-A05", "action": "Missing account reference rejected with zero writes", "status": "pass", "spec": "CMM-04" },
+    { "id": "CMM-A06", "action": "Ambiguous account name rejected with zero writes", "status": "pass", "spec": "CMM-05" },
+    { "id": "CMM-A07", "action": "Opportunity account resolved by unique account code", "status": "pass", "spec": "CMM-06" },
+    { "id": "CMM-A08", "action": "Opportunity source lead resolved by unique lead code", "status": "pass", "spec": "CMM-06" },
+    { "id": "CMM-A09", "action": "Opportunity update matched by business code and blank notes preserved", "status": "pass", "spec": "CMM-07" },
+    { "id": "CMM-A10", "action": "Public PID remains a supported reference value", "status": "pass", "spec": "CMM-03" },
+    { "id": "CMM-A11", "action": "Viewer import entry hidden and direct validation API denied", "status": "pass", "spec": "CMM-08" },
+    { "id": "CMM-A12", "action": "Generated templates document reference business keys and PID", "status": "pass", "spec": "CMM-03,CMM-06" }
+  ],
+  "screenshots": [
+    "01-lead-insert-precheck.png",
+    "02-contact-code-precheck.png",
+    "03-contact-missing-blocked.png",
+    "04-contact-ambiguous-blocked.png",
+    "05-opportunity-result.png",
+    "06-viewer-no-import.png",
+    "07-lead-2000-result.png"
+  ],
+  "residualGaps": [
+    "at s143: error-report workbook download and correction workflow; later closed by s144/s147/s148, see recovery-scale-manifest.json",
+    "outside this s143 adoption manifest: cancel/retry and restart-during-running recovery",
+    "outside this s143 adoption manifest: separately budgeted 10k/100k performance benchmark",
+    "independent product-owner and mobile/channel sign-off"
+  ],
+  "dataMigration": "out_of_scope_during_development"
+}

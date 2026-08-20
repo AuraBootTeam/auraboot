@@ -16,6 +16,8 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /bash -n scripts\/db\/cleanup-scheduler-residue\.sh/);
   assert.match(gate, /bash -n scripts\/import-plugins\.sh/);
   assert.match(gate, /bash -n scripts\/lib\/reset-init-common\.sh/);
+  assert.match(gate, /bash -n scripts\/lib\/runtime-process-owner\.sh/);
+  assert.match(gate, /bash -n scripts\/lib\/test-runtime-process-owner\.sh/);
   assert.match(gate, /bash -n scripts\/seed-marketplace\.sh/);
   assert.match(gate, /bash -n scripts\/sync-marketplace-catalog\.sh/);
   assert.match(gate, /bash -n scripts\/docker-ga-e2e-bootstrap\.sh/);
@@ -30,6 +32,58 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /node --test scripts\/db\/cleanup-scheduler-residue\.test\.mjs/);
   assert.match(gate, /node --test scripts\/oss-test-fixture-gate\.test\.mjs/);
   assert.match(gate, /node web-admin\/scripts\/run-showcase-seed-sequence\.test\.mjs/);
+  assert.match(gate, /bash scripts\/lib\/test-runtime-process-owner\.sh/);
+});
+
+test('OSS reset uses fail-closed runtime ownership instead of global process matching', () => {
+  const reset = read('scripts/oss-reset-and-init.sh');
+  const helper = read('scripts/lib/runtime-process-owner.sh');
+  const hostE2e = read('scripts/host-e2e-up.sh');
+
+  assert.match(reset, /source "\$SCRIPT_DIR\/lib\/runtime-process-owner\.sh"/);
+  assert.match(reset, /aura_reset_owner_init/);
+  assert.match(reset, /aura_reset_acquire_locks/);
+  assert.match(reset, /aura_reset_stop_service "backend"/);
+  assert.match(reset, /aura_reset_stop_service "backend"[^\n]+"bootRun"/);
+  assert.match(reset, /aura_reset_stop_service "web"/);
+  assert.match(reset, /aura_reset_stop_service "bff"/);
+  assert.match(reset, /aura_reset_register_process "backend"/);
+  assert.match(reset, /aura_reset_register_process "backend"[^\n]+"bootRun"/);
+  assert.match(reset, /aura_reset_assert_service_owned[\s\\]+\n\s*"backend"[^\n]+"bootRun"/);
+  assert.match(reset, /aura_reset_register_process "web"/);
+  assert.match(reset, /aura_reset_register_process "bff"/);
+  assert.match(reset, /aura_reset_assert_service_owned[\s\\]+\n\s*"web"/);
+  assert.match(reset, /aura_reset_assert_service_owned[\s\\]+\n\s*"bff"/);
+  assert.doesNotMatch(reset, /\bpkill\b|\bkillall\b/);
+
+  for (const requiredField of [
+    'runtime_id',
+    'hostname',
+    'pid',
+    'pgid',
+    'start_time',
+    'source_root',
+    'process_root',
+    'port',
+    'tmux_session',
+    'tmux_session_id',
+    'tmux_pane_id',
+    'command_token',
+  ]) {
+    assert.match(helper, new RegExp(`echo "${requiredField}=`));
+  }
+  assert.match(helper, /aura_reset_pid_belongs_to_owner/);
+  assert.match(helper, /refusing to signal unsafe process group/);
+  assert.match(helper, /lock is held or cannot be proved stale/);
+  assert.match(helper, /"tcp-port-\$\{AURA_RESET_OWNER_HOST_HASH:0:16\}-\$port"/);
+  assert.match(helper, /LC_ALL=C TZ=UTC ps -p/);
+  assert.match(helper, /tmux has-session -t "=\$session_name"/);
+  assert.match(helper, /tmux kill-session -t "\$tmux_session_id"/);
+  assert.doesNotMatch(helper, /tmux kill-session -t "=?\$tmux_session"/);
+  assert.doesNotMatch(helper, /\bpkill\b|\bkillall\b/);
+
+  assert.match(hostE2e, /exec bash scripts\/oss-reset-and-init\.sh/);
+  assert.doesNotMatch(hostE2e, /FORCE_HOST="\$\{FORCE_HOST:-1\}"/);
 });
 
 test('OSS reset init contract gate is executable for direct local use', () => {

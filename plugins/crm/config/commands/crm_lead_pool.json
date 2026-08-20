@@ -1,0 +1,125 @@
+[
+  {
+    "code": "crm:create_lead_pool",
+    "displayName:zh-CN": "新建线索池",
+    "displayName:en": "Create Lead Pool",
+    "type": "create",
+    "modelCode": "crm_lead_pool",
+    "inputFields": ["crm_lp_name", "crm_lp_member_user_ids", "crm_lp_admin_user_ids", "crm_lp_daily_pick_limit", "crm_lp_new_cooldown_days", "crm_lp_previous_owner_cooldown_days", "crm_lp_auto_recycle", "crm_lp_recycle_after_days", "crm_lp_recycle_basis", "crm_lp_description"],
+    "autoSetFields": {
+      "crm_lp_code": { "strategy": "auto_generate", "pattern": "LP-{yyyyMMdd}-{seq}" },
+      "crm_lp_status": { "strategy": "fixed_value", "value": "enabled" }
+    },
+    "permissions": ["crm.lead_pool.manage"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:update_lead_pool",
+    "displayName:zh-CN": "编辑线索池策略",
+    "displayName:en": "Update Lead Pool Policy",
+    "type": "update",
+    "modelCode": "crm_lead_pool",
+    "inputFields": ["crm_lp_name", "crm_lp_member_user_ids", "crm_lp_admin_user_ids", "crm_lp_daily_pick_limit", "crm_lp_new_cooldown_days", "crm_lp_previous_owner_cooldown_days", "crm_lp_auto_recycle", "crm_lp_recycle_after_days", "crm_lp_recycle_basis", "crm_lp_description"],
+    "permissions": ["crm.lead_pool.manage"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:toggle_lead_pool",
+    "displayName:zh-CN": "启用/停用线索池",
+    "displayName:en": "Enable or Disable Lead Pool",
+    "type": "custom",
+    "modelCode": "crm_lead_pool",
+    "handler": "crm:toggle_lead_pool",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.lead_pool.manage"],
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:delete_lead_pool",
+    "displayName:zh-CN": "删除线索池",
+    "displayName:en": "Delete Lead Pool",
+    "type": "custom",
+    "modelCode": "crm_lead_pool",
+    "handler": "crm:delete_lead_pool",
+    "handlerParams": { "dslPersistence": false },
+    "extension": { "confirmMessage:zh-CN": "仅空线索池可删除，确认继续？", "confirmMessage:en": "Only an empty lead pool can be deleted. Continue?" },
+    "permissions": ["crm.lead_pool.manage"],
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:list_lead_pools",
+    "displayName:zh-CN": "线索池列表",
+    "displayName:en": "List Lead Pools",
+    "type": "query",
+    "modelCode": "crm_lead_pool",
+    "permissions": ["crm.lead_pool.read"],
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:detail_lead_pool",
+    "displayName:zh-CN": "查看线索池",
+    "displayName:en": "View Lead Pool",
+    "type": "query",
+    "modelCode": "crm_lead_pool",
+    "permissions": ["crm.lead_pool.read"],
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:move_lead_to_pool",
+    "displayName:zh-CN": "移入线索池",
+    "displayName:en": "Move Lead to Pool",
+    "type": "custom",
+    "modelCode": "crm_lead_common",
+    "handler": "crm:move_lead_to_pool",
+    "handlerParams": { "dslPersistence": false },
+    "inputFields": ["crm_lead_last_pool_id"],
+    "permissions": ["crm.lead_pool.move"],
+    "agent_hint": "Move an owned lead into an enabled pool. Payload poolId or crm_lead_last_pool_id is required.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:claim_pool_lead",
+    "displayName:zh-CN": "领取线索",
+    "displayName:en": "Claim Lead",
+    "type": "custom",
+    "modelCode": "crm_lead_pool_item",
+    "handler": "crm:claim_pool_lead",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.lead_pool.pick"],
+    "agent_hint": "Claim one available pool item. Capacity, daily limit and cooldown policies are enforced atomically.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:assign_pool_lead",
+    "displayName:zh-CN": "分配线索",
+    "displayName:en": "Assign Lead",
+    "type": "custom",
+    "modelCode": "crm_lead_pool_item",
+    "handler": "crm:assign_pool_lead",
+    "handlerParams": { "dslPersistence": false },
+    "inputFields": ["crm_lpi_claimed_by"],
+    "permissions": ["crm.lead_pool.assign"],
+    "agent_hint": "Pool administrators assign one available pool item to a user. Payload assigneeId or crm_lpi_claimed_by is required.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:list_lead_pool_items",
+    "displayName:zh-CN": "线索池条目列表",
+    "displayName:en": "List Lead Pool Items",
+    "type": "query",
+    "modelCode": "crm_lead_pool_item",
+    "permissions": ["crm.lead_pool.read"],
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:run_lead_pool_recycle",
+    "displayName:zh-CN": "立即执行自动回收",
+    "displayName:en": "Run Lead Pool Recycle Now",
+    "type": "custom",
+    "modelCode": "crm_lead_pool",
+    "handler": "crm:run_lead_pool_recycle",
+    "handlerParams": { "dslPersistence": false },
+    "permissions": ["crm.lead_pool.recycle"],
+    "cmd_risk_level": "L2"
+  }
+]

@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  */
 @Data
 @EqualsAndHashCode(callSuper = false)
-@TableName("ab_import_job")
+@TableName(value = "ab_import_job", autoResultMap = true)
 public class ImportJob {
 
     @TableId(value = "id", type = IdType.AUTO)
@@ -56,6 +56,10 @@ public class ImportJob {
 
     @TableField("error_report_url")
     private String errorReportUrl;
+
+    /** JSON array of bounded row errors used to reconstruct terminal async status. */
+    @TableField("error_details")
+    private String errorDetails;
 
     @TableField("created_at")
     private LocalDateTime createdAt;

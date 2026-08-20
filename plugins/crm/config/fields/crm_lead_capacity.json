@@ -1,0 +1,7 @@
+[
+  { "code": "crm_lcap_user_key", "displayName:zh-CN": "用户唯一键", "displayName:en": "User Key", "dataType": "string", "constraints": { "required": true, "unique": true, "maxLength": 100 }, "feature": { "readonly": true } },
+  { "code": "crm_lcap_user_id", "displayName:zh-CN": "销售用户", "displayName:en": "Sales User", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "constraints": { "required": true }, "extension": { "renderComponent": "user-select" } },
+  { "code": "crm_lcap_capacity", "displayName:zh-CN": "最大库容", "displayName:en": "Maximum Capacity", "dataType": "integer", "constraints": { "required": true, "min": 1 }, "feature": { "sortable": true } },
+  { "code": "crm_lcap_status", "displayName:zh-CN": "状态", "displayName:en": "Status", "dataType": "enum", "dictCode": "crm_lead_capacity_status", "defaultValue": "active", "constraints": { "required": true } },
+  { "code": "crm_lcap_remark", "displayName:zh-CN": "说明", "displayName:en": "Remark", "dataType": "text" }
+]

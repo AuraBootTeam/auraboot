@@ -153,10 +153,15 @@ describe('useActionHandler - handlerParams.async polling', () => {
     });
 
     expect(writeText).toHaveBeenCalledWith('TempPass1!');
-    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('TempPass1!'), 'success');
+    expect(showToast).toHaveBeenCalledWith(
+      'Temporary password generated and copied when permitted',
+      'success',
+    );
   });
 
   it('collects command inputFields and merges them into the command payload', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
     fetchResultMock.mockResolvedValueOnce({
       code: '0',
       data: {
@@ -166,6 +171,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
           action: 'provision_member_from_employee',
           employeePid: 'emp-001',
           memberPid: 'member-001',
+          userName: 'emp_emp001',
           tempPassword: 'TempPass1!',
         },
       },
@@ -227,7 +233,13 @@ describe('useActionHandler - handlerParams.async polling', () => {
       }),
     );
     expect(loadData).toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('TempPass1!'), 'success');
+    expect(writeText).toHaveBeenCalledWith(
+      'Login name: emp_emp001\nTemporary password: TempPass1!',
+    );
+    expect(showToast).toHaveBeenCalledWith(
+      'Account credentials generated and copied when permitted',
+      'success',
+    );
   });
 
   it('surfaces a failed async task in the modal instead of throwing to the page', async () => {

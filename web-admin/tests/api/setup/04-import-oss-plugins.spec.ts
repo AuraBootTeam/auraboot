@@ -15,6 +15,25 @@ const BACKEND_PLUGIN_ROOT =
 
 const REQUIRED_OSS_PLUGINS = [
   {
+    name: 'core-bpm',
+    pluginId: 'com.auraboot.core-bpm',
+    probeModelCode: 'bpm_process_definition',
+    probeCommandCode: '__menu_only__',
+    probeMenuCode: 'bpm_management',
+  },
+  {
+    name: 'platform-admin',
+    pluginId: 'com.auraboot.platform-admin',
+    probeModelCode: 'tenant_member',
+    probeCommandCode: 'admin:create_member',
+  },
+  {
+    name: 'org-management',
+    pluginId: 'com.auraboot.org-management',
+    probeModelCode: 'org_department',
+    probeCommandCode: 'org:create_department',
+  },
+  {
     name: 'core-announcement',
     pluginId: 'com.auraboot.core-announcement',
     probeModelCode: 'ab_announcement',
@@ -42,21 +61,29 @@ test('import required OSS plugins for OSS E2E profile', async ({ request }) => {
   const token = await login(request);
 
   for (const plugin of REQUIRED_OSS_PLUGINS) {
-    const existingCommandsRes = await request.get(
-      `${BACKEND_URL}/api/meta/commands?modelCode=${encodeURIComponent(plugin.probeModelCode)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
+    const probeMenuCode = 'probeMenuCode' in plugin ? plugin.probeMenuCode : undefined;
+    if (probeMenuCode) {
+      const menusRes = await request.get(`${BACKEND_URL}/api/menu/user`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (menusRes.ok() && (await menusRes.text()).includes(probeMenuCode)) continue;
+    } else {
+      const existingCommandsRes = await request.get(
+        `${BACKEND_URL}/api/meta/commands?modelCode=${encodeURIComponent(plugin.probeModelCode)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      },
-    );
-    if (existingCommandsRes.ok()) {
-      const existingCommandsBody = (await existingCommandsRes.json()) as {
-        data?: Array<{ code?: string }>;
-      };
-      const commands = Array.isArray(existingCommandsBody?.data) ? existingCommandsBody.data : [];
-      if (commands.some((command) => command?.code === plugin.probeCommandCode)) {
-        continue;
+      );
+      if (existingCommandsRes.ok()) {
+        const existingCommandsBody = (await existingCommandsRes.json()) as {
+          data?: Array<{ code?: string }>;
+        };
+        const commands = Array.isArray(existingCommandsBody?.data) ? existingCommandsBody.data : [];
+        if (commands.some((command) => command?.code === plugin.probeCommandCode)) {
+          continue;
+        }
       }
     }
 

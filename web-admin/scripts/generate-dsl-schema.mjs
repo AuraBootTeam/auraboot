@@ -176,6 +176,94 @@ function addPageTypeDiscriminator(schema) {
 
 addPageTypeDiscriminator(output);
 
+/**
+ * Preserve the runtime grouped-radio invariants in the publish-time JSON Schema.
+ * Safe defaults are explicit and opt-in: both producer fields must be named,
+ * defaultFirst can never substitute for them, and row identity must survive reloads.
+ */
+function addGroupedRadioSelectionContract(schema) {
+  const selection = schema.definitions?.SelectionConfig;
+  const table = schema.definitions?.TableConfig;
+  if (!selection || !table) return;
+
+  for (const field of [
+    'keyField',
+    'exclusiveBy',
+    'optionLabelField',
+    'recommendedField',
+    'safeField',
+  ]) {
+    if (selection.properties?.[field]) selection.properties[field].minLength = 1;
+  }
+  if (table.properties?.rowKey) table.properties.rowKey.minLength = 1;
+
+  selection.allOf = [
+    ...(selection.allOf || []),
+    {
+      if: {
+        required: ['presentation'],
+        properties: { presentation: { const: 'grouped-radio' } },
+      },
+      then: {
+        required: ['exclusiveBy', 'optionLabelField'],
+        properties: {
+          mode: { const: 'multiple' },
+          defaultFirst: { const: false },
+        },
+      },
+    },
+    {
+      if: { required: ['exclusiveBy'] },
+      then: { properties: { mode: { const: 'multiple' } } },
+    },
+    {
+      if: { required: ['optionLabelField'] },
+      then: {
+        required: ['presentation'],
+        properties: { presentation: { const: 'grouped-radio' } },
+      },
+    },
+    {
+      if: { required: ['recommendedField'] },
+      then: {
+        required: ['safeField', 'presentation'],
+        properties: { presentation: { const: 'grouped-radio' } },
+      },
+    },
+    {
+      if: { required: ['safeField'] },
+      then: {
+        required: ['recommendedField', 'presentation'],
+        properties: { presentation: { const: 'grouped-radio' } },
+      },
+    },
+  ];
+  selection['x-distinct-properties'] = [['recommendedField', 'safeField']];
+
+  table.allOf = [
+    ...(table.allOf || []),
+    {
+      if: {
+        required: ['selection'],
+        properties: {
+          selection: {
+            required: ['presentation'],
+            properties: { presentation: { const: 'grouped-radio' } },
+          },
+        },
+      },
+      then: {
+        anyOf: [
+          { required: ['rowKey'] },
+          { properties: { selection: { required: ['keyField'] } } },
+        ],
+      },
+    },
+  ];
+}
+
+addGroupedRadioSelectionContract(output);
+
 // Add metadata
 output.$comment =
   'Auto-generated from web-admin/app/framework/meta/schemas/dsl-schema-types.ts — DO NOT EDIT MANUALLY. Run: cd web-admin && pnpm generate:dsl-schema';

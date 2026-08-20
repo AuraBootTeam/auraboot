@@ -1,0 +1,14 @@
+[
+  { "code": "crm_lp_code", "displayName:zh-CN": "线索池编号", "displayName:en": "Pool Code", "dataType": "string", "constraints": { "required": true, "unique": true, "maxLength": 50 }, "feature": { "searchable": true, "sortable": true } },
+  { "code": "crm_lp_name", "displayName:zh-CN": "线索池名称", "displayName:en": "Pool Name", "dataType": "string", "constraints": { "required": true, "maxLength": 200 }, "feature": { "searchable": true, "sortable": true } },
+  { "code": "crm_lp_status", "displayName:zh-CN": "状态", "displayName:en": "Status", "dataType": "enum", "dictCode": "crm_lead_pool_status", "defaultValue": "enabled", "constraints": { "required": true }, "feature": { "searchable": true } },
+  { "code": "crm_lp_member_user_ids", "displayName:zh-CN": "成员用户", "displayName:en": "Member Users", "dataType": "text", "constraints": { "required": true }, "extension": { "renderComponent": "memberpicker", "multiple": true, "placeholder:zh-CN": "选择可查看和领取线索的成员", "placeholder:en": "Select members who may view and claim leads" } },
+  { "code": "crm_lp_admin_user_ids", "displayName:zh-CN": "管理员用户", "displayName:en": "Administrator Users", "dataType": "text", "constraints": { "required": true }, "extension": { "renderComponent": "memberpicker", "multiple": true, "placeholder:zh-CN": "选择可分配线索和维护策略的管理员", "placeholder:en": "Select administrators who may assign leads and manage policy" } },
+  { "code": "crm_lp_daily_pick_limit", "displayName:zh-CN": "每日领取上限", "displayName:en": "Daily Pick Limit", "dataType": "integer", "defaultValue": 20, "constraints": { "required": true, "min": 1 } },
+  { "code": "crm_lp_new_cooldown_days", "displayName:zh-CN": "新线索冷却天数", "displayName:en": "New Lead Cooldown Days", "dataType": "integer", "defaultValue": 0, "constraints": { "required": true, "min": 0 } },
+  { "code": "crm_lp_previous_owner_cooldown_days", "displayName:zh-CN": "前负责人冷却天数", "displayName:en": "Previous Owner Cooldown Days", "dataType": "integer", "defaultValue": 0, "constraints": { "required": true, "min": 0 } },
+  { "code": "crm_lp_auto_recycle", "displayName:zh-CN": "自动回收", "displayName:en": "Automatic Recycle", "dataType": "boolean", "defaultValue": false, "constraints": { "required": true } },
+  { "code": "crm_lp_recycle_after_days", "displayName:zh-CN": "回收等待天数", "displayName:en": "Recycle After Days", "dataType": "integer", "defaultValue": 30, "constraints": { "min": 0 } },
+  { "code": "crm_lp_recycle_basis", "displayName:zh-CN": "回收口径", "displayName:en": "Recycle Basis", "dataType": "enum", "dictCode": "crm_lead_recycle_basis", "defaultValue": "last_activity" },
+  { "code": "crm_lp_description", "displayName:zh-CN": "说明", "displayName:en": "Description", "dataType": "text" }
+]

@@ -368,7 +368,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             records = applyFieldPermissionFilter(modelCode, records);
         }
 
-        records = enrichListRecords(modelCode, records);
+        // Command handlers consume canonical stored values (ids/codes), not presentation-only
+        // `<field>_display` projections. Their permit boundary was already evaluated by the
+        // command pipeline, so target-reference authorization/enrichment here is both redundant
+        // and a large N+1 multiplier for multi-step commands.
+        if (!commandPermitInForce) {
+            records = enrichListRecords(modelCode, records);
+        }
 
         if (useCursor) {
             // Extract nextCursor from the last record's public pid.
@@ -716,6 +722,19 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             String displayField = canonical[1];
             if (targetModelCode == null || targetModelCode.isBlank()) continue;
 
+            // Collect unique reference IDs
+            Set<String> refIds = new java.util.LinkedHashSet<>();
+            for (Map<String, Object> record : records) {
+                Object val = record.get(columnName);
+                if (val != null && !String.valueOf(val).isBlank()) {
+                    refIds.add(String.valueOf(val));
+                }
+            }
+            if (refIds.isEmpty()) continue;
+
+            // An empty reference cannot reveal target data. Short-circuit before target RBAC,
+            // row-scope and masking lookups; otherwise every nullable reference on every write
+            // read-back pays the full authorization query cost despite having nothing to enrich.
             ReferenceReadAccess targetAccess = evaluateReferenceReadAccess(
                     tenantId, userId, targetModelCode);
             if (!targetAccess.allowed()) {
@@ -730,19 +749,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 continue;
             }
 
-            // Collect unique reference IDs
-            Set<String> refIds = new java.util.LinkedHashSet<>();
-            for (Map<String, Object> record : records) {
-                Object val = record.get(columnName);
-                if (val != null && !String.valueOf(val).isBlank()) {
-                    refIds.add(String.valueOf(val));
-                }
-            }
-            if (refIds.isEmpty()) continue;
-
             // Batch lookup: query target model for display values
             try {
-                Optional<ModelDefinition> targetModelOpt = metadataService.getModelDefinition(targetModelCode);
+                // System aliases are backed by fixed platform tables and deliberately have no
+                // dynamic model definition. Avoid repeating the same known-negative lookup for
+                // every user/organization reference during list enrichment.
+                Optional<ModelDefinition> targetModelOpt = resolveSystemTable(targetModelCode) == null
+                        ? metadataService.getModelDefinition(targetModelCode)
+                        : Optional.empty();
                 String targetTable = targetModelOpt
                         .map(ModelDefinition::getTableName)
                         .orElse(resolveSystemTable(targetModelCode));
@@ -1252,11 +1266,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             record = applyFieldPermissionFilterSingle(modelCode, record);
         }
 
-        // Resolve reference display names (same as list) so the detail page shows names, not pids.
-        List<Map<String, Object>> single = new java.util.ArrayList<>(1);
-        single.add(record);
-        enrichReferenceDisplayFields(modelCode, single);
-        record = single.get(0);
+        if (!commandPermitInForce) {
+            // Resolve reference display names (same as list) so the detail page shows names, not pids.
+            // Internal command reads intentionally retain the canonical stored shape.
+            List<Map<String, Object>> single = new java.util.ArrayList<>(1);
+            single.add(record);
+            enrichReferenceDisplayFields(modelCode, single);
+            record = single.get(0);
+        }
 
         return record;
     }
@@ -2885,7 +2902,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             return null;
         }
 
+        // System aliases are fixed platform tables, not meta models. Probing their known-absent
+        // model definition for every reference field creates a negative-lookup N+1.
         Optional<ModelDefinition> targetModelOpt = hasText(targetModelCode)
+                && resolveSystemTable(targetModelCode) == null
                 ? metadataService.getModelDefinition(targetModelCode)
                 : Optional.empty();
         String resolvedTargetTable = firstText(
@@ -3395,7 +3415,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      * existence.
      */
     private void assertWritable(String modelCode) {
-        ModelDefinition def = metadataService.getDefinitionByCode(modelCode);
+        // Metadata mutations already evict modelDefinitions. Bypassing that cache here used to
+        // evict and rebuild the complete model definition before every business-row write. A
+        // multi-step command therefore reloaded fields and relations for each mutation.
+        ModelDefinition def = metadataService.getModelDefinition(modelCode).orElse(null);
         if (def == null) {
             return;
         }

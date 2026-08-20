@@ -58,6 +58,6 @@ describe('BulkActionResultDialog', () => {
     expect(screen.getByRole('heading', { name: '批量操作结果' })).toBeInTheDocument();
     expect(screen.getByText('成功 1 条')).toBeInTheDocument();
     expect(screen.getByText('失败 1 条')).toBeInTheDocument();
-    expect(screen.getByText('当前记录状态不满足操作条件')).toBeInTheDocument();
+    expect(screen.getByText('Bad parameter')).toBeInTheDocument();
   });
 });

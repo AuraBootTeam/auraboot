@@ -9,7 +9,13 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { createSearchParams, useSearchParams } from 'react-router';
+import {
+  createSearchParams,
+  useSearchParams,
+  type NavigateFunction,
+  type NavigateOptions,
+  type To,
+} from 'react-router';
 import { BlockRenderer, type PageContentProps } from '@auraboot/runtime-kernel';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -27,7 +33,10 @@ import type {
 import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
-import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import {
+  resolveCommandErrorMessage,
+  useActionHandler,
+} from '~/framework/meta/hooks/useActionHandler';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import { confirmDialog } from '~/utils/confirmDialog';
 import {
@@ -124,6 +133,7 @@ import {
 import { savedViewService, type ChipPin } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
+import { TenantMemberAccountImportDialog } from './list/TenantMemberAccountImportDialog';
 import {
   buildCommandTargetParams,
   getLegacyCompatibleRecordPid,
@@ -158,6 +168,7 @@ interface ListLoadDataParams {
   size?: number;
   filters?: Record<string, any>;
   sorts?: SortConfig[];
+  chipFilters?: ViewFilterConfig[];
 }
 
 interface BulkFieldCommandState {
@@ -171,6 +182,18 @@ interface BulkFieldCommandState {
 
 export function buildBulkFieldCommandPayload(field: FieldConfig, value: unknown) {
   return { [field.field]: value };
+}
+
+export function resolveInitialListTabKey(blocks: unknown): string {
+  if (!Array.isArray(blocks)) return 'all';
+  const tabsBlock = blocks.find(
+    (block): block is { blockType: string; tabs?: Array<{ key?: unknown }> } =>
+      Boolean(block && typeof block === 'object' && (block as any).blockType === 'tabs'),
+  );
+  const tabs = Array.isArray(tabsBlock?.tabs) ? tabsBlock.tabs : [];
+  const allTab = tabs.find((tab) => tab?.key === 'all');
+  const initialKey = allTab?.key ?? tabs[0]?.key;
+  return typeof initialKey === 'string' && initialKey.length > 0 ? initialKey : 'all';
 }
 
 export interface ListReferenceDisplayConfig {
@@ -430,6 +453,7 @@ type SearchParamsSetter = ReturnType<typeof useSearchParams>[1];
 export function useSerializedSearchParamsUpdater(
   searchParams: URLSearchParams,
   setSearchParams: SearchParamsSetter,
+  writesEnabledRef?: { current: boolean },
 ): SearchParamsSetter {
   const latestSearchParamsRef = useRef(new URLSearchParams(searchParams));
 
@@ -439,6 +463,7 @@ export function useSerializedSearchParamsUpdater(
 
   return useCallback<SearchParamsSetter>(
     (nextInit, options) => {
+      if (writesEnabledRef?.current === false) return;
       const resolvedInit =
         typeof nextInit === 'function'
           ? nextInit(new URLSearchParams(latestSearchParamsRef.current))
@@ -447,7 +472,7 @@ export function useSerializedSearchParamsUpdater(
       latestSearchParamsRef.current = new URLSearchParams(next);
       setSearchParams(next, options);
     },
-    [setSearchParams],
+    [setSearchParams, writesEnabledRef],
   );
 }
 
@@ -670,12 +695,22 @@ export function queryConditionToExportCondition(condition: ListQueryFilterCondit
   };
 }
 
-export function resolveUrlFilterSyncAction(
+export function resolveUrlStateSyncAction(
   pendingLocalEncoding: string | null | undefined,
   currentUrlEncoding: string | null,
 ): 'apply-url' | 'ack-local' | 'wait-for-local' {
   if (pendingLocalEncoding === undefined) return 'apply-url';
   return pendingLocalEncoding === currentUrlEncoding ? 'ack-local' : 'wait-for-local';
+}
+
+export function applyLocalSortUpdate(
+  previous: SortConfig[],
+  update: SortConfig[] | ((previous: SortConfig[]) => SortConfig[]),
+  pendingUrlSync: { current: string | null | undefined },
+): SortConfig[] {
+  const next = typeof update === 'function' ? update(previous) : update;
+  pendingUrlSync.current = encodeSorts(next);
+  return next;
 }
 
 export interface ViewManageFieldOption {
@@ -902,23 +937,6 @@ interface InviteCodeData {
   createdAt?: string;
 }
 
-interface TenantMemberImportError {
-  rowNumber: number;
-  name?: string | null;
-  email?: string | null;
-  reason: string;
-}
-
-interface TenantMemberImportResult {
-  totalRows: number;
-  successCount: number;
-  errorCount: number;
-  existingUserBoundCount: number;
-  invitedCount: number;
-  employeeCreatedCount: number;
-  errors: TenantMemberImportError[];
-}
-
 // Quick filter chip definitions — preset views (T8). Keys + filter logic live
 // in ./list/quickFilterPresets so the toolbar and the view switcher share one
 // source of truth.
@@ -951,7 +969,12 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Parse filter_* params from URL for drill-down navigation
   const [searchParams, routerSetSearchParams] = useSearchParams();
-  const setSearchParams = useSerializedSearchParamsUpdater(searchParams, routerSetSearchParams);
+  const listUrlWritesEnabledRef = useRef(true);
+  const setSearchParams = useSerializedSearchParamsUpdater(
+    searchParams,
+    routerSetSearchParams,
+    listUrlWritesEnabledRef,
+  );
   const urlFilters = useMemo(() => {
     const filters: Record<string, any> = {};
     searchParams.forEach((value, key) => {
@@ -1064,6 +1087,13 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Active sort state — initialized from URL > SavedView > DSL defaultSort
   const [activeSorts, setActiveSorts] = useState<SortConfig[]>(() => urlSorts);
+  const pendingSortUrlSyncRef = useRef<string | null | undefined>(undefined);
+  const setLocalActiveSorts = useCallback(
+    (update: SortConfig[] | ((previous: SortConfig[]) => SortConfig[])) => {
+      setActiveSorts((previous) => applyLocalSortUpdate(previous, update, pendingSortUrlSyncRef));
+    },
+    [],
+  );
   // Active filter chips — user-added filters via chip bar (separate from filters)
   const [chipFilters, setChipFilters] = useState<ViewFilterConfig[]>(() => urlChipFilters);
   const pendingChipFilterUrlSyncRef = useRef<string | null | undefined>(undefined);
@@ -1258,7 +1288,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Sync URL chip filters -> local state (supports refresh and browser back/forward).
   useEffect(() => {
     const currentUrlEncoding = searchParams.get('filters');
-    const syncAction = resolveUrlFilterSyncAction(
+    const syncAction = resolveUrlStateSyncAction(
       pendingChipFilterUrlSyncRef.current,
       currentUrlEncoding,
     );
@@ -1272,8 +1302,15 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Sync URL sorts -> local state (supports refresh and browser back/forward).
   useEffect(() => {
+    const currentUrlEncoding = searchParams.get('sort');
+    const syncAction = resolveUrlStateSyncAction(pendingSortUrlSyncRef.current, currentUrlEncoding);
+    if (syncAction === 'wait-for-local') return;
+    if (syncAction === 'ack-local') {
+      pendingSortUrlSyncRef.current = undefined;
+      return;
+    }
     setActiveSorts((prev) => (areSortsEqual(prev, urlSorts) ? prev : urlSorts));
-  }, [urlSorts]);
+  }, [searchParams, urlSorts]);
 
   // Sync local pagination state -> URL query params (preserve existing filter_* params).
   useEffect(() => {
@@ -1296,6 +1333,16 @@ function ListPageContentInner(props: PageContentProps) {
       filters,
     },
   });
+  const navigateAwayFromList = useCallback(
+    ((toOrDelta: To | number, options?: NavigateOptions) => {
+      // List URL state effects (SavedView sorts, filters and pagination) can still be queued
+      // when a user clicks Create/View/Edit. Once an outgoing navigation starts, those stale
+      // effects must never replace the destination route with the list's query-string URL.
+      listUrlWritesEnabledRef.current = false;
+      return typeof toOrDelta === 'number' ? navigate(toOrDelta) : navigate(toOrDelta, options);
+    }) as NavigateFunction,
+    [navigate],
+  );
 
   const appendListSearch = useCallback(
     (path: string) => {
@@ -1311,13 +1358,13 @@ function ListPageContentInner(props: PageContentProps) {
       if (recordPid == null || recordPid === '') {
         return;
       }
-      navigate(appendListSearch(`/p/${tableName}/view/${String(recordPid)}`));
+      navigateAwayFromList(appendListSearch(`/p/${tableName}/view/${String(recordPid)}`));
     },
-    [appendListSearch, navigate, tableName],
+    [appendListSearch, navigateAwayFromList, tableName],
   );
 
   // Tab state for tabs
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState(() => resolveInitialListTabKey(schema?.blocks));
   const [importOpen, setImportOpen] = useState(false);
   const [viewManageOpen, setViewManageOpen] = useState(false);
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
@@ -1354,12 +1401,6 @@ function ListPageContentInner(props: PageContentProps) {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteCodeData, setInviteCodeData] = useState<InviteCodeData | null>(null);
   const [memberImportDialogOpen, setMemberImportDialogOpen] = useState(false);
-  const [memberImportFile, setMemberImportFile] = useState<File | null>(null);
-  const [memberImportLoading, setMemberImportLoading] = useState(false);
-  const [memberImportError, setMemberImportError] = useState<string | null>(null);
-  const [memberImportResult, setMemberImportResult] = useState<TenantMemberImportResult | null>(
-    null,
-  );
   const [bulkActionResult, setBulkActionResult] = useState<BulkActionResult | null>(null);
   const { formats: dateTimeFormats, timezone: effectiveTimezone } = useTimezone();
   const pendingSavedViewFiltersRef = useRef<Record<string, any> | null>(null);
@@ -1713,12 +1754,12 @@ function ListPageContentInner(props: PageContentProps) {
       pendingSavedViewFiltersRef.current = restoredFilters;
       setFilters(restoredFilters);
       chipFiltersRef.current = restoredViewFilters;
-      setChipFilters((prev) =>
+      setLocalChipFilters((prev) =>
         areFiltersEqual(prev, restoredViewFilters) ? prev : restoredViewFilters,
       );
 
       const restoredSorts = vc.sorts ?? [];
-      setActiveSorts((prev) => (areSortsEqual(prev, restoredSorts) ? prev : restoredSorts));
+      setLocalActiveSorts((prev) => (areSortsEqual(prev, restoredSorts) ? prev : restoredSorts));
 
       if (vc.pagination?.pageSize && vc.pagination.pageSize > 0) {
         setPagination((prev: typeof pagination) => ({
@@ -1729,7 +1770,7 @@ function ListPageContentInner(props: PageContentProps) {
 
       return restoredFilters;
     },
-    [setFilters, setPagination, user?.pid],
+    [setFilters, setLocalActiveSorts, setLocalChipFilters, setPagination, user?.pid],
   );
 
   // Apply SavedView viewConfig (pagination + filters + sorts) when view changes.
@@ -2008,7 +2049,7 @@ function ListPageContentInner(props: PageContentProps) {
           const filtersParam = buildFiltersParam(
             tabCondition,
             params?.filters,
-            chipFiltersRef.current,
+            params?.chipFilters ?? chipFiltersRef.current,
           );
           if (filtersParam) {
             queryParams.filters = filtersParam;
@@ -2160,7 +2201,7 @@ function ListPageContentInner(props: PageContentProps) {
   // to avoid temporal dead zone ("Cannot access 'handleAction' before initialization").
   const { handleAction } = useActionHandler({
     runtime,
-    navigate,
+    navigate: navigateAwayFromList,
     tableName,
     context: {
       loadData,
@@ -2531,7 +2572,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Column header sort toggle: none → asc → desc → none
   // Shift+click appends to multi-sort, regular click replaces
   const toggleSort = useCallback((fieldCode: string, multiSort = false) => {
-    setActiveSorts((prev) => {
+    setLocalActiveSorts((prev) => {
       const existing = prev.find((s) => s.fieldCode === fieldCode);
       let next: SortConfig[];
       if (!existing) {
@@ -2549,7 +2590,7 @@ function ListPageContentInner(props: PageContentProps) {
       }
       return next;
     });
-  }, []);
+  }, [setLocalActiveSorts]);
 
   // Debounced re-fetch when sorts or chip filters change (150ms).
   // Prevents multiple rapid API calls when users adjust multiple filters
@@ -2577,6 +2618,7 @@ function ListPageContentInner(props: PageContentProps) {
     const encoded = encodeSorts(activeSorts);
     const currentEncoded = searchParams.get('sort');
     if ((encoded ?? null) !== (currentEncoded ?? null)) {
+      pendingSortUrlSyncRef.current = encoded;
       setSearchParams(
         (prev) => {
           const p = new URLSearchParams(prev);
@@ -2715,7 +2757,7 @@ function ListPageContentInner(props: PageContentProps) {
             failures.push({
               recordPid: id,
               recordLabel: recordLabelById.get(id) || id,
-              reason: (result as any).desc || (result as any).message || 'Command failed',
+              reason: resolveCommandErrorMessage(result, command),
             });
           }
         } catch (error) {
@@ -2850,7 +2892,7 @@ function ListPageContentInner(props: PageContentProps) {
           failures.push({
             recordPid: command,
             recordLabel: command,
-            reason: (result as any).desc || (result as any).message || 'Command failed',
+            reason: resolveCommandErrorMessage(result, command),
           });
         }
       } else {
@@ -3607,7 +3649,7 @@ function ListPageContentInner(props: PageContentProps) {
         const resolved = detailUrl.replace(/\{(\w+)\}/g, (_: string, key: string) =>
           String(record[key] ?? ''),
         );
-        navigate(appendListSearch(resolved));
+        navigateAwayFromList(appendListSearch(resolved));
         return;
       }
 
@@ -3621,16 +3663,23 @@ function ListPageContentInner(props: PageContentProps) {
         const optionDetailPageKey = (schema as any)?.options?.detailPageKey;
         const resolvedDetailPageKey = relatedDetailPageKey || optionDetailPageKey;
         if (resolvedDetailPageKey) {
-          navigate(appendListSearch(`/p/${resolvedDetailPageKey}/view/${pid}`));
+          navigateAwayFromList(appendListSearch(`/p/${resolvedDetailPageKey}/view/${pid}`));
         } else {
-          navigate(appendListSearch(`/p/${tableName}/view/${pid}`));
+          navigateAwayFromList(appendListSearch(`/p/${tableName}/view/${pid}`));
         }
         return;
       }
 
       setPreviewRecordId(pid);
     },
-    [appendListSearch, schema, tableBlock, tableName, navigate, listExtensions?.disableRowClick],
+    [
+      appendListSearch,
+      schema,
+      tableBlock,
+      tableName,
+      navigateAwayFromList,
+      listExtensions?.disableRowClick,
+    ],
   );
 
   // All model-backed column definitions for ColumnSettingsPanel. DSL columns
@@ -3686,13 +3735,22 @@ function ListPageContentInner(props: PageContentProps) {
         operator: 'eq',
         value: filter.value,
       }));
-      setLocalChipFilters((previous) => {
-        const fields = new Set(next.map((filter) => filter.fieldCode));
-        return [...previous.filter((filter) => !fields.has(filter.fieldCode)), ...next];
+      const fields = new Set(next.map((filter) => filter.fieldCode));
+      const nextChipFilters = [
+        ...chipFilters.filter((filter) => !fields.has(filter.fieldCode)),
+        ...next,
+      ];
+      chipFiltersRef.current = nextChipFilters;
+      setLocalChipFilters(nextChipFilters);
+      void loadData({
+        page: 0,
+        size: pagination.pageSize,
+        filters,
+        chipFilters: nextChipFilters,
       });
       setAnalysisOpen(false);
     },
-    [setLocalChipFilters],
+    [chipFilters, filters, loadData, pagination.pageSize, setLocalChipFilters],
   );
 
   // Personal-only baseline: changes to an explicit personal view are staged as
@@ -4452,80 +4510,6 @@ function ListPageContentInner(props: PageContentProps) {
     }
   }, [inviteCodeData?.code, showErrorToast, showSuccessToast, token]);
 
-  const resetMemberImportState = useCallback(() => {
-    setMemberImportFile(null);
-    setMemberImportLoading(false);
-    setMemberImportError(null);
-    setMemberImportResult(null);
-  }, []);
-
-  const handleTenantMemberImport = useCallback(async () => {
-    if (!memberImportFile) {
-      setMemberImportError('请先选择 Excel 文件');
-      return;
-    }
-
-    setMemberImportLoading(true);
-    setMemberImportError(null);
-    try {
-      const XLSX = await import('xlsx');
-      const workbook = XLSX.read(await memberImportFile.arrayBuffer(), { type: 'array' });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      if (!firstSheet) {
-        throw new Error('Excel 文件缺少可读取的工作表');
-      }
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: '' });
-      const payload = rows.map((row) => ({
-        name: String(row['姓名*'] ?? row['姓名'] ?? row['name'] ?? '').trim(),
-        email: String(row['邮箱*'] ?? row['邮箱'] ?? row['email'] ?? '').trim(),
-        phone: String(row['手机号'] ?? row['手机'] ?? row['phone'] ?? '').trim(),
-        department: String(row['部门'] ?? row['department'] ?? '').trim(),
-        position: String(row['职位'] ?? row['position'] ?? '').trim(),
-      }));
-
-      const response = await fetch('/api/tenant/members/import-rows', {
-        method: 'post',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(payload),
-      });
-      const body = await response.json().catch(() => null);
-      if (!response.ok || !body || !ResultHelper.isSuccess(body)) {
-        throw new Error(body?.message || body?.desc || '批量导入失败');
-      }
-
-      const result = body.data as TenantMemberImportResult;
-      setMemberImportResult(result);
-      if (result.successCount > 0) {
-        showSuccessToast(`已导入 ${result.successCount} 条成员记录`);
-        await loadDataRef.current?.({
-          page: 0,
-          size: pagination.pageSize,
-          filters,
-        });
-      }
-      if (result.errorCount > 0) {
-        showWarningToast(`有 ${result.errorCount} 条记录导入失败，请检查错误列表`);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '批量导入失败';
-      setMemberImportError(message);
-      showErrorToast(message);
-    } finally {
-      setMemberImportLoading(false);
-    }
-  }, [
-    filters,
-    memberImportFile,
-    pagination.pageSize,
-    showErrorToast,
-    showSuccessToast,
-    showWarningToast,
-    token,
-  ]);
-
   const listTabsBlock = useMemo(() => {
     const found = allBlocks.find((block: any) => block.blockType === 'tabs');
     return found;
@@ -4720,10 +4704,7 @@ function ListPageContentInner(props: PageContentProps) {
             exportFilters={exportFilterConditions}
             isTenantMemberPage={isTenantMemberPage}
             onInvite={() => setInviteDialogOpen(true)}
-            onImportMembers={() => {
-              resetMemberImportState();
-              setMemberImportDialogOpen(true);
-            }}
+            onImportMembers={() => setMemberImportDialogOpen(true)}
             hideSavedViews={hideSavedViews}
             hideBuiltInImport={
               skipListData ? true : (listExtensions?.hideBuiltInImport ?? !canImport)
@@ -4744,227 +4725,19 @@ function ListPageContentInner(props: PageContentProps) {
             }
           />
 
-          {isTenantMemberPage && memberImportDialogOpen && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              data-testid="member-import-dialog"
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-            >
-              <div className="rounded-card bg-panel w-full max-w-2xl p-6 shadow-xl">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-text text-lg font-semibold">批量导入成员</h3>
-                    <p className="text-text-2 mt-1 text-sm">
-                      入口归属 tenant_member。导入的主语义是批量准入，不是直接维护组织树。
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMemberImportDialogOpen(false);
-                      resetMemberImportState();
-                    }}
-                    className="text-text-2 hover:text-text-2 text-sm"
-                  >
-                    关闭
-                  </button>
-                </div>
-
-                <div className="text-text-2 space-y-4 text-sm">
-                  <div className="rounded-control bg-accent-weak border border-blue-200 p-3">
-                    <p className="font-medium text-blue-900">推荐流程</p>
-                    <p className="mt-1 text-blue-800">
-                      Excel 导入先处理租户成员准入，再按邮箱复用已有 User
-                      或创建待激活账号，最后再建立组织关系。
-                    </p>
-                  </div>
-
-                  <div className="rounded-control border-border bg-subtle border p-4">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="text-text font-medium">1. 下载模板</p>
-                        <p className="text-text-2 mt-1 text-xs">
-                          支持 `.xlsx`。必填列是姓名、邮箱；部门和职位用于补全组织关系。
-                        </p>
-                      </div>
-                      <a
-                        href="/api/tenant/members/import/template"
-                        className="rounded-control bg-panel text-accent hover:bg-accent-weak inline-flex items-center justify-center border border-blue-200 px-3 py-2 text-sm font-medium"
-                      >
-                        下载模板
-                      </a>
-                    </div>
-
-                    <div className="mt-4">
-                      <p className="text-text font-medium">2. 选择文件</p>
-                      <input
-                        data-testid="member-import-file-input"
-                        type="file"
-                        accept=".xlsx,.xls"
-                        onChange={(event) => {
-                          const selectedFile = event.target.files?.[0] ?? null;
-                          setMemberImportFile(selectedFile);
-                          setMemberImportError(null);
-                        }}
-                        className="rounded-control border-border-strong text-text-2 file:rounded-control file:bg-accent hover:file:bg-accent-hover mt-2 block w-full border px-3 py-2 text-sm file:mr-3 file:border-0 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
-                      />
-                      {memberImportFile && (
-                        <p className="text-text-2 mt-2 text-xs">已选择: {memberImportFile.name}</p>
-                      )}
-                    </div>
-
-                    {memberImportError && (
-                      <div className="rounded-control bg-status-red-bg mt-3 border border-red-200 px-3 py-2 text-sm text-red-700">
-                        {memberImportError}
-                      </div>
-                    )}
-
-                    <div className="mt-4 flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMemberImportDialogOpen(false);
-                          resetMemberImportState();
-                        }}
-                        className="rounded-control border-border-strong text-text-2 hover:bg-hover border px-4 py-2 text-sm font-medium"
-                      >
-                        取消
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="member-import-submit"
-                        disabled={!memberImportFile || memberImportLoading}
-                        onClick={() => void handleTenantMemberImport()}
-                        className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-blue-300"
-                      >
-                        {memberImportLoading ? '导入中...' : '开始导入'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-text font-medium">导入结果分三类</p>
-                    <ul className="mt-2 list-disc space-y-1 pl-5">
-                      <li>已绑定已有用户：复用现有 User，创建 TenantMember，并建立组织关系</li>
-                      <li>待激活成员：创建准入记录，发送邀请，等首次设置密码后启用登录</li>
-                      <li>冲突项：邮箱重复、同租户已存在成员、部门不存在、职位不存在</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <p className="text-text font-medium">建议模板字段</p>
-                    <div className="rounded-control border-border mt-2 overflow-hidden border">
-                      <table className="divide-border min-w-full divide-y text-sm">
-                        <thead className="bg-subtle">
-                          <tr>
-                            <th className="text-text-2 px-3 py-2 text-left font-medium">字段</th>
-                            <th className="text-text-2 px-3 py-2 text-left font-medium">必填</th>
-                            <th className="text-text-2 px-3 py-2 text-left font-medium">说明</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-border bg-panel divide-y">
-                          <tr>
-                            <td className="px-3 py-2">姓名</td>
-                            <td className="px-3 py-2">是</td>
-                            <td className="px-3 py-2">员工显示名称</td>
-                          </tr>
-                          <tr>
-                            <td className="px-3 py-2">邮箱</td>
-                            <td className="px-3 py-2">是</td>
-                            <td className="px-3 py-2">作为账号识别键；优先用于复用已有 User</td>
-                          </tr>
-                          <tr>
-                            <td className="px-3 py-2">手机号</td>
-                            <td className="px-3 py-2">否</td>
-                            <td className="px-3 py-2">补充联系方式</td>
-                          </tr>
-                          <tr>
-                            <td className="px-3 py-2">部门</td>
-                            <td className="px-3 py-2">否</td>
-                            <td className="px-3 py-2">
-                              用于自动建立组织关系；不存在时进入冲突列表
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="px-3 py-2">职位</td>
-                            <td className="px-3 py-2">否</td>
-                            <td className="px-3 py-2">依赖部门/职位主数据匹配</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div className="rounded-control bg-status-amber-bg border border-amber-200 p-3 text-amber-900">
-                    第一版实现先固定入口和规则，不默认给新导入人员生成可直接登录的密码。新用户应走邀请激活链路。
-                  </div>
-
-                  {memberImportResult && (
-                    <div
-                      data-testid="member-import-result"
-                      className="rounded-card border border-emerald-200 bg-emerald-50 p-4"
-                    >
-                      <p className="font-medium text-emerald-900">导入结果</p>
-                      <div className="mt-2 grid gap-2 text-sm text-emerald-900 md:grid-cols-2">
-                        <div>总行数: {memberImportResult.totalRows}</div>
-                        <div>成功: {memberImportResult.successCount}</div>
-                        <div>复用已有用户: {memberImportResult.existingUserBoundCount}</div>
-                        <div>待激活邀请: {memberImportResult.invitedCount}</div>
-                        <div>建立组织关系: {memberImportResult.employeeCreatedCount}</div>
-                        <div>失败: {memberImportResult.errorCount}</div>
-                      </div>
-
-                      {memberImportResult.errors.length > 0 && (
-                        <div className="rounded-control bg-panel mt-4 overflow-hidden border border-amber-200">
-                          <table className="min-w-full divide-y divide-amber-100 text-sm">
-                            <thead className="bg-status-amber-bg">
-                              <tr>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">
-                                  行号
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">
-                                  姓名
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">
-                                  邮箱
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-amber-900">
-                                  原因
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-amber-100">
-                              {memberImportResult.errors.slice(0, 10).map((item) => (
-                                <tr key={`${item.rowNumber}-${item.email ?? item.name ?? 'row'}`}>
-                                  <td className="px-3 py-2">{item.rowNumber}</td>
-                                  <td className="px-3 py-2">{item.name || '-'}</td>
-                                  <td className="px-3 py-2">{item.email || '-'}</td>
-                                  <td className="px-3 py-2 text-amber-900">{item.reason}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-6 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMemberImportDialogOpen(false);
-                      resetMemberImportState();
-                    }}
-                    className="rounded-control border-border-strong text-text-2 hover:bg-hover border px-4 py-2 text-sm font-medium"
-                  >
-                    关闭
-                  </button>
-                </div>
-              </div>
-            </div>
+          {isTenantMemberPage && (
+            <TenantMemberAccountImportDialog
+              open={memberImportDialogOpen}
+              token={token}
+              onClose={() => setMemberImportDialogOpen(false)}
+              onImported={async () => {
+                await loadDataRef.current?.({
+                  page: pagination.current - 1,
+                  size: pagination.pageSize,
+                  filters,
+                });
+              }}
+            />
           )}
 
           {isTenantMemberPage && inviteDialogOpen && (
@@ -5288,7 +5061,7 @@ function ListPageContentInner(props: PageContentProps) {
                 onActivateChip={handleActivateChip}
                 onSaveActivePreset={handleSaveActivePreset}
                 activeSorts={activeSorts}
-                onSortsChange={setActiveSorts}
+                onSortsChange={setLocalActiveSorts}
                 sortableColumns={tableColumns
                   .filter((c: ColumnConfig) => !c.isActionColumn && c.field && c.sortable !== false)
                   .map((c: ColumnConfig) => ({
@@ -5303,7 +5076,16 @@ function ListPageContentInner(props: PageContentProps) {
                   namedQueryCode || isApiDatasourcePage ? undefined : () => setAnalysisOpen(true)
                 }
                 chipFilters={chipFilters}
-                onChipFiltersChange={setLocalChipFilters}
+                onChipFiltersChange={(nextChipFilters) => {
+                  chipFiltersRef.current = nextChipFilters;
+                  setLocalChipFilters(nextChipFilters);
+                  void loadData({
+                    page: 0,
+                    size: pagination.pageSize,
+                    filters,
+                    chipFilters: nextChipFilters,
+                  });
+                }}
                 fieldMetadata={filterFieldMetadata}
                 resolveChipValueLabel={(filter) => {
                   if (filter.isExpression && filter.expression) {
@@ -5358,8 +5140,16 @@ function ListPageContentInner(props: PageContentProps) {
                   setEditingChipIdx(idx);
                 }}
                 onClearAll={() => {
+                  chipFiltersRef.current = [];
                   setLocalChipFilters([]);
-                  setActiveSorts([]);
+                  setLocalActiveSorts([]);
+                  void loadData({
+                    page: 0,
+                    size: pagination.pageSize,
+                    filters,
+                    sorts: [],
+                    chipFilters: [],
+                  });
                 }}
                 hideQuickFilters={hideQuickFilters}
                 hideSort={listExtensions?.hideSort ?? Boolean(schemaExtension.hideSort)}
@@ -5660,12 +5450,20 @@ function ListPageContentInner(props: PageContentProps) {
             schema={schema}
             tableName={tableName}
             onFilterApply={(operator, value) => {
-              setLocalChipFilters((prev) =>
-                prev.map((f, i) =>
-                  i === editingChipIdx ? { ...f, operator: operator as any, value } : f,
-                ),
+              const nextChipFilters = chipFilters.map((filter, index) =>
+                index === editingChipIdx
+                  ? { ...filter, operator: operator as ViewFilterConfig['operator'], value }
+                  : filter,
               );
+              chipFiltersRef.current = nextChipFilters;
+              setLocalChipFilters(nextChipFilters);
               setEditingChipIdx(null);
+              void loadData({
+                page: 0,
+                size: pagination.pageSize,
+                filters,
+                chipFilters: nextChipFilters,
+              });
             }}
             onFilterCancel={() => setEditingChipIdx(null)}
             // ColumnContextMenu
@@ -5674,11 +5472,11 @@ function ListPageContentInner(props: PageContentProps) {
             onSort={(dir) => {
               if (!contextMenu) return;
               if (dir === 'clear') {
-                setActiveSorts((prev) =>
+                setLocalActiveSorts((prev) =>
                   prev.filter((s) => s.fieldCode !== contextMenu.column.field),
                 );
               } else {
-                setActiveSorts([
+                setLocalActiveSorts([
                   { fieldCode: contextMenu.column.field, direction: dir, priority: 0 },
                 ]);
               }

@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '~/utils/cn';
 import { ResultHelper } from '~/utils/type';
 import { useI18n } from '~/contexts/I18nContext';
-import { resolveImportFieldLabel, resolveImportMessageFieldCodes } from './importCapability';
+import {
+  resolveImportFieldLabel,
+  resolveImportExecutionMessage,
+  resolveImportMessageFieldCodes,
+  resolveImportReferenceMessage,
+} from './importCapability';
 
 export type ImportMode = 'insert' | 'update';
 
@@ -29,6 +34,10 @@ export interface ImportResultData {
   created: number;
   updated: number;
   errors: ImportRowError[];
+  taskId?: string | null;
+  errorReportUrl?: string | null;
+  errorReportFailed?: boolean;
+  errorReportExpired?: boolean;
 }
 
 interface ImportRowError {
@@ -44,6 +53,10 @@ interface ValidationReport {
   valid: boolean;
   errors: ImportRowError[];
   warnings: ImportRowError[];
+  taskId?: string | null;
+  errorReportUrl?: string | null;
+  errorReportFailed?: boolean;
+  errorReportExpired?: boolean;
 }
 
 interface ApiEnvelope<T> {
@@ -62,6 +75,9 @@ interface BackendImportResult {
   errors?: ImportRowError[];
   hasErrors: boolean;
   taskId?: string | null;
+  errorReportUrl?: string | null;
+  errorReportFailed?: boolean;
+  errorReportExpired?: boolean;
 }
 
 interface AsyncImportStatus {
@@ -92,7 +108,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   config,
   onImportComplete,
 }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const modes = useMemo<ImportMode[]>(
     () => (config?.modes?.length ? config.modes : ['insert']),
     [config?.modes],
@@ -109,8 +125,10 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+  const [downloadingErrorReport, setDownloadingErrorReport] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isBusy = step === 'validating' || step === 'importing' || downloadingTemplate;
+  const isBusy =
+    step === 'validating' || step === 'importing' || downloadingTemplate || downloadingErrorReport;
 
   const resetState = useCallback(() => {
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -172,11 +190,14 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     [fieldLabels],
   );
 
-  const requestParams = useCallback((nextMode: ImportMode, nextMatchKey: string) => {
-    const params = new URLSearchParams({ mode: nextMode });
-    if (nextMode === 'update' && nextMatchKey) params.set('matchKey', nextMatchKey);
-    return params;
-  }, []);
+  const requestParams = useCallback(
+    (nextMode: ImportMode, nextMatchKey: string) => {
+      const params = new URLSearchParams({ mode: nextMode, locale });
+      if (nextMode === 'update' && nextMatchKey) params.set('matchKey', nextMatchKey);
+      return params;
+    },
+    [locale],
+  );
 
   const downloadTemplate = useCallback(async () => {
     setDownloadingTemplate(true);
@@ -209,6 +230,46 @@ export const ImportModal: React.FC<ImportModalProps> = ({
       setDownloadingTemplate(false);
     }
   }, [mode, modelCode, t]);
+
+  const downloadErrorReport = useCallback(
+    async (url: string) => {
+      setDownloadingErrorReport(true);
+      setError(null);
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          const body = (await response.json().catch(() => undefined)) as
+            | ApiEnvelope<unknown>
+            | undefined;
+          throw apiError(response, body);
+        }
+        const blobUrl = URL.createObjectURL(await response.blob());
+        const anchor = document.createElement('a');
+        anchor.href = blobUrl;
+        anchor.download = `${modelCode}-${mode}-import-errors.xlsx`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+      } catch (cause) {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : t('import.error.error_report', undefined, '修正工作簿下载失败，请重试。'),
+        );
+      } finally {
+        setDownloadingErrorReport(false);
+      }
+    },
+    [mode, modelCode, t],
+  );
+
+  const chooseCorrectionFile = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  }, []);
 
   const validateFile = useCallback(
     async (selectedFile: File, nextMode: ImportMode, nextMatchKey: string) => {
@@ -307,6 +368,10 @@ export const ImportModal: React.FC<ImportModalProps> = ({
       created: result.createdCount,
       updated: result.updatedCount,
       errors: result.errors || [],
+      taskId: result.taskId,
+      errorReportUrl: result.errorReportUrl,
+      errorReportFailed: result.errorReportFailed,
+      errorReportExpired: result.errorReportExpired,
     };
     setImportResult(data);
     setStep('result');
@@ -353,11 +418,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
       const namedRequired = /^Field '([^']+)' is required$/.exec(message);
       if (namedRequired) {
         const field = fieldLabel(namedRequired[1]);
-        return t(
-          'import.validation.named_required',
-          { field },
-          `字段“${field}”为必填项`,
-        );
+        return t('import.validation.named_required', { field }, `字段“${field}”为必填项`);
       }
       if (message === 'Required field is missing') {
         return t('import.validation.required', undefined, '必填字段缺失');
@@ -378,8 +439,16 @@ export const ImportModal: React.FC<ImportModalProps> = ({
       if (message === 'Duplicate column header') {
         return t('import.validation.duplicate_header', undefined, '存在重复列头');
       }
-      if (message === 'Referenced record does not exist or is not accessible') {
-        return t('import.validation.reference', undefined, '关联记录不存在或无权访问');
+      const referenceMessage = resolveImportReferenceMessage(message);
+      if (referenceMessage === '关联记录不存在或无权访问') {
+        return t('import.validation.reference', undefined, referenceMessage);
+      }
+      if (referenceMessage === '关联值不唯一，请改用唯一业务编码或 PID') {
+        return t('import.validation.reference_ambiguous', undefined, referenceMessage);
+      }
+      const executionMessage = resolveImportExecutionMessage(message, fieldLabels);
+      if (executionMessage) {
+        return t(executionMessage.key, executionMessage.params, executionMessage.fallback);
       }
       return resolveImportMessageFieldCodes(message, fieldLabels);
     },
@@ -492,6 +561,16 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           </div>
 
           <main className="flex-1 overflow-y-auto px-6 py-5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={(event) => {
+                const selected = event.target.files?.[0];
+                if (selected) void parseAndValidate(selected);
+              }}
+              className="hidden"
+            />
             {step === 'upload' && (
               <div
                 onDragOver={(event) => {
@@ -522,16 +601,6 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                 >
                   {t('import.choose_file', undefined, '选择文件')}
                 </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  onChange={(event) => {
-                    const selected = event.target.files?.[0];
-                    if (selected) void parseAndValidate(selected);
-                  }}
-                  className="hidden"
-                />
                 <p className="text-text-3 mt-3 text-xs">
                   {t('import.file_limit', undefined, '仅支持 .xlsx，最大 10 MB')}
                 </p>
@@ -562,11 +631,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                       )}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={resetState}
-                    className="text-accent text-sm"
-                  >
+                  <button type="button" onClick={resetState} className="text-accent text-sm">
                     {t('import.change_file', undefined, '更换文件')}
                   </button>
                 </div>
@@ -614,6 +679,49 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                           </p>
                         ))}
                       </div>
+                    )}
+                    {!validation.valid && validation.errorReportUrl && (
+                      <div className="border-status-red/30 mt-4 flex flex-wrap items-center gap-3 border-t pt-3">
+                        <p className="text-text-2 mr-auto text-xs">
+                          {t(
+                            'import.correction.pending_hint',
+                            undefined,
+                            '下载包含全部待导入行的修正工作簿，修正标记单元格后直接重新上传。',
+                          )}
+                        </p>
+                        <button
+                          type="button"
+                          data-testid="import-download-error-report"
+                          disabled={isBusy}
+                          onClick={() => void downloadErrorReport(validation.errorReportUrl!)}
+                          className="border-accent text-accent hover:bg-accent-weak rounded-control border px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {downloadingErrorReport
+                            ? t('import.correction.downloading', undefined, '正在下载修正工作簿…')
+                            : t('import.correction.download', undefined, '下载修正工作簿')}
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="import-upload-correction"
+                          disabled={isBusy}
+                          onClick={chooseCorrectionFile}
+                          className="bg-accent rounded-control px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {t('import.correction.upload', undefined, '上传修正工作簿')}
+                        </button>
+                      </div>
+                    )}
+                    {!validation.valid && validation.errorReportFailed && (
+                      <p
+                        data-testid="import-error-report-unavailable"
+                        className="text-status-red mt-3 text-xs"
+                      >
+                        {t(
+                          'import.error.error_report_unavailable',
+                          undefined,
+                          '错误明细已保留在当前页面，但修正工作簿暂时无法生成。请修正原文件后重新上传。',
+                        )}
+                      </p>
                     )}
                   </div>
                 )}
@@ -665,8 +773,16 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                 </h3>
                 <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {[
-                    ['created', t('import.result.created', undefined, '新增'), importResult.created],
-                    ['updated', t('import.result.updated', undefined, '更新'), importResult.updated],
+                    [
+                      'created',
+                      t('import.result.created', undefined, '新增'),
+                      importResult.created,
+                    ],
+                    [
+                      'updated',
+                      t('import.result.updated', undefined, '更新'),
+                      importResult.updated,
+                    ],
                     ['failed', t('import.result.failed', undefined, '失败'), importResult.failed],
                     ['total', t('import.result.total', undefined, '总计'), importResult.total],
                   ].map(([key, label, value]) => (
@@ -690,6 +806,63 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                       </p>
                     ))}
                   </div>
+                )}
+                {!importResult.success && importResult.errorReportUrl && (
+                  <div className="border-border bg-subtle mt-5 rounded-lg border p-4 text-left">
+                    <p className="text-text-2 text-sm">
+                      {t(
+                        'import.correction.partial_hint',
+                        undefined,
+                        '已成功的记录不会出现在修正工作簿中。修正失败行后可直接再次上传。',
+                      )}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        data-testid="import-result-download-error-report"
+                        disabled={isBusy}
+                        onClick={() => void downloadErrorReport(importResult.errorReportUrl!)}
+                        className="border-accent text-accent hover:bg-accent-weak rounded-control border px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {downloadingErrorReport
+                          ? t('import.correction.downloading', undefined, '正在下载修正工作簿…')
+                          : t('import.correction.download', undefined, '下载修正工作簿')}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="import-result-upload-correction"
+                        disabled={isBusy}
+                        onClick={chooseCorrectionFile}
+                        className="bg-accent rounded-control px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {t('import.correction.upload', undefined, '上传修正工作簿')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {!importResult.success && importResult.errorReportFailed && (
+                  <p
+                    data-testid="import-result-error-report-unavailable"
+                    className="text-status-red mt-4 text-sm"
+                  >
+                    {t(
+                      'import.error.error_report_unavailable',
+                      undefined,
+                      '错误明细已保留在当前页面，但修正工作簿暂时无法生成。请修正原文件后重新上传。',
+                    )}
+                  </p>
+                )}
+                {!importResult.success && importResult.errorReportExpired && (
+                  <p
+                    data-testid="import-result-error-report-expired"
+                    className="text-text-3 mt-4 text-sm"
+                  >
+                    {t(
+                      'import.error.error_report_expired',
+                      undefined,
+                      '修正工作簿已超过保留期。请基于原文件重新执行预检。',
+                    )}
+                  </p>
                 )}
               </div>
             )}

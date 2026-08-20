@@ -1,0 +1,2 @@
+pid,status,total_rows,processed_rows,success_rows,error_rows,import_mode,has_error_report,durable_error_count,completed_at
+01KZXNMZ15EYW6KT4MG6D2XJAS,completed,2,2,1,1,update,t,1,2026-08-13 13:40:39.148887

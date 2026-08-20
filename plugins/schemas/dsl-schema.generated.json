@@ -1378,7 +1378,8 @@
       "type": "object",
       "properties": {
         "rowKey": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "dataSource": {
           "type": "string"
@@ -1498,7 +1499,46 @@
       "required": [
         "columns"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "selection"
+            ],
+            "properties": {
+              "selection": {
+                "required": [
+                  "presentation"
+                ],
+                "properties": {
+                  "presentation": {
+                    "const": "grouped-radio"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "rowKey"
+                ]
+              },
+              {
+                "properties": {
+                  "selection": {
+                    "required": [
+                      "keyField"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
     },
     "PaginationConfig": {
       "type": "object",
@@ -1541,7 +1581,36 @@
           "type": "boolean"
         },
         "keyField": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
+        },
+        "presentation": {
+          "type": "string",
+          "enum": [
+            "table",
+            "grouped-radio"
+          ],
+          "description": "Renders exclusive multiple-selection rows as one decision card per group. The bound value remains an array containing at most one row per group."
+        },
+        "exclusiveBy": {
+          "type": "string",
+          "description": "Field whose value defines an exclusive selection group. In multiple mode, selecting another row with the same value replaces the previous row.",
+          "minLength": 1
+        },
+        "optionLabelField": {
+          "type": "string",
+          "description": "Field rendered as the radio option label in grouped-radio presentation.",
+          "minLength": 1
+        },
+        "recommendedField": {
+          "type": "string",
+          "description": "Explicit boolean field marking a business recommendation. Automatic grouped selection is enabled only when `safeField` is configured as well.",
+          "minLength": 1
+        },
+        "safeField": {
+          "type": "string",
+          "description": "Explicit boolean field proving that the recommendation is safe and reversible. A row is preselected only when both configured fields are strictly `true`.",
+          "minLength": 1
         },
         "detailBind": {
           "type": "string"
@@ -1557,7 +1626,108 @@
         "mode",
         "bind"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "presentation"
+            ],
+            "properties": {
+              "presentation": {
+                "const": "grouped-radio"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "exclusiveBy",
+              "optionLabelField"
+            ],
+            "properties": {
+              "mode": {
+                "const": "multiple"
+              },
+              "defaultFirst": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "exclusiveBy"
+            ]
+          },
+          "then": {
+            "properties": {
+              "mode": {
+                "const": "multiple"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "optionLabelField"
+            ]
+          },
+          "then": {
+            "required": [
+              "presentation"
+            ],
+            "properties": {
+              "presentation": {
+                "const": "grouped-radio"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "recommendedField"
+            ]
+          },
+          "then": {
+            "required": [
+              "safeField",
+              "presentation"
+            ],
+            "properties": {
+              "presentation": {
+                "const": "grouped-radio"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "safeField"
+            ]
+          },
+          "then": {
+            "required": [
+              "recommendedField",
+              "presentation"
+            ],
+            "properties": {
+              "presentation": {
+                "const": "grouped-radio"
+              }
+            }
+          }
+        }
+      ],
+      "x-distinct-properties": [
+        [
+          "recommendedField",
+          "safeField"
+        ]
+      ]
     },
     "ColumnConfig": {
       "type": "object",

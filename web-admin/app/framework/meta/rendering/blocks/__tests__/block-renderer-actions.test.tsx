@@ -659,6 +659,421 @@ describe('TableBlockRenderer', () => {
     ]);
   });
 
+  it('keeps exactly one selected row per configured exclusive group', () => {
+    const rows = [
+      { pid: 'issue-a-keep', issueId: 'issue-a', action: 'keep' },
+      { pid: 'issue-a-return', issueId: 'issue-a', action: 'return' },
+      { pid: 'issue-b-keep', issueId: 'issue-b', action: 'keep' },
+    ];
+    const runtime = makeRuntimeWithRows(rows) as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: {
+          mode: 'multiple',
+          bind: 'selectedDecisions',
+          exclusiveBy: 'issueId',
+        },
+        columns: [{ field: 'action', label: 'Action' }],
+      },
+    };
+
+    const { getByTestId, queryByTestId } = render(
+      <TableBlockRenderer block={block as any} runtime={runtime} />,
+    );
+    expect(queryByTestId('table-select-all')).not.toBeInTheDocument();
+
+    fireEvent.click(getByTestId('table-select-row-issue-a-keep'));
+    fireEvent.click(getByTestId('table-select-row-issue-a-return'));
+    fireEvent.click(getByTestId('table-select-row-issue-b-keep'));
+
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedDecisions', [rows[0]]);
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedDecisions', [rows[1]]);
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedDecisions', [
+      rows[1],
+      rows[2],
+    ]);
+  });
+
+  it('renders grouped-radio decisions without defaults and preserves choices in other groups', () => {
+    const rows = [
+      {
+        pid: 'issue-a-keep',
+        issueId: 'issue-a',
+        line: '52',
+        issue: 'Quantity differs from reference count',
+        actionLabel: 'Keep source quantity',
+      },
+      {
+        pid: 'issue-a-recalculate',
+        issueId: 'issue-a',
+        line: '52',
+        issue: 'Quantity differs from reference count',
+        actionLabel: 'Recalculate quantity',
+      },
+      {
+        pid: 'issue-b-keep',
+        issueId: 'issue-b',
+        line: '81',
+        issue: 'Package needs confirmation',
+        actionLabel: 'Keep source package',
+      },
+      {
+        pid: 'issue-b-return',
+        issueId: 'issue-b',
+        line: '81',
+        issue: 'Package needs confirmation',
+        actionLabel: 'Return to source file',
+      },
+    ];
+    const runtime = makeRuntimeWithRows(rows) as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: {
+          mode: 'multiple',
+          bind: 'selectedDecisions',
+          presentation: 'grouped-radio',
+          exclusiveBy: 'issueId',
+          optionLabelField: 'actionLabel',
+        },
+        columns: [
+          { field: 'line', label: 'Source line' },
+          { field: 'issue', label: 'Issue' },
+          { field: 'actionLabel', label: 'Action' },
+        ],
+      },
+    };
+
+    const { getAllByRole, getByTestId, queryByTestId } = render(
+      <TableBlockRenderer block={block as any} runtime={runtime} />,
+    );
+
+    expect(getAllByRole('radiogroup')).toHaveLength(2);
+    expect(getAllByRole('radio')).toHaveLength(4);
+    expect(
+      getAllByRole('radio').every((radio: HTMLElement) => !(radio as HTMLInputElement).checked),
+    ).toBe(true);
+    expect(queryByTestId('table-select-all')).not.toBeInTheDocument();
+    expect(getByTestId('table-selection-group-0-issue-a-field-line')).toHaveTextContent('52');
+    expect(getByTestId('table-selection-group-1-issue-b-field-line')).toHaveTextContent('81');
+
+    fireEvent.click(getByTestId('table-select-row-issue-a-keep'));
+    fireEvent.click(getByTestId('table-select-row-issue-b-return'));
+    fireEvent.click(getByTestId('table-select-row-issue-a-recalculate'));
+
+    const finalRows = runtime.__updateState.mock.calls
+      .filter((call: any[]) => call[1] === 'selectedDecisions')
+      .at(-1)?.[2];
+    expect(finalRows).toEqual([rows[1], rows[3]]);
+    expect(getByTestId('table-select-row-issue-a-recalculate')).toBeChecked();
+    expect(getByTestId('table-select-row-issue-b-return')).toBeChecked();
+  });
+
+  it('preselects only one explicitly recommended and safe option per group', async () => {
+    const rows = [
+      {
+        pid: 'safe-keep',
+        issueId: 'safe',
+        actionLabel: 'Keep source',
+        recommended: true,
+        safe: true,
+      },
+      {
+        pid: 'safe-return',
+        issueId: 'safe',
+        actionLabel: 'Return to source',
+        recommended: false,
+        safe: false,
+      },
+      {
+        pid: 'unsafe-recommendation',
+        issueId: 'unsafe',
+        actionLabel: 'Rewrite value',
+        recommended: true,
+        safe: false,
+      },
+      {
+        pid: 'duplicate-a',
+        issueId: 'duplicate',
+        actionLabel: 'First recommendation',
+        recommended: true,
+        safe: true,
+      },
+      {
+        pid: 'duplicate-b',
+        issueId: 'duplicate',
+        actionLabel: 'Second recommendation',
+        recommended: true,
+        safe: true,
+      },
+      {
+        pid: 'string-flags',
+        issueId: 'non-boolean',
+        actionLabel: 'String flags',
+        recommended: 'true',
+        safe: 'true',
+      },
+      {
+        pid: 'missing-group',
+        actionLabel: 'Missing group identity',
+        recommended: true,
+        safe: true,
+      },
+    ];
+    const runtime = makeRuntimeWithRows(rows) as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: {
+          mode: 'multiple',
+          bind: 'selectedDecisions',
+          presentation: 'grouped-radio',
+          exclusiveBy: 'issueId',
+          optionLabelField: 'actionLabel',
+          recommendedField: 'recommended',
+          safeField: 'safe',
+        },
+        columns: [{ field: 'actionLabel', label: 'Action' }],
+      },
+    };
+
+    const view = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+    await waitFor(() => {
+      expect(runtime.getContext().state.selectedDecisions).toEqual([rows[0]]);
+    });
+    expect(view.getByTestId('table-select-row-safe-keep')).toBeChecked();
+    expect(view.getByTestId('table-select-row-unsafe-recommendation')).not.toBeChecked();
+    expect(view.getByTestId('table-select-row-duplicate-a')).not.toBeChecked();
+    expect(view.getByTestId('table-select-row-duplicate-b')).not.toBeChecked();
+    expect(view.getByTestId('table-select-row-string-flags')).not.toBeChecked();
+    expect(view.getByTestId('table-select-row-missing-group')).not.toBeChecked();
+  });
+
+  it('does not preselect when grouped-radio lacks an explicit stable row identity', () => {
+    const rows = [
+      {
+        pid: 'inferred-but-not-contracted',
+        issueId: 'issue-a',
+        actionLabel: 'Keep source',
+        recommended: true,
+        safe: true,
+      },
+    ];
+    const runtime = makeRuntimeWithRows(rows) as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        selection: {
+          mode: 'multiple',
+          bind: 'selectedDecisions',
+          presentation: 'grouped-radio',
+          exclusiveBy: 'issueId',
+          optionLabelField: 'actionLabel',
+          recommendedField: 'recommended',
+          safeField: 'safe',
+        },
+        columns: [{ field: 'actionLabel', label: 'Action' }],
+      },
+    };
+
+    const view = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+    expect(runtime.getContext().state.selectedDecisions).toBeUndefined();
+    expect(view.getByTestId('table-select-row-inferred-but-not-contracted')).not.toBeChecked();
+  });
+
+  it('preserves user choices across refresh and safely defaults only new unselected groups', async () => {
+    type DecisionRow = {
+      pid: string;
+      issueId: string;
+      actionLabel: string;
+      recommended: boolean;
+      safe: boolean;
+      snapshot?: string;
+    };
+    let rows: DecisionRow[] = [
+      {
+        pid: 'issue-a-keep',
+        issueId: 'issue-a',
+        actionLabel: 'Keep source',
+        recommended: true,
+        safe: true,
+      },
+      {
+        pid: 'issue-a-return',
+        issueId: 'issue-a',
+        actionLabel: 'Return to source',
+        recommended: false,
+        safe: false,
+      },
+      {
+        pid: 'issue-b-keep',
+        issueId: 'issue-b',
+        actionLabel: 'Keep source',
+        recommended: false,
+        safe: false,
+      },
+      {
+        pid: 'issue-b-return',
+        issueId: 'issue-b',
+        actionLabel: 'Return to source',
+        recommended: false,
+        safe: false,
+      },
+    ];
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => rows,
+        has: () => true,
+        register: vi.fn(),
+      }),
+    }) as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: {
+          mode: 'multiple',
+          bind: 'selectedDecisions',
+          presentation: 'grouped-radio',
+          exclusiveBy: 'issueId',
+          optionLabelField: 'actionLabel',
+          recommendedField: 'recommended',
+          safeField: 'safe',
+        },
+        columns: [{ field: 'actionLabel', label: 'Action' }],
+      },
+    };
+    const view = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+    await waitFor(() => {
+      expect(runtime.getContext().state.selectedDecisions).toEqual([rows[0]]);
+    });
+    fireEvent.click(view.getByTestId('table-select-row-issue-a-return'));
+    fireEvent.click(view.getByTestId('table-select-row-issue-b-return'));
+
+    rows = [
+      { ...rows[0], recommended: true, safe: true, snapshot: 'refreshed' },
+      { ...rows[1], recommended: false, safe: false, snapshot: 'refreshed' },
+      { ...rows[2], recommended: true, safe: true, snapshot: 'refreshed' },
+      { ...rows[3], snapshot: 'refreshed' },
+      {
+        pid: 'issue-c-keep',
+        issueId: 'issue-c',
+        actionLabel: 'Keep source',
+        recommended: true,
+        safe: true,
+        snapshot: 'refreshed',
+      },
+      {
+        pid: 'issue-c-return',
+        issueId: 'issue-c',
+        actionLabel: 'Return to source',
+        recommended: false,
+        safe: false,
+        snapshot: 'refreshed',
+      },
+    ];
+    view.rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+    await waitFor(() => {
+      expect(runtime.getContext().state.selectedDecisions).toEqual([rows[1], rows[3], rows[4]]);
+    });
+    expect(view.getByTestId('table-select-row-issue-a-return')).toBeChecked();
+    expect(view.getByTestId('table-select-row-issue-b-return')).toBeChecked();
+    expect(view.getByTestId('table-select-row-issue-c-keep')).toBeChecked();
+  });
+
+  it('moves grouped-radio selection with arrow keys inside one group', () => {
+    const rows = [
+      { pid: 'issue-a-keep', issueId: 'issue-a', actionLabel: 'Keep source' },
+      { pid: 'issue-a-return', issueId: 'issue-a', actionLabel: 'Return to source' },
+    ];
+    const runtime = makeRuntimeWithRows(rows) as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: {
+          mode: 'multiple',
+          bind: 'selectedDecisions',
+          presentation: 'grouped-radio',
+          exclusiveBy: 'issueId',
+          optionLabelField: 'actionLabel',
+        },
+        columns: [{ field: 'actionLabel', label: 'Action' }],
+      },
+    };
+
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    const firstRadio = getByTestId('table-select-row-issue-a-keep');
+    firstRadio.focus();
+    fireEvent.keyDown(firstRadio, { key: 'ArrowDown' });
+
+    expect(getByTestId('table-select-row-issue-a-return')).toBeChecked();
+    expect(document.activeElement).toBe(getByTestId('table-select-row-issue-a-return'));
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedDecisions', [rows[1]]);
+  });
+
+  it('drops grouped-radio choices that no longer exist after a data-source reload', async () => {
+    let rows = [
+      { pid: 'old-issue-keep', issueId: 'old-issue', actionLabel: 'Keep source' },
+      { pid: 'old-issue-return', issueId: 'old-issue', actionLabel: 'Return to source' },
+    ];
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => rows,
+        has: () => true,
+        register: vi.fn(),
+      }),
+    }) as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: {
+          mode: 'multiple',
+          bind: 'selectedDecisions',
+          presentation: 'grouped-radio',
+          exclusiveBy: 'issueId',
+          optionLabelField: 'actionLabel',
+        },
+        columns: [{ field: 'actionLabel', label: 'Action' }],
+      },
+    };
+
+    const view = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(view.getByTestId('table-select-row-old-issue-keep'));
+    expect(runtime.getContext().state.selectedDecisions).toEqual([rows[0]]);
+
+    rows = [
+      { pid: 'new-issue-keep', issueId: 'new-issue', actionLabel: 'Keep source' },
+      { pid: 'new-issue-return', issueId: 'new-issue', actionLabel: 'Return to source' },
+    ];
+    view.rerender(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+    await waitFor(() => {
+      expect(runtime.getContext().state.selectedDecisions).toEqual([]);
+    });
+    expect(
+      view
+        .getAllByRole('radio')
+        .every((radio: HTMLElement) => !(radio as HTMLInputElement).checked),
+    ).toBe(true);
+  });
+
   it('uses configured rowKey for row identity and highlights the clicked row immediately', () => {
     const row = { lineNo: 'L-001', name: 'Beta' };
     const runtime = makeRuntime({

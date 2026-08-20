@@ -1,10 +1,12 @@
 package com.auraboot.module.meta.excel;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.TypeSystemManager;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.module.meta.excel.mapper.ImportJobMapper;
 import com.auraboot.module.meta.excel.entity.ImportJob;
@@ -56,18 +58,28 @@ class ExcelImportServiceTest {
     @Mock
     private CommandExecutor commandExecutor;
 
+    @Mock
+    private ExcelReferenceResolver referenceResolver;
+
+    @Mock
+    private ExcelImportErrorReportService errorReportService;
+
     private ExcelImportService importService;
 
     @BeforeEach
     void setUp() {
         importService = new ExcelImportService(
-                dynamicDataService, metaModelService, importJobMapper, policyResolver, commandExecutor);
+                dynamicDataService, metaModelService, importJobMapper, policyResolver,
+                commandExecutor, referenceResolver, new TypeSystemManager(), errorReportService,
+                new ObjectMapper());
         lenient().when(policyResolver.requireEnabled(anyString())).thenReturn(ExcelImportPolicy.builder()
                 .modelCode("test_model")
                 .enabled(true)
                 .modes(java.util.Set.of("insert", "update"))
                 .updateKeys(List.of("code"))
-                .createFields(java.util.Set.of("name", "code", "pe_so_code", "pe_so_name", "pe_so_qty", "pe_so_total", "pe_total", "pe_name"))
+                .createFields(java.util.Set.of(
+                        "name", "code", "pe_so_code", "pe_so_name", "pe_so_qty",
+                        "pe_so_total", "pe_total", "pe_name"))
                 .updateFields(java.util.Set.of("name", "code"))
                 .build());
     }
@@ -133,8 +145,10 @@ class ExcelImportServiceTest {
         job.setImportMode("insert");
         job.setTotalRows(3);
         job.setProcessedRows(3);
-        job.setSuccessRows(3);
-        job.setErrorRows(0);
+        job.setSuccessRows(2);
+        job.setErrorRows(1);
+        job.setErrorDetails("[{\"rowNumber\":3,\"fieldCode\":null,"
+                + "\"message\":\"No existing record matches code=MISSING-001\"}]");
         when(importJobMapper.selectOne(any())).thenReturn(job);
 
         MetaContext.setContext(7L, 42L, "test-user", "tester");
@@ -144,8 +158,13 @@ class ExcelImportServiceTest {
             assertNotNull(status);
             assertEquals("completed", status.getStatus());
             assertEquals(3, status.getProcessedRows());
-            assertEquals(3, status.getResult().getCreatedCount());
-            assertEquals(0, status.getResult().getErrorCount());
+            assertEquals(2, status.getResult().getCreatedCount());
+            assertEquals(1, status.getResult().getErrorCount());
+            assertEquals(1, status.getResult().getErrors().size());
+            assertEquals(3, status.getResult().getErrors().get(0).getRowNumber());
+            assertEquals(
+                    "No existing record matches code=MISSING-001",
+                    status.getResult().getErrors().get(0).getMessage());
             assertFalse(new ObjectMapper().writeValueAsString(status).contains("tenantId"));
             assertFalse(new ObjectMapper().writeValueAsString(status).contains("createdBy"));
         } finally {
@@ -244,7 +263,7 @@ class ExcelImportServiceTest {
         // Row 2 (index 1) throws an exception in per-row fallback
         when(dynamicDataService.create(eq("test_model"), anyMap()))
                 .thenReturn(Map.of("id", "1"))                          // row 1 succeeds
-                .thenThrow(new RuntimeException("Duplicate code"))      // row 2 fails
+                .thenThrow(new BusinessException("Duplicate code"))     // row 2 fails
                 .thenReturn(Map.of("id", "3"));                         // row 3 succeeds
 
         ImportOptions options = new ImportOptions();
@@ -393,6 +412,90 @@ class ExcelImportServiceTest {
     }
 
     @Test
+    void testGenerateTemplate_addsReferenceInstructionsWithoutChangingImportHeader() throws IOException {
+        FieldDefinition reference = FieldDefinition.builder()
+                .code("account_id").displayName("Account").dataType("reference").required(true)
+                .refTarget(FieldDefinition.RefTarget.builder()
+                        .targetEntity("account").valueField("pid")
+                        .importMatchFields(List.of("account_code")).build())
+                .build();
+        when(metaModelService.getModelFields("test_model")).thenReturn(List.of(reference));
+        when(policyResolver.requireEnabled("test_model")).thenReturn(ExcelImportPolicy.builder()
+                .modelCode("test_model").enabled(true).modes(java.util.Set.of("insert"))
+                .createFields(java.util.Set.of("account_id")).build());
+        when(referenceResolver.importHint(reference))
+                .thenReturn("可填写 Account Code (account_code)；仍兼容内部 PID；值必须唯一。");
+
+        Path template = importService.generateImportTemplate("test_model");
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(Files.newInputStream(template))) {
+            var importSheet = wb.getSheet("Import");
+            assertEquals("* Account", importSheet.getRow(0).getCell(0).getStringCellValue());
+            assertNotNull(importSheet.getRow(0).getCell(0).getCellComment());
+            assertTrue(importSheet.getRow(0).getCell(0).getCellComment().getString().getString()
+                    .contains("account_code"));
+            var instructions = wb.getSheet("填写说明");
+            assertNotNull(instructions);
+            assertEquals("Account", instructions.getRow(1).getCell(0).getStringCellValue());
+            assertTrue(instructions.getRow(1).getCell(1).getStringCellValue().contains("PID"));
+        } finally {
+            Files.deleteIfExists(template);
+        }
+    }
+
+    @Test
+    void resolveReferenceValues_rewritesBusinessValueBeforeCommandExecution() throws IOException {
+        FieldDefinition reference = FieldDefinition.builder()
+                .code("account_id").displayName("Account").dataType("reference")
+                .refTarget(FieldDefinition.RefTarget.builder()
+                        .targetEntity("account").valueField("pid")
+                        .importMatchFields(List.of("account_code")).build())
+                .build();
+        when(metaModelService.getModelFields("test_model")).thenReturn(List.of(reference));
+        when(policyResolver.requireEnabled("test_model")).thenReturn(ExcelImportPolicy.builder()
+                .modelCode("test_model").enabled(true).modes(java.util.Set.of("insert"))
+                .createCommand("test:create").createFields(java.util.Set.of("account_id")).build());
+        when(referenceResolver.resolve(reference, "ACC-001")).thenReturn("01KZACCOUNT");
+
+        MetaContext.setContext(7L, 42L, "test-user", "tester");
+        try {
+            ExcelImportResult result = importService.importExcel("test_model",
+                    createExcel(new String[]{"Account"}, new String[][]{{"ACC-001"}}),
+                    new ImportOptions());
+            assertEquals(1, result.getCreatedCount(), () -> "import errors: " + result.getErrors());
+        } finally {
+            MetaContext.clear();
+        }
+
+        ArgumentCaptor<CommandExecuteRequest> request = ArgumentCaptor.forClass(CommandExecuteRequest.class);
+        verify(commandExecutor).execute(eq("test:create"), request.capture());
+        assertEquals("01KZACCOUNT", request.getValue().getPayload().get("account_id"));
+    }
+
+    @Test
+    void resolveReferenceValues_failsBeforeAnyWrite() throws IOException {
+        FieldDefinition reference = FieldDefinition.builder()
+                .code("account_id").displayName("Account").dataType("reference")
+                .refTarget(FieldDefinition.RefTarget.builder()
+                        .targetEntity("account").valueField("pid")
+                        .importMatchFields(List.of("account_code")).build())
+                .build();
+        when(metaModelService.getModelFields("test_model")).thenReturn(List.of(reference));
+        when(referenceResolver.resolve(reference, "ACC-MISSING"))
+                .thenThrow(new BusinessException("Referenced record does not exist"));
+
+        ExcelImportResult result = importService.importExcel("test_model",
+                createExcel(new String[]{"Account"}, new String[][]{{"ACC-MISSING"}}),
+                new ImportOptions());
+
+        assertEquals(0, result.getSuccessCount());
+        assertEquals(1, result.getErrorCount());
+        assertEquals("account_id", result.getErrors().get(0).getFieldCode());
+        verify(commandExecutor, never()).execute(anyString(), any());
+        verify(dynamicDataService, never()).create(anyString(), anyMap());
+    }
+
+    @Test
     void testGenerateTemplate_doesNotMarkCommandDefaultAsRequired() throws IOException {
         var fields = List.of(
                 FieldDefinition.builder().code("pe_so_name").displayName("Name").required(true).build(),
@@ -450,14 +553,15 @@ class ExcelImportServiceTest {
     }
 
     @Test
-    void importExcel_shouldOmitBlankAutoSetCellsSoCommandDefaultsApply() throws IOException {
+    void importExcel_shouldOmitAllBlankCreateCellsSoDefaultsAndTypedFieldsRemainValid() throws IOException {
         when(metaModelService.getModelFields("test_model")).thenReturn(List.of(
                 FieldDefinition.builder().code("name").displayName("Name").build(),
-                FieldDefinition.builder().code("status").displayName("Status").build()));
+                FieldDefinition.builder().code("status").displayName("Status").build(),
+                FieldDefinition.builder().code("score").displayName("Score").dataType("integer").build()));
         when(policyResolver.requireEnabled("test_model")).thenReturn(ExcelImportPolicy.builder()
                 .modelCode("test_model").enabled(true).modes(java.util.Set.of("insert"))
                 .createCommand("test:create")
-                .createFields(java.util.Set.of("name", "status"))
+                .createFields(java.util.Set.of("name", "status", "score"))
                 .createAutoSetFields(java.util.Set.of("status"))
                 .build());
 
@@ -466,7 +570,8 @@ class ExcelImportServiceTest {
         try {
             result = importService.importExcel(
                     "test_model",
-                    createExcel(new String[]{"Name", "Status"}, new String[][]{{"Acme", ""}}),
+                    createExcel(new String[]{"Name", "Status", "Score"},
+                            new String[][]{{"Acme", "", ""}}),
                     new ImportOptions());
         } finally {
             MetaContext.clear();
@@ -477,6 +582,60 @@ class ExcelImportServiceTest {
         verify(commandExecutor).execute(eq("test:create"), request.capture());
         assertEquals("Acme", request.getValue().getPayload().get("name"));
         assertFalse(request.getValue().getPayload().containsKey("status"));
+        assertFalse(request.getValue().getPayload().containsKey("score"));
+    }
+
+    @Test
+    void importExcel_shouldHideInfrastructureDetailsFromRowErrors() throws IOException {
+        when(metaModelService.getModelFields("test_model")).thenReturn(List.of(
+                FieldDefinition.builder().code("name").displayName("Name").build()));
+        when(policyResolver.requireEnabled("test_model")).thenReturn(ExcelImportPolicy.builder()
+                .modelCode("test_model").enabled(true).modes(java.util.Set.of("insert"))
+                .createCommand("test:create").createFields(java.util.Set.of("name")).build());
+        doThrow(new RuntimeException(
+                "### Error updating database. Cause: org.postgresql.util.PSQLException: bad SQL grammar"))
+                .when(commandExecutor).execute(eq("test:create"), any());
+
+        ExcelImportResult result;
+        MetaContext.setContext(7L, 42L, "test-user", "tester");
+        try {
+            result = importService.importExcel(
+                    "test_model", createExcel(new String[]{"Name"}, new String[][]{{"Acme"}}),
+                    new ImportOptions());
+        } finally {
+            MetaContext.clear();
+        }
+
+        assertEquals(1, result.getErrorCount());
+        assertEquals(ExcelImportService.ROW_WRITE_FAILED_MESSAGE,
+                result.getErrors().get(0).getMessage());
+        assertFalse(result.getErrors().get(0).getMessage().contains("postgresql"));
+    }
+
+    @Test
+    void importExcel_shouldConvertMoneyTextBeforeCommandExecution() throws IOException {
+        when(metaModelService.getModelFields("test_model")).thenReturn(List.of(
+                FieldDefinition.builder().code("name").displayName("Name").dataType("string").build(),
+                FieldDefinition.builder().code("amount").displayName("Amount").dataType("money").build()));
+        when(policyResolver.requireEnabled("test_model")).thenReturn(ExcelImportPolicy.builder()
+                .modelCode("test_model").enabled(true).modes(java.util.Set.of("insert"))
+                .createCommand("test:create").createFields(java.util.Set.of("name", "amount")).build());
+
+        ExcelImportResult result;
+        MetaContext.setContext(7L, 42L, "test-user", "tester");
+        try {
+            result = importService.importExcel(
+                    "test_model",
+                    createExcel(new String[]{"Name", "Amount"}, new String[][]{{"Opportunity", "168000"}}),
+                    new ImportOptions());
+        } finally {
+            MetaContext.clear();
+        }
+
+        assertEquals(1, result.getCreatedCount(), () -> "import errors: " + result.getErrors());
+        ArgumentCaptor<CommandExecuteRequest> request = ArgumentCaptor.forClass(CommandExecuteRequest.class);
+        verify(commandExecutor).execute(eq("test:create"), request.capture());
+        assertEquals(new java.math.BigDecimal("168000"), request.getValue().getPayload().get("amount"));
     }
 
     @Test

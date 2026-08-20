@@ -28,6 +28,9 @@ import java.util.concurrent.atomic.AtomicLong;
 @Service
 public class TypeSystemManager {
 
+    private static final DateTimeFormatter EXCEL_DATE_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     //fixme
     
     // 用于生成Long类型ID的计数器（简单实现，生产环境应使用分布式ID生成器）
@@ -149,6 +152,9 @@ public class TypeSystemManager {
                 case "decimal":
                 case "numeric":
                 case "double":
+                case "float":
+                case "number":
+                case "money":
                     return convertToDecimal(value);
                     
                 case "date":
@@ -263,9 +269,13 @@ public class TypeSystemManager {
         if (value instanceof LocalDate) {
             return ((LocalDate) value).atStartOfDay();
         }
-        // 尝试解析字符串
+        // Excel 校验同时接受 ISO_LOCAL_DATE_TIME 与常见的空格分隔格式，转换必须保持一致。
         String str = value.toString().trim();
-        return LocalDateTime.parse(str, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        try {
+            return LocalDateTime.parse(str, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        } catch (DateTimeParseException ignored) {
+            return LocalDateTime.parse(str, EXCEL_DATE_TIME_FORMATTER);
+        }
     }
     
     /**

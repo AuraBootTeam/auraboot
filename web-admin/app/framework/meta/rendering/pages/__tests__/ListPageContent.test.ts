@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  applyLocalSortUpdate,
   buildListReferenceDisplayCacheKey,
   buildBulkFieldCommandPayload,
   buildViewManageFieldOptions,
@@ -21,14 +22,38 @@ import {
   resolveListMiscBlocksPosition,
   resolveTableBlockRowActions,
   queryConditionToExportCondition,
-  resolveUrlFilterSyncAction,
+  resolveUrlStateSyncAction,
   shouldSkipListData,
   shouldSkipModelFieldMeta,
   useRestoreSavedViewFromUrl,
   useSerializedSearchParamsUpdater,
   viewFilterToQueryCondition,
   resolveSavedViewFilterExpressions,
+  resolveInitialListTabKey,
 } from '../ListPageContent';
+
+describe('resolveInitialListTabKey', () => {
+  it('uses the explicit all tab when the DSL provides one', () => {
+    expect(
+      resolveInitialListTabKey([
+        { blockType: 'tabs', tabs: [{ key: 'available' }, { key: 'all' }] },
+      ]),
+    ).toBe('all');
+  });
+
+  it('uses the first DSL tab when no all tab exists', () => {
+    expect(
+      resolveInitialListTabKey([
+        { blockType: 'tabs', tabs: [{ key: 'available' }, { key: 'claimed' }] },
+      ]),
+    ).toBe('available');
+  });
+
+  it('falls back to all when the page has no valid tabs', () => {
+    expect(resolveInitialListTabKey([])).toBe('all');
+    expect(resolveInitialListTabKey([{ blockType: 'tabs', tabs: [{}] }])).toBe('all');
+  });
+});
 
 describe('buildBulkFieldCommandPayload', () => {
   it('maps the collected value only to the DSL-owned command input', () => {
@@ -75,6 +100,25 @@ describe('useSerializedSearchParamsUpdater', () => {
     });
 
     expect(committed.at(-1)).toBe('sort=updated_at%3Adesc&view=personal-view&pageNum=1');
+  });
+
+  it('drops queued list URL writes after an outgoing page navigation begins', () => {
+    const routerSetter = vi.fn();
+    const writesEnabledRef = { current: true };
+    const { result } = renderHook(() =>
+      useSerializedSearchParamsUpdater(
+        new URLSearchParams('sort=updated_at%3Adesc'),
+        routerSetter as any,
+        writesEnabledRef,
+      ),
+    );
+
+    act(() => {
+      writesEnabledRef.current = false;
+      result.current(new URLSearchParams('sort=created_at%3Aasc'), { replace: true });
+    });
+
+    expect(routerSetter).not.toHaveBeenCalled();
   });
 });
 
@@ -786,13 +830,40 @@ describe('resolveSavedViewFilterExpressions', () => {
   });
 });
 
-describe('resolveUrlFilterSyncAction', () => {
-  it('does not let a stale URL write clobber a newer local filter edit', () => {
-    expect(resolveUrlFilterSyncAction('new-filter-state', 'older-filter-state')).toBe(
+describe('resolveUrlStateSyncAction', () => {
+  it('marks a restored local sort before the URL effect can reapply stale search params', () => {
+    const pending = { current: undefined as string | null | undefined };
+    const restored = applyLocalSortUpdate(
+      [],
+      [{ fieldCode: 'updated_at', direction: 'desc', priority: 0 }],
+      pending,
+    );
+
+    expect(restored).toEqual([{ fieldCode: 'updated_at', direction: 'desc', priority: 0 }]);
+    expect(pending.current).toBe('updated_at:desc');
+    expect(resolveUrlStateSyncAction(pending.current, null)).toBe('wait-for-local');
+    expect(resolveUrlStateSyncAction(pending.current, 'updated_at:desc')).toBe('ack-local');
+  });
+
+  it('does not let a stale URL write clobber newer local list state', () => {
+    expect(resolveUrlStateSyncAction('new-filter-state', 'older-filter-state')).toBe(
       'wait-for-local',
     );
-    expect(resolveUrlFilterSyncAction('new-filter-state', 'new-filter-state')).toBe('ack-local');
-    expect(resolveUrlFilterSyncAction(undefined, 'browser-history-state')).toBe('apply-url');
+    expect(resolveUrlStateSyncAction('new-filter-state', 'new-filter-state')).toBe('ack-local');
+    expect(resolveUrlStateSyncAction(undefined, 'browser-history-state')).toBe('apply-url');
+  });
+
+  it('keeps a restored default sort until React Router acknowledges the local URL write', () => {
+    const restoredSort = 'updated_at:desc';
+
+    expect(resolveUrlStateSyncAction(restoredSort, null)).toBe('wait-for-local');
+    expect(resolveUrlStateSyncAction(restoredSort, restoredSort)).toBe('ack-local');
+    expect(resolveUrlStateSyncAction(undefined, restoredSort)).toBe('apply-url');
+  });
+
+  it('acknowledges clearing a sort without reapplying the stale sorted URL', () => {
+    expect(resolveUrlStateSyncAction(null, 'updated_at:desc')).toBe('wait-for-local');
+    expect(resolveUrlStateSyncAction(null, null)).toBe('ack-local');
   });
 });
 

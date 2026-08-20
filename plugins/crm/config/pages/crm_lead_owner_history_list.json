@@ -1,0 +1,8 @@
+{
+  "pageKey": "crm_lead_owner_history_list", "name:zh-CN": "线索归属历史", "name:en": "Lead Ownership History", "modelCode": "crm_lead_owner_history", "kind": "list", "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12 },
+  "blocks": [ { "id": "history", "blockType": "table", "columns": [
+    { "field": "crm_loh_occurred_at", "width": 180, "sortable": true }, { "field": "crm_loh_event", "width": 150, "renderType": "tag", "dictCode": "crm_lead_owner_event" }, { "field": "crm_loh_lead_id", "width": 180 }, { "field": "crm_loh_pool_id", "width": 180 }, { "field": "crm_loh_previous_owner", "width": 150 }, { "field": "crm_loh_next_owner", "width": 150 }, { "field": "crm_loh_actor", "width": 150 }, { "field": "crm_loh_reason", "width": 260 },
+    { "field": "actions", "isActionColumn": true, "label": "$i18n:common.actions", "buttons": [ { "code": "view", "label": "$i18n:common.button.view", "action": { "type": "navigate", "to": "crm_lead_owner_history_detail" } } ] }
+  ], "defaultSort": { "field": "crm_loh_occurred_at", "order": "desc" } } ]
+}

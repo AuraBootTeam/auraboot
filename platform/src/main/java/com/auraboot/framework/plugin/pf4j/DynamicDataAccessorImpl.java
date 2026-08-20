@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -111,13 +112,13 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     @Override
     public Map<String, Object> create(String modelCode, Map<String, Object> data) {
         log.debug("Plugin DataAccessor: create({}, {} fields)", modelCode, data != null ? data.size() : 0);
-        return withCommandAuthority(() -> dynamicDataService.create(modelCode, data));
+        return withCommandAuthority(() -> dynamicDataService.create(modelCode, mutableCopy(data)));
     }
 
     @Override
     public Map<String, Object> update(String modelCode, String recordId, Map<String, Object> data) {
         log.debug("Plugin DataAccessor: update({}, {})", modelCode, recordId);
-        return withCommandAuthority(() -> dynamicDataService.update(modelCode, recordId, data));
+        return withCommandAuthority(() -> dynamicDataService.update(modelCode, recordId, mutableCopy(data)));
     }
 
     @Override
@@ -134,7 +135,8 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     @Override
     public List<Map<String, Object>> batchCreate(String modelCode, List<Map<String, Object>> dataList) {
         log.debug("Plugin DataAccessor: batchCreate({}, {} records)", modelCode, dataList != null ? dataList.size() : 0);
-        var response = withCommandAuthority(() -> dynamicDataService.batchCreate(modelCode, dataList));
+        List<Map<String, Object>> safeData = mutableCopies(dataList);
+        var response = withCommandAuthority(() -> dynamicDataService.batchCreate(modelCode, safeData));
         if (response != null && response.getSuccessItems() != null) {
             return response.getSuccessItems();
         }
@@ -144,7 +146,7 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     @Override
     public List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList) {
         log.debug("Plugin DataAccessor: bulkCreate({}, {} records)", modelCode, dataList != null ? dataList.size() : 0);
-        return withCommandAuthority(() -> dynamicDataService.bulkCreate(modelCode, dataList));
+        return withCommandAuthority(() -> dynamicDataService.bulkCreate(modelCode, mutableCopies(dataList)));
     }
 
     @Override
@@ -187,5 +189,16 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     /** The authoritative permit context is installed outside this adapter. */
     private <T> T withCommandAuthority(java.util.function.Supplier<T> operation) {
         return operation.get();
+    }
+
+    private static Map<String, Object> mutableCopy(Map<String, Object> data) {
+        return data == null ? null : new LinkedHashMap<>(data);
+    }
+
+    private static List<Map<String, Object>> mutableCopies(List<Map<String, Object>> dataList) {
+        if (dataList == null) {
+            return null;
+        }
+        return dataList.stream().map(DynamicDataAccessorImpl::mutableCopy).toList();
     }
 }

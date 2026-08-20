@@ -2,6 +2,7 @@ package com.auraboot.module.meta.excel;
 
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.TypeSystemManager;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.module.meta.excel.mapper.ImportJobMapper;
 import org.apache.poi.ss.usermodel.Row;
@@ -47,12 +48,20 @@ class ExcelEdgeCaseTest {
     @Mock
     private CommandExecutor commandExecutor;
 
+    @Mock
+    private ExcelReferenceResolver referenceResolver;
+
+    @Mock
+    private ExcelImportErrorReportService errorReportService;
+
     private ExcelImportService importService;
 
     @BeforeEach
     void setUp() {
         importService = new ExcelImportService(
-                dynamicDataService, metaModelService, importJobMapper, policyResolver, commandExecutor);
+                dynamicDataService, metaModelService, importJobMapper, policyResolver,
+                commandExecutor, referenceResolver, new TypeSystemManager(), errorReportService,
+                new com.fasterxml.jackson.databind.ObjectMapper());
         lenient().when(policyResolver.requireEnabled(anyString())).thenReturn(ExcelImportPolicy.builder()
                 .modelCode("test_model")
                 .enabled(true)

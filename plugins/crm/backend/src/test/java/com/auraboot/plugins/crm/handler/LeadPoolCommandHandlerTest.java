@@ -1,0 +1,286 @@
+package com.auraboot.plugins.crm.handler;
+
+import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+import com.auraboot.framework.plugin.extension.CommandHandlerExtension.CommandContext;
+import com.auraboot.framework.plugin.extension.DataAccessor;
+import com.auraboot.framework.plugin.extension.RecordShareAccessor;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class LeadPoolCommandHandlerTest {
+
+    private final LeadPoolCommandHandler handler = new LeadPoolCommandHandler();
+
+    @Test
+    void moveCreatesSharedProjectionClearsOwnerAndAppendsHistory() {
+        FakeDb db = baseline();
+        FakeShares shares = new FakeShares();
+        Map<?, ?> result = execute(db, shares, LeadPoolCommandHandler.MOVE, "lead-1", "member-a",
+                Map.of("poolId", "pool-1", "reason", "No progress"));
+
+        assertEquals("available", result.get("status"));
+        assertNull(db.getById("crm_lead_common", "lead-1").get("crm_lead_assigned_to"));
+        assertEquals("in_pool", db.getById("crm_lead_common", "lead-1").get("crm_lead_pool_state"));
+        assertEquals(1, db.query("crm_lead_pool_item", Map.of("crm_lpi_status", "available")).size());
+        assertEquals("moved_to_pool", db.query("crm_lead_owner_history", Map.of()).getFirst().get("crm_loh_event"));
+        assertEquals(3, shares.calls.size());
+        assertTrue(shares.calls.stream().allMatch(call ->
+                call.userPids().equals(java.util.Set.of("member-a", "rep-b", "manager"))));
+        assertTrue(shares.calls.stream().anyMatch(call ->
+                call.resourceCode().equals("crm_lead_pool_item")
+                        && call.permissionMask().equals("read,update")));
+        assertTrue(shares.calls.stream().anyMatch(call ->
+                call.resourceCode().equals("crm_lead_common")
+                        && call.permissionMask().equals("read,update")));
+        assertTrue(shares.calls.stream().anyMatch(call ->
+                call.resourceCode().equals("crm_lead_owner_history")
+                        && call.permissionMask().equals("read")));
+    }
+
+    @Test
+    void claimEnforcesMembershipCapacityDailyLimitAndBothCooldowns() {
+        FakeDb cooldown = availableItem(baseline(), "item-1", "lead-1", "member-a",
+                Instant.parse("2026-08-13T00:00:00Z"));
+        cooldown.getById("crm_lead_pool", "pool-1").put("crm_lp_new_cooldown_days", 2);
+        assertThrows(IllegalStateException.class, () -> execute(cooldown, LeadPoolCommandHandler.CLAIM,
+                "item-1", "member-a", Map.of()));
+
+        FakeDb capacity = availableItem(baseline(), "item-1", "lead-1", "other-owner",
+                Instant.parse("2026-08-01T00:00:00Z"));
+        capacity.put("crm_lead_capacity", "cap-1", map("crm_lcap_user_id", "member-a",
+                "crm_lcap_capacity", 1, "crm_lcap_status", "active"));
+        capacity.put("crm_lead_common", "owned-2", lead("owned-2", "member-a"));
+        assertThrows(IllegalStateException.class, () -> execute(capacity, LeadPoolCommandHandler.CLAIM,
+                "item-1", "member-a", Map.of()));
+
+        FakeDb daily = availableItem(baseline(), "item-1", "lead-1", "other-owner",
+                Instant.parse("2026-08-01T00:00:00Z"));
+        daily.getById("crm_lead_pool", "pool-1").put("crm_lp_daily_pick_limit", 1);
+        execute(daily, LeadPoolCommandHandler.CLAIM, "item-1", "member-a", Map.of());
+        daily.put("crm_lead_common", "lead-2", lead("lead-2", "other-owner"));
+        availableItem(daily, "item-2", "lead-2", "other-owner", Instant.parse("2026-08-01T00:00:00Z"));
+        assertThrows(IllegalStateException.class, () -> execute(daily, LeadPoolCommandHandler.CLAIM,
+                "item-2", "member-a", Map.of()));
+
+        FakeDb previous = availableItem(baseline(), "item-1", "lead-1", "member-a",
+                Instant.parse("2026-08-13T00:00:00Z"));
+        previous.getById("crm_lead_pool", "pool-1").put("crm_lp_new_cooldown_days", 0);
+        previous.getById("crm_lead_pool", "pool-1").put("crm_lp_previous_owner_cooldown_days", 7);
+        assertThrows(IllegalStateException.class, () -> execute(previous, LeadPoolCommandHandler.CLAIM,
+                "item-1", "member-a", Map.of()));
+
+        assertThrows(SecurityException.class, () -> execute(previous, LeadPoolCommandHandler.CLAIM,
+                "item-1", "stranger", Map.of()));
+    }
+
+    @Test
+    void administratorAssignsAndClaimCasAllowsOnlyOneWinner() throws Exception {
+        FakeDb assign = availableItem(baseline(), "item-1", "lead-1", "member-a",
+                Instant.parse("2026-08-14T00:00:00Z"));
+        Map<?, ?> result = execute(assign, LeadPoolCommandHandler.ASSIGN, "item-1", "manager",
+                Map.of("assigneeId", "rep-b"));
+        assertEquals("rep-b", result.get("ownerId"));
+        assertEquals("assigned", assign.getById("crm_lead_pool_item", "item-1").get("crm_lpi_status"));
+
+        FakeDb race = availableItem(baseline(), "item-1", "lead-1", "member-a",
+                Instant.parse("2026-08-01T00:00:00Z"));
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            List<Callable<Boolean>> attempts = List.of(
+                    () -> succeeds(() -> execute(race, LeadPoolCommandHandler.CLAIM, "item-1", "manager", Map.of())),
+                    () -> succeeds(() -> execute(race, LeadPoolCommandHandler.CLAIM, "item-1", "manager", Map.of())));
+            long winners = executor.invokeAll(attempts).stream().filter(future -> {
+                try { return future.get(); } catch (Exception error) { throw new RuntimeException(error); }
+            }).count();
+            assertEquals(1, winners);
+        }
+    }
+
+    @Test
+    void claimAcceptsPostgresTimestampTextReturnedByDynamicDataAccessor() {
+        FakeDb db = availableItem(baseline(), "item-1", "lead-1", "other-owner",
+                Instant.parse("2026-08-01T00:00:00Z"));
+        FakeShares shares = new FakeShares();
+        db.getById("crm_lead_pool_item", "item-1")
+                .put("crm_lpi_available_at", "2026-08-01 00:00:00.123456");
+
+        Map<?, ?> result = execute(db, shares, LeadPoolCommandHandler.CLAIM, "item-1", "manager", Map.of());
+
+        assertEquals("claimed", result.get("status"));
+        assertEquals("manager", result.get("ownerId"));
+        assertTrue(shares.calls.stream().anyMatch(call ->
+                call.resourceCode().equals("crm_lead_common")
+                        && call.userPids().equals(java.util.Set.of("manager"))
+                        && call.permissionMask().equals("read,update")));
+    }
+
+    @Test
+    void poolToggleDeleteGuardAndAutomaticRecycleAreGoverned() {
+        FakeDb db = availableItem(baseline(), "item-1", "lead-1", "member-a",
+                Instant.parse("2026-08-01T00:00:00Z"));
+        assertThrows(IllegalStateException.class, () -> execute(db, LeadPoolCommandHandler.DELETE_POOL,
+                "pool-1", "manager", Map.of()));
+        assertEquals("disabled", execute(db, LeadPoolCommandHandler.TOGGLE, "pool-1", "manager", Map.of()).get("status"));
+
+        FakeDb recycle = baseline();
+        recycle.getById("crm_lead_pool", "pool-1").put("crm_lp_auto_recycle", true);
+        recycle.getById("crm_lead_pool", "pool-1").put("crm_lp_recycle_after_days", 5);
+        recycle.getById("crm_lead_common", "lead-1").put("crm_lead_last_pool_id", "pool-1");
+        recycle.getById("crm_lead_common", "lead-1").put("crm_lead_claimed_at", "2026-08-01T00:00:00Z");
+        int count = LeadPoolCommandHandler.recycle(recycle, new FakeShares(), 1L,
+                "system", Instant.parse("2026-08-14T00:00:00Z"));
+        assertEquals(1, count);
+        assertEquals("in_pool", recycle.getById("crm_lead_common", "lead-1").get("crm_lead_pool_state"));
+        assertEquals("auto_recycled", recycle.query("crm_lead_owner_history", Map.of()).getFirst().get("crm_loh_event"));
+    }
+
+    private Map<String, Object> execute(FakeDb db, String command, String recordId, String actor,
+                                        Map<String, Object> payload) {
+        return execute(db, new FakeShares(), command, recordId, actor, payload);
+    }
+
+    private Map<String, Object> execute(FakeDb db, FakeShares shares, String command,
+                                        String recordId, String actor, Map<String, Object> payload) {
+        CommandContext context = new CommandContext(1L, "com.auraboot.crm", "crm", command,
+                command.contains("pool_lead") ? "crm_lead_pool_item" : "crm_lead_common",
+                recordId, payload, Map.of(
+                        "__dataAccessor", db,
+                        CommandHandlerExtension.CURRENT_USER_PID_KEY, actor,
+                        RecordShareAccessor.SETTINGS_KEY, shares), false);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = (Map<String, Object>) handler.execute(context);
+        return result;
+    }
+
+    private static boolean succeeds(Runnable work) {
+        try { work.run(); return true; } catch (RuntimeException ignored) { return false; }
+    }
+
+    private static final class FakeShares implements RecordShareAccessor {
+        private final List<ShareCall> calls = new ArrayList<>();
+
+        @Override
+        public void replaceReadSharesForUsers(long tenantId, String resourceCode,
+                                              String recordPid, Collection<String> userPids) {
+            calls.add(new ShareCall(resourceCode, recordPid, java.util.Set.copyOf(userPids), "read"));
+        }
+
+        @Override
+        public void replaceReadUpdateSharesForUsers(long tenantId, String resourceCode,
+                                                    String recordPid, Collection<String> userPids) {
+            calls.add(new ShareCall(
+                    resourceCode, recordPid, java.util.Set.copyOf(userPids), "read,update"));
+        }
+    }
+
+    private record ShareCall(String resourceCode, String recordPid,
+                             java.util.Set<String> userPids, String permissionMask) {}
+
+    private static FakeDb baseline() {
+        FakeDb db = new FakeDb();
+        db.put("crm_lead_pool", "pool-1", map(
+                "crm_lp_status", "enabled", "crm_lp_member_user_ids", "member-a,rep-b",
+                "crm_lp_admin_user_ids", "manager", "crm_lp_daily_pick_limit", 20,
+                "crm_lp_new_cooldown_days", 0, "crm_lp_previous_owner_cooldown_days", 0,
+                "crm_lp_auto_recycle", false, "crm_lp_recycle_after_days", 30,
+                "crm_lp_recycle_basis", "claimed_at"));
+        db.put("crm_lead_common", "lead-1", lead("lead-1", "member-a"));
+        return db;
+    }
+
+    private static FakeDb availableItem(FakeDb db, String itemId, String leadId, String previousOwner, Instant entered) {
+        db.put("crm_lead_pool_item", itemId, map(
+                "crm_lpi_lead_key", leadId, "crm_lpi_lead_id", leadId, "crm_lpi_pool_id", "pool-1",
+                "crm_lpi_status", "available", "crm_lpi_previous_owner", previousOwner,
+                "crm_lpi_entered_at", entered.toString()));
+        return db;
+    }
+
+    private static Map<String, Object> lead(String id, String owner) {
+        return map("crm_lead_code", id.toUpperCase(), "crm_lead_company", "Acme " + id,
+                "crm_lead_status", "new", "crm_lead_pool_state", "owned",
+                "crm_lead_assigned_to", owner, "crm_lead_score", 80);
+    }
+
+    private static Map<String, Object> map(Object... values) {
+        HashMap<String, Object> result = new HashMap<>();
+        for (int i = 0; i < values.length; i += 2) result.put(values[i].toString(), values[i + 1]);
+        return result;
+    }
+
+    private static final class FakeDb implements DataAccessor {
+        private final Map<String, LinkedHashMap<String, Map<String, Object>>> rows = new HashMap<>();
+        private long sequence = 100;
+
+        void put(String model, String id, Map<String, Object> values) {
+            HashMap<String, Object> copy = new HashMap<>(values);
+            copy.put("pid", id);
+            rows.computeIfAbsent(model, ignored -> new LinkedHashMap<>()).put(id, copy);
+        }
+
+        @Override public synchronized Map<String, Object> getById(String modelCode, String recordId) {
+            return rows.getOrDefault(modelCode, new LinkedHashMap<>()).get(recordId);
+        }
+
+        @Override public synchronized List<Map<String, Object>> query(String modelCode, Map<String, Object> filters) {
+            return rows.getOrDefault(modelCode, new LinkedHashMap<>()).values().stream()
+                    .filter(row -> filters.entrySet().stream().allMatch(entry ->
+                            java.util.Objects.equals(row.get(entry.getKey()), entry.getValue())))
+                    .toList();
+        }
+
+        @Override public synchronized Map<String, Object> create(String modelCode, Map<String, Object> data) {
+            String id = "generated-" + (++sequence);
+            put(modelCode, id, data);
+            return getById(modelCode, id);
+        }
+
+        @Override public synchronized Map<String, Object> update(String modelCode, String recordId, Map<String, Object> data) {
+            Map<String, Object> row = getById(modelCode, recordId);
+            if (row == null) return null;
+            row.putAll(data);
+            return row;
+        }
+
+        @Override public synchronized boolean compareAndSet(String modelCode, String recordId, String fieldCode,
+                                                            Object expectedValue, Object nextValue) {
+            Map<String, Object> row = getById(modelCode, recordId);
+            if (row == null || !java.util.Objects.equals(row.get(fieldCode), expectedValue)) return false;
+            row.put(fieldCode, nextValue);
+            return true;
+        }
+
+        @Override public synchronized Optional<Long> incrementWithinCap(String modelCode, String recordId,
+                                                                         String counterCode, long delta, String capCode) {
+            Map<String, Object> row = getById(modelCode, recordId);
+            long current = ((Number) row.get(counterCode)).longValue();
+            long cap = ((Number) row.get(capCode)).longValue();
+            if (current + delta > cap) return Optional.empty();
+            row.put(counterCode, current + delta);
+            return Optional.of(current + delta);
+        }
+
+        @Override public List<Map<String, Object>> batchCreate(String modelCode, List<Map<String, Object>> dataList) {
+            return dataList.stream().map(data -> create(modelCode, data)).toList();
+        }
+
+        @Override public synchronized void delete(String modelCode, String recordId) {
+            rows.getOrDefault(modelCode, new LinkedHashMap<>()).remove(recordId);
+        }
+
+        @Override public void batchDelete(String modelCode, Collection<String> recordIds) {
+            recordIds.forEach(id -> delete(modelCode, id));
+        }
+    }
+}

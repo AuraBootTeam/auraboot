@@ -1,0 +1,266 @@
+{
+  "generatedAt": "2026-08-13T15:11:32.746Z",
+  "runtime": {
+    "name": "crm-import-partial-async-20260813-s147",
+    "slot": "147",
+    "web": "http://127.0.0.1:5247",
+    "backend": "http://127.0.0.1:6547",
+    "database": "auraboot_147"
+  },
+  "lifecycleRuntime": {
+    "name": "crm-import-provider-lifecycle-20260813-s148",
+    "slot": "148",
+    "web": "http://127.0.0.1:5248",
+    "backend": "http://127.0.0.1:6548",
+    "database": "auraboot_148",
+    "storage": "real MinIO",
+    "topology": "single JVM"
+  },
+  "axes": {
+    "surface": "journey",
+    "dependencies": "real-stack",
+    "authority": "blocking-release",
+    "driver": "browser"
+  },
+  "summary": {
+    "pass": 14,
+    "deferred": 1,
+    "untested": 5,
+    "total": 20,
+    "coveragePercent": 70
+  },
+  "cases": [
+    {
+      "id": "CMM-C10-01",
+      "claim": "update precheck accepts existing and missing match values",
+      "verdict": "pass",
+      "evidence": [
+        "09-lead-async-partial-result.png",
+        "10-lead-async-partial-correction-original.xlsx",
+        "11-lead-async-partial-recovered.png",
+        "api-evidence/cmm-10-terminal-task.json",
+        "api-evidence/cmm-10-persisted-records.json",
+        "artifacts/*/trace.zip"
+      ]
+    },
+    {
+      "id": "CMM-C10-02",
+      "claim": "two-row upload returns a durable public task id",
+      "verdict": "pass",
+      "evidence": [
+        "09-lead-async-partial-result.png",
+        "10-lead-async-partial-correction-original.xlsx",
+        "11-lead-async-partial-recovered.png",
+        "api-evidence/cmm-10-terminal-task.json",
+        "api-evidence/cmm-10-persisted-records.json",
+        "artifacts/*/trace.zip"
+      ]
+    },
+    {
+      "id": "CMM-C10-03",
+      "claim": "partial result reports one update and one failure",
+      "verdict": "pass",
+      "evidence": [
+        "09-lead-async-partial-result.png",
+        "10-lead-async-partial-correction-original.xlsx",
+        "11-lead-async-partial-recovered.png",
+        "api-evidence/cmm-10-terminal-task.json",
+        "api-evidence/cmm-10-persisted-records.json",
+        "artifacts/*/trace.zip"
+      ]
+    },
+    {
+      "id": "CMM-C10-04",
+      "claim": "terminal task is reconstructed as completed with exact counts",
+      "verdict": "pass",
+      "evidence": [
+        "09-lead-async-partial-result.png",
+        "10-lead-async-partial-correction-original.xlsx",
+        "11-lead-async-partial-recovered.png",
+        "api-evidence/cmm-10-terminal-task.json",
+        "api-evidence/cmm-10-persisted-records.json",
+        "artifacts/*/trace.zip"
+      ]
+    },
+    {
+      "id": "CMM-C10-05",
+      "claim": "durable status retains row number and actionable error",
+      "verdict": "pass",
+      "evidence": [
+        "09-lead-async-partial-result.png",
+        "10-lead-async-partial-correction-original.xlsx",
+        "11-lead-async-partial-recovered.png",
+        "api-evidence/cmm-10-terminal-task.json",
+        "api-evidence/cmm-10-persisted-records.json",
+        "artifacts/*/trace.zip"
+      ]
+    },
+    {
+      "id": "CMM-C10-06",
+      "claim": "correction download is authorized OOXML with update filename",
+      "verdict": "pass",
+      "evidence": [
+        "09-lead-async-partial-result.png",
+        "10-lead-async-partial-correction-original.xlsx",
+        "11-lead-async-partial-recovered.png",
+        "api-evidence/cmm-10-terminal-task.json",
+        "api-evidence/cmm-10-persisted-records.json",
+        "artifacts/*/trace.zip"
+      ]
+    },
+    {
+      "id": "CMM-C10-07",
+      "claim": "correction workbook contains exactly the failed row",
+      "verdict": "pass",
+      "evidence": [
+        "09-lead-async-partial-result.png",
+        "10-lead-async-partial-correction-original.xlsx",
+        "11-lead-async-partial-recovered.png",
+        "api-evidence/cmm-10-terminal-task.json",
+        "api-evidence/cmm-10-persisted-records.json",
+        "artifacts/*/trace.zip"
+      ]
+    },
+    {
+      "id": "CMM-C10-08",
+      "claim": "correction workbook omits the already successful row",
+      "verdict": "pass",
+      "evidence": [
+        "09-lead-async-partial-result.png",
+        "10-lead-async-partial-correction-original.xlsx",
+        "11-lead-async-partial-recovered.png",
+        "api-evidence/cmm-10-terminal-task.json",
+        "api-evidence/cmm-10-persisted-records.json",
+        "artifacts/*/trace.zip"
+      ]
+    },
+    {
+      "id": "CMM-C10-09",
+      "claim": "error sheet uses business label and no internal field code",
+      "verdict": "pass",
+      "evidence": [
+        "09-lead-async-partial-result.png",
+        "10-lead-async-partial-correction-original.xlsx",
+        "11-lead-async-partial-recovered.png",
+        "api-evidence/cmm-10-terminal-task.json",
+        "api-evidence/cmm-10-persisted-records.json",
+        "artifacts/*/trace.zip"
+      ]
+    },
+    {
+      "id": "CMM-C10-10",
+      "claim": "corrected workbook re-upload passes validation",
+      "verdict": "pass",
+      "evidence": [
+        "09-lead-async-partial-result.png",
+        "10-lead-async-partial-correction-original.xlsx",
+        "11-lead-async-partial-recovered.png",
+        "api-evidence/cmm-10-terminal-task.json",
+        "api-evidence/cmm-10-persisted-records.json",
+        "artifacts/*/trace.zip"
+      ]
+    },
+    {
+      "id": "CMM-C10-11",
+      "claim": "corrected failed row persists exactly once",
+      "verdict": "pass",
+      "evidence": [
+        "09-lead-async-partial-result.png",
+        "10-lead-async-partial-correction-original.xlsx",
+        "11-lead-async-partial-recovered.png",
+        "api-evidence/cmm-10-terminal-task.json",
+        "api-evidence/cmm-10-persisted-records.json",
+        "artifacts/*/trace.zip"
+      ]
+    },
+    {
+      "id": "CMM-C10-12",
+      "claim": "first successful row remains exact and is not replayed",
+      "verdict": "pass",
+      "evidence": [
+        "09-lead-async-partial-result.png",
+        "10-lead-async-partial-correction-original.xlsx",
+        "11-lead-async-partial-recovered.png",
+        "api-evidence/cmm-10-terminal-task.json",
+        "api-evidence/cmm-10-persisted-records.json",
+        "artifacts/*/trace.zip"
+      ]
+    },
+    {
+      "id": "CMM-C11-01",
+      "claim": "report storage provider upload failure",
+      "verdict": "pass",
+      "evidence": [
+        "12-minio-upload-denied-inline-recovery.png",
+        "api-evidence/cmm-11-provider-upload-failure.json"
+      ]
+    },
+    {
+      "id": "CMM-C11-02",
+      "claim": "scheduled retention expiry and expired download UX",
+      "verdict": "pass",
+      "evidence": [
+        "13-downloaded-correction-before-expiry.xlsx",
+        "14-scheduler-expired-report.png",
+        "db-evidence/cmm-11-retention-before-after.json"
+      ]
+    },
+    {
+      "id": "CMM-C11-03",
+      "claim": "multi-node task polling and report download",
+      "verdict": "deferred-by-product-priority",
+      "evidence": []
+    },
+    {
+      "id": "CMM-C12-01",
+      "claim": "user cancellation",
+      "verdict": "untested",
+      "evidence": []
+    },
+    {
+      "id": "CMM-C12-02",
+      "claim": "explicit retry operation",
+      "verdict": "untested",
+      "evidence": []
+    },
+    {
+      "id": "CMM-C12-03",
+      "claim": "service restart during a running import",
+      "verdict": "untested",
+      "evidence": []
+    },
+    {
+      "id": "CMM-C12-04",
+      "claim": "10k-row capacity and latency",
+      "verdict": "untested",
+      "evidence": []
+    },
+    {
+      "id": "CMM-C12-05",
+      "claim": "100k-row capacity and latency",
+      "verdict": "untested",
+      "evidence": []
+    }
+  ],
+  "evidence": [
+    "09-lead-async-partial-result.png",
+    "10-lead-async-partial-correction-original.xlsx",
+    "10-lead-async-partial-correction-fixed.xlsx",
+    "11-lead-async-partial-recovered.png",
+    "api-evidence/cmm-10-terminal-task.json",
+    "api-evidence/cmm-10-persisted-records.json",
+    "db-evidence/cmm-10-import-job.csv",
+    "artifacts/*/trace.zip",
+    "12-minio-upload-denied-inline-recovery.png",
+    "13-downloaded-correction-before-expiry.xlsx",
+    "14-scheduler-expired-report.png",
+    "api-evidence/cmm-11-provider-upload-failure.json",
+    "db-evidence/cmm-11-retention-before-after.json"
+  ],
+  "trust": {
+    "retries": 0,
+    "mutation": "Expected failed=0 produced a deterministic red result because the real UI reported failed=1.",
+    "providerFailure": "A MinIO identity that can list the bucket but cannot PutObject produced the real degraded UI.",
+    "retention": "The test aged completed_at only; it did not call cleanupExpiredReports directly. The real scheduler removed the object pointer."
+  }
+}
