@@ -1341,6 +1341,16 @@ function ListPageContentInner(props: PageContentProps) {
       filters,
     },
   });
+  const tableEmptyState = useMemo(() => {
+    const configured = (tableBlock as any)?.empty ?? (tableBlock as any)?.table?.empty;
+    if (!configured || typeof configured !== 'object') return {};
+    return {
+      title: configured.title ? getLocalizedText(configured.title, locale, t) : undefined,
+      description: configured.description
+        ? getLocalizedText(configured.description, locale, t)
+        : undefined,
+    };
+  }, [locale, t, tableBlock]);
   const navigateAwayFromList = useCallback(
     ((toOrDelta: To | number, options?: NavigateOptions) => {
       // List URL state effects (SavedView sorts, filters and pagination) can still be queued
@@ -2587,26 +2597,31 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Column header sort toggle: none → asc → desc → none
   // Shift+click appends to multi-sort, regular click replaces
-  const toggleSort = useCallback((fieldCode: string, multiSort = false) => {
-    setLocalActiveSorts((prev) => {
-      const existing = prev.find((s) => s.fieldCode === fieldCode);
-      let next: SortConfig[];
-      if (!existing) {
-        // Add new sort
-        const newSort: SortConfig = { fieldCode, direction: 'asc', priority: prev.length };
-        next = multiSort ? [...prev, newSort] : [newSort];
-      } else if (existing.direction === 'asc') {
-        // asc → desc
-        next = multiSort
-          ? prev.map((s) => (s.fieldCode === fieldCode ? { ...s, direction: 'desc' as const } : s))
-          : [{ fieldCode, direction: 'desc', priority: 0 }];
-      } else {
-        // desc → clear
-        next = multiSort ? prev.filter((s) => s.fieldCode !== fieldCode) : [];
-      }
-      return next;
-    });
-  }, [setLocalActiveSorts]);
+  const toggleSort = useCallback(
+    (fieldCode: string, multiSort = false) => {
+      setLocalActiveSorts((prev) => {
+        const existing = prev.find((s) => s.fieldCode === fieldCode);
+        let next: SortConfig[];
+        if (!existing) {
+          // Add new sort
+          const newSort: SortConfig = { fieldCode, direction: 'asc', priority: prev.length };
+          next = multiSort ? [...prev, newSort] : [newSort];
+        } else if (existing.direction === 'asc') {
+          // asc → desc
+          next = multiSort
+            ? prev.map((s) =>
+                s.fieldCode === fieldCode ? { ...s, direction: 'desc' as const } : s,
+              )
+            : [{ fieldCode, direction: 'desc', priority: 0 }];
+        } else {
+          // desc → clear
+          next = multiSort ? prev.filter((s) => s.fieldCode !== fieldCode) : [];
+        }
+        return next;
+      });
+    },
+    [setLocalActiveSorts],
+  );
 
   // Debounced re-fetch when sorts or chip filters change (150ms).
   // Prevents multiple rapid API calls when users adjust multiple filters
@@ -5242,6 +5257,8 @@ function ListPageContentInner(props: PageContentProps) {
                 getRowStyle={getRowStyle}
                 previewRecordId={previewRecordId}
                 t={t}
+                emptyTitle={tableEmptyState.title}
+                emptyDescription={tableEmptyState.description}
                 onInlineSave={handleInlineSave}
                 dictDataCache={dictDataCache.current}
                 enableSelection={selectionEnabled}

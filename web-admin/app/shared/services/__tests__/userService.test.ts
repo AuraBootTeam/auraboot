@@ -25,6 +25,7 @@ import {
   hasAnyPermission,
   hasAllPermissions,
 } from '../userService';
+import { ErrorCodes } from '~/shared/services/http-client/types';
 
 import type { UserPermissions } from '~/utils/type';
 
@@ -196,9 +197,14 @@ describe('fetchUserInfo', () => {
     expect(result!.preferences).toBeNull();
   });
 
-  it('returns null when response is not ok', async () => {
+  it('returns null when the backend authoritatively rejects the session', async () => {
     getTokenMock.mockResolvedValue(TOKEN);
-    fetchSpy.mockResolvedValue({ ok: false, statusText: 'Unauthorized' } as any);
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      json: async () => ({ code: '401', message: 'Unauthorized', data: null }),
+    } as any);
 
     const result = await fetchUserInfo(FAKE_REQUEST);
 
@@ -217,13 +223,44 @@ describe('fetchUserInfo', () => {
     expect(result).toBeNull();
   });
 
-  it('returns null and does not throw on fetch error', async () => {
+  it('does not treat an authoritative 403 permission denial as an expired session', async () => {
+    getTokenMock.mockResolvedValue(TOKEN);
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+      json: async () => ({ code: '403', message: 'Forbidden', data: null }),
+    } as any);
+
+    await expect(fetchUserInfo(FAKE_REQUEST)).rejects.toMatchObject({
+      name: 'UserInfoUnavailableError',
+      code: '403',
+    });
+  });
+
+  it('keeps transport failures distinct from invalid sessions', async () => {
     getTokenMock.mockResolvedValue(TOKEN);
     fetchSpy.mockRejectedValue(new Error('Network error'));
 
-    const result = await fetchUserInfo(FAKE_REQUEST);
+    await expect(fetchUserInfo(FAKE_REQUEST)).rejects.toMatchObject({
+      name: 'UserInfoUnavailableError',
+      code: ErrorCodes.NETWORK_ERROR,
+    });
+  });
 
-    expect(result).toBeNull();
+  it('keeps backend 5xx failures distinct from invalid sessions', async () => {
+    getTokenMock.mockResolvedValue(TOKEN);
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+      json: async () => ({ code: '503', message: 'Service Unavailable', data: null }),
+    } as any);
+
+    await expect(fetchUserInfo(FAKE_REQUEST)).rejects.toMatchObject({
+      name: 'UserInfoUnavailableError',
+      code: '503',
+    });
   });
 
   it('defaults permissions to empty arrays when not provided', async () => {

@@ -841,6 +841,40 @@ export function resolveSubmitCommandCode(
   return schemaCommands?.[isEditMode ? 'update' : 'create'] ?? null;
 }
 
+export function resolveCreateSubTableEmptyState(
+  config:
+    | {
+        emptyState?: {
+          title?: string | Record<string, string>;
+          description?: string | Record<string, string>;
+        };
+      }
+    | null
+    | undefined,
+  locale: string,
+  t: (key: string) => string,
+): { title: string; description: string } {
+  const chinese = locale.toLowerCase().startsWith('zh');
+  const translatedDescription = t('common.saveFirstToAddLines');
+  const fallbackDescription =
+    translatedDescription !== 'common.saveFirstToAddLines'
+      ? translatedDescription
+      : chinese
+        ? '请先保存当前单据，再到详情页添加业务明细。'
+        : 'Save this record first, then add business lines on its detail page.';
+
+  return {
+    title: config?.emptyState?.title
+      ? getLocalizedText(config.emptyState.title as any, locale, t)
+      : chinese
+        ? '明细将在保存后登记'
+        : 'Lines become available after save',
+    description: config?.emptyState?.description
+      ? getLocalizedText(config.emptyState.description as any, locale, t)
+      : fallbackDescription,
+  };
+}
+
 /**
  * Map field dataType to SubTableColumn type for sub-table cell editors.
  */
@@ -2657,6 +2691,7 @@ export function FormPageContent(props: PageContentProps) {
                   ? enhancedColumns[childModel] || subTableColumnsMap[childModel]
                   : undefined;
                 const blockKey = block.id || `sub-table-${blockIndex}`;
+                const createEmptyState = resolveCreateSubTableEmptyState(subTableConfig, locale, t);
 
                 return (
                   <div key={blockKey} className="mt-6">
@@ -2682,10 +2717,13 @@ export function FormPageContent(props: PageContentProps) {
                       </div>
                     ) : !isEditMode ? (
                       /* Create mode: show placeholder — lines can be added after saving */
-                      <div className="rounded-card border-border-strong text-text-3 border border-dashed py-6 text-center text-sm">
-                        {t('common.saveFirstToAddLines') !== 'common.saveFirstToAddLines'
-                          ? t('common.saveFirstToAddLines')
-                          : 'Save the record first, then add line items on the detail page'}
+                      <div className="rounded-card border-border-strong flex flex-col items-center border border-dashed px-6 py-8 text-center">
+                        <div className="text-text-2 text-sm font-medium">
+                          {createEmptyState.title}
+                        </div>
+                        <div className="text-text-3 mt-2 max-w-xl text-sm leading-6">
+                          {createEmptyState.description}
+                        </div>
                       </div>
                     ) : columns && columns.length > 0 ? (
                       <SubTable

@@ -6,7 +6,7 @@
  * status endpoint (no single long request), and the list reloaded on success.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 
 const fetchResultMock = vi.fn();
 vi.mock('~/shared/services/http-client', () => ({
@@ -40,6 +40,58 @@ function makeRuntime(overrides: Record<string, unknown> = {}): SchemaRuntime {
 
 describe('useActionHandler - handlerParams.async polling', () => {
   beforeEach(() => fetchResultMock.mockReset());
+
+  it('keeps the action loading until the post-command detail refresh settles', async () => {
+    fetchResultMock.mockResolvedValueOnce({
+      code: '0',
+      data: { commandCode: 'inv:record_shipment_tracking', phaseReached: 'completed' },
+    });
+    let resolveRefresh!: () => void;
+    const loadData = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: vi.fn() as any,
+        tableName: 'inv_shipment',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        context: { loadData } as any,
+      }),
+    );
+    const button = {
+      code: 'tracking',
+      action: {
+        type: 'command',
+        command: 'inv:record_shipment_tracking',
+        operationType: 'update',
+      },
+    } as unknown as ButtonConfig;
+
+    let actionPromise!: Promise<void>;
+    act(() => {
+      actionPromise = result.current.handleAction(button, { pid: 'shipment-1', row_version: 5 });
+    });
+    await waitFor(() => expect(loadData).toHaveBeenCalledTimes(1));
+    expect(result.current.loading).toBe(true);
+
+    resolveRefresh();
+    await act(async () => actionPromise);
+    expect(result.current.loading).toBe(false);
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/inv:record_shipment_tracking',
+      expect.objectContaining({
+        params: expect.objectContaining({
+          targetRecordPid: 'shipment-1',
+          expectedVersion: 5,
+        }),
+      }),
+    );
+  });
 
   it('polls the async task to completion and reloads, instead of treating the immediate ack as the result', async () => {
     // 1) command execute → immediate async ack; 2) task poll → completed.

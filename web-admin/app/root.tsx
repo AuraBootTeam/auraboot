@@ -189,8 +189,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     fetchSpaces(),
   ]);
 
-  // Stale token guard: token exists but user resolution failed (e.g. DB reset)
-  // → clear session and redirect to login
+  // Authoritative auth rejection: fetchUserInfo returns null only for a 401.
+  // Transport, timeout and 5xx failures throw instead, preserving the valid session for retry.
   if (!user && !isPublicRoute(pathname)) {
     if (token) {
       const session = await getSessionFromRequest(request);
@@ -225,7 +225,8 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     i18n: i18nData,
     locale,
     initialTimezone: initialTimezone ?? undefined,
-    skipTenantPreferences: isAnonymousRuntimeProfile(runtimeProfile) || (isPublicRoute(pathname) && !user),
+    skipTenantPreferences:
+      isAnonymousRuntimeProfile(runtimeProfile) || (isPublicRoute(pathname) && !user),
     edition,
     spaces,
     bootstrapStatus,
@@ -344,7 +345,10 @@ export default function App() {
     <RuntimeProfileProvider value={data.runtimeProfile}>
       <I18nProvider initialData={data.i18n || {}} initialLocale={data.locale}>
         <AppDirectionSync locale={data.locale} />
-        <TimezoneProvider initialTimezone={data.initialTimezone} skipTenantPreferences={data.skipTenantPreferences}>
+        <TimezoneProvider
+          initialTimezone={data.initialTimezone}
+          skipTenantPreferences={data.skipTenantPreferences}
+        >
           <ToastProvider>
             <ConfirmDialogProvider>
               {bootCoreRuntime ? <AuraBotProvider>{appFrame}</AuraBotProvider> : appFrame}

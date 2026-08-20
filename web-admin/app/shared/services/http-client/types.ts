@@ -200,6 +200,9 @@ export interface Result<T> {
    * so callers can surface specific messages instead of a generic fallback.
    */
   context?: Record<string, unknown> | null;
+
+  /** Authoritative HTTP status when the transport returned a non-2xx response. */
+  httpStatus?: number;
 }
 
 /**

@@ -116,12 +116,77 @@ describe('ActionRegistry record navigation', () => {
 });
 
 describe('ActionRegistry command.execute inputFields (command-form sugar)', () => {
+  it('loads dictCode choices before opening a command form', async () => {
+    const fetchResult = vi.fn().mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/api/meta/dict/by-code/inv_shipment_manual_tracking_milestone/data') {
+        return {
+          code: '0',
+          data: {
+            items: [
+              { value: 'departed', label: '已发车' },
+              { value: 'in_transit', label: '运输中' },
+            ],
+          },
+        };
+      }
+      return { code: '0', data: { ok: true } };
+    });
+    window.addEventListener(
+      'dialog:form',
+      (event) => {
+        const detail = (event as CustomEvent).detail;
+        expect(detail.fieldOptions.inv_sht_milestone).toEqual([
+          { value: 'departed', label: '已发车' },
+          { value: 'in_transit', label: '运输中' },
+        ]);
+        detail.onSubmit({ inv_sht_milestone: 'in_transit' });
+      },
+      { once: true },
+    );
+
+    await actionRegistry.execute('command.execute', {
+      fetchResult,
+      args: {
+        command: 'inv:record_shipment_tracking',
+        targetRecordPid: 'SHIP-1',
+        inputFields: [
+          {
+            field: 'inv_sht_milestone',
+            type: 'select',
+            dictCode: 'inv_shipment_manual_tracking_milestone',
+            required: true,
+          },
+        ],
+      },
+    });
+
+    expect(fetchResult).toHaveBeenNthCalledWith(
+      1,
+      '/api/meta/dict/by-code/inv_shipment_manual_tracking_milestone/data',
+      { method: 'get' },
+    );
+    expect(fetchResult).toHaveBeenNthCalledWith(
+      2,
+      '/api/meta/commands/execute/inv:record_shipment_tracking',
+      expect.objectContaining({
+        method: 'post',
+        params: expect.objectContaining({
+          payload: { inv_sht_milestone: 'in_transit' },
+        }),
+      }),
+    );
+  });
+
   it('pops a form (FormDialog) and merges collected values into the command payload', async () => {
     const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: { ok: true } });
     // Simulate the user filling + submitting the FormDialog the action pops.
     window.addEventListener(
       'dialog:form',
-      (e) => (e as CustomEvent).detail.onSubmit({ cookies_json: '{"sid":"1"}' }),
+      (e) => {
+        const detail = (e as CustomEvent).detail;
+        expect(detail.fields[0].group).toEqual({ 'zh-CN': '凭据内容', en: 'Credential Data' });
+        detail.onSubmit({ cookies_json: '{"sid":"1"}' });
+      },
       { once: true },
     );
 
@@ -134,7 +199,13 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
         payload: { keep: 'me' },
         inputFieldsTitle: 'Set Credential',
         inputFields: [
-          { field: 'cookies_json', label: 'Cookies', type: 'textarea', required: true },
+          {
+            field: 'cookies_json',
+            group: { 'zh-CN': '凭据内容', en: 'Credential Data' },
+            label: 'Cookies',
+            type: 'textarea',
+            required: true,
+          },
         ],
       },
     });

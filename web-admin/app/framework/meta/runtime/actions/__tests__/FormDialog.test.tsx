@@ -92,6 +92,116 @@ describe('FormDialog choice fields', () => {
     );
   });
 
+  it('renders localized business section headings and widens grouped dialogs', () => {
+    renderDialog({
+      title: '记录包装箱',
+      fields: [
+        {
+          field: 'packageCode',
+          group: { 'zh-CN': '箱号与数量', en: 'Carton and Quantity' },
+          label: '包装箱号',
+          type: 'text',
+        },
+        {
+          field: 'quantity',
+          group: { 'zh-CN': '箱号与数量', en: 'Carton and Quantity' },
+          label: '本箱数量',
+          type: 'number',
+        },
+        {
+          field: 'grossWeight',
+          group: { 'zh-CN': '称重结果', en: 'Weight Results' },
+          label: '毛重',
+          type: 'number',
+        },
+      ],
+      fieldOptions: {},
+      defaults: {},
+    });
+
+    expect(screen.getByText('箱号与数量')).toBeInTheDocument();
+    expect(screen.getByText('称重结果')).toBeInTheDocument();
+    expect(screen.getAllByTestId(/form-dialog-group-/)).toHaveLength(2);
+    expect(screen.getByRole('group', { name: '箱号与数量' })).toContainElement(
+      screen.getByTestId('form-dialog-field-quantity'),
+    );
+    expect(screen.getByTestId('form-dialog').firstElementChild?.nextElementSibling).toHaveClass(
+      'max-w-2xl',
+    );
+  });
+
+  it('clears a stale value when conditional variants share one payload field', () => {
+    const onSubmit = vi.fn();
+    renderDialog({
+      fields: [
+        { field: 'step', label: '校验步骤', type: 'segmented', required: true },
+        {
+          field: 'actualValue',
+          label: '清线结果',
+          type: 'segmented',
+          required: true,
+          visibleWhen: { field: 'step', operator: 'equals', value: 'clearance' },
+        },
+        {
+          field: 'actualValue',
+          label: '扫码实际值',
+          type: 'text',
+          required: true,
+          visibleWhen: { field: 'step', operator: 'equals', value: 'tooling' },
+        },
+      ],
+      fieldOptions: {
+        step: [
+          { value: 'clearance', label: '清线' },
+          { value: 'tooling', label: '工装' },
+        ],
+        actualValue: [{ value: 'cleared', label: '清线已完成' }],
+      },
+      defaults: {},
+      onSubmit,
+    });
+
+    fireEvent.click(screen.getByRole('radio', { name: '清线' }));
+    fireEvent.click(screen.getByRole('radio', { name: '清线已完成' }));
+    fireEvent.click(screen.getByRole('radio', { name: '工装' }));
+    expect(screen.getByTestId('form-dialog-field-actualValue')).toHaveValue('');
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('keeps a later business section mounted when an earlier section becomes hidden', () => {
+    renderDialog({
+      fields: [
+        { field: 'mode', label: '执行模式', type: 'segmented', required: true },
+        {
+          field: 'program',
+          group: '程序准备',
+          label: '程序版本',
+          type: 'text',
+          visibleWhen: { field: 'mode', operator: 'equals', value: 'advanced' },
+        },
+        {
+          field: 'tooling',
+          group: '工装确认',
+          label: '工装编号',
+          type: 'text',
+        },
+      ],
+      fieldOptions: {
+        mode: [
+          { value: 'advanced', label: '完整准备' },
+          { value: 'basic', label: '基础准备' },
+        ],
+      },
+      defaults: { mode: 'advanced' },
+    });
+
+    const toolingSection = screen.getByRole('group', { name: '工装确认' });
+    fireEvent.click(screen.getByRole('radio', { name: '基础准备' }));
+    expect(screen.queryByRole('group', { name: '程序准备' })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: '工装确认' })).toBe(toolingSection);
+  });
+
   it('switches mode-specific fields and submits only visible values', () => {
     const onSubmit = vi.fn();
     renderDialog({

@@ -303,9 +303,13 @@ export interface ColumnConfig {
 export interface CommandInputFieldConfig {
   field: string;
   label?: string | LocalizedText;
+  /** Optional business section rendered by the shared command dialog. */
+  group?: string | LocalizedText;
   helpText?: string | LocalizedText;
   placeholder?: string | LocalizedText;
   type?: string;
+  /** Static dictionary used to populate select/segmented choice fields. */
+  dictCode?: string;
   required?: boolean;
   [key: string]: unknown;
 }

@@ -2546,9 +2546,21 @@ describe('ReviewDrawerBlockRenderer', () => {
                     inputFieldsTitle: '录入人工价',
                     inputFieldsSubmitLabel: '录入并采用',
                     inputFields: [
-                      { field: 'unitPrice', label: '人工单价', type: 'number', required: true },
-                      { field: 'currency', label: '币种', type: 'text', defaultValue: 'CNY' },
-                      { field: 'reason', label: '来源说明', type: 'textarea' },
+                      {
+                        field: 'unitPrice',
+                        group: '价格结果',
+                        label: '人工单价',
+                        type: 'number',
+                        required: true,
+                      },
+                      {
+                        field: 'currency',
+                        group: '价格结果',
+                        label: '币种',
+                        type: 'text',
+                        defaultValue: 'CNY',
+                      },
+                      { field: 'reason', group: '采用依据', label: '来源说明', type: 'textarea' },
                     ],
                   },
                 },
@@ -2578,6 +2590,11 @@ describe('ReviewDrawerBlockRenderer', () => {
       'unitPrice',
       'currency',
       'reason',
+    ]);
+    expect(formDetail.fields.map((field: any) => field.group)).toEqual([
+      '价格结果',
+      '价格结果',
+      '采用依据',
     ]);
     // simulate the user filling + submitting the standard FormDialog
     formDetail.onSubmit({ unitPrice: '8.88', currency: 'CNY', reason: '业务裁决价' });
