@@ -32,6 +32,9 @@ test('contacts expose an explicit active/inactive lifecycle instead of overloadi
   assert.equal(status.dictCode, 'crm_contact_status');
   assert.equal(status.defaultValue, 'active');
   assert.equal(bindings.get('crm_ct_status').editable, false);
+  assert.equal(fields.get('crm_ct_primary_account_key').constraints.unique, true);
+  assert.equal(bindings.get('crm_ct_primary_account_key').visible, false);
+  assert.equal(bindings.get('crm_ct_primary_account_key').editable, false);
 
   assert.deepEqual(
     dicts.get('crm_contact_status').items.map((item) => item.value),

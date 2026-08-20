@@ -1744,8 +1744,8 @@ export function buildReleaseManifest() {
       {
         id: 'CRM-CONTACT-FOLLOWUP-LIFECYCLE',
         filePrefix: 'crm-contact-followup-lifecycle-',
-        expectedScenarios: 9,
-        minimumScreenshots: 5,
+        expectedScenarios: 10,
+        minimumScreenshots: 6,
         expectedCoverage: CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE,
         expectedTechnicalVerdict: 'pass',
         expectedDataMigration: 'out-of-scope-development-stage',

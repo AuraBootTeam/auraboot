@@ -1,4 +1,5 @@
-import { expect, test, type Page, type TestInfo } from '../../fixtures';
+import type { TestInfo } from '@playwright/test';
+import { expect, test, type Page } from '../../fixtures';
 import fs from 'node:fs';
 import { Pool } from 'pg';
 import { PG_CONN } from '../../helpers/environments';
@@ -11,6 +12,7 @@ const EXPECTED_SCENARIOS = [
   'disable-preserves-history',
   'disabled-contact-cannot-be-primary',
   'enable-contact',
+  'concurrent-set-primary-single-winner',
   'follow-plan-and-record-tabs',
   'task-actions-state-guarded',
   'follow-record-delete-from-detail',
@@ -74,8 +76,9 @@ async function contactRow(pool: Pool, pid: string) {
   const result = await pool.query<{
     crm_ct_status: string;
     crm_ct_is_primary: boolean;
+    crm_ct_primary_account_key: string | null;
   }>(
-    `SELECT crm_ct_status, crm_ct_is_primary
+    `SELECT crm_ct_status, crm_ct_is_primary, crm_ct_primary_account_key
        FROM mt_crm_contact_common
       WHERE pid = $1`,
     [pid],
@@ -88,6 +91,7 @@ test.describe('CRM contact and follow-up lifecycle — Cordys PAR-07/10/11 parit
 
   test('PAR07-10-11-UI-01: primary, enable/disable, plan/record and detail delete @critical @golden', async ({
     page,
+    browser,
   }, testInfo) => {
     const uid = uniqueId('crm_lifecycle');
     const accountName = `PAR 生命周期客户 ${uid}`;
@@ -97,6 +101,12 @@ test.describe('CRM contact and follow-up lifecycle — Cordys PAR-07/10/11 parit
     const recordSubject = `拜访记录 ${uid}`;
     const screenshots: string[] = [];
     const failedRuntimeRequests: string[] = [];
+    let concurrentSetPrimaryResults: Array<{
+      ok: boolean;
+      status: number;
+      code: string;
+      message: string;
+    }> = [];
     page.on('response', (response) => {
       if (response.status() >= 500 && response.url().includes('/api/')) {
         failedRuntimeRequests.push(
@@ -243,6 +253,104 @@ test.describe('CRM contact and follow-up lifecycle — Cordys PAR-07/10/11 parit
       await page.reload({ waitUntil: 'domcontentloaded' });
       await expect(page.getByRole('button', { name: /设为主联系人|Set Primary/ })).toBeVisible();
 
+      const concurrentNames = [`并发候选甲 ${uid}`, `并发候选乙 ${uid}`];
+      const concurrentContacts = await Promise.all(
+        concurrentNames.map((name, index) =>
+          executeCommandViaApi(
+            page,
+            'crm:create_contact',
+            {
+              crm_ct_account_id: account.recordId,
+              crm_ct_name: name,
+              crm_ct_email: `${uid}-concurrent-${index}@example.com`,
+              crm_ct_is_primary: false,
+            },
+            undefined,
+            'create',
+          ),
+        ),
+      );
+      const storageState = await page.context().storageState();
+      const contexts = await Promise.all([
+        browser.newContext({ storageState }),
+        browser.newContext({ storageState }),
+      ]);
+      try {
+        const contenderPages = await Promise.all(contexts.map((context) => context.newPage()));
+        const results = await Promise.all(
+          contenderPages.map(async (contenderPage, index) => {
+            const response = await contenderPage.request.post(
+              '/api/meta/commands/execute/crm:set_primary_contact',
+              {
+                data: {
+                  payload: {},
+                  targetRecordPid: concurrentContacts[index].recordId,
+                },
+              },
+            );
+            return {
+              ok: response.ok(),
+              status: response.status(),
+              body: await response.json().catch(() => ({})),
+            };
+          }),
+        );
+        expect(results.filter((result) => result.ok)).toHaveLength(1);
+        expect(results.filter((result) => !result.ok)).toHaveLength(1);
+        const loser = results.find((result) => !result.ok)!;
+        expect(loser.status).toBeGreaterThanOrEqual(400);
+        expect(loser.status).toBeLessThan(500);
+        expect(JSON.stringify(loser.body)).toMatch(/刷新后重试|refresh and retry/i);
+        expect(JSON.stringify(loser.body)).not.toMatch(
+          /duplicate key|primary_account_key|UPDATE mt_crm_contact_common/i,
+        );
+        concurrentSetPrimaryResults = results.map((result) => ({
+          ok: result.ok,
+          status: result.status,
+          code: String(result.body?.code ?? ''),
+          message: String(result.body?.message ?? ''),
+        }));
+
+        const winner = concurrentContacts[results.findIndex((result) => result.ok)];
+        await expect
+          .poll(async () => {
+            const rows = await pool.query<{
+              pid: string;
+              crm_ct_is_primary: boolean;
+              crm_ct_primary_account_key: string | null;
+            }>(
+              `SELECT pid, crm_ct_is_primary, crm_ct_primary_account_key
+                 FROM mt_crm_contact_common
+                WHERE pid = ANY($1::varchar[])`,
+              [concurrentContacts.map((contact) => contact.recordId)],
+            );
+            return rows.rows
+              .filter(
+                (row) =>
+                  row.crm_ct_is_primary && row.crm_ct_primary_account_key === account.recordId,
+              )
+              .map((row) => row.pid);
+          })
+          .toEqual([winner.recordId]);
+        const primaryFacts = await pool.query<{ primary_count: string; key_count: string }>(
+          `SELECT count(*) FILTER (WHERE crm_ct_is_primary)::text AS primary_count,
+                  count(crm_ct_primary_account_key)::text AS key_count
+             FROM mt_crm_contact_common
+            WHERE crm_ct_account_id = $1`,
+          [account.recordId],
+        );
+        expect(primaryFacts.rows[0]).toEqual({ primary_count: '1', key_count: '1' });
+        await page.goto(`/p/crm_contact_common/view/${winner.recordId}`, {
+          waitUntil: 'domcontentloaded',
+        });
+        await expect(
+          page.getByText(concurrentNames[results.findIndex((result) => result.ok)]).first(),
+        ).toBeVisible();
+        screenshots.push(await screenshot(page, testInfo, '04-contact-concurrency-single-winner'));
+      } finally {
+        await Promise.all(contexts.map((context) => context.close()));
+      }
+
       await page.goto('/p/crm_activity_common', { waitUntil: 'domcontentloaded' });
       const planTab = page.getByRole('button', { name: /跟进计划|Follow-up Plans/ });
       const recordTab = page.getByRole('button', { name: /跟进记录|Follow-up Records/ });
@@ -254,7 +362,7 @@ test.describe('CRM contact and follow-up lifecycle — Cordys PAR-07/10/11 parit
       await recordTab.click();
       await expect(page.getByText(recordSubject).first()).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText(planSubject)).toHaveCount(0);
-      screenshots.push(await screenshot(page, testInfo, '04-follow-plan-record-tabs'));
+      screenshots.push(await screenshot(page, testInfo, '05-follow-plan-record-tabs'));
 
       await page.goto(`/p/crm_activity_common/view/${plan.recordId}`, {
         waitUntil: 'domcontentloaded',
@@ -270,7 +378,7 @@ test.describe('CRM contact and follow-up lifecycle — Cordys PAR-07/10/11 parit
       await expect(page.getByRole('button', { name: /开始任务|Start Task/ })).toHaveCount(0);
       const deleteButton = page.getByRole('button', { name: /删除|Delete/ });
       await expect(deleteButton).toBeVisible();
-      screenshots.push(await screenshot(page, testInfo, '05-follow-record-detail-delete'));
+      screenshots.push(await screenshot(page, testInfo, '06-follow-record-detail-delete'));
       await deleteButton.click();
       const confirmDelete = page.getByRole('button', { name: /确认|Confirm/ }).last();
       await expect(confirmDelete).toBeVisible();
@@ -300,6 +408,7 @@ test.describe('CRM contact and follow-up lifecycle — Cordys PAR-07/10/11 parit
             coverage: completedCoverage,
             screenshots,
             failedRuntimeRequests,
+            concurrentSetPrimaryResults,
             recordIds: {
               account: account.recordId,
               contacts: [first.recordId, second.recordId],

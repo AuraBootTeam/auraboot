@@ -152,8 +152,8 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   const contactFollowupLifecycleContract = committed.runtimeEvidenceContracts.find(
     (contract) => contract.id === 'CRM-CONTACT-FOLLOWUP-LIFECYCLE',
   );
-  assert.equal(contactFollowupLifecycleContract.expectedScenarios, 9);
-  assert.equal(contactFollowupLifecycleContract.minimumScreenshots, 5);
+  assert.equal(contactFollowupLifecycleContract.expectedScenarios, 10);
+  assert.equal(contactFollowupLifecycleContract.minimumScreenshots, 6);
   assert.equal(contactFollowupLifecycleContract.expectedCoverage.pages.length, 3);
   assert.equal(contactFollowupLifecycleContract.expectedCoverage.blocks.length, 6);
   assert.equal(contactFollowupLifecycleContract.expectedCoverage.fields.length, 11);

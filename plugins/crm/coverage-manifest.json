@@ -2817,8 +2817,8 @@
     {
       "id": "CRM-CONTACT-FOLLOWUP-LIFECYCLE",
       "filePrefix": "crm-contact-followup-lifecycle-",
-      "expectedScenarios": 9,
-      "minimumScreenshots": 5,
+      "expectedScenarios": 10,
+      "minimumScreenshots": 6,
       "expectedCoverage": {
         "pages": [
           "crm_contact_common_detail",

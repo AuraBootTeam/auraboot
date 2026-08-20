@@ -152,6 +152,7 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
         data.put("crm_ct_phone", lead.get("crm_lead_contact_phone"));
         data.put("crm_ct_mobile", lead.get("crm_lead_contact_phone"));
         data.put("crm_ct_is_primary", true);
+        data.put("crm_ct_primary_account_key", accountId);
         data.put("crm_ct_status", "active");
         return db.create("crm_contact_common", data);
     }

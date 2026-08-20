@@ -54,6 +54,7 @@ class ConvertLeadHandlerTest {
         assertEquals("Ada Chen", contact.get("crm_ct_name"));
         assertEquals("ada@example.com", contact.get("crm_ct_email"));
         assertEquals(true, contact.get("crm_ct_is_primary"));
+        assertEquals("PID1", contact.get("crm_ct_primary_account_key"));
 
         Map<String, Object> opportunity = db.store.get("crm_opportunity_common").getFirst();
         assertEquals("PID1", opportunity.get("crm_opp_account_id"));
