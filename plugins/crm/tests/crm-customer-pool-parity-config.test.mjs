@@ -255,7 +255,7 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
   assert.equal(operations.dataSources.poolQueue.queryCode, 'crm_customer_pool_ops_queue');
   assert.deepEqual(
     operations.blocks.find((block) => block.id === 'crm_customer_pool_metrics').metrics.map((metric) => metric.key),
-    ['available', 'ready', 'cooldown', 'owned', 'processing'],
+    ['available', 'ready', 'blocked', 'owned', 'processing'],
   );
   assert.equal(operations.blocks.find((block) => block.id === 'crm_customer_pool_metrics').density, 'compact');
   assert.equal(operations.blocks.find((block) => block.id === 'crm_customer_pool_search').density, 'compact');
@@ -271,7 +271,7 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
     fields: [
       'crm_cpi_rating',
       'crm_cpi_industry',
-      'crm_cpi_claim_release_at',
+      'next_eligible_at',
       'owner_name',
     ],
     actionCodes: ['claim', 'assign', 'view_pool_evidence'],
@@ -291,7 +291,16 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
   assert.deepEqual(
     dictionaries.find((dictionary) => dictionary.code === 'crm_customer_pool_operational_state')
       ?.items.map((item) => item.value),
-    ['ready', 'cooldown', 'claimed', 'assigned', 'recycling', 'recycling_retry'],
+    [
+      'ready',
+      'cooldown',
+      'quota_blocked',
+      'capacity_blocked',
+      'claimed',
+      'assigned',
+      'recycling',
+      'recycling_retry',
+    ],
   );
   const poolActions = operations.blocks.find((block) => block.id === 'crm_customer_pool_actions').actions;
   assert.deepEqual(poolActions.map((action) => action.code), ['claim', 'assign']);
@@ -389,15 +398,25 @@ test('PAR-06 customer pool exposes the complete Cordys policy denominator', asyn
   assert.match(statsQuery.fromSql, /params\.currentUserId/);
   assert.match(statsQuery.fromSql, /crm_cp_member_user_ids/);
   assert.match(statsQuery.fromSql, /crm_cp_admin_user_ids/);
-  assert.match(statsQuery.fromSql, /crm_cpi_claim_release_at <= now\(\)/);
+  assert.match(statsQuery.fromSql, /effective_release_at > now\(\)/);
+  assert.match(statsQuery.fromSql, /quota_blocked/);
+  assert.match(statsQuery.fromSql, /capacity_blocked/);
   assert.deepEqual(
     statsQuery.outputFields.map((field) => field.code),
-    ['available_count', 'ready_count', 'cooldown_count', 'owned_count', 'processing_count'],
+    [
+      'available_count',
+      'ready_count',
+      'cooldown_count',
+      'blocked_count',
+      'owned_count',
+      'processing_count',
+    ],
   );
   assert.equal(queueQuery.resourceCode, 'crm.customer_pool');
   assert.match(queueQuery.fromSql, /i\.tenant_id = #\{params\.tenantId\}/);
   assert.match(queueQuery.fromSql, /params\.currentUserId/);
   assert.match(queueQuery.fromSql, /CAST\(#\{params\.viewFilter\} AS text\) = 'ready'/);
+  assert.match(queueQuery.fromSql, /CAST\(#\{params\.viewFilter\} AS text\) = 'blocked'/);
   assert.match(queueQuery.fromSql, /CAST\(#\{params\.viewFilter\} AS text\) = 'processing'/);
   assert.ok(queueQuery.outputFields.some((field) => field.code === 'operational_state'));
   for (const code of ['crm_pool_customer_timeline', 'crm_pool_customer_owner_history']) {

@@ -1619,8 +1619,8 @@ export function buildReleaseManifest() {
       {
         id: 'CRM-CUSTOMER-POOL',
         filePrefix: 'crm-customer-pool-parity',
-        expectedScenarios: 3,
-        minimumScreenshots: 13,
+        expectedScenarios: 4,
+        minimumScreenshots: 15,
         expectedCoverage: CUSTOMER_POOL_COVERAGE,
       },
     ],

@@ -120,8 +120,8 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   const customerPoolContract = committed.runtimeEvidenceContracts.find(
     (contract) => contract.id === 'CRM-CUSTOMER-POOL',
   );
-  assert.equal(customerPoolContract.expectedScenarios, 3);
-  assert.equal(customerPoolContract.minimumScreenshots, 13);
+  assert.equal(customerPoolContract.expectedScenarios, 4);
+  assert.equal(customerPoolContract.minimumScreenshots, 15);
   assert.equal(customerPoolContract.expectedCoverage.pages.length, 15);
   assert.equal(customerPoolContract.expectedCoverage.commands.length, 19);
   assert.equal(customerPoolContract.expectedCoverage.permissions.length, 7);

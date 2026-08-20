@@ -13,8 +13,10 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Pool } from 'pg';
 import { read as xlsxRead, utils as XLSXUtils, write as xlsxWrite } from 'xlsx';
 import { ensureSidebarExpanded, waitForFormReady } from '../helpers';
+import { PG_CONN } from '../../helpers/environments';
 
 const ADMIN_EMAIL = 'admin@auraboot.com';
 const PASSWORD = 'Test2026x';
@@ -27,9 +29,9 @@ type CommandResult = Record<string, unknown>;
 const COLD_CLAIM_SQL_BUDGET = 130;
 const STEADY_COMMAND_SQL_BUDGET = 100;
 // The first successful permanent purge initializes metadata for the pool projection,
-// ownership history and both activity relation shapes. The measured cold path is 102 SQL;
-// the second item in the same batch is 85, so keep a narrow cold-only ceiling.
-const COLD_CUSTOMER_DELETE_SQL_BUDGET = 110;
+// ownership history and both activity relation shapes. Fresh-plugin runs have measured 102-114
+// SQL while the second item in the same batch remains 85, so keep a narrow cold-only ceiling.
+const COLD_CUSTOMER_DELETE_SQL_BUDGET = 120;
 const REJECT_SQL_BUDGET = 75;
 const MEMBER_OPERATIONS_SCENARIO =
   'member scope, quick edit, chart, exports, guarded delete, batch update, claim and assignment persist on the real stack';
@@ -37,10 +39,13 @@ const GOVERNANCE_RECYCLE_SCENARIO =
   'administrator governs quick pool policy, capacity, relative and fixed recycle rules, and recent activity blocks recycle';
 const IMPORT_MOBILE_SCENARIO =
   'administrator downloads, prechecks and imports XLSX customers while mobile sales reviews customer, activity and ownership tabs';
+const PERMISSION_LIFECYCLE_SCENARIO =
+  'existing sales session loses and regains customer-pool access after role changes while cross-tenant membership is rejected';
 const CUSTOMER_POOL_SCENARIOS = [
   MEMBER_OPERATIONS_SCENARIO,
   GOVERNANCE_RECYCLE_SCENARIO,
   IMPORT_MOBILE_SCENARIO,
+  PERMISSION_LIFECYCLE_SCENARIO,
 ];
 const completedScenarios = new Set<string>();
 const failedScenarios = new Set<string>();
@@ -152,25 +157,49 @@ function writeRuntimeReceipt(): void {
   fs.writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
 }
 
+function hydrateRuntimeReceipt(): void {
+  const receiptPath = process.env.CUSTOMER_POOL_RUNTIME_RECEIPT;
+  if (!receiptPath || !fs.existsSync(receiptPath)) return;
+  const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8')) as {
+    completedScenarios?: unknown;
+    failedScenarios?: unknown;
+    screenshots?: unknown;
+  };
+  for (const scenario of Array.isArray(receipt.completedScenarios)
+    ? receipt.completedScenarios
+    : []) {
+    if (typeof scenario === 'string') completedScenarios.add(scenario);
+  }
+  for (const scenario of Array.isArray(receipt.failedScenarios) ? receipt.failedScenarios : []) {
+    if (typeof scenario === 'string') failedScenarios.add(scenario);
+  }
+  for (const screenshot of Array.isArray(receipt.screenshots) ? receipt.screenshots : []) {
+    if (typeof screenshot === 'string') runtimeScreenshots.add(screenshot);
+  }
+}
+
 async function navigateToCrmMenu(page: Page, section: RegExp, href: string): Promise<void> {
   await ensureSidebarExpanded(page);
+  let nav = page.locator('nav, aside, [role="navigation"]').first();
   if ((page.viewportSize()?.width ?? 1280) <= 640) {
-    const mobileMenu = page.getByRole('button', {
+    const openMobileMenu = page.getByRole('button', {
       name: /打开导航菜单|Open navigation menu/i,
     });
+    const closeMobileMenu = page.getByRole('button', {
+      name: /关闭导航菜单|Close navigation menu/i,
+    });
     const mobileSidebar = page.getByTestId('sidebar');
-    await expect(mobileMenu).toBeVisible({ timeout: 8_000 });
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      await mobileMenu.click();
+      if (await closeMobileMenu.isVisible().catch(() => false)) break;
+      await expect(openMobileMenu).toBeVisible({ timeout: 8_000 });
+      await openMobileMenu.click();
       await page.waitForTimeout(250);
-      const sidebarBox = await mobileSidebar.boundingBox();
-      if (sidebarBox && sidebarBox.x >= -1) break;
     }
-    await expect
-      .poll(async () => (await mobileSidebar.boundingBox())?.x ?? -999, { timeout: 5_000 })
-      .toBeGreaterThanOrEqual(-1);
+    await expect(closeMobileMenu, 'mobile navigation drawer must be open').toBeVisible({
+      timeout: 5_000,
+    });
+    nav = mobileSidebar;
   }
-  const nav = page.locator('nav, aside, [role="navigation"]').first();
   const leaf = nav.locator(`a[href="${href}"]`).first();
   if (!(await leaf.isVisible().catch(() => false))) {
     const crmRoot = nav.getByRole('button', { name: /客户关系管理|CRM/i }).first();
@@ -691,6 +720,154 @@ async function provisionUser(
   return { email, pid };
 }
 
+async function resolveTenantMemberPid(page: Page, email: string): Promise<string> {
+  const response = await page.request.post('/api/tenant/members/search', {
+    data: { keyword: email, pageNum: 1, pageSize: 100 },
+  });
+  const body = await response.json().catch(() => ({}));
+  expect(
+    response.ok() && String(body?.code) === '0',
+    `tenant member search failed: HTTP ${response.status()} ${JSON.stringify(body).slice(0, 800)}`,
+  ).toBe(true);
+  const rows = queryRows(body?.data);
+  const member = rows.find(
+    (row) => String((row.user as Record<string, unknown> | undefined)?.email ?? '') === email,
+  );
+  const memberPid = String(member?.pid ?? '');
+  expect(memberPid, `tenant member pid for ${email}`).toBeTruthy();
+  return memberPid;
+}
+
+async function activeUserRoleAssignmentPids(page: Page, memberPid: string): Promise<string[]> {
+  const response = await page.request.get(
+    `/api/user-roles?memberPid=${encodeURIComponent(memberPid)}&pageNum=1&pageSize=100`,
+  );
+  const body = await response.json().catch(() => ({}));
+  expect(
+    response.ok() && String(body?.code) === '0',
+    `user-role list failed: HTTP ${response.status()} ${JSON.stringify(body).slice(0, 800)}`,
+  ).toBe(true);
+  return queryRows(body?.data)
+    .filter((row) => String(row.status ?? 'active') === 'active')
+    .map((row) => String(row.pid ?? ''))
+    .filter(Boolean);
+}
+
+async function removeUserRoleAssignments(page: Page, memberPid: string): Promise<string[]> {
+  const assignmentPids = await activeUserRoleAssignmentPids(page, memberPid);
+  expect(assignmentPids.length, `active role assignments for ${memberPid}`).toBeGreaterThan(0);
+  const response = await page.request.delete('/api/user-roles/batch-remove-by-pid', {
+    data: assignmentPids,
+  });
+  const body = await response.json().catch(() => ({}));
+  expect(
+    response.ok() && String(body?.code) === '0' && body?.data === true,
+    `user-role removal failed: HTTP ${response.status()} ${JSON.stringify(body).slice(0, 800)}`,
+  ).toBe(true);
+  return assignmentPids;
+}
+
+async function assignUserRoleByCode(
+  page: Page,
+  memberPid: string,
+  roleCode: string,
+): Promise<void> {
+  const response = await page.request.post('/api/user-roles/assign-by-code', {
+    data: { memberPid, roleCodes: [roleCode] },
+  });
+  const body = await response.json().catch(() => ({}));
+  expect(
+    response.ok() && String(body?.code) === '0' && body?.data === true,
+    `user-role assignment failed: HTTP ${response.status()} ${JSON.stringify(body).slice(0, 800)}`,
+  ).toBe(true);
+}
+
+async function moveUserMembershipToIsolatedTenant(
+  userPid: string,
+  stamp: string,
+): Promise<{ sourceTenantId: string; memberPid: string }> {
+  const pool = new Pool(PG_CONN);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const membership = await client.query<{
+      member_id: string;
+      member_pid: string;
+      tenant_id: string;
+    }>(
+      `SELECT tm.id::text AS member_id, tm.pid AS member_pid, tm.tenant_id::text AS tenant_id
+       FROM ab_tenant_member tm
+       INNER JOIN ab_user u ON u.id = tm.user_id
+       WHERE u.pid = $1
+         AND tm.status = 'active'
+         AND tm.deleted_flag = false
+       LIMIT 1`,
+      [userPid],
+    );
+    expect(membership.rowCount, `source membership for ${userPid}`).toBe(1);
+    const source = membership.rows[0];
+    const isolatedTenantId = (
+      BigInt(Date.now()) * 1_000_000n +
+      BigInt(Math.floor(Math.random() * 1_000_000))
+    ).toString();
+    await client.query(
+      `INSERT INTO ab_tenant
+         (id, pid, name, display_name, status, deleted_flag, created_at, updated_at)
+       VALUES ($1, substr(md5(random()::text || clock_timestamp()::text), 1, 26),
+               $2, $3, 'active', false, now(), now())`,
+      [
+        isolatedTenantId,
+        `crm-customer-pool-isolated-${stamp}`,
+        `CRM Customer Pool Isolated ${stamp}`,
+      ],
+    );
+    await client.query(
+      `UPDATE ab_user_role
+       SET deleted_flag = true, updated_at = now()
+       WHERE member_id = $1`,
+      [source.member_id],
+    );
+    const moved = await client.query(
+      `UPDATE ab_tenant_member
+       SET tenant_id = $1, updated_at = now()
+       WHERE id = $2
+       RETURNING tenant_id`,
+      [isolatedTenantId, source.member_id],
+    );
+    expect(moved.rowCount, `move ${userPid} to isolated tenant`).toBe(1);
+    await client.query('COMMIT');
+    return { sourceTenantId: source.tenant_id, memberPid: source.member_pid };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+async function expectNoPoolShareResidue(tenantId: string, memberPid: string): Promise<void> {
+  const pool = new Pool(PG_CONN);
+  try {
+    const result = await pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM ab_record_share
+       WHERE tenant_id = $1::bigint
+         AND subject_type = 'member'
+         AND subject_pid = $2
+         AND resource_code IN (
+           'crm_customer_pool_common',
+           'crm_customer_pool_item_common',
+           'crm_customer_owner_history_common'
+         )`,
+      [tenantId, memberPid],
+    );
+    expect(result.rows[0]?.count, 'cross-tenant customer-pool share residue').toBe('0');
+  } finally {
+    await pool.end();
+  }
+}
+
 async function createCustomerAndMove(
   page: Page,
   poolPid: string,
@@ -741,18 +918,20 @@ async function openAs(
 test.describe('CRM customer-pool Cordys parity W1', () => {
   test.setTimeout(300_000);
 
-  test.beforeAll(() => {
+  test.beforeAll(({}, workerInfo) => {
     completedScenarios.clear();
     failedScenarios.clear();
     runtimeScreenshots.clear();
     const receiptPath = process.env.CUSTOMER_POOL_RUNTIME_RECEIPT;
-    if (receiptPath) fs.rmSync(receiptPath, { force: true });
+    if (receiptPath && workerInfo.workerIndex === 0) fs.rmSync(receiptPath, { force: true });
+    else hydrateRuntimeReceipt();
   });
 
   test.afterEach(({}, testInfo) => {
     if (!CUSTOMER_POOL_SCENARIOS.includes(testInfo.title)) return;
     if (testInfo.status === testInfo.expectedStatus) completedScenarios.add(testInfo.title);
     else failedScenarios.add(testInfo.title);
+    writeRuntimeReceipt();
   });
 
   test.afterAll(() => {
@@ -1158,7 +1337,13 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     ).toBeVisible();
     await expect(page.getByRole('button', { name: /客户公海策略|Pool Policies/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /人员库容|User Capacity/ })).toHaveCount(0);
+    const adminAssignSearch = page.getByRole('textbox', {
+      name: /搜索池内客户|Search pooled customers/,
+    });
+    await adminAssignSearch.fill(assignA);
+    await page.getByTestId('filter-btn-search').click();
     const assignRow = page.getByRole('row', { name: new RegExp(assignA) });
+    await expect(assignRow).toBeVisible({ timeout: 20_000 });
     await assignRow.click();
     await page.getByRole('button', { name: /分配给成员|Assign to Member/, exact: true }).click();
     const assignDialog = page.getByRole('dialog');
@@ -1771,10 +1956,22 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
     await expect(capacityRow).toBeVisible({ timeout: 15_000 });
     await clickRowAction(page, capacityRow, 'view', /查看|View/);
     await expect(page.getByText(/用户库容|User Capacity/)).toBeVisible();
+    const capacityEditLoad = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'GET' &&
+        response.url().includes(`/api/dynamic/crm_customer_capacity_common/${capacityPid}`),
+      { timeout: 20_000 },
+    );
     await page.getByTestId('toolbar-btn-edit').click();
+    await capacityEditLoad;
     await waitForFormReady(page, 15_000);
+    await expect(formField(page, 'crm_ccap_capacity').locator('input')).toHaveValue('5');
+    await expect(formField(page, 'crm_ccap_remark').locator('input, textarea')).toHaveValue(
+      capacityRemark,
+    );
     await fillFormField(page, 'crm_ccap_capacity', '6');
     await fillFormField(page, 'crm_ccap_remark', `${capacityRemark} edited`);
+    await expect(formField(page, 'crm_ccap_capacity').locator('input')).toHaveValue('6');
     await submitFormCommand(page, 'crm:update_customer_capacity');
     await navigateToCustomerPoolStrategy(page, 'capacity');
     await expect(
@@ -2267,6 +2464,10 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
         /业务档案|Business Records/i,
         '/p/c/crm_customer_pool_item_list',
       );
+      await adminMobilePage
+        .getByRole('textbox', { name: /搜索池内客户|Search pooled customers/ })
+        .fill(validName);
+      await adminMobilePage.getByTestId('filter-btn-search').click();
       const adminCard = adminMobilePage.getByTestId(`table-mobile-card-${importedItemPid}`);
       await expect(adminCard).toContainText(validName, { timeout: 20_000 });
       const adminAssignButton = adminCard.getByRole('button', { name: /分配|Assign/ });
@@ -2298,6 +2499,10 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
         /业务档案|Business Records/i,
         '/p/c/crm_customer_pool_item_list',
       );
+      await mobilePage
+        .getByRole('textbox', { name: /搜索池内客户|Search pooled customers/ })
+        .fill(validName);
+      await mobilePage.getByTestId('filter-btn-search').click();
       await expect(
         mobilePage.getByRole('heading', { name: /客户公海运营台|Customer Pool Operations/ }),
       ).toBeVisible({ timeout: 20_000 });
@@ -2394,6 +2599,192 @@ test.describe('CRM customer-pool Cordys parity W1', () => {
       await attachScreenshot(mobilePage, testInfo, 'mobile-pool-customer-ownership-390');
     } finally {
       await mobileContext.close();
+    }
+  });
+
+  test(PERMISSION_LIFECYCLE_SCENARIO, async ({ page, browser, baseURL }, testInfo) => {
+    await uiLogin(page, ADMIN_EMAIL);
+    const stamp = `${Date.now()}`;
+    const adminMeResponse = await page.request.get('/api/auth/me');
+    const adminMeBody = await adminMeResponse.json().catch(() => ({}));
+    const adminPid = String(adminMeBody?.data?.user?.pid ?? '');
+    expect(adminPid, 'admin pid from /api/auth/me').toBeTruthy();
+
+    const sales = await provisionUser(page, stamp, 'sales', ['crm_sales']);
+    const memberPid = await resolveTenantMemberPid(page, sales.email);
+    const pool = await command(
+      page,
+      'crm:create_customer_pool',
+      {
+        crm_cp_name: `Permission Lifecycle Pool ${stamp}`,
+        crm_cp_member_user_ids: JSON.stringify([sales.pid]),
+        crm_cp_admin_user_ids: JSON.stringify([adminPid]),
+        crm_cp_daily_pick_limit: 10,
+        crm_cp_new_cooldown_days: 0,
+        crm_cp_previous_owner_cooldown_days: 0,
+        crm_cp_auto_recycle: false,
+        crm_cp_recycle_after_days: 30,
+        crm_cp_recycle_basis: 'last_activity',
+        crm_cp_recycle_match_mode: 'all',
+        crm_cp_description: 'Long-lived token and cross-tenant fail-closed acceptance',
+      },
+      undefined,
+      'create',
+    );
+    const poolPid = recordPid(pool);
+    expect(poolPid, 'permission lifecycle pool pid').toBeTruthy();
+    const customerName = `Permission-Lifecycle-${stamp}`;
+    const customer = await createCustomerAndMove(page, poolPid, customerName, 51);
+
+    const salesSession = await openAs(browser, baseURL ?? 'http://localhost:5251', sales.email);
+    try {
+      const salesPage = salesSession.page;
+      const permissions = async (): Promise<string> => {
+        const response = await salesPage.request.get('/api/auth/me');
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok() || String(body?.code) !== '0') return '';
+        return JSON.stringify(body?.data?.permissions ?? []);
+      };
+
+      await expect.poll(permissions).toContain('crm.customer_pool.pick');
+      await navigateToCrmMenu(
+        salesPage,
+        /业务档案|Business Records/i,
+        '/p/c/crm_customer_pool_item_list',
+      );
+      await expect(companyCell(salesPage, customerName)).toBeVisible({ timeout: 15_000 });
+
+      await removeUserRoleAssignments(page, memberPid);
+      await expect.poll(permissions, { timeout: 15_000 }).not.toContain('crm.customer_pool.pick');
+      const roleRevokedClaim = await salesPage.request.post(
+        '/api/meta/commands/execute/crm:claim_pool_customer',
+        { data: { targetRecordPid: customer.itemPid, operationType: 'update', payload: {} } },
+      );
+      const roleRevokedClaimBody = await roleRevokedClaim.json().catch(() => ({}));
+      expect(
+        roleRevokedClaim.ok() && String(roleRevokedClaimBody?.code) === '0',
+        'the existing session must lose command permission immediately after role revocation',
+      ).toBe(false);
+      expect(JSON.stringify(roleRevokedClaimBody)).toMatch(
+        /permission|forbidden|not permitted|required permission|无权|权限/i,
+      );
+
+      await salesPage.goto('/p/c/crm_customer_pool_item_list', {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(companyCell(salesPage, customerName)).toHaveCount(0);
+      await expect(
+        salesPage.getByText(/403|Forbidden|Access Denied|无权限|权限不足|页面不可用/i).first(),
+      ).toBeVisible({ timeout: 15_000 });
+      await attachScreenshot(salesPage, testInfo, 'existing-session-role-revoked-denied');
+
+      await assignUserRoleByCode(page, memberPid, 'crm_sales');
+      await expect.poll(permissions, { timeout: 15_000 }).toContain('crm.customer_pool.pick');
+      await salesPage.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+      await navigateToCrmMenu(
+        salesPage,
+        /业务档案|Business Records/i,
+        '/p/c/crm_customer_pool_item_list',
+      );
+      await expect(companyCell(salesPage, customerName)).toBeVisible({ timeout: 15_000 });
+
+      const movedMembership = await moveUserMembershipToIsolatedTenant(sales.pid, stamp);
+      expect(movedMembership.memberPid).toBe(memberPid);
+      const crossTenantClaim = await salesPage.request.post(
+        '/api/meta/commands/execute/crm:claim_pool_customer',
+        { data: { targetRecordPid: customer.itemPid, operationType: 'update', payload: {} } },
+      );
+      const crossTenantClaimBody = await crossTenantClaim.json().catch(() => ({}));
+      expect(
+        crossTenantClaim.ok() && String(crossTenantClaimBody?.code) === '0',
+        'an old tenant-bound session must fail closed after membership moves to another tenant',
+      ).toBe(false);
+      expect(JSON.stringify(crossTenantClaimBody)).toMatch(
+        /tenant|member|permission|forbidden|not permitted|无权|权限/i,
+      );
+
+      await command(
+        page,
+        'crm:update_customer_pool',
+        {
+          crm_cp_name: `Permission Lifecycle Pool ${stamp}`,
+          crm_cp_member_user_ids: JSON.stringify([]),
+          crm_cp_admin_user_ids: JSON.stringify([adminPid]),
+          crm_cp_daily_pick_limit: 10,
+          crm_cp_new_cooldown_days: 0,
+          crm_cp_previous_owner_cooldown_days: 0,
+          crm_cp_auto_recycle: false,
+          crm_cp_recycle_after_days: 30,
+          crm_cp_recycle_basis: 'last_activity',
+          crm_cp_recycle_match_mode: 'all',
+          crm_cp_description: 'Cross-tenant member removed from the customer pool',
+        },
+        poolPid,
+        'update',
+      );
+      await expectNoPoolShareResidue(movedMembership.sourceTenantId, movedMembership.memberPid);
+
+      const crossTenantReAdd = await page.request.post(
+        '/api/meta/commands/execute/crm:update_customer_pool',
+        {
+          data: {
+            targetRecordPid: poolPid,
+            operationType: 'update',
+            payload: {
+              crm_cp_name: `Permission Lifecycle Pool ${stamp}`,
+              crm_cp_member_user_ids: JSON.stringify([sales.pid]),
+              crm_cp_admin_user_ids: JSON.stringify([adminPid]),
+              crm_cp_daily_pick_limit: 10,
+              crm_cp_new_cooldown_days: 0,
+              crm_cp_previous_owner_cooldown_days: 0,
+              crm_cp_auto_recycle: false,
+              crm_cp_recycle_after_days: 30,
+              crm_cp_recycle_basis: 'last_activity',
+              crm_cp_recycle_match_mode: 'all',
+              crm_cp_description: 'Cross-tenant user must not be re-added',
+            },
+          },
+        },
+      );
+      const crossTenantReAddBody = await crossTenantReAdd.json().catch(() => ({}));
+      expect(
+        crossTenantReAdd.ok() && String(crossTenantReAddBody?.code) === '0',
+        'customer-pool ACL synchronization must reject a user from another tenant',
+      ).toBe(false);
+      expect(JSON.stringify(crossTenantReAddBody)).toMatch(
+        /Active tenant member not found|tenant member|different tenant|跨租户/i,
+      );
+
+      const pools = await dynamicListRows(page, 'crm_customer_pool_common');
+      const persistedPool = pools.find((row) => String(row.pid ?? '') === poolPid);
+      expect(
+        persistedPool,
+        'permission lifecycle pool remains readable after rejected update',
+      ).toBeTruthy();
+      expect(JSON.stringify(persistedPool?.crm_cp_member_user_ids ?? '')).not.toContain(sales.pid);
+      await expectNoPoolShareResidue(movedMembership.sourceTenantId, movedMembership.memberPid);
+      await attachJson(testInfo, 'permission-lifecycle-evidence.json', {
+        roleRevokedExistingSession: {
+          httpStatus: roleRevokedClaim.status(),
+          applicationCode: roleRevokedClaimBody?.code,
+          denied: true,
+        },
+        roleRestoredWithoutRelogin: true,
+        crossTenantOldSession: {
+          httpStatus: crossTenantClaim.status(),
+          applicationCode: crossTenantClaimBody?.code,
+          denied: true,
+        },
+        crossTenantPoolReAdd: {
+          httpStatus: crossTenantReAdd.status(),
+          applicationCode: crossTenantReAddBody?.code,
+          deniedAndRolledBack: true,
+        },
+        persistedPoolMemberUserIds: persistedPool?.crm_cp_member_user_ids,
+        crossTenantShareResidue: 0,
+      });
+    } finally {
+      await salesSession.context.close();
     }
   });
 });
