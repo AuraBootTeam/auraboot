@@ -54,6 +54,12 @@ const EVIDENCE = {
   dashboards: 'plugins/crm/e2e/crm-dashboards.golden.spec.ts',
   forecastVariance: 'plugins/crm/e2e/forecast-variance.golden.spec.ts',
   customerPool: 'web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts',
+  followupComments: 'web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts',
+};
+
+const FOLLOWUP_COMMENT_COVERAGE = {
+  pages: ['crm_activity_common_detail'],
+  blocks: ['crm_activity_common_detail:activity_followup_comments'],
 };
 
 // Executable denominator owned by the opportunity-efficiency true-stack gate.
@@ -637,6 +643,9 @@ const releaseBCoverageSets = Object.fromEntries(
 const customerPoolCoverageSets = Object.fromEntries(
   Object.entries(CUSTOMER_POOL_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
 );
+const followupCommentCoverageSets = Object.fromEntries(
+  Object.entries(FOLLOWUP_COMMENT_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
+);
 const dashboardCoverageSets = Object.fromEntries(
   Object.entries(DASHBOARD_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
 );
@@ -973,6 +982,9 @@ function buildProductGroups({
         ...(releaseBCoverageSets.blocks.has(blockKey) ? [EVIDENCE.releaseB] : []),
         ...(forecastVarianceCoverageSets.blocks.has(blockKey) ? [EVIDENCE.forecastVariance] : []),
         ...(customerPoolCoverageSets.blocks.has(blockKey) ? [EVIDENCE.customerPool] : []),
+        ...(followupCommentCoverageSets.blocks.has(blockKey)
+          ? [EVIDENCE.followupComments]
+          : []),
       ]);
       blockRows.push(
         executableRow({
@@ -1362,6 +1374,7 @@ export function buildReleaseManifest() {
     ...RG2_PAGES,
     ...RELEASE_B_COVERAGE.pages,
     ...CUSTOMER_POOL_COVERAGE.pages,
+    ...FOLLOWUP_COMMENT_COVERAGE.pages,
   ]).map(
     (pageKey) => {
       const page = pages.get(pageKey);
@@ -1372,6 +1385,9 @@ export function buildReleaseManifest() {
         ...(RG2_PAGES.includes(pageKey) ? ['RG-2'] : []),
         ...(releaseBCoverageSets.pages.has(pageKey) ? ['RELEASE-B'] : []),
         ...(customerPoolCoverageSets.pages.has(pageKey) ? ['CORDYS-CUSTOMER-POOL'] : []),
+        ...(followupCommentCoverageSets.pages.has(pageKey)
+          ? ['CORDYS-FOLLOWUP-COMMENTS']
+          : []),
       ];
       const evidence = uniq([
         ...(RG1_PAGES.includes(pageKey) ? [EVIDENCE.rg1Browser] : []),
@@ -1382,6 +1398,9 @@ export function buildReleaseManifest() {
           : []),
         ...(releaseBCoverageSets.pages.has(pageKey) ? [EVIDENCE.releaseB] : []),
         ...(customerPoolCoverageSets.pages.has(pageKey) ? [EVIDENCE.customerPool] : []),
+        ...(followupCommentCoverageSets.pages.has(pageKey)
+          ? [EVIDENCE.followupComments]
+          : []),
       ]);
       const menuPermissions = menus
         .filter((menu) => menu.pageKey === pageKey && menu.permissionCode)
@@ -1624,6 +1643,15 @@ export function buildReleaseManifest() {
         expectedScenarios: 6,
         minimumScreenshots: 15,
         expectedCoverage: CUSTOMER_POOL_COVERAGE,
+      },
+      {
+        id: 'CRM-FOLLOWUP-COMMENTS',
+        filePrefix: 'crm-followup-comments-parity-',
+        expectedScenarios: 12,
+        minimumScreenshots: 6,
+        expectedTechnicalVerdict: 'pass',
+        expectedDataMigration: 'out-of-scope-development-stage',
+        requireNoFailedRuntimeRequests: true,
       },
     ],
     untested: [

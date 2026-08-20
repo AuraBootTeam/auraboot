@@ -132,6 +132,14 @@
       ]
     },
     {
+      "id": "activity_followup_comments",
+      "blockType": "record-comments",
+      "title": {
+        "zh-CN": "跟进评论",
+        "en-US": "Follow-up Comments"
+      }
+    },
+    {
       "id": "crm_activity_detail_toolbar",
       "blockType": "toolbar",
       "buttons": [

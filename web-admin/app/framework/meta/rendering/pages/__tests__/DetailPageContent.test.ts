@@ -14,6 +14,7 @@ import {
   resolveActiveDetailTab,
   resolveDetailFieldComponent,
   resolveDetailRecordEndpoint,
+  resolveDirectSpecializedDetailBlocks,
   resolveHiddenSystemTabKeys,
   resolveSettingsCardDisplayValue,
   resolveSettingsCardField,
@@ -79,9 +80,7 @@ describe('resolveDetailReturnTarget', () => {
         state: { searchKeyword: '华东智造云' },
       }),
     )}`;
-    expect(resolveDetailReturnTarget(search)).toBe(
-      `/p/c/crm_opportunity_workspace${search}`,
-    );
+    expect(resolveDetailReturnTarget(search)).toBe(`/p/c/crm_opportunity_workspace${search}`);
   });
 
   it('rejects external return targets', () => {
@@ -540,18 +539,14 @@ describe('resolveVisibleDetailTabs', () => {
 });
 
 describe('resolveVisibleDetailTabsFromBlocks', () => {
-  const tabBlock = (
-    id: string,
-    key: string,
-    visibleWhen?: string,
-    detailTabOrder?: number,
-  ) => ({
-    id,
-    blockType: 'tabs',
-    visibleWhen,
-    detailTabOrder,
-    tabs: [{ key, label: key, blocks: [] }],
-  }) as any;
+  const tabBlock = (id: string, key: string, visibleWhen?: string, detailTabOrder?: number) =>
+    ({
+      id,
+      blockType: 'tabs',
+      visibleWhen,
+      detailTabOrder,
+      tabs: [{ key, label: key, blocks: [] }],
+    }) as any;
 
   it('composes all visible tab groups and does not let a hidden first group mask later groups', () => {
     const blocks = [
@@ -593,20 +588,43 @@ describe('resolveVisibleTopLevelDetailBlocks', () => {
       { id: 'audit', blockType: 'description' },
     ] as any;
 
-    expect(resolveVisibleTopLevelDetailBlocks(blocks, () => true).map((block) => block.id)).toEqual([
-      'profile-fields',
-      'audit',
-    ]);
+    expect(resolveVisibleTopLevelDetailBlocks(blocks, () => true).map((block) => block.id)).toEqual(
+      ['profile-fields', 'audit'],
+    );
   });
 
   it('removes hidden top-level blocks without dropping later visible blocks', () => {
     const blocks = [
-      { id: 'candidate-only', blockType: 'form-section', visibleWhen: "form.status == 'candidate'" },
+      {
+        id: 'candidate-only',
+        blockType: 'form-section',
+        visibleWhen: "form.status == 'candidate'",
+      },
       { id: 'always', blockType: 'form-section' },
     ] as any;
 
-    expect(resolveVisibleTopLevelDetailBlocks(blocks, () => false).map((block) => block.id)).toEqual([
-      'always',
+    expect(
+      resolveVisibleTopLevelDetailBlocks(blocks, () => false).map((block) => block.id),
+    ).toEqual(['always']);
+  });
+});
+
+describe('resolveDirectSpecializedDetailBlocks', () => {
+  it('keeps specialized live blocks on a detail page without tabs in source order', () => {
+    const blocks = [
+      { id: 'fields', blockType: 'form-section' },
+      { id: 'timeline', blockType: 'activity-timeline' },
+      { id: 'comments', blockType: 'record-comments' },
+      { id: 'history', blockType: 'field-history' },
+      { id: 'approval', blockType: 'bpm-panel' },
+      { id: 'chart', blockType: 'chart' },
+    ] as any;
+
+    expect(resolveDirectSpecializedDetailBlocks(blocks).map((block) => block.id)).toEqual([
+      'timeline',
+      'comments',
+      'history',
+      'approval',
     ]);
   });
 });

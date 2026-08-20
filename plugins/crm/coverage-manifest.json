@@ -27,7 +27,7 @@
       "model-surfaces": 49,
       "menus": 55,
       "pages": 125,
-      "page-blocks": 402,
+      "page-blocks": 403,
       "page-fields": 1707,
       "ui-actions": 600,
       "commands": 238,
@@ -36,8 +36,8 @@
       "dashboards": 37
     },
     "productVerdicts": {
-      "pass": 641,
-      "untested": 2741
+      "pass": 643,
+      "untested": 2740
     },
     "fullProductNonGoals": [
       "data migration"
@@ -1102,6 +1102,19 @@
       }
     ],
     "pages": [
+      {
+        "id": "crm_activity_common_detail",
+        "goals": [
+          "CORDYS-FOLLOWUP-COMMENTS"
+        ],
+        "kind": "detail",
+        "permissionCodes": [],
+        "evidence": [
+          "web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts"
+        ],
+        "permissionsVerified": true,
+        "verdict": "pass"
+      },
       {
         "id": "crm_activity_service_desk",
         "goals": [
@@ -2693,6 +2706,15 @@
           "crm_customer_pool_recycle_rule_list:crm_cprr_toolbar:create"
         ]
       }
+    },
+    {
+      "id": "CRM-FOLLOWUP-COMMENTS",
+      "filePrefix": "crm-followup-comments-parity-",
+      "expectedScenarios": 12,
+      "minimumScreenshots": 6,
+      "expectedTechnicalVerdict": "pass",
+      "expectedDataMigration": "out-of-scope-development-stage",
+      "requireNoFailedRuntimeRequests": true
     }
   ],
   "untested": [
@@ -4255,10 +4277,12 @@
         {
           "id": "page:crm_activity_common_detail",
           "action": "Open crm_activity_common_detail (detail) from its supported product entry and exercise its complete page journey",
-          "evidence": [],
-          "assertion": "No qualifying browser journey is registered for this page; it remains in the denominator.",
-          "verdict": "untested",
-          "verdict_by": null,
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts"
+          ],
+          "assertion": "Real-stack browser evidence exists for the current release scope.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
           "surface": "ui",
           "dependencies": "real-stack",
           "authority": "blocking-release",
@@ -6133,7 +6157,22 @@
           "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[3]"
         },
         {
-          "id": "block:crm_activity_common_detail:crm_activity_detail_toolbar:4",
+          "id": "block:crm_activity_common_detail:activity_followup_comments:4",
+          "action": "Render and semantically verify record-comments block activity_followup_comments on crm_activity_common_detail",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts"
+          ],
+          "assertion": "The registered real-stack journey renders this block and asserts its business state.",
+          "verdict": "pass",
+          "verdict_by": "spec-assert",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "authority": "blocking-release",
+          "driver": "browser",
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4]"
+        },
+        {
+          "id": "block:crm_activity_common_detail:crm_activity_detail_toolbar:5",
           "action": "Render and semantically verify toolbar block crm_activity_detail_toolbar on crm_activity_common_detail",
           "evidence": [],
           "assertion": "Block-level browser visibility, content, loading, empty, error, and permission evidence is not yet registered.",
@@ -6143,7 +6182,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5]"
         },
         {
           "id": "block:crm_activity_common_form:basic:0",
@@ -34342,7 +34381,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4].buttons[0]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5].buttons[0]"
         },
         {
           "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:start_task:1",
@@ -34355,7 +34394,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4].buttons[1]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5].buttons[1]"
         },
         {
           "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:complete_task:2",
@@ -34368,7 +34407,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4].buttons[2]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5].buttons[2]"
         },
         {
           "id": "ui-action:crm_activity_common_detail:crm_activity_detail_toolbar:cancel_task:3",
@@ -34381,7 +34420,7 @@
           "dependencies": "real-stack",
           "authority": "blocking-release",
           "driver": "browser",
-          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[4].buttons[3]"
+          "source": "plugins/crm/config/pages/crm_activity_common_detail.json#root[5].buttons[3]"
         },
         {
           "id": "ui-action:crm_activity_common_form:buttons:submit:0",

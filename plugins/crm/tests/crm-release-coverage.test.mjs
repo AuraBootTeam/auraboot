@@ -20,7 +20,7 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
 
   assert.equal(committed.axes.semanticActions.length, 26);
   assert.equal(committed.axes.commands.length, 49);
-  assert.equal(committed.axes.pages.length, 26);
+  assert.equal(committed.axes.pages.length, 27);
   assert.equal(committed.axes.permissions.length, 24);
   assert.equal(committed.axes.queries.length, 39);
   assert.deepEqual(
@@ -47,12 +47,12 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.equal(committed.scope.productDenominator.pages, 125);
   assert.equal(committed.scope.productDenominator.commands, 238);
   assert.equal(committed.scope.productDenominator.permissions, 114);
-  assert.equal(committed.scope.productDenominator['page-blocks'], 402);
+  assert.equal(committed.scope.productDenominator['page-blocks'], 403);
   assert.equal(committed.scope.productDenominator['page-fields'], 1707);
   assert.equal(committed.scope.productDenominator['ui-actions'], 600);
   assert.equal(committed.scope.productDenominator.queries, 55);
-  assert.equal(committed.scope.productVerdicts.pass, 641);
-  assert.equal(committed.scope.productVerdicts.untested, 2741);
+  assert.equal(committed.scope.productVerdicts.pass, 643);
+  assert.equal(committed.scope.productVerdicts.untested, 2740);
   assert.ok(committed.scope.productVerdicts.untested > 0);
   assert.equal(committed.scope.productVerdicts.gap ?? 0, 0);
   const coreWorkbenchContract = committed.runtimeEvidenceContracts.find(
@@ -138,6 +138,17 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
     'queries',
     'uiActions',
   ]);
+  const followupCommentsContract = committed.runtimeEvidenceContracts.find(
+    (contract) => contract.id === 'CRM-FOLLOWUP-COMMENTS',
+  );
+  assert.equal(followupCommentsContract.expectedScenarios, 12);
+  assert.equal(followupCommentsContract.minimumScreenshots, 6);
+  assert.equal(followupCommentsContract.expectedTechnicalVerdict, 'pass');
+  assert.equal(
+    followupCommentsContract.expectedDataMigration,
+    'out-of-scope-development-stage',
+  );
+  assert.equal(followupCommentsContract.requireNoFailedRuntimeRequests, true);
   const modelGroup = committed.groups.find((group) => group.id === 'model-surfaces');
   assert.equal(
     modelGroup.rows.find((row) => row.id === 'model:crm_sla_breach')?.verdict,

@@ -3,19 +3,29 @@ package com.auraboot.framework.meta.service;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.exception.MetaServiceException;
+import com.auraboot.framework.notification.service.NotificationService;
+import com.auraboot.framework.user.mapper.UserMapper;
+import com.auraboot.framework.user.service.UserService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Optional;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -39,6 +49,14 @@ class RecordCommentServiceTest {
     private MetaModelService metaModelService;
     @Mock
     private DynamicDataService dynamicDataService;
+    @Mock
+    private NotificationService notificationService;
+    @Mock
+    private UserMapper userMapper;
+    @Mock
+    private UserService userService;
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     private RecordCommentService service;
@@ -87,5 +105,35 @@ class RecordCommentServiceTest {
 
         // Gate is skipped: getById is never consulted for a non-model target.
         verify(dynamicDataService, never()).getById(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("interactive comment notifies the registered record owner through the public owner pid")
+    void interactiveComment_notifiesRecordOwner() {
+        ModelDefinition definition = ModelDefinition.builder()
+                .code("crm_activity_common")
+                .extension(Map.of("dataScope", Map.of("ownerField", "crm_act_owner")))
+                .build();
+        when(metaModelService.getModelDefinition("crm_activity_common"))
+                .thenReturn(Optional.of(definition));
+        when(dynamicDataService.getById("crm_activity_common", "activity-1"))
+                .thenReturn(Map.of("crm_act_owner", "owner-pid"));
+        when(userMapper.findUserIdInTenantByPid(1L, "owner-pid")).thenReturn(22L);
+        when(jdbcTemplate.queryForObject(startsWith("SELECT COALESCE(NULLIF(nick_name"),
+                eq(String.class), eq(11L))).thenReturn("Actor");
+        when(jdbcTemplate.queryForList(startsWith("INSERT INTO ab_record_comment"), any(Object[].class)))
+                .thenReturn(List.of(Map.of(
+                        "commentPid", "comment-1",
+                        "model_code", "crm_activity_common",
+                        "record_pid", "activity-1",
+                        "content", "Owner update")));
+        MetaContext.setContext(1L, 11L, "actor-pid", "actor");
+
+        service.addInteractiveComment(
+                "crm_activity_common", "activity-1", "Owner update", List.of(), null);
+
+        verify(notificationService).sendInApp(
+                22L, "记录新增了一条评论", "Actor：Owner update",
+                "BUSINESS", "crm_activity_common", "activity-1");
     }
 }

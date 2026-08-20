@@ -33,7 +33,9 @@ class RecordCommentServiceIntegrationTest extends BaseIntegrationTest {
     @MockitoBean
     private FileService fileService;
 
-    private static final String MODEL_CODE = "test_model";
+    // Intentionally unregistered: this suite exercises the polymorphic comment store itself.
+    // "test_model" is now a real plugin fixture and therefore triggers row-ACL lookup.
+    private static final String MODEL_CODE = "record_comment_test_target";
     private static final String RECORD_PID = "test_record_001";
 
     @Test
@@ -196,5 +198,94 @@ class RecordCommentServiceIntegrationTest extends BaseIntegrationTest {
         boolean stillPresent = commentService.listComments(MODEL_CODE, RECORD_PID).stream()
                 .anyMatch(c -> commentPid.equals(c.get("commentPid")));
         assertThat(stillPresent).isTrue();
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("CMT-09: page roots with normalized two-level replies and cascade root deletion")
+    @SuppressWarnings("unchecked")
+    void threadedRepliesPageAndCascade() {
+        Map<String, Object> root = commentService.addInteractiveComment(
+                MODEL_CODE, RECORD_PID, "Root discussion", List.of(), null);
+        String rootPid = (String) root.get("commentPid");
+        Map<String, Object> firstReply = commentService.addInteractiveComment(
+                MODEL_CODE, RECORD_PID, "First reply", List.of(), rootPid);
+        commentService.addInteractiveComment(
+                MODEL_CODE, RECORD_PID, "Reply to reply", List.of(),
+                (String) firstReply.get("commentPid"));
+
+        Map<String, Object> page = commentService.pageComments(MODEL_CODE, RECORD_PID, 1, 10);
+        assertThat(page.get("commentCount")).isEqualTo(3L);
+        List<Map<String, Object>> roots = (List<Map<String, Object>>) page.get("items");
+        Map<String, Object> pagedRoot = roots.stream()
+                .filter(row -> rootPid.equals(row.get("commentPid")))
+                .findFirst()
+                .orElseThrow();
+        List<Map<String, Object>> replies = (List<Map<String, Object>>) pagedRoot.get("replies");
+
+        assertThat(replies).extracting(row -> row.get("content"))
+                .containsExactly("First reply", "Reply to reply");
+        assertThat(replies).allSatisfy(reply -> assertThat(reply.get("parentPid")).isEqualTo(rootPid));
+
+        commentService.deleteComment(rootPid);
+        assertThat(commentService.listComments(MODEL_CODE, RECORD_PID))
+                .noneMatch(row -> rootPid.equals(row.get("commentPid"))
+                        || rootPid.equals(row.get("parentPid")));
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("CMT-10: mention plus reply target is deduplicated to one tenant-scoped notification")
+    void mentionReplyNotificationDeduplicated() {
+        long otherUserId = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(id), 0) + 1000000 FROM ab_user", Long.class);
+        long memberId = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(id), 0) + 1000000 FROM ab_tenant_member", Long.class);
+        String otherUserPid = UniqueIdGenerator.generate();
+        jdbcTemplate.update(
+                "INSERT INTO ab_user (id, pid, user_name, nick_name, email, deleted_flag) VALUES (?, ?, ?, ?, ?, false)",
+                otherUserId, otherUserPid, "comment-peer-" + otherUserPid,
+                "Comment Peer", otherUserPid + "@example.test");
+        jdbcTemplate.update(
+                "INSERT INTO ab_tenant_member (id, pid, tenant_id, user_id, status, deleted_flag)"
+                        + " VALUES (?, ?, ?, ?, 'active', false)",
+                memberId, UniqueIdGenerator.generate(), testTenant.getId(), otherUserId);
+
+        MetaContext.setContext(testTenant.getId(), otherUserId, otherUserPid, "comment-peer");
+        String rootPid;
+        try {
+            rootPid = (String) commentService.addInteractiveComment(
+                    MODEL_CODE, RECORD_PID, "Peer root", List.of(), null).get("commentPid");
+        } finally {
+            applyTestMetaContext();
+        }
+
+        commentService.addInteractiveComment(
+                MODEL_CODE, RECORD_PID, "@Comment Peer please review", List.of(otherUserPid), rootPid);
+
+        Integer notifications = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_notification"
+                        + " WHERE tenant_id = ? AND user_id = ? AND source_type = ? AND source_id = ?",
+                Integer.class, testTenant.getId(), otherUserId, MODEL_CODE, RECORD_PID);
+        assertThat(notifications).isEqualTo(1);
+    }
+
+    @Test
+    @Order(11)
+    @DisplayName("CMT-11: interactive mutation cannot reuse a comment pid through another record path")
+    void interactiveMutationRequiresMatchingThreadPath() {
+        String commentPid = (String) commentService.addInteractiveComment(
+                MODEL_CODE, RECORD_PID, "Path-bound comment", List.of(), null).get("commentPid");
+
+        assertThatThrownBy(() -> commentService.editInteractiveComment(
+                MODEL_CODE, "different-record", commentPid, "Hijacked path", List.of()))
+                .isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> commentService.deleteInteractiveComment(
+                MODEL_CODE, "different-record", commentPid))
+                .isInstanceOf(RuntimeException.class);
+
+        assertThat(commentService.listComments(MODEL_CODE, RECORD_PID))
+                .anyMatch(row -> commentPid.equals(row.get("commentPid"))
+                        && "Path-bound comment".equals(row.get("content")));
     }
 }

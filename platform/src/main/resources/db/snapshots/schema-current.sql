@@ -14596,7 +14596,9 @@ CREATE TABLE public.ab_record_comment (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     is_edited boolean DEFAULT false NOT NULL,
-    deleted_flag boolean DEFAULT false NOT NULL
+    deleted_flag boolean DEFAULT false NOT NULL,
+    parent_pid character varying(26),
+    reply_to_user_pid character varying(26)
 );
 
 
@@ -28556,6 +28558,13 @@ CREATE INDEX idx_recon_run_profile ON public.ab_reconciliation_run USING btree (
 --
 
 CREATE INDEX idx_recon_run_status ON public.ab_reconciliation_run USING btree (tenant_id, status);
+
+
+--
+-- Name: idx_record_comment_parent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_record_comment_parent ON public.ab_record_comment USING btree (tenant_id, parent_pid, created_at) WHERE (deleted_flag = false);
 
 
 --
