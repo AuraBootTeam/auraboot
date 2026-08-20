@@ -109,6 +109,7 @@ import {
 import { assembleQuickFilterChips, type QuickFilterChip } from './list/quickFilterChips';
 import { resolveListRowClickMode } from './list/rowClickNavigation';
 import { SelectAllMatchingBanner } from './list/SelectAllMatchingBanner';
+import { SavedViewOverlayStatusBanner } from './list/SavedViewOverlayStatusBanner';
 import {
   resolveAuditUserCellValue,
   resolveAuditUserDisplayFields,
@@ -766,6 +767,7 @@ export function buildListColumnSettingsDefinitions(
     definitions.set(column.field, {
       field: column.field,
       label: resolveLabel(column),
+      ...(column.mandatory === true ? { mandatory: true } : {}),
       dataType: resolveColumnCapabilityDataType(column, modelFieldMap),
       group: 'business',
       defaultVisible: true,
@@ -1515,6 +1517,7 @@ function ListPageContentInner(props: PageContentProps) {
   const [pendingViewConfig, setPendingViewConfig] = useState<Partial<ViewConfig> | null>(null);
   const [savingViewDraft, setSavingViewDraft] = useState(false);
   const [copyingViewDraft, setCopyingViewDraft] = useState(false);
+  const [repairingViewOverlay, setRepairingViewOverlay] = useState(false);
   const savedViewPersistenceMode = getSavedViewPersistenceMode(currentView);
   const isCurrentViewLockedPreset = isSavedViewLockedPreset(currentView);
   const canCopyCurrentView = canCopySavedView(currentView);
@@ -1630,6 +1633,48 @@ function ListPageContentInner(props: PageContentProps) {
     },
     [t],
   );
+  const overlayMeta = currentView?.viewConfig?.meta;
+  const overlayCanWrite =
+    Boolean(currentView) &&
+    (savedViewPersistenceMode !== 'shared-draft' || canSaveSharedView) &&
+    !isCurrentViewLockedPreset;
+  const canRepairViewOverlay = overlayCanWrite && !hasPendingViewConfig;
+  const repairViewOverlayUnavailableReason = hasPendingViewConfig
+    ? translateCommon(
+        'common.saved_view_overlay_pending_draft',
+        '请先保存或放弃当前视图的本地变更。',
+      )
+    : undefined;
+
+  const handleRepairViewOverlay = useCallback(async () => {
+    if (!currentView?.viewConfig || !canRepairViewOverlay) return;
+
+    setRepairingViewOverlay(true);
+    try {
+      await updateView({ viewConfig: currentView.viewConfig });
+      showSuccessToast(
+        translateCommon(
+          'common.saved_view_overlay_repair_success',
+          '失效设置已清理，个人视图已适配当前页面。',
+        ),
+      );
+    } catch (err) {
+      showErrorToast(
+        err instanceof Error
+          ? err.message
+          : translateCommon('common.saved_view_overlay_repair_failed', '个人视图修复失败'),
+      );
+    } finally {
+      setRepairingViewOverlay(false);
+    }
+  }, [
+    canRepairViewOverlay,
+    currentView,
+    showErrorToast,
+    showSuccessToast,
+    translateCommon,
+    updateView,
+  ]);
   useEffect(() => {
     setPendingViewConfig(null);
   }, [currentView?.pid]);
@@ -4637,6 +4682,16 @@ function ListPageContentInner(props: PageContentProps) {
               </button>
             </div>
           )}
+          <SavedViewOverlayStatusBanner
+            status={overlayMeta?.overlayStatus}
+            reasonCodes={overlayMeta?.overlayReasonCodes}
+            stalePaths={overlayMeta?.overlayStalePaths}
+            canRepair={canRepairViewOverlay}
+            repairing={repairingViewOverlay}
+            onRepair={handleRepairViewOverlay}
+            repairUnavailableReason={repairViewOverlayUnavailableReason}
+            t={translateCommon}
+          />
           {/* Page title, view selector, and action buttons */}
           <ListPageHeader
             title={
@@ -4674,6 +4729,7 @@ function ListPageContentInner(props: PageContentProps) {
             onAction={handleAction}
             onToolbarConfigChange={handleToolbarConfigChange}
             resolveLabel={resolveButtonLabel}
+            t={t}
             evaluateVisible={evaluateButtonVisible}
             onImport={() => setImportOpen(true)}
             onExport={handleExport}
@@ -4791,13 +4847,15 @@ function ListPageContentInner(props: PageContentProps) {
 
           {/* List Tabs */}
           {listTabsBlock?.tabs && (listTabsBlock.tabs as any[]).length > 0 && (
-            <ListTabs
-              tabs={listTabsBlock.tabs as any[]}
-              activeTab={activeTab}
-              onTabChange={handleTabChange}
-              locale={locale}
-              t={t}
-            />
+            <div data-aura-block-id={listTabsBlock.id} data-aura-element-id={listTabsBlock.id}>
+              <ListTabs
+                tabs={listTabsBlock.tabs as any[]}
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+                locale={locale}
+                t={t}
+              />
+            </div>
           )}
 
           {/* Filter area - Using Smart Components with collapse/expand (hidden in print) */}
@@ -4807,6 +4865,8 @@ function ListPageContentInner(props: PageContentProps) {
             filterBlock.fields.length > 0 && (
               <div
                 data-testid="search-area"
+                data-aura-block-id={filterBlock.id}
+                data-aura-element-id={filterBlock.id}
                 data-ab-testid={deriveTestId('list', modelCode, 'filters')}
                 className="print-hide border-border bg-subtle border-b px-6 py-4"
                 data-print="hide"
@@ -4827,6 +4887,7 @@ function ListPageContentInner(props: PageContentProps) {
                   {filterBlock.fields.map((field: FieldConfig) => (
                     <div
                       key={field.field}
+                      data-authoring-node-id={(field as any).id || field.field}
                       className="min-w-0"
                       style={{
                         gridColumn: `span ${Math.min(Math.max(field.layout?.colSpan || 4, 1), 12)}`,
@@ -4925,6 +4986,7 @@ function ListPageContentInner(props: PageContentProps) {
                           type="button"
                           key={button.code}
                           data-testid={`filter-btn-${button.code}`}
+                          data-authoring-node-id={(button as any).id || button.code}
                           onClick={() => handleAction(button)}
                           className={`rounded-control px-4 py-2 ${
                             button.primary || button.variant === 'primary'
@@ -4978,7 +5040,11 @@ function ListPageContentInner(props: PageContentProps) {
               </div>
             )
           ) : activeViewType === 'table' ? (
-            <>
+            <div
+              className="relative"
+              data-aura-block-id={tableBlock?.id}
+              data-aura-element-id={tableBlock?.id}
+            >
               {miscBlocksPosition === 'beforeTable' && miscListBlocks.length > 0 && runtime && (
                 <div className="flex flex-col gap-4 p-4" data-testid="list-misc-blocks">
                   {miscListBlocks.map((block: any, idx: number) => (
@@ -5247,28 +5313,30 @@ function ListPageContentInner(props: PageContentProps) {
                 resolveBulkActionLabel={resolveButtonLabel}
                 onClearSelection={clearAllSelection}
               />
-            </>
+            </div>
           ) : (
-            <SmartViewRenderer
-              view={
-                {
-                  ...(activeViewTemplate || currentView || {}),
-                  modelCode,
-                  viewType: activeViewType,
-                  viewConfig: activeViewConfig,
-                } as any
-              }
-              onGanttTaskClick={navigateToRecordView}
-              onOpenViewConfig={() => setViewManageOpen(true)}
-              onSwitchToTableView={() => setActiveViewType('table')}
-              onCardClick={(card) => navigateToRecordView(getLegacyCompatibleRecordPid(card))}
-              onEventClick={navigateToRecordView}
-              onGalleryCardClick={navigateToRecordView}
-              onTreeNodeClick={navigateToRecordView}
-              onDataRefresh={() => loadData({ page: 0, size: pagination.pageSize })}
-              linkageFilters={[]}
-              pageKey={pageKey}
-            />
+            <div data-aura-block-id={tableBlock?.id} data-aura-element-id={tableBlock?.id}>
+              <SmartViewRenderer
+                view={
+                  {
+                    ...(activeViewTemplate || currentView || {}),
+                    modelCode,
+                    viewType: activeViewType,
+                    viewConfig: activeViewConfig,
+                  } as any
+                }
+                onGanttTaskClick={navigateToRecordView}
+                onOpenViewConfig={() => setViewManageOpen(true)}
+                onSwitchToTableView={() => setActiveViewType('table')}
+                onCardClick={(card) => navigateToRecordView(getLegacyCompatibleRecordPid(card))}
+                onEventClick={navigateToRecordView}
+                onGalleryCardClick={navigateToRecordView}
+                onTreeNodeClick={navigateToRecordView}
+                onDataRefresh={() => loadData({ page: 0, size: pagination.pageSize })}
+                linkageFilters={[]}
+                pageKey={pageKey}
+              />
+            </div>
           )}
 
           <ListModals

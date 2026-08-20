@@ -89,6 +89,14 @@ public class PageSchema extends AbstractMultiVersionEntity {
     @TableField("plugin_pid")
     private String pluginPid;
 
+    /** Declared source ownership used by governed authoring overlay resolution. */
+    @TableField("ownership_scope")
+    private String ownershipScope;
+
+    /** Optional application/plugin/template ownership reference. */
+    @TableField("ownership_ref")
+    private String ownershipRef;
+
     /**
      * env-layering PoC: foreign key to ab_environment(id). Auto-filled on insert by
      * {@code EnvIdMetaObjectHandler} from {@link com.auraboot.framework.application.tenant.MetaContext},

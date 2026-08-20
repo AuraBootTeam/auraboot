@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
@@ -27,4 +28,22 @@ public class PageSchemaSyncVersionDTO {
 
     @JsonProperty("modelCode")
     private String modelCode;
+
+    @JsonProperty("runtime")
+    private PageSchemaRuntimeDTO runtime;
+
+    @JsonIgnore
+    private String pagePid;
+
+    @JsonIgnore
+    private String runtimeReleasePid;
+
+    @JsonIgnore
+    private Long runtimeChannelVersion;
+
+    @JsonIgnore
+    private Long runtimeSourceVersion;
+
+    @JsonIgnore
+    private String runtimeSnapshotChecksum;
 }

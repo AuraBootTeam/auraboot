@@ -23,10 +23,12 @@ import java.util.stream.Collectors;
 /**
  * Guards the bootstrap-vs-plugin menu boundary at startup.
  *
- * <p>Scans {@code ab_menu} for rows with {@code plugin_pid IS NULL} (bootstrap-owned menus).
- * Any distinct menu code not present in {@code seed/platform-menu-whitelist.json} indicates
- * a functional menu leaked into {@code default-bootstrap.json} — the process aborts so the
- * orphan is fixed before it accumulates.
+ * <p>Scans {@code ab_menu} for rows with {@code plugin_pid IS NULL} that are not explicitly
+ * marked as authoring-managed. Authoring-managed rows are tenant-owned runtime resources,
+ * not bootstrap seeds. Any remaining distinct menu code not present in
+ * {@code seed/platform-menu-whitelist.json} indicates a functional menu leaked into
+ * {@code default-bootstrap.json} — the process aborts so the orphan is fixed before it
+ * accumulates.
  */
 @Slf4j
 @Component
@@ -39,6 +41,7 @@ public class OrphanMenuCheckRunner implements ApplicationRunner {
     private static final String ORPHAN_QUERY =
             "SELECT DISTINCT code FROM ab_menu "
                     + "WHERE plugin_pid IS NULL AND deleted_flag = FALSE AND status = 'active' "
+                    + "AND COALESCE(extension ->> 'authoringManaged', 'false') <> 'true' "
                     + "AND code IS NOT NULL AND TRIM(code) <> ''";
     private static final String MALFORMED_ORPHAN_COUNT_QUERY =
             "SELECT COUNT(*) FROM ab_menu "

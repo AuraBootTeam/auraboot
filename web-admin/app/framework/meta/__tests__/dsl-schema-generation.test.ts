@@ -112,6 +112,11 @@ describe('DSL Generated Schema', () => {
     expect(editable?.type).toBe('boolean');
   });
 
+  it('personalization mandatory flags should be explicit booleans', () => {
+    expect(defs.ColumnConfig.properties?.mandatory?.type).toBe('boolean');
+    expect(defs.ButtonConfig.properties?.mandatory?.type).toBe('boolean');
+  });
+
   it('ColumnConfig.valueType should be string enum with known values', () => {
     const vt = defs.ColumnConfig.properties?.valueType;
     expect(vt?.type).toBe('string');

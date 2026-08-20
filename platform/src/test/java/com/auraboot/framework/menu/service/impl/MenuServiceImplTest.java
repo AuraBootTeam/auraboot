@@ -1,16 +1,40 @@
 package com.auraboot.framework.menu.service.impl;
 
+import com.auraboot.framework.menu.entity.Menu;
+import com.auraboot.framework.menu.service.MenuEnvironmentScopeService;
+import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
+import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Unit tests for MenuServiceImpl
  */
 class MenuServiceImplTest {
+
+    @Test
+    void authoringManagedMenusAreVisibleOnlyInPublishedEnvironments() {
+        Menu legacy = new Menu();
+        assertTrue(MenuEnvironmentScopeService.isVisibleIn(legacy, 10L));
+
+        ExtensionBean extension = new ExtensionBean();
+        extension.setDynamicProperty("authoringManaged", true);
+        extension.setDynamicProperty("authoringEnvironmentIds", List.of(10L, "12"));
+        Menu managed = new Menu();
+        managed.setExtension(extension);
+
+        assertTrue(MenuEnvironmentScopeService.isVisibleIn(managed, 10L));
+        assertTrue(MenuEnvironmentScopeService.isVisibleIn(managed, 12L));
+        assertFalse(MenuEnvironmentScopeService.isVisibleIn(managed, 11L));
+        assertFalse(MenuEnvironmentScopeService.isVisibleIn(managed, null));
+    }
 
     @Test
     @DisplayName("convertPathToResourceCode should convert valid paths correctly")

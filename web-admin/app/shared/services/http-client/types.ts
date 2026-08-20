@@ -74,6 +74,12 @@ export interface FetchOptions {
   params?: Record<string, any> | any[];
 
   /**
+   * Additional request headers merged with the shared JSON/auth/timezone headers.
+   * Shared security headers may still override a caller-provided value.
+   */
+  headers?: Record<string, string>;
+
+  /**
    * Explicit authentication token
    *
    * When provided, overrides automatic token resolution.

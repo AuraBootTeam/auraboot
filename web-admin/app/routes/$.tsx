@@ -151,7 +151,7 @@ export default function CatchAllRoute() {
 
         // Fallback to pagePid if pageKey lookup failed
         if (!pageInfo && pagePid) {
-          const pageResult = await fetchResult<PageInfo>(`/api/pages/${pagePid}`, {
+          const pageResult = await fetchResult<PageInfo>(`/api/pages/runtime/${pagePid}`, {
             method: 'get',
             token,
           });

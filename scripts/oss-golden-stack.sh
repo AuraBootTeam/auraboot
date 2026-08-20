@@ -152,7 +152,8 @@ NODE
     backend_dir="$REPO_ROOT/plugins/$plugin_name/backend"
     jar_path="$REPO_ROOT/plugins/$plugin_name/$jar_rel"
     [ -d "$backend_dir" ] || die "hybrid backend missing for $plugin_name: $backend_dir"
-    ( cd "$backend_dir" && GRADLE_USER_HOME="$gradle_home" gradle --no-daemon \
+    ( cd "$backend_dir" && GRADLE_USER_HOME="$gradle_home" "$REPO_ROOT/platform/gradlew" \
+      --project-dir "$backend_dir" --no-daemon \
       -Dmaven.repo.local="$maven_repo" clean jar --console=plain ) \
       >"$sd/${plugin_name}-jar.log" 2>&1 \
       || die "hybrid jar build failed for $plugin_name — see $sd/${plugin_name}-jar.log"

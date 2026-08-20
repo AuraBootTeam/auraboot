@@ -115,7 +115,7 @@ PGPASSWORD=auraboot psql -h localhost -p "$PG_PORT" -U auraboot -d auraboot \
 # -----------------------------------------------------------------------------
 
 echo "==> [3/6] Building plugins/workflow-demo/backend"
-( cd plugins/workflow-demo/backend && gradle build --no-daemon -q ) \
+( ./platform/gradlew --project-dir plugins/workflow-demo/backend build --no-daemon -q ) \
   2>&1 | tee "$LOG_DIR/03-plugin-build.log" || {
   echo "ERROR: workflow-demo backend build failed. See $LOG_DIR/03-plugin-build.log" >&2
   exit 3

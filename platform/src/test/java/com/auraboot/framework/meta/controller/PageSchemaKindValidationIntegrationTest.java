@@ -154,7 +154,7 @@ class PageSchemaKindValidationIntegrationTest {
         dto.setKind("dashboard");
         dto.setSchemaVersion(3);
         dto.setBlocks(List.of(Map.of("id", "dashboard_system_overview", "blockType", "dashboard")));
-        when(pageSchemaService.findAnyByPageKey("system_overview")).thenReturn(dto);
+        when(pageSchemaService.findByPageKey("system_overview")).thenReturn(dto);
 
         mockMvc.perform(get("/api/pages/page-key/system_overview")
                         .accept(MediaType.APPLICATION_JSON))

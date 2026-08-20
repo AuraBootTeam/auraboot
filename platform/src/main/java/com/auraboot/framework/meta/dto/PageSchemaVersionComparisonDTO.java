@@ -109,6 +109,11 @@ public class PageSchemaVersionComparisonDTO {
         private Integer modifiedFields;
 
         /**
+         * 移动块数量
+         */
+        private Integer movedFields;
+
+        /**
          * 是否有重大变更
          */
         private Boolean hasMajorChanges;
@@ -125,6 +130,7 @@ public class PageSchemaVersionComparisonDTO {
     public enum DifferenceType {
         ADDED,      // 新增
         REMOVED,    // 删除
-        MODIFIED    // 修改
+        MODIFIED,   // 修改
+        MOVED       // 移动
     }
 }

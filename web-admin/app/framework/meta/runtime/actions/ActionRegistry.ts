@@ -24,6 +24,15 @@ import {
   getLegacyCompatibleRecordPid,
 } from '~/framework/meta/utils/publicRecordId';
 
+function translateOrFallback(
+  t: ((key: string) => string) | undefined,
+  key: string,
+  fallback: string,
+): string {
+  const translated = t?.(key);
+  return translated && translated !== key ? translated : fallback;
+}
+
 /**
  * 动作执行上下文
  * 包含所有动作执行所需的依赖和状态
@@ -289,6 +298,7 @@ actionRegistry.register(
     fetchResult,
     buildApiEndpoint,
     t,
+    locale,
     confirm: ctxConfirm,
     showToast,
   }) => {
@@ -302,8 +312,13 @@ actionRegistry.register(
       return;
     }
 
-    const confirmMessage =
-      t?.('common.confirm.delete') || 'Are you sure you want to delete this record?';
+    const confirmMessage = translateOrFallback(
+      t,
+      'common.confirm.delete',
+      locale?.toLowerCase().startsWith('zh')
+        ? '确定要删除这条记录吗？'
+        : 'Are you sure you want to delete this record?',
+    );
     const doConfirm = ctxConfirm ?? confirmDialog;
     const confirmed = await doConfirm({ content: confirmMessage, variant: 'danger' });
     if (!confirmed) {
@@ -338,16 +353,30 @@ actionRegistry.register(
           });
 
       if (ResultHelper.isSuccess(result)) {
-        const successMessage = t?.('common.success.delete') || 'Deleted successfully';
+        const successMessage = translateOrFallback(
+          t,
+          'common.success.delete',
+          locale?.toLowerCase().startsWith('zh') ? '删除成功' : 'Deleted successfully',
+        );
         showToast?.(successMessage, 'success');
         await loadData({ filters });
       } else {
-        const errorMessage = result.desc || t?.('common.error.delete') || 'Delete failed';
+        const errorMessage =
+          result.desc ||
+          translateOrFallback(
+            t,
+            'common.error.delete',
+            locale?.toLowerCase().startsWith('zh') ? '删除失败' : 'Delete failed',
+          );
         showToast?.(errorMessage, 'error');
       }
     } catch (error) {
       console.error('[ActionRegistry] delete error:', error);
-      const errorMessage = t?.('common.error.delete') || 'Delete failed';
+      const errorMessage = translateOrFallback(
+        t,
+        'common.error.delete',
+        locale?.toLowerCase().startsWith('zh') ? '删除失败' : 'Delete failed',
+      );
       showToast?.(errorMessage, 'error');
     }
   },

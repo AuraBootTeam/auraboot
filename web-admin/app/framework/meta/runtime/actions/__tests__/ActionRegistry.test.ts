@@ -2,6 +2,34 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { actionRegistry, promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
 
+describe('ActionRegistry delete translations', () => {
+  it('does not leak unresolved i18n keys into confirmation and success toasts', async () => {
+    const confirm = vi.fn().mockResolvedValue(true);
+    const showToast = vi.fn();
+    const loadData = vi.fn().mockResolvedValue(undefined);
+
+    await actionRegistry.execute('delete', {
+      tableName: 'supplier_management_supplier',
+      record: { pid: 'SUP-1' },
+      button: { commandCode: 'supplier_management:delete_supplier_management_supplier' },
+      t: (key) => key,
+      locale: 'zh-CN',
+      confirm,
+      showToast,
+      loadData,
+      filters: {},
+      buildApiEndpoint: (tableName) => `/api/dynamic/${tableName}`,
+      fetchResult: vi.fn().mockResolvedValue({ code: '0', data: {} }),
+    });
+
+    expect(confirm).toHaveBeenCalledWith({
+      content: '确定要删除这条记录吗？',
+      variant: 'danger',
+    });
+    expect(showToast).toHaveBeenCalledWith('删除成功', 'success');
+  });
+});
+
 describe('ActionRegistry record navigation', () => {
   it('prefers pid over id for edit routes', async () => {
     const navigate = vi.fn();

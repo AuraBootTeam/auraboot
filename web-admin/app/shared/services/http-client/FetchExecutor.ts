@@ -74,8 +74,13 @@ export async function executeFetch<T>(url: string, init: RequestInit): Promise<R
   let response: Response | null = null;
 
   try {
+    // Fetch only normalizes the CORS-safelisted method names. In particular,
+    // a caller-provided `patch` can reach the HTTP server in lowercase and be
+    // rejected before Spring routing. Normalize at the wire boundary while
+    // keeping the caller-facing FetchOptions API case-insensitive.
+    const wireInit = init.method ? { ...init, method: init.method.toUpperCase() } : init;
     // Execute fetch request
-    response = await fetch(url, init);
+    response = await fetch(url, wireInit);
 
     // Check HTTP status code
     if (!response.ok) {

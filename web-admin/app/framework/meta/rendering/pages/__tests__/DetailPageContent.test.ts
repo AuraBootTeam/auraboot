@@ -22,6 +22,7 @@ import {
   resolveVisibleDetailTabsFromBlocks,
   resolveVisibleTopLevelDetailBlocks,
   shouldRenderDefaultDetailEditAction,
+  canRenderDetailToolbarButton,
   unwrapDetailRecord,
 } from '../DetailPageContent';
 
@@ -166,6 +167,30 @@ describe('shouldRenderDefaultDetailEditAction', () => {
 
   it('hides the default edit action when extension.showEdit is false', () => {
     expect(shouldRenderDefaultDetailEditAction({ extension: { showEdit: false } })).toBe(false);
+  });
+});
+
+describe('canRenderDetailToolbarButton', () => {
+  it('keeps buttons without a permission code visible', () => {
+    expect(canRenderDetailToolbarButton({}, () => false)).toBe(true);
+  });
+
+  it('hides a permission-bound button when the current user lacks the permission', () => {
+    expect(
+      canRenderDetailToolbarButton(
+        { permissionCode: 'model.supplier_management_supplier.update' },
+        () => false,
+      ),
+    ).toBe(false);
+  });
+
+  it('shows a permission-bound button when the current user has the permission', () => {
+    expect(
+      canRenderDetailToolbarButton(
+        { permissionCode: 'model.supplier_management_supplier.update' },
+        (code) => code === 'model.supplier_management_supplier.update',
+      ),
+    ).toBe(true);
   });
 });
 

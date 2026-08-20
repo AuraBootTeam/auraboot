@@ -196,6 +196,41 @@ describe('FormButtonsBlockRenderer', () => {
 // ---------------------------------------------------------------------------
 
 describe('ToolbarBlockRenderer', () => {
+  it('filters toolbar buttons by permissionCode before rendering', () => {
+    hasPermissionSpy.mockImplementation((code?: string) => code !== 'model.test_model.update');
+    const runtime = makeRuntime();
+    const block = {
+      type: 'toolbar',
+      buttons: [
+        {
+          code: 'edit',
+          label: 'Edit',
+          permissionCode: 'model.test_model.update',
+          action: { type: 'navigate', to: 'test_model_form' },
+        },
+        {
+          code: 'view-audit',
+          label: 'View audit',
+          permissionCode: 'model.test_model.read',
+          action: { type: 'navigate', to: 'test_model_audit' },
+        },
+        {
+          code: 'back',
+          label: 'Back',
+          action: { type: 'navigate', to: 'test_model_list' },
+        },
+      ],
+    };
+
+    const { getByTestId, queryByTestId } = render(
+      <ToolbarBlockRenderer block={block as any} runtime={runtime} />,
+    );
+
+    expect(queryByTestId('toolbar-btn-edit')).toBeNull();
+    expect(getByTestId('toolbar-btn-view-audit')).toBeInTheDocument();
+    expect(getByTestId('toolbar-btn-back')).toBeInTheDocument();
+  });
+
   it('dispatches new-format action with record=undefined (toolbar has no row)', () => {
     const runtime = makeRuntime();
     const block = {

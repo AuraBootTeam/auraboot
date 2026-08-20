@@ -29,6 +29,7 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
             + "page_key, model_code, name, description, kind, schema_version, "
             + "profile, title, layout, blocks, meta_info, is_template, "
             + "template_category, sort_weight, published_at, tags, plugin_pid, "
+            + "ownership_scope, ownership_ref, "
             + "version, semver, row_version, created_at, updated_at, deleted_flag";
 
     // ==================== 幂等INSERT方法（统一使用） ====================
@@ -343,6 +344,12 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
     @Select("SELECT " + PAGE_SCHEMA_COLUMNS + " FROM ab_page_schema WHERE page_key = #{pageKey} AND status = 'published' AND deleted_flag = false")
     PageSchema selectByPageKey(@Param("pageKey") String pageKey);
 
+    /** Return one published runtime page by public identifier. */
+    @Select("SELECT " + PAGE_SCHEMA_COLUMNS
+            + " FROM ab_page_schema WHERE pid = #{pid}"
+            + " AND status = 'published' AND deleted_flag = false")
+    PageSchema selectPublishedByPid(@Param("pid") String pid);
+
     /**
      * 根据页面唯一标识查询（包含草稿和已发布，用于存在性检查）
      * @param pageKey 页面唯一标识
@@ -503,17 +510,40 @@ public interface PageSchemaMapper extends BaseMapper<PageSchema> {
      * @param since timestamp threshold
      * @return lightweight version DTOs
      */
-    @Select("SELECT page_key, schema_version, updated_at, kind, model_code " +
-            "FROM ab_page_schema " +
-            "WHERE updated_at > #{since} AND status = 'published' " +
-            "AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
-            "ORDER BY updated_at DESC")
+    @Select("""
+            SELECT p.pid AS page_pid, p.page_key, p.schema_version,
+                   GREATEST(p.updated_at, COALESCE(c.updated_at, p.updated_at)) AS updated_at,
+                   p.kind, p.model_code, r.pid AS runtime_release_pid,
+                   COALESCE(c.row_version, 0) AS runtime_channel_version,
+                   COALESCE(i.source_version, p.row_version, p.version, 1) AS runtime_source_version,
+                   i.snapshot_checksum AS runtime_snapshot_checksum
+            FROM ab_page_schema p
+            LEFT JOIN ab_authoring_release_channel c
+              ON c.tenant_id = p.tenant_id AND c.env_id = p.env_id
+             AND c.resource_type = 'PAGE_SCHEMA' AND c.resource_pid = p.pid
+            LEFT JOIN ab_authoring_release r
+              ON r.id = c.active_release_id AND r.tenant_id = c.tenant_id
+             AND r.env_id = c.env_id AND r.status = 'ACTIVE'
+            LEFT JOIN ab_authoring_release_item i
+              ON i.release_id = r.id AND i.tenant_id = r.tenant_id
+             AND i.env_id = r.env_id AND i.resource_type = 'PAGE_SCHEMA'
+             AND i.resource_pid = p.pid
+            WHERE GREATEST(p.updated_at, COALESCE(c.updated_at, p.updated_at)) > #{since}
+              AND p.status = 'published'
+              AND (p.deleted_flag = FALSE OR p.deleted_flag IS NULL)
+            ORDER BY updated_at DESC
+            """)
     @Results({
         @Result(column = "page_key", property = "pageKey"),
         @Result(column = "schema_version", property = "schemaVersion"),
         @Result(column = "updated_at", property = "updatedAt"),
         @Result(column = "kind", property = "kind"),
-        @Result(column = "model_code", property = "modelCode")
+        @Result(column = "model_code", property = "modelCode"),
+        @Result(column = "page_pid", property = "pagePid"),
+        @Result(column = "runtime_release_pid", property = "runtimeReleasePid"),
+        @Result(column = "runtime_channel_version", property = "runtimeChannelVersion"),
+        @Result(column = "runtime_source_version", property = "runtimeSourceVersion"),
+        @Result(column = "runtime_snapshot_checksum", property = "runtimeSnapshotChecksum")
     })
     List<PageSchemaSyncVersionDTO> selectVersionsSince(@Param("since") Instant since);
 

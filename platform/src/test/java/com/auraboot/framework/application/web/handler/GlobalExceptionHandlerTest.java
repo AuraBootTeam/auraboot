@@ -19,6 +19,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -295,6 +296,24 @@ class GlobalExceptionHandlerTest {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody().getCode()).isEqualTo(ResponseCode.NOT_FOUND.getCode());
+    }
+
+    @Test
+    void handleDataAccessException_neverExposesPersistenceDetailsEvenInDev() {
+        asDev();
+        DataIntegrityViolationException ex = new DataIntegrityViolationException(
+                "secret trigger and SQL detail");
+
+        ResponseEntity<ApiResponse<Object>> resp = handler.handleDataAccessException(ex);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(resp.getBody()).isNotNull();
+        assertThat(resp.getBody().getContext()).isEqualTo(
+                "An unexpected error occurred. Please try again later.");
+        assertThat(String.valueOf(resp.getBody().getContext()))
+                .doesNotContain("secret")
+                .doesNotContain("trigger")
+                .doesNotContain("SQL");
     }
 
     @Test

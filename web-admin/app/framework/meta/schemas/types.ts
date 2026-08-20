@@ -203,6 +203,8 @@ export interface EventConfig {
 export interface ColumnConfig {
   field: string;
   label?: string | LocalizedText; // optional: resolved by i18n Resolver from model displayName
+  /** Runtime personalization may reorder but never hide this baseline field. */
+  mandatory?: boolean;
 
   // Layout
   align?: 'left' | 'center' | 'right';
@@ -359,6 +361,8 @@ export type ActionDef =
 // Button 配置
 export interface ButtonConfig {
   code: string;
+  /** Runtime personalization may reorder but never hide this baseline action. */
+  mandatory?: boolean;
   /** Designer-authored shorthand for common toolbar buttons. */
   preset?: string;
   /** @deprecated Use `label` for i18n display text. Kept for backward compatibility. */
@@ -672,6 +676,15 @@ export interface UnifiedSchema {
   id: string;
   /** Runtime page key from PageSchemaDTO.pageKey. */
   pageKey?: string;
+  /** Immutable runtime-version identity used to partition schema caches. */
+  runtime?: {
+    source: 'PAGE_SCHEMA' | 'AUTHORING_RELEASE';
+    releasePid?: string | null;
+    channelVersion: number;
+    sourceVersion: number;
+    snapshotChecksum?: string | null;
+    cacheKey: string;
+  };
   title: string | LocalizedText;
   /** Page name (from PageSchemaDTO.name; effective name fallback when title is missing). */
   name?: string;

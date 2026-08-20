@@ -125,6 +125,27 @@ public class PermissionSnapshotCache {
         return Collections.unmodifiableSet(result);
     }
 
+    /**
+     * Resolve the effective permission IDs for one role, including the implicit tenant-member
+     * baseline used by normal runtime authorization.
+     *
+     * <p>This projection is intentionally role-only: it does not create a synthetic user or alter
+     * the request identity. Callers must tenant-validate the role before invoking it.
+     */
+    public Set<Long> getEffectiveRolePermissionIds(Long tenantId, Long roleId) {
+        if (tenantId == null || roleId == null) {
+            return Collections.emptySet();
+        }
+        LocalDate today = LocalDate.now();
+        LinkedHashSet<Long> effective = new LinkedHashSet<>(
+                getRolePermissionIds(tenantId, roleId, today));
+        Long baselineRoleId = getBaselineRoleId(tenantId);
+        if (baselineRoleId != null && !baselineRoleId.equals(roleId)) {
+            effective.addAll(getRolePermissionIds(tenantId, baselineRoleId, today));
+        }
+        return Collections.unmodifiableSet(effective);
+    }
+
     public void evictUser(Long tenantId, Long userId) {
         if (tenantId == null || userId == null) {
             return;

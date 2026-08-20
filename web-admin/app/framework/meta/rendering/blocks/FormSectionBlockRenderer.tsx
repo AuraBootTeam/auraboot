@@ -171,6 +171,7 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
             return (
               <div
                 key={field.field}
+                data-authoring-node-id={(field as any).id || field.field}
                 className="rounded-control border-border bg-panel min-w-0 border px-4 py-3"
                 style={{ gridColumn: `span ${Math.min(12, Math.max(1, colSpan))}` }}
               >
@@ -200,6 +201,7 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
           return (
             <div
               key={field.field}
+              data-authoring-node-id={(field as any).id || field.field}
               style={{
                 gridColumn: `span ${colSpan}`,
                 gridRow: rowSpan > 1 ? `span ${rowSpan}` : undefined,

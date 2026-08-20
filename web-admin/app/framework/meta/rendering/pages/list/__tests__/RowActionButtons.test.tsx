@@ -60,10 +60,7 @@ describe('RowActionButtons — More actions dropdown', () => {
     // Clicking a menu item dispatches handleAction and closes the dropdown.
     fireEvent.click(screen.getByTestId('row-action-delete'));
     expect(handleAction).toHaveBeenCalledTimes(1);
-    expect(handleAction).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 'delete' }),
-      record,
-    );
+    expect(handleAction).toHaveBeenCalledWith(expect.objectContaining({ code: 'delete' }), record);
     expect(screen.queryByTestId('row-action-dropdown')).not.toBeInTheDocument();
   });
 
@@ -71,13 +68,17 @@ describe('RowActionButtons — More actions dropdown', () => {
     setup();
 
     const trigger = screen.getByTestId('row-action-more');
-    const wrapper = trigger.closest('[data-row-actions-open]') ||
-      trigger.parentElement; // before open, attribute is absent
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+    expect(trigger).toHaveAttribute('aria-controls');
+    const wrapper = trigger.closest('[data-row-actions-open]') || trigger.parentElement; // before open, attribute is absent
     // Pre-open: attribute should not be set on the relative wrapper.
     expect(trigger.parentElement?.getAttribute('data-row-actions-open')).toBeNull();
 
     fireEvent.click(trigger);
     expect(trigger.parentElement?.getAttribute('data-row-actions-open')).toBe('true');
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('menu')).toHaveAttribute('id', trigger.getAttribute('aria-controls'));
 
     // Voids unused-var lint
     void wrapper;
