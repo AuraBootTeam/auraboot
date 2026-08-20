@@ -36,7 +36,7 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
 
   // 路由 / 鉴权上下文 — useActionHandler hook 要求
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { token, hasPermission } = useAuth();
   const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToastContext();
   const schema = runtime.getSchema();
   const tableName = (schema as any).modelCode || schema.id || '';
@@ -134,6 +134,10 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
       <LoadingOverlay visible={busy} label={t('common.loading')} />
       <div className="toolbar-block flex space-x-2">
         {buttons.map((button) => {
+          if (button.permissionCode && !hasPermission(button.permissionCode)) {
+            return null;
+          }
+
           // 条件渲染
           if (button.visibleWhen) {
             const visible = evaluator.evaluateCondition(button.visibleWhen, context);
