@@ -221,6 +221,7 @@ public class LeadPoolCommandHandler implements CommandHandlerExtension {
         for (Map<String, Object> pool : pools) {
             String poolId = string(pool.get("pid"));
             int days = intValue(pool.get("crm_lp_recycle_after_days"));
+            List<Map<String, Object>> configuredRules = activeRecycleRules(db, poolId);
 
             for (String leaseState : RECYCLE_LEASE_STATES) {
                 List<Map<String, Object>> leasedItems = db.query("crm_lead_pool_item", Map.of(
@@ -254,12 +255,8 @@ public class LeadPoolCommandHandler implements CommandHandlerExtension {
             if (leads == null) continue;
             for (Map<String, Object> lead : leads) {
                 if (!OPEN_LEAD_STATES.contains(string(lead.get("crm_lead_status")))) continue;
-                Object basisValue = "claimed_at".equals(string(pool.get("crm_lp_recycle_basis")))
-                        ? lead.get("crm_lead_claimed_at")
-                        : Optional.ofNullable(lead.get("crm_lead_last_activity_at"))
-                                .orElse(lead.get("crm_lead_claimed_at"));
-                if (LeadPoolRules.shouldRecycle(instant(basisValue), days, now)) {
-                    try {
+                try {
+                    if (shouldRecycle(db, pool, lead, configuredRules, days, now)) {
                         LeaseAttempt attempt = acquireRecycleLease(db, pool, lead, actor, days, now, leaseTimeout);
                         if (attempt.activeLease()) {
                             activeLeases++;
@@ -271,15 +268,90 @@ public class LeadPoolCommandHandler implements CommandHandlerExtension {
                                 activeLeases++;
                             }
                         }
-                    } catch (RuntimeException error) {
-                        // Per-item tolerance: surface the failed candidate and continue independent work.
-                        failed++;
-                        log.warn("Failed to recycle lead {} in pool {}", string(lead.get("pid")), poolId, error);
                     }
+                } catch (RuntimeException error) {
+                    // Per-item tolerance: surface the failed candidate and continue independent work.
+                    failed++;
+                    log.warn("Failed to recycle lead {} in pool {}", string(lead.get("pid")), poolId, error);
                 }
             }
         }
         return new RecycleResult(recycled, recovered, activeLeases, failed);
+    }
+
+    private static List<Map<String, Object>> activeRecycleRules(DataAccessor db, String poolId) {
+        List<Map<String, Object>> rules = db.query("crm_lead_pool_recycle_rule", Map.of(
+                "crm_lprr_pool_id", poolId,
+                "crm_lprr_status", "active"));
+        if (rules == null || rules.isEmpty()) return List.of();
+        return rules.stream()
+                .sorted(java.util.Comparator.comparingInt(rule -> intValue(rule.get("crm_lprr_sort_order"))))
+                .toList();
+    }
+
+    private static boolean shouldRecycle(DataAccessor db, Map<String, Object> pool,
+                                         Map<String, Object> lead,
+                                         List<Map<String, Object>> configuredRules,
+                                         int legacyDays, Instant now) {
+        if (configuredRules == null || configuredRules.isEmpty()) {
+            Object basisValue = "claimed_at".equals(string(pool.get("crm_lp_recycle_basis")))
+                    ? lead.get("crm_lead_claimed_at")
+                    : Optional.ofNullable(lead.get("crm_lead_last_activity_at"))
+                            .orElse(lead.get("crm_lead_claimed_at"));
+            return LeadPoolRules.shouldRecycle(instant(basisValue), legacyDays, now);
+        }
+        String leadId = required(lead.get("pid"), "Lead has no pid");
+        List<Map<String, Object>> items = db.query("crm_lead_pool_item", Map.of("crm_lpi_lead_key", leadId));
+        Map<String, Object> item = items == null || items.isEmpty() ? Map.of() : items.getFirst();
+        boolean matchAll = !"any".equals(string(pool.get("crm_lp_recycle_match_mode")));
+        return matchAll
+                ? configuredRules.stream().allMatch(rule -> matchesRecycleRule(rule, lead, item, now))
+                : configuredRules.stream().anyMatch(rule -> matchesRecycleRule(rule, lead, item, now));
+    }
+
+    static boolean matchesRecycleRule(Map<String, Object> rule, Map<String, Object> lead,
+                                      Map<String, Object> item, Instant now) {
+        String source = required(rule.get("crm_lprr_time_source"), "Recycle rule time source is required");
+        String operator = required(rule.get("crm_lprr_operator"), "Recycle rule operator is required");
+        List<Instant> timestamps = switch (source) {
+            case "pool_entered_or_claimed" -> nonNullInstants(
+                    instant(item.get("crm_lpi_entered_at")),
+                    instant(lead.get("crm_lead_claimed_at")));
+            case "pool_entered_at" -> nonNullInstants(instant(item.get("crm_lpi_entered_at")));
+            case "claimed_at" -> nonNullInstants(instant(lead.get("crm_lead_claimed_at")));
+            case "last_activity_at" -> nonNullInstants(instant(lead.get("crm_lead_last_activity_at")));
+            default -> throw new IllegalArgumentException("Unsupported recycle rule time source: " + source);
+        };
+        // Cordys treats an absent selected time as satisfying that recycle condition.
+        if (timestamps.isEmpty()) return true;
+        int days = intValue(rule.get("crm_lprr_days"));
+        Instant start = instant(rule.get("crm_lprr_start_at"));
+        Instant end = instant(rule.get("crm_lprr_end_at"));
+        return switch (operator) {
+            case "older_than_days" -> timestamps.stream()
+                    .anyMatch(value -> !value.isAfter(now.minus(Duration.ofDays(days))));
+            case "newer_than_days" -> timestamps.stream()
+                    .anyMatch(value -> !value.isBefore(now.minus(Duration.ofDays(days))));
+            case "fixed_between" -> {
+                if (start == null || end == null || start.isAfter(end)) {
+                    throw new IllegalArgumentException("Fixed interval requires an ordered start and end");
+                }
+                yield timestamps.stream().anyMatch(value -> !value.isBefore(start) && !value.isAfter(end));
+            }
+            case "fixed_before" -> {
+                if (end == null) throw new IllegalArgumentException("Fixed-before rule requires an end time");
+                yield timestamps.stream().anyMatch(value -> value.isBefore(end));
+            }
+            case "fixed_after" -> {
+                if (start == null) throw new IllegalArgumentException("Fixed-after rule requires a start time");
+                yield timestamps.stream().anyMatch(value -> value.isAfter(start));
+            }
+            default -> throw new IllegalArgumentException("Unsupported recycle rule operator: " + operator);
+        };
+    }
+
+    private static List<Instant> nonNullInstants(Instant... values) {
+        return java.util.Arrays.stream(values).filter(java.util.Objects::nonNull).toList();
     }
 
     private static LeaseAttempt acquireRecycleLease(DataAccessor db, Map<String, Object> pool,

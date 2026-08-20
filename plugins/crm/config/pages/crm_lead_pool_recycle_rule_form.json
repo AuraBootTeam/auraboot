@@ -1,0 +1,46 @@
+{
+  "pageKey": "crm_lead_pool_recycle_rule_form",
+  "name:zh-CN": "回收条件编辑",
+  "name:en": "Recycle Condition Editor",
+  "modelCode": "crm_lead_pool_recycle_rule",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12, "gap": 16 },
+  "blocks": [
+    {
+      "id": "identity",
+      "blockType": "form-section",
+      "title": { "zh-CN": "条件归属", "en": "Condition Identity" },
+      "description": { "zh-CN": "一条记录代表一个时间条件；同一线索池的生效条件由池策略中的 AND/OR 关系组合。", "en": "Each record is one time condition. Active conditions for the same pool are composed by the pool's AND/OR match mode." },
+      "fields": [
+        { "field": "crm_lprr_code", "colSpan": 6, "required": true },
+        { "field": "crm_lprr_name", "colSpan": 6, "required": true },
+        { "field": "crm_lprr_pool_id", "colSpan": 6, "required": true },
+        { "field": "crm_lprr_status", "colSpan": 6, "required": true, "defaultValue": "active" },
+        { "field": "crm_lprr_sort_order", "colSpan": 6, "required": true, "defaultValue": 100 }
+      ]
+    },
+    {
+      "id": "time_condition",
+      "blockType": "form-section",
+      "title": { "zh-CN": "时间条件", "en": "Time Condition" },
+      "description": { "zh-CN": "相对天数运算填写“相对天数”；固定区间填写开始/结束时间；固定早于使用结束时间，固定晚于使用开始时间。", "en": "Relative operators use Relative Days. Fixed intervals use both endpoints; Fixed Before uses the end and Fixed After uses the start." },
+      "fields": [
+        { "field": "crm_lprr_time_source", "colSpan": 6, "required": true },
+        { "field": "crm_lprr_operator", "colSpan": 6, "required": true },
+        { "field": "crm_lprr_days", "colSpan": 4, "required": true, "visibleWhen": "record.crm_lprr_operator === 'older_than_days' || record.crm_lprr_operator === 'newer_than_days'" },
+        { "field": "crm_lprr_start_at", "colSpan": 4, "required": true, "visibleWhen": "record.crm_lprr_operator === 'fixed_between' || record.crm_lprr_operator === 'fixed_after'" },
+        { "field": "crm_lprr_end_at", "colSpan": 4, "required": true, "visibleWhen": "record.crm_lprr_operator === 'fixed_between' || record.crm_lprr_operator === 'fixed_before'" },
+        { "field": "crm_lprr_description", "colSpan": 12 }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        { "code": "submit", "primary": true, "permissionCode": "crm.lead_pool.manage", "label": "$i18n:common.button.save", "action": { "type": "command" } },
+        { "code": "cancel", "label": "$i18n:common.button.cancel" }
+      ]
+    }
+  ]
+}

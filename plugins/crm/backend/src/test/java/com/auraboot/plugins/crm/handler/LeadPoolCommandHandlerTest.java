@@ -53,7 +53,7 @@ class LeadPoolCommandHandlerTest {
     @Test
     void claimEnforcesMembershipCapacityDailyLimitAndBothCooldowns() {
         FakeDb cooldown = availableItem(baseline(), "item-1", "lead-1", "member-a",
-                Instant.parse("2026-08-13T00:00:00Z"));
+                Instant.now().minus(Duration.ofDays(1)));
         cooldown.getById("crm_lead_pool", "pool-1").put("crm_lp_new_cooldown_days", 2);
         assertThrows(IllegalStateException.class, () -> execute(cooldown, LeadPoolCommandHandler.CLAIM,
                 "item-1", "member-a", Map.of()));
@@ -76,7 +76,7 @@ class LeadPoolCommandHandlerTest {
                 "item-2", "member-a", Map.of()));
 
         FakeDb previous = availableItem(baseline(), "item-1", "lead-1", "member-a",
-                Instant.parse("2026-08-13T00:00:00Z"));
+                Instant.now().minus(Duration.ofDays(1)));
         previous.getById("crm_lead_pool", "pool-1").put("crm_lp_new_cooldown_days", 0);
         previous.getById("crm_lead_pool", "pool-1").put("crm_lp_previous_owner_cooldown_days", 7);
         assertThrows(IllegalStateException.class, () -> execute(previous, LeadPoolCommandHandler.CLAIM,
@@ -144,6 +144,57 @@ class LeadPoolCommandHandlerTest {
         assertEquals(1, count);
         assertEquals("in_pool", recycle.getById("crm_lead_common", "lead-1").get("crm_lead_pool_state"));
         assertEquals("auto_recycled", recycle.query("crm_lead_owner_history", Map.of()).getFirst().get("crm_loh_event"));
+    }
+
+    @Test
+    void configuredRecycleRulesRespectAllAndAnyCompositionWithoutLegacyMigration() {
+        Instant now = Instant.parse("2026-08-14T00:00:00Z");
+        FakeDb all = configuredRuleBaseline();
+        all.getById("crm_lead_pool", "pool-1").put("crm_lp_recycle_match_mode", "all");
+
+        LeadPoolCommandHandler.RecycleResult allResult = LeadPoolCommandHandler.recycleDetailed(
+                all, new FakeShares(), 1L, "system", now, Duration.ofMinutes(15));
+
+        assertEquals(0, allResult.recycled(), "recent activity must keep an ALL policy from matching");
+        assertEquals("owned", all.getById("crm_lead_common", "lead-1").get("crm_lead_pool_state"));
+
+        FakeDb any = configuredRuleBaseline();
+        any.getById("crm_lead_pool", "pool-1").put("crm_lp_recycle_match_mode", "any");
+
+        LeadPoolCommandHandler.RecycleResult anyResult = LeadPoolCommandHandler.recycleDetailed(
+                any, new FakeShares(), 1L, "system", now, Duration.ofMinutes(15));
+
+        assertEquals(1, anyResult.recycled(), "old claim time must satisfy an ANY policy");
+        assertEquals("in_pool", any.getById("crm_lead_common", "lead-1").get("crm_lead_pool_state"));
+    }
+
+    @Test
+    void fixedRecycleIntervalsAndMissingCordysTimeSemanticsAreExplicit() {
+        Instant now = Instant.parse("2026-08-14T00:00:00Z");
+        Map<String, Object> lead = map(
+                "crm_lead_claimed_at", "2026-08-05T12:00:00Z",
+                "crm_lead_last_activity_at", "2026-08-13T12:00:00Z");
+        Map<String, Object> item = map("crm_lpi_entered_at", "2026-08-01T00:00:00Z");
+
+        assertTrue(LeadPoolCommandHandler.matchesRecycleRule(map(
+                "crm_lprr_time_source", "claimed_at",
+                "crm_lprr_operator", "fixed_between",
+                "crm_lprr_start_at", "2026-08-05T00:00:00Z",
+                "crm_lprr_end_at", "2026-08-06T00:00:00Z"), lead, item, now));
+        assertFalse(LeadPoolCommandHandler.matchesRecycleRule(map(
+                "crm_lprr_time_source", "last_activity_at",
+                "crm_lprr_operator", "older_than_days",
+                "crm_lprr_days", 5), lead, item, now));
+        assertTrue(LeadPoolCommandHandler.matchesRecycleRule(map(
+                "crm_lprr_time_source", "last_activity_at",
+                "crm_lprr_operator", "older_than_days",
+                "crm_lprr_days", 5), Map.of(), item, now),
+                "Cordys treats a missing selected time as satisfying the condition");
+        assertThrows(IllegalArgumentException.class, () -> LeadPoolCommandHandler.matchesRecycleRule(map(
+                "crm_lprr_time_source", "claimed_at",
+                "crm_lprr_operator", "fixed_between",
+                "crm_lprr_start_at", "2026-08-07T00:00:00Z",
+                "crm_lprr_end_at", "2026-08-06T00:00:00Z"), lead, item, now));
     }
 
     @Test
@@ -337,6 +388,32 @@ class LeadPoolCommandHandlerTest {
                 "crm_lp_auto_recycle", false, "crm_lp_recycle_after_days", 30,
                 "crm_lp_recycle_basis", "claimed_at"));
         db.put("crm_lead_common", "lead-1", lead("lead-1", "member-a"));
+        return db;
+    }
+
+    private static FakeDb configuredRuleBaseline() {
+        FakeDb db = baseline();
+        Map<String, Object> pool = db.getById("crm_lead_pool", "pool-1");
+        pool.put("crm_lp_auto_recycle", true);
+        pool.put("crm_lp_recycle_after_days", 365);
+        Map<String, Object> lead = db.getById("crm_lead_common", "lead-1");
+        lead.put("crm_lead_last_pool_id", "pool-1");
+        lead.put("crm_lead_claimed_at", "2026-08-01T00:00:00Z");
+        lead.put("crm_lead_last_activity_at", "2026-08-13T00:00:00Z");
+        db.put("crm_lead_pool_item", "item-1", map(
+                "crm_lpi_lead_key", "lead-1", "crm_lpi_lead_id", "lead-1",
+                "crm_lpi_pool_id", "pool-1", "crm_lpi_status", "claimed",
+                "crm_lpi_entered_at", "2026-07-25T00:00:00Z",
+                "crm_lpi_claimed_at", "2026-08-01T00:00:00Z",
+                "crm_lpi_claimed_by", "member-a"));
+        db.put("crm_lead_pool_recycle_rule", "rule-1", map(
+                "crm_lprr_pool_id", "pool-1", "crm_lprr_status", "active",
+                "crm_lprr_time_source", "claimed_at", "crm_lprr_operator", "older_than_days",
+                "crm_lprr_days", 5, "crm_lprr_sort_order", 10));
+        db.put("crm_lead_pool_recycle_rule", "rule-2", map(
+                "crm_lprr_pool_id", "pool-1", "crm_lprr_status", "active",
+                "crm_lprr_time_source", "last_activity_at", "crm_lprr_operator", "older_than_days",
+                "crm_lprr_days", 5, "crm_lprr_sort_order", 20));
         return db;
     }
 

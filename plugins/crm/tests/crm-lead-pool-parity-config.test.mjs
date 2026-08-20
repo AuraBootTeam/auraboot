@@ -8,6 +8,7 @@ const json = async (path) => JSON.parse(await readFile(new URL(path, root), 'utf
 test('PAR-04 lead pool exposes the complete Cordys policy denominator', async () => {
   const models = await json('config/models.json');
   const commands = await json('config/commands/crm_lead_pool.json');
+  const recycleRuleCommands = await json('config/commands/crm_lead_pool_recycle_rule.json');
   const permissions = await json('config/permissions.json');
   const roles = await json('config/roles.json');
   const namedQueries = await json('config/named-queries.json');
@@ -19,7 +20,13 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
     'crm_lead_capacity_list.json',
     'crm_lead_owner_history_list.json',
   ].map((file) => json(`config/pages/${file}`)));
+  const recycleRulePages = await Promise.all([
+    'crm_lead_pool_recycle_rule_list.json',
+    'crm_lead_pool_recycle_rule_form.json',
+    'crm_lead_pool_recycle_rule_detail.json',
+  ].map((file) => json(`config/pages/${file}`)));
   const poolFields = await json('config/fields/crm_lead_pool.json');
+  const recycleRuleFields = await json('config/fields/crm_lead_pool_recycle_rule.json');
   const itemFields = await json('config/fields/crm_lead_pool_item.json');
   const historyFields = await json('config/fields/crm_lead_owner_history.json');
   const dictionaries = await json('config/dicts.json');
@@ -39,6 +46,7 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
   const modelCodes = new Set(models.map((model) => model.code));
   for (const code of [
     'crm_lead_pool',
+    'crm_lead_pool_recycle_rule',
     'crm_lead_capacity',
     'crm_lead_pool_item',
     'crm_lead_pool_quota',
@@ -53,9 +61,33 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
     'crm_lp_new_cooldown_days',
     'crm_lp_previous_owner_cooldown_days',
     'crm_lp_auto_recycle',
+    'crm_lp_recycle_match_mode',
     'crm_lp_recycle_after_days',
     'crm_lp_recycle_basis',
   ]) assert.ok(poolFieldCodes.has(code), `missing pool policy ${code}`);
+  for (const code of [
+    'crm_lprr_pool_id',
+    'crm_lprr_time_source',
+    'crm_lprr_operator',
+    'crm_lprr_days',
+    'crm_lprr_start_at',
+    'crm_lprr_end_at',
+    'crm_lprr_status',
+    'crm_lprr_sort_order',
+  ]) assert.ok(recycleRuleFields.some((field) => field.code === code), `missing recycle condition ${code}`);
+  const recyclePoolReference = recycleRuleFields.find((field) => field.code === 'crm_lprr_pool_id');
+  assert.equal(recyclePoolReference.refTarget?.valueField, 'pid');
+  assert.equal(recyclePoolReference.refTarget?.displayField, 'crm_lp_name');
+  assert.deepEqual(
+    dictionaries.find((dictionary) => dictionary.code === 'crm_lead_recycle_match_mode')
+      ?.items.map((item) => item.value),
+    ['all', 'any'],
+  );
+  assert.deepEqual(
+    dictionaries.find((dictionary) => dictionary.code === 'crm_lead_recycle_time_operator')
+      ?.items.map((item) => item.value),
+    ['older_than_days', 'newer_than_days', 'fixed_between', 'fixed_before', 'fixed_after'],
+  );
   for (const code of ['crm_lp_member_user_ids', 'crm_lp_admin_user_ids']) {
     const field = poolFields.find((candidate) => candidate.code === code);
     assert.equal(field.extension?.renderComponent, 'memberpicker');
@@ -84,6 +116,30 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
     'crm:run_lead_pool_recycle',
   ]) assert.ok(commandCodes.has(code), `missing command ${code}`);
 
+  for (const code of ['crm:create_lead_pool', 'crm:update_lead_pool']) {
+    assert.ok(
+      commands.find((command) => command.code === code)?.inputFields?.includes('crm_lp_recycle_match_mode'),
+      `${code} must persist the selected AND/OR recycle relation`,
+    );
+  }
+
+  assert.deepEqual(
+    recycleRuleCommands.map((command) => command.code),
+    [
+      'crm:create_lead_pool_recycle_rule',
+      'crm:update_lead_pool_recycle_rule',
+      'crm:delete_lead_pool_recycle_rule',
+      'crm:list_lead_pool_recycle_rules',
+      'crm:detail_lead_pool_recycle_rule',
+    ],
+  );
+  for (const code of ['crm:create_lead_pool_recycle_rule', 'crm:update_lead_pool_recycle_rule']) {
+    const command = recycleRuleCommands.find((candidate) => candidate.code === code);
+    assert.ok(command.inputFields.includes('crm_lprr_pool_id'));
+    assert.ok(command.inputFields.includes('crm_lprr_operator'));
+    assert.ok(command.inputFields.includes('crm_lprr_days'));
+  }
+
   for (const code of [
     'crm:move_lead_to_pool',
     'crm:claim_pool_lead',
@@ -110,6 +166,49 @@ test('PAR-04 lead pool exposes the complete Cordys policy denominator', async ()
       'crm_lead_capacity_list',
       'crm_lead_owner_history_list',
     ],
+  );
+  assert.deepEqual(
+    recycleRulePages.map((page) => page.pageKey),
+    [
+      'crm_lead_pool_recycle_rule_list',
+      'crm_lead_pool_recycle_rule_form',
+      'crm_lead_pool_recycle_rule_detail',
+    ],
+  );
+  assert.match(
+    recycleRulePages[0].blocks.find((block) => block.id === 'crm_lprr_guidance').content['zh-CN'],
+    /全部满足（AND）\/任一满足（OR）/,
+  );
+  const recycleConditionFields = recycleRulePages[1].blocks
+    .find((block) => block.id === 'time_condition').fields;
+  const poolRecycleFields = pages[1].blocks
+    .find((block) => block.id === 'recycle_policy').fields;
+  assert.equal(
+    poolRecycleFields.find((field) => field.field === 'crm_lp_recycle_match_mode').defaultValue,
+    'all',
+    'the create form must submit a concrete AND/OR value even when the first enum option is chosen',
+  );
+  const recycleIdentityFields = recycleRulePages[1].blocks
+    .find((block) => block.id === 'identity').fields;
+  assert.equal(
+    recycleIdentityFields.find((field) => field.field === 'crm_lprr_status').defaultValue,
+    'active',
+  );
+  assert.equal(
+    recycleIdentityFields.find((field) => field.field === 'crm_lprr_sort_order').defaultValue,
+    100,
+  );
+  assert.match(
+    recycleConditionFields.find((field) => field.field === 'crm_lprr_days').visibleWhen,
+    /older_than_days/,
+  );
+  assert.match(
+    recycleConditionFields.find((field) => field.field === 'crm_lprr_start_at').visibleWhen,
+    /fixed_between/,
+  );
+  assert.match(
+    recycleConditionFields.find((field) => field.field === 'crm_lprr_end_at').visibleWhen,
+    /fixed_before/,
   );
   const operations = pages[2];
   assert.equal(operations.kind, 'detail');

@@ -1,0 +1,38 @@
+{
+  "pageKey": "crm_lead_pool_recycle_rule_detail",
+  "name:zh-CN": "回收条件详情",
+  "name:en": "Recycle Condition Detail",
+  "modelCode": "crm_lead_pool_recycle_rule",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "blocks": [
+    {
+      "id": "condition",
+      "blockType": "form-section",
+      "title": { "zh-CN": "回收条件", "en": "Recycle Condition" },
+      "columns": 3,
+      "fields": [
+        { "field": "crm_lprr_code", "readOnly": true },
+        { "field": "crm_lprr_name", "readOnly": true },
+        { "field": "crm_lprr_pool_id", "readOnly": true },
+        { "field": "crm_lprr_time_source", "readOnly": true },
+        { "field": "crm_lprr_operator", "readOnly": true },
+        { "field": "crm_lprr_days", "readOnly": true },
+        { "field": "crm_lprr_start_at", "readOnly": true },
+        { "field": "crm_lprr_end_at", "readOnly": true },
+        { "field": "crm_lprr_status", "readOnly": true },
+        { "field": "crm_lprr_sort_order", "readOnly": true },
+        { "field": "crm_lprr_description", "span": 3, "readOnly": true }
+      ]
+    },
+    {
+      "id": "actions",
+      "blockType": "toolbar",
+      "buttons": [
+        { "code": "edit", "permissionCode": "crm.lead_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_lead_pool_recycle_rule_form" } },
+        { "code": "back", "label": { "zh-CN": "返回规则列表", "en": "Back to Rules" }, "action": { "type": "navigate", "to": "crm_lead_pool_recycle_rule_list" } }
+      ]
+    }
+  ]
+}

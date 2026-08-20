@@ -5,7 +5,7 @@
     "displayName:en": "Create Lead Pool",
     "type": "create",
     "modelCode": "crm_lead_pool",
-    "inputFields": ["crm_lp_name", "crm_lp_member_user_ids", "crm_lp_admin_user_ids", "crm_lp_daily_pick_limit", "crm_lp_new_cooldown_days", "crm_lp_previous_owner_cooldown_days", "crm_lp_auto_recycle", "crm_lp_recycle_after_days", "crm_lp_recycle_basis", "crm_lp_description"],
+    "inputFields": ["crm_lp_name", "crm_lp_member_user_ids", "crm_lp_admin_user_ids", "crm_lp_daily_pick_limit", "crm_lp_new_cooldown_days", "crm_lp_previous_owner_cooldown_days", "crm_lp_auto_recycle", "crm_lp_recycle_match_mode", "crm_lp_recycle_after_days", "crm_lp_recycle_basis", "crm_lp_description"],
     "autoSetFields": {
       "crm_lp_code": { "strategy": "auto_generate", "pattern": "LP-{yyyyMMdd}-{seq}" },
       "crm_lp_status": { "strategy": "fixed_value", "value": "enabled" }
@@ -19,7 +19,7 @@
     "displayName:en": "Update Lead Pool Policy",
     "type": "update",
     "modelCode": "crm_lead_pool",
-    "inputFields": ["crm_lp_name", "crm_lp_member_user_ids", "crm_lp_admin_user_ids", "crm_lp_daily_pick_limit", "crm_lp_new_cooldown_days", "crm_lp_previous_owner_cooldown_days", "crm_lp_auto_recycle", "crm_lp_recycle_after_days", "crm_lp_recycle_basis", "crm_lp_description"],
+    "inputFields": ["crm_lp_name", "crm_lp_member_user_ids", "crm_lp_admin_user_ids", "crm_lp_daily_pick_limit", "crm_lp_new_cooldown_days", "crm_lp_previous_owner_cooldown_days", "crm_lp_auto_recycle", "crm_lp_recycle_match_mode", "crm_lp_recycle_after_days", "crm_lp_recycle_basis", "crm_lp_description"],
     "permissions": ["crm.lead_pool.manage"],
     "cmd_risk_level": "L2"
   },

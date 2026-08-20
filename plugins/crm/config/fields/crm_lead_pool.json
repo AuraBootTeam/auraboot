@@ -8,6 +8,7 @@
   { "code": "crm_lp_new_cooldown_days", "displayName:zh-CN": "新线索冷却天数", "displayName:en": "New Lead Cooldown Days", "dataType": "integer", "defaultValue": 0, "constraints": { "required": true, "min": 0 } },
   { "code": "crm_lp_previous_owner_cooldown_days", "displayName:zh-CN": "前负责人冷却天数", "displayName:en": "Previous Owner Cooldown Days", "dataType": "integer", "defaultValue": 0, "constraints": { "required": true, "min": 0 } },
   { "code": "crm_lp_auto_recycle", "displayName:zh-CN": "自动回收", "displayName:en": "Automatic Recycle", "dataType": "boolean", "defaultValue": false, "constraints": { "required": true } },
+  { "code": "crm_lp_recycle_match_mode", "displayName:zh-CN": "回收条件关系", "displayName:en": "Recycle Match Mode", "dataType": "enum", "dictCode": "crm_lead_recycle_match_mode", "defaultValue": "all", "constraints": { "required": true }, "extension": { "helpText:zh-CN": "全部满足（AND）或任一满足（OR）时自动回收；具体条件在线索池回收规则中维护", "helpText:en": "Recycle when all (AND) or any (OR) active rule matches; maintain conditions in Lead Pool Recycle Rules" } },
   { "code": "crm_lp_recycle_after_days", "displayName:zh-CN": "回收等待天数", "displayName:en": "Recycle After Days", "dataType": "integer", "defaultValue": 30, "constraints": { "min": 0 } },
   { "code": "crm_lp_recycle_basis", "displayName:zh-CN": "回收口径", "displayName:en": "Recycle Basis", "dataType": "enum", "dictCode": "crm_lead_recycle_basis", "defaultValue": "last_activity" },
   { "code": "crm_lp_description", "displayName:zh-CN": "说明", "displayName:en": "Description", "dataType": "text" }

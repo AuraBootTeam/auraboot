@@ -754,6 +754,15 @@
     "action": "read"
   },
   {
+    "code": "model.crm_lead_pool_recycle_rule.read",
+    "name:zh-CN": "查看线索池回收规则模型",
+    "name:en": "Read Lead Pool Recycle Rule Model",
+    "resourceType": "model",
+    "module": "crm",
+    "resourceCode": "crm_lead_pool_recycle_rule",
+    "action": "read"
+  },
+  {
     "code": "model.crm_lead_capacity.read",
     "name:zh-CN": "查看线索库容模型",
     "name:en": "Read Lead Capacity Model",

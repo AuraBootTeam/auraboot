@@ -51,6 +51,10 @@
     },
     {
       "type": "model",
+      "code": "crm_lead_pool_recycle_rule"
+    },
+    {
+      "type": "model",
       "code": "crm_lead_capacity"
     },
     {

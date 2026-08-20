@@ -8,6 +8,8 @@ import { useLoaderData } from 'react-router';
 import type { LoaderFunctionArgs } from 'react-router';
 import { getTokenFromRequest } from '~/shared/services/session';
 import { DynamicPageRenderer } from '~/framework/meta/rendering/pages/DynamicPageRenderer';
+import { DynamicPageUnavailable } from '~/framework/meta/rendering/pages/DynamicPageUnavailable';
+import { resolveDynamicPageAccessError } from '~/shared/services/dynamic-page-access.server';
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
   const { pageKey } = params;
@@ -18,7 +20,8 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 
   try {
     const token = await getTokenFromRequest(request);
-    return { tableName: pageKey, recordPid, token };
+    const accessError = await resolveDynamicPageAccessError(request, token, pageKey);
+    return { tableName: pageKey, recordPid, token, accessError };
   } catch (error) {
     console.error('Failed to load edit page:', error);
     if (error instanceof Response) {
@@ -29,7 +32,10 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 };
 
 export default function DynamicFormEdit() {
-  const { tableName, recordPid, token } = useLoaderData<typeof loader>();
+  const { tableName, recordPid, token, accessError } = useLoaderData<typeof loader>();
+  if (accessError) {
+    return <DynamicPageUnavailable message={accessError} />;
+  }
   return (
     <DynamicPageRenderer tableName={tableName} pageType="form" token={token} recordPid={recordPid} />
   );

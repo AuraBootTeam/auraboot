@@ -1,0 +1,58 @@
+[
+  {
+    "code": "crm:create_lead_pool_recycle_rule",
+    "displayName:zh-CN": "新建线索池回收规则",
+    "displayName:en": "Create Lead Pool Recycle Rule",
+    "type": "create",
+    "modelCode": "crm_lead_pool_recycle_rule",
+    "inputFields": ["crm_lprr_code", "crm_lprr_name", "crm_lprr_pool_id", "crm_lprr_time_source", "crm_lprr_operator", "crm_lprr_days", "crm_lprr_start_at", "crm_lprr_end_at", "crm_lprr_status", "crm_lprr_sort_order", "crm_lprr_description"],
+    "permissions": ["crm.lead_pool.manage"],
+    "agent_hint": "Create one ordered automatic-recycle time condition for a lead pool. The pool reference persists its pid.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:update_lead_pool_recycle_rule",
+    "displayName:zh-CN": "编辑线索池回收规则",
+    "displayName:en": "Update Lead Pool Recycle Rule",
+    "type": "update",
+    "modelCode": "crm_lead_pool_recycle_rule",
+    "inputFields": ["crm_lprr_code", "crm_lprr_name", "crm_lprr_pool_id", "crm_lprr_time_source", "crm_lprr_operator", "crm_lprr_days", "crm_lprr_start_at", "crm_lprr_end_at", "crm_lprr_status", "crm_lprr_sort_order", "crm_lprr_description"],
+    "permissions": ["crm.lead_pool.manage"],
+    "agent_hint": "Update one lead-pool automatic-recycle time condition.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:delete_lead_pool_recycle_rule",
+    "displayName:zh-CN": "删除线索池回收规则",
+    "displayName:en": "Delete Lead Pool Recycle Rule",
+    "type": "delete",
+    "modelCode": "crm_lead_pool_recycle_rule",
+    "extension": {
+      "confirmMessage:zh-CN": "删除后该条件不再参与自动回收，确认继续？",
+      "confirmMessage:en": "This condition will no longer participate in automatic recycle. Continue?"
+    },
+    "permissions": ["crm.lead_pool.manage"],
+    "agent_hint": "Delete a lead-pool recycle condition. Irreversible.",
+    "cmd_risk_level": "L4"
+  },
+  {
+    "code": "crm:list_lead_pool_recycle_rules",
+    "displayName:zh-CN": "线索池回收规则列表",
+    "displayName:en": "List Lead Pool Recycle Rules",
+    "type": "query",
+    "modelCode": "crm_lead_pool_recycle_rule",
+    "permissions": ["crm.lead_pool.read"],
+    "agent_hint": "Query lead-pool automatic-recycle conditions.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:detail_lead_pool_recycle_rule",
+    "displayName:zh-CN": "查看线索池回收规则",
+    "displayName:en": "View Lead Pool Recycle Rule",
+    "type": "query",
+    "modelCode": "crm_lead_pool_recycle_rule",
+    "permissions": ["crm.lead_pool.read"],
+    "agent_hint": "View one lead-pool automatic-recycle condition.",
+    "cmd_risk_level": "L0"
+  }
+]

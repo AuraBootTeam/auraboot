@@ -666,6 +666,20 @@
     "pageKey": "crm_lead_capacity_list"
   },
   {
+    "code": "crm_lead_pool_recycle_rules",
+    "parentCode": "crm_operations",
+    "name:zh-CN": "线索池回收规则",
+    "name:en": "Lead Pool Recycle Rules",
+    "path": "/p/crm_lead_pool_recycle_rule",
+    "component": null,
+    "icon": "IconListCheck",
+    "type": 1,
+    "permissionCode": "crm.lead_pool.manage",
+    "orderNo": 20,
+    "visible": true,
+    "pageKey": "crm_lead_pool_recycle_rule_list"
+  },
+  {
     "code": "crm_lead_owner_history",
     "parentCode": "crm_operations",
     "name:zh-CN": "线索归属历史",
@@ -675,7 +689,7 @@
     "icon": "IconHistory",
     "type": 1,
     "permissionCode": "crm.lead_pool.read",
-    "orderNo": 20,
+    "orderNo": 21,
     "visible": true,
     "pageKey": "crm_lead_owner_history_list"
   }

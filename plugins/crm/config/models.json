@@ -807,6 +807,24 @@
     "lifecycle_description": "Enabled <-> Disabled. A pool with available items cannot be deleted."
   },
   {
+    "code": "crm_lead_pool_recycle_rule",
+    "displayName:zh-CN": "线索池回收规则",
+    "displayName:en": "Lead Pool Recycle Rule",
+    "description": "One ordered time condition evaluated by a lead pool automatic recycle policy.",
+    "modelType": "entity",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "ListChecks",
+      "category": "crm",
+      "titleField": "crm_lprr_name",
+      "subtitleField": "crm_lprr_pool_id"
+    },
+    "semantic_description": "An operator-managed Cordys-parity recycle condition. Active rules are grouped by pool and evaluated using the pool's ALL/ANY match mode; relative-day and fixed-time conditions can inspect pool entry, claim, or last-activity time.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Active <-> Inactive. Inactive rules remain auditable but do not participate in scheduled or manual recycle evaluation."
+  },
+  {
     "code": "crm_lead_capacity",
     "displayName:zh-CN": "线索库容",
     "displayName:en": "Lead Capacity",

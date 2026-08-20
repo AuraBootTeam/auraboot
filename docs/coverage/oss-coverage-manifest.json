@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "d9f9a5e21",
+    "commit": "b27fd2660",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -2638,6 +2638,7 @@
           "driver": "browser",
           "evidence": [
             "tests/crm-lead-assignment-ref-config.test.mjs",
+            "tests/crm-lead-pool-parity-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
             "web-admin/tests/e2e/crm/crm-batch-ops.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
@@ -2675,10 +2676,23 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "tests/crm-lead-pool-parity-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-lead-pool-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
+        },
+        {
+          "id": "crm:create_lead_pool_recycle_rule",
+          "action": "crm:create_lead_pool_recycle_rule",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-lead-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
         },
         {
           "id": "crm:create_lead_task",
@@ -3007,6 +3021,18 @@
           "verdict": "partial"
         },
         {
+          "id": "crm:delete_lead_pool_recycle_rule",
+          "action": "crm:delete_lead_pool_recycle_rule",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-lead-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
           "id": "crm:delete_opp_line",
           "action": "crm:delete_opp_line",
           "surface": "ui",
@@ -3205,23 +3231,40 @@
         {
           "id": "crm:detail_lead",
           "action": "crm:detail_lead",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-lead-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial",
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
           "id": "crm:detail_lead_pool",
           "action": "crm:detail_lead_pool",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-lead-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_lead_pool_recycle_rule",
+          "action": "crm:detail_lead_pool_recycle_rule",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-lead-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial",
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
@@ -3517,6 +3560,19 @@
           "evidence": [],
           "assertion": "no test references this command",
           "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_lead_pool_recycle_rules",
+          "action": "crm:list_lead_pool_recycle_rules",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-lead-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial",
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
@@ -4301,7 +4357,8 @@
           "dependencies": "hermetic",
           "driver": "unit",
           "evidence": [
-            "tests/crm-lead-assignment-ref-config.test.mjs"
+            "tests/crm-lead-assignment-ref-config.test.mjs",
+            "tests/crm-lead-pool-parity-config.test.mjs"
           ],
           "assertion": "covered below the UI only — no browser evidence",
           "verdict": "partial"
@@ -4325,10 +4382,23 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "tests/crm-lead-pool-parity-config.test.mjs",
             "web-admin/tests/e2e/crm/crm-lead-pool-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
+        },
+        {
+          "id": "crm:update_lead_pool_recycle_rule",
+          "action": "crm:update_lead_pool_recycle_rule",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-lead-pool-parity-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
         },
         {
           "id": "crm:update_opp_line",
@@ -5211,9 +5281,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec names this page or its route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-pool-parity.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
           "note": "kind=detail model=crm_lead_pool_item"
         },
         {
@@ -5226,6 +5298,39 @@
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
           "note": "kind=list model=crm_lead_pool"
+        },
+        {
+          "id": "page:crm_lead_pool_recycle_rule_detail",
+          "action": "crm_lead_pool_recycle_rule_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_lead_pool_recycle_rule"
+        },
+        {
+          "id": "page:crm_lead_pool_recycle_rule_form",
+          "action": "crm_lead_pool_recycle_rule_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_lead_pool_recycle_rule"
+        },
+        {
+          "id": "page:crm_lead_pool_recycle_rule_list",
+          "action": "crm_lead_pool_recycle_rule_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_lead_pool_recycle_rule"
         },
         {
           "id": "page:crm_lead_score_rule_detail",
@@ -7300,6 +7405,7 @@
           "evidence": [
             "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts",
             "web-admin/tests/e2e/enterprise/member-invite.spec.ts",
+            "web-admin/tests/e2e/enterprise/member-management.spec.ts",
             "web-admin/tests/e2e/organization/member-detail.spec.ts",
             "web-admin/tests/e2e/organization/tenant-member-password-reset.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-bom-focused-menu-and-permissions.spec.ts"
@@ -9423,6 +9529,7 @@
             "web-admin/tests/e2e/email/email-inbox.spec.ts",
             "web-admin/tests/e2e/email/email-sequence.spec.ts",
             "web-admin/tests/e2e/email/email-shared-mailbox.spec.ts",
+            "web-admin/tests/e2e/enterprise/member-management.spec.ts",
             "web-admin/tests/e2e/finance/erp-depth-smoke.spec.ts",
             "web-admin/tests/e2e/finance/finance-account-crud.spec.ts",
             "web-admin/tests/e2e/finance/finance-gl-query.spec.ts",
@@ -10528,10 +10635,10 @@
     }
   ],
   "stats": {
-    "commands": 472,
-    "untested": 322,
-    "pages": 277,
-    "pagesUntested": 185,
+    "commands": 477,
+    "untested": 320,
+    "pages": 280,
+    "pagesUntested": 187,
     "platformPages": 99,
     "platformPagesUntested": 41
   }
