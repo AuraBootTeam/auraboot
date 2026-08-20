@@ -5,6 +5,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { buildLeadPoolScaleConsoleReport } from './lib/lead-pool-scale-report.mjs';
+
 const crmRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = parseArgs(process.argv.slice(2));
 if (args.help) {
@@ -88,7 +90,7 @@ const report = {
   failures,
 };
 writeFileSync(output, `${JSON.stringify(report, null, 2)}\n`);
-console.log(JSON.stringify(report, null, 2));
+console.log(JSON.stringify(buildLeadPoolScaleConsoleReport(report), null, 2));
 if (failures.length > 0) process.exit(1);
 
 function namedQuery(code) {
