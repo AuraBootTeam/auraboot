@@ -93,7 +93,11 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
     // Simulate the user filling + submitting the FormDialog the action pops.
     window.addEventListener(
       'dialog:form',
-      (e) => (e as CustomEvent).detail.onSubmit({ cookies_json: '{"sid":"1"}' }),
+      (e) => {
+        const detail = (e as CustomEvent).detail;
+        expect(detail.fields[0].group).toEqual({ 'zh-CN': '凭据内容', en: 'Credential Data' });
+        detail.onSubmit({ cookies_json: '{"sid":"1"}' });
+      },
       { once: true },
     );
 
@@ -105,7 +109,15 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
         operationType: 'update',
         payload: { keep: 'me' },
         inputFieldsTitle: 'Set Credential',
-        inputFields: [{ field: 'cookies_json', label: 'Cookies', type: 'textarea', required: true }],
+        inputFields: [
+          {
+            field: 'cookies_json',
+            group: { 'zh-CN': '凭据内容', en: 'Credential Data' },
+            label: 'Cookies',
+            type: 'textarea',
+            required: true,
+          },
+        ],
       },
     });
 

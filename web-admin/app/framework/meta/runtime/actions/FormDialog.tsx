@@ -233,28 +233,82 @@ export default function FormDialog() {
     setState((prev) => ({ ...prev, open: false }));
   }, [state.fields, state.onSubmit, formData, locale, t]);
 
-  const updateField = useCallback((fieldName: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [fieldName]: value }));
-    // Clear error when user starts typing
-    setErrors((prev) => {
-      if (prev[fieldName]) {
+  const updateField = useCallback(
+    (fieldName: string, value: any) => {
+      const dependentFields = [
+        ...new Set(
+          state.fields
+            .filter((field) => field.field !== fieldName && field.visibleWhen?.field === fieldName)
+            .map((field) => field.field),
+        ),
+      ];
+      setFormData((prev) => {
+        const next = { ...prev, [fieldName]: value };
+        for (const dependentField of dependentFields) {
+          const previousVariant = state.fields.findIndex(
+            (field) => field.field === dependentField && matchesVisibility(field.visibleWhen, prev),
+          );
+          const nextVariant = state.fields.findIndex(
+            (field) => field.field === dependentField && matchesVisibility(field.visibleWhen, next),
+          );
+          if (previousVariant >= 0 && previousVariant !== nextVariant) delete next[dependentField];
+        }
+        return next;
+      });
+      // Clear error when user starts typing
+      setErrors((prev) => {
         const next = { ...prev };
         delete next[fieldName];
+        dependentFields.forEach((field) => delete next[field]);
         return next;
-      }
-      return prev;
-    });
-  }, []);
+      });
+      setSearchTerms((prev) => {
+        const next = { ...prev };
+        dependentFields.forEach((field) => delete next[field]);
+        return next;
+      });
+    },
+    [state.fields],
+  );
 
   if (!state.open) return null;
 
   const dialogTitle = state.title
     ? getLocalizedText(state.title, locale, t)
     : t('common.form') || 'Form';
-  const visibleFields = state.fields.filter((field) =>
+  const configuredFields = state.fields.map((field, sourceIndex) => ({ field, sourceIndex }));
+  const visibleFields = configuredFields.filter(({ field }) =>
     matchesVisibility(field.visibleWhen, formData),
   );
-  const hasBusinessGroups = visibleFields.some((field) => field.group);
+  const configuredSections = configuredFields.reduce<
+    Array<{
+      group?: string | Record<string, string>;
+      groupKey: string;
+      runStartSourceIndex: number;
+      fields: typeof configuredFields;
+    }>
+  >((sections, entry) => {
+    const groupKey = entry.field.group ? JSON.stringify(entry.field.group) : '__ungrouped__';
+    const previous = sections.at(-1);
+    if (previous?.groupKey === groupKey) {
+      previous.fields.push(entry);
+    } else {
+      sections.push({
+        group: entry.field.group,
+        groupKey,
+        runStartSourceIndex: entry.sourceIndex,
+        fields: [entry],
+      });
+    }
+    return sections;
+  }, []);
+  const formSections = configuredSections
+    .map((section) => ({
+      ...section,
+      fields: section.fields.filter(({ field }) => matchesVisibility(field.visibleWhen, formData)),
+    }))
+    .filter((section) => section.fields.length > 0);
+  const hasBusinessGroups = formSections.some((section) => section.group);
 
   return (
     <div
@@ -271,315 +325,356 @@ export default function FormDialog() {
       />
 
       {/* Dialog */}
-      <div className={`relative mx-4 flex max-h-[calc(100vh-2rem)] w-full scale-100 transform flex-col rounded-lg bg-white opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800 ${
-        hasBusinessGroups ? 'max-w-2xl' : 'max-w-lg'
-      }`}>
+      <div
+        className={`relative mx-4 flex max-h-[calc(100vh-2rem)] w-full scale-100 transform flex-col rounded-lg bg-white opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800 ${
+          hasBusinessGroups ? 'max-w-2xl' : 'max-w-lg'
+        }`}
+      >
         {/* Header */}
         <div className="shrink-0 border-b border-gray-200 px-6 pt-6 pb-4 dark:border-gray-700">
-          <h3 id="form-dialog-title" className="text-lg font-semibold text-gray-900 dark:text-white">{dialogTitle}</h3>
+          <h3
+            id="form-dialog-title"
+            className="text-lg font-semibold text-gray-900 dark:text-white"
+          >
+            {dialogTitle}
+          </h3>
         </div>
 
         {/* Body - Form Fields */}
         <div
-          className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4 [scrollbar-gutter:stable]"
+          className="min-h-0 flex-1 [scrollbar-gutter:stable] space-y-4 overflow-y-auto px-6 py-4"
           data-testid="form-dialog-body"
         >
-          {visibleFields.map((field, index) => {
-            const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
-            const groupTitle = field.group ? getLocalizedText(field.group, locale, t) : '';
-            const previousGroupTitle = index > 0 && visibleFields[index - 1].group
-              ? getLocalizedText(visibleFields[index - 1].group!, locale, t)
-              : '';
-            const startsBusinessGroup = Boolean(groupTitle) && groupTitle !== previousGroupTitle;
-            const placeholder = field.placeholder
-              ? getLocalizedText(field.placeholder, locale, t)
-              : '';
-            const helpText = field.helpText
-              ? getLocalizedText(field.helpText, locale, t)
-              : '';
-            const fieldType = field.type || 'text';
-            const component = field.component?.toLocaleLowerCase();
-            const options = visibleOptions(field, state.fieldOptions, formData);
-            const error = errors[field.field];
-            const isFirst = index === 0;
-            const searchTerm = searchTerms[field.field] || '';
-            const filteredOptions = field.searchable && searchTerm
-              ? options.filter((option) => {
-                  const optionLabel = getLocalizedText(option.label, locale, t);
-                  const description = option.description
-                    ? getLocalizedText(option.description, locale, t)
-                    : '';
-                  const keyword = searchTerm.toLocaleLowerCase();
-                  return `${optionLabel} ${description}`.toLocaleLowerCase().includes(keyword);
-                })
-              : options;
+          {formSections.map((section) => {
+            const renderedFields = section.fields.map(({ field, sourceIndex }) => {
+              const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
+              const placeholder = field.placeholder
+                ? getLocalizedText(field.placeholder, locale, t)
+                : '';
+              const helpText = field.helpText ? getLocalizedText(field.helpText, locale, t) : '';
+              const fieldType = field.type || 'text';
+              const component = field.component?.toLocaleLowerCase();
+              const options = visibleOptions(field, state.fieldOptions, formData);
+              const error = errors[field.field];
+              const isFirst = sourceIndex === visibleFields[0]?.sourceIndex;
+              const searchTerm = searchTerms[field.field] || '';
+              const filteredOptions =
+                field.searchable && searchTerm
+                  ? options.filter((option) => {
+                      const optionLabel = getLocalizedText(option.label, locale, t);
+                      const description = option.description
+                        ? getLocalizedText(option.description, locale, t)
+                        : '';
+                      const keyword = searchTerm.toLocaleLowerCase();
+                      return `${optionLabel} ${description}`.toLocaleLowerCase().includes(keyword);
+                    })
+                  : options;
 
-            return (
-              <div key={`${field.field}-${index}`}>
-                {startsBusinessGroup && (
-                  <div
-                    className={`${index > 0 ? 'pt-2' : ''} mb-4`}
-                    data-testid={`form-dialog-group-${index}`}
-                  >
-                    <div className="flex items-center gap-3 border-b border-gray-200 pb-2 dark:border-gray-700">
-                      <span className="h-4 w-1 rounded-full bg-blue-600" aria-hidden="true" />
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {groupTitle}
-                      </h4>
-                    </div>
-                  </div>
-                )}
-                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {label}
-                  {field.required && <span className="ml-1 text-red-500">*</span>}
-                </label>
+              return (
+                <div key={`${field.field}-${sourceIndex}`}>
+                  <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {label}
+                    {field.required && <span className="ml-1 text-red-500">*</span>}
+                  </label>
 
-                {component === 'memberpicker' ? (
-                  <MemberPicker
-                    name={field.field}
-                    required={field.required}
-                    value={formData[field.field]}
-                    onChange={(value) => updateField(field.field, value)}
-                    multiple={field.props?.multiple === true}
-                    placeholder={placeholder || undefined}
-                  />
-                ) : fieldType === 'select' ? (
-                  <select
-                    ref={
-                      isFirst ? (firstInputRef as React.RefObject<HTMLSelectElement>) : undefined
-                    }
-                    data-testid={`form-dialog-field-${field.field}`}
-                    value={formData[field.field] ?? ''}
-                    onChange={(e) => updateField(field.field, e.target.value)}
-                    className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 transition-colors dark:bg-gray-700 dark:text-white ${
-                      error
-                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
-                        : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600'
-                    } focus:ring-2 focus:outline-none`}
-                  >
-                    <option value="">
-                      {placeholder || `${translatedOrFallback(
-                        t,
-                        'common.select',
-                        locale.startsWith('zh') ? '请选择' : 'Select',
-                      )}...`}
-                    </option>
-                    {options.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {getLocalizedText(opt.label, locale, t)}
+                  {component === 'memberpicker' ? (
+                    <MemberPicker
+                      name={field.field}
+                      required={field.required}
+                      value={formData[field.field]}
+                      onChange={(value) => updateField(field.field, value)}
+                      multiple={field.props?.multiple === true}
+                      placeholder={placeholder || undefined}
+                    />
+                  ) : fieldType === 'select' ? (
+                    <select
+                      ref={
+                        isFirst ? (firstInputRef as React.RefObject<HTMLSelectElement>) : undefined
+                      }
+                      data-testid={`form-dialog-field-${field.field}`}
+                      value={formData[field.field] ?? ''}
+                      onChange={(e) => updateField(field.field, e.target.value)}
+                      className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 transition-colors dark:bg-gray-700 dark:text-white ${
+                        error
+                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                          : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600'
+                      } focus:ring-2 focus:outline-none`}
+                    >
+                      <option value="">
+                        {placeholder ||
+                          `${translatedOrFallback(
+                            t,
+                            'common.select',
+                            locale.startsWith('zh') ? '请选择' : 'Select',
+                          )}...`}
                       </option>
-                    ))}
-                  </select>
-                ) : fieldType === 'segmented' ? (
-                  <div
-                    role="radiogroup"
-                    data-testid={`form-dialog-field-${field.field}`}
-                    className="grid grid-cols-2 gap-2 sm:grid-cols-3"
-                  >
-                    {options.map((option) => {
-                      const selected = formData[field.field] === option.value;
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          role="radio"
-                          aria-checked={selected}
-                          disabled={option.disabled}
-                          onClick={() => updateField(field.field, option.value)}
-                          className={`min-h-10 rounded-md border px-3 py-2 text-sm font-medium transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
-                            selected
-                              ? 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200'
-                              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {getLocalizedText(option.label, locale, t)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : fieldType === 'multiselect' ? (
-                  <div
-                    data-testid={`form-dialog-field-${field.field}`}
-                    className={`overflow-hidden rounded-lg border ${
-                      error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-                    }`}
-                  >
-                    {field.searchable && (
-                      <input
-                        ref={isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
-                        type="search"
-                        value={searchTerm}
-                        onChange={(event) => setSearchTerms((prev) => ({
-                          ...prev,
-                          [field.field]: event.target.value,
-                        }))}
-                        placeholder={placeholder}
-                        className="w-full border-0 border-b border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                      />
-                    )}
-                    <div className="max-h-48 overflow-y-auto bg-white dark:bg-gray-700">
-                      {filteredOptions.map((option) => {
-                        const selected = Array.isArray(formData[field.field])
-                          && formData[field.field].includes(option.value);
+                      {options.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {getLocalizedText(opt.label, locale, t)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : fieldType === 'segmented' ? (
+                    <div
+                      role="radiogroup"
+                      data-testid={`form-dialog-field-${field.field}`}
+                      className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+                    >
+                      {options.map((option) => {
+                        const selected = formData[field.field] === option.value;
                         return (
-                          <label
+                          <button
                             key={option.value}
-                            className={`flex min-h-11 cursor-pointer items-start gap-3 border-b border-gray-100 px-3 py-2 last:border-b-0 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-600 ${
-                              option.disabled ? 'cursor-not-allowed opacity-50' : ''
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            disabled={option.disabled}
+                            onClick={() => updateField(field.field, option.value)}
+                            className={`min-h-10 rounded-md border px-3 py-2 text-sm font-medium transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
+                              selected
+                                ? 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200'
+                                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
                             }`}
                           >
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              disabled={option.disabled}
-                              onChange={() => {
-                                const current = Array.isArray(formData[field.field])
-                                  ? formData[field.field]
-                                  : [];
-                                updateField(
-                                  field.field,
-                                  selected
-                                    ? current.filter((value: string) => value !== option.value)
-                                    : [...current, option.value],
-                                );
-                              }}
-                              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="min-w-0">
-                              <span className="block text-sm font-medium text-gray-900 dark:text-white">
-                                {getLocalizedText(option.label, locale, t)}
-                              </span>
-                              {option.description && (
-                                <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-300">
-                                  {getLocalizedText(option.description, locale, t)}
-                                </span>
-                              )}
-                            </span>
-                          </label>
+                            {getLocalizedText(option.label, locale, t)}
+                          </button>
                         );
                       })}
-                      {filteredOptions.length === 0 && (
-                        <div className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-300">
-                          {t('common.noData') || 'No data'}
-                        </div>
-                      )}
                     </div>
-                  </div>
-                ) : fieldType === 'checkbox' ? (
-                  <label
-                    data-testid={`form-dialog-field-${field.field}`}
-                    className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 ${
-                      error
-                        ? 'border-red-500'
-                        : 'border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-700'
-                    }`}
-                  >
+                  ) : fieldType === 'multiselect' ? (
+                    <div
+                      data-testid={`form-dialog-field-${field.field}`}
+                      className={`overflow-hidden rounded-lg border ${
+                        error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                      }`}
+                    >
+                      {field.searchable && (
+                        <input
+                          ref={
+                            isFirst
+                              ? (firstInputRef as React.RefObject<HTMLInputElement>)
+                              : undefined
+                          }
+                          type="search"
+                          value={searchTerm}
+                          onChange={(event) =>
+                            setSearchTerms((prev) => ({
+                              ...prev,
+                              [field.field]: event.target.value,
+                            }))
+                          }
+                          placeholder={placeholder}
+                          className="w-full border-0 border-b border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none focus:ring-inset dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        />
+                      )}
+                      <div className="max-h-48 overflow-y-auto bg-white dark:bg-gray-700">
+                        {filteredOptions.map((option) => {
+                          const selected =
+                            Array.isArray(formData[field.field]) &&
+                            formData[field.field].includes(option.value);
+                          return (
+                            <label
+                              key={option.value}
+                              className={`flex min-h-11 cursor-pointer items-start gap-3 border-b border-gray-100 px-3 py-2 last:border-b-0 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-600 ${
+                                option.disabled ? 'cursor-not-allowed opacity-50' : ''
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                disabled={option.disabled}
+                                onChange={() => {
+                                  const current = Array.isArray(formData[field.field])
+                                    ? formData[field.field]
+                                    : [];
+                                  updateField(
+                                    field.field,
+                                    selected
+                                      ? current.filter((value: string) => value !== option.value)
+                                      : [...current, option.value],
+                                  );
+                                }}
+                                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="min-w-0">
+                                <span className="block text-sm font-medium text-gray-900 dark:text-white">
+                                  {getLocalizedText(option.label, locale, t)}
+                                </span>
+                                {option.description && (
+                                  <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-300">
+                                    {getLocalizedText(option.description, locale, t)}
+                                  </span>
+                                )}
+                              </span>
+                            </label>
+                          );
+                        })}
+                        {filteredOptions.length === 0 && (
+                          <div className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-300">
+                            {t('common.noData') || 'No data'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : fieldType === 'checkbox' ? (
+                    <label
+                      data-testid={`form-dialog-field-${field.field}`}
+                      className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 ${
+                        error
+                          ? 'border-red-500'
+                          : 'border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-700'
+                      }`}
+                    >
+                      <input
+                        ref={
+                          isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined
+                        }
+                        type="checkbox"
+                        checked={formData[field.field] === true}
+                        onChange={(event) => updateField(field.field, event.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-200">
+                        {placeholder || label}
+                      </span>
+                    </label>
+                  ) : fieldType === 'file' ? (
                     <input
-                      ref={isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
-                      type="checkbox"
-                      checked={formData[field.field] === true}
-                      onChange={(event) => updateField(field.field, event.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      ref={
+                        isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined
+                      }
+                      data-testid={`form-dialog-field-${field.field}`}
+                      type="file"
+                      accept={field.accept}
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) {
+                          updateField(field.field, '');
+                          if (field.fileNameField) updateField(field.fileNameField, '');
+                          return;
+                        }
+                        if (field.maxBytes && file.size > field.maxBytes) {
+                          setErrors((prev) => ({
+                            ...prev,
+                            [field.field]: locale.startsWith('zh')
+                              ? `文件不能超过 ${Math.ceil(field.maxBytes! / 1024 / 1024)} MB`
+                              : `File must not exceed ${Math.ceil(field.maxBytes! / 1024 / 1024)} MB`,
+                          }));
+                          event.target.value = '';
+                          return;
+                        }
+                        try {
+                          const content = await file.text();
+                          updateField(field.field, content);
+                          if (field.fileNameField) updateField(field.fileNameField, file.name);
+                        } catch {
+                          setErrors((prev) => ({
+                            ...prev,
+                            [field.field]: locale.startsWith('zh')
+                              ? '无法读取文件'
+                              : 'Unable to read file',
+                          }));
+                          event.target.value = '';
+                        }
+                      }}
+                      className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded file:border-0 file:bg-blue-50 file:px-3 file:py-1 file:text-blue-700 dark:bg-gray-700 dark:text-white ${
+                        error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                      }`}
                     />
-                    <span className="text-sm text-gray-700 dark:text-gray-200">{placeholder || label}</span>
-                  </label>
-                ) : fieldType === 'file' ? (
-                  <input
-                    ref={isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
-                    data-testid={`form-dialog-field-${field.field}`}
-                    type="file"
-                    accept={field.accept}
-                    onChange={async (event) => {
-                      const file = event.target.files?.[0];
-                      if (!file) {
-                        updateField(field.field, '');
-                        if (field.fileNameField) updateField(field.fileNameField, '');
-                        return;
+                  ) : fieldType === 'number' ? (
+                    <input
+                      ref={
+                        isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined
                       }
-                      if (field.maxBytes && file.size > field.maxBytes) {
-                        setErrors((prev) => ({
-                          ...prev,
-                          [field.field]: locale.startsWith('zh')
-                            ? `文件不能超过 ${Math.ceil(field.maxBytes! / 1024 / 1024)} MB`
-                            : `File must not exceed ${Math.ceil(field.maxBytes! / 1024 / 1024)} MB`,
-                        }));
-                        event.target.value = '';
-                        return;
+                      data-testid={`form-dialog-field-${field.field}`}
+                      type="number"
+                      value={formData[field.field] ?? ''}
+                      onChange={(e) =>
+                        updateField(
+                          field.field,
+                          e.target.value === '' ? '' : Number(e.target.value),
+                        )
                       }
-                      try {
-                        const content = await file.text();
-                        updateField(field.field, content);
-                        if (field.fileNameField) updateField(field.fileNameField, file.name);
-                      } catch {
-                        setErrors((prev) => ({
-                          ...prev,
-                          [field.field]: locale.startsWith('zh') ? '无法读取文件' : 'Unable to read file',
-                        }));
-                        event.target.value = '';
+                      placeholder={placeholder}
+                      className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-500 ${
+                        error
+                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                          : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600'
+                      } focus:ring-2 focus:outline-none`}
+                    />
+                  ) : fieldType === 'textarea' ? (
+                    <textarea
+                      ref={
+                        isFirst
+                          ? (firstInputRef as React.RefObject<HTMLTextAreaElement>)
+                          : undefined
                       }
-                    }}
-                    className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded file:border-0 file:bg-blue-50 file:px-3 file:py-1 file:text-blue-700 dark:bg-gray-700 dark:text-white ${
-                      error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-                    }`}
-                  />
-                ) : fieldType === 'number' ? (
-                  <input
-                    ref={isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
-                    data-testid={`form-dialog-field-${field.field}`}
-                    type="number"
-                    value={formData[field.field] ?? ''}
-                    onChange={(e) =>
-                      updateField(field.field, e.target.value === '' ? '' : Number(e.target.value))
-                    }
-                    placeholder={placeholder}
-                    className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-500 ${
-                      error
-                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
-                        : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600'
-                    } focus:ring-2 focus:outline-none`}
-                  />
-                ) : fieldType === 'textarea' ? (
-                  <textarea
-                    ref={
-                      isFirst ? (firstInputRef as React.RefObject<HTMLTextAreaElement>) : undefined
-                    }
-                    data-testid={`form-dialog-field-${field.field}`}
-                    value={formData[field.field] ?? ''}
-                    onChange={(e) => updateField(field.field, e.target.value)}
-                    placeholder={placeholder}
-                    rows={3}
-                    className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-500 ${
-                      error
-                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
-                        : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600'
-                    } resize-none focus:ring-2 focus:outline-none`}
-                  />
-                ) : (
-                  <input
-                    ref={isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
-                    data-testid={`form-dialog-field-${field.field}`}
-                    type="text"
-                    value={formData[field.field] ?? ''}
-                    onChange={(e) => updateField(field.field, e.target.value)}
-                    placeholder={placeholder}
-                    className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-500 ${
-                      error
-                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
-                        : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600'
-                    } focus:ring-2 focus:outline-none`}
-                  />
-                )}
+                      data-testid={`form-dialog-field-${field.field}`}
+                      value={formData[field.field] ?? ''}
+                      onChange={(e) => updateField(field.field, e.target.value)}
+                      placeholder={placeholder}
+                      rows={3}
+                      className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-500 ${
+                        error
+                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                          : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600'
+                      } resize-none focus:ring-2 focus:outline-none`}
+                    />
+                  ) : (
+                    <input
+                      ref={
+                        isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined
+                      }
+                      data-testid={`form-dialog-field-${field.field}`}
+                      type="text"
+                      value={formData[field.field] ?? ''}
+                      onChange={(e) => updateField(field.field, e.target.value)}
+                      placeholder={placeholder}
+                      className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 transition-colors dark:bg-gray-700 dark:text-white dark:placeholder-gray-500 ${
+                        error
+                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                          : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600'
+                      } focus:ring-2 focus:outline-none`}
+                    />
+                  )}
 
-                {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
-                {helpText && (
-                  <p
-                    className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400"
-                    data-testid={`form-dialog-help-${field.field}`}
-                  >
-                    {helpText}
-                  </p>
-                )}
-              </div>
+                  {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+                  {helpText && (
+                    <p
+                      className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400"
+                      data-testid={`form-dialog-help-${field.field}`}
+                    >
+                      {helpText}
+                    </p>
+                  )}
+                </div>
+              );
+            });
+            if (!section.group) {
+              return (
+                <div
+                  key={`${section.groupKey}-${section.runStartSourceIndex}`}
+                  className="space-y-4"
+                >
+                  {renderedFields}
+                </div>
+              );
+            }
+            const groupTitle = getLocalizedText(section.group, locale, t);
+            return (
+              <fieldset
+                key={`${section.groupKey}-${section.runStartSourceIndex}`}
+                className="rounded-lg border border-gray-200 px-4 pb-4 dark:border-gray-700"
+                data-testid={`form-dialog-group-${section.runStartSourceIndex}`}
+              >
+                <legend className="px-2 text-sm font-semibold text-gray-900 dark:text-white">
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-4 w-1 rounded-full bg-blue-600" aria-hidden="true" />
+                    {groupTitle}
+                  </span>
+                </legend>
+                <div className="mt-2 space-y-4">{renderedFields}</div>
+              </fieldset>
             );
           })}
         </div>

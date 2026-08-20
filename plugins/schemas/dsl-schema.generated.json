@@ -1070,7 +1070,34 @@
       "anyOf": [
         {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
+            "inputFields": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/CommandInputFieldConfig"
+              }
+            },
+            "inputFieldsTitle": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/LocalizedText"
+                }
+              ]
+            },
+            "inputFieldsSubmitLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/LocalizedText"
+                }
+              ]
+            },
             "type": {
               "type": "string",
               "const": "command"
@@ -1080,14 +1107,40 @@
             }
           },
           "required": [
-            "type",
-            "command"
-          ],
-          "additionalProperties": false
+            "command",
+            "type"
+          ]
         },
         {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
+            "inputFields": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/CommandInputFieldConfig"
+              }
+            },
+            "inputFieldsTitle": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/LocalizedText"
+                }
+              ]
+            },
+            "inputFieldsSubmitLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/LocalizedText"
+                }
+              ]
+            },
             "type": {
               "type": "string",
               "const": "state_transition"
@@ -1097,14 +1150,40 @@
             }
           },
           "required": [
-            "type",
-            "command"
-          ],
-          "additionalProperties": false
+            "command",
+            "type"
+          ]
         },
         {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
+            "inputFields": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/CommandInputFieldConfig"
+              }
+            },
+            "inputFieldsTitle": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/LocalizedText"
+                }
+              ]
+            },
+            "inputFieldsSubmitLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/LocalizedText"
+                }
+              ]
+            },
             "type": {
               "type": "string",
               "const": "bulk_command"
@@ -1114,14 +1193,40 @@
             }
           },
           "required": [
-            "type",
-            "command"
-          ],
-          "additionalProperties": false
+            "command",
+            "type"
+          ]
         },
         {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
+            "inputFields": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/CommandInputFieldConfig"
+              }
+            },
+            "inputFieldsTitle": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/LocalizedText"
+                }
+              ]
+            },
+            "inputFieldsSubmitLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/LocalizedText"
+                }
+              ]
+            },
             "type": {
               "type": "string",
               "const": "bulk_state_transition"
@@ -1131,10 +1236,9 @@
             }
           },
           "required": [
-            "type",
-            "command"
-          ],
-          "additionalProperties": false
+            "command",
+            "type"
+          ]
         },
         {
           "type": "object",
@@ -1298,6 +1402,65 @@
           "additionalProperties": false
         }
       ]
+    },
+    "CommandInputFieldConfig": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/LocalizedText"
+            }
+          ]
+        },
+        "group": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/LocalizedText"
+            }
+          ],
+          "description": "Optional business section rendered by the shared command dialog."
+        },
+        "helpText": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/LocalizedText"
+            }
+          ]
+        },
+        "placeholder": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/LocalizedText"
+            }
+          ]
+        },
+        "type": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "additionalProperties": {}
     },
     "FlowStep": {
       "type": "object",
@@ -2090,6 +2253,13 @@
           "items": {
             "$ref": "#/definitions/ButtonConfig"
           }
+        },
+        "rowActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ButtonConfig"
+          },
+          "deprecated": "Use actions. Kept for imported DSL compatibility."
         },
         "summary": {
           "$ref": "#/definitions/SummaryConfig"
