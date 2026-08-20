@@ -112,7 +112,7 @@
 | `suspended-tenant-login-ui-golden.sh` | 0 | 2026-07-17 | suspended-tenant-login-ui-golden.sh — E5, at the glass: what a user sees when their org is |
 | `test-acp-runtime.sh` | 0 | 2026-05-09 |  |
 
-## pipeline/lib (10)
+## pipeline/lib (12)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
@@ -125,7 +125,9 @@
 | `lib/plugin-config.mjs` | 3 | 2026-07-23 | Read a plugin's config regardless of how it is laid out on disk. |
 | `lib/repo-root.mjs` | 5 | 2026-07-23 | Resolve the repo the test-system gates should run against. |
 | `lib/reset-init-common.sh` | 7 | 2026-05-17 | Shared reset/init primitives. This file is sourced by lifecycle scripts; keep |
+| `lib/runtime-process-owner.sh` | 5 | 2026-08-14 | Resolve and validate runtime process ownership for worktree-scoped stacks. |
 | `lib/test-multi-worktree-guard.sh` | 1 | 2026-05-22 | Sanity tests for scripts/lib/multi-worktree-guard.sh |
+| `lib/test-runtime-process-owner.sh` | 1 | 2026-08-14 | Regression tests for runtime process ownership checks. |
 
 ## tooling (66)
 
