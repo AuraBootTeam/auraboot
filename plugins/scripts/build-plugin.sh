@@ -103,17 +103,17 @@ if [ "$SKIP_BACKEND" = true ]; then
 elif [ ! -d "$PLUGIN_SRC_DIR/backend" ]; then
   echo "       ⚠ No backend directory found, skipping"
 else
+  PLATFORM_DIR="${AURA_CORE_PROJECT_ROOT:-$(cd "$PROJECT_DIR/.." && pwd)}/platform"
   # Check if Plugin API is available in Maven Local
   if [ ! -d "$PLUGIN_API_PATH" ]; then
     echo "       ⚠ Plugin API not found in Maven Local."
     echo "         Publishing Plugin API to Maven Local..."
-    PLATFORM_DIR="$PROJECT_DIR/../../platform"
     if [ -d "$PLATFORM_DIR" ]; then
-      (cd "$PLATFORM_DIR" && ./gradlew :platform-plugin-api:publishToMavenLocal --quiet 2>/dev/null) && {
+      (cd "$PLATFORM_DIR" && ./gradlew :platform-plugin-api:publishToMavenLocal --quiet --no-daemon 2>/dev/null) && {
         echo "       ✓ Plugin API published to Maven Local"
       } || {
         echo "       ⚠ Failed to publish Plugin API. Run manually:"
-        echo "         cd platform && ./gradlew :platform-plugin-api:publishToMavenLocal"
+        echo "         cd platform && ./gradlew :platform-plugin-api:publishToMavenLocal --no-daemon"
         echo "         Skipping backend build..."
       }
     else
@@ -128,13 +128,14 @@ else
 
     if [ -f "gradlew" ]; then
       chmod +x gradlew
-      if ./gradlew clean build -x test --quiet 2>/dev/null; then
+      if ./gradlew clean build -x test --quiet --no-daemon 2>/dev/null; then
         BACKEND_BUILT=true
       else
         echo "       ⚠ Gradle build failed, skipping backend"
       fi
     elif [ -f "build.gradle" ]; then
-      if gradle clean build -x test --quiet 2>/dev/null; then
+      if "$PLATFORM_DIR/gradlew" --project-dir "$PLUGIN_SRC_DIR/backend" \
+        clean build -x test --quiet --no-daemon 2>/dev/null; then
         BACKEND_BUILT=true
       else
         echo "       ⚠ Gradle build failed, skipping backend"

@@ -141,7 +141,8 @@ IMPORT_PLUGINS=(core-meta core-bpm platform-admin core-decisionops core-announce
 log "1/7 prepare verified hybrid plugin jars"
 build_jar() {  # <plugin> <backend-dir>
   [ -d "$2" ] || die "missing backend for hybrid plugin $1: $2"
-  ( cd "$2" && gradle jar --console=plain -q ) || die "build failed: $1"
+  "$CORE_ROOT/platform/gradlew" --project-dir "$2" jar --console=plain -q --no-daemon \
+    || die "build failed: $1"
   local j; j="$(ls "$2/build/libs/"*.jar 2>/dev/null | head -1)"
   [ -n "$j" ] || die "build produced no jar: $1"
   cp "$j" "$STAGE/"
