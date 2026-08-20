@@ -129,6 +129,12 @@
                   {
                     "field": "crm_ct_is_primary",
                     "width": 100
+                  },
+                  {
+                    "field": "crm_ct_status",
+                    "width": 100,
+                    "renderType": "tag",
+                    "dictCode": "crm_contact_status"
                   }
                 ],
                 "actions": [
@@ -490,7 +496,10 @@
         {
           "code": "log_activity",
           "icon": "MessageSquare",
-          "label": "$i18n:common.button.create",
+          "label": {
+            "zh-CN": "记录跟进",
+            "en-US": "Log Follow-up"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_activity_common_form",
@@ -500,7 +509,10 @@
         {
           "code": "create_task",
           "icon": "CheckSquare",
-          "label": "$i18n:common.button.create",
+          "label": {
+            "zh-CN": "新建计划",
+            "en-US": "New Follow-up Plan"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_activity_common_form",

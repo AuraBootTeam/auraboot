@@ -23,6 +23,36 @@
           "filter": null
         },
         {
+          "key": "follow_plans",
+          "label": {
+            "en-US": "Follow-up Plans",
+            "zh-CN": "跟进计划"
+          },
+          "filter": {
+            "field": "crm_act_type",
+            "value": "task",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "follow_records",
+          "label": {
+            "en-US": "Follow-up Records",
+            "zh-CN": "跟进记录"
+          },
+          "filter": {
+            "field": "crm_act_type",
+            "value": [
+              "call",
+              "email",
+              "meeting",
+              "note",
+              "visit"
+            ],
+            "operator": "IN"
+          }
+        },
+        {
           "key": "task",
           "label": {
             "en": "Tasks",

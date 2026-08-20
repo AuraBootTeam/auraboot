@@ -118,6 +118,26 @@
     "defaultValue": "false"
   },
   {
+    "code": "crm_ct_status",
+    "displayName:zh-CN": "联系人状态",
+    "displayName:en": "Contact Status",
+    "dataType": "enum",
+    "dictCode": "crm_contact_status",
+    "defaultValue": "active",
+    "feature": {
+      "searchable": true
+    }
+  },
+  {
+    "code": "crm_ct_disabled_reason",
+    "displayName:zh-CN": "停用原因",
+    "displayName:en": "Disabled Reason",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 500
+    }
+  },
+  {
     "code": "crm_ct_remark",
     "displayName:zh-CN": "备注",
     "displayName:en": "Remark",

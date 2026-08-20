@@ -58,6 +58,15 @@
                   "readOnly": true
                 },
                 {
+                  "field": "crm_ct_status",
+                  "readOnly": true
+                },
+                {
+                  "field": "crm_ct_disabled_reason",
+                  "readOnly": true,
+                  "visibleWhen": "record.crm_ct_status === 'inactive'"
+                },
+                {
                   "field": "crm_ct_remark",
                   "span": 2,
                   "readOnly": true
@@ -128,9 +137,59 @@
           }
         },
         {
+          "code": "set_primary",
+          "icon": "Star",
+          "permissionCode": "crm.contact.manage",
+          "label": {
+            "zh-CN": "设为主联系人",
+            "en-US": "Set Primary"
+          },
+          "visibleWhen": "record.crm_ct_status === 'active' && record.crm_ct_is_primary !== true",
+          "action": {
+            "type": "command",
+            "command": "crm:set_primary_contact"
+          }
+        },
+        {
+          "code": "disable",
+          "icon": "UserRoundX",
+          "danger": true,
+          "permissionCode": "crm.contact.manage",
+          "label": {
+            "zh-CN": "停用联系人",
+            "en-US": "Disable Contact"
+          },
+          "visibleWhen": "record.crm_ct_status === 'active'",
+          "confirm": {
+            "zh-CN": "确定停用该联系人吗？历史跟进和关联数据会保留。",
+            "en-US": "Disable this contact? Historical activities and relationships will be retained."
+          },
+          "action": {
+            "type": "state_transition",
+            "command": "crm:disable_contact"
+          }
+        },
+        {
+          "code": "enable",
+          "icon": "UserRoundCheck",
+          "permissionCode": "crm.contact.manage",
+          "label": {
+            "zh-CN": "启用联系人",
+            "en-US": "Enable Contact"
+          },
+          "visibleWhen": "record.crm_ct_status === 'inactive'",
+          "action": {
+            "type": "state_transition",
+            "command": "crm:enable_contact"
+          }
+        },
+        {
           "code": "log_activity",
           "icon": "MessageSquare",
-          "label": "$i18n:common.button.create",
+          "label": {
+            "zh-CN": "记录跟进",
+            "en-US": "Log Follow-up"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_activity_common_form",
@@ -140,7 +199,10 @@
         {
           "code": "create_task",
           "icon": "CheckSquare",
-          "label": "$i18n:common.button.create",
+          "label": {
+            "zh-CN": "新建计划",
+            "en-US": "New Follow-up Plan"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_activity_common_form",

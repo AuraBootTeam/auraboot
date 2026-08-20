@@ -191,7 +191,10 @@
         {
           "code": "log_activity",
           "icon": "MessageSquare",
-          "label": "$i18n:common.button.create",
+          "label": {
+            "zh-CN": "记录跟进",
+            "en-US": "Log Follow-up"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_activity_common_form",
@@ -201,7 +204,10 @@
         {
           "code": "create_task",
           "icon": "CheckSquare",
-          "label": "$i18n:common.button.create",
+          "label": {
+            "zh-CN": "新建计划",
+            "en-US": "New Follow-up Plan"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_activity_common_form",

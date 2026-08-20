@@ -207,6 +207,30 @@
     }
   },
   {
+    "name": "$i18n:crm.saved_view.activity_list",
+    "description": "$i18n:crm.saved_view.activity_list_description",
+    "modelCode": "crm_activity_common",
+    "pageKey": "crm_activity_common_list",
+    "viewKey": "crm_activity_all_table",
+    "scope": "global",
+    "viewType": "table",
+    "isDefault": true,
+    "sortOrder": 1,
+    "viewConfig": {
+      "filters": [],
+      "sorts": [
+        {
+          "fieldCode": "crm_act_date",
+          "direction": "desc",
+          "priority": 1
+        }
+      ],
+      "pagination": {
+        "pageSize": 20
+      }
+    }
+  },
+  {
     "name": "Activity Calendar",
     "description": "CRM activities displayed in calendar view",
     "modelCode": "crm_activity_common",
@@ -215,9 +239,9 @@
     "scope": "global",
     "viewType": "calendar",
     "isDefault": false,
-    "sortOrder": 1,
+    "sortOrder": 2,
     "viewConfig": {
-      "calendarDateField": "crm_act_activity_date",
+      "calendarDateField": "crm_act_date",
       "calendarTitleField": "crm_act_subject",
       "calendarColorField": "crm_act_type",
       "calendarDefaultView": "dayGridMonth"

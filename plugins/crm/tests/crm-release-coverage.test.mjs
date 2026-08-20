@@ -19,8 +19,8 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.doesNotMatch(JSON.stringify(committed.run), /auraboot-enterprise/);
 
   assert.equal(committed.axes.semanticActions.length, 26);
-  assert.equal(committed.axes.commands.length, 49);
-  assert.equal(committed.axes.pages.length, 27);
+  assert.equal(committed.axes.commands.length, 53);
+  assert.equal(committed.axes.pages.length, 29);
   assert.equal(committed.axes.permissions.length, 24);
   assert.equal(committed.axes.queries.length, 39);
   assert.deepEqual(
@@ -45,14 +45,14 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
     ],
   );
   assert.equal(committed.scope.productDenominator.pages, 125);
-  assert.equal(committed.scope.productDenominator.commands, 238);
+  assert.equal(committed.scope.productDenominator.commands, 241);
   assert.equal(committed.scope.productDenominator.permissions, 114);
   assert.equal(committed.scope.productDenominator['page-blocks'], 403);
-  assert.equal(committed.scope.productDenominator['page-fields'], 1707);
-  assert.equal(committed.scope.productDenominator['ui-actions'], 600);
+  assert.equal(committed.scope.productDenominator['page-fields'], 1713);
+  assert.equal(committed.scope.productDenominator['ui-actions'], 609);
   assert.equal(committed.scope.productDenominator.queries, 55);
-  assert.equal(committed.scope.productVerdicts.pass, 643);
-  assert.equal(committed.scope.productVerdicts.untested, 2740);
+  assert.equal(committed.scope.productVerdicts.pass, 675);
+  assert.equal(committed.scope.productVerdicts.untested, 2726);
   assert.ok(committed.scope.productVerdicts.untested > 0);
   assert.equal(committed.scope.productVerdicts.gap ?? 0, 0);
   const coreWorkbenchContract = committed.runtimeEvidenceContracts.find(
@@ -149,6 +149,22 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
     'out-of-scope-development-stage',
   );
   assert.equal(followupCommentsContract.requireNoFailedRuntimeRequests, true);
+  const contactFollowupLifecycleContract = committed.runtimeEvidenceContracts.find(
+    (contract) => contract.id === 'CRM-CONTACT-FOLLOWUP-LIFECYCLE',
+  );
+  assert.equal(contactFollowupLifecycleContract.expectedScenarios, 9);
+  assert.equal(contactFollowupLifecycleContract.minimumScreenshots, 5);
+  assert.equal(contactFollowupLifecycleContract.expectedCoverage.pages.length, 3);
+  assert.equal(contactFollowupLifecycleContract.expectedCoverage.blocks.length, 6);
+  assert.equal(contactFollowupLifecycleContract.expectedCoverage.fields.length, 11);
+  assert.equal(contactFollowupLifecycleContract.expectedCoverage.uiActions.length, 7);
+  assert.equal(contactFollowupLifecycleContract.expectedCoverage.commands.length, 7);
+  assert.equal(contactFollowupLifecycleContract.expectedTechnicalVerdict, 'pass');
+  assert.equal(
+    contactFollowupLifecycleContract.expectedDataMigration,
+    'out-of-scope-development-stage',
+  );
+  assert.equal(contactFollowupLifecycleContract.requireNoFailedRuntimeRequests, true);
   const modelGroup = committed.groups.find((group) => group.id === 'model-surfaces');
   assert.equal(
     modelGroup.rows.find((row) => row.id === 'model:crm_sla_breach')?.verdict,

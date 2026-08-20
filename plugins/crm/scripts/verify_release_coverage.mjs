@@ -55,11 +55,59 @@ const EVIDENCE = {
   forecastVariance: 'plugins/crm/e2e/forecast-variance.golden.spec.ts',
   customerPool: 'web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts',
   followupComments: 'web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts',
+  contactFollowupLifecycle:
+    'web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts',
 };
 
 const FOLLOWUP_COMMENT_COVERAGE = {
   pages: ['crm_activity_common_detail'],
   blocks: ['crm_activity_common_detail:activity_followup_comments'],
+};
+const CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE = {
+  pages: [
+    'crm_contact_common_detail',
+    'crm_activity_common_list',
+    'crm_activity_common_detail',
+  ],
+  blocks: [
+    'crm_contact_common_detail:section_basic',
+    'crm_contact_common_detail:crm_contact_detail_toolbar',
+    'crm_activity_common_list:crm_act_tabs',
+    'crm_activity_common_list:crm_act_table',
+    'crm_activity_common_detail:section_basic',
+    'crm_activity_common_detail:crm_activity_detail_toolbar',
+  ],
+  fields: [
+    'crm_contact_common_detail:section_basic:crm_ct_account_id',
+    'crm_contact_common_detail:section_basic:crm_ct_name',
+    'crm_contact_common_detail:section_basic:crm_ct_is_primary',
+    'crm_contact_common_detail:section_basic:crm_ct_status',
+    'crm_activity_common_list:crm_act_table:crm_act_type',
+    'crm_activity_common_list:crm_act_table:crm_act_subject',
+    'crm_activity_common_list:crm_act_table:crm_act_date',
+    'crm_activity_common_detail:section_basic:crm_act_type',
+    'crm_activity_common_detail:section_basic:crm_act_subject',
+    'crm_activity_common_detail:section_basic:crm_act_date',
+    'crm_activity_common_detail:section_basic:crm_act_content',
+  ],
+  uiActions: [
+    'crm_contact_common_detail:crm_contact_detail_toolbar:set_primary',
+    'crm_contact_common_detail:crm_contact_detail_toolbar:disable',
+    'crm_contact_common_detail:crm_contact_detail_toolbar:enable',
+    'crm_activity_common_list:crm_act_tabs:follow_plans',
+    'crm_activity_common_list:crm_act_tabs:follow_records',
+    'crm_activity_common_detail:crm_activity_detail_toolbar:start_task',
+    'crm_activity_common_detail:crm_activity_detail_toolbar:delete',
+  ],
+  commands: [
+    'crm:create_account',
+    'crm:create_contact',
+    'crm:set_primary_contact',
+    'crm:disable_contact',
+    'crm:enable_contact',
+    'crm:create_activity',
+    'crm:delete_activity',
+  ],
 };
 
 // Executable denominator owned by the opportunity-efficiency true-stack gate.
@@ -646,6 +694,12 @@ const customerPoolCoverageSets = Object.fromEntries(
 const followupCommentCoverageSets = Object.fromEntries(
   Object.entries(FOLLOWUP_COMMENT_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
 );
+const contactFollowupLifecycleCoverageSets = Object.fromEntries(
+  Object.entries(CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE).map(([axis, values]) => [
+    axis,
+    new Set(values),
+  ]),
+);
 const dashboardCoverageSets = Object.fromEntries(
   Object.entries(DASHBOARD_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
 );
@@ -734,6 +788,9 @@ function evidenceForCommand(code, rg1Commands) {
   if (RG3_COMMANDS.includes(code)) files.push(EVIDENCE.rg3Journey);
   if (releaseBCoverageSets.commands.has(code)) files.push(EVIDENCE.releaseB);
   if (customerPoolCoverageSets.commands.has(code)) files.push(EVIDENCE.customerPool);
+  if (contactFollowupLifecycleCoverageSets.commands.has(code)) {
+    files.push(EVIDENCE.contactFollowupLifecycle);
+  }
   return uniq(files);
 }
 
@@ -985,6 +1042,9 @@ function buildProductGroups({
         ...(followupCommentCoverageSets.blocks.has(blockKey)
           ? [EVIDENCE.followupComments]
           : []),
+        ...(contactFollowupLifecycleCoverageSets.blocks.has(blockKey)
+          ? [EVIDENCE.contactFollowupLifecycle]
+          : []),
       ]);
       blockRows.push(
         executableRow({
@@ -1008,6 +1068,9 @@ function buildProductGroups({
         ...(releaseBCoverageSets.fields.has(fieldKey) ? [EVIDENCE.releaseB] : []),
         ...(forecastVarianceCoverageSets.fields.has(fieldKey) ? [EVIDENCE.forecastVariance] : []),
         ...(customerPoolCoverageSets.fields.has(fieldKey) ? [EVIDENCE.customerPool] : []),
+        ...(contactFollowupLifecycleCoverageSets.fields.has(fieldKey)
+          ? [EVIDENCE.contactFollowupLifecycle]
+          : []),
       ]);
       fieldRows.push(
         executableRow({
@@ -1035,11 +1098,16 @@ function buildProductGroups({
       const customerPoolAction = customerPoolCoverageSets.uiActions.has(
         `${page.pageKey}:${item.blockId}:${item.code}`,
       );
+      const contactFollowupLifecycleAction =
+        contactFollowupLifecycleCoverageSets.uiActions.has(
+          `${page.pageKey}:${item.blockId}:${item.code}`,
+        );
       const evidence = uniq([
         ...(releaseAction?.evidence ?? []),
         ...(releaseBAction ? [EVIDENCE.releaseB] : []),
         ...(forecastVarianceAction ? [EVIDENCE.forecastVariance] : []),
         ...(customerPoolAction ? [EVIDENCE.customerPool] : []),
+        ...(contactFollowupLifecycleAction ? [EVIDENCE.contactFollowupLifecycle] : []),
       ]);
       uiActionRows.push(
         executableRow({
@@ -1349,6 +1417,7 @@ export function buildReleaseManifest() {
     ...RG3_COMMANDS,
     ...RELEASE_B_COVERAGE.commands,
     ...CUSTOMER_POOL_COVERAGE.commands,
+    ...CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE.commands,
   ]);
   const commandRows = commandCodes.map((code) => {
     const command = commands.get(code);
@@ -1359,12 +1428,17 @@ export function buildReleaseManifest() {
     if (RG3_COMMANDS.includes(code)) goals.push('RG-3');
     if (releaseBCoverageSets.commands.has(code)) goals.push('RELEASE-B');
     if (customerPoolCoverageSets.commands.has(code)) goals.push('CORDYS-CUSTOMER-POOL');
+    if (contactFollowupLifecycleCoverageSets.commands.has(code)) {
+      goals.push('CORDYS-CONTACT-FOLLOWUP-LIFECYCLE');
+    }
     return {
       id: code,
       goals,
       permissionCodes: uniq(command.permissions ?? []),
       evidence: evidenceForCommand(code, rg1Commands),
-      permissionsVerified: goals.some((goal) => goal !== 'RELEASE-B'),
+      permissionsVerified: goals.some((goal) =>
+        ['RG-1', 'RG-2', 'RG-3', 'CORDYS-CUSTOMER-POOL'].includes(goal),
+      ),
       verdict: 'pass',
     };
   });
@@ -1375,6 +1449,7 @@ export function buildReleaseManifest() {
     ...RELEASE_B_COVERAGE.pages,
     ...CUSTOMER_POOL_COVERAGE.pages,
     ...FOLLOWUP_COMMENT_COVERAGE.pages,
+    ...CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE.pages,
   ]).map(
     (pageKey) => {
       const page = pages.get(pageKey);
@@ -1387,6 +1462,9 @@ export function buildReleaseManifest() {
         ...(customerPoolCoverageSets.pages.has(pageKey) ? ['CORDYS-CUSTOMER-POOL'] : []),
         ...(followupCommentCoverageSets.pages.has(pageKey)
           ? ['CORDYS-FOLLOWUP-COMMENTS']
+          : []),
+        ...(contactFollowupLifecycleCoverageSets.pages.has(pageKey)
+          ? ['CORDYS-CONTACT-FOLLOWUP-LIFECYCLE']
           : []),
       ];
       const evidence = uniq([
@@ -1401,6 +1479,9 @@ export function buildReleaseManifest() {
         ...(followupCommentCoverageSets.pages.has(pageKey)
           ? [EVIDENCE.followupComments]
           : []),
+        ...(contactFollowupLifecycleCoverageSets.pages.has(pageKey)
+          ? [EVIDENCE.contactFollowupLifecycle]
+          : []),
       ]);
       const menuPermissions = menus
         .filter((menu) => menu.pageKey === pageKey && menu.permissionCode)
@@ -1411,7 +1492,9 @@ export function buildReleaseManifest() {
         kind: page.kind,
         permissionCodes: uniq([page.permissionCode, ...menuPermissions].filter(Boolean)),
         evidence: uniq(evidence),
-        permissionsVerified: goals.some((goal) => goal !== 'RELEASE-B'),
+        permissionsVerified: goals.some((goal) =>
+          ['RG-1', 'RG-2', 'RG-3', 'CORDYS-CUSTOMER-POOL'].includes(goal),
+        ),
         verdict: 'pass',
       };
     },
@@ -1567,6 +1650,11 @@ export function buildReleaseManifest() {
         verdict: 'pass',
         note: 'Three real-stack journeys cover member operations, manager batch work, administrator governance, recycle policy, ownership evidence, import/mobile behavior and negative boundaries without development-data migration.',
       },
+      {
+        id: 'CORDYS-CONTACT-FOLLOWUP-LIFECYCLE',
+        verdict: 'pass',
+        note: 'A self-seeded real-stack journey verifies contact primary/enable-disable invariants and the Web follow-up plan/record lifecycle without development-data migration.',
+      },
     ],
     axes: {
       semanticActions,
@@ -1649,6 +1737,16 @@ export function buildReleaseManifest() {
         filePrefix: 'crm-followup-comments-parity-',
         expectedScenarios: 12,
         minimumScreenshots: 6,
+        expectedTechnicalVerdict: 'pass',
+        expectedDataMigration: 'out-of-scope-development-stage',
+        requireNoFailedRuntimeRequests: true,
+      },
+      {
+        id: 'CRM-CONTACT-FOLLOWUP-LIFECYCLE',
+        filePrefix: 'crm-contact-followup-lifecycle-',
+        expectedScenarios: 9,
+        minimumScreenshots: 5,
+        expectedCoverage: CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE,
         expectedTechnicalVerdict: 'pass',
         expectedDataMigration: 'out-of-scope-development-stage',
         requireNoFailedRuntimeRequests: true,

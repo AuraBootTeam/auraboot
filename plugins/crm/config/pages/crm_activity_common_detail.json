@@ -159,6 +159,7 @@
             "zh-CN": "开始任务",
             "en-US": "Start Task"
           },
+          "visibleWhen": "record.crm_act_type === 'task' && record.crm_act_status === 'open'",
           "action": {
             "type": "state_transition",
             "command": "crm:start_task"
@@ -171,6 +172,7 @@
             "zh-CN": "完成任务",
             "en-US": "Complete Task"
           },
+          "visibleWhen": "record.crm_act_type === 'task' && ['open','in_progress'].includes(record.crm_act_status)",
           "action": {
             "type": "state_transition",
             "command": "crm:complete_task"
@@ -183,9 +185,25 @@
             "zh-CN": "取消任务",
             "en-US": "Cancel Task"
           },
+          "visibleWhen": "record.crm_act_type === 'task' && ['open','in_progress'].includes(record.crm_act_status)",
           "action": {
             "type": "state_transition",
             "command": "crm:cancel_task"
+          }
+        },
+        {
+          "code": "delete",
+          "icon": "Trash2",
+          "danger": true,
+          "permissionCode": "crm.activity.manage",
+          "label": "$i18n:common.button.delete",
+          "confirm": {
+            "zh-CN": "确定删除这条跟进计划或跟进记录吗？关联评论也将不可见。",
+            "en-US": "Delete this follow-up plan or record? Related comments will no longer be visible."
+          },
+          "action": {
+            "type": "command",
+            "command": "crm:delete_activity"
           }
         }
       ]

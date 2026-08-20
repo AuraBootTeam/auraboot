@@ -67,6 +67,12 @@
           "width": 100
         },
         {
+          "field": "crm_ct_status",
+          "width": 100,
+          "renderType": "tag",
+          "dictCode": "crm_contact_status"
+        },
+        {
           "field": "crm_ct_dup_of"
         },
         {
@@ -92,6 +98,50 @@
               "action": {
                 "type": "navigate",
                 "to": "crm_contact_common_form"
+              }
+            },
+            {
+              "code": "set_primary",
+              "permissionCode": "crm.contact.manage",
+              "label": {
+                "zh-CN": "设为主联系人",
+                "en-US": "Set Primary"
+              },
+              "visibleWhen": "record.crm_ct_status === 'active' && record.crm_ct_is_primary !== true",
+              "action": {
+                "type": "command",
+                "command": "crm:set_primary_contact"
+              }
+            },
+            {
+              "code": "disable",
+              "danger": true,
+              "permissionCode": "crm.contact.manage",
+              "label": {
+                "zh-CN": "停用",
+                "en-US": "Disable"
+              },
+              "visibleWhen": "record.crm_ct_status === 'active'",
+              "confirm": {
+                "zh-CN": "确定停用该联系人吗？",
+                "en-US": "Disable this contact?"
+              },
+              "action": {
+                "type": "state_transition",
+                "command": "crm:disable_contact"
+              }
+            },
+            {
+              "code": "enable",
+              "permissionCode": "crm.contact.manage",
+              "label": {
+                "zh-CN": "启用",
+                "en-US": "Enable"
+              },
+              "visibleWhen": "record.crm_ct_status === 'inactive'",
+              "action": {
+                "type": "state_transition",
+                "command": "crm:enable_contact"
               }
             },
             {
