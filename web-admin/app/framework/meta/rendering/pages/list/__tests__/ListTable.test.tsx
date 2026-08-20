@@ -308,6 +308,20 @@ describe('ListTable selection column layout', () => {
       }
     }
   });
+
+  it('renders the page business empty state instead of the generic fallback', async () => {
+    renderListTable({
+      data: [],
+      emptyTitle: '暂无生产退料申请',
+      emptyDescription: '点击“新建退料申请”，从一张已确认的生产发料单开始。',
+    });
+
+    expect(await screen.findByTestId('empty-state-title')).toHaveTextContent('暂无生产退料申请');
+    expect(screen.getByTestId('empty-state-description')).toHaveTextContent(
+      '点击“新建退料申请”，从一张已确认的生产发料单开始。',
+    );
+    expect(screen.queryByText('table.noData')).not.toBeInTheDocument();
+  });
 });
 
 describe('ListTable expandable tree rows (T10)', () => {
