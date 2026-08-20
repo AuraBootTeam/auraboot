@@ -84,9 +84,7 @@ export default function SocialCallback() {
       return;
     }
 
-    if (
-      !consumeOAuthState(window.sessionStorage, loginOAuthStateKey(provider), stateParam)
-    ) {
+    if (!consumeOAuthState(window.sessionStorage, loginOAuthStateKey(provider), stateParam)) {
       setError('OAuth state validation failed');
       setState('error');
       return;
@@ -135,7 +133,7 @@ export default function SocialCallback() {
         const fields: Record<string, string> = {
           intent: 'social-callback',
           token: data.jwt,
-          redirectTo: '/',
+          redirectTo: data.tenantId ? '/' : '/tenant-selection',
         };
 
         for (const [key, value] of Object.entries(fields)) {
@@ -199,7 +197,7 @@ export default function SocialCallback() {
         const fields: Record<string, string> = {
           intent: 'social-callback',
           token: result.data.jwt,
-          redirectTo: '/',
+          redirectTo: result.data.tenantId ? '/' : '/tenant-selection',
         };
 
         for (const [key, value] of Object.entries(fields)) {

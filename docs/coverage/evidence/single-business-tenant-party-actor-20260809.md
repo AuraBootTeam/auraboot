@@ -15,6 +15,9 @@ created: 2026-08-09
 - Final rebuilt runtime ports: PostgreSQL 5481, backend 6492, Vite 5222, BFF 3549
 - Federated-identity incremental runtime: PostgreSQL 17.6 database
   `aura_sso_idp_20260809`, Redis DB 15, backend 16443, Vite 15173, BFF 13500.
+- PC closure runtimes: fresh SINGLE `single-party-sso-pc-final-20260820-s88` and fresh MULTI
+  `multi-party-sso-pc-control-20260820-s90`, each with isolated PostgreSQL database, Redis DB,
+  latest-source backend, BFF and Vite.
 - Secrets and bearer tokens are intentionally omitted.
 
 ## Automated results
@@ -28,6 +31,10 @@ created: 2026-08-09
    - Result: 6/6 suites, 12/12 tests passed; actor-switch action covers precision-safe Party ID, replacement cookie, malformed input and local redirect/auth fail-closed.
    - `pnpm typecheck`: exit 0.
    - Generated acceptance report: `web-admin/test-results/runs/party-actor-long/acceptance.html` (`14 pass / 2 deliberate partial / 0 red / 16 total`).
+   - PC closure: `pnpm typecheck` passed; five focused Vitest files passed 24/24; the new
+     `social-oauth-callback.spec.ts` passed 3/3 on both SINGLE and MULTI; SINGLE registration and
+     OTP mode-aware actions passed 1/1 each; MULTI auth setup passed 4/4, space selection passed
+     5/5, and registration mode-aware action passed 1/1.
 3. Schema:
    - `scripts/db/check-schema-drift.sh --edition oss` against a fresh database: exit 0.
    - 56 migrations applied through `V20260809120000`; regenerated 28,752-line snapshot exactly matches committed snapshot.
@@ -97,9 +104,16 @@ Controlled mutation: temporarily make application/channel capability intersectio
   schema snapshot. It includes Web/mobile
   instance separation, mobile-only status changes, inline-secret rejection, exact redirect
   allow-listing, and remote HTTP redirect rejection.
-- Enterprise federated-identity targeted batch: 22/22 passed across transaction, flow,
+- Enterprise federated-identity targeted batch: 24/24 passed across transaction, flow,
   canonical/legacy identity routing, OIDC, Apple, WeChat and LDAP. A wrong native/browser binding
   consumes the Redis state before rejection, and a retry with the correct binding still fails.
+- The added `FederatedOAuthHttpIntegrationTest` runs through real Spring MVC, PostgreSQL and Redis.
+  Only the external IdP network exchange is controlled. It proves the server ignores a forged
+  SINGLE tenant, creates the canonical link and session through the shared admission pipeline,
+  validates nonce/PKCE/redirect data, and consumes a wrong-bound state so it cannot be replayed.
+- The changed OSS login-channel compatibility suite passed 13/13. Tenant-admin toggles now merge
+  built-in password/OTP methods with canonical federated descriptors, so enabling `email_code`
+  is reflected by both the string and typed public login-channel APIs.
 - OIDC hardening rejects metadata, loopback, non-HTTP and plain-HTTP discovery URLs before
   outbound I/O; discovery, authorization, token, JWKS and userinfo endpoints must use HTTPS.
 - A controlled identity-routing mutation restored canonical miss → legacy `providerType + subject`
@@ -161,6 +175,17 @@ Controlled mutation: temporarily make application/channel capability intersectio
   live descriptor/link union, arbitrary `company-oidc` rendering, profile navigation, and a
   controlled LINK start that asserts POST, follows the server authorize URL, and stores the exact
   provider-scoped state.
+- The versioned OAuth callback suite executed 3/3 on a fresh SINGLE runtime and 3/3 on a fresh
+  MULTI runtime with empty storage. Its success case obtains a real JWT through the real password
+  login endpoint and controls only the callback response; it asserts callback payload, token
+  persistence and deployment-aware routing. The negative cases prove a state mismatch never calls
+  the callback API and consumes local state, and that an empty password cannot submit account merge.
+  Static trust review found no skip/fixme/only, wait timeout, retry or threshold escape hatch; its
+  only `page.request.post` is the setup-only real password login used to obtain the backend-valid JWT.
+- SINGLE open registration and email-code login each bypassed Tenant selection and entered the
+  business workspace. MULTI password/registration retained `/tenant-selection`; authenticated setup
+  passed 4/4 and the existing platform/business space-selection journey passed 5/5, including header,
+  switcher and platform-console behavior.
 
 ### Physical-device denominator
 

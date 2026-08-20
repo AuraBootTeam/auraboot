@@ -88,16 +88,16 @@ class TenantLoginChannelServiceImplTest {
     }
 
     @Test
-    @DisplayName("application/channel registry wins over legacy tenant channel rows")
+    @DisplayName("application registry keeps federated methods while tenant toggles own built-in methods")
     void getEnabledChannelsFromApplicationRegistry() {
         when(applicationChannelMapper.findEnabledAuthMethods(
                 "business-web", "supplier-portal", 1L))
                 .thenReturn(List.of("email_password", "oidc"));
+        when(channelMapper.selectList(any())).thenReturn(List.of(ch("email_code", 0)));
 
         assertEquals(
-                List.of("email_password", "oidc"),
+                List.of("email_code", "oidc"),
                 service.getEnabledChannels(1L, "business-web", "supplier-portal"));
-        verify(channelMapper, never()).selectList(any());
     }
 
     @Test
@@ -108,6 +108,7 @@ class TenantLoginChannelServiceImplTest {
         when(applicationChannelMapper.findEnabledAuthMethods(
                 "business-web", "default-business-web", 2L))
                 .thenReturn(List.of("email_password", "wechat"));
+        when(channelMapper.selectList(any())).thenReturn(List.of(ch("email_password", 0)));
 
         assertEquals(
                 List.of("email_password", "wechat"),
@@ -126,11 +127,15 @@ class TenantLoginChannelServiceImplTest {
         when(applicationChannelMapper.findEnabledAuthOptions(
                 "business-web", "default-business-web", 1L))
                 .thenReturn(List.of(password, corporateOidc));
+        when(channelMapper.selectList(any())).thenReturn(List.of(
+                ch("email_password", 0), ch("email_code", 1)));
 
         assertEquals(
-                List.of(password, corporateOidc),
+                List.of(
+                        password,
+                        new LoginChannelOption("email_code", "otp", "email_code", null),
+                        corporateOidc),
                 service.getEnabledChannelOptions(1L, "business-web", "default-business-web"));
-        verify(channelMapper, never()).selectList(any());
     }
 
     @Test

@@ -31,8 +31,8 @@
         {
           "id": "policy.tenant-entry",
           "action": "Block create/join/select product entry in SINGLE while preserving MULTI self-service",
-          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.tenant.controller.TenantSelectionControllerPolicyTest.xml", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
-          "assertion": "Direct API calls are rejected in SINGLE; MULTI policy remains delegated; SINGLE browser exposes no Tenant self-service entry",
+          "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.tenant.controller.TenantSelectionControllerPolicyTest.xml", "web-admin/tests/e2e/auth/auth-complete.spec.ts", "web-admin/tests/e2e/auth/space-selection.spec.ts", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Direct API calls are rejected in SINGLE; registration, OTP and password login bypass Tenant selection; MULTI registration/login still enters the existing space-selection journey",
           "verdict": "pass",
           "verdict_by": "spec-assert",
           "surface": "api", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
@@ -74,7 +74,7 @@
           "id": "iam.default-surface",
           "action": "Resolve and repair the default LoginApplication/Channel/AuthMethod",
           "evidence": ["platform/build/test-results/test/TEST-com.auraboot.framework.saas.bootstrap.BootstrapRepairServiceTenantBootstrapTest.xml", "platform/build/test-results/test/TEST-com.auraboot.framework.auth.service.impl.TenantLoginChannelServiceImplTest.xml"],
-          "assertion": "Schema-snapshot first install receives separate Web/native default password surfaces and registry wins with safe legacy fallback",
+          "assertion": "Schema-snapshot first install receives separate Web/native default password surfaces; tenant toggles control built-in password/OTP methods while canonical registry controls federated IdP methods",
           "verdict": "pass",
           "verdict_by": "spec-assert",
           "surface": "service", "dependencies": "hermetic", "authority": "blocking-commit", "driver": "unit"
@@ -172,8 +172,8 @@
         {
           "id": "sso.web-journey",
           "action": "Render a configured IdP, start OAuth, reject forged state, preserve password login and show authenticated binding UI",
-          "evidence": ["web-admin/tests/e2e/personal/social-links.spec.ts", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
-          "assertion": "Real browser reached Google authorize, rejected wrong callback state, logged in by password to /home and rendered the configured binding card; the descriptor/link/bind-start Playwright suite passes 5/5",
+          "evidence": ["web-admin/tests/e2e/auth/social-oauth-callback.spec.ts", "web-admin/tests/e2e/auth/auth-complete.spec.ts", "web-admin/tests/e2e/personal/social-links.spec.ts", "docs/coverage/evidence/single-business-tenant-party-actor-20260809.md"],
+          "assertion": "Real browser reached Google authorize, rejects state mismatch before exchange, consumes state, blocks empty merge confirmation, routes SINGLE to the workspace and MULTI to Tenant selection, while authenticated binding remains executable",
           "verdict": "pass", "verdict_by": "spec-assert",
           "vision_check": "Inspected semantic DOM and rendered pixels for the login and social-binding pages on the PostgreSQL/Redis runtime",
           "surface": "journey", "dependencies": "real-stack", "authority": "blocking-release", "driver": "browser"
