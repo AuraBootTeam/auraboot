@@ -1084,7 +1084,9 @@ describe('UnifiedDesignerPage', () => {
         },
       ),
     );
-    expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4');
+    await waitFor(() =>
+      expect(screen.getByTestId('studio-handoff-context')).toHaveTextContent('修订 r4'),
+    );
     expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('已保存');
     expect(savePageSchemaV3).not.toHaveBeenCalled();
   });
