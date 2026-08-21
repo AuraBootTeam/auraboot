@@ -4414,5 +4414,42 @@
       { "value": "true", "label": "Enabled", "label:zh-CN": "已开启", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
       { "value": "false", "label": "Disabled", "label:zh-CN": "未开启", "sortNo": 20, "status": "enabled", "extension": { "color": "gray" } }
     ]
+  },
+  {
+    "code": "crm_account_relation_type",
+    "name": "Account Relationship Type",
+    "name:zh-CN": "客户关系类型",
+    "dictType": "static",
+    "items": [
+      { "value": "parent", "label": "Parent Company", "label:zh-CN": "母公司", "sortNo": 10, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "subsidiary", "label": "Subsidiary", "label:zh-CN": "子公司", "sortNo": 20, "status": "enabled", "extension": { "color": "cyan" } },
+      { "value": "affiliate", "label": "Affiliate", "label:zh-CN": "关联公司", "sortNo": 30, "status": "enabled", "extension": { "color": "purple" } },
+      { "value": "partner", "label": "Partner", "label:zh-CN": "合作伙伴", "sortNo": 40, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "supplier", "label": "Supplier", "label:zh-CN": "供应商", "sortNo": 50, "status": "enabled", "extension": { "color": "amber" } },
+      { "value": "customer", "label": "Customer", "label:zh-CN": "客户", "sortNo": 60, "status": "enabled", "extension": { "color": "teal" } },
+      { "value": "competitor", "label": "Competitor", "label:zh-CN": "竞争对手", "sortNo": 70, "status": "enabled", "extension": { "color": "red" } },
+      { "value": "other", "label": "Other", "label:zh-CN": "其他", "sortNo": 80, "status": "enabled", "extension": { "color": "gray" } }
+    ]
+  },
+  {
+    "code": "crm_account_relation_strength",
+    "name": "Account Relationship Strength",
+    "name:zh-CN": "客户关系强度",
+    "dictType": "static",
+    "items": [
+      { "value": "strategic", "label": "Strategic", "label:zh-CN": "战略", "sortNo": 10, "status": "enabled", "extension": { "color": "purple" } },
+      { "value": "important", "label": "Important", "label:zh-CN": "重要", "sortNo": 20, "status": "enabled", "extension": { "color": "blue" } },
+      { "value": "standard", "label": "Standard", "label:zh-CN": "一般", "sortNo": 30, "status": "enabled", "extension": { "color": "gray" } }
+    ]
+  },
+  {
+    "code": "crm_account_relation_status",
+    "name": "Account Relationship Status",
+    "name:zh-CN": "客户关系状态",
+    "dictType": "static",
+    "items": [
+      { "value": "active", "label": "Active", "label:zh-CN": "生效", "sortNo": 10, "status": "enabled", "extension": { "color": "green" } },
+      { "value": "inactive", "label": "Inactive", "label:zh-CN": "停用", "sortNo": 20, "status": "enabled", "extension": { "color": "gray" } }
+    ]
   }
 ]

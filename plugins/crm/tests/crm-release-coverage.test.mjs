@@ -19,8 +19,8 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.doesNotMatch(JSON.stringify(committed.run), /auraboot-enterprise/);
 
   assert.equal(committed.axes.semanticActions.length, 26);
-  assert.equal(committed.axes.commands.length, 54);
-  assert.equal(committed.axes.pages.length, 31);
+  assert.equal(committed.axes.commands.length, 58);
+  assert.equal(committed.axes.pages.length, 34);
   assert.equal(committed.axes.permissions.length, 24);
   assert.equal(committed.axes.queries.length, 40);
   assert.deepEqual(
@@ -44,15 +44,15 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
       'dashboards',
     ],
   );
-  assert.equal(committed.scope.productDenominator.pages, 125);
-  assert.equal(committed.scope.productDenominator.commands, 241);
+  assert.equal(committed.scope.productDenominator.pages, 128);
+  assert.equal(committed.scope.productDenominator.commands, 246);
   assert.equal(committed.scope.productDenominator.permissions, 114);
-  assert.equal(committed.scope.productDenominator['page-blocks'], 403);
-  assert.equal(committed.scope.productDenominator['page-fields'], 1713);
-  assert.equal(committed.scope.productDenominator['ui-actions'], 609);
+  assert.equal(committed.scope.productDenominator['page-blocks'], 412);
+  assert.equal(committed.scope.productDenominator['page-fields'], 1754);
+  assert.equal(committed.scope.productDenominator['ui-actions'], 623);
   assert.equal(committed.scope.productDenominator.queries, 55);
-  assert.equal(committed.scope.productVerdicts.pass, 692);
-  assert.equal(committed.scope.productVerdicts.untested, 2709);
+  assert.equal(committed.scope.productVerdicts.pass, 725);
+  assert.equal(committed.scope.productVerdicts.untested, 2749);
   assert.ok(committed.scope.productVerdicts.untested > 0);
   assert.equal(committed.scope.productVerdicts.gap ?? 0, 0);
   const coreWorkbenchContract = committed.runtimeEvidenceContracts.find(
@@ -189,6 +189,30 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
     'opportunity',
     'customerRequest',
     'activities',
+  ]);
+  const accountRelationshipContract = committed.runtimeEvidenceContracts.find(
+    (contract) => contract.id === 'CRM-ACCOUNT-RELATIONSHIP',
+  );
+  assert.equal(accountRelationshipContract.expectedScenarios, 12);
+  assert.equal(accountRelationshipContract.minimumScreenshots, 7);
+  assert.equal(accountRelationshipContract.expectedCoverage.pages.length, 3);
+  assert.equal(accountRelationshipContract.expectedCoverage.commands.length, 4);
+  assert.equal(accountRelationshipContract.expectedCoverage.permissions.length, 2);
+  assert.equal(accountRelationshipContract.expectedCoverage.blocks.length, 8);
+  assert.equal(accountRelationshipContract.expectedCoverage.fields.length, 8);
+  assert.equal(accountRelationshipContract.expectedCoverage.uiActions.length, 6);
+  assert.equal(accountRelationshipContract.expectedTechnicalVerdict, 'pass');
+  assert.equal(
+    accountRelationshipContract.expectedDataMigration,
+    'out-of-scope-development-stage',
+  );
+  assert.equal(accountRelationshipContract.requireNoFailedRuntimeRequests, true);
+  assert.equal(accountRelationshipContract.expectedFixtureMode, 'self-seeded');
+  assert.deepEqual(accountRelationshipContract.requiredRecordIds, [
+    'sourceAccount',
+    'targetAccount',
+    'thirdAccount',
+    'relationship',
   ]);
   const modelGroup = committed.groups.find((group) => group.id === 'model-surfaces');
   assert.equal(

@@ -1,0 +1,36 @@
+{
+  "pageKey": "crm_account_relation_common_detail",
+  "name:zh-CN": "客户关系详情",
+  "name:en": "Account Relationship Detail",
+  "modelCode": "crm_account_relation_common",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "blocks": [
+    {
+      "id": "relationship_detail",
+      "blockType": "form-section",
+      "title": { "zh-CN": "关系证据", "en-US": "Relationship Evidence" },
+      "columns": 2,
+      "fields": [
+        { "field": "crm_acr_source_account_id", "readOnly": true },
+        { "field": "crm_acr_target_account_id", "readOnly": true },
+        { "field": "crm_acr_relation_type", "readOnly": true },
+        { "field": "crm_acr_strength", "readOnly": true },
+        { "field": "crm_acr_status", "readOnly": true },
+        { "field": "crm_acr_owner", "readOnly": true },
+        { "field": "crm_acr_effective_from", "readOnly": true },
+        { "field": "crm_acr_effective_to", "readOnly": true },
+        { "field": "crm_acr_notes", "readOnly": true, "span": 2 }
+      ]
+    },
+    {
+      "id": "relationship_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        { "code": "edit", "permissionCode": "crm.account.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_account_relation_common_form" } },
+        { "code": "delete", "danger": true, "permissionCode": "crm.account.manage", "label": "$i18n:common.button.delete", "confirm": { "zh-CN": "确认删除此客户关系？", "en-US": "Delete this account relationship?" }, "action": { "type": "command", "command": "crm:delete_account_relation" } }
+      ]
+    }
+  ]
+}

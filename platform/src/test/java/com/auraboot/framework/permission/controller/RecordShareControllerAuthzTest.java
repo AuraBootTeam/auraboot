@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.permission.constants.MetaPermission;
@@ -185,6 +186,36 @@ class RecordShareControllerAuthzTest {
         assertThat(controller.getManageCapability(RESOURCE, RECORD_PID).getData().canManage())
                 .isFalse();
         verify(userPermissionService, never()).hasPermission(any(Long.class), any(String.class));
+    }
+
+    @Test
+    void capabilityIsFalseWhenCallerCanNoLongerSeeAnExpiredOrRevokedRecord() {
+        when(dynamicDataService.getById(RESOURCE, RECORD_PID)).thenThrow(
+                new MetaServiceException("Access denied: you do not have permission to view this record"));
+
+        assertThat(controller.getManageCapability(RESOURCE, RECORD_PID).getData().canManage())
+                .isFalse();
+        verify(userPermissionService, never()).hasPermission(any(Long.class), any(String.class));
+    }
+
+    @Test
+    void capabilityIsFalseWhenRecordWasDeletedDuringDetailNavigation() {
+        when(dynamicDataService.getById(RESOURCE, RECORD_PID)).thenThrow(
+                new MetaServiceException("Record not found: " + RECORD_PID + " in model: " + RESOURCE));
+
+        assertThat(controller.getManageCapability(RESOURCE, RECORD_PID).getData().canManage())
+                .isFalse();
+        verify(userPermissionService, never()).hasPermission(any(Long.class), any(String.class));
+    }
+
+    @Test
+    void capabilityDoesNotHideUnexpectedMetadataFailures() {
+        MetaServiceException failure = new MetaServiceException("metadata unavailable");
+        when(dynamicDataService.getById(RESOURCE, RECORD_PID)).thenThrow(failure);
+
+        assertThat(assertThrows(
+                MetaServiceException.class,
+                () -> controller.getManageCapability(RESOURCE, RECORD_PID))).isSameAs(failure);
     }
 
     @Test

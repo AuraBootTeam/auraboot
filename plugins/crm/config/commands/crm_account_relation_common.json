@@ -1,0 +1,63 @@
+[
+  {
+    "code": "crm:create_account_relation",
+    "displayName:zh-CN": "新增客户关系",
+    "displayName:en": "Create Account Relationship",
+    "type": "create",
+    "modelCode": "crm_account_relation_common",
+    "inputFields": ["crm_acr_source_account_id", "crm_acr_target_account_id", "crm_acr_relation_type", "crm_acr_strength", "crm_acr_status", "crm_acr_effective_from", "crm_acr_effective_to", "crm_acr_notes"],
+    "autoSetFields": {
+      "crm_acr_owner": { "strategy": "current_user_pid" },
+      "crm_acr_status": { "strategy": "default_value", "value": "active" },
+      "crm_acr_strength": { "strategy": "default_value", "value": "standard" }
+    },
+    "permissions": ["crm.account.manage"],
+    "agent_hint": "Create one governed relationship edge between two distinct CRM accounts.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:update_account_relation",
+    "displayName:zh-CN": "编辑客户关系",
+    "displayName:en": "Update Account Relationship",
+    "type": "update",
+    "modelCode": "crm_account_relation_common",
+    "inputFields": ["crm_acr_source_account_id", "crm_acr_target_account_id", "crm_acr_relation_type", "crm_acr_strength", "crm_acr_status", "crm_acr_effective_from", "crm_acr_effective_to", "crm_acr_notes"],
+    "permissions": ["crm.account.manage"],
+    "agent_hint": "Update a customer relationship while preserving its stable public identity.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:delete_account_relation",
+    "displayName:zh-CN": "删除客户关系",
+    "displayName:en": "Delete Account Relationship",
+    "type": "delete",
+    "modelCode": "crm_account_relation_common",
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此客户关系？删除后两端客户都将不再显示该关系。",
+      "confirmMessage:en": "Delete this account relationship? It will disappear from both account endpoints."
+    },
+    "permissions": ["crm.account.manage"],
+    "agent_hint": "Delete one account relationship edge.",
+    "cmd_risk_level": "L3"
+  },
+  {
+    "code": "crm:detail_account_relation",
+    "displayName:zh-CN": "查看客户关系",
+    "displayName:en": "View Account Relationship",
+    "type": "query",
+    "modelCode": "crm_account_relation_common",
+    "permissions": ["crm.account.read"],
+    "agent_hint": "Read one account relationship.",
+    "cmd_risk_level": "L0"
+  },
+  {
+    "code": "crm:list_account_relations",
+    "displayName:zh-CN": "客户关系列表",
+    "displayName:en": "List Account Relationships",
+    "type": "query",
+    "modelCode": "crm_account_relation_common",
+    "permissions": ["crm.account.read"],
+    "agent_hint": "List account relationship edges visible to the current user.",
+    "cmd_risk_level": "L0"
+  }
+]

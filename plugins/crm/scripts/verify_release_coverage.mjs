@@ -59,6 +59,8 @@ const EVIDENCE = {
     'web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts',
   leadConversionActivityCarry:
     'web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts',
+  accountCollaboration: 'web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts',
+  accountRelationship: 'web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts',
 };
 
 const FOLLOWUP_COMMENT_COVERAGE = {
@@ -147,6 +149,63 @@ const LEAD_CONVERSION_ACTIVITY_CARRY_COVERAGE = {
     'crm_account_common_detail:crm_account_tabs:activities',
     'crm_contact_common_detail:crm_contact_tabs:activities',
     'crm_opportunity_common_detail:crm_opportunity_tabs:activities',
+  ],
+};
+const ACCOUNT_COLLABORATION_COVERAGE = {
+  pages: ['crm_account_common_list', 'crm_account_common_detail'],
+  commands: ['crm:create_account', 'crm:update_account'],
+  permissions: ['crm.account.read', 'crm.account.manage'],
+  blocks: [
+    'crm_account_common_list:crm_account_tabs',
+    'crm_account_common_list:crm_account_table',
+    'crm_account_common_detail:crm_account_tabs',
+    'crm_account_common_detail:crm_account_detail_toolbar',
+  ],
+  uiActions: [
+    'crm_account_common_list:platform:collaborative_accounts',
+    'crm_account_common_detail:platform:share_record',
+  ],
+};
+const ACCOUNT_RELATIONSHIP_COVERAGE = {
+  pages: [
+    'crm_account_common_detail',
+    'crm_account_relation_common_form',
+    'crm_account_relation_common_detail',
+  ],
+  commands: [
+    'crm:create_account',
+    'crm:create_account_relation',
+    'crm:update_account_relation',
+    'crm:delete_account_relation',
+  ],
+  permissions: ['crm.account.read', 'crm.account.manage'],
+  blocks: [
+    'crm_account_common_detail:crm_account_tabs',
+    'crm_account_common_detail:crm_account_relationship_actions',
+    'crm_account_common_detail:block_outgoing_relationships',
+    'crm_account_common_detail:block_incoming_relationships',
+    'crm_account_relation_common_form:relationship_basic',
+    'crm_account_relation_common_form:relationship_buttons',
+    'crm_account_relation_common_detail:relationship_detail',
+    'crm_account_relation_common_detail:relationship_detail_toolbar',
+  ],
+  fields: [
+    'crm_account_relation_common_form:relationship_basic:crm_acr_source_account_id',
+    'crm_account_relation_common_form:relationship_basic:crm_acr_target_account_id',
+    'crm_account_relation_common_form:relationship_basic:crm_acr_relation_type',
+    'crm_account_relation_common_form:relationship_basic:crm_acr_strength',
+    'crm_account_relation_common_form:relationship_basic:crm_acr_status',
+    'crm_account_relation_common_form:relationship_basic:crm_acr_effective_from',
+    'crm_account_relation_common_form:relationship_basic:crm_acr_effective_to',
+    'crm_account_relation_common_form:relationship_basic:crm_acr_notes',
+  ],
+  uiActions: [
+    'crm_account_common_detail:crm_account_tabs:relationships',
+    'crm_account_common_detail:crm_account_relationship_actions:add',
+    'crm_account_common_detail:block_outgoing_relationships:view',
+    'crm_account_relation_common_form:relationship_buttons:submit',
+    'crm_account_relation_common_detail:relationship_detail_toolbar:edit',
+    'crm_account_relation_common_detail:relationship_detail_toolbar:delete',
   ],
 };
 
@@ -746,6 +805,18 @@ const leadConversionActivityCarryCoverageSets = Object.fromEntries(
     new Set(values),
   ]),
 );
+const accountCollaborationCoverageSets = Object.fromEntries(
+  Object.entries(ACCOUNT_COLLABORATION_COVERAGE).map(([axis, values]) => [
+    axis,
+    new Set(values),
+  ]),
+);
+const accountRelationshipCoverageSets = Object.fromEntries(
+  Object.entries(ACCOUNT_RELATIONSHIP_COVERAGE).map(([axis, values]) => [
+    axis,
+    new Set(values),
+  ]),
+);
 const dashboardCoverageSets = Object.fromEntries(
   Object.entries(DASHBOARD_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
 );
@@ -839,6 +910,12 @@ function evidenceForCommand(code, rg1Commands) {
   }
   if (leadConversionActivityCarryCoverageSets.commands.has(code)) {
     files.push(EVIDENCE.leadConversionActivityCarry);
+  }
+  if (accountCollaborationCoverageSets.commands.has(code)) {
+    files.push(EVIDENCE.accountCollaboration);
+  }
+  if (accountRelationshipCoverageSets.commands.has(code)) {
+    files.push(EVIDENCE.accountRelationship);
   }
   return uniq(files);
 }
@@ -1097,6 +1174,12 @@ function buildProductGroups({
         ...(leadConversionActivityCarryCoverageSets.blocks.has(blockKey)
           ? [EVIDENCE.leadConversionActivityCarry]
           : []),
+        ...(accountCollaborationCoverageSets.blocks.has(blockKey)
+          ? [EVIDENCE.accountCollaboration]
+          : []),
+        ...(accountRelationshipCoverageSets.blocks.has(blockKey)
+          ? [EVIDENCE.accountRelationship]
+          : []),
       ]);
       blockRows.push(
         executableRow({
@@ -1122,6 +1205,9 @@ function buildProductGroups({
         ...(customerPoolCoverageSets.fields.has(fieldKey) ? [EVIDENCE.customerPool] : []),
         ...(contactFollowupLifecycleCoverageSets.fields.has(fieldKey)
           ? [EVIDENCE.contactFollowupLifecycle]
+          : []),
+        ...(accountRelationshipCoverageSets.fields.has(fieldKey)
+          ? [EVIDENCE.accountRelationship]
           : []),
       ]);
       fieldRows.push(
@@ -1158,6 +1244,12 @@ function buildProductGroups({
         leadConversionActivityCarryCoverageSets.uiActions.has(
           `${page.pageKey}:${item.blockId}:${item.code}`,
         );
+      const accountCollaborationAction = accountCollaborationCoverageSets.uiActions.has(
+        `${page.pageKey}:${item.blockId}:${item.code}`,
+      );
+      const accountRelationshipAction = accountRelationshipCoverageSets.uiActions.has(
+        `${page.pageKey}:${item.blockId}:${item.code}`,
+      );
       const evidence = uniq([
         ...(releaseAction?.evidence ?? []),
         ...(releaseBAction ? [EVIDENCE.releaseB] : []),
@@ -1165,6 +1257,8 @@ function buildProductGroups({
         ...(customerPoolAction ? [EVIDENCE.customerPool] : []),
         ...(contactFollowupLifecycleAction ? [EVIDENCE.contactFollowupLifecycle] : []),
         ...(leadConversionActivityCarryAction ? [EVIDENCE.leadConversionActivityCarry] : []),
+        ...(accountCollaborationAction ? [EVIDENCE.accountCollaboration] : []),
+        ...(accountRelationshipAction ? [EVIDENCE.accountRelationship] : []),
       ]);
       uiActionRows.push(
         executableRow({
@@ -1484,6 +1578,53 @@ export function buildReleaseManifest() {
       `lead-conversion covered UI action no longer exists: ${actionKey}`,
     );
   }
+  for (const blockKey of ACCOUNT_COLLABORATION_COVERAGE.blocks) {
+    const separator = blockKey.indexOf(':');
+    const pageKey = blockKey.slice(0, separator);
+    const blockId = blockKey.slice(separator + 1);
+    assert.ok(
+      allBlocks(pages.get(pageKey)).some((block) => block.id === blockId),
+      `account-collaboration covered block no longer exists: ${blockKey}`,
+    );
+  }
+  for (const actionKey of ACCOUNT_COLLABORATION_COVERAGE.uiActions) {
+    const [pageKey, blockId, ...actionParts] = actionKey.split(':');
+    if (blockId === 'platform') continue;
+    const code = actionParts.join(':');
+    const structure = collectPageStructure(
+      pages.get(pageKey),
+      `plugins/crm/config/pages/${pageKey}.json`,
+    );
+    assert.ok(
+      structure.uiActions.some(
+        (candidate) => candidate.blockId === blockId && candidate.code === code,
+      ),
+      `account-collaboration covered UI action no longer exists: ${actionKey}`,
+    );
+  }
+  for (const blockKey of ACCOUNT_RELATIONSHIP_COVERAGE.blocks) {
+    const separator = blockKey.indexOf(':');
+    const pageKey = blockKey.slice(0, separator);
+    const blockId = blockKey.slice(separator + 1);
+    assert.ok(
+      allBlocks(pages.get(pageKey)).some((block) => block.id === blockId),
+      `account-relationship covered block no longer exists: ${blockKey}`,
+    );
+  }
+  for (const actionKey of ACCOUNT_RELATIONSHIP_COVERAGE.uiActions) {
+    const [pageKey, blockId, ...actionParts] = actionKey.split(':');
+    const code = actionParts.join(':');
+    const structure = collectPageStructure(
+      pages.get(pageKey),
+      `plugins/crm/config/pages/${pageKey}.json`,
+    );
+    assert.ok(
+      structure.uiActions.some(
+        (candidate) => candidate.blockId === blockId && candidate.code === code,
+      ),
+      `account-relationship covered UI action no longer exists: ${actionKey}`,
+    );
+  }
 
   const rg1Commands = new Set(
     semanticActions.filter((row) => row.targetType === 'command').map((row) => row.target),
@@ -1497,6 +1638,8 @@ export function buildReleaseManifest() {
     ...CUSTOMER_POOL_COVERAGE.commands,
     ...CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE.commands,
     ...LEAD_CONVERSION_ACTIVITY_CARRY_COVERAGE.commands,
+    ...ACCOUNT_COLLABORATION_COVERAGE.commands,
+    ...ACCOUNT_RELATIONSHIP_COVERAGE.commands,
   ]);
   const commandRows = commandCodes.map((code) => {
     const command = commands.get(code);
@@ -1513,13 +1656,26 @@ export function buildReleaseManifest() {
     if (leadConversionActivityCarryCoverageSets.commands.has(code)) {
       goals.push('CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY');
     }
+    if (accountCollaborationCoverageSets.commands.has(code)) {
+      goals.push('CORDYS-ACCOUNT-COLLABORATION');
+    }
+    if (accountRelationshipCoverageSets.commands.has(code)) {
+      goals.push('CORDYS-ACCOUNT-RELATIONSHIP');
+    }
     return {
       id: code,
       goals,
       permissionCodes: uniq(command.permissions ?? []),
       evidence: evidenceForCommand(code, rg1Commands),
       permissionsVerified: goals.some((goal) =>
-        ['RG-1', 'RG-2', 'RG-3', 'CORDYS-CUSTOMER-POOL'].includes(goal),
+        [
+          'RG-1',
+          'RG-2',
+          'RG-3',
+          'CORDYS-CUSTOMER-POOL',
+          'CORDYS-ACCOUNT-COLLABORATION',
+          'CORDYS-ACCOUNT-RELATIONSHIP',
+        ].includes(goal),
       ),
       verdict: 'pass',
     };
@@ -1533,6 +1689,8 @@ export function buildReleaseManifest() {
     ...FOLLOWUP_COMMENT_COVERAGE.pages,
     ...CONTACT_FOLLOWUP_LIFECYCLE_COVERAGE.pages,
     ...LEAD_CONVERSION_ACTIVITY_CARRY_COVERAGE.pages,
+    ...ACCOUNT_COLLABORATION_COVERAGE.pages,
+    ...ACCOUNT_RELATIONSHIP_COVERAGE.pages,
   ]).map(
     (pageKey) => {
       const page = pages.get(pageKey);
@@ -1551,6 +1709,12 @@ export function buildReleaseManifest() {
           : []),
         ...(leadConversionActivityCarryCoverageSets.pages.has(pageKey)
           ? ['CORDYS-LEAD-CONVERSION-ACTIVITY-CARRY']
+          : []),
+        ...(accountCollaborationCoverageSets.pages.has(pageKey)
+          ? ['CORDYS-ACCOUNT-COLLABORATION']
+          : []),
+        ...(accountRelationshipCoverageSets.pages.has(pageKey)
+          ? ['CORDYS-ACCOUNT-RELATIONSHIP']
           : []),
       ];
       const evidence = uniq([
@@ -1571,6 +1735,12 @@ export function buildReleaseManifest() {
         ...(leadConversionActivityCarryCoverageSets.pages.has(pageKey)
           ? [EVIDENCE.leadConversionActivityCarry]
           : []),
+        ...(accountCollaborationCoverageSets.pages.has(pageKey)
+          ? [EVIDENCE.accountCollaboration]
+          : []),
+        ...(accountRelationshipCoverageSets.pages.has(pageKey)
+          ? [EVIDENCE.accountRelationship]
+          : []),
       ]);
       const menuPermissions = menus
         .filter((menu) => menu.pageKey === pageKey && menu.permissionCode)
@@ -1582,7 +1752,14 @@ export function buildReleaseManifest() {
         permissionCodes: uniq([page.permissionCode, ...menuPermissions].filter(Boolean)),
         evidence: uniq(evidence),
         permissionsVerified: goals.some((goal) =>
-          ['RG-1', 'RG-2', 'RG-3', 'CORDYS-CUSTOMER-POOL'].includes(goal),
+          [
+            'RG-1',
+            'RG-2',
+            'RG-3',
+            'CORDYS-CUSTOMER-POOL',
+            'CORDYS-ACCOUNT-COLLABORATION',
+            'CORDYS-ACCOUNT-RELATIONSHIP',
+          ].includes(goal),
         ),
         verdict: 'pass',
       };
@@ -1610,6 +1787,12 @@ export function buildReleaseManifest() {
   }
   for (const code of CUSTOMER_POOL_COVERAGE.permissions) {
     addPermissionEvidence(code, [EVIDENCE.customerPool]);
+  }
+  for (const code of ACCOUNT_COLLABORATION_COVERAGE.permissions) {
+    addPermissionEvidence(code, [EVIDENCE.accountCollaboration]);
+  }
+  for (const code of ACCOUNT_RELATIONSHIP_COVERAGE.permissions) {
+    addPermissionEvidence(code, [EVIDENCE.accountRelationship]);
   }
   const permissionRows = [...permissionEvidence.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
@@ -1756,6 +1939,16 @@ export function buildReleaseManifest() {
         verdict: 'pass',
         note: 'A self-seeded browser journey converts a qualified lead and proves that direct and relation-anchored follow-up activities, comments and deduplicated customer history remain visible across the resulting account, contact and opportunity graph.',
       },
+      {
+        id: 'CORDYS-ACCOUNT-COLLABORATION',
+        verdict: 'pass',
+        note: 'A self-seeded two-person browser journey proves owner isolation, read-only and editable collaboration, expiry, renewal, revoke, notification, collaborative-account filtering and cross-tenant fail-closed behavior.',
+      },
+      {
+        id: 'CORDYS-ACCOUNT-RELATIONSHIP',
+        verdict: 'pass',
+        note: 'A self-seeded browser journey creates one governed customer relationship fact from account detail, proves outgoing and incoming projections, edit persistence, self/missing/duplicate rollback, uniqueness and confirmed deletion.',
+      },
     ],
     axes: {
       semanticActions,
@@ -1869,6 +2062,42 @@ export function buildReleaseManifest() {
           'opportunity',
           'customerRequest',
           'activities',
+        ],
+      },
+      {
+        id: 'CRM-ACCOUNT-COLLABORATION',
+        filePrefix: 'crm-account-collaboration-',
+        expectedScenarios: 14,
+        minimumScreenshots: 7,
+        expectedCoverage: ACCOUNT_COLLABORATION_COVERAGE,
+        expectedTechnicalVerdict: 'pass',
+        expectedDataMigration: 'out-of-scope-development-stage',
+        requireNoFailedRuntimeRequests: true,
+        expectedFixtureMode: 'self-seeded',
+        requiredRecordIds: [
+          'owner',
+          'recipient',
+          'otherTenantMember',
+          'ownerAccount',
+          'recipientAccount',
+          'share',
+        ],
+      },
+      {
+        id: 'CRM-ACCOUNT-RELATIONSHIP',
+        filePrefix: 'crm-account-relationship-',
+        expectedScenarios: 12,
+        minimumScreenshots: 7,
+        expectedCoverage: ACCOUNT_RELATIONSHIP_COVERAGE,
+        expectedTechnicalVerdict: 'pass',
+        expectedDataMigration: 'out-of-scope-development-stage',
+        requireNoFailedRuntimeRequests: true,
+        expectedFixtureMode: 'self-seeded',
+        requiredRecordIds: [
+          'sourceAccount',
+          'targetAccount',
+          'thirdAccount',
+          'relationship',
         ],
       },
     ],
