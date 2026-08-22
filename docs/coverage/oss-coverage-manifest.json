@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "062e225be",
+    "commit": "4b41ecabf",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -2159,10 +2159,7 @@
           "evidence": [
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
             "web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts",
-            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/crm-dashboards.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -2176,11 +2173,7 @@
           "evidence": [
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
             "web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts",
-            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/crm-dashboards.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-bulk-operations.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -2293,11 +2286,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:claim_pool_customer",
@@ -2333,8 +2324,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
-            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -2352,15 +2342,14 @@
         {
           "id": "crm:compile_qdp_revision",
           "action": "crm:compile_qdp_revision",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
           "evidence": [
-            "tests/crm-qdp-release-config.test.mjs",
-            "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
+            "tests/crm-qdp-release-config.test.mjs"
           ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
         },
         {
           "id": "crm:complete_campaign",
@@ -2378,16 +2367,14 @@
         {
           "id": "crm:complete_task",
           "action": "crm:complete_task",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
           "evidence": [
-            "tests/crm-approval-case-config.test.mjs",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "tests/crm-approval-case-config.test.mjs"
           ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
         },
         {
           "id": "crm:contact_lead",
@@ -2396,8 +2383,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -2410,8 +2396,9 @@
           "driver": "browser",
           "evidence": [
             "backend/src/test/java/com/auraboot/plugins/crm/handler/ConvertLeadHandlerTest.java",
-            "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+            "tests/crm-activity-timeline-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -2424,6 +2411,8 @@
           "driver": "browser",
           "evidence": [
             "tests/crm-account-common-form-config.test.mjs",
+            "tests/crm-account-relationship-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
@@ -2458,13 +2447,20 @@
             "web-admin/tests/e2e/sales/sales-order-lifecycle.spec.ts",
             "web-admin/tests/e2e/sales/sales-quotation-lifecycle.spec.ts",
             "web-admin/tests/e2e/sales/sales-shipment-lifecycle.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/crm-dashboards.golden.spec.ts",
-            "plugins/crm/e2e/forecast-variance.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-bulk-operations.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-department-scope.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_account_relation",
+          "action": "crm:create_account_relation",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-account-relationship-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -2491,10 +2487,9 @@
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
             "web-admin/tests/e2e/crm/crm-followup-comments-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
-            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/crm-dashboards.golden.spec.ts"
+            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -2587,9 +2582,7 @@
           "evidence": [
             "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
             "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
-            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/crm-dashboards.golden.spec.ts"
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -2618,8 +2611,7 @@
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts",
             "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
             "web-admin/tests/e2e/email/email-crm-timeline.spec.ts",
-            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -2716,13 +2708,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/forecast-variance.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:create_journey",
@@ -2750,15 +2738,14 @@
             "web-admin/tests/e2e/crm/crm-dashboard.spec.ts",
             "web-admin/tests/e2e/crm/crm-import-provider-lifecycle.golden.spec.ts",
             "web-admin/tests/e2e/crm/crm-inline-edit.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-lead-pool-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts",
             "web-admin/tests/e2e/crm/crm-multimodel-import-cordys-parity.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
             "web-admin/tests/e2e/list-ux/ux-loading-states.spec.ts",
             "web-admin/tests/e2e/list-ux/ux-operation-feedback.spec.ts",
-            "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/crm-dashboards.golden.spec.ts"
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -2829,11 +2816,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:create_opportunity",
@@ -2851,13 +2836,7 @@
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
             "web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts",
-            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/crm-dashboards.golden.spec.ts",
-            "plugins/crm/e2e/forecast-variance.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-bulk-operations.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-department-scope.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -2868,12 +2847,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/crm-dashboards.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:create_review",
@@ -2969,10 +2945,24 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "tests/crm-account-relationship-config.test.mjs",
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
             "web-admin/tests/e2e/finance-accounting/fac-ar-ap-payment.spec.ts",
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
             "web-admin/tests/e2e/platform/multi-tenant-isolation.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:delete_account_relation",
+          "action": "crm:delete_account_relation",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-account-relationship-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -3287,12 +3277,27 @@
         {
           "id": "crm:detail_account",
           "action": "crm:detail_account",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-account-relationship-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_account_relation",
+          "action": "crm:detail_account_relation",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-account-relationship-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial",
           "note": "no UI entry point: no page/menu DSL references it"
         },
         {
@@ -3633,11 +3638,23 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
-            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
+        },
+        {
+          "id": "crm:list_account_relations",
+          "action": "crm:list_account_relations",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/crm-account-relationship-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial",
+          "note": "no UI entry point: no page/menu DSL references it"
         },
         {
           "id": "crm:list_accounts",
@@ -4032,9 +4049,11 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:log_opp_activity",
@@ -4042,11 +4061,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:lose_customer_request",
@@ -4064,11 +4081,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:lose_opportunity",
@@ -4076,12 +4091,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/crm-dashboards.golden.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:mark_clarification_replied",
@@ -4187,15 +4199,14 @@
         {
           "id": "crm:publish_qdp_revision",
           "action": "crm:publish_qdp_revision",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
           "evidence": [
-            "tests/crm-qdp-release-config.test.mjs",
-            "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
+            "tests/crm-qdp-release-config.test.mjs"
           ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
         },
         {
           "id": "crm:qualify_lead",
@@ -4204,8 +4215,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -4221,11 +4232,7 @@
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
             "web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts",
-            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/crm-dashboards.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-bulk-operations.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -4362,8 +4369,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
-            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -4500,16 +4506,14 @@
         {
           "id": "crm:start_task",
           "action": "crm:start_task",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
           "evidence": [
-            "tests/crm-approval-case-config.test.mjs",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "tests/crm-approval-case-config.test.mjs"
           ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
         },
         {
           "id": "crm:submit_customer_request",
@@ -4531,24 +4535,21 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
-          ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
         },
         {
           "id": "crm:submit_qdp_review",
           "action": "crm:submit_qdp_review",
-          "surface": "ui",
-          "dependencies": "real-stack",
-          "driver": "browser",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
           "evidence": [
-            "tests/crm-qdp-release-config.test.mjs",
-            "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
+            "tests/crm-qdp-release-config.test.mjs"
           ],
-          "assertion": "driven through the UI",
-          "verdict": "pass"
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
         },
         {
           "id": "crm:toggle_customer_pool",
@@ -4580,9 +4581,25 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no test references this command",
-          "verdict": "untested"
+          "evidence": [
+            "tests/crm-account-relationship-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:update_account_relation",
+          "action": "crm:update_account_relation",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/crm-account-relationship-config.test.mjs",
+            "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
         },
         {
           "id": "crm:update_activity",
@@ -4916,10 +4933,7 @@
           "evidence": [
             "tests/crm-release-coverage.test.mjs",
             "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
-            "web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts",
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/crm-dashboards.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
+            "web-admin/tests/e2e/sales/crm-receivables-lifecycle.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -4941,8 +4955,10 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts",
             "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
@@ -4971,7 +4987,6 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
             "web-admin/tests/e2e/crm/crm-ownership-sharing.spec.ts",
             "web-admin/tests/e2e/list-ux/list-ux-enhancements.spec.ts",
             "web-admin/tests/e2e/pcba-solution/quote-bom-customer-crud-isolation.spec.ts",
@@ -4986,15 +5001,53 @@
           "note": "kind=list model=crm_account_common"
         },
         {
+          "id": "page:crm_account_relation_common_detail",
+          "action": "crm_account_relation_common_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=crm_account_relation_common"
+        },
+        {
+          "id": "page:crm_account_relation_common_form",
+          "action": "crm_account_relation_common_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=form model=crm_account_relation_common"
+        },
+        {
+          "id": "page:crm_account_relation_common_list",
+          "action": "crm_account_relation_common_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-account-relationship-parity.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=crm_account_relation_common"
+        },
+        {
           "id": "page:crm_activity_common_detail",
           "action": "crm_activity_common_detail",
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
@@ -5007,12 +5060,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
           "note": "kind=form model=crm_activity_common"
         },
         {
@@ -5022,7 +5072,6 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
             "web-admin/tests/e2e/showcase/showcase-smoke.spec.ts"
           ],
@@ -5036,11 +5085,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
           "note": "kind=detail model=crm_activity_common"
         },
         {
@@ -5221,7 +5268,6 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
             "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
@@ -5291,6 +5337,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/crm/crm-contact-followup-lifecycle-parity.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
             "web-admin/tests/e2e/email/email-crm-timeline.spec.ts"
           ],
           "assertion": "a browser spec reaches this page",
@@ -5315,7 +5362,6 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
             "web-admin/tests/e2e/crm/crm-contact-channel-masking.spec.ts",
             "web-admin/tests/e2e/email/email-crm-timeline.spec.ts"
           ],
@@ -5329,11 +5375,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
           "note": "kind=detail model=crm_account_common"
         },
         {
@@ -5615,13 +5659,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/forecast-variance.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
           "note": "kind=detail model=crm_forecast_submission"
         },
         {
@@ -5630,11 +5670,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
           "note": "kind=detail model=crm_forecast_submission"
         },
         {
@@ -5654,11 +5692,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
           "note": "kind=list model=crm_forecast_submission"
         },
         {
@@ -5767,8 +5803,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
             "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts",
             "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
           ],
@@ -5794,8 +5830,6 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/crm-dashboards.golden.spec.ts",
             "web-admin/tests/e2e/aurabot/ai-panel.spec.ts",
             "web-admin/tests/e2e/crm/crm-inbound-lifecycle.spec.ts",
             "web-admin/tests/e2e/crm/crm-inline-edit.spec.ts",
@@ -5827,11 +5861,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
           "note": "kind=detail model=crm_lead_common"
         },
         {
@@ -6067,9 +6099,7 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/forecast-variance.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
+            "web-admin/tests/e2e/crm/crm-lead-conversion-activity-carry-parity.spec.ts",
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
             "web-admin/tests/e2e/sales/crm-win-sales-extension.spec.ts"
           ],
@@ -6095,10 +6125,6 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-bulk-operations.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-department-scope.golden.spec.ts",
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts",
             "web-admin/tests/e2e/crm/crm-m4-forecast.spec.ts",
             "web-admin/tests/e2e/crm/crm-open-core-boundary.spec.ts",
             "web-admin/tests/e2e/crm/crm-opportunity-currency.spec.ts",
@@ -6115,11 +6141,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/core-workbenches.golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
           "note": "kind=detail model=crm_opportunity_common"
         },
         {
@@ -6128,11 +6152,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
           "note": "kind=detail model=crm_qdp_revision_common"
         },
         {
@@ -6141,12 +6163,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/order-commitment.golden.spec.ts",
-            "plugins/crm/e2e/qdp-release-center.golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
           "note": "kind=detail model=crm_qdp_revision_common"
         },
         {
@@ -6166,11 +6185,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/order-commitment.golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
           "note": "kind=detail model=crm_quote_summary_common"
         },
         {
@@ -6179,11 +6196,9 @@
           "surface": "ui",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [
-            "plugins/crm/e2e/opportunity-efficiency.golden.spec.ts"
-          ],
-          "assertion": "a browser spec reaches this page",
-          "verdict": "pass",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
           "note": "kind=form model=crm_quote_summary_common"
         },
         {
@@ -7020,8 +7035,7 @@
             "web-admin/tests/e2e/organization/org-department.spec.ts",
             "web-admin/tests/e2e/organization/org-employee.spec.ts",
             "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
-            "web-admin/tests/e2e/organization/org-position.spec.ts",
-            "plugins/crm/e2e/opportunity-department-scope.golden.spec.ts"
+            "web-admin/tests/e2e/organization/org-position.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -7050,8 +7064,7 @@
             "web-admin/tests/e2e/organization/account-policy-and-employee-open-account.spec.ts",
             "web-admin/tests/e2e/organization/org-employee.spec.ts",
             "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
-            "web-admin/tests/e2e/organization/org-position.spec.ts",
-            "plugins/crm/e2e/opportunity-department-scope.golden.spec.ts"
+            "web-admin/tests/e2e/organization/org-position.spec.ts"
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
@@ -10631,7 +10644,6 @@
             "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts",
             "web-admin/tests/e2e/aurabot/admin-agent-runs.spec.ts",
             "web-admin/tests/e2e/aurabot/chat-bi-render-golden.spec.ts",
-            "web-admin/tests/e2e/auth/auth-complete.spec.ts",
             "web-admin/tests/e2e/automation/rule-binding-designer-host.spec.ts",
             "web-admin/tests/e2e/behavior/behavior-sdk-dashboard.golden.spec.ts",
             "web-admin/tests/e2e/bpm/rule-binding-designer-host.spec.ts",
@@ -11299,10 +11311,10 @@
     }
   ],
   "stats": {
-    "commands": 505,
-    "untested": 316,
-    "pages": 295,
-    "pagesUntested": 188,
+    "commands": 510,
+    "untested": 321,
+    "pages": 298,
+    "pagesUntested": 200,
     "platformPages": 99,
     "platformPagesUntested": 41
   }
