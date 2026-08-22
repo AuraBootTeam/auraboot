@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -88,6 +89,9 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
                 db, lead, leadPid, leadCode, company, accountId, contactId, opportunityId, owner);
         String requestId = resolveId(request);
 
+        ActivityCarryResult activityCarry = carryLeadActivities(
+                db, leadPid, accountId, contactId, opportunityId);
+
         Map<String, Object> update = new HashMap<>();
         update.put("crm_lead_status", "converted");
         update.put("crm_lead_converted_account_id", accountId);
@@ -99,8 +103,10 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
         update.put("crm_lead_converted_at", Instant.now().toString());
         db.update("crm_lead_common", leadPid, update);
 
-        log.info("Converted lead {} into account={}, contact={}, opportunity={}, request={}",
-                leadPid, accountId, contactId, opportunityId, requestId);
+        log.info("Converted lead {} into account={}, contact={}, opportunity={}, request={} "
+                        + "with {} carried activities and {} new relation edges",
+                leadPid, accountId, contactId, opportunityId, requestId,
+                activityCarry.activityCount(), activityCarry.createdRelationCount());
 
         return Map.of(
                 "success", true,
@@ -108,7 +114,87 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
                 "accountId", accountId,
                 "contactId", contactId == null ? "" : contactId,
                 "opportunityId", opportunityId,
-                "customerRequestId", requestId);
+                "customerRequestId", requestId,
+                "carriedActivityCount", activityCarry.activityCount(),
+                "createdActivityRelationCount", activityCarry.createdRelationCount());
+    }
+
+    private static ActivityCarryResult carryLeadActivities(
+            DataAccessor db,
+            String leadId,
+            String accountId,
+            String contactId,
+            String opportunityId) {
+        LinkedHashSet<String> activityIds = new LinkedHashSet<>();
+        List<Map<String, Object>> leadRelations = db.query(
+                "crm_activity_relation_common",
+                Map.of("crm_ar_object_type", "lead", "crm_ar_object_id", leadId));
+        if (leadRelations != null) {
+            for (Map<String, Object> relation : leadRelations) {
+                String activityId = str(relation.get("crm_ar_activity_id"));
+                if (!isBlank(activityId)) activityIds.add(activityId);
+            }
+        }
+        List<Map<String, Object>> directlyAnchored = db.query(
+                "crm_activity_common",
+                Map.of("crm_act_related_model", "crm_lead_common", "crm_act_related_id", leadId));
+        if (directlyAnchored != null) {
+            for (Map<String, Object> activity : directlyAnchored) {
+                String activityId = resolveId(activity);
+                if (!isBlank(activityId)) activityIds.add(activityId);
+            }
+        }
+        if (activityIds.isEmpty()) return new ActivityCarryResult(0, 0);
+
+        List<Map<String, Object>> existing = db.queryIn(
+                "crm_activity_relation_common", "crm_ar_activity_id", activityIds);
+        Set<String> existingEdges = new java.util.HashSet<>();
+        if (existing != null) {
+            for (Map<String, Object> relation : existing) {
+                existingEdges.add(relationKey(
+                        str(relation.get("crm_ar_activity_id")),
+                        str(relation.get("crm_ar_object_type")),
+                        str(relation.get("crm_ar_object_id"))));
+            }
+        }
+
+        int created = 0;
+        for (String activityId : activityIds) {
+            created += ensureActivityRelation(db, existingEdges, activityId, "lead", leadId);
+            created += ensureActivityRelation(db, existingEdges, activityId, "account", accountId);
+            if (!isBlank(contactId)) {
+                created += ensureActivityRelation(db, existingEdges, activityId, "contact", contactId);
+            }
+            created += ensureActivityRelation(
+                    db, existingEdges, activityId, "opportunity", opportunityId);
+        }
+        return new ActivityCarryResult(activityIds.size(), created);
+    }
+
+    private static int ensureActivityRelation(
+            DataAccessor db,
+            Set<String> existingEdges,
+            String activityId,
+            String objectType,
+            String objectId) {
+        String key = relationKey(activityId, objectType, objectId);
+        if (existingEdges.contains(key)) return 0;
+        db.create("crm_activity_relation_common", Map.of(
+                "crm_ar_activity_id", activityId,
+                "crm_ar_object_type", objectType,
+                "crm_ar_object_id", objectId,
+                "crm_ar_role", "related"));
+        existingEdges.add(key);
+        return 1;
+    }
+
+    private static String relationKey(String activityId, String objectType, String objectId) {
+        return nonBlank(activityId, "") + "\u0000"
+                + nonBlank(objectType, "") + "\u0000"
+                + nonBlank(objectId, "");
+    }
+
+    private record ActivityCarryResult(int activityCount, int createdRelationCount) {
     }
 
     private static Map<String, Object> findOrCreateAccount(
@@ -152,6 +238,8 @@ public class ConvertLeadHandler implements CommandHandlerExtension {
         data.put("crm_ct_phone", lead.get("crm_lead_contact_phone"));
         data.put("crm_ct_mobile", lead.get("crm_lead_contact_phone"));
         data.put("crm_ct_is_primary", true);
+        data.put("crm_ct_primary_account_key", accountId);
+        data.put("crm_ct_status", "active");
         return db.create("crm_contact_common", data);
     }
 

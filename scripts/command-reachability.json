@@ -11,6 +11,8 @@
     "crm": {
       "crm:detail_account": "Agent/API query surface; the dynamic detail page reads the standard data endpoint.",
       "crm:list_accounts": "Agent/API query surface; the dynamic list page reads the standard data endpoint.",
+      "crm:detail_account_relation": "Agent/API query surface; the dynamic detail page reads the standard data endpoint.",
+      "crm:list_account_relations": "Agent/API query surface; the dynamic list page reads the standard data endpoint.",
       "crm:detail_activity": "Agent/API query surface; the dynamic detail page reads the standard data endpoint.",
       "crm:list_activities": "Agent/API query surface; the dynamic list page reads the standard data endpoint.",
       "crm:create_activity_relation": "Embedded timeline relation API used by nested activity composers; there is no standalone relation page.",

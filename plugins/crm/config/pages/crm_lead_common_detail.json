@@ -105,7 +105,8 @@
                   "params": {
                     "datasourceId": "nq:crm_activities_by_object",
                     "objectType": "lead",
-                    "objectId": "${recordPid}"
+                    "objectId": "${recordPid}",
+                    "format": "records"
                   }
                 },
                 "readOnly": true,
@@ -191,7 +192,10 @@
         {
           "code": "log_activity",
           "icon": "MessageSquare",
-          "label": "$i18n:common.button.create",
+          "label": {
+            "zh-CN": "记录跟进",
+            "en-US": "Log Follow-up"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_activity_common_form",
@@ -201,7 +205,10 @@
         {
           "code": "create_task",
           "icon": "CheckSquare",
-          "label": "$i18n:common.button.create",
+          "label": {
+            "zh-CN": "新建计划",
+            "en-US": "New Follow-up Plan"
+          },
           "action": {
             "type": "navigate",
             "to": "crm_activity_common_form",
@@ -262,6 +269,10 @@
           "label": {
             "zh-CN": "转化线索",
             "en-US": "Convert Lead"
+          },
+          "confirm": {
+            "zh-CN": "确认将此线索转化为客户、联系人、商机和客户需求？转化前的跟进记录与评论将继续保留。",
+            "en-US": "Convert this lead to an account, contact, opportunity, and customer request? Existing follow-up records and comments will be preserved."
           },
           "action": {
             "type": "command",

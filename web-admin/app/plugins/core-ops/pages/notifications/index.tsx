@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import {
@@ -197,19 +197,10 @@ export default function NotificationCenter() {
   // Batch selection
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
-  // Refs to avoid infinite loops
-  const fetchNotificationsRef = useRef(fetchNotifications);
-  const fetchUnreadCountRef = useRef(fetchUnreadCount);
-
-  useEffect(() => {
-    fetchNotificationsRef.current = fetchNotifications;
-    fetchUnreadCountRef.current = fetchUnreadCount;
-  });
-
   // Initial unread count load
   useEffect(() => {
-    fetchUnreadCountRef.current();
-  }, []);
+    void fetchUnreadCount();
+  }, [fetchUnreadCount]);
 
   // Build query params from local state
   const queryParams: NotificationQueryParams = useMemo(
@@ -224,10 +215,10 @@ export default function NotificationCenter() {
 
   // Fetch on query param changes
   useEffect(() => {
-    fetchNotificationsRef.current(queryParams);
+    void fetchNotifications(queryParams);
     // Clear selection when filters/pages change
     setSelectedIds(new Set());
-  }, [queryParams]);
+  }, [fetchNotifications, queryParams]);
 
   // -- Handlers ----------------------------------------------------------
 

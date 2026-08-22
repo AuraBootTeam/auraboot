@@ -2674,6 +2674,20 @@
     "refType": "ui"
   },
   {
+    "key": "crm.saved_view.activity_list",
+    "zh-CN": "活动列表",
+    "en-US": "Activity List",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
+    "key": "crm.saved_view.activity_list_description",
+    "zh-CN": "按最近跟进时间查看全部计划与记录",
+    "en-US": "All follow-up plans and records ordered by latest activity time",
+    "source": "import",
+    "refType": "saved_view"
+  },
+  {
     "key": "dashboard.crm.kpi.won_revenue",
     "zh-CN": "赢单金额",
     "en-US": "Won Revenue",

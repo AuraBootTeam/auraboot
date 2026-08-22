@@ -686,6 +686,18 @@ export function viewFilterToQueryCondition(
   };
 }
 
+/** Normalize a DSL list-tab filter through the same array-aware query contract as saved views. */
+export function tabFilterToQueryCondition(filter: any): ListQueryFilterCondition | null {
+  if (!filter || typeof filter !== 'object') return null;
+  const fieldCode = filter.fieldName || filter.field;
+  if (!fieldCode) return null;
+  return viewFilterToQueryCondition({
+    fieldCode,
+    operator: String(filter.operator || 'EQ').toLowerCase() as ViewFilterConfig['operator'],
+    value: filter.value,
+  });
+}
+
 /** Convert the dynamic-list condition shape to the export endpoint shape. */
 export function queryConditionToExportCondition(condition: ListQueryFilterCondition): {
   field: string;
@@ -1887,18 +1899,13 @@ function ListPageContentInner(props: PageContentProps) {
   }, [locale, filters, selectedIdList, t, token, dataSourceManager]);
 
   // Get current tab filter as QueryCondition (if tabs block exists)
-  const getTabFilter = useCallback((): {
-    fieldName: string;
-    operator: string;
-    value: string;
-  } | null => {
+  const getTabFilter = useCallback((): ListQueryFilterCondition | null => {
     if (!schema?.blocks) return null;
     const tabsBlock = schema.blocks.find((block: any) => block.blockType === 'tabs');
     if (!tabsBlock?.tabs) return null;
     const currentTab = (tabsBlock.tabs as any[]).find((tab: any) => tab.key === activeTab);
     if (!currentTab?.filter) return null;
-    const { field, fieldName, value, operator } = currentTab.filter;
-    return { fieldName: fieldName || field, operator: operator || 'EQ', value };
+    return tabFilterToQueryCondition(currentTab.filter);
   }, [schema, activeTab]);
 
   const displayData = useMemo(() => {
@@ -1906,6 +1913,12 @@ function ListPageContentInner(props: PageContentProps) {
     if (!tabCondition) return data;
     const operator = String(tabCondition.operator || 'EQ').toUpperCase();
     const expected = String(tabCondition.value ?? '');
+    const expectedValues = (
+      tabCondition.values ??
+      (Array.isArray(tabCondition.value) ? tabCondition.value : [tabCondition.value])
+    )
+      .filter((value) => value != null)
+      .map(String);
     return data.filter((record) => {
       const actual = String((record as Record<string, any>)[tabCondition.fieldName] ?? '');
       switch (operator) {
@@ -1914,6 +1927,11 @@ function ListPageContentInner(props: PageContentProps) {
         case 'NE':
         case 'NEQ':
           return actual !== expected;
+        case 'IN':
+          return expectedValues.includes(actual);
+        case 'NOT_IN':
+        case 'NOTIN':
+          return !expectedValues.includes(actual);
         default:
           return true;
       }
@@ -1923,14 +1941,12 @@ function ListPageContentInner(props: PageContentProps) {
   // Build filters JSON array from tab filter + user filters
   const buildFiltersParam = useCallback(
     (
-      tabCondition: { fieldName: string; operator: string; value: string } | null,
+      tabCondition: ListQueryFilterCondition | null,
       userFilters?: Record<string, any>,
       chipFiltersList?: ViewFilterConfig[],
     ) => {
       const conditions: ListQueryFilterCondition[] = [];
-      if (tabCondition) {
-        conditions.push(tabCondition);
-      }
+      if (tabCondition) conditions.push(tabCondition);
       // Convert user filters (key-value from filters) to QueryCondition format
       if (userFilters) {
         for (const [key, value] of Object.entries(userFilters)) {
@@ -2315,16 +2331,12 @@ function ListPageContentInner(props: PageContentProps) {
       setActiveTab(tabKey);
       const requestSeq = ++tabRequestSeqRef.current;
       // Compute tab filter directly (don't rely on getTabFilter since activeTab is stale in closure)
-      let tabCondition: { fieldName: string; operator: string; value: string } | null = null;
+      let tabCondition: ListQueryFilterCondition | null = null;
       if (schema?.blocks) {
         const tabsBlock = schema.blocks.find((block: any) => block.blockType === 'tabs');
         const tabDef = (tabsBlock?.tabs as any[])?.find((t: any) => t.key === tabKey);
         if (tabDef?.filter) {
-          tabCondition = {
-            fieldName: tabDef.filter.fieldName || tabDef.filter.field,
-            operator: tabDef.filter.operator || 'EQ',
-            value: tabDef.filter.value,
-          };
+          tabCondition = tabFilterToQueryCondition(tabDef.filter);
         }
       }
 
@@ -2361,7 +2373,7 @@ function ListPageContentInner(props: PageContentProps) {
           if (isApiDatasource) {
             // API datasource: tab filter as individual query param
             if (tabCondition) {
-              queryParams[tabCondition.fieldName] = tabCondition.value;
+              queryParams[tabCondition.fieldName] = tabCondition.values ?? tabCondition.value;
             }
             if (filters) {
               for (const [key, value] of Object.entries(filters)) {
@@ -4156,7 +4168,7 @@ function ListPageContentInner(props: PageContentProps) {
       conditions.push({
         field: tabCondition.fieldName,
         operator: tabCondition.operator,
-        value: tabCondition.value,
+        value: tabCondition.values ?? tabCondition.value,
       });
     }
     if (filters) {

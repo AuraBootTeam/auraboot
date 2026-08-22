@@ -1,0 +1,35 @@
+{
+  "pageKey": "crm_account_relation_common_form",
+  "name:zh-CN": "客户关系表单",
+  "name:en": "Account Relationship Form",
+  "modelCode": "crm_account_relation_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12, "gap": 16 },
+  "blocks": [
+    {
+      "id": "relationship_basic",
+      "blockType": "form-section",
+      "title": { "zh-CN": "关系信息", "en-US": "Relationship" },
+      "columns": 2,
+      "fields": [
+        { "field": "crm_acr_source_account_id", "required": true },
+        { "field": "crm_acr_target_account_id", "required": true },
+        { "field": "crm_acr_relation_type", "required": true },
+        { "field": "crm_acr_strength", "required": true },
+        { "field": "crm_acr_status", "required": true },
+        { "field": "crm_acr_effective_from" },
+        { "field": "crm_acr_effective_to" },
+        { "field": "crm_acr_notes", "span": 2 }
+      ]
+    },
+    {
+      "id": "relationship_buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        { "code": "submit", "primary": true, "label": "$i18n:common.button.save", "action": { "type": "command" } },
+        { "code": "cancel", "label": "$i18n:common.button.cancel" }
+      ]
+    }
+  ]
+}
