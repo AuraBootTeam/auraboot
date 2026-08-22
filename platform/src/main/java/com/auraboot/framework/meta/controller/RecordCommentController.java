@@ -35,6 +35,16 @@ public class RecordCommentController {
         return ApiResponse.success(commentService.listComments(modelCode, recordPid));
     }
 
+    @GetMapping("/{modelCode}/{recordPid}/comments/page")
+    @Operation(summary = "Page root comments with their replies")
+    public ApiResponse<Map<String, Object>> pageComments(
+            @PathVariable String modelCode,
+            @PathVariable String recordPid,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.success(commentService.pageComments(modelCode, recordPid, page, size));
+    }
+
     @PostMapping("/{modelCode}/{recordPid}/comments")
     @Operation(summary = "Add a comment to a record")
     public ApiResponse<Map<String, Object>> addComment(
@@ -42,8 +52,9 @@ public class RecordCommentController {
             @PathVariable String recordPid,
             @RequestBody Map<String, Object> body) {
         String content = (String) body.get("content");
-        String mentions = body.get("mentions") != null ? body.get("mentions").toString() : null;
-        return ApiResponse.success(commentService.addComment(modelCode, recordPid, content, mentions));
+        String parentPid = body.get("parentPid") != null ? body.get("parentPid").toString() : null;
+        return ApiResponse.success(commentService.addInteractiveComment(
+                modelCode, recordPid, content, stringList(body.get("mentionUserPids")), parentPid));
     }
 
     @PutMapping("/{modelCode}/{recordPid}/comments/{commentPid}")
@@ -54,7 +65,8 @@ public class RecordCommentController {
             @PathVariable String commentPid,
             @RequestBody Map<String, Object> body) {
         String content = (String) body.get("content");
-        return ApiResponse.success(commentService.editComment(commentPid, content));
+        return ApiResponse.success(commentService.editInteractiveComment(
+                modelCode, recordPid, commentPid, content, stringList(body.get("mentionUserPids"))));
     }
 
     @DeleteMapping("/{modelCode}/{recordPid}/comments/{commentPid}")
@@ -63,7 +75,7 @@ public class RecordCommentController {
             @PathVariable String modelCode,
             @PathVariable String recordPid,
             @PathVariable String commentPid) {
-        commentService.deleteComment(commentPid);
+        commentService.deleteInteractiveComment(modelCode, recordPid, commentPid);
         return ApiResponse.success(true);
     }
 
@@ -73,5 +85,13 @@ public class RecordCommentController {
             @PathVariable String modelCode,
             @PathVariable String recordPid) {
         return ApiResponse.success(commentService.listActivity(modelCode, recordPid));
+    }
+
+    private static List<String> stringList(Object value) {
+        if (!(value instanceof List<?> values)) return List.of();
+        return values.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(Object::toString)
+                .toList();
     }
 }

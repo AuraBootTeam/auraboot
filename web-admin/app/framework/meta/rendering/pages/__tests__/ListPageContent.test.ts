@@ -28,6 +28,7 @@ import {
   useRestoreSavedViewFromUrl,
   useSerializedSearchParamsUpdater,
   viewFilterToQueryCondition,
+  tabFilterToQueryCondition,
   resolveSavedViewFilterExpressions,
   resolveInitialListTabKey,
 } from '../ListPageContent';
@@ -731,6 +732,29 @@ describe('viewFilterToQueryCondition', () => {
     expect(
       viewFilterToQueryCondition({ fieldCode: 'name', operator: 'like', value: '华东' }),
     ).toEqual({ fieldName: 'name', operator: 'LIKE', value: '%华东%' });
+  });
+});
+
+describe('tabFilterToQueryCondition', () => {
+  it('preserves DSL IN arrays in the dynamic-query values property', () => {
+    expect(
+      tabFilterToQueryCondition({
+        field: 'crm_act_type',
+        operator: 'IN',
+        value: ['call', 'email', 'meeting', 'note', 'visit'],
+      }),
+    ).toEqual({
+      fieldName: 'crm_act_type',
+      operator: 'IN',
+      values: ['call', 'email', 'meeting', 'note', 'visit'],
+    });
+  });
+
+  it('accepts fieldName and rejects an empty DSL tab filter', () => {
+    expect(
+      tabFilterToQueryCondition({ fieldName: 'crm_act_type', operator: 'EQ', value: 'task' }),
+    ).toEqual({ fieldName: 'crm_act_type', operator: 'EQ', value: 'task' });
+    expect(tabFilterToQueryCondition({ operator: 'EQ', value: 'task' })).toBeNull();
   });
 });
 

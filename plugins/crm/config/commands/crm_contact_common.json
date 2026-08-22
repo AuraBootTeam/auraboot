@@ -15,6 +15,12 @@
       "crm_ct_is_primary",
       "crm_ct_remark"
     ],
+    "autoSetFields": {
+      "crm_ct_status": {
+        "strategy": "fixed_value",
+        "value": "active"
+      }
+    },
     "permissions": [
       "crm.contact.manage"
     ],
@@ -41,6 +47,62 @@
       "crm.contact.manage"
     ],
     "agent_hint": "Update an existing crm contact record. Editable fields: account_id, name, title, email, phone.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:set_primary_contact",
+    "displayName:zh-CN": "设为主联系人",
+    "displayName:en": "Set as Primary Contact",
+    "type": "custom",
+    "handler": "crm:set_primary_contact",
+    "modelCode": "crm_contact_common",
+    "permissions": [
+      "crm.contact.manage"
+    ],
+    "agent_hint": "Make this active contact the account's sole primary contact.",
+    "cmd_risk_level": "L1"
+  },
+  {
+    "code": "crm:disable_contact",
+    "displayName:zh-CN": "停用联系人",
+    "displayName:en": "Disable Contact",
+    "type": "state_transition",
+    "modelCode": "crm_contact_common",
+    "stateField": "crm_ct_status",
+    "fromStates": [
+      "active"
+    ],
+    "toState": "inactive",
+    "inputFields": [
+      "crm_ct_disabled_reason"
+    ],
+    "permissions": [
+      "crm.contact.manage"
+    ],
+    "agent_hint": "Disable a contact without deleting its history or related activities.",
+    "cmd_risk_level": "L2"
+  },
+  {
+    "code": "crm:enable_contact",
+    "displayName:zh-CN": "启用联系人",
+    "displayName:en": "Enable Contact",
+    "type": "state_transition",
+    "modelCode": "crm_contact_common",
+    "stateField": "crm_ct_status",
+    "fromStates": [
+      "inactive"
+    ],
+    "toState": "active",
+    "autoSetFields": {
+      "crm_ct_disabled_reason": {
+        "strategy": "fixed_value",
+        "value": ""
+      }
+    },
+    "permissions": [
+      "crm.contact.manage"
+    ],
+    "agent_hint": "Re-enable an inactive contact while preserving its history.",
     "cmd_risk_level": "L1"
   },
   {

@@ -19,10 +19,10 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.doesNotMatch(JSON.stringify(committed.run), /auraboot-enterprise/);
 
   assert.equal(committed.axes.semanticActions.length, 26);
-  assert.equal(committed.axes.commands.length, 49);
-  assert.equal(committed.axes.pages.length, 26);
+  assert.equal(committed.axes.commands.length, 58);
+  assert.equal(committed.axes.pages.length, 34);
   assert.equal(committed.axes.permissions.length, 24);
-  assert.equal(committed.axes.queries.length, 39);
+  assert.equal(committed.axes.queries.length, 40);
   assert.deepEqual(
     committed.untested.map((row) => row.id),
     ['RG3-INDEPENDENT-HUMAN-ADOPTER'],
@@ -44,15 +44,15 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
       'dashboards',
     ],
   );
-  assert.equal(committed.scope.productDenominator.pages, 125);
-  assert.equal(committed.scope.productDenominator.commands, 238);
+  assert.equal(committed.scope.productDenominator.pages, 128);
+  assert.equal(committed.scope.productDenominator.commands, 246);
   assert.equal(committed.scope.productDenominator.permissions, 114);
-  assert.equal(committed.scope.productDenominator['page-blocks'], 402);
-  assert.equal(committed.scope.productDenominator['page-fields'], 1707);
-  assert.equal(committed.scope.productDenominator['ui-actions'], 600);
+  assert.equal(committed.scope.productDenominator['page-blocks'], 412);
+  assert.equal(committed.scope.productDenominator['page-fields'], 1754);
+  assert.equal(committed.scope.productDenominator['ui-actions'], 623);
   assert.equal(committed.scope.productDenominator.queries, 55);
-  assert.equal(committed.scope.productVerdicts.pass, 641);
-  assert.equal(committed.scope.productVerdicts.untested, 2741);
+  assert.equal(committed.scope.productVerdicts.pass, 725);
+  assert.equal(committed.scope.productVerdicts.untested, 2749);
   assert.ok(committed.scope.productVerdicts.untested > 0);
   assert.equal(committed.scope.productVerdicts.gap ?? 0, 0);
   const coreWorkbenchContract = committed.runtimeEvidenceContracts.find(
@@ -137,6 +137,82 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
     'permissions',
     'queries',
     'uiActions',
+  ]);
+  const followupCommentsContract = committed.runtimeEvidenceContracts.find(
+    (contract) => contract.id === 'CRM-FOLLOWUP-COMMENTS',
+  );
+  assert.equal(followupCommentsContract.expectedScenarios, 12);
+  assert.equal(followupCommentsContract.minimumScreenshots, 6);
+  assert.equal(followupCommentsContract.expectedTechnicalVerdict, 'pass');
+  assert.equal(
+    followupCommentsContract.expectedDataMigration,
+    'out-of-scope-development-stage',
+  );
+  assert.equal(followupCommentsContract.requireNoFailedRuntimeRequests, true);
+  const contactFollowupLifecycleContract = committed.runtimeEvidenceContracts.find(
+    (contract) => contract.id === 'CRM-CONTACT-FOLLOWUP-LIFECYCLE',
+  );
+  assert.equal(contactFollowupLifecycleContract.expectedScenarios, 10);
+  assert.equal(contactFollowupLifecycleContract.minimumScreenshots, 6);
+  assert.equal(contactFollowupLifecycleContract.expectedCoverage.pages.length, 3);
+  assert.equal(contactFollowupLifecycleContract.expectedCoverage.blocks.length, 6);
+  assert.equal(contactFollowupLifecycleContract.expectedCoverage.fields.length, 11);
+  assert.equal(contactFollowupLifecycleContract.expectedCoverage.uiActions.length, 7);
+  assert.equal(contactFollowupLifecycleContract.expectedCoverage.commands.length, 7);
+  assert.equal(contactFollowupLifecycleContract.expectedTechnicalVerdict, 'pass');
+  assert.equal(
+    contactFollowupLifecycleContract.expectedDataMigration,
+    'out-of-scope-development-stage',
+  );
+  assert.equal(contactFollowupLifecycleContract.requireNoFailedRuntimeRequests, true);
+  const leadConversionActivityCarryContract = committed.runtimeEvidenceContracts.find(
+    (contract) => contract.id === 'CRM-LEAD-CONVERSION-ACTIVITY-CARRY',
+  );
+  assert.equal(leadConversionActivityCarryContract.expectedScenarios, 10);
+  assert.equal(leadConversionActivityCarryContract.minimumScreenshots, 7);
+  assert.equal(leadConversionActivityCarryContract.expectedCoverage.pages.length, 5);
+  assert.equal(leadConversionActivityCarryContract.expectedCoverage.blocks.length, 11);
+  assert.equal(leadConversionActivityCarryContract.expectedCoverage.uiActions.length, 6);
+  assert.equal(leadConversionActivityCarryContract.expectedCoverage.commands.length, 5);
+  assert.equal(leadConversionActivityCarryContract.expectedCoverage.queries.length, 2);
+  assert.equal(leadConversionActivityCarryContract.expectedTechnicalVerdict, 'pass');
+  assert.equal(
+    leadConversionActivityCarryContract.expectedDataMigration,
+    'out-of-scope-development-stage',
+  );
+  assert.equal(leadConversionActivityCarryContract.requireNoFailedRuntimeRequests, true);
+  assert.equal(leadConversionActivityCarryContract.expectedFixtureMode, 'self-seeded');
+  assert.deepEqual(leadConversionActivityCarryContract.requiredRecordIds, [
+    'lead',
+    'account',
+    'contact',
+    'opportunity',
+    'customerRequest',
+    'activities',
+  ]);
+  const accountRelationshipContract = committed.runtimeEvidenceContracts.find(
+    (contract) => contract.id === 'CRM-ACCOUNT-RELATIONSHIP',
+  );
+  assert.equal(accountRelationshipContract.expectedScenarios, 12);
+  assert.equal(accountRelationshipContract.minimumScreenshots, 7);
+  assert.equal(accountRelationshipContract.expectedCoverage.pages.length, 3);
+  assert.equal(accountRelationshipContract.expectedCoverage.commands.length, 4);
+  assert.equal(accountRelationshipContract.expectedCoverage.permissions.length, 2);
+  assert.equal(accountRelationshipContract.expectedCoverage.blocks.length, 8);
+  assert.equal(accountRelationshipContract.expectedCoverage.fields.length, 8);
+  assert.equal(accountRelationshipContract.expectedCoverage.uiActions.length, 6);
+  assert.equal(accountRelationshipContract.expectedTechnicalVerdict, 'pass');
+  assert.equal(
+    accountRelationshipContract.expectedDataMigration,
+    'out-of-scope-development-stage',
+  );
+  assert.equal(accountRelationshipContract.requireNoFailedRuntimeRequests, true);
+  assert.equal(accountRelationshipContract.expectedFixtureMode, 'self-seeded');
+  assert.deepEqual(accountRelationshipContract.requiredRecordIds, [
+    'sourceAccount',
+    'targetAccount',
+    'thirdAccount',
+    'relationship',
   ]);
   const modelGroup = committed.groups.find((group) => group.id === 'model-surfaces');
   assert.equal(

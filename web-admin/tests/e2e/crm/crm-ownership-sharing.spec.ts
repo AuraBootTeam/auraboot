@@ -1,5 +1,13 @@
-import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import {
+  expect,
+  test,
+  type Browser,
+  type BrowserContext,
+  type Page,
+  type TestInfo,
+} from '@playwright/test';
 import { createCookieSessionStorage } from 'react-router';
+import fs from 'node:fs';
 import { Pool } from 'pg';
 import {
   clickRowActionByLocator,
@@ -13,6 +21,37 @@ const PASSWORD = 'Test2026x';
 const MODEL_CODE = 'crm_account_common';
 const JWT_TOKEN_KEY = 'jwtToken';
 const DEFAULT_BASE_URL = 'http://127.0.0.1:5173';
+const EXPECTED_SCENARIOS = [
+  'owner-record-isolation',
+  'non-owner-share-denied',
+  'cross-tenant-member-hidden',
+  'cross-tenant-direct-share-denied',
+  'read-share-visible',
+  'collaboration-notification-created',
+  'read-share-update-denied',
+  'collaborative-account-view-exact',
+  'expired-share-removes-access',
+  'renewal-restores-access',
+  'collaboration-upgrade-allows-update',
+  'single-stable-public-share-row',
+  'revoke-removes-access',
+  'revoked-account-absent-from-list',
+] as const;
+const COVERAGE = {
+  pages: ['crm_account_common_list', 'crm_account_common_detail'],
+  commands: ['crm:create_account', 'crm:update_account'],
+  permissions: ['crm.account.read', 'crm.account.manage'],
+  blocks: [
+    'crm_account_common_list:crm_account_tabs',
+    'crm_account_common_list:crm_account_table',
+    'crm_account_common_detail:crm_account_tabs',
+    'crm_account_common_detail:crm_account_detail_toolbar',
+  ],
+  uiActions: [
+    'crm_account_common_list:platform:collaborative_accounts',
+    'crm_account_common_detail:platform:share_record',
+  ],
+} as const;
 
 const authSessionStorage = createCookieSessionStorage({
   cookie: {
@@ -79,6 +118,18 @@ test.describe('CRM account collaboration', () => {
     const recipientContext = await newAuthenticatedContext(browser, resolvedBaseURL, recipient);
     const ownerPage = await ownerContext.newPage();
     const recipientPage = await recipientContext.newPage();
+    const screenshots: string[] = [];
+    const failedRuntimeRequests: Array<{ method: string; status: number; url: string }> = [];
+    for (const runtimePage of [ownerPage, recipientPage]) {
+      runtimePage.on('response', (response) => {
+        if (response.status() < 500) return;
+        failedRuntimeRequests.push({
+          method: response.request().method(),
+          status: response.status(),
+          url: response.url(),
+        });
+      });
+    }
 
     try {
       const ownerAccount = await createAccount(ownerPage, `Owner Account ${uid}`);
@@ -157,10 +208,9 @@ test.describe('CRM account collaboration', () => {
         'owner cannot submit a member from another tenant even with its public PID',
       ).toBe(false);
       await expectShareNotPersisted(ownerAccount.pid, otherTenantMember.pid);
-      await testInfo.attach('owner-cross-tenant-member-hidden', {
-        body: await ownerPage.screenshot(),
-        contentType: 'image/png',
-      });
+      screenshots.push(
+        await captureScreenshot(ownerPage, testInfo, '01-cross-tenant-member-hidden'),
+      );
 
       await dialog.getByTestId('member-picker-search-input').fill(recipient.email);
       const recipientOption = dialog.getByTestId(`member-picker-option-${recipient.pid}`);
@@ -202,10 +252,7 @@ test.describe('CRM account collaboration', () => {
       );
       expect(sharePid, 'share row exposes a stable public share PID').toMatch(/\S+/);
       expect(sharePid, 'share row must not expose an internal numeric ID').not.toMatch(/^\d+$/);
-      await testInfo.attach('owner-share-dialog', {
-        body: await ownerPage.screenshot(),
-        contentType: 'image/png',
-      });
+      screenshots.push(await captureScreenshot(ownerPage, testInfo, '02-owner-share-dialog'));
 
       await expect
         .poll(
@@ -280,10 +327,9 @@ test.describe('CRM account collaboration', () => {
         'detail',
       );
       await expect(recipientPage.locator('[data-testid$="share-btn"]')).toHaveCount(0);
-      await testInfo.attach('recipient-shared-account-visible', {
-        body: await recipientPage.screenshot(),
-        contentType: 'image/png',
-      });
+      screenshots.push(
+        await captureScreenshot(recipientPage, testInfo, '03-recipient-shared-account-visible'),
+      );
 
       await expireOwnShareForClockAdvance(sharePid!);
       await expectAccountVisibility(
@@ -299,10 +345,9 @@ test.describe('CRM account collaboration', () => {
       const expiredShareRow = dialog.getByTestId(`record-share-row-${sharePid}`);
       await expect(expiredShareRow).toContainText(/已到期|Expired/);
       await expect(expiredShareRow.getByRole('button', { name: /续期|Renew/ })).toBeVisible();
-      await testInfo.attach('owner-expired-collaboration-visible', {
-        body: await ownerPage.screenshot(),
-        contentType: 'image/png',
-      });
+      screenshots.push(
+        await captureScreenshot(ownerPage, testInfo, '04-expired-collaboration-visible'),
+      );
 
       await expiredShareRow.getByRole('button', { name: /续期|Renew/ }).click();
       await expect(dialog.getByTestId('record-share-editing-member')).toContainText(
@@ -336,10 +381,9 @@ test.describe('CRM account collaboration', () => {
         true,
         'renewed share restores recipient list/detail visibility',
       );
-      await testInfo.attach('owner-collaboration-renewed', {
-        body: await ownerPage.screenshot(),
-        contentType: 'image/png',
-      });
+      screenshots.push(
+        await captureScreenshot(ownerPage, testInfo, '05-collaboration-renewed'),
+      );
 
       const existingOwnerToasts = ownerPage.getByRole('button', {
         name: 'Close notification',
@@ -365,10 +409,9 @@ test.describe('CRM account collaboration', () => {
       });
       await expect(shareRow).toContainText(/可协作|Collaborate/);
       await expect(dialog.locator('[data-testid^="record-share-row-"]')).toHaveCount(1);
-      await testInfo.attach('owner-collaboration-upgraded', {
-        body: await ownerPage.screenshot(),
-        contentType: 'image/png',
-      });
+      screenshots.push(
+        await captureScreenshot(ownerPage, testInfo, '06-collaboration-upgraded'),
+      );
 
       const collaborativeName = `Collaborated Account ${uid}`;
       const allowedUpdate = await recipientPage.request.post(
@@ -409,16 +452,56 @@ test.describe('CRM account collaboration', () => {
         0,
       );
       await expect(recipientPage.getByText(/加载中|Loading/)).toHaveCount(0);
-      await testInfo.attach('recipient-account-hidden-after-revoke', {
-        body: await recipientPage.screenshot(),
-        contentType: 'image/png',
-      });
+      screenshots.push(
+        await captureScreenshot(recipientPage, testInfo, '07-account-hidden-after-revoke'),
+      );
+
+      expect(failedRuntimeRequests).toEqual([]);
+      fs.writeFileSync(
+        testInfo.outputPath(`crm-account-collaboration-${uid}.json`),
+        `${JSON.stringify(
+          {
+            runId: uid,
+            verdict: 'pass',
+            technicalVerdict: 'pass',
+            fixtureMode: 'self-seeded',
+            dataMigration: 'out-of-scope-development-stage',
+            expectedScenarios: EXPECTED_SCENARIOS,
+            completedScenarios: EXPECTED_SCENARIOS,
+            coverage: Object.fromEntries(
+              Object.entries(COVERAGE).map(([axis, expected]) => [
+                axis,
+                { expected, completed: expected },
+              ]),
+            ),
+            screenshots,
+            failedRuntimeRequests,
+            recordIds: {
+              owner: owner.pid,
+              recipient: recipient.pid,
+              otherTenantMember: otherTenantMember.pid,
+              ownerAccount: ownerAccount.pid,
+              recipientAccount: recipientAccount.pid,
+              share: sharePid,
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
     } finally {
       await ownerContext.close();
       await recipientContext.close();
     }
   });
 });
+
+async function captureScreenshot(page: Page, testInfo: TestInfo, name: string): Promise<string> {
+  const screenshotPath = testInfo.outputPath(`${name}.png`);
+  await page.screenshot({ path: screenshotPath, fullPage: false });
+  await testInfo.attach(name, { path: screenshotPath, contentType: 'image/png' });
+  return screenshotPath;
+}
 
 async function expireOwnShareForClockAdvance(sharePid: string): Promise<void> {
   const pool = new Pool(PG_CONN);

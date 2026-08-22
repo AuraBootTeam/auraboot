@@ -5,6 +5,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.notification.service.NotificationService;
@@ -237,12 +238,26 @@ public class RecordShareController {
         if (callerId == null || !StringUtils.hasText(resourceCode) || !StringUtils.hasText(recordPid)) {
             return false;
         }
-        Map<String, Object> record = dynamicDataService.getById(resourceCode, recordPid);
+        Map<String, Object> record;
+        try {
+            record = dynamicDataService.getById(resourceCode, recordPid);
+        } catch (MetaServiceException error) {
+            if (!isRecordUnavailable(error)) throw error;
+            log.debug("Record-share capability unavailable for inaccessible or deleted record: caller={}, resource={}/{}",
+                    callerId, resourceCode, recordPid);
+            return false;
+        }
         if (record == null || record.isEmpty()) {
             return false;
         }
         return userPermissionService.hasPermission(callerId, MetaPermission.RECORD_SHARE_MANAGE)
                 || isRecordOwner(resourceCode, record, callerId, MetaContext.getCurrentUserPid());
+    }
+
+    private static boolean isRecordUnavailable(MetaServiceException error) {
+        String message = error.getMessage();
+        return message != null
+                && (message.startsWith("Access denied:") || message.startsWith("Record not found:"));
     }
 
     /**

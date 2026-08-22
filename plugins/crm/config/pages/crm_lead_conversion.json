@@ -125,7 +125,10 @@
                   "buttons": [
                     {
                       "code": "log_activity",
-                      "label": "$i18n:common.button.create",
+                      "label": {
+                        "zh-CN": "记录跟进",
+                        "en-US": "Log Follow-up"
+                      },
                       "action": {
                         "type": "navigate",
                         "to": "crm_activity_common_form",

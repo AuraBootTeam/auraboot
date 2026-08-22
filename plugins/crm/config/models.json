@@ -28,6 +28,28 @@
     "lifecycle_description": "No status lifecycle — accounts are long-lived master entities. Created with status=active, may be updated or deleted but do not transition through states."
   },
   {
+    "code": "crm_account_relation_common",
+    "displayName:zh-CN": "客户关系",
+    "displayName:en": "Account Relationship",
+    "description": "Governed directional relationship between two CRM accounts",
+    "modelType": "entity",
+    "modelCategory": "relationship",
+    "extension": {
+      "icon": "Network",
+      "category": "crm",
+      "titleField": "crm_acr_relation_type",
+      "subtitleField": "crm_acr_target_account_id",
+      "dataScope": {
+        "ownerField": "crm_acr_owner",
+        "departmentField": null
+      }
+    },
+    "semantic_description": "A single directional relationship edge between two customer accounts, with type, strength, validity and accountable owner. The same edge is visible from both customer endpoints without duplicating facts.",
+    "domain_category": "crm",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "Created active, editable while retained, and explicitly deletable. Self-links and duplicate account-pair/type edges are rejected transactionally."
+  },
+  {
     "code": "crm_contact_common",
     "displayName:zh-CN": "联系人",
     "displayName:en": "Contact",
@@ -48,7 +70,7 @@
     "semantic_description": "An individual person at a customer organization. Contacts are reference entities linked to an account and may participate in multiple opportunities and activities. LLM need to understand: primary contact flag, contact title, communication channels.",
     "domain_category": "crm",
     "data_sensitivity": "internal",
-    "lifecycle_description": "No status lifecycle — contacts are long-lived master entities. Created upon association with an account; may be marked primary or secondary; deletion removes the relationship."
+    "lifecycle_description": "Active -> Inactive -> Active. Disabling preserves the contact, relationship and activity history; deletion remains an explicit irreversible action. An active contact may be the account's sole primary contact."
   },
   {
     "code": "crm_lead_common",

@@ -47,7 +47,11 @@
         },
         {
           "field": "crm_ct_is_primary",
-          "colSpan": 6
+          "colSpan": 6,
+          "helpText": {
+            "zh-CN": "设为主联系人后，同一客户的其他主联系人会自动降为普通联系人。",
+            "en-US": "Setting this contact as primary demotes any other primary contact for the same account."
+          }
         },
         {
           "field": "crm_ct_remark",

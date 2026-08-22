@@ -612,6 +612,24 @@ export function resolveVisibleTopLevelDetailBlocks(
   });
 }
 
+const DIRECT_DETAIL_SPECIALIZED_BLOCK_TYPES = new Set([
+  'activity-timeline',
+  'record-comments',
+  'field-history',
+  'bpm-panel',
+]);
+
+/**
+ * Specialized blocks rendered beside field sections on detail pages without tabs.
+ * These block types are intentionally excluded from the generic BlockRenderer, so
+ * they need an explicit direct-mode dispatch just like sub-table and embedded-list.
+ */
+export function resolveDirectSpecializedDetailBlocks(blocks: BlockConfig[]): BlockConfig[] {
+  return blocks.filter((block) =>
+    DIRECT_DETAIL_SPECIALIZED_BLOCK_TYPES.has(block.blockType as string),
+  );
+}
+
 export function evaluateDetailVisibleWhen(
   visibleWhen: string | undefined,
   recordData: Record<string, unknown> | null | undefined,
@@ -1003,6 +1021,11 @@ function DetailPageContentInner(props: PageContentProps) {
 
   const directEmbeddedListBlocks = useMemo(
     () => allBlocks.filter((b: BlockConfig) => b.blockType === 'embedded-list'),
+    [allBlocks],
+  );
+
+  const directSpecializedBlocks = useMemo(
+    () => resolveDirectSpecializedDetailBlocks(allBlocks),
     [allBlocks],
   );
 
@@ -1521,6 +1544,26 @@ function DetailPageContentInner(props: PageContentProps) {
                 dataSourceManager={dataSourceManager}
               />
             ))}
+            {directSpecializedBlocks.map((block: BlockConfig, blockIndex: number) => (
+              <DetailBlockRenderer
+                key={block.id || `specialized-${blockIndex}`}
+                block={block}
+                recordData={recordData}
+                rawData={rawData}
+                recordPid={recordPid!}
+                token={token || undefined}
+                locale={locale}
+                t={t}
+                modelCode={schema?.modelCode || tableName}
+                evaluateEditableWhen={evaluateVisibleWhen}
+                onDataChange={reloadRecord}
+                getDictItems={getDictItems}
+                enrichField={enrichField}
+                runtime={runtime as SchemaRuntime}
+                schemaDataSources={schema?.dataSources}
+                dataSourceManager={dataSourceManager}
+              />
+            ))}
 
             {/* G7 — unified fallback dispatch for blocks not handled by the
                 hardcoded detail switch (chart / description / rich-text /
@@ -1547,6 +1590,7 @@ function DetailPageContentInner(props: PageContentProps) {
               directSubTableBlocks.length === 0 &&
               directMonthlyGridBlocks.length === 0 &&
               directEmbeddedListBlocks.length === 0 &&
+              directSpecializedBlocks.length === 0 &&
               directMiscBlocks.length === 0 &&
               tabs.length === 0 && (
                 <FallbackDetailView schema={schema} recordData={recordData} locale={locale} />

@@ -1,0 +1,12 @@
+[
+  { "modelCode": "crm_account_relation_common", "fieldCode": "crm_acr_source_account_id", "sequence": 1, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_account_relation_common", "fieldCode": "crm_acr_target_account_id", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_account_relation_common", "fieldCode": "crm_acr_relation_type", "sequence": 3, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_account_relation_common", "fieldCode": "crm_acr_strength", "sequence": 4, "required": true, "visible": true, "editable": true },
+  { "modelCode": "crm_account_relation_common", "fieldCode": "crm_acr_status", "sequence": 5, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_account_relation_common", "fieldCode": "crm_acr_effective_from", "sequence": 6, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_account_relation_common", "fieldCode": "crm_acr_effective_to", "sequence": 7, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_account_relation_common", "fieldCode": "crm_acr_owner", "sequence": 8, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_account_relation_common", "fieldCode": "crm_acr_notes", "sequence": 9, "required": false, "visible": true, "editable": true },
+  { "modelCode": "crm_account_relation_common", "fieldCode": "crm_acr_pair_key", "sequence": 10, "required": false, "visible": false, "editable": false }
+]
