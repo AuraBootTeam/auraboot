@@ -116,14 +116,14 @@
           "code": "batch_operations",
           "permissionCode": "crm.customer_pool.pick",
           "label": { "zh-CN": "批量处理", "en": "Batch Operations" },
-          "variant": "secondary",
+          "variant": "default",
           "onClick": { "action": "navigate", "args": { "to": "/p/c/crm_customer_pool_batch_list" } }
         },
         {
           "code": "pool_policy",
           "permissionCode": "crm.customer_pool.manage",
           "label": { "zh-CN": "客户公海策略", "en": "Pool Policies" },
-          "variant": "secondary",
+          "variant": "default",
           "onClick": { "action": "navigate", "args": { "to": "/p/c/crm_customer_pool_strategy" } }
         }
       ]
@@ -176,11 +176,11 @@
             "reload": ["poolStats", "poolQueue"]
           }
         },
-        {
-          "code": "assign",
+      {
+        "code": "assign",
           "label": { "zh-CN": "分配", "en": "Assign" },
           "permissionCode": "crm.customer_pool.assign",
-          "variant": "secondary",
+        "variant": "default",
           "mobileOnly": true,
           "visibleWhen": "record.crm_cpi_status == 'available'",
           "action": {
@@ -203,11 +203,11 @@
             "reload": ["poolStats", "poolQueue"]
           }
         },
-        {
-          "code": "view_pool_evidence",
+      {
+        "code": "view_pool_evidence",
           "label": { "zh-CN": "池内详情", "en": "Pool Details" },
           "permissionCode": "crm.customer_pool.read",
-          "variant": "secondary",
+        "variant": "default",
           "action": { "type": "navigate", "to": "crm_customer_pool_item_detail" }
         }
       ],
