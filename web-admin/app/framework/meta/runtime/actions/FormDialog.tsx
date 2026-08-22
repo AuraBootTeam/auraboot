@@ -279,12 +279,13 @@ export default function FormDialog() {
         if (field.fileNameField) updateField(field.fileNameField, '');
         return;
       }
-      if (field.maxBytes && file.size > field.maxBytes) {
+      const maxBytes = field.maxBytes;
+      if (maxBytes && file.size > maxBytes) {
         setErrors((prev) => ({
           ...prev,
           [field.field]: locale.startsWith('zh')
-            ? `文件不能超过 ${Math.ceil(field.maxBytes / 1024 / 1024)} MB`
-            : `File must not exceed ${Math.ceil(field.maxBytes / 1024 / 1024)} MB`,
+            ? `文件不能超过 ${Math.ceil(maxBytes / 1024 / 1024)} MB`
+            : `File must not exceed ${Math.ceil(maxBytes / 1024 / 1024)} MB`,
         }));
         return;
       }
