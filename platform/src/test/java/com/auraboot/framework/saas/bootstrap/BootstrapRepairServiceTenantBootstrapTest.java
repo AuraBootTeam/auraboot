@@ -1,6 +1,7 @@
 package com.auraboot.framework.saas.bootstrap;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.billing.account.service.BillingAccountIdentityService;
 import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.plugin.service.BuiltinPluginImportService;
 import com.auraboot.framework.rbac.entity.Role;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 
@@ -28,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -55,6 +58,10 @@ class BootstrapRepairServiceTenantBootstrapTest {
     private MenuMapper menuMapper;
     @Mock
     private TenantBootstrapService tenantBootstrapService;
+    @Mock
+    private BillingAccountIdentityService billingAccountIdentityService;
+    @Mock
+    private JdbcTemplate jdbcTemplate;
 
     @InjectMocks
     private BootstrapRepairService service;
@@ -116,6 +123,21 @@ class BootstrapRepairServiceTenantBootstrapTest {
 
         assertThat(result.status()).isEqualTo(RepairStepResult.Status.PRESENT);
         verify(tenantBootstrapService, never()).bootstrapTenant(anyLong(), anyLong());
+    }
+
+    @Test
+    void defaultLoginSurfaceIsRepairedForSchemaSnapshotFirstInstall() {
+        when(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_login_application WHERE code = 'business-web'",
+                Integer.class)).thenReturn(0);
+
+        assertThat(service.ensureDefaultLoginSurface()).isTrue();
+
+        // Web and native login surfaces are repaired independently:
+        // application + channel + password method for each surface.
+        verify(jdbcTemplate, times(6)).update(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.<Object[]>any());
     }
 
     private static Role role(String code) {

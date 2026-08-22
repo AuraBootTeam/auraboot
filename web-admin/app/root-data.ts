@@ -3,6 +3,7 @@ import { useRouteLoaderData } from 'react-router';
 import type { BrandingConfig, BuildIdentity } from '~/config/branding';
 import type { IcpComplianceConfig } from '~/config/icpCompliance';
 import type { BootstrapStatus } from '~/services/bootstrapStatus';
+import type { AccessPolicy } from '~/services/accessPolicy';
 
 export interface RootLoaderData {
   runtimeProfile: RuntimeProfile;
@@ -20,6 +21,7 @@ export interface RootLoaderData {
   icpCompliance: IcpComplianceConfig;
   branding: BrandingConfig;
   buildIdentity: BuildIdentity;
+  accessPolicy: AccessPolicy;
 }
 
 export function useRootLoaderData(): RootLoaderData | undefined {

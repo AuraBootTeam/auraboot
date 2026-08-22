@@ -12,6 +12,7 @@ import {
   GlobeAltIcon,
   InformationCircleIcon,
   SparklesIcon,
+  IdentificationIcon,
 } from '@heroicons/react/24/outline';
 import { useRootLoaderData } from '~/root-data';
 import { COMMUNITY_BRANDING } from '~/config/branding';
@@ -34,6 +35,16 @@ interface HeaderProps {
   simplified?: boolean;
 }
 
+interface PartyActorOption {
+  partyId: string;
+  partyMembershipId: string;
+  displayName: string;
+  partyType: string;
+  lifecycleStatus: string;
+  membershipStatus: string;
+  current: boolean;
+}
+
 export default function Header({
   sidebarOpen,
   setSidebarOpen,
@@ -45,6 +56,7 @@ export default function Header({
   const { state: aiState, togglePanel: toggleAI } = useAuraBot();
   const rootData = useRootLoaderData();
   const user = rootData?.user ?? null;
+  const showBusinessWorkspaceSwitcher = rootData?.accessPolicy?.deploymentMode !== 'single';
   const branding = rootData?.branding ?? COMMUNITY_BRANDING;
   const hasMenus = (rootData?.menus?.length ?? 0) > 0;
   const { theme, setTheme, isDark } = useTheme();
@@ -58,6 +70,7 @@ export default function Header({
   const [spaces, setSpaces] = useState<
     Array<{ tenantId: string; tenantName: string; tenantDisplayName: string; spaceType: string }>
   >([]);
+  const [actors, setActors] = useState<PartyActorOption[]>([]);
   // Hydration marker (same pattern as Login.tsx): the SSR header renders the
   // avatar long before React attaches its click handlers, so E2E must be able
   // to wait for interactivity instead of clicking a dead button.
@@ -108,6 +121,16 @@ export default function Header({
       })
       .catch(() => {});
   }, [user, simplified]);
+
+  useEffect(() => {
+    if (!user || simplified || !rootData?.accessPolicy?.actorSwitchEnabled) return;
+    fetch('/api/actors')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((result) => {
+        if (Array.isArray(result?.data)) setActors(result.data);
+      })
+      .catch(() => {});
+  }, [user, simplified, rootData?.accessPolicy?.actorSwitchEnabled]);
 
   // Connect to SSE for real-time data sync via useSSE hook
   // (provides exponential backoff, tab visibility pause, and proper cleanup)
@@ -380,59 +403,114 @@ export default function Header({
                     </p>
                   </div>
 
-                  {/* Tenant list */}
-                  {spaces.filter((s) => s.spaceType === 'business').length > 0 && (
+                  {actors.length > 0 && (
                     <div className="border-b border-gray-200 py-1 dark:border-gray-700">
                       <p className="px-4 py-1 text-xs font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                        {workspaceLabel}
+                        Business identity
                       </p>
-                      {spaces
-                        .filter((s) => s.spaceType === 'business')
-                        .map((space) => {
-                          const isCurrent = String(user.tenantId) === String(space.tenantId);
-                          return (
-                            <button
-                              key={space.tenantId}
-                              data-testid={`tenant-switch-${space.tenantId}`}
-                              onClick={() => {
-                                if (isCurrent) return;
-                                setShowUserDropdown(false);
-                                const form = document.createElement('form');
-                                form.method = 'POST';
-                                form.action = '/_action/switch-space';
-                                const tid = document.createElement('input');
-                                tid.type = 'hidden';
-                                tid.name = 'tenantId';
-                                tid.value = space.tenantId;
-                                form.appendChild(tid);
-                                const redir = document.createElement('input');
-                                redir.type = 'hidden';
-                                redir.name = 'redirectTo';
-                                redir.value = '/';
-                                form.appendChild(redir);
-                                document.body.appendChild(form);
-                                form.submit();
-                              }}
-                              className={`flex w-full items-center gap-3 px-4 py-2 text-sm transition-colors ${
-                                isCurrent
-                                  ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                                  : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
-                              }`}
-                            >
-                              <BuildingOffice2Icon
-                                className={`h-4 w-4 flex-shrink-0 ${isCurrent ? 'text-blue-500' : 'text-gray-400'}`}
-                              />
-                              <span className="truncate">
-                                {space.tenantDisplayName || space.tenantName}
-                              </span>
-                              {isCurrent && (
-                                <span className="ms-auto text-xs text-blue-500">&#10003;</span>
-                              )}
-                            </button>
-                          );
-                        })}
+                      {actors.map((actor) => {
+                        const selectable =
+                          actor.lifecycleStatus === 'active' && actor.membershipStatus === 'active';
+                        return (
+                          <button
+                            key={actor.partyMembershipId}
+                            type="button"
+                            disabled={!selectable || actor.current}
+                            data-testid={`actor-switch-${actor.partyId}`}
+                            onClick={() => {
+                              if (!selectable || actor.current) return;
+                              setShowUserDropdown(false);
+                              const form = document.createElement('form');
+                              form.method = 'POST';
+                              form.action = '/_action/switch-actor';
+                              const party = document.createElement('input');
+                              party.type = 'hidden';
+                              party.name = 'partyId';
+                              party.value = actor.partyId;
+                              form.appendChild(party);
+                              const redir = document.createElement('input');
+                              redir.type = 'hidden';
+                              redir.name = 'redirectTo';
+                              redir.value = '/';
+                              form.appendChild(redir);
+                              document.body.appendChild(form);
+                              form.submit();
+                            }}
+                            className={`flex w-full items-center gap-3 px-4 py-2 text-sm transition-colors ${
+                              actor.current
+                                ? 'bg-violet-50 font-medium text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'
+                                : selectable
+                                  ? 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                                  : 'cursor-not-allowed text-gray-400'
+                            }`}
+                          >
+                            <IdentificationIcon className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{actor.displayName}</span>
+                            {actor.current ? (
+                              <span className="ms-auto text-xs">&#10003;</span>
+                            ) : !selectable ? (
+                              <span className="ms-auto text-xs">{actor.lifecycleStatus}</span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
+
+                  {/* Tenant list */}
+                  {showBusinessWorkspaceSwitcher &&
+                    spaces.filter((s) => s.spaceType === 'business').length > 0 && (
+                      <div className="border-b border-gray-200 py-1 dark:border-gray-700">
+                        <p className="px-4 py-1 text-xs font-semibold tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                          {workspaceLabel}
+                        </p>
+                        {spaces
+                          .filter((s) => s.spaceType === 'business')
+                          .map((space) => {
+                            const isCurrent = String(user.tenantId) === String(space.tenantId);
+                            return (
+                              <button
+                                key={space.tenantId}
+                                data-testid={`tenant-switch-${space.tenantId}`}
+                                onClick={() => {
+                                  if (isCurrent) return;
+                                  setShowUserDropdown(false);
+                                  const form = document.createElement('form');
+                                  form.method = 'POST';
+                                  form.action = '/_action/switch-space';
+                                  const tid = document.createElement('input');
+                                  tid.type = 'hidden';
+                                  tid.name = 'tenantId';
+                                  tid.value = space.tenantId;
+                                  form.appendChild(tid);
+                                  const redir = document.createElement('input');
+                                  redir.type = 'hidden';
+                                  redir.name = 'redirectTo';
+                                  redir.value = '/';
+                                  form.appendChild(redir);
+                                  document.body.appendChild(form);
+                                  form.submit();
+                                }}
+                                className={`flex w-full items-center gap-3 px-4 py-2 text-sm transition-colors ${
+                                  isCurrent
+                                    ? 'bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
+                                    : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                                }`}
+                              >
+                                <BuildingOffice2Icon
+                                  className={`h-4 w-4 flex-shrink-0 ${isCurrent ? 'text-blue-500' : 'text-gray-400'}`}
+                                />
+                                <span className="truncate">
+                                  {space.tenantDisplayName || space.tenantName}
+                                </span>
+                                {isCurrent && (
+                                  <span className="ms-auto text-xs text-blue-500">&#10003;</span>
+                                )}
+                              </button>
+                            );
+                          })}
+                      </div>
+                    )}
 
                   {/* Platform Console — only for platform_admin users */}
                   {spaces.some((s) => s.spaceType === 'platform') && (

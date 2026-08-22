@@ -1,17 +1,23 @@
 package com.auraboot.framework.auth.service.impl;
 
 import com.auraboot.framework.auth.dto.ChannelUpdateRequest;
+import com.auraboot.framework.auth.dto.LoginChannelOption;
 import com.auraboot.framework.auth.entity.TenantLoginChannel;
 import com.auraboot.framework.auth.mapper.TenantLoginChannelMapper;
+import com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper;
 import com.auraboot.framework.auth.service.TenantLoginChannelService;
+import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -29,7 +35,55 @@ public class TenantLoginChannelServiceImpl implements TenantLoginChannelService 
             "email_password", "sms", "email_code"
     );
 
+    /**
+     * Built-in methods still controlled by the tenant login-channel settings screen.
+     * Federated methods are owned by the application/IdP registry instead.
+     */
+    private static final Set<String> LEGACY_MANAGED_LOCAL_METHODS = Set.of(
+            "email_password", "password", "sms", "email_code"
+    );
+
     private final TenantLoginChannelMapper channelMapper;
+
+    @Autowired(required = false)
+    private LoginApplicationChannelMapper applicationChannelMapper;
+
+    @Autowired(required = false)
+    private SystemModeService systemModeService;
+
+    @Override
+    public List<String> getEnabledChannels(Long tenantId, String applicationCode, String channelCode) {
+        Long effectiveTenantId = resolvePreAuthTenantId(tenantId);
+        if (applicationChannelMapper != null) {
+            List<String> methods = applicationChannelMapper.findEnabledAuthMethods(
+                    applicationCode == null || applicationCode.isBlank() ? "business-web" : applicationCode,
+                    channelCode == null || channelCode.isBlank() ? "default-business-web" : channelCode,
+                    effectiveTenantId);
+            if (methods != null && !methods.isEmpty()) {
+                return mergeRegistryMethodsWithLegacyLocalToggles(
+                        methods, getEnabledChannels(effectiveTenantId));
+            }
+        }
+        return getEnabledChannels(effectiveTenantId);
+    }
+
+    @Override
+    public List<LoginChannelOption> getEnabledChannelOptions(
+            Long tenantId, String applicationCode, String channelCode) {
+        Long effectiveTenantId = resolvePreAuthTenantId(tenantId);
+        if (applicationChannelMapper != null) {
+            List<LoginChannelOption> options = applicationChannelMapper.findEnabledAuthOptions(
+                    applicationCode == null || applicationCode.isBlank() ? "business-web" : applicationCode,
+                    channelCode == null || channelCode.isBlank() ? "default-business-web" : channelCode,
+                    effectiveTenantId);
+            if (options != null && !options.isEmpty()) {
+                return mergeRegistryOptionsWithLegacyLocalToggles(
+                        options, getEnabledChannels(effectiveTenantId));
+            }
+        }
+        return TenantLoginChannelService.super.getEnabledChannelOptions(
+                effectiveTenantId, applicationCode, channelCode);
+    }
 
     @Override
     public List<String> getEnabledChannels(Long tenantId) {
@@ -131,5 +185,55 @@ public class TenantLoginChannelServiceImpl implements TenantLoginChannelService 
         }
 
         log.info("Initialized default login channels for tenant {}", tenantId);
+    }
+
+    private Long resolvePreAuthTenantId(Long requestedTenantId) {
+        if (systemModeService != null && systemModeService.isSingleTenant()) {
+            return systemModeService.getDefaultTenantId();
+        }
+        return requestedTenantId;
+    }
+
+    private List<String> mergeRegistryMethodsWithLegacyLocalToggles(
+            List<String> registryMethods, List<String> enabledLegacyMethods) {
+        Map<String, String> merged = new LinkedHashMap<>();
+        enabledLegacyMethods.stream()
+                .filter(this::isLegacyManagedLocalMethod)
+                .forEach(method -> merged.put(normalizeMethod(method), method));
+        registryMethods.stream()
+                .filter(method -> !isLegacyManagedLocalMethod(method))
+                .forEach(method -> merged.putIfAbsent(normalizeMethod(method), method));
+        return List.copyOf(merged.values());
+    }
+
+    private List<LoginChannelOption> mergeRegistryOptionsWithLegacyLocalToggles(
+            List<LoginChannelOption> registryOptions, List<String> enabledLegacyMethods) {
+        Map<String, LoginChannelOption> merged = new LinkedHashMap<>();
+        enabledLegacyMethods.stream()
+                .filter(this::isLegacyManagedLocalMethod)
+                .map(this::legacyOption)
+                .forEach(option -> merged.put(normalizeMethod(option.getCode()), option));
+        registryOptions.stream()
+                .filter(option -> !isLegacyManagedLocalMethod(option.getCode()))
+                .forEach(option -> merged.putIfAbsent(normalizeMethod(option.getCode()), option));
+        return List.copyOf(merged.values());
+    }
+
+    private LoginChannelOption legacyOption(String rawCode) {
+        String code = normalizeMethod(rawCode);
+        String kind = switch (code) {
+            case "email_password", "password" -> "password";
+            case "sms", "email_code" -> "otp";
+            default -> "oauth";
+        };
+        return new LoginChannelOption(code, kind, rawCode, null);
+    }
+
+    private boolean isLegacyManagedLocalMethod(String method) {
+        return LEGACY_MANAGED_LOCAL_METHODS.contains(normalizeMethod(method));
+    }
+
+    private String normalizeMethod(String method) {
+        return method == null ? "" : method.toLowerCase();
     }
 }

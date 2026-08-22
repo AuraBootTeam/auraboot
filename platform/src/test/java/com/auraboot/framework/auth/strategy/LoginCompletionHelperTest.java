@@ -1,6 +1,11 @@
 package com.auraboot.framework.auth.strategy;
 
 import com.auraboot.framework.auth.dto.AuthenticationResponse;
+import com.auraboot.framework.auth.dto.LoginContextRef;
+import com.auraboot.framework.auth.dto.SessionTokenContext;
+import com.auraboot.framework.auth.constant.ExecutionScope;
+import com.auraboot.framework.auth.constant.SessionStage;
+import com.auraboot.framework.auth.mapper.LoginApplicationChannelMapper;
 import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.auth.util.JwtUtil;
@@ -15,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -40,6 +46,9 @@ class LoginCompletionHelperTest {
 
     @Mock
     private PasswordManagementService passwordManagementService;
+
+    @Mock
+    private LoginApplicationChannelMapper loginApplicationChannelMapper;
 
     @InjectMocks
     private LoginCompletionHelper helper;
@@ -247,6 +256,44 @@ class LoginCompletionHelperTest {
         helper.completeLogin(user, null, null);
 
         verify(jwtUtil).generateTokenWithTenantId(any(), any(), any(), any(), eq(5));
+    }
+
+    @Test
+    void completeLogin_resolvedApplicationChannel_areBoundIntoReadyTenantToken() {
+        ReflectionTestUtils.setField(helper, "loginApplicationChannelMapper", loginApplicationChannelMapper);
+        User user = buildUser(13L, "user-pid-013", null, false, false);
+        user.setSecurityVersion(7);
+        TenantMember member = new TenantMember();
+        member.setId(501L);
+        member.setStatus("active");
+        LoginContextRef loginContext = new LoginContextRef();
+        loginContext.setApplicationId(601L);
+        loginContext.setLoginChannelId(701L);
+
+        when(tenantMemberService.getTenantIdByUserId(13L)).thenReturn(401L);
+        when(tenantMemberService.findByTenantIdAndUserId(401L, 13L)).thenReturn(member);
+        when(tenantService.getById(401L)).thenReturn(tenantWithStatus("active"));
+        when(loginApplicationChannelMapper.resolveLoginContext(
+                "business-web", "default-business-web", 401L)).thenReturn(loginContext);
+        when(jwtUtil.generateTokenWithContext(any(), any(), any())).thenReturn("jwt-context");
+        when(passwordManagementService.isPasswordExpired(user)).thenReturn(false);
+
+        AuthenticationResponse result = helper.completeLogin(user, null, null);
+
+        org.mockito.ArgumentCaptor<SessionTokenContext> contextCaptor =
+                org.mockito.ArgumentCaptor.forClass(SessionTokenContext.class);
+        verify(jwtUtil).generateTokenWithContext(any(), eq("user-pid-013"), contextCaptor.capture());
+        SessionTokenContext context = contextCaptor.getValue();
+        assertThat(result.getJwt()).isEqualTo("jwt-context");
+        assertThat(context.tenantId()).isEqualTo(401L);
+        assertThat(context.memberId()).isEqualTo(501L);
+        assertThat(context.applicationId()).isEqualTo(601L);
+        assertThat(context.loginChannelId()).isEqualTo(701L);
+        assertThat(context.executionScope()).isEqualTo(ExecutionScope.TENANT);
+        assertThat(context.sessionStage()).isEqualTo(SessionStage.READY);
+        assertThat(context.contextVersion()).isEqualTo(1);
+        assertThat(context.securityVersion()).isEqualTo(7);
+        verify(jwtUtil, never()).generateTokenWithTenantId(any(), any(), any(), any(), anyInt());
     }
 
     // =========================================================

@@ -1,6 +1,7 @@
 package com.auraboot.framework.auth.util;
 
 import com.auraboot.framework.auth.dto.CustomUserDetails;
+import com.auraboot.framework.auth.dto.SessionTokenContext;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Header;
 import io.jsonwebtoken.Jwts;
@@ -198,6 +199,49 @@ public class JwtUtil {
         });
     }
 
+    public Long extractApplicationId(String token) {
+        return extractLongClaim(token, "applicationId");
+    }
+
+    public Long extractLoginChannelId(String token) {
+        return extractLongClaim(token, "loginChannelId");
+    }
+
+    public Long extractActorPartyId(String token) {
+        return extractLongClaim(token, "actorPartyId");
+    }
+
+    public Long extractPartyMembershipId(String token) {
+        return extractLongClaim(token, "partyMembershipId");
+    }
+
+    public String extractExecutionScope(String token) {
+        return extractStringClaim(token, "executionScope");
+    }
+
+    public String extractSessionStage(String token) {
+        return extractStringClaim(token, "sessionStage");
+    }
+
+    public long extractContextVersion(String token) {
+        Long value = extractLongClaim(token, "cv");
+        return value == null ? 1 : value;
+    }
+
+    private Long extractLongClaim(String token, String name) {
+        return extractClaim(token, claims -> {
+            Object value = claims.get(name);
+            return value == null ? null : Long.valueOf(value.toString());
+        });
+    }
+
+    private String extractStringClaim(String token, String name) {
+        return extractClaim(token, claims -> {
+            Object value = claims.get(name);
+            return value == null ? null : value.toString();
+        });
+    }
+
     /**
      * Extract security version from token. Returns 0 if not present (backward compatible).
      */
@@ -270,16 +314,45 @@ public class JwtUtil {
     }
 
     public String generateTokenWithTenantId(UserDetails userDetails, String userPid, Long tenantId, Long memberId, int securityVersion) {
+        return generateTokenWithContext(
+                userDetails,
+                userPid,
+                SessionTokenContext.tenant(tenantId, memberId, securityVersion));
+    }
+
+    public String generateTokenWithContext(
+            UserDetails userDetails,
+            String userPid,
+            SessionTokenContext context) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("name", userDetails.getUsername());
-        if (tenantId != null) {
-            claims.put("tenantId", tenantId);
+        if (context.tenantId() != null) {
+            claims.put("tenantId", context.tenantId());
         }
-        if (memberId != null) {
-            claims.put("memberId", memberId);
+        if (context.memberId() != null) {
+            claims.put("memberId", context.memberId());
         }
-        if (securityVersion > 0) {
-            claims.put("sv", securityVersion);
+        if (context.applicationId() != null) {
+            claims.put("applicationId", context.applicationId());
+        }
+        if (context.loginChannelId() != null) {
+            claims.put("loginChannelId", context.loginChannelId());
+        }
+        if (context.executionScope() != null) {
+            claims.put("executionScope", context.executionScope().getCode());
+        }
+        if (context.actorPartyId() != null) {
+            claims.put("actorPartyId", context.actorPartyId());
+        }
+        if (context.partyMembershipId() != null) {
+            claims.put("partyMembershipId", context.partyMembershipId());
+        }
+        if (context.sessionStage() != null) {
+            claims.put("sessionStage", context.sessionStage().getCode());
+        }
+        claims.put("cv", Math.max(1, context.contextVersion()));
+        if (context.securityVersion() > 0) {
+            claims.put("sv", context.securityVersion());
         }
         return createToken(claims, userPid);
     }

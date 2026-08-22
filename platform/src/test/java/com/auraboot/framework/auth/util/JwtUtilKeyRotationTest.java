@@ -1,6 +1,9 @@
 package com.auraboot.framework.auth.util;
 
 import com.auraboot.framework.auth.dto.CustomUserDetails;
+import com.auraboot.framework.auth.dto.SessionTokenContext;
+import com.auraboot.framework.auth.constant.ExecutionScope;
+import com.auraboot.framework.auth.constant.SessionStage;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
@@ -63,6 +66,28 @@ class JwtUtilKeyRotationTest {
         assertThat(util.validateToken(token, user)).isTrue();
         assertThat(util.extractUserPid(token)).isEqualTo("pid-1");
         assertThat(util.extractTenantId(token)).isEqualTo(1L);
+    }
+
+    @Test
+    void actorContextClaimsRoundTripIndependentlyFromSecurityVersion() {
+        JwtUtil util = createUtil(SECRET_A, KID_A, null, null);
+        CustomUserDetails user = mockUser("pid-actor");
+        SessionTokenContext context = new SessionTokenContext(
+                11L, 12L, 13L, 14L, ExecutionScope.PARTY,
+                15L, 16L, SessionStage.READY, 7L, 3);
+
+        String token = util.generateTokenWithContext(user, "pid-actor", context);
+
+        assertThat(util.extractTenantId(token)).isEqualTo(11L);
+        assertThat(util.extractMemberId(token)).isEqualTo(12L);
+        assertThat(util.extractApplicationId(token)).isEqualTo(13L);
+        assertThat(util.extractLoginChannelId(token)).isEqualTo(14L);
+        assertThat(util.extractExecutionScope(token)).isEqualTo("party");
+        assertThat(util.extractActorPartyId(token)).isEqualTo(15L);
+        assertThat(util.extractPartyMembershipId(token)).isEqualTo(16L);
+        assertThat(util.extractSessionStage(token)).isEqualTo("ready");
+        assertThat(util.extractContextVersion(token)).isEqualTo(7L);
+        assertThat(util.extractSecurityVersion(token)).isEqualTo(3);
     }
 
     // --- Dual-key rotation: old tokens still verify ---

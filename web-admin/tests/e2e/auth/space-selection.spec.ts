@@ -23,7 +23,6 @@ import { BACKEND_URL } from '../../helpers/environments';
 const ADMIN = DEFAULT_TEST_ACCOUNT;
 
 test.describe('Space Selection API', () => {
-
   test('my-spaces API returns platform + business spaces', async ({ page }) => {
     // Login to get token
     const loginRes = await page.request.post('/api/auth/login', {
@@ -157,7 +156,13 @@ test.describe('Tenant Switch in Avatar Menu', () => {
     }
   });
 
-  test('avatar menu shows tenant list and platform console', async ({ page }) => {
+  test('avatar menu respects deployment mode and shows platform console', async ({ page }) => {
+    const accessPolicyResponse = await page.request.get('/api/auth/access-policy');
+    expect(accessPolicyResponse.ok()).toBeTruthy();
+    const accessPolicy = (await accessPolicyResponse.json()).data as {
+      deploymentMode: 'single' | 'multi' | 'hybrid';
+    };
+
     await page.goto('/', { waitUntil: 'load' });
 
     // Wait for React hydration — avatar button must be interactive, and the
@@ -188,8 +193,15 @@ test.describe('Tenant Switch in Avatar Menu', () => {
     // Should show user email
     await expect(dropdown.locator('text=admin@auraboot.com')).toBeVisible();
 
-    // Should show workspace section with at least one tenant
-    await expect(dropdown.locator('button[data-testid^="tenant-switch-"]').first()).toBeVisible();
+    const tenantSwitches = dropdown.locator('button[data-testid^="tenant-switch-"]');
+    if (accessPolicy.deploymentMode === 'single') {
+      // SINGLE keeps tenant isolation internally but removes business-tenant
+      // selection from the product surface. Party actors are the business context.
+      await expect(tenantSwitches).toHaveCount(0);
+    } else {
+      // MULTI/HYBRID must retain the existing workspace switcher.
+      await expect(tenantSwitches.first()).toBeVisible();
+    }
 
     // Platform Console should be visible for admin user
     const platformConsole = page.locator('[data-testid="platform-console-link"]');

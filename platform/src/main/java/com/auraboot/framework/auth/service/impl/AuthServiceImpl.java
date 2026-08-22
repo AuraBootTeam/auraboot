@@ -5,17 +5,14 @@ import com.auraboot.framework.auth.dto.AuthenticationRequest;
 import com.auraboot.framework.auth.dto.AuthenticationResponse;
 import com.auraboot.framework.auth.dto.RegisterRequest;
 import com.auraboot.framework.auth.service.AuthService;
-import com.auraboot.framework.auth.service.SessionManagementService;
+import com.auraboot.framework.auth.service.UserAdmissionService;
 import com.auraboot.framework.auth.strategy.AuthStrategy;
 import com.auraboot.framework.auth.strategy.LoginCompletionHelper;
-import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.exception.UserException;
 import com.auraboot.framework.user.service.UserService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -39,21 +36,18 @@ public class AuthServiceImpl implements AuthService {
 
     private final Map<String, AuthStrategy> strategyMap;
     private final UserService userService;
-    private final JwtUtil jwtUtil;
-    private final UserDetailsService userDetailsService;
-    private final SessionManagementService sessionManagementService;
+    private final UserAdmissionService userAdmissionService;
+    private final LoginCompletionHelper loginCompletionHelper;
 
     public AuthServiceImpl(List<AuthStrategy> strategies,
                            UserService userService,
-                           JwtUtil jwtUtil,
-                           UserDetailsService userDetailsService,
-                           SessionManagementService sessionManagementService) {
+                           UserAdmissionService userAdmissionService,
+                           LoginCompletionHelper loginCompletionHelper) {
         this.strategyMap = strategies.stream()
                 .collect(Collectors.toMap(AuthStrategy::getChannelCode, Function.identity()));
         this.userService = userService;
-        this.jwtUtil = jwtUtil;
-        this.userDetailsService = userDetailsService;
-        this.sessionManagementService = sessionManagementService;
+        this.userAdmissionService = userAdmissionService;
+        this.loginCompletionHelper = loginCompletionHelper;
 
         log.info("Registered {} auth strategies: {}", strategyMap.size(), strategyMap.keySet());
     }
@@ -91,13 +85,9 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthenticationResponse register(RegisterRequest request) throws UserException {
+        userAdmissionService.assertSelfRegistrationAllowed();
         User user = userService.signUp(request.getEmail(), request.getPassword(), request.getDisplayName());
-        final UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
-        final String jwt = jwtUtil.generateTokenWithTenantId(userDetails, user.getPid().toString(), null);
-
-        // Register server-side session so the JWT passes session validation
-        sessionManagementService.createSession(user.getId(), jwt, null, null);
-
-        return new AuthenticationResponse(jwt, user.getId(), user.getPid(), user.getNickName());
+        userAdmissionService.admitSelfRegisteredUser(user);
+        return loginCompletionHelper.completeLogin(user, null, null);
     }
 }

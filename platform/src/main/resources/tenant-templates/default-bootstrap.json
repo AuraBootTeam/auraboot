@@ -5,6 +5,26 @@
   "description": "默认租户初始化模板，包含标准的角色、菜单和权限配置",
   "permissions": [
     {
+      "code": "party.party.read",
+      "name": "业务参与方查看",
+      "description": "查看本租户内的业务参与方与可选 Actor",
+      "type": "function",
+      "module": "party",
+      "resource": "/api/actors",
+      "action": "read",
+      "resourceType": "function"
+    },
+    {
+      "code": "party.party.manage",
+      "name": "业务参与方管理",
+      "description": "审批并管理本租户内的业务参与方",
+      "type": "function",
+      "module": "party",
+      "resource": "/api/actors/parties",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
       "code": "page.page.read",
       "name": "页面配置读取",
       "description": "读取和查看页面配置（Schema）",
@@ -1814,6 +1834,7 @@
       "permissionCodes": [
         "meta.model.read",
         "page.page.read",
+        "party.party.read",
         "dashboard.saved_view.read",
         "bpm.process.read",
         "notification.view"

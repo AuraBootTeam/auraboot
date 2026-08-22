@@ -20,12 +20,12 @@ import { useRootLoaderData } from '~/root-data';
 import { COMMUNITY_BRANDING, resolveBrandDisplayName } from '~/config/branding';
 import IcpComplianceFooter from './IcpComplianceFooter';
 import { getLoginFailureActionData } from './login-errors';
+import { fetchAccessPolicy, isPublicRegistrationOpen } from '~/services/accessPolicy';
+import { loginOAuthStateKey } from './oauth-state';
 
 const REMEMBER_KEY = 'auth.remember';
 const REMEMBER_EMAIL_KEY = 'auth.rememberedEmail';
 const REMEMBER_PWD_KEY = 'auth.rememberedPwd';
-const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';
-
 const CHANNEL_I18N_KEYS: Record<string, string> = {
   EMAIL_PASSWORD: 'auth.channel.emailPassword',
   email_password: 'auth.channel.emailPassword',
@@ -35,7 +35,6 @@ const CHANNEL_I18N_KEYS: Record<string, string> = {
   email_code: 'auth.channel.emailCode',
 };
 
-const SOCIAL_CHANNELS = ['wechat', 'google', 'apple', 'oidc'] as const;
 const SOCIAL_I18N_KEYS: Record<string, string> = {
   wechat: 'auth.social.wechat',
   google: 'auth.social.google',
@@ -43,7 +42,28 @@ const SOCIAL_I18N_KEYS: Record<string, string> = {
   oidc: 'auth.social.oidc',
 };
 
+interface LoginChannelOption {
+  code: string;
+  kind: 'password' | 'otp' | 'oauth' | 'ldap';
+  displayName: string;
+  providerType: string | null;
+}
+
+const legacyLoginChannelOption = (rawCode: string): LoginChannelOption => {
+  const code = String(rawCode || '').toLowerCase();
+  const kind: LoginChannelOption['kind'] =
+    code === 'email_password' || code === 'password'
+      ? 'password'
+      : code === 'sms' || code === 'email_code'
+        ? 'otp'
+        : code === 'ldap'
+          ? 'ldap'
+          : 'oauth';
+  return { code, kind, displayName: rawCode, providerType: null };
+};
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const accessPolicy = await fetchAccessPolicy();
   const token = await getTokenFromRequest(request);
   if (token) {
     const { user } = await getUserInfo(request);
@@ -52,7 +72,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
     const session = await sessionStorage.getSession(request.headers.get('Cookie'));
     return data(
-      { channels: ['email_password'] },
+      { channels: ['email_password'], accessPolicy },
       {
         headers: {
           'Set-Cookie': await sessionStorage.destroySession(session),
@@ -62,17 +82,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   // Fetch available login channels (public endpoint)
-  let channels: string[] = ['email_password'];
+  let channelOptions: LoginChannelOption[] = [legacyLoginChannelOption('email_password')];
   try {
-    const result = await fetchResult<string[]>('/api/auth/login/channels', {}, request);
+    const result = await fetchResult<LoginChannelOption[]>(
+      '/api/auth/login/channel-options',
+      {},
+      request,
+    );
     if (ResultHelper.isSuccess(result) && Array.isArray(result.data) && result.data.length > 0) {
-      channels = result.data;
+      channelOptions = result.data;
+    } else {
+      const legacyResult = await fetchResult<string[]>('/api/auth/login/channels', {}, request);
+      if (
+        ResultHelper.isSuccess(legacyResult) &&
+        Array.isArray(legacyResult.data) &&
+        legacyResult.data.length > 0
+      ) {
+        channelOptions = legacyResult.data.map(legacyLoginChannelOption);
+      }
     }
   } catch {
-    // fallback to email/password only
+    // Fall back to email/password when the backend predates channel descriptors.
   }
 
-  return { channels };
+  return { channelOptions, accessPolicy };
 };
 
 function isMobileDevice(userAgent: string): boolean {
@@ -99,6 +132,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const channelCode = (formData.get('channelCode') as string) || 'email_password';
+  const authKind = formData.get('authKind') as string | null;
   const redirectTo = safeRedirect(formData.get('redirectTo'), '/');
   const remember = formData.get('remember');
 
@@ -108,6 +142,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return handleSmsLogin(formData, request, redirectTo, remember === 'on');
   } else if (channelCode === 'email_code') {
     return handleEmailCodeLogin(formData, request, redirectTo, remember === 'on');
+  } else if (authKind === 'ldap') {
+    return handleLdapLogin(formData, request, redirectTo, remember === 'on');
   }
 
   return data({ errors: { general: 'Unsupported login method' } }, { status: 400 });
@@ -139,6 +175,47 @@ function extractCodeLoginError(result: unknown, fallback: string): string {
     return response.message.trim();
   }
   return fallback;
+}
+
+async function handleLdapLogin(
+  formData: FormData,
+  request: Request,
+  redirectTo: string,
+  remember: boolean,
+) {
+  const username = String(formData.get('username') || '').trim();
+  const password = String(formData.get('password') || '');
+  const provider = String(formData.get('channelCode') || 'ldap')
+    .trim()
+    .toLowerCase();
+  if (!username || !password) {
+    return data(
+      { channelCode: provider, errors: { general: 'auth.error.invalidCredentials' } },
+      { status: 400 },
+    );
+  }
+  const result = await post<User>(
+    '/api/auth/login/ldap',
+    {
+      username,
+      password,
+      provider,
+      application: 'business-web',
+      channel: 'default-business-web',
+    },
+    {},
+    request,
+  );
+  if (!ResultHelper.isSuccess(result)) {
+    return data(
+      {
+        channelCode: provider,
+        errors: { general: extractBusinessLoginError(result) ?? 'auth.error.invalidCredentials' },
+      },
+      { status: 400 },
+    );
+  }
+  return completeLogin(result.data as User, request, redirectTo, remember);
 }
 
 /**
@@ -337,11 +414,17 @@ export default function LoginPage() {
   const actionData = useActionData<typeof action>();
   const visibleActionData = actionData ?? getLoginFailureActionData(searchParams);
   const loaderData = useLoaderData<typeof loader>();
-  const rawChannels = Array.isArray((loaderData as any)?.channels)
-    ? ((loaderData as any).channels as unknown[])
-    : ['email_password'];
-  const channels: string[] = Array.from(
-    new Set(rawChannels.map((channel) => String(channel || '').toLowerCase()).filter(Boolean)),
+  const registrationOpen = isPublicRegistrationOpen(loaderData.accessPolicy);
+  const rawOptions = Array.isArray((loaderData as any)?.channelOptions)
+    ? ((loaderData as any).channelOptions as LoginChannelOption[])
+    : [legacyLoginChannelOption('email_password')];
+  const channelOptions = Array.from(
+    new Map(
+      rawOptions
+        .map((option) => ({ ...option, code: String(option.code || '').toLowerCase() }))
+        .filter((option) => option.code)
+        .map((option) => [option.code, option]),
+    ).values(),
   );
   const actionChannel =
     typeof (visibleActionData as any)?.channelCode === 'string'
@@ -357,13 +440,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
 
   // Determine which tab channels and social channels are available
-  const tabChannels = channels.filter((c: string) => !SOCIAL_CHANNELS.includes(c as any));
-  const socialChannels = channels.filter((c: string) => SOCIAL_CHANNELS.includes(c as any));
+  const tabOptions = channelOptions.filter((option) => option.kind !== 'oauth');
+  const socialOptions = channelOptions.filter((option) => option.kind === 'oauth');
+  const tabChannels = tabOptions.map((option) => option.code);
   const preferredTab =
     actionChannel && tabChannels.includes(actionChannel)
       ? actionChannel
       : tabChannels[0] || 'email_password';
   const [activeTab, setActiveTab] = useState<string>(preferredTab);
+  const activeOption = tabOptions.find((option) => option.code === activeTab);
 
   useEffect(() => {
     if (actionChannel && tabChannels.includes(actionChannel)) {
@@ -501,8 +586,10 @@ export default function LoginPage() {
     },
   ];
 
-  const oidcChannel = socialChannels.find((c: string) => c === 'oidc');
-  const iconSocialChannels = socialChannels.filter((c: string) => c !== 'oidc');
+  const oidcOption = socialOptions.find(
+    (option) => option.code === 'oidc' || option.providerType?.toLowerCase() === 'oidc',
+  );
+  const iconSocialOptions = socialOptions.filter((option) => option !== oidcOption);
 
   const card = (
     <div className="w-full max-w-[404px]">
@@ -547,7 +634,9 @@ export default function LoginPage() {
                   : 'text-[#8A8694] hover:text-[#54505E] dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
-              {t(CHANNEL_I18N_KEYS[ch] || ch)}
+              {CHANNEL_I18N_KEYS[ch]
+                ? t(CHANNEL_I18N_KEYS[ch])
+                : tabOptions.find((option) => option.code === ch)?.displayName || ch}
             </button>
           ))}
         </div>
@@ -590,9 +679,19 @@ export default function LoginPage() {
           t={t}
         />
       )}
+      {activeOption?.kind === 'ldap' && (
+        <LdapLoginForm
+          provider={activeOption.code}
+          actionData={visibleActionData}
+          redirectTo={redirectTo}
+          remember={remember}
+          setRemember={setRemember}
+          t={t}
+        />
+      )}
 
       {/* Social / SSO login (conditional) */}
-      {socialChannels.length > 0 && (
+      {socialOptions.length > 0 && (
         <div className="mt-6">
           <div className="flex items-center gap-3.5 text-[12.5px] text-[#B4B0BE] dark:text-gray-500">
             <span className="h-px flex-1 bg-[#E8E6EF] dark:bg-gray-700" />
@@ -600,11 +699,11 @@ export default function LoginPage() {
             <span className="h-px flex-1 bg-[#E8E6EF] dark:bg-gray-700" />
           </div>
 
-          {oidcChannel && (
+          {oidcOption && (
             <button
               type="button"
               data-testid="login-sso-oidc"
-              onClick={() => startSocialLogin('oidc')}
+              onClick={() => startSocialLogin(oidcOption.code)}
               className="mt-5 flex h-[50px] w-full items-center justify-center gap-2.5 rounded-[13px] border-[1.5px] border-[#E4E2EC] bg-white text-[14.5px] font-semibold text-[#54505E] transition hover:border-[#CFCCDA] hover:bg-[#FAFAFD] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             >
               <svg
@@ -620,21 +719,23 @@ export default function LoginPage() {
                 />
                 <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              {t('auth.ssoLogin', undefined, '使用企业 SSO 登录')}
+              {oidcOption.code === 'oidc'
+                ? t('auth.ssoLogin', undefined, '使用企业 SSO 登录')
+                : oidcOption.displayName || oidcOption.code}
             </button>
           )}
 
-          {iconSocialChannels.length > 0 && (
+          {iconSocialOptions.length > 0 && (
             <div className="mt-3 flex justify-center gap-2.5">
-              {iconSocialChannels.map((ch: string) => (
-                <SocialLoginButton key={ch} provider={ch} />
+              {iconSocialOptions.map((option) => (
+                <SocialLoginButton key={option.code} option={option} />
               ))}
             </div>
           )}
         </div>
       )}
 
-      {PUBLIC_REGISTRATION_ENABLED && (
+      {registrationOpen && (
         <div className="mt-7 text-center text-[14px] text-[#8A8694] dark:text-gray-400">
           {t('auth.noAccount') || 'No account yet?'}{' '}
           <Link
@@ -771,11 +872,12 @@ const SECONDARY_BTN_CLS =
 async function startSocialLogin(provider: string) {
   try {
     const redirectUri = `${window.location.origin}/login/social/${provider.toLowerCase()}/callback`;
-    const result = await fetchResult<{ authorizeUrl: string }>(
+    const result = await fetchResult<{ authorizeUrl: string; state: string }>(
       `/api/auth/login/social/${provider.toLowerCase()}`,
       { method: 'get', params: { redirectUri } },
     );
-    if (ResultHelper.isSuccess(result) && result.data?.authorizeUrl) {
+    if (ResultHelper.isSuccess(result) && result.data?.authorizeUrl && result.data.state) {
+      window.sessionStorage.setItem(loginOAuthStateKey(provider), result.data.state);
       window.location.href = result.data.authorizeUrl;
     }
   } catch {
@@ -983,6 +1085,72 @@ function EmailPasswordForm({
 
       <button type="submit" className={SUBMIT_CLS}>
         {t('auth.loginNow') || 'Sign In'}
+      </button>
+    </Form>
+  );
+}
+
+function LdapLoginForm({
+  provider,
+  actionData,
+  redirectTo,
+  remember,
+  setRemember,
+  t,
+}: {
+  provider: string;
+  actionData: any;
+  redirectTo: string;
+  remember: boolean;
+  setRemember: (value: boolean) => void;
+  t: (key: string, params?: Record<string, any>, fallback?: string) => string;
+}) {
+  return (
+    <Form method="post" action="/login" reloadDocument className="space-y-5">
+      <input type="hidden" name="channelCode" value={provider} />
+      <input type="hidden" name="authKind" value="ldap" />
+      <input type="hidden" name="redirectTo" value={redirectTo} />
+      {actionData?.errors?.general && <ErrorBanner message={actionData.errors.general} t={t} />}
+      <div>
+        <label htmlFor={`ldap-username-${provider}`} className={LABEL_CLS}>
+          {t('auth.identifier', undefined, '用户名')}
+        </label>
+        <input
+          id={`ldap-username-${provider}`}
+          name="username"
+          type="text"
+          required
+          autoComplete="username"
+          className={INPUT_CLS}
+          placeholder={t('auth.identifierPlaceholder', undefined, '输入目录账号')}
+        />
+      </div>
+      <div>
+        <label htmlFor={`ldap-password-${provider}`} className={LABEL_CLS}>
+          {t('auth.password', undefined, '密码')}
+        </label>
+        <input
+          id={`ldap-password-${provider}`}
+          name="password"
+          type="password"
+          required
+          autoComplete="current-password"
+          className={INPUT_CLS}
+          placeholder={t('auth.passwordPlaceholder', undefined, '••••••••')}
+        />
+      </div>
+      <label className="inline-flex cursor-pointer items-center gap-2.5 text-[14px] text-[#54505E] select-none dark:text-gray-400">
+        <input
+          name="remember"
+          type="checkbox"
+          checked={remember}
+          onChange={(event) => setRemember(event.target.checked)}
+          className="h-[18px] w-[18px] rounded-[6px] border-[1.5px] border-[#CFCCDA] text-[#4B3FE4] focus:ring-[#4B3FE4] dark:border-gray-600"
+        />
+        {t('auth.rememberMe', undefined, '记住我')}
+      </label>
+      <button type="submit" className={SUBMIT_CLS}>
+        {t('auth.loginNow', undefined, '登录')}
       </button>
     </Form>
   );
@@ -1255,8 +1423,9 @@ function EmailCodeLoginForm({
   );
 }
 
-function SocialLoginButton({ provider }: { provider: string }) {
+function SocialLoginButton({ option }: { option: LoginChannelOption }) {
   const { t } = useI18n();
+  const provider = option.code;
   const handleClick = useCallback(() => startSocialLogin(provider), [provider]);
 
   const icons: Record<string, React.ReactNode> = {
@@ -1304,7 +1473,11 @@ function SocialLoginButton({ provider }: { provider: string }) {
     ),
   };
 
-  const title = SOCIAL_I18N_KEYS[provider] ? t(SOCIAL_I18N_KEYS[provider]) : provider;
+  const normalizedCode = provider.toLowerCase();
+  const normalizedType = option.providerType?.toLowerCase() || '';
+  const knownLabelKey = SOCIAL_I18N_KEYS[normalizedCode];
+  const title = knownLabelKey ? t(knownLabelKey) : option.displayName || provider;
+  const icon = icons[normalizedCode] || icons[normalizedType];
 
   return (
     <button
@@ -1314,9 +1487,7 @@ function SocialLoginButton({ provider }: { provider: string }) {
       title={title || provider}
       aria-label={title || provider}
     >
-      {icons[provider.toLowerCase()] || (
-        <span className="text-[10px] font-bold uppercase">{provider.substring(0, 2)}</span>
-      )}
+      {icon || <span className="text-[10px] font-bold uppercase">{provider.substring(0, 2)}</span>}
     </button>
   );
 }

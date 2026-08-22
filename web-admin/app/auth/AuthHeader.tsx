@@ -7,14 +7,14 @@ import { useHydrated } from '~/hooks/useHydrated';
 import { useAuth } from '~/contexts/AuthContext';
 import { useRootLoaderData } from '~/root-data';
 import { COMMUNITY_BRANDING, resolveBrandDisplayName } from '~/config/branding';
-
-const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';
+import { isPublicRegistrationOpen } from '~/services/accessPolicy';
 
 export default function AuthHeader() {
   const rootData = useRootLoaderData();
   const compliance = rootData!.icpCompliance;
   const branding = rootData?.branding ?? COMMUNITY_BRANDING;
   const displayName = resolveBrandDisplayName(branding, compliance);
+  const registrationOpen = isPublicRegistrationOpen(rootData!.accessPolicy);
   const { theme, setTheme, isDark } = useTheme();
   const { t, locale, setLocale } = useI18n();
   const isHydrated = useHydrated();
@@ -166,7 +166,7 @@ export default function AuthHeader() {
                 >
                   {t('auth.login') || '登录'}
                 </Link>
-                {PUBLIC_REGISTRATION_ENABLED && (
+                {registrationOpen && (
                   <Link
                     to="/signup"
                     className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"

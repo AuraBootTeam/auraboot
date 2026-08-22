@@ -59,6 +59,7 @@ import { DslRegistryProvider } from '~/contexts/DslRegistryContext';
 import { AuraBotProvider } from '~/plugins/core-aurabot/components-shell';
 import { QueryProvider } from '~/providers/QueryProvider';
 import { fetchBootstrapStatus } from '~/services/bootstrapStatus';
+import { fetchAccessPolicy } from '~/services/accessPolicy';
 import { BootstrapBanner } from '~/components/BootstrapBanner';
 import { BootstrapNotReady } from '~/components/BootstrapNotReady';
 import { AuthSessionRevalidator } from '~/components/AuthSessionRevalidator';
@@ -120,6 +121,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
 
   // Bootstrap status: never redirect; inject into loader data so the banner can render
   const bootstrapStatus = await fetchBootstrapStatus();
+  const accessPolicy = await fetchAccessPolicy();
   const token = await getTokenFromRequest(request);
 
   // Public runtime shells must never load admin user, permissions, or menus.
@@ -157,6 +159,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
       icpCompliance,
       branding,
       buildIdentity,
+      accessPolicy,
     };
     ssrLoaderCache.set(cacheKey, result);
     return result;
@@ -233,6 +236,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     icpCompliance,
     branding,
     buildIdentity,
+    accessPolicy,
   };
 }
 

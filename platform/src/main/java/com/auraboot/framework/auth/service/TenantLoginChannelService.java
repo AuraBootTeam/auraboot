@@ -1,6 +1,7 @@
 package com.auraboot.framework.auth.service;
 
 import com.auraboot.framework.auth.dto.ChannelUpdateRequest;
+import com.auraboot.framework.auth.dto.LoginChannelOption;
 import com.auraboot.framework.auth.entity.TenantLoginChannel;
 
 import java.util.List;
@@ -23,6 +24,33 @@ public interface TenantLoginChannelService {
      * @return sorted list of enabled channel codes
      */
     List<String> getEnabledChannels(Long tenantId);
+
+    /** Resolve auth methods from the application/channel registry, with legacy tenant toggles as fallback. */
+    default List<String> getEnabledChannels(Long tenantId, String applicationCode, String channelCode) {
+        return getEnabledChannels(tenantId);
+    }
+
+    /**
+     * Resolve enabled methods together with the minimum routing metadata required by login clients.
+     * Implementations must never include provider configuration or secret references.
+     */
+    default List<LoginChannelOption> getEnabledChannelOptions(
+            Long tenantId, String applicationCode, String channelCode) {
+        return getEnabledChannels(tenantId, applicationCode, channelCode).stream()
+                .map(TenantLoginChannelService::legacyOption)
+                .toList();
+    }
+
+    private static LoginChannelOption legacyOption(String rawCode) {
+        String code = rawCode == null ? "" : rawCode.toLowerCase();
+        String kind = switch (code) {
+            case "email_password", "password" -> "password";
+            case "sms", "email_code" -> "otp";
+            case "ldap" -> "ldap";
+            default -> "oauth";
+        };
+        return new LoginChannelOption(code, kind, rawCode, null);
+    }
 
     /**
      * List all channel configurations for a tenant (enabled and disabled).

@@ -9,6 +9,7 @@ import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.saas.config.service.SystemModeService;
+import com.auraboot.framework.party.service.PartyAuthorizationService;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
@@ -56,6 +57,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Autowired(required = false)
     private TenantMemberService tenantMemberService;
+
+    @Autowired(required = false)
+    private PartyAuthorizationService partyAuthorizationService;
 
     @Autowired
     private com.auraboot.framework.rbac.service.UserRoleService userRoleService;
@@ -173,6 +177,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
 
                 Long memberId = jwtUtil.extractMemberId(jwt);
+                String executionScope = jwtUtil.extractExecutionScope(jwt);
+                Long actorPartyId = positiveOrNull(jwtUtil.extractActorPartyId(jwt));
+                Long partyMembershipId = positiveOrNull(jwtUtil.extractPartyMembershipId(jwt));
+                String sessionStage = jwtUtil.extractSessionStage(jwt);
+                long contextVersion = jwtUtil.extractContextVersion(jwt);
+                if (isRestrictedStage(sessionStage)
+                        && !isAllowedForRestrictedStage(request.getRequestURI())) {
+                    ApiResponse<?> apiResponse = ApiResponse.errorWithContext(
+                            ResponseCode.FORBIDDEN, request.getRequestURI());
+                    reject(request, response, apiResponse);
+                    return;
+                }
                 java.util.Set<Long> roleIds = java.util.Set.of();
                 if (memberId != null && tenantId != null) {
                     try {
@@ -188,11 +204,60 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     }
                 }
 
+                if ("party".equals(executionScope)) {
+                    if (!"ready".equals(sessionStage) || partyAuthorizationService == null) {
+                        ApiResponse<?> apiResponse = ApiResponse.errorWithContext(
+                                ResponseCode.FORBIDDEN, request.getRequestURI());
+                        reject(request, response, apiResponse);
+                        return;
+                    }
+                    // Party tables deliberately remain behind TenantLineInterceptor. Install the
+                    // verified JWT tenant/member context before revalidating the Party membership,
+                    // otherwise the interceptor sees no current tenant and fail-closes the lookup.
+                    // This provisional context is replaced with the final role/session context below;
+                    // rejection paths must clear it before returning to avoid a pooled-thread leak.
+                    MetaContext.setContext(tenantId, userDetails.getUserId(), userPid,
+                                           userDetails.getUsername(), roleIds);
+                    if (memberId != null) {
+                        MetaContext.setMemberId(memberId);
+                    }
+                    try {
+                        java.util.Set<Long> partyRoleIds = partyAuthorizationService.resolveActivePartyRoleIds(
+                                tenantId, memberId, actorPartyId, partyMembershipId);
+                        if (!partyRoleIds.isEmpty()) {
+                            java.util.Set<Long> effectiveRoleIds = new java.util.HashSet<>(roleIds);
+                            effectiveRoleIds.addAll(partyRoleIds);
+                            roleIds = java.util.Set.copyOf(effectiveRoleIds);
+                        }
+                    } catch (RuntimeException e) {
+                        log.warn("Rejected stale Party Actor context: tenant={}, member={}, party={}, membership={}",
+                                tenantId, memberId, actorPartyId, partyMembershipId);
+                        MetaContext.clear();
+                        ApiResponse<?> apiResponse = ApiResponse.errorWithContext(
+                                ResponseCode.FORBIDDEN, request.getRequestURI());
+                        reject(request, response, apiResponse);
+                        return;
+                    }
+                } else if (actorPartyId != null || partyMembershipId != null) {
+                    ApiResponse<?> apiResponse = ApiResponse.errorWithContext(
+                            ResponseCode.FORBIDDEN, request.getRequestURI());
+                    reject(request, response, apiResponse);
+                    return;
+                }
+
                 MetaContext.setContext(tenantId, userDetails.getUserId(), userPid,
                                        userDetails.getUsername(), roleIds);
                 if (memberId != null) {
                     MetaContext.setMemberId(memberId);
                 }
+                MetaContext.setSessionContext(
+                        jwtUtil.extractApplicationId(jwt),
+                        jwtUtil.extractLoginChannelId(jwt),
+                        executionScope,
+                        actorPartyId,
+                        partyMembershipId,
+                        sessionStage,
+                        contextVersion);
 
                 // Surface tenant/user in every log line for this request (log pattern reads
                 // %X{tenantId}/%X{userId}). Cleared in the finally below so a pooled thread
@@ -294,5 +359,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private boolean isDevOrTestProfile() {
         return activeProfile != null && (activeProfile.contains("dev") || activeProfile.contains("local")
                 || activeProfile.contains("test") || activeProfile.contains("integration-test"));
+    }
+
+    private boolean isRestrictedStage(String sessionStage) {
+        return "onboarding".equals(sessionStage) || "actor_selection".equals(sessionStage);
+    }
+
+    private Long positiveOrNull(Long value) {
+        return value != null && value > 0 ? value : null;
+    }
+
+    private boolean isAllowedForRestrictedStage(String path) {
+        return "/api/auth/me".equals(path)
+                || path.startsWith("/api/tenant-selection")
+                || path.startsWith("/api/actors")
+                || path.startsWith("/api/user/sessions")
+                || path.startsWith("/api/auth/logout");
     }
 }
