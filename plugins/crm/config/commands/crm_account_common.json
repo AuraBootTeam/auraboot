@@ -23,10 +23,14 @@
       "crm_acc_owner": {
         "strategy": "current_user_pid"
       },
-      "crm_acc_status": {
-        "strategy": "default_value",
-        "value": "active"
-      }
+    "crm_acc_status": {
+      "strategy": "default_value",
+      "value": "active"
+    },
+    "crm_acc_pool_state": {
+      "strategy": "fixed_value",
+      "value": "owned"
+    }
     },
     "permissions": [
       "crm.account.manage"

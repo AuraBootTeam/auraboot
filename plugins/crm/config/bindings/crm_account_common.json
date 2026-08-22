@@ -117,5 +117,39 @@
     "displayConfig": {
       "sortable": true
     }
+  },
+  {
+    "modelCode": "crm_account_common",
+    "fieldCode": "crm_acc_pool_state",
+    "sequence": 13,
+    "required": true,
+    "visible": true,
+    "editable": false,
+    "displayConfig": { "searchable": true }
+  },
+  {
+    "modelCode": "crm_account_common",
+    "fieldCode": "crm_acc_last_pool_id",
+    "sequence": 14,
+    "required": false,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_account_common",
+    "fieldCode": "crm_acc_claimed_at",
+    "sequence": 15,
+    "required": false,
+    "visible": false,
+    "editable": false
+  },
+  {
+    "modelCode": "crm_account_common",
+    "fieldCode": "crm_acc_last_activity_at",
+    "sequence": 16,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": { "sortable": true }
   }
 ]

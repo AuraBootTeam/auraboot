@@ -1,0 +1,11 @@
+[
+  { "code": "crm_coh_customer_id", "displayName:zh-CN": "客户", "displayName:en": "Customer", "dataType": "reference", "referenceModelCode": "crm_account_common", "constraints": { "required": true }, "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_coh_pool_id", "displayName:zh-CN": "客户公海", "displayName:en": "Customer Pool", "dataType": "reference", "referenceModelCode": "crm_customer_pool_common", "constraints": { "required": true }, "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_coh_event", "displayName:zh-CN": "归属事件", "displayName:en": "Ownership Event", "dataType": "enum", "dictCode": "crm_customer_owner_event", "constraints": { "required": true }, "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_coh_previous_owner", "displayName:zh-CN": "前负责人", "displayName:en": "Previous Owner", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } },
+  { "code": "crm_coh_next_owner", "displayName:zh-CN": "新负责人", "displayName:en": "Next Owner", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } },
+  { "code": "crm_coh_actor", "displayName:zh-CN": "操作人", "displayName:en": "Actor", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } },
+  { "code": "crm_coh_reason", "displayName:zh-CN": "原因", "displayName:en": "Reason", "dataType": "text", "feature": { "readonly": true } },
+  { "code": "crm_coh_occurred_at", "displayName:zh-CN": "发生时间", "displayName:en": "Occurred At", "dataType": "datetime", "constraints": { "required": true }, "feature": { "readonly": true, "sortable": true } },
+  { "code": "crm_coh_operation_key", "displayName:zh-CN": "幂等操作键", "displayName:en": "Idempotency Operation Key", "dataType": "string", "constraints": { "unique": true, "maxLength": 80 }, "feature": { "readonly": true } }
+]

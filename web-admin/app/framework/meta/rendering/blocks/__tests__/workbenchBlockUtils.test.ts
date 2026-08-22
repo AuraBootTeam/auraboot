@@ -166,6 +166,30 @@ describe('workbenchBlockUtils action runner', () => {
     expect(runtime.__reload).toHaveBeenCalledWith(['summary', 'lines']);
   });
 
+  it('reloads explicitly configured dependencies after a business command conflict', async () => {
+    fetchResultMock.mockResolvedValueOnce({
+      code: 'CUSTOMER_POOL_CONFLICT',
+      message: 'Business error',
+      context: { detail: 'Pool item already claimed or assigned' },
+    });
+    const runtime = makeRuntime() as any;
+
+    await expect(
+      executeSimpleWorkbenchAction(runtime, {
+        action: 'command.execute',
+        args: {
+          command: 'crm:claim_pool_customer',
+          targetRecordPid: 'POOL-ITEM-1',
+          reload: ['poolStats', 'poolQueue'],
+          reloadOnError: ['poolStats', 'poolQueue'],
+        },
+      }),
+    ).rejects.toThrow(/already claimed or assigned/i);
+
+    expect(runtime.__reload).toHaveBeenCalledOnce();
+    expect(runtime.__reload).toHaveBeenCalledWith(['poolStats', 'poolQueue']);
+  });
+
   it('downloads Base64 command artifacts from the workbench action path', async () => {
     fetchResultMock.mockResolvedValueOnce({
       code: '0',
@@ -180,7 +204,9 @@ describe('workbenchBlockUtils action runner', () => {
     });
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:workbench-artifact');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
 
     await executeSimpleWorkbenchAction(makeRuntime() as any, {
       action: 'command.execute',

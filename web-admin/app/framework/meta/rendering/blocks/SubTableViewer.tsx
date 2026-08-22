@@ -1232,7 +1232,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   return (
     <div
-      className="rounded-card border-border overflow-hidden border"
+      className="rounded-card border-border overflow-x-auto border"
       data-testid="subtable-viewer"
     >
       {/* Cross-row validation errors banner */}
@@ -1277,7 +1277,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
               {effectiveColumns.map((col: EnrichedColumnConfig) => (
                 <th
                   key={col.field}
-                  className={`text-text-2 px-4 py-2.5 text-xs font-medium tracking-wider uppercase ${
+                  className={`text-text-2 px-4 py-2.5 text-xs font-medium tracking-wider whitespace-nowrap uppercase ${
                     col.align === 'right'
                       ? 'text-right'
                       : col.align === 'center'
@@ -1286,7 +1286,10 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                   }`}
                   style={
                     col.width
-                      ? { width: typeof col.width === 'number' ? `${col.width}px` : col.width }
+                      ? {
+                          width: typeof col.width === 'number' ? `${col.width}px` : col.width,
+                          minWidth: typeof col.width === 'number' ? `${col.width}px` : col.width,
+                        }
                       : undefined
                   }
                 >

@@ -19,10 +19,10 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.doesNotMatch(JSON.stringify(committed.run), /auraboot-enterprise/);
 
   assert.equal(committed.axes.semanticActions.length, 26);
-  assert.equal(committed.axes.commands.length, 30);
-  assert.equal(committed.axes.pages.length, 11);
-  assert.equal(committed.axes.permissions.length, 17);
-  assert.equal(committed.axes.queries.length, 31);
+  assert.equal(committed.axes.commands.length, 49);
+  assert.equal(committed.axes.pages.length, 26);
+  assert.equal(committed.axes.permissions.length, 24);
+  assert.equal(committed.axes.queries.length, 39);
   assert.deepEqual(
     committed.untested.map((row) => row.id),
     ['RG3-INDEPENDENT-HUMAN-ADOPTER'],
@@ -44,15 +44,15 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
       'dashboards',
     ],
   );
-  assert.equal(committed.scope.productDenominator.pages, 110);
-  assert.equal(committed.scope.productDenominator.commands, 213);
-  assert.equal(committed.scope.productDenominator.permissions, 102);
-  assert.equal(committed.scope.productDenominator['page-blocks'], 352);
-  assert.equal(committed.scope.productDenominator['page-fields'], 1474);
-  assert.equal(committed.scope.productDenominator['ui-actions'], 517);
-  assert.equal(committed.scope.productDenominator.queries, 47);
-  assert.equal(committed.scope.productVerdicts.pass, 340);
-  assert.equal(committed.scope.productVerdicts.untested, 2605);
+  assert.equal(committed.scope.productDenominator.pages, 125);
+  assert.equal(committed.scope.productDenominator.commands, 238);
+  assert.equal(committed.scope.productDenominator.permissions, 114);
+  assert.equal(committed.scope.productDenominator['page-blocks'], 402);
+  assert.equal(committed.scope.productDenominator['page-fields'], 1707);
+  assert.equal(committed.scope.productDenominator['ui-actions'], 600);
+  assert.equal(committed.scope.productDenominator.queries, 55);
+  assert.equal(committed.scope.productVerdicts.pass, 641);
+  assert.equal(committed.scope.productVerdicts.untested, 2741);
   assert.ok(committed.scope.productVerdicts.untested > 0);
   assert.equal(committed.scope.productVerdicts.gap ?? 0, 0);
   const coreWorkbenchContract = committed.runtimeEvidenceContracts.find(
@@ -117,6 +117,27 @@ test('CRM release manifest derives the complete RG-1 through RG-4 denominator', 
   assert.equal(forecastVarianceContract.expectedCoverage.blocks.length, 4);
   assert.equal(forecastVarianceContract.expectedCoverage.fields.length, 12);
   assert.equal(forecastVarianceContract.expectedCoverage.uiActions.length, 2);
+  const customerPoolContract = committed.runtimeEvidenceContracts.find(
+    (contract) => contract.id === 'CRM-CUSTOMER-POOL',
+  );
+  assert.equal(customerPoolContract.expectedScenarios, 6);
+  assert.equal(customerPoolContract.minimumScreenshots, 15);
+  assert.equal(customerPoolContract.expectedCoverage.pages.length, 15);
+  assert.equal(customerPoolContract.expectedCoverage.commands.length, 19);
+  assert.equal(customerPoolContract.expectedCoverage.permissions.length, 7);
+  assert.equal(customerPoolContract.expectedCoverage.queries.length, 8);
+  assert.equal(customerPoolContract.expectedCoverage.blocks.length, 50);
+  assert.equal(customerPoolContract.expectedCoverage.fields.length, 109);
+  assert.equal(customerPoolContract.expectedCoverage.uiActions.length, 69);
+  assert.deepEqual(Object.keys(customerPoolContract.expectedCoverage).sort(), [
+    'blocks',
+    'commands',
+    'fields',
+    'pages',
+    'permissions',
+    'queries',
+    'uiActions',
+  ]);
   const modelGroup = committed.groups.find((group) => group.id === 'model-surfaces');
   assert.equal(
     modelGroup.rows.find((row) => row.id === 'model:crm_sla_breach')?.verdict,

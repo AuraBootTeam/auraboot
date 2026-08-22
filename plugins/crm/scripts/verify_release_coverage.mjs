@@ -53,6 +53,7 @@ const EVIDENCE = {
   releaseB: 'plugins/crm/e2e/opportunity-efficiency.golden.spec.ts',
   dashboards: 'plugins/crm/e2e/crm-dashboards.golden.spec.ts',
   forecastVariance: 'plugins/crm/e2e/forecast-variance.golden.spec.ts',
+  customerPool: 'web-admin/tests/e2e/crm/crm-customer-pool-parity.spec.ts',
 };
 
 // Executable denominator owned by the opportunity-efficiency true-stack gate.
@@ -136,6 +137,299 @@ const RELEASE_B_COVERAGE = {
     'crm_opportunity_common_list:crm_opp_table:crm_opp_name',
     'crm_opportunity_common_list:crm_opp_table:crm_opp_probability',
     'crm_opportunity_common_list:crm_opp_table:crm_opp_stage',
+  ],
+};
+const CUSTOMER_POOL_COVERAGE = {
+  pages: [
+    'crm_customer_capacity_detail',
+    'crm_customer_capacity_form',
+    'crm_customer_capacity_list',
+    'crm_customer_owner_history_detail',
+    'crm_customer_owner_history_list',
+    'crm_customer_pool_batch_list',
+    'crm_customer_pool_detail',
+    'crm_customer_pool_form',
+    'crm_customer_pool_item_detail',
+    'crm_customer_pool_item_list',
+    'crm_customer_pool_list',
+    'crm_customer_pool_strategy',
+    'crm_customer_pool_recycle_rule_detail',
+    'crm_customer_pool_recycle_rule_form',
+    'crm_customer_pool_recycle_rule_list',
+  ],
+  commands: [
+    'crm:assign_pool_customer',
+    'crm:claim_pool_customer',
+    'crm:create_customer_capacity',
+    'crm:create_customer_pool',
+    'crm:create_customer_pool_recycle_rule',
+    'crm:download_customer_pool_import_template',
+    'crm:delete_customer_capacity',
+    'crm:delete_customer_pool',
+    'crm:delete_customer_pool_recycle_rule',
+    'crm:delete_pool_customer',
+    'crm:move_customer_to_pool',
+    'crm:precheck_customer_pool_import',
+    'crm:run_customer_pool_recycle',
+    'crm:toggle_customer_pool',
+    'crm:import_customer_pool_customers',
+    'crm:update_customer_capacity',
+    'crm:update_customer_pool',
+    'crm:update_customer_pool_recycle_rule',
+    'crm:update_pool_customer',
+  ],
+  queries: [
+    'crm_customer_pool_ops_queue',
+    'crm_customer_pool_ops_stats',
+    'crm_customer_pool_policy_queue',
+    'crm_customer_pool_policy_stats',
+    'crm_customer_capacity_policy_queue',
+    'crm_customer_recycle_policy_queue',
+    'crm_pool_customer_owner_history',
+    'crm_pool_customer_timeline',
+  ],
+  permissions: [
+    'crm.customer_pool.assign',
+    'crm.customer_pool.manage',
+    'crm.customer_pool.import',
+    'crm.customer_pool.move',
+    'crm.customer_pool.pick',
+    'crm.customer_pool.read',
+    'crm.customer_pool.recycle',
+  ],
+  blocks: [
+    'crm_customer_capacity_detail:actions',
+    'crm_customer_capacity_detail:capacity_detail',
+    'crm_customer_capacity_form:buttons',
+    'crm_customer_capacity_form:capacity',
+    'crm_customer_capacity_list:table',
+    'crm_customer_capacity_list:toolbar',
+    'crm_customer_owner_history_detail:ownership_evidence',
+    'crm_customer_owner_history_list:history',
+    'crm_customer_pool_batch_list:batch_guidance',
+    'crm_customer_pool_batch_list:pool_queue',
+    'crm_customer_pool_batch_list:pool_tabs',
+    'crm_customer_pool_detail:actions',
+    'crm_customer_pool_detail:policy',
+    'crm_customer_pool_form:buttons',
+    'crm_customer_pool_form:claim_policy',
+    'crm_customer_pool_form:identity',
+    'crm_customer_pool_form:recycle_policy',
+    'crm_customer_pool_item_detail:customer_snapshot',
+    'crm_customer_pool_item_detail:pool_customer_activity_timeline',
+    'crm_customer_pool_item_detail:pool_customer_owner_history',
+    'crm_customer_pool_item_detail:pool_evidence',
+    'crm_customer_pool_item_detail:pooled_customer_mobile_tabs',
+    'crm_customer_pool_item_list:crm_customer_pool_actions',
+    'crm_customer_pool_item_list:crm_customer_pool_evidence',
+    'crm_customer_pool_item_list:crm_customer_pool_header_actions',
+    'crm_customer_pool_item_list:crm_customer_pool_metrics',
+    'crm_customer_pool_item_list:crm_customer_pool_queue',
+    'crm_customer_pool_item_list:crm_customer_pool_search',
+    'crm_customer_pool_item_list:crm_customer_pool_status',
+    'crm_customer_pool_list:crm_cp_table',
+    'crm_customer_pool_list:crm_cp_toolbar',
+    'crm_customer_pool_strategy:crm_customer_policy_metrics',
+    'crm_customer_pool_strategy:crm_customer_policy_search',
+    'crm_customer_pool_strategy:crm_customer_policy_header_actions',
+    'crm_customer_pool_strategy:crm_customer_policy_tabs',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table',
+    'crm_customer_pool_strategy:crm_customer_capacity_actions',
+    'crm_customer_pool_strategy:crm_customer_capacity_table',
+    'crm_customer_pool_strategy:crm_customer_recycle_actions',
+    'crm_customer_pool_strategy:crm_customer_recycle_table',
+    'crm_customer_pool_strategy:crm_customer_policy_status',
+    'crm_customer_pool_strategy:crm_customer_policy_evidence',
+    'crm_customer_pool_recycle_rule_detail:actions',
+    'crm_customer_pool_recycle_rule_detail:condition',
+    'crm_customer_pool_recycle_rule_form:buttons',
+    'crm_customer_pool_recycle_rule_form:identity',
+    'crm_customer_pool_recycle_rule_form:time_condition',
+    'crm_customer_pool_recycle_rule_list:crm_cprr_guidance',
+    'crm_customer_pool_recycle_rule_list:crm_cprr_table',
+    'crm_customer_pool_recycle_rule_list:crm_cprr_toolbar',
+  ],
+  fields: [
+    'crm_customer_capacity_form:capacity:crm_ccap_capacity',
+    'crm_customer_capacity_form:capacity:crm_ccap_remark',
+    'crm_customer_capacity_form:capacity:crm_ccap_status',
+    'crm_customer_capacity_form:capacity:crm_ccap_user_id',
+    'crm_customer_capacity_list:table:crm_ccap_capacity',
+    'crm_customer_capacity_list:table:crm_ccap_remark',
+    'crm_customer_owner_history_detail:ownership_evidence:crm_coh_reason',
+    'crm_customer_owner_history_list:history:crm_coh_event',
+    'crm_customer_owner_history_list:history:crm_coh_reason',
+    'crm_customer_pool_batch_list:pool_queue:crm_cpi_account_name',
+    'crm_customer_pool_batch_list:pool_queue:crm_cpi_claimed_by',
+    'crm_customer_pool_batch_list:pool_queue:crm_cpi_industry',
+    'crm_customer_pool_batch_list:pool_queue:crm_cpi_phone',
+    'crm_customer_pool_batch_list:pool_queue:crm_cpi_rating',
+    'crm_customer_pool_batch_list:pool_tabs:crm_cpi_status',
+    'crm_customer_pool_detail:policy:crm_cp_name',
+    'crm_customer_pool_form:claim_policy:crm_cp_daily_pick_limit',
+    'crm_customer_pool_form:claim_policy:crm_cp_new_cooldown_days',
+    'crm_customer_pool_form:claim_policy:crm_cp_previous_owner_cooldown_days',
+    'crm_customer_pool_form:identity:crm_cp_admin_user_ids',
+    'crm_customer_pool_form:identity:crm_cp_description',
+    'crm_customer_pool_form:identity:crm_cp_member_user_ids',
+    'crm_customer_pool_form:identity:crm_cp_name',
+    'crm_customer_pool_form:recycle_policy:crm_cp_auto_recycle',
+    'crm_customer_pool_form:recycle_policy:crm_cp_recycle_after_days',
+    'crm_customer_pool_form:recycle_policy:crm_cp_recycle_basis',
+    'crm_customer_pool_form:recycle_policy:crm_cp_recycle_match_mode',
+    'crm_customer_pool_item_detail:customer_snapshot:crm_cpi_account_name',
+    'crm_customer_pool_item_detail:pool_customer_activity_timeline:crm_act_content',
+    'crm_customer_pool_item_detail:pool_customer_activity_timeline:crm_act_date',
+    'crm_customer_pool_item_detail:pool_customer_activity_timeline:crm_act_subject',
+    'crm_customer_pool_item_detail:pool_customer_activity_timeline:crm_act_type',
+    'crm_customer_pool_item_detail:pool_customer_activity_timeline:crm_ar_object_type',
+    'crm_customer_pool_item_detail:pool_customer_activity_timeline:owner_name',
+    'crm_customer_pool_item_detail:pool_customer_owner_history:actor_name',
+    'crm_customer_pool_item_detail:pool_customer_owner_history:crm_coh_event',
+    'crm_customer_pool_item_detail:pool_customer_owner_history:crm_coh_occurred_at',
+    'crm_customer_pool_item_detail:pool_customer_owner_history:crm_coh_reason',
+    'crm_customer_pool_item_detail:pool_customer_owner_history:next_owner_name',
+    'crm_customer_pool_item_detail:pool_customer_owner_history:previous_owner_name',
+    'crm_customer_pool_item_detail:pool_evidence:crm_cpi_reason',
+    'crm_customer_pool_item_list:crm_customer_pool_evidence:crm_cpi_account_name',
+    'crm_customer_pool_item_list:crm_customer_pool_evidence:owner_name',
+    'crm_customer_pool_item_list:crm_customer_pool_queue:crm_cpi_account_name',
+    'crm_customer_pool_item_list:crm_customer_pool_queue:crm_cpi_claimed_by',
+    'crm_customer_pool_item_list:crm_customer_pool_queue:operational_state',
+    'crm_customer_pool_item_list:crm_customer_pool_search:crm_cpi_account_name',
+    'crm_customer_pool_item_list:crm_customer_pool_status:owner_name',
+    'crm_customer_pool_list:crm_cp_table:crm_cp_name',
+    'crm_customer_pool_list:crm_cp_table:crm_cp_daily_pick_limit',
+    'crm_customer_pool_list:crm_cp_table:crm_cp_new_cooldown_days',
+    'crm_customer_pool_list:crm_cp_table:crm_cp_previous_owner_cooldown_days',
+    'crm_customer_pool_list:crm_cp_table:crm_cp_status',
+    'crm_customer_pool_list:crm_cp_table:importType',
+    'crm_customer_pool_list:crm_cp_table:skipErrors',
+    'crm_customer_pool_strategy:crm_customer_policy_search:crm_cp_name',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_name',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_status',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:member_count',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:admin_count',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_daily_pick_limit',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_auto_recycle',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_new_cooldown_days',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:crm_cp_previous_owner_cooldown_days',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:active_rule_count',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:importType',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:importFileId',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:skipErrors',
+    'crm_customer_pool_strategy:crm_customer_capacity_table:user_name',
+    'crm_customer_pool_strategy:crm_customer_capacity_table:crm_ccap_capacity',
+    'crm_customer_pool_strategy:crm_customer_capacity_table:owned_customer_count',
+    'crm_customer_pool_strategy:crm_customer_capacity_table:remaining_capacity',
+    'crm_customer_pool_strategy:crm_customer_capacity_table:crm_ccap_status',
+    'crm_customer_pool_strategy:crm_customer_capacity_table:crm_ccap_remark',
+    'crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_name',
+    'crm_customer_pool_strategy:crm_customer_recycle_table:pool_name',
+    'crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_time_source',
+    'crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_operator',
+    'crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_days',
+    'crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_status',
+    'crm_customer_pool_strategy:crm_customer_recycle_table:crm_cprr_sort_order',
+    'crm_customer_pool_strategy:crm_customer_policy_status:member_count',
+    'crm_customer_pool_strategy:crm_customer_policy_status:admin_count',
+    'crm_customer_pool_strategy:crm_customer_policy_status:crm_cp_daily_pick_limit',
+    'crm_customer_pool_strategy:crm_customer_policy_status:crm_cp_new_cooldown_days',
+    'crm_customer_pool_strategy:crm_customer_policy_status:active_rule_count',
+    'crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_name',
+    'crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_description',
+    'crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_daily_pick_limit',
+    'crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_new_cooldown_days',
+    'crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_previous_owner_cooldown_days',
+    'crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_recycle_match_mode',
+    'crm_customer_pool_strategy:crm_customer_policy_evidence:crm_cp_recycle_after_days',
+    'crm_customer_pool_recycle_rule_detail:condition:crm_cprr_code',
+    'crm_customer_pool_recycle_rule_detail:condition:crm_cprr_days',
+    'crm_customer_pool_recycle_rule_detail:condition:crm_cprr_operator',
+    'crm_customer_pool_recycle_rule_form:identity:crm_cprr_code',
+    'crm_customer_pool_recycle_rule_form:identity:crm_cprr_name',
+    'crm_customer_pool_recycle_rule_form:identity:crm_cprr_pool_id',
+    'crm_customer_pool_recycle_rule_form:identity:crm_cprr_sort_order',
+    'crm_customer_pool_recycle_rule_form:identity:crm_cprr_status',
+    'crm_customer_pool_recycle_rule_form:time_condition:crm_cprr_days',
+    'crm_customer_pool_recycle_rule_form:time_condition:crm_cprr_description',
+    'crm_customer_pool_recycle_rule_form:time_condition:crm_cprr_end_at',
+    'crm_customer_pool_recycle_rule_form:time_condition:crm_cprr_operator',
+    'crm_customer_pool_recycle_rule_form:time_condition:crm_cprr_start_at',
+    'crm_customer_pool_recycle_rule_form:time_condition:crm_cprr_time_source',
+    'crm_customer_pool_recycle_rule_list:crm_cprr_table:crm_cprr_name',
+    'crm_customer_pool_recycle_rule_list:crm_cprr_table:crm_cprr_sort_order',
+  ],
+  uiActions: [
+    'crm_customer_capacity_detail:actions:edit',
+    'crm_customer_capacity_form:buttons:submit',
+    'crm_customer_capacity_list:table:delete',
+    'crm_customer_capacity_list:table:view',
+    'crm_customer_capacity_list:toolbar:create',
+    'crm_customer_owner_history_list:history:view',
+    'crm_customer_pool_batch_list:pool_queue:batch_assign',
+    'crm_customer_pool_batch_list:pool_queue:batch_claim',
+    'crm_customer_pool_batch_list:pool_queue:batch_delete',
+    'crm_customer_pool_batch_list:pool_queue:batch_update_industry',
+    'crm_customer_pool_batch_list:pool_queue:batch_update_name',
+    'crm_customer_pool_batch_list:pool_queue:batch_update_rating',
+    'crm_customer_pool_batch_list:pool_queue:delete',
+    'crm_customer_pool_batch_list:pool_queue:quick_update',
+    'crm_customer_pool_batch_list:platform:analyze_current_view',
+    'crm_customer_pool_batch_list:platform:export_filtered_xlsx',
+    'crm_customer_pool_batch_list:platform:export_selected_xlsx',
+    'crm_customer_pool_batch_list:pool_tabs:assigned',
+    'crm_customer_pool_batch_list:pool_tabs:available',
+    'crm_customer_pool_batch_list:pool_tabs:claimed',
+    'crm_customer_pool_detail:actions:edit',
+    'crm_customer_pool_form:buttons:submit',
+    'crm_customer_pool_item_list:crm_customer_pool_actions:assign',
+    'crm_customer_pool_item_list:crm_customer_pool_actions:claim',
+    'crm_customer_pool_item_list:crm_customer_pool_header_actions:batch_operations',
+    'crm_customer_pool_item_list:crm_customer_pool_queue:open_customer',
+    'crm_customer_pool_item_list:crm_customer_pool_queue:assign',
+    'crm_customer_pool_item_list:crm_customer_pool_queue:claim',
+    'crm_customer_pool_item_list:crm_customer_pool_queue:view_pool_evidence',
+    'crm_customer_pool_item_detail:pooled_customer_mobile_tabs:activity_history',
+    'crm_customer_pool_item_detail:pooled_customer_mobile_tabs:customer_info',
+    'crm_customer_pool_item_detail:pooled_customer_mobile_tabs:ownership_history',
+    'crm_customer_pool_list:crm_cp_table:delete',
+    'crm_customer_pool_list:crm_cp_table:download_import_template',
+    'crm_customer_pool_list:crm_cp_table:import_customers',
+    'crm_customer_pool_list:crm_cp_table:precheck_import',
+    'crm_customer_pool_list:crm_cp_table:quick_update',
+    'crm_customer_pool_list:crm_cp_table:toggle',
+    'crm_customer_pool_list:crm_cp_table:view',
+    'crm_customer_pool_list:crm_cp_toolbar:create',
+    'crm_customer_pool_list:crm_cp_toolbar:run_recycle',
+    'crm_customer_pool_strategy:crm_customer_policy_header_actions:open_pool_operations',
+    'crm_customer_pool_strategy:crm_customer_policy_header_actions:open_ownership_history',
+    'crm_customer_pool_strategy:crm_customer_policy_header_actions:run_recycle',
+    'crm_customer_pool_strategy:crm_customer_policy_header_actions:create_pool',
+    'crm_customer_pool_strategy:crm_customer_policy_tabs:pools',
+    'crm_customer_pool_strategy:crm_customer_policy_tabs:capacity',
+    'crm_customer_pool_strategy:crm_customer_policy_tabs:recycle',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:view',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:edit',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:quick_update',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:download_import_template',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:precheck_import',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:import_customers',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:toggle',
+    'crm_customer_pool_strategy:crm_customer_policy_pool_table:delete',
+    'crm_customer_pool_strategy:crm_customer_capacity_actions:create_capacity',
+    'crm_customer_pool_strategy:crm_customer_capacity_table:view',
+    'crm_customer_pool_strategy:crm_customer_capacity_table:edit',
+    'crm_customer_pool_strategy:crm_customer_capacity_table:delete',
+    'crm_customer_pool_strategy:crm_customer_recycle_actions:create_recycle_rule',
+    'crm_customer_pool_strategy:crm_customer_recycle_table:view',
+    'crm_customer_pool_strategy:crm_customer_recycle_table:edit',
+    'crm_customer_pool_strategy:crm_customer_recycle_table:delete',
+    'crm_customer_pool_recycle_rule_detail:actions:edit',
+    'crm_customer_pool_recycle_rule_form:buttons:submit',
+    'crm_customer_pool_recycle_rule_list:crm_cprr_table:delete',
+    'crm_customer_pool_recycle_rule_list:crm_cprr_table:view',
+    'crm_customer_pool_recycle_rule_list:crm_cprr_toolbar:create',
   ],
 };
 const DASHBOARD_COVERAGE = {
@@ -340,6 +634,9 @@ const coreWorkbenchCoverageSets = Object.fromEntries(
 const releaseBCoverageSets = Object.fromEntries(
   Object.entries(RELEASE_B_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
 );
+const customerPoolCoverageSets = Object.fromEntries(
+  Object.entries(CUSTOMER_POOL_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
+);
 const dashboardCoverageSets = Object.fromEntries(
   Object.entries(DASHBOARD_COVERAGE).map(([axis, values]) => [axis, new Set(values)]),
 );
@@ -427,6 +724,7 @@ function evidenceForCommand(code, rg1Commands) {
   }
   if (RG3_COMMANDS.includes(code)) files.push(EVIDENCE.rg3Journey);
   if (releaseBCoverageSets.commands.has(code)) files.push(EVIDENCE.releaseB);
+  if (customerPoolCoverageSets.commands.has(code)) files.push(EVIDENCE.customerPool);
   return uniq(files);
 }
 
@@ -674,6 +972,7 @@ function buildProductGroups({
         ...(coreWorkbenchCoverageSets.blocks.has(blockKey) ? [EVIDENCE.rg1Browser] : []),
         ...(releaseBCoverageSets.blocks.has(blockKey) ? [EVIDENCE.releaseB] : []),
         ...(forecastVarianceCoverageSets.blocks.has(blockKey) ? [EVIDENCE.forecastVariance] : []),
+        ...(customerPoolCoverageSets.blocks.has(blockKey) ? [EVIDENCE.customerPool] : []),
       ]);
       blockRows.push(
         executableRow({
@@ -696,6 +995,7 @@ function buildProductGroups({
         ...(coreWorkbenchCoverageSets.fields.has(fieldKey) ? [EVIDENCE.rg1Browser] : []),
         ...(releaseBCoverageSets.fields.has(fieldKey) ? [EVIDENCE.releaseB] : []),
         ...(forecastVarianceCoverageSets.fields.has(fieldKey) ? [EVIDENCE.forecastVariance] : []),
+        ...(customerPoolCoverageSets.fields.has(fieldKey) ? [EVIDENCE.customerPool] : []),
       ]);
       fieldRows.push(
         executableRow({
@@ -720,10 +1020,14 @@ function buildProductGroups({
       const forecastVarianceAction = forecastVarianceCoverageSets.uiActions.has(
         `${page.pageKey}:${item.blockId}:${item.code}`,
       );
+      const customerPoolAction = customerPoolCoverageSets.uiActions.has(
+        `${page.pageKey}:${item.blockId}:${item.code}`,
+      );
       const evidence = uniq([
         ...(releaseAction?.evidence ?? []),
         ...(releaseBAction ? [EVIDENCE.releaseB] : []),
         ...(forecastVarianceAction ? [EVIDENCE.forecastVariance] : []),
+        ...(customerPoolAction ? [EVIDENCE.customerPool] : []),
       ]);
       uiActionRows.push(
         executableRow({
@@ -988,6 +1292,40 @@ export function buildReleaseManifest() {
       `forecast-variance covered field no longer exists: ${fieldKey}`,
     );
   }
+  for (const blockKey of CUSTOMER_POOL_COVERAGE.blocks) {
+    const separator = blockKey.indexOf(':');
+    const pageKey = blockKey.slice(0, separator);
+    const blockId = blockKey.slice(separator + 1);
+    assert.ok(
+      allBlocks(pages.get(pageKey)).some((block) => block.id === blockId),
+      `customer-pool covered block no longer exists: ${blockKey}`,
+    );
+  }
+  for (const fieldKey of CUSTOMER_POOL_COVERAGE.fields) {
+    const [pageKey, blockId, ...fieldParts] = fieldKey.split(':');
+    const field = fieldParts.join(':');
+    const page = pages.get(pageKey);
+    const structure = collectPageStructure(page, `plugins/crm/config/pages/${pageKey}.json`);
+    assert.ok(
+      structure.fields.some(
+        (candidate) => candidate.blockId === blockId && candidate.field === field,
+      ),
+      `customer-pool covered field no longer exists: ${fieldKey}`,
+    );
+  }
+  for (const actionKey of CUSTOMER_POOL_COVERAGE.uiActions) {
+    const [pageKey, blockId, ...actionParts] = actionKey.split(':');
+    const code = actionParts.join(':');
+    if (blockId === 'platform') continue;
+    const page = pages.get(pageKey);
+    const structure = collectPageStructure(page, `plugins/crm/config/pages/${pageKey}.json`);
+    assert.ok(
+      structure.uiActions.some(
+        (candidate) => candidate.blockId === blockId && candidate.code === code,
+      ),
+      `customer-pool covered UI action no longer exists: ${actionKey}`,
+    );
+  }
 
   const rg1Commands = new Set(
     semanticActions.filter((row) => row.targetType === 'command').map((row) => row.target),
@@ -998,6 +1336,7 @@ export function buildReleaseManifest() {
     ...RG2_COMMANDS,
     ...RG3_COMMANDS,
     ...RELEASE_B_COVERAGE.commands,
+    ...CUSTOMER_POOL_COVERAGE.commands,
   ]);
   const commandRows = commandCodes.map((code) => {
     const command = commands.get(code);
@@ -1007,6 +1346,7 @@ export function buildReleaseManifest() {
     if (RG2_COMMANDS.includes(code)) goals.push('RG-2');
     if (RG3_COMMANDS.includes(code)) goals.push('RG-3');
     if (releaseBCoverageSets.commands.has(code)) goals.push('RELEASE-B');
+    if (customerPoolCoverageSets.commands.has(code)) goals.push('CORDYS-CUSTOMER-POOL');
     return {
       id: code,
       goals,
@@ -1017,7 +1357,12 @@ export function buildReleaseManifest() {
     };
   });
 
-  const pageRows = uniq([...RG1_PAGES, ...RG2_PAGES, ...RELEASE_B_COVERAGE.pages]).map(
+  const pageRows = uniq([
+    ...RG1_PAGES,
+    ...RG2_PAGES,
+    ...RELEASE_B_COVERAGE.pages,
+    ...CUSTOMER_POOL_COVERAGE.pages,
+  ]).map(
     (pageKey) => {
       const page = pages.get(pageKey);
       assert.ok(page, `missing release page ${pageKey}`);
@@ -1026,6 +1371,7 @@ export function buildReleaseManifest() {
         ...(pageKey === 'crm_lead_desk_workbench' ? ['RG-3'] : []),
         ...(RG2_PAGES.includes(pageKey) ? ['RG-2'] : []),
         ...(releaseBCoverageSets.pages.has(pageKey) ? ['RELEASE-B'] : []),
+        ...(customerPoolCoverageSets.pages.has(pageKey) ? ['CORDYS-CUSTOMER-POOL'] : []),
       ];
       const evidence = uniq([
         ...(RG1_PAGES.includes(pageKey) ? [EVIDENCE.rg1Browser] : []),
@@ -1035,6 +1381,7 @@ export function buildReleaseManifest() {
           ? [EVIDENCE.rg2OrderBrowser]
           : []),
         ...(releaseBCoverageSets.pages.has(pageKey) ? [EVIDENCE.releaseB] : []),
+        ...(customerPoolCoverageSets.pages.has(pageKey) ? [EVIDENCE.customerPool] : []),
       ]);
       const menuPermissions = menus
         .filter((menu) => menu.pageKey === pageKey && menu.permissionCode)
@@ -1070,6 +1417,9 @@ export function buildReleaseManifest() {
   for (const code of RELEASE_B_COVERAGE.permissions) {
     addPermissionEvidence(code, [EVIDENCE.releaseB]);
   }
+  for (const code of CUSTOMER_POOL_COVERAGE.permissions) {
+    addPermissionEvidence(code, [EVIDENCE.customerPool]);
+  }
   const permissionRows = [...permissionEvidence.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([code, evidence]) => ({ id: code, evidence, verdict: 'pass' }));
@@ -1090,6 +1440,10 @@ export function buildReleaseManifest() {
   for (const code of RELEASE_B_COVERAGE.queries) {
     assert.ok(queries.has(code), `missing Release B named query ${code}`);
     queryEvidence.set(code, uniq([...(queryEvidence.get(code) ?? []), EVIDENCE.releaseB]));
+  }
+  for (const code of CUSTOMER_POOL_COVERAGE.queries) {
+    assert.ok(queries.has(code), `missing customer-pool named query ${code}`);
+    queryEvidence.set(code, uniq([...(queryEvidence.get(code) ?? []), EVIDENCE.customerPool]));
   }
   for (const code of DASHBOARD_COVERAGE.queries) {
     assert.ok(queries.has(code), `missing dashboard named query ${code}`);
@@ -1189,6 +1543,11 @@ export function buildReleaseManifest() {
         verdict: 'pass',
         note: 'Selected forecast submissions are compared with live owner facts and drilled down to exact opportunity drivers.',
       },
+      {
+        id: 'CORDYS-CUSTOMER-POOL',
+        verdict: 'pass',
+        note: 'Three real-stack journeys cover member operations, manager batch work, administrator governance, recycle policy, ownership evidence, import/mobile behavior and negative boundaries without development-data migration.',
+      },
     ],
     axes: {
       semanticActions,
@@ -1259,6 +1618,13 @@ export function buildReleaseManifest() {
         minimumScreenshots: 2,
         expectedCoverage: FORECAST_VARIANCE_COVERAGE,
       },
+      {
+        id: 'CRM-CUSTOMER-POOL',
+        filePrefix: 'crm-customer-pool-parity',
+        expectedScenarios: 6,
+        minimumScreenshots: 15,
+        expectedCoverage: CUSTOMER_POOL_COVERAGE,
+      },
     ],
     untested: [
       {
@@ -1317,10 +1683,21 @@ function validateScreenshots(receipt, minimum, label) {
   }
 }
 
-export function verifyRuntimeEvidence(evidenceRoot, manifest = buildReleaseManifest()) {
+export function verifyRuntimeEvidence(
+  evidenceRoot,
+  manifest = buildReleaseManifest(),
+  contractIds = null,
+) {
   const files = walkFiles(evidenceRoot).filter((file) => file.endsWith('.json'));
   const results = [];
-  for (const contract of manifest.runtimeEvidenceContracts) {
+  const contracts = contractIds?.length
+    ? contractIds.map((id) => {
+        const contract = manifest.runtimeEvidenceContracts.find((candidate) => candidate.id === id);
+        assert.ok(contract, `unknown runtime evidence contract ${id}`);
+        return contract;
+      })
+    : manifest.runtimeEvidenceContracts;
+  for (const contract of contracts) {
     const candidates = files
       .filter((file) => path.basename(file).startsWith(contract.filePrefix))
       .map((file) => ({
@@ -1537,8 +1914,13 @@ function main(argv) {
   if (argv.includes('--require-full-product')) assertFullProductReady(actual);
 
   const evidenceRoot = option(argv, '--evidence-root');
+  const runtimeContract = option(argv, '--runtime-contract');
   const runtimeEvidence = evidenceRoot
-    ? verifyRuntimeEvidence(path.resolve(evidenceRoot), actual)
+    ? verifyRuntimeEvidence(
+        path.resolve(evidenceRoot),
+        actual,
+        runtimeContract ? [runtimeContract] : null,
+      )
     : [];
   const mutation = argv.includes('--self-test-mutation') ? runMutationProof(actual) : null;
   const mutationEvidencePath = option(argv, '--mutation-evidence');

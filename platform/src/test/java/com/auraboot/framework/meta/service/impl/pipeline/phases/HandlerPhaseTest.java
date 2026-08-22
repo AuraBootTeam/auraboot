@@ -322,6 +322,7 @@ class HandlerPhaseTest {
                 "handlerParams", Map.of("async", true)
         ));
         ctx.getRequest().setExpectedVersion(6);
+        MetaContext.setContext(1L, 2L, "user-pid", "tester");
 
         MetaContext.runWithCommandPermitPlan(
                 "SELF", 6L, "pr_purchase_order", "po-1", () -> phase.execute(ctx));
@@ -343,6 +344,7 @@ class HandlerPhaseTest {
         assertThat(taskInput.path("commandPermitScope").asText()).isEqualTo("SELF");
         assertThat(taskInput.path("commandExpectedVersion").asLong()).isEqualTo(6L);
         assertThat(taskInput.path("clientRequestId").asText()).isEqualTo("client-request-1");
+        assertThat(taskInput.path("currentUserPid").asText()).isEqualTo("user-pid");
     }
 
     @Test

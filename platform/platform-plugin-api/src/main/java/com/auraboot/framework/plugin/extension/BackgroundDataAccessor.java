@@ -1,5 +1,8 @@
 package com.auraboot.framework.plugin.extension;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -67,6 +70,27 @@ public interface BackgroundDataAccessor {
      * @param filters field-code &rarr; value, all ANDed equality
      */
     List<Map<String, Object>> query(long tenantId, String modelCode, Map<String, Object> filters);
+
+    /**
+     * Query records whose field value belongs to a tenant-scoped candidate set.
+     * Runtime implementations should issue one {@code IN} query; the default keeps
+     * source compatibility for lightweight plugin test doubles.
+     */
+    default List<Map<String, Object>> queryIn(long tenantId, String modelCode,
+                                               String fieldName, Collection<?> values) {
+        if (fieldName == null || fieldName.isBlank()) {
+            throw new IllegalArgumentException("fieldName cannot be null or blank");
+        }
+        if (values == null || values.isEmpty()) return List.of();
+        LinkedHashSet<Object> distinct = new LinkedHashSet<>();
+        values.stream().filter(java.util.Objects::nonNull).forEach(distinct::add);
+        if (distinct.isEmpty()) return List.of();
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (Object value : distinct) {
+            records.addAll(query(tenantId, modelCode, Map.of(fieldName, value)));
+        }
+        return records;
+    }
 
     /** Update fields of an existing record. */
     Map<String, Object> update(long tenantId, String modelCode, String recordId, Map<String, Object> data);

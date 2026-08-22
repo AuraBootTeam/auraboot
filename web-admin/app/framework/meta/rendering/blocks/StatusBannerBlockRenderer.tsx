@@ -7,6 +7,7 @@ import {
   readDataSourceRecord,
   readDataSourceState,
   readPath,
+  formatTemporalValue,
   resolveRuntimeValue,
   useDataSourceSubscription,
   useRuntimeStateSubscription,
@@ -78,15 +79,17 @@ function formatSummaryValue(
   const mapped = mappedValue(value, field?.valueMap, locale, t);
   if (mapped !== null) return mapped;
 
+  const temporal = formatTemporalValue(value, field?.valueType ?? field?.format, locale);
+  if (temporal !== null) return temporal;
+
   const precision = Number(field?.precision);
   const numericValue = typeof value === 'number' ? value : Number(String(value).trim());
   if (
     (field?.valueType === 'currency' || field?.format === 'currency') &&
     Number.isFinite(numericValue)
   ) {
-    const fractionDigits = Number.isInteger(precision) && precision >= 0 && precision <= 20
-      ? precision
-      : 2;
+    const fractionDigits =
+      Number.isInteger(precision) && precision >= 0 && precision <= 20 ? precision : 2;
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: String(field?.currencyCode || 'CNY').toUpperCase(),
@@ -108,11 +111,7 @@ function formatSummaryValue(
   return String(value);
 }
 
-function localizedAuxValue(
-  value: unknown,
-  locale: string,
-  t: (key: string) => string,
-): string {
+function localizedAuxValue(value: unknown, locale: string, t: (key: string) => string): string {
   if (value === undefined || value === null || value === '') return '';
   if (typeof value === 'object') return getLocalizedText(value as LocalizedText, locale, t);
   return String(value);
@@ -411,7 +410,7 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
                 >
                   {href ? (
                     <a
-                      className="text-accent inline-block max-w-full cursor-pointer break-words underline decoration-accent underline-offset-2 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                      className="text-accent decoration-accent hover:text-accent inline-block max-w-full cursor-pointer break-words underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                       href={href}
                       onClick={(event) => handleSummaryLinkClick(event, href)}
                     >

@@ -48,6 +48,7 @@ interface FormFieldConfig {
   accept?: string;
   maxBytes?: number;
   fileNameField?: string;
+  fileValueMode?: 'text' | 'file';
   visibleWhen?: VisibilityRule;
   dataSource?: {
     type: 'api' | 'static';
@@ -269,6 +270,36 @@ export default function FormDialog() {
       });
     },
     [state.fields],
+  );
+
+  const handleFileSelection = useCallback(
+    async (field: FormFieldConfig, file?: File) => {
+      if (!file) {
+        updateField(field.field, field.fileValueMode === 'file' ? null : '');
+        if (field.fileNameField) updateField(field.fileNameField, '');
+        return;
+      }
+      const maxBytes = field.maxBytes;
+      if (maxBytes && file.size > maxBytes) {
+        setErrors((prev) => ({
+          ...prev,
+          [field.field]: locale.startsWith('zh')
+            ? `文件不能超过 ${Math.ceil(maxBytes / 1024 / 1024)} MB`
+            : `File must not exceed ${Math.ceil(maxBytes / 1024 / 1024)} MB`,
+        }));
+        return;
+      }
+      try {
+        updateField(field.field, field.fileValueMode === 'file' ? file : await file.text());
+        if (field.fileNameField) updateField(field.fileNameField, file.name);
+      } catch {
+        setErrors((prev) => ({
+          ...prev,
+          [field.field]: locale.startsWith('zh') ? '无法读取文件' : 'Unable to read file',
+        }));
+      }
+    },
+    [locale, updateField],
   );
 
   if (!state.open) return null;
@@ -539,48 +570,55 @@ export default function FormDialog() {
                       </span>
                     </label>
                   ) : fieldType === 'file' ? (
-                    <input
-                      ref={
-                        isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined
-                      }
-                      data-testid={`form-dialog-field-${field.field}`}
-                      type="file"
-                      accept={field.accept}
-                      onChange={async (event) => {
-                        const file = event.target.files?.[0];
-                        if (!file) {
-                          updateField(field.field, '');
-                          if (field.fileNameField) updateField(field.fileNameField, '');
-                          return;
-                        }
-                        if (field.maxBytes && file.size > field.maxBytes) {
-                          setErrors((prev) => ({
-                            ...prev,
-                            [field.field]: locale.startsWith('zh')
-                              ? `文件不能超过 ${Math.ceil(field.maxBytes! / 1024 / 1024)} MB`
-                              : `File must not exceed ${Math.ceil(field.maxBytes! / 1024 / 1024)} MB`,
-                          }));
-                          event.target.value = '';
-                          return;
-                        }
-                        try {
-                          const content = await file.text();
-                          updateField(field.field, content);
-                          if (field.fileNameField) updateField(field.fileNameField, file.name);
-                        } catch {
-                          setErrors((prev) => ({
-                            ...prev,
-                            [field.field]: locale.startsWith('zh')
-                              ? '无法读取文件'
-                              : 'Unable to read file',
-                          }));
-                          event.target.value = '';
-                        }
-                      }}
-                      className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded file:border-0 file:bg-blue-50 file:px-3 file:py-1 file:text-blue-700 dark:bg-gray-700 dark:text-white ${
-                        error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                    <div
+                      data-testid={`form-dialog-dropzone-${field.field}`}
+                      className={`rounded-card bg-subtle hover:border-accent hover:bg-accent-weak relative border-2 border-dashed p-5 text-center transition-colors ${
+                        error ? 'border-status-red' : 'border-border-strong'
                       }`}
-                    />
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        void handleFileSelection(field, event.dataTransfer.files?.[0]);
+                      }}
+                    >
+                      <input
+                        ref={
+                          isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined
+                        }
+                        id={`form-dialog-file-${field.field}`}
+                        data-testid={`form-dialog-field-${field.field}`}
+                        type="file"
+                        accept={field.accept}
+                        onChange={(event) => {
+                          void handleFileSelection(field, event.target.files?.[0]);
+                          event.target.value = '';
+                        }}
+                        className="sr-only"
+                      />
+                      <label
+                        htmlFor={`form-dialog-file-${field.field}`}
+                        className="flex cursor-pointer flex-col items-center"
+                      >
+                        <span className="text-body text-text-2 font-medium">
+                          {field.fileNameField && formData[field.fileNameField]
+                            ? formData[field.fileNameField]
+                            : translatedOrFallback(
+                                t,
+                                'upload.button',
+                                locale.startsWith('zh') ? '点击选择文件' : 'Click to select a file',
+                              )}
+                        </span>
+                        <span className="text-aux text-text-3 mt-1">
+                          {translatedOrFallback(
+                            t,
+                            'upload.dragHint',
+                            locale.startsWith('zh')
+                              ? '或将文件拖拽到此处'
+                              : 'or drag and drop it here',
+                          )}
+                        </span>
+                      </label>
+                    </div>
                   ) : fieldType === 'number' ? (
                     <input
                       ref={

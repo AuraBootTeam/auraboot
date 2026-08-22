@@ -523,6 +523,18 @@ describe('resolveEditRecordEndpoint', () => {
     expect(resolveEditRecordEndpoint(undefined, 'crm_lead', 'r1')).toBe('/api/dynamic/crm_lead/r1');
     expect(resolveEditRecordEndpoint({}, 'crm_lead', 'r1')).toBe('/api/dynamic/crm_lead/r1');
   });
+  it('prefers schema.modelCode when the route table name is only a page alias', () => {
+    expect(
+      resolveEditRecordEndpoint(
+        { modelCode: 'crm_customer_pool_common' },
+        'crm_customer_pool',
+        'pool-1',
+      ),
+    ).toBe('/api/dynamic/crm_customer_pool_common/pool-1');
+    expect(
+      resolveEditRecordEndpoint({ modelCode: 'crm_customer_pool_common' }, 'crm_customer_pool'),
+    ).toBe('/api/dynamic/crm_customer_pool_common');
+  });
   it('uses the custom endpoint and interpolates public pid placeholders', () => {
     expect(
       resolveEditRecordEndpoint(

@@ -145,6 +145,28 @@ Open the Vite URL printed by `start-isolated.sh` and sign in as
 Do not count a demo as complete if a command only shows a success toast. Reopen
 or query each record and verify the persisted status and relationship IDs.
 
+### Independent customer-pool sign-off
+
+PAR-06 requires a person who did not implement the feature to perform and sign
+the customer-pool journey. The developer rehearsal and automated receipt do not
+replace that independent decision. On a clean imported stack, the reviewer must:
+
+1. sign in as a Sales Manager, create a customer pool, add a Sales user, and set
+   that user's active capacity and daily quota;
+2. move an owned Account into the pool and verify the owner is cleared and an
+   ownership-history entry is visible;
+3. sign in as the Sales user, claim the Account, and verify the Account owner,
+   pool-item state, capacity counters, and ownership history agree;
+4. return as Sales Manager, configure an eligible recycle rule, run recycle, and
+   verify the Account becomes available again with exactly one recycle history;
+5. capture the pool setup, available state, claimed state, recycled state, and
+   any recovery message, then record reviewer name, role, date, runtime commit,
+   result, and unresolved observations.
+
+A failed step remains a failed sign-off even when a developer can repair the
+fixture or database manually. After a product fix, restart the journey with a
+new self-created customer and preserve both the failed and passing evidence.
+
 ## Install into an existing host stack
 
 Build the hybrid JAR and use the runtime guard so the local artifact, PF4J

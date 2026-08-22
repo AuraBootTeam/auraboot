@@ -131,6 +131,7 @@ describe('SubTableViewer', () => {
     });
 
     await expect(screen.findByTestId('sortable-row-row-1')).resolves.toBeInTheDocument();
+    expect(screen.getByTestId('subtable-viewer')).toHaveClass('overflow-x-auto');
     expect(screen.getByTestId('subtable-viewer').textContent).toContain('task_manager_approve');
     expect(screen.getByTestId('subtable-viewer').textContent).toContain('pending');
   });

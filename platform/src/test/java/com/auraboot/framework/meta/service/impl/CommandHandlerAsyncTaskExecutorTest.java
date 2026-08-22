@@ -5,12 +5,14 @@ import com.auraboot.framework.meta.service.AsyncTaskExecutor.ProgressCallback;
 import com.auraboot.framework.meta.service.AsyncTaskResult;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+import com.auraboot.framework.plugin.extension.RecordShareAccessor;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
 import java.util.Optional;
@@ -48,6 +50,7 @@ class CommandHandlerAsyncTaskExecutorTest {
         in.put("commandCode", "bom:import_material_library");
         in.put("tenantId", 123L);
         in.put("userId", 45L);
+        in.put("currentUserPid", "user-pid-45");
         in.put("modelCode", "bom_material_master");
         in.put("clientRequestId", "client-request-async-1");
         in.put("commandExpectedVersion", 7L);
@@ -83,6 +86,8 @@ class CommandHandlerAsyncTaskExecutorTest {
     @Test
     void injectsAuthenticatedUserAsServerOwnedPluginSetting() throws Exception {
         AtomicReference<CommandHandlerExtension.CommandContext> captured = new AtomicReference<>();
+        RecordShareAccessor recordShareAccessor = mock(RecordShareAccessor.class);
+        ReflectionTestUtils.setField(executor, "recordShareAccessor", recordShareAccessor);
         CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
         when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
             captured.set(inv.getArgument(0));
@@ -95,6 +100,8 @@ class CommandHandlerAsyncTaskExecutorTest {
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(captured.get().settings()).containsEntry("__currentUser", "45");
+        assertThat(captured.get().currentUserPid()).isEqualTo("user-pid-45");
+        assertThat(captured.get().recordShareAccessor()).isSameAs(recordShareAccessor);
         assertThat(captured.get().clientRequestId()).isEqualTo("client-request-async-1");
         assertThat(captured.get().expectedVersion()).isEqualTo(7L);
     }

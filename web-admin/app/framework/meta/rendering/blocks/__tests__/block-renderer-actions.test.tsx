@@ -532,6 +532,8 @@ describe('TableBlockRenderer', () => {
 
     expect(queryByTestId('row-action-ack')).toBeNull();
     expect(getByTestId('row-action-simulate')).toBeInTheDocument();
+    expect(queryByTestId('row-action-view')).toBeNull();
+    fireEvent.click(getByTestId('row-action-more'));
     expect(getByTestId('row-action-view')).toBeInTheDocument();
   });
 

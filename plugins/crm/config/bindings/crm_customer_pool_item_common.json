@@ -1,0 +1,20 @@
+[
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_account_key", "sequence": 1, "required": true, "visible": false, "editable": false },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_account_id", "sequence": 2, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_pool_id", "sequence": 3, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_status", "sequence": 4, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_account_code", "sequence": 5, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_account_name", "sequence": 6, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_rating", "sequence": 7, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_phone", "sequence": 8, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_industry", "sequence": 9, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_health_score", "sequence": 10, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_previous_owner", "sequence": 11, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_entered_at", "sequence": 12, "required": true, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_entered_by", "sequence": 13, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_reason", "sequence": 14, "required": false, "visible": false, "editable": false },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_claim_release_at", "sequence": 15, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_claimed_at", "sequence": 16, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_claimed_by", "sequence": 17, "required": false, "visible": true, "editable": false },
+  { "modelCode": "crm_customer_pool_item_common", "fieldCode": "crm_cpi_recycle_token", "sequence": 18, "required": false, "visible": false, "editable": false }
+]

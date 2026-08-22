@@ -1,0 +1,362 @@
+{
+  "pageKey": "crm_customer_pool_strategy",
+  "name:zh-CN": "客户公海策略",
+  "name:en": "Customer Pool Strategy",
+  "modelCode": "crm_customer_pool_common",
+  "description": "Focused administrator workspace for customer-pool membership, claim capacity, cooldown and recycle governance.",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "extension": { "showShare": false, "showReport": false, "showPrint": false, "showEdit": false },
+  "dataSources": {
+    "policyStats": {
+      "type": "namedQuery",
+      "queryCode": "crm_customer_pool_policy_stats",
+      "params": {},
+      "adaptor": "table",
+      "format": "records"
+    },
+    "policyPools": {
+      "type": "namedQuery",
+      "queryCode": "crm_customer_pool_policy_queue",
+      "params": { "policyKeyword": "${state.policyKeyword}" },
+      "dependOn": ["state.policyKeyword"],
+      "adaptor": "table",
+      "format": "records"
+    },
+    "capacityPolicies": {
+      "type": "namedQuery",
+      "queryCode": "crm_customer_capacity_policy_queue",
+      "params": {},
+      "adaptor": "table",
+      "format": "records"
+    },
+    "recyclePolicies": {
+      "type": "namedQuery",
+      "queryCode": "crm_customer_recycle_policy_queue",
+      "params": {},
+      "adaptor": "table",
+      "format": "records"
+    }
+  },
+  "blocks": [
+    {
+      "id": "crm_customer_policy_metrics",
+      "blockType": "metric-strip",
+      "detailPlacement": "header",
+      "dataSource": "policyStats",
+      "variant": "cards",
+      "density": "compact",
+      "columns": 4,
+      "metrics": [
+        {
+          "key": "enabled_pools",
+          "label": { "zh-CN": "已启用公海", "en": "Enabled Pools" },
+          "valueField": "enabled_pool_count",
+          "subText": { "zh-CN": "销售成员当前可用", "en": "Available to sales members" },
+          "tone": "green",
+          "icon": "BadgeCheck"
+        },
+        {
+          "key": "daily_capacity",
+          "label": { "zh-CN": "每日领取额度", "en": "Daily Claim Capacity" },
+          "valueField": "daily_claim_capacity",
+          "subText": { "zh-CN": "所有启用公海的成员额度基线", "en": "Member quota baseline across enabled pools" },
+          "tone": "blue",
+          "icon": "Gauge"
+        },
+        {
+          "key": "auto_recycle",
+          "label": { "zh-CN": "自动回收公海", "en": "Auto-recycle Pools" },
+          "valueField": "auto_recycle_pool_count",
+          "subText": { "zh-CN": "已启用自动回收", "en": "Automatic recycle enabled" },
+          "tone": "amber",
+          "icon": "RefreshCw"
+        },
+        {
+          "key": "active_rules",
+          "label": { "zh-CN": "生效回收条件", "en": "Active Recycle Conditions" },
+          "valueField": "active_recycle_rule_count",
+          "subText": { "zh-CN": "按公海 AND / OR 组合执行", "en": "Composed by each pool's AND / OR policy" },
+          "tone": "default",
+          "icon": "ListChecks"
+        }
+      ]
+    },
+    {
+      "id": "crm_customer_policy_search",
+      "blockType": "filters",
+      "detailPlacement": "header",
+      "density": "compact",
+      "onSearch": { "action": "dataSource.reload", "args": { "dataSourceId": "policyPools" } },
+      "onReset": { "action": "state.set", "args": { "policyKeyword": "" } },
+      "fields": [
+        {
+          "field": "crm_cp_name",
+          "component": "SmartInput",
+          "bindState": "policyKeyword",
+          "label": { "zh-CN": "搜索公海策略", "en": "Search Pool Policies" },
+          "placeholder": { "zh-CN": "输入公海名称或编号", "en": "Search pool name or code" },
+          "helpText": { "zh-CN": "仅筛选策略工作区，不改变领取与回收规则。", "en": "Filters this strategy workspace without changing claim or recycle policy." }
+        }
+      ]
+    },
+    {
+      "id": "crm_customer_policy_header_actions",
+      "blockType": "workbench-action-bar",
+      "detailPlacement": "header",
+      "surface": "bare",
+      "density": "compact",
+      "align": "end",
+      "actions": [
+        {
+          "code": "open_pool_operations",
+          "permissionCode": "crm.customer_pool.read",
+          "label": { "zh-CN": "打开公海运营台", "en": "Open Pool Operations" },
+          "variant": "secondary",
+          "onClick": { "action": "navigate", "args": { "to": "/p/c/crm_customer_pool_item_list" } }
+        },
+        {
+          "code": "open_ownership_history",
+          "permissionCode": "crm.customer_pool.read",
+          "label": { "zh-CN": "查看归属历史", "en": "View Ownership History" },
+          "variant": "secondary",
+          "onClick": { "action": "navigate", "args": { "to": "/p/crm_customer_owner_history" } }
+        },
+        {
+          "code": "run_recycle",
+          "permissionCode": "crm.customer_pool.recycle",
+          "label": { "zh-CN": "立即执行回收", "en": "Run Recycle Now" },
+          "variant": "secondary",
+          "confirm": { "zh-CN": "系统将按所有启用公海的回收条件扫描，并使用租约避免重复处理。确认继续？", "en": "All enabled pool policies will be scanned with leases preventing duplicate processing. Continue?" },
+          "onClick": { "action": "command.execute", "args": { "command": "crm:run_customer_pool_recycle", "reload": ["policyStats", "policyPools", "recyclePolicies"] } }
+        },
+        {
+          "code": "create_pool",
+          "permissionCode": "crm.customer_pool.manage",
+          "label": { "zh-CN": "新建公海策略", "en": "Create Pool Policy" },
+          "variant": "primary",
+          "onClick": { "action": "navigate", "args": { "to": "/p/crm_customer_pool/new" } }
+        }
+      ]
+    },
+    {
+      "id": "crm_customer_policy_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "pools",
+          "label": { "zh-CN": "公海策略", "en": "Pool Policies" },
+          "blocks": [
+            {
+              "id": "crm_customer_policy_pool_table",
+              "blockType": "table",
+              "title": { "zh-CN": "成员、领取与回收基线", "en": "Membership, Claim and Recycle Baseline" },
+              "dataSource": "policyPools",
+              "density": "compact",
+              "maxHeight": 390,
+              "selection": { "mode": "single", "bind": "selectedPolicy", "defaultFirst": true },
+              "columns": [
+                { "field": "crm_cp_name", "width": 190, "label": { "zh-CN": "客户公海", "en": "Customer Pool" } },
+                { "field": "crm_cp_status", "width": 90, "dictCode": "crm_customer_pool_status", "label": { "zh-CN": "状态", "en": "Status" } },
+                { "field": "member_count", "width": 85, "align": "right", "label": { "zh-CN": "成员", "en": "Members" } },
+                { "field": "admin_count", "width": 85, "align": "right", "label": { "zh-CN": "管理员", "en": "Admins" } },
+                { "field": "crm_cp_daily_pick_limit", "width": 110, "align": "right", "label": { "zh-CN": "每日上限", "en": "Daily Limit" } },
+                { "field": "crm_cp_auto_recycle", "width": 110, "dictCode": "crm_boolean_switch", "label": { "zh-CN": "自动回收", "en": "Auto Recycle" } },
+                { "field": "active_rule_count", "width": 105, "align": "right", "label": { "zh-CN": "生效条件", "en": "Active Rules" } }
+              ],
+              "rowActions": [
+                { "code": "view", "label": "$i18n:common.button.view", "action": { "type": "navigate", "to": "crm_customer_pool_detail" } },
+                { "code": "edit", "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_customer_pool_form" } },
+                {
+                  "code": "quick_update",
+                  "permissionCode": "crm.customer_pool.manage",
+                  "label": { "zh-CN": "快速调整策略", "en": "Quick Policy Update" },
+                  "action": {
+                    "type": "command",
+                    "command": "crm:update_customer_pool",
+                    "inputFieldsTitle": { "zh-CN": "快速调整客户公海策略", "en": "Quickly Update Pool Policy" },
+                    "inputFieldsSubmitLabel": { "zh-CN": "保存策略", "en": "Save Policy" },
+                    "inputFields": [
+                      { "field": "crm_cp_name", "label": { "zh-CN": "客户公海名称", "en": "Pool Name" }, "type": "string", "required": true, "defaultValue": "${row.crm_cp_name}", "placeholder": { "zh-CN": "例如：华南重点客户公海", "en": "For example: South China Key Accounts" }, "helpText": { "zh-CN": "使用销售团队能够快速识别的区域或客群名称。", "en": "Use a region or segment name the sales team recognizes quickly." } },
+                      { "field": "crm_cp_daily_pick_limit", "label": { "zh-CN": "每日领取上限", "en": "Daily Claim Limit" }, "type": "integer", "required": true, "defaultValue": "${row.crm_cp_daily_pick_limit}", "placeholder": { "zh-CN": "例如：20", "en": "For example: 20" }, "helpText": { "zh-CN": "限制每位普通成员每天可领取的客户数量。", "en": "Limits how many customers each regular member may claim per day." } },
+                      { "field": "crm_cp_new_cooldown_days", "label": { "zh-CN": "新客户冷却天数", "en": "New Customer Cooldown Days" }, "type": "integer", "required": true, "defaultValue": "${row.crm_cp_new_cooldown_days}", "placeholder": { "zh-CN": "例如：2", "en": "For example: 2" }, "helpText": { "zh-CN": "客户入池后经过该天数才允许普通成员领取。", "en": "Regular members can claim only after this many days in the pool." } },
+                      { "field": "crm_cp_previous_owner_cooldown_days", "label": { "zh-CN": "前负责人冷却天数", "en": "Previous Owner Cooldown Days" }, "type": "integer", "required": true, "defaultValue": "${row.crm_cp_previous_owner_cooldown_days}", "placeholder": { "zh-CN": "例如：7", "en": "For example: 7" }, "helpText": { "zh-CN": "前负责人再次领取同一客户前必须等待的天数。", "en": "Days the previous owner must wait before reclaiming the same customer." } }
+                    ],
+                    "reload": ["policyStats", "policyPools"]
+                  }
+                },
+                { "code": "download_import_template", "permissionCode": "crm.customer_pool.import", "label": { "zh-CN": "下载导入模板", "en": "Download Import Template" }, "action": { "type": "command", "command": "crm:download_customer_pool_import_template", "operationType": "UPDATE", "reload": ["policyPools"] } },
+                {
+                  "code": "precheck_import",
+                  "permissionCode": "crm.customer_pool.import",
+                  "label": { "zh-CN": "预检导入文件", "en": "Pre-check Import File" },
+                  "promptUpload": { "key": "importFileId", "accept": ".xlsx", "feedbackMode": "panel" },
+                  "action": {
+                    "type": "command",
+                    "command": "crm:precheck_customer_pool_import",
+                    "operationType": "UPDATE",
+                    "inputFieldsTitle": { "zh-CN": "预检客户公海导入", "en": "Pre-check Customer Pool Import" },
+                    "inputFieldsSubmitLabel": { "zh-CN": "开始预检", "en": "Start Pre-check" },
+                    "inputFields": [
+                      { "field": "importType", "label": { "zh-CN": "导入方式", "en": "Import Mode" }, "type": "segmented", "required": true, "defaultValue": "ADD", "dataSource": { "type": "static", "data": [ { "value": "ADD", "label": { "zh-CN": "新增客户", "en": "Add Customers" }, "description": { "zh-CN": "客户编号已存在时失败", "en": "Existing customer codes fail" } }, { "value": "UPDATE", "label": { "zh-CN": "更新客户", "en": "Update Customers" }, "description": { "zh-CN": "客户编号不存在时失败", "en": "Missing customer codes fail" } } ] } },
+                      { "field": "importFileId", "label": { "zh-CN": "客户导入文件", "en": "Customer Import File" }, "type": "file", "fileValueMode": "file", "fileNameField": "importFilename", "required": true, "accept": ".xlsx", "maxBytes": 52428800, "helpText": { "zh-CN": "仅支持下载模板生成的 .xlsx，最大 50MB；预检不会写入客户数据。", "en": "Use the downloaded .xlsx template, up to 50MB; pre-check does not write customer data." } }
+                    ],
+                    "reload": ["policyPools"]
+                  }
+                },
+                {
+                  "code": "import_customers",
+                  "permissionCode": "crm.customer_pool.import",
+                  "label": { "zh-CN": "正式导入客户", "en": "Import Customers" },
+                  "promptUpload": { "key": "importFileId", "accept": ".xlsx", "feedbackMode": "panel" },
+                  "action": {
+                    "type": "command",
+                    "command": "crm:import_customer_pool_customers",
+                    "operationType": "UPDATE",
+                    "inputFieldsTitle": { "zh-CN": "正式导入客户到公海", "en": "Import Customers to Public Pool" },
+                    "inputFieldsSubmitLabel": { "zh-CN": "确认导入", "en": "Confirm Import" },
+                    "inputFields": [
+                      { "field": "importType", "label": { "zh-CN": "导入方式", "en": "Import Mode" }, "type": "segmented", "required": true, "defaultValue": "ADD", "dataSource": { "type": "static", "data": [ { "value": "ADD", "label": { "zh-CN": "新增客户", "en": "Add Customers" }, "description": { "zh-CN": "仅新增编号不存在的客户", "en": "Adds only customer codes that do not exist" } }, { "value": "UPDATE", "label": { "zh-CN": "更新客户", "en": "Update Customers" }, "description": { "zh-CN": "仅更新编号已存在的客户", "en": "Updates only existing customer codes" } } ] } },
+                      { "field": "importFileId", "label": { "zh-CN": "客户导入文件", "en": "Customer Import File" }, "type": "file", "fileValueMode": "file", "fileNameField": "importFilename", "required": true, "accept": ".xlsx", "maxBytes": 52428800, "helpText": { "zh-CN": "先下载模板并完成预检；文件最大 50MB，导入结果保留逐行成功与失败原因。", "en": "Download the template and pre-check first; files are limited to 50MB and results retain row-level outcomes." } },
+                      { "field": "skipErrors", "label": { "zh-CN": "忽略错误并导入合法行", "en": "Skip Errors and Import Valid Rows" }, "type": "checkbox", "defaultValue": false, "helpText": { "zh-CN": "默认关闭：任一行失败时零写入；开启后仅导入合法行。", "en": "Off by default: any invalid row means zero writes; enable to import only valid rows." } }
+                    ],
+                    "reload": ["policyStats", "policyPools"]
+                  }
+                },
+                { "code": "toggle", "permissionCode": "crm.customer_pool.manage", "label": { "zh-CN": "启用/停用", "en": "Enable/Disable" }, "action": { "type": "command", "command": "crm:toggle_customer_pool", "reload": ["policyStats", "policyPools"] } },
+                { "code": "delete", "danger": true, "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.delete", "confirm": { "zh-CN": "仅空客户公海可删除，确认继续？", "en": "Only an empty pool can be deleted. Continue?" }, "action": { "type": "command", "command": "crm:delete_customer_pool", "reload": ["policyStats", "policyPools"] } }
+              ],
+              "empty": {
+                "title": { "zh-CN": "尚未配置客户公海策略", "en": "No customer pool policy is configured" },
+                "description": { "zh-CN": "新建公海并设置成员、领取上限、冷却与回收规则。", "en": "Create a pool and configure membership, claim limits, cooldown and recycle policy." }
+              }
+            }
+          ]
+        },
+        {
+          "key": "capacity",
+          "label": { "zh-CN": "人员库容", "en": "User Capacity" },
+          "blocks": [
+            {
+              "id": "crm_customer_capacity_actions",
+              "blockType": "workbench-action-bar",
+              "surface": "bare",
+              "density": "compact",
+              "align": "end",
+              "actions": [
+                { "code": "create_capacity", "permissionCode": "crm.customer_pool.manage", "label": { "zh-CN": "新增人员库容", "en": "Add User Capacity" }, "variant": "primary", "onClick": { "action": "navigate", "args": { "to": "/p/crm_customer_capacity/new" } } }
+              ]
+            },
+            {
+              "id": "crm_customer_capacity_table",
+              "blockType": "table",
+              "title": { "zh-CN": "销售人员并发持有客户上限", "en": "Concurrent Customer Ownership Limit" },
+              "dataSource": "capacityPolicies",
+              "density": "compact",
+              "maxHeight": 390,
+              "columns": [
+                { "field": "user_name", "width": 210, "label": { "zh-CN": "销售人员", "en": "Sales User" } },
+                { "field": "crm_ccap_capacity", "width": 140, "align": "right", "label": { "zh-CN": "客户库容", "en": "Customer Capacity" } },
+                { "field": "owned_customer_count", "width": 140, "align": "right", "label": { "zh-CN": "当前持有", "en": "Currently Owned" } },
+                { "field": "remaining_capacity", "width": 140, "align": "right", "label": { "zh-CN": "剩余库容", "en": "Remaining" } },
+                { "field": "crm_ccap_status", "width": 110, "dictCode": "crm_customer_capacity_status", "label": { "zh-CN": "状态", "en": "Status" } },
+                { "field": "crm_ccap_remark", "width": 260, "label": { "zh-CN": "运营说明", "en": "Operating Note" } }
+              ],
+              "rowActions": [
+                { "code": "view", "label": "$i18n:common.button.view", "action": { "type": "navigate", "to": "crm_customer_capacity_detail" } },
+                { "code": "edit", "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_customer_capacity_form" } },
+                { "code": "delete", "danger": true, "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.delete", "confirm": { "zh-CN": "删除后该用户恢复为不限客户库容，确认继续？", "en": "Deleting this policy restores unlimited customer capacity. Continue?" }, "action": { "type": "command", "command": "crm:delete_customer_capacity", "reload": ["capacityPolicies"] } }
+              ],
+              "empty": {
+                "title": { "zh-CN": "尚未配置人员库容", "en": "No user capacity is configured" },
+                "description": { "zh-CN": "未配置的用户默认不限持有客户数；新增策略后领取和分配都会即时校验。", "en": "Users without a policy remain unlimited; claim and assignment enforce new limits immediately." }
+              }
+            }
+          ]
+        },
+        {
+          "key": "recycle",
+          "label": { "zh-CN": "回收条件", "en": "Recycle Conditions" },
+          "blocks": [
+            {
+              "id": "crm_customer_recycle_actions",
+              "blockType": "workbench-action-bar",
+              "surface": "bare",
+              "density": "compact",
+              "align": "end",
+              "actions": [
+                { "code": "create_recycle_rule", "permissionCode": "crm.customer_pool.manage", "label": { "zh-CN": "新增回收条件", "en": "Add Recycle Condition" }, "variant": "primary", "onClick": { "action": "navigate", "args": { "to": "/p/crm_customer_pool_recycle_rule/new" } } }
+              ]
+            },
+            {
+              "id": "crm_customer_recycle_table",
+              "blockType": "table",
+              "title": { "zh-CN": "按公海组合执行的时间条件", "en": "Time Conditions Composed by Pool Policy" },
+              "dataSource": "recyclePolicies",
+              "density": "compact",
+              "maxHeight": 390,
+              "columns": [
+                { "field": "crm_cprr_name", "width": 190, "label": { "zh-CN": "回收条件", "en": "Recycle Condition" } },
+                { "field": "pool_name", "width": 180, "label": { "zh-CN": "客户公海", "en": "Customer Pool" } },
+                { "field": "crm_cprr_time_source", "width": 150, "dictCode": "crm_customer_recycle_time_source", "label": { "zh-CN": "时间来源", "en": "Time Source" } },
+                { "field": "crm_cprr_operator", "width": 145, "dictCode": "crm_customer_recycle_time_operator", "label": { "zh-CN": "判断方式", "en": "Operator" } },
+                { "field": "crm_cprr_days", "width": 100, "align": "right", "label": { "zh-CN": "相对天数", "en": "Relative Days" } },
+                { "field": "crm_cprr_status", "width": 100, "dictCode": "crm_customer_recycle_rule_status", "label": { "zh-CN": "状态", "en": "Status" } },
+                { "field": "crm_cprr_sort_order", "width": 100, "align": "right", "label": { "zh-CN": "顺序", "en": "Order" } }
+              ],
+              "rowActions": [
+                { "code": "view", "label": "$i18n:common.button.view", "action": { "type": "navigate", "to": "crm_customer_pool_recycle_rule_detail" } },
+                { "code": "edit", "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.edit", "action": { "type": "navigate", "to": "crm_customer_pool_recycle_rule_form" } },
+                { "code": "delete", "danger": true, "permissionCode": "crm.customer_pool.manage", "label": "$i18n:common.button.delete", "confirm": { "zh-CN": "删除后该条件不再参与自动回收，确认继续？", "en": "This condition will no longer participate in automatic recycle. Continue?" }, "action": { "type": "command", "command": "crm:delete_customer_pool_recycle_rule", "reload": ["policyStats", "policyPools", "recyclePolicies"] } }
+              ],
+              "empty": {
+                "title": { "zh-CN": "尚未配置客户回收条件", "en": "No customer recycle condition is configured" },
+                "description": { "zh-CN": "新增条件后，启用自动回收的公海按 AND / OR 策略组合评估。", "en": "Add a condition; auto-recycle pools compose active conditions using their AND / OR policy." }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crm_customer_policy_status",
+      "blockType": "status-banner",
+      "context": "${state.selectedPolicy}",
+      "statusField": "crm_cp_status",
+      "toneMap": { "enabled": "green", "disabled": "gray" },
+      "titleMap": {
+        "enabled": { "zh-CN": "该客户公海策略已生效", "en": "This customer pool policy is active" },
+        "disabled": { "zh-CN": "该客户公海当前停用", "en": "This customer pool is disabled" }
+      },
+      "descriptionMap": {
+        "enabled": { "zh-CN": "成员可进入运营台，领取时实时校验每日上限、冷却、人员库容与并发状态。", "en": "Members can use the operations workspace; each claim rechecks quota, cooldown, capacity and concurrency." },
+        "disabled": { "zh-CN": "停用后不可移入或领取客户；现有归属和历史仍保留可审计。", "en": "Disabled pools reject moves and claims while retaining ownership and history for audit." }
+      },
+      "summaryFields": [
+        { "field": "member_count", "label": { "zh-CN": "成员数", "en": "Members" } },
+        { "field": "admin_count", "label": { "zh-CN": "管理员数", "en": "Administrators" } },
+        { "field": "crm_cp_daily_pick_limit", "label": { "zh-CN": "每人每日上限", "en": "Daily Limit per Member" } },
+        { "field": "crm_cp_new_cooldown_days", "label": { "zh-CN": "新客冷却天数", "en": "New Customer Cooldown" } },
+        { "field": "active_rule_count", "label": { "zh-CN": "生效回收条件", "en": "Active Recycle Conditions" } }
+      ]
+    },
+    {
+      "id": "crm_customer_policy_evidence",
+      "blockType": "evidence-panel",
+      "context": "${state.selectedPolicy}",
+      "title": { "zh-CN": "策略解释", "en": "Policy Explanation" },
+      "description": { "zh-CN": "领取、前负责人冷却和自动回收使用同一份可审计策略。", "en": "Claim, previous-owner cooldown and automatic recycle share one auditable policy." },
+      "sections": [
+        { "key": "pool", "label": { "zh-CN": "客户公海", "en": "Customer Pool" }, "field": "crm_cp_name" },
+        { "key": "description", "label": { "zh-CN": "适用边界", "en": "Scope" }, "field": "crm_cp_description" },
+        { "key": "daily", "label": { "zh-CN": "每日领取上限", "en": "Daily Claim Limit" }, "field": "crm_cp_daily_pick_limit" },
+        { "key": "new_cooldown", "label": { "zh-CN": "新客户冷却", "en": "New Customer Cooldown" }, "field": "crm_cp_new_cooldown_days", "unit": { "zh-CN": "天", "en": "days" } },
+        { "key": "previous_cooldown", "label": { "zh-CN": "前负责人冷却", "en": "Previous-owner Cooldown" }, "field": "crm_cp_previous_owner_cooldown_days", "unit": { "zh-CN": "天", "en": "days" } },
+        { "key": "recycle_mode", "label": { "zh-CN": "回收条件关系", "en": "Recycle Match Mode" }, "field": "crm_cp_recycle_match_mode", "valueMap": { "all": { "zh-CN": "全部满足（AND）", "en": "All conditions (AND)" }, "any": { "zh-CN": "任一满足（OR）", "en": "Any condition (OR)" } } },
+        { "key": "fallback", "label": { "zh-CN": "兼容回收天数", "en": "Fallback Recycle Days" }, "field": "crm_cp_recycle_after_days", "unit": { "zh-CN": "天", "en": "days" } }
+      ],
+      "empty": { "title": { "zh-CN": "选择一条公海策略，查看领取与回收解释", "en": "Select a pool policy to review claim and recycle behavior" } }
+    }
+  ]
+}

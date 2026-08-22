@@ -5,6 +5,24 @@ import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import { fetchResult } from '~/shared/services/http-client';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 
+export function formatTemporalValue(
+  value: unknown,
+  valueType: unknown,
+  locale: string,
+): string | null {
+  const normalizedType = String(valueType || '')
+    .trim()
+    .toLowerCase();
+  if (normalizedType !== 'date' && normalizedType !== 'datetime') return null;
+  if (value === undefined || value === null || value === '') return null;
+
+  const parsed = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return null;
+  return normalizedType === 'date'
+    ? parsed.toLocaleDateString(locale)
+    : parsed.toLocaleString(locale);
+}
+
 export function readDataSourceRows(runtime: SchemaRuntime, dataSource?: string): any[] {
   if (!dataSource) return [];
   const data = runtime.getDataSourceManager().getData(dataSource);
@@ -558,6 +576,17 @@ export async function executeSimpleWorkbenchAction(
       }
       return resultData;
     } catch (error) {
+      const reloadOnErrorIds = resolveReloadIds(args.reloadOnError);
+      if (
+        typeof reloadOnErrorIds === 'string' ||
+        (Array.isArray(reloadOnErrorIds) && reloadOnErrorIds.length > 0)
+      ) {
+        try {
+          await reloadDataSources(runtime, reloadOnErrorIds);
+        } catch (reloadError) {
+          console.error('[workbench] command error-state reload failed:', reloadError);
+        }
+      }
       showCommandFeedback(
         runtime,
         feedback,

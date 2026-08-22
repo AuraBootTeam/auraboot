@@ -1,0 +1,32 @@
+{
+  "pageKey": "crm_customer_pool_form",
+  "name:zh-CN": "客户公海策略",
+  "name:en": "Customer Pool Policy",
+  "modelCode": "crm_customer_pool_common",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12, "gap": 16 },
+  "blocks": [
+    { "id": "identity", "blockType": "form-section", "title": { "zh-CN": "基本信息与成员", "en": "Identity and Membership" }, "fields": [
+      { "field": "crm_cp_name", "colSpan": 12, "required": true, "placeholder": { "zh-CN": "例如 华南重点客户公海", "en": "e.g. South China Key Accounts" }, "helpText": { "zh-CN": "使用销售团队能识别的区域、客群或业务边界命名。", "en": "Name the pool by a region, segment, or business boundary sales teams recognize." } },
+      { "field": "crm_cp_member_user_ids", "colSpan": 6, "required": true, "helpText": { "zh-CN": "成员可查看公海队列并领取满足规则的客户。", "en": "Members can view the queue and claim customers that satisfy policy." } },
+      { "field": "crm_cp_admin_user_ids", "colSpan": 6, "required": true, "helpText": { "zh-CN": "管理员可分配客户、维护策略并执行回收。", "en": "Administrators can assign customers, maintain policy, and run recycle." } },
+      { "field": "crm_cp_description", "colSpan": 12, "placeholder": { "zh-CN": "说明适用区域、客群与进入条件", "en": "Describe the region, segment, and entry criteria" }, "helpText": { "zh-CN": "帮助销售判断客户为何进入该公海，不替代结构化领取和回收规则。", "en": "Explains why customers enter this pool without replacing structured claim and recycle rules." } }
+    ] },
+    { "id": "claim_policy", "blockType": "form-section", "title": { "zh-CN": "领取规则", "en": "Claim Policy" }, "fields": [
+      { "field": "crm_cp_daily_pick_limit", "colSpan": 4, "required": true, "placeholder": { "zh-CN": "例如 20", "en": "e.g. 20" }, "helpText": { "zh-CN": "单个成员每天从该公海最多领取的客户数。", "en": "Maximum customers one member may claim from this pool per day." } },
+      { "field": "crm_cp_new_cooldown_days", "colSpan": 4, "required": true, "placeholder": { "zh-CN": "例如 1", "en": "e.g. 1" }, "helpText": { "zh-CN": "客户入池后普通成员需等待的天数；管理员分配不受此限制。", "en": "Days ordinary members wait after entry; administrator assignment is not blocked." } },
+      { "field": "crm_cp_previous_owner_cooldown_days", "colSpan": 4, "required": true, "placeholder": { "zh-CN": "例如 7", "en": "e.g. 7" }, "helpText": { "zh-CN": "前负责人再次领取同一客户前必须等待的天数。", "en": "Days the previous owner must wait before reclaiming the same customer." } }
+    ] },
+    { "id": "recycle_policy", "blockType": "form-section", "title": { "zh-CN": "自动回收规则", "en": "Automatic Recycle Policy" }, "description": { "zh-CN": "开启后优先使用独立回收条件；未配置条件时使用兼容回收天数与口径。", "en": "When enabled, composed recycle conditions take precedence; pools without conditions use the compatible day/basis policy." }, "fields": [
+      { "field": "crm_cp_auto_recycle", "colSpan": 3, "required": true },
+      { "field": "crm_cp_recycle_match_mode", "colSpan": 3, "required": true, "defaultValue": "all", "visibleWhen": "record.crm_cp_auto_recycle === true" },
+      { "field": "crm_cp_recycle_after_days", "colSpan": 4, "visibleWhen": "record.crm_cp_auto_recycle === true", "placeholder": { "zh-CN": "例如 30", "en": "e.g. 30" }, "helpText": { "zh-CN": "没有独立回收条件时使用的兼容等待天数。", "en": "Fallback wait in days when no independent recycle conditions exist." } },
+      { "field": "crm_cp_recycle_basis", "colSpan": 2, "visibleWhen": "record.crm_cp_auto_recycle === true" }
+    ] },
+    { "id": "buttons", "blockType": "form-buttons", "buttons": [
+      { "code": "submit", "primary": true, "label": "$i18n:common.button.save", "action": { "type": "command" } },
+      { "code": "cancel", "label": "$i18n:common.button.cancel" }
+    ] }
+  ]
+}

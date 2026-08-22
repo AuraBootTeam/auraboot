@@ -1,0 +1,20 @@
+[
+  { "code": "crm_cpi_account_key", "displayName:zh-CN": "客户唯一键", "displayName:en": "Customer Key", "dataType": "string", "constraints": { "required": true, "unique": true, "maxLength": 100 }, "feature": { "readonly": true } },
+  { "code": "crm_cpi_account_id", "displayName:zh-CN": "客户", "displayName:en": "Customer", "dataType": "reference", "referenceModelCode": "crm_account_common", "refTarget": { "targetModel": "crm_account_common", "valueField": "pid", "displayField": "crm_acc_name" }, "constraints": { "required": true }, "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_cpi_pool_id", "displayName:zh-CN": "客户公海", "displayName:en": "Customer Pool", "dataType": "reference", "referenceModelCode": "crm_customer_pool_common", "constraints": { "required": true }, "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_cpi_status", "displayName:zh-CN": "池内状态", "displayName:en": "Pool Status", "dataType": "enum", "dictCode": "crm_customer_pool_item_status", "constraints": { "required": true }, "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_cpi_account_code", "displayName:zh-CN": "客户编号", "displayName:en": "Customer Code", "dataType": "string", "feature": { "readonly": true, "searchable": true, "sortable": true } },
+  { "code": "crm_cpi_account_name", "displayName:zh-CN": "客户名称", "displayName:en": "Customer Name", "dataType": "string", "feature": { "readonly": true, "searchable": true, "sortable": true } },
+  { "code": "crm_cpi_rating", "displayName:zh-CN": "客户评级", "displayName:en": "Customer Rating", "dataType": "string", "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_cpi_phone", "displayName:zh-CN": "联系电话", "displayName:en": "Phone", "dataType": "string", "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_cpi_industry", "displayName:zh-CN": "行业", "displayName:en": "Industry", "dataType": "enum", "dictCode": "crm_account_industry", "feature": { "readonly": true, "searchable": true } },
+  { "code": "crm_cpi_health_score", "displayName:zh-CN": "健康分", "displayName:en": "Health Score", "dataType": "integer", "feature": { "readonly": true, "sortable": true } },
+  { "code": "crm_cpi_previous_owner", "displayName:zh-CN": "前负责人", "displayName:en": "Previous Owner", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } },
+  { "code": "crm_cpi_entered_at", "displayName:zh-CN": "入池时间", "displayName:en": "Entered At", "dataType": "datetime", "constraints": { "required": true }, "feature": { "readonly": true, "sortable": true } },
+  { "code": "crm_cpi_entered_by", "displayName:zh-CN": "入池操作人", "displayName:en": "Entered By", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } },
+  { "code": "crm_cpi_reason", "displayName:zh-CN": "入池原因", "displayName:en": "Entry Reason", "dataType": "text", "feature": { "readonly": true } },
+  { "code": "crm_cpi_claim_release_at", "displayName:zh-CN": "可领取时间", "displayName:en": "Claim Release At", "dataType": "datetime", "feature": { "readonly": true, "sortable": true } },
+  { "code": "crm_cpi_claimed_at", "displayName:zh-CN": "领取/分配时间", "displayName:en": "Claimed or Assigned At", "dataType": "datetime", "feature": { "readonly": true, "sortable": true } },
+  { "code": "crm_cpi_claimed_by", "displayName:zh-CN": "领取/获配用户", "displayName:en": "Claimed or Assigned User", "dataType": "reference", "refTarget": { "targetModel": "ab_user", "targetField": "user_name" }, "feature": { "readonly": true } },
+  { "code": "crm_cpi_recycle_token", "displayName:zh-CN": "回收操作键", "displayName:en": "Recycle Operation Key", "dataType": "string", "constraints": { "maxLength": 80 }, "feature": { "readonly": true } }
+]

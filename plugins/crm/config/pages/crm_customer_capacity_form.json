@@ -1,0 +1,13 @@
+{
+  "pageKey": "crm_customer_capacity_form", "name:zh-CN": "客户库容设置", "name:en": "Customer Capacity Setting", "modelCode": "crm_customer_capacity_common", "kind": "form", "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12, "gap": 16 },
+  "blocks": [
+    { "id": "capacity", "blockType": "form-section", "title": { "zh-CN": "用户库容", "en": "User Capacity" }, "fields": [
+      { "field": "crm_ccap_user_id", "colSpan": 6, "required": true, "placeholder": { "zh-CN": "选择需要限制客户库容的销售用户", "en": "Select a sales user whose customer capacity is limited" }, "helpText": { "zh-CN": "同一用户只能有一条生效配置；未配置表示不限库容。", "en": "Each user has one active configuration; no configuration means unlimited capacity." } },
+      { "field": "crm_ccap_capacity", "colSpan": 3, "required": true, "placeholder": { "zh-CN": "例如 100", "en": "e.g. 100" }, "helpText": { "zh-CN": "该用户可同时负责的活跃客户上限，领取和分配都会校验。", "en": "Maximum active customers owned concurrently; both claim and assignment enforce it." } },
+      { "field": "crm_ccap_status", "colSpan": 3, "required": true },
+      { "field": "crm_ccap_remark", "colSpan": 12, "placeholder": { "zh-CN": "说明该库容适用的团队或阶段", "en": "Describe the team or phase this capacity applies to" }, "helpText": { "zh-CN": "说明仅用于运营审计，不改变库容计算。", "en": "The note is for operating audit and does not alter capacity calculation." } }
+    ] },
+    { "id": "buttons", "blockType": "form-buttons", "buttons": [ { "code": "submit", "primary": true, "label": "$i18n:common.button.save", "action": { "type": "command" } }, { "code": "cancel", "label": "$i18n:common.button.cancel" } ] }
+  ]
+}

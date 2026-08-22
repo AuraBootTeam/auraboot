@@ -689,6 +689,10 @@ public class HandlerPhase implements CommandPhase {
         input.put("commandCode", commandCode);
         input.put("tenantId", tenantId);
         input.put("userId", userId);
+        String currentUserPid = MetaContext.getCurrentUserPid();
+        if (StringUtils.hasText(currentUserPid)) {
+            input.put("currentUserPid", currentUserPid.trim());
+        }
         input.put("modelCode", modelCode);
         input.put("recordPid", recordPid);
         input.put("payload", payload != null ? payload : Collections.emptyMap());

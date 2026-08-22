@@ -375,6 +375,59 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
     });
   });
 
+  it('normalizes DSL field types, loads dictionary options, and resolves row defaults', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({
+      code: '0',
+      data: {
+        code: 'crm_account_rating',
+        items: [
+          { value: 'A', label: 'A - 重点客户', enabled: true },
+          { value: 'B', label: 'B - 重要客户', enabled: true },
+        ],
+      },
+    });
+    window.addEventListener(
+      'dialog:form',
+      (event) => {
+        const detail = (event as CustomEvent).detail;
+        expect(detail.fields.map((field: Record<string, any>) => field.type)).toEqual([
+          'text',
+          'number',
+          'select',
+        ]);
+        expect(detail.fieldOptions.rating).toEqual([
+          { value: 'A', label: 'A - 重点客户' },
+          { value: 'B', label: 'B - 重要客户' },
+        ]);
+        expect(detail.defaults).toEqual({ name: '华南公海', limit: 20, rating: 'A' });
+        detail.onSubmit(detail.defaults);
+      },
+      { once: true },
+    );
+
+    await expect(
+      promptInputForm(
+        [
+          { field: 'name', type: 'string', defaultValue: '${row.name}' },
+          { field: 'limit', type: 'integer', defaultValue: '${row.limit}' },
+          {
+            field: 'rating',
+            type: 'enum',
+            dictCode: 'crm_account_rating',
+            defaultValue: '${row.rating}',
+          },
+        ],
+        '快速编辑',
+        fetchResult,
+        undefined,
+        { row: { name: '华南公海', limit: 20, rating: 'A' } },
+      ),
+    ).resolves.toEqual({ name: '华南公海', limit: 20, rating: 'A' });
+    expect(fetchResult).toHaveBeenCalledWith('/api/meta/dict/by-code/crm_account_rating/data', {
+      method: 'get',
+    });
+  });
+
   it('aborts (does not submit the command) when the user cancels the form', async () => {
     const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {} });
     window.addEventListener('dialog:form', (e) => (e as CustomEvent).detail.onCancel(), {

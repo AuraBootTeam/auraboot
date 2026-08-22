@@ -47,6 +47,7 @@ class ConvertLeadHandlerTest {
         assertEquals("Acme PCBA", account.get("crm_acc_name"));
         assertEquals("electronics", account.get("crm_acc_industry"));
         assertEquals("sales-a", account.get("crm_acc_owner"));
+        assertEquals("owned", account.get("crm_acc_pool_state"));
 
         Map<String, Object> contact = db.store.get("crm_contact_common").getFirst();
         assertEquals("PID1", contact.get("crm_ct_account_id"));
@@ -105,6 +106,23 @@ class ConvertLeadHandlerTest {
     }
 
     @Test
+    void usesAuthenticatedActorAsOwnerWhenLeadIsUnassigned() throws Exception {
+        FakeDataAccessor db = new FakeDataAccessor();
+        db.seed("crm_lead_common", Map.of(
+                "pid", "lead-unassigned",
+                "crm_lead_code", "LEAD-UNASSIGNED",
+                "crm_lead_company", "First-use Customer",
+                "crm_lead_status", "qualified"
+        ));
+
+        handler.execute(context("lead-unassigned", db));
+
+        assertEquals("actor-1", db.store.get("crm_account_common").getFirst().get("crm_acc_owner"));
+        assertEquals("actor-1", db.store.get("crm_opportunity_common").getFirst().get("crm_opp_owner"));
+        assertEquals("actor-1", db.store.get("crm_customer_request_common").getFirst().get("crm_cr_owner"));
+    }
+
+    @Test
     void rejectsNonQualifiedLead() {
         FakeDataAccessor db = new FakeDataAccessor();
         db.seed("crm_lead_common", Map.of(
@@ -147,7 +165,7 @@ class ConvertLeadHandlerTest {
                 .commandType("crm:convert_lead")
                 .modelCode("crm_lead_common")
                 .recordId(recordId)
-                .settings(Map.of("__dataAccessor", db))
+                .settings(Map.of("__dataAccessor", db, "__currentUserPid", "actor-1"))
                 .dryRun(false)
                 .build();
     }

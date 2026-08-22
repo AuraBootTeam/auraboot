@@ -22,28 +22,35 @@ describe('FormDialog choice fields', () => {
 
   it('renders a MemberPicker command input and submits the selected user pid', async () => {
     const onSubmit = vi.fn();
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        code: '0',
-        data: {
-          records: [{
-            displayName: 'Sales One',
-            user: { pid: 'user-sales-1', email: 'sales@example.com' },
-          }],
-        },
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          code: '0',
+          data: {
+            records: [
+              {
+                displayName: 'Sales One',
+                user: { pid: 'user-sales-1', email: 'sales@example.com' },
+              },
+            ],
+          },
+        }),
       }),
-    }));
+    );
     renderDialog({
       title: '分配线索',
-      fields: [{
-        field: 'crm_lpi_claimed_by',
-        label: '分配给',
-        type: 'reference',
-        component: 'MemberPicker',
-        required: true,
-        props: { multiple: false },
-      }],
+      fields: [
+        {
+          field: 'crm_lpi_claimed_by',
+          label: '分配给',
+          type: 'reference',
+          component: 'MemberPicker',
+          required: true,
+          props: { multiple: false },
+        },
+      ],
       fieldOptions: {},
       defaults: {},
       onSubmit,
@@ -72,16 +79,18 @@ describe('FormDialog choice fields', () => {
 
   it('renders localized business help text below an action input', () => {
     renderDialog({
-      fields: [{
-        field: 'quantity',
-        label: { 'zh-CN': '本次上架数量', en: 'Putaway Quantity' },
-        placeholder: { 'zh-CN': '例如：20', en: 'e.g. 20' },
-        helpText: {
-          'zh-CN': '不得超过当前剩余量；确认后才移动库存。',
-          en: 'Must not exceed the remainder; inventory moves only after confirmation.',
+      fields: [
+        {
+          field: 'quantity',
+          label: { 'zh-CN': '本次上架数量', en: 'Putaway Quantity' },
+          placeholder: { 'zh-CN': '例如：20', en: 'e.g. 20' },
+          helpText: {
+            'zh-CN': '不得超过当前剩余量；确认后才移动库存。',
+            en: 'Must not exceed the remainder; inventory moves only after confirmation.',
+          },
+          type: 'number',
         },
-        type: 'number',
-      }],
+      ],
       fieldOptions: {},
       defaults: {},
     });
@@ -321,15 +330,17 @@ describe('FormDialog choice fields', () => {
   it('reads a selected CSV file into the command payload and carries its filename', async () => {
     const onSubmit = vi.fn();
     renderDialog({
-      fields: [{
-        field: 'csvText',
-        label: 'CSV 文件',
-        type: 'file',
-        required: true,
-        accept: '.csv,text/csv',
-        maxBytes: 1024,
-        fileNameField: 'sourceName',
-      }],
+      fields: [
+        {
+          field: 'csvText',
+          label: 'CSV 文件',
+          type: 'file',
+          required: true,
+          accept: '.csv,text/csv',
+          maxBytes: 1024,
+          fileNameField: 'sourceName',
+        },
+      ],
       fieldOptions: {},
       defaults: {},
       onSubmit,
@@ -350,6 +361,41 @@ describe('FormDialog choice fields', () => {
     expect(onSubmit).toHaveBeenCalledWith({
       csvText: 'deviceCode,sn\nDPS-001,SN-001',
       sourceName: 'devices.csv',
+    });
+  });
+
+  it('returns the original File for an inline command upload field', async () => {
+    const onSubmit = vi.fn();
+    renderDialog({
+      fields: [
+        {
+          field: 'importFileId',
+          label: '客户导入文件',
+          type: 'file',
+          fileValueMode: 'file',
+          fileNameField: 'importFilename',
+          required: true,
+          accept: '.xlsx',
+          maxBytes: 50 * 1024 * 1024,
+        },
+      ],
+      fieldOptions: {},
+      defaults: {},
+      onSubmit,
+    });
+    const file = new File(['xlsx-bytes'], 'customer-pool.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+
+    fireEvent.change(screen.getByTestId('form-dialog-field-importFileId'), {
+      target: { files: [file] },
+    });
+    await waitFor(() => expect(screen.getByText('customer-pool.xlsx')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      importFileId: file,
+      importFilename: 'customer-pool.xlsx',
     });
   });
 });

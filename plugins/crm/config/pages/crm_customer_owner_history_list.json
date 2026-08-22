@@ -1,0 +1,8 @@
+{
+  "pageKey": "crm_customer_owner_history_list", "name:zh-CN": "客户归属历史", "name:en": "Customer Ownership History", "modelCode": "crm_customer_owner_history_common", "kind": "list", "schemaVersion": 4,
+  "layout": { "type": "grid", "cols": 12 },
+  "blocks": [ { "id": "history", "blockType": "table", "empty": { "title": { "zh-CN": "暂无客户归属变更记录", "en": "No customer ownership history exists" }, "description": { "zh-CN": "客户移入公海、领取、分配或自动回收后会在此保留不可变证据。", "en": "Moving, claiming, assigning, or recycling a customer creates immutable evidence here." } }, "columns": [
+    { "field": "crm_coh_occurred_at", "width": 180, "sortable": true }, { "field": "crm_coh_event", "width": 150, "renderType": "tag", "dictCode": "crm_customer_owner_event" }, { "field": "crm_coh_customer_id", "width": 180 }, { "field": "crm_coh_pool_id", "width": 180 }, { "field": "crm_coh_previous_owner", "width": 150 }, { "field": "crm_coh_next_owner", "width": 150 }, { "field": "crm_coh_actor", "width": 150 }, { "field": "crm_coh_reason", "width": 260 },
+    { "field": "actions", "isActionColumn": true, "label": "$i18n:common.actions", "buttons": [ { "code": "view", "label": "$i18n:common.button.view", "action": { "type": "navigate", "to": "crm_customer_owner_history_detail" } } ] }
+  ], "defaultSort": { "field": "crm_coh_occurred_at", "order": "desc" } } ]
+}
