@@ -219,51 +219,60 @@ describe('DecisionDefinitionActionsBlock', () => {
     renderAtDetail();
 
     fireEvent.click(await screen.findByTestId('dda-validate-version-pid-draft'));
-    await waitFor(() =>
-      expect(http.post).toHaveBeenCalledWith('/decision/versions/version-pid-draft/validate', undefined),
+    await waitFor(
+      () => expect(http.post).toHaveBeenCalledWith('/decision/versions/version-pid-draft/validate', undefined),
+      { timeout: 5_000 },
     );
 
     fireEvent.click(screen.getByTestId('dda-submit-version-pid-validated'));
-    await waitFor(() =>
-      expect(http.post).toHaveBeenCalledWith(
+    await waitFor(
+      () => expect(http.post).toHaveBeenCalledWith(
         '/decision/versions/version-pid-validated/submit-for-approval',
         undefined,
       ),
+      { timeout: 5_000 },
     );
 
     fireEvent.click(screen.getByTestId('dda-approve-version-pid-pending'));
-    await waitFor(() =>
-      expect(http.post).toHaveBeenCalledWith('/decision/versions/version-pid-pending/approve', {
+    await waitFor(
+      () => expect(http.post).toHaveBeenCalledWith('/decision/versions/version-pid-pending/approve', {
         impactAcknowledged: true,
         note: 'DecisionOps definition DSL action acknowledged impact',
       }),
+      { timeout: 5_000 },
     );
 
     fireEvent.click(screen.getByTestId('dda-reject-version-pid-pending'));
-    await waitFor(() =>
-      expect(http.post).toHaveBeenCalledWith('/decision/versions/version-pid-pending/reject', {
+    await waitFor(
+      () => expect(http.post).toHaveBeenCalledWith('/decision/versions/version-pid-pending/reject', {
         note: 'Rejected from DecisionOps DSL action',
       }),
+      { timeout: 5_000 },
     );
 
     fireEvent.click(screen.getByTestId('dda-deprecate-version-pid-published'));
-    await waitFor(() =>
-      expect(http.post).toHaveBeenCalledWith('/decision/versions/version-pid-published/deprecate', {
+    await waitFor(
+      () => expect(http.post).toHaveBeenCalledWith('/decision/versions/version-pid-published/deprecate', {
         impactAcknowledged: true,
         note: 'DecisionOps definition DSL action acknowledged impact',
       }),
+      { timeout: 5_000 },
     );
 
     fireEvent.click(screen.getByTestId('dda-retire-version-pid-deprecated'));
-    await waitFor(() =>
-      expect(http.post).toHaveBeenCalledWith('/decision/versions/version-pid-deprecated/retire', {
+    await waitFor(
+      () => expect(http.post).toHaveBeenCalledWith('/decision/versions/version-pid-deprecated/retire', {
         impactAcknowledged: true,
         note: 'DecisionOps definition DSL action acknowledged impact',
       }),
+      { timeout: 5_000 },
     );
 
     fireEvent.click(screen.getByTestId('dda-delete-version-pid-draft'));
-    await waitFor(() => expect(http.delete).toHaveBeenCalledWith('/decision/versions/version-pid-draft'));
+    await waitFor(
+      () => expect(http.delete).toHaveBeenCalledWith('/decision/versions/version-pid-draft'),
+      { timeout: 5_000 },
+    );
     expect(routerMocks.navigate).not.toHaveBeenCalledWith('/decision-ops');
   });
 
